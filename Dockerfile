@@ -59,7 +59,7 @@ RUN dotnet restore src/AMR.DeliveryPlanning.Api/AMR.DeliveryPlanning.Api.csproj
 
 # Copy everything and build
 COPY src/ src/
-RUN dotnet publish src/AMR.DeliveryPlanning.Api/AMR.DeliveryPlanning.Api.csproj -c Release -o /app/publish --no-restore
+RUN dotnet publish src/AMR.DeliveryPlanning.Api/AMR.DeliveryPlanning.Api.csproj -c Release -o /app/publish
 
 FROM base AS final
 COPY --from=build /app/publish .

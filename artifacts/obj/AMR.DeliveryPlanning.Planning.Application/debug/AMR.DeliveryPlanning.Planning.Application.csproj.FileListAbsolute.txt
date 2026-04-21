@@ -16,3 +16,7 @@
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Application/debug/AMR.DeliveryPlanning.SharedKernel.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Application/debug/AMR.Deli.4BC92FC5.Up2Date
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Application/debug/AMR.DeliveryPlanning.Planning.Application.sourcelink.json
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Application/debug/AMR.DeliveryPlanning.Planning.IntegrationEvents.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Application/debug/AMR.DeliveryPlanning.Planning.IntegrationEvents.pdb

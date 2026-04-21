@@ -14,7 +14,7 @@ public static class PlanningEndpoints
 {
     public static void MapPlanningEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/planning/jobs").WithTags("Planning");
+        var group = app.MapGroup("/api/planning/jobs").WithTags("Planning").RequireAuthorization();
 
         // POST /api/planning/jobs — Create a Job from a DeliveryOrder
         group.MapPost("/", async (CreateJobFromOrderCommand command, ISender sender) =>

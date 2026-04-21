@@ -3,10 +3,13 @@
   <ItemGroup>
     <ProjectReference Include="..\AMR.DeliveryPlanning.DeliveryOrder.Domain\AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj" />
     <ProjectReference Include="..\..\..\AMR.DeliveryPlanning.SharedKernel\AMR.DeliveryPlanning.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.IntegrationEvents\AMR.DeliveryPlanning.Dispatch.IntegrationEvents.csproj" />
+    <ProjectReference Include="..\AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents\AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="FluentValidation" />
+    <PackageReference Include="MassTransit" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -11,7 +11,7 @@ public static class DeliveryOrderEndpoints
 {
     public static void MapDeliveryOrderEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/delivery-orders").WithTags("DeliveryOrders");
+        var group = app.MapGroup("/api/delivery-orders").WithTags("DeliveryOrders").RequireAuthorization();
 
         group.MapPost("/", async (SubmitDeliveryOrderCommand command, ISender sender) =>
         {

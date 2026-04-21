@@ -16,3 +16,7 @@
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.Application.csproj.AssemblyReference.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.Deli.01C32964.Up2Date
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.Application.sourcelink.json
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.Dispatch.IntegrationEvents.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.Dispatch.IntegrationEvents.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.pdb

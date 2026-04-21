@@ -12,7 +12,7 @@ public static class VehicleEndpoints
 {
     public static void MapFleetEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/fleet/vehicles").WithTags("Fleet");
+        var group = app.MapGroup("/api/fleet/vehicles").WithTags("Fleet").RequireAuthorization();
 
         group.MapPost("/", async (RegisterVehicleCommand command, ISender sender) =>
         {

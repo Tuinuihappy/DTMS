@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using AMR.DeliveryPlanning.Planning.IntegrationEvents;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Commands.CommitPlan;
@@ -6,10 +7,12 @@ namespace AMR.DeliveryPlanning.Planning.Application.Commands.CommitPlan;
 public class CommitPlanCommandHandler : ICommandHandler<CommitPlanCommand>
 {
     private readonly IJobRepository _jobRepository;
+    private readonly IEventBus _eventBus;
 
-    public CommitPlanCommandHandler(IJobRepository jobRepository)
+    public CommitPlanCommandHandler(IJobRepository jobRepository, IEventBus eventBus)
     {
         _jobRepository = jobRepository;
+        _eventBus = eventBus;
     }
 
     public async Task<Result> Handle(CommitPlanCommand request, CancellationToken cancellationToken)
@@ -22,6 +25,14 @@ public class CommitPlanCommandHandler : ICommandHandler<CommitPlanCommand>
         {
             job.Commit();
             await _jobRepository.UpdateAsync(job, cancellationToken);
+
+            // Publish integration event → Dispatch module auto-creates a Trip
+            await _eventBus.PublishAsync(new PlanCommittedIntegrationEvent(
+                Guid.NewGuid(),
+                DateTime.UtcNow,
+                job.Id,
+                job.AssignedVehicleId ?? Guid.Empty), cancellationToken);
+
             return Result.Success();
         }
         catch (InvalidOperationException ex)
@@ -30,3 +41,4 @@ public class CommitPlanCommandHandler : ICommandHandler<CommitPlanCommand>
         }
     }
 }
+

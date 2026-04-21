@@ -696,8 +696,9 @@ Predictive replanning, battery-aware dispatch, cost-model tuning per tenant, pla
 | MediatR | ✅ Done | CQRS pipeline with behaviors |
 | Exception Middleware | ✅ Done | Global error handling |
 | Unit Tests | ✅ Done | 23 tests (Dispatch 9, Planning 7, DeliveryOrder 7) |
-| Integration Tests | ❌ Not started | Testcontainers + WebApplicationFactory |
-| JWT Auth | ❌ Not started | AuthN/AuthZ |
+| Integration Tests | ✅ Done | 7 tests via Testcontainers + WebApplicationFactory |
+| JWT Auth | ✅ Done | Bearer token + `POST /api/auth/token` login endpoint |
+| Consumer Flow | ✅ Done | 3 MassTransit consumers wiring DeliveryOrder→Planning→Dispatch |
 | OpenTelemetry | ❌ Not started | Distributed tracing |
 | Outbox Pattern | ⚡ Scaffolded | Interface + model exist, no processor |
 | Redis Caching | ❌ Not started | Route cost cache |
@@ -707,17 +708,17 @@ Predictive replanning, battery-aware dispatch, cost-model tuning per tenant, pla
 
 | Phase | Status | Scope |
 |---|---|---|
-| **Phase 1 — MVP** | ⚡ ~70% | All 6 contexts scaffolded with core CRUD + DB + Docker + Event Bus. Missing: end-to-end wire (Consumer-driven cross-module flow), auth, and integration tests. |
+| **Phase 1 — MVP** | ✅ Complete | All 6 contexts + Docker + Event Bus + JWT Auth + Consumer Flow + 30 tests (23 unit + 7 integration) |
 | **Phase 2 — Multi-Stop + Consolidation** | ❌ Not started | TSP solver, consolidation window |
 | **Phase 3 — Full pattern coverage** | ❌ Not started | Cross-dock, milk-run, CVRPPD |
 | **Phase 4 — Multi-vendor** | ❌ Not started | Feeder adapter, capability matrix |
 | **Phase 5 — Advanced optimization** | ❌ Not started | Predictive replanning, battery-aware |
 
-### 8.5 API Endpoints (18 implemented)
+### 8.5 API Endpoints (19 implemented)
 
 | # | Method | Path | Module |
 |---|---|---|---|
-| 1 | POST | `/api/facility/maps` | Facility |
+| 0 | POST | `/api/auth/token` | Auth (anonymous) || 1 | POST | `/api/facility/maps` | Facility |
 | 2 | GET | `/api/facility/maps/{id}` | Facility |
 | 3 | POST | `/api/fleet/vehicles/register-state` | Fleet |
 | 4 | GET | `/api/fleet/vehicles/available` | Fleet |
