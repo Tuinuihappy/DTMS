@@ -14,6 +14,14 @@ public class Job : AggregateRoot<Guid>
     public double EstimatedDistance { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
+    // Phase 2: Pattern + Multi-order support
+    public PatternType Pattern { get; private set; } = PatternType.PointToPoint;
+    public string? RequiredCapability { get; private set; }
+    public double TotalWeight { get; private set; }
+
+    private readonly List<Guid> _derivedFromOrders = new();
+    public IReadOnlyCollection<Guid> DerivedFromOrders => _derivedFromOrders.AsReadOnly();
+
     private readonly List<Leg> _legs = new();
     public IReadOnlyCollection<Leg> Legs => _legs.AsReadOnly();
 
@@ -26,9 +34,30 @@ public class Job : AggregateRoot<Guid>
         Priority = priority;
         Status = JobStatus.Created;
         CreatedAt = DateTime.UtcNow;
+        _derivedFromOrders.Add(deliveryOrderId);
 
         AddDomainEvent(new JobCreatedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId));
     }
+
+    /// <summary>
+    /// Create a Job from multiple consolidated orders.
+    /// </summary>
+    public Job(List<Guid> orderIds, string priority, PatternType pattern)
+    {
+        Id = Guid.NewGuid();
+        DeliveryOrderId = orderIds.First();
+        Priority = priority;
+        Pattern = pattern;
+        Status = JobStatus.Created;
+        CreatedAt = DateTime.UtcNow;
+        _derivedFromOrders.AddRange(orderIds);
+
+        AddDomainEvent(new JobCreatedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId));
+    }
+
+    public void SetPattern(PatternType pattern) => Pattern = pattern;
+    public void SetRequiredCapability(string capability) => RequiredCapability = capability;
+    public void SetTotalWeight(double weight) => TotalWeight = weight;
 
     public Leg AddLeg(Guid fromStationId, Guid toStationId, int sequenceOrder, double estimatedCost)
     {
@@ -57,5 +86,18 @@ public class Job : AggregateRoot<Guid>
 
         Status = JobStatus.Committed;
         AddDomainEvent(new JobCommittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+    }
+
+    /// <summary>
+    /// Replan: reset a committed job so it can be re-assigned to a different vehicle.
+    /// </summary>
+    public void Replan(string reason)
+    {
+        if (Status != JobStatus.Committed && Status != JobStatus.Assigned)
+            throw new InvalidOperationException($"Cannot replan a job in {Status} status.");
+
+        AssignedVehicleId = null;
+        EstimatedDuration = 0;
+        Status = JobStatus.Created;
     }
 }

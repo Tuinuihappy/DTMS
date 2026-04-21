@@ -18,13 +18,20 @@ public class SimpleRouteCostCalculator : IRouteCostCalculator
 
     public Task<double> CalculateCostAsync(Guid fromStationId, Guid toStationId, CancellationToken cancellationToken = default)
     {
-        // MVP: return a fixed cost. In future, query the Facility module's RouteEdge graph.
-        // If fromStationId is Empty (vehicle's current position unknown), use a default cost.
-        double cost = fromStationId == Guid.Empty ? 10.0 : 15.0;
-
-        _logger.LogInformation("Calculated route cost from {From} to {To}: {Cost}",
-            fromStationId, toStationId, cost);
-
+        double cost = Calculate(fromStationId, toStationId);
         return Task.FromResult(cost);
+    }
+
+    public double Calculate(Guid fromStationId, Guid toStationId)
+    {
+        if (fromStationId == Guid.Empty)
+            return 10.0;
+
+        // Use hashcode-based pseudo-distance so TSP produces meaningful ordering
+        var diff = Math.Abs(fromStationId.GetHashCode() - toStationId.GetHashCode());
+        double cost = (diff % 100) + 1.0;
+
+        _logger.LogDebug("Route cost {From} → {To}: {Cost}", fromStationId, toStationId, cost);
+        return cost;
     }
 }

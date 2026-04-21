@@ -22,6 +22,13 @@ public class PlanningDbContext : DbContext
             builder.HasKey(j => j.Id);
             builder.Property(j => j.Priority).HasMaxLength(20);
             builder.Property(j => j.Status).HasConversion<string>().HasMaxLength(20);
+            builder.Property(j => j.Pattern).HasConversion<string>().HasMaxLength(30);
+            builder.Property(j => j.RequiredCapability).HasMaxLength(50);
+            builder.Property(j => j.TotalWeight);
+
+            // Store DerivedFromOrders as JSON column
+            builder.Property(j => j.DerivedFromOrders)
+                   .HasColumnType("jsonb");
 
             builder.HasMany(j => j.Legs)
                    .WithOne()

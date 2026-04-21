@@ -120,3 +120,14 @@
 /Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/AMR.DeliveryPlanning.SharedKernel.dll
 /Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/AMR.DeliveryPlanning.Planning.Domain.pdb
 /Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/AMR.DeliveryPlanning.SharedKernel.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/Microsoft.EntityFrameworkCore.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/Microsoft.EntityFrameworkCore.Abstractions.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/Microsoft.EntityFrameworkCore.Relational.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/Microsoft.Extensions.Caching.Abstractions.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/Microsoft.Extensions.Caching.Memory.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/Microsoft.Extensions.DependencyInjection.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/Microsoft.Extensions.Logging.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/Npgsql.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/Npgsql.EntityFrameworkCore.PostgreSQL.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/AMR.DeliveryPlanning.Planning.Infrastructure.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/AMR.DeliveryPlanning.Planning.Infrastructure.pdb
