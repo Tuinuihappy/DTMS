@@ -55,7 +55,12 @@ using (var scope = app.Services.CreateScope())
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.MapScalarApiReference();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/openapi/v1.json", "AMR.DeliveryPlanning.Api v1");
+        options.RoutePrefix = "swagger";
+        options.DocumentTitle = "AMR Delivery Planning API";
+    });
 }
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
