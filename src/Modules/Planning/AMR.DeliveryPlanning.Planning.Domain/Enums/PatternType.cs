@@ -4,5 +4,8 @@ public enum PatternType
 {
     PointToPoint,
     MultiStop,
-    Consolidation
+    Consolidation,
+    CrossDock,
+    MilkRun,
+    MultiPickMultiDrop
 }

@@ -254,6 +254,80 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         replanResponse.IsSuccessStatusCode.Should().BeTrue($"Replan failed: {await replanResponse.Content.ReadAsStringAsync()}");
     }
 
+    // ── Phase 3: Cross-Dock ──────────────────────────────────────
+
+    [Fact]
+    public async Task Planning_CrossDock_CreatesLinkedJobs()
+    {
+        var client = await _factory.GetAuthenticatedClient();
+
+        var response = await client.PostAsJsonAsync("/api/planning/cross-dock", new
+        {
+            InboundOrderId = Guid.NewGuid(),
+            OutboundOrderId = Guid.NewGuid(),
+            InboundPickupStationId = Guid.NewGuid(),
+            DockStationId = Guid.NewGuid(),
+            OutboundDropStationId = Guid.NewGuid(),
+            HandlingDwellMinutes = 5,
+            Priority = "Normal"
+        });
+
+        response.IsSuccessStatusCode.Should().BeTrue($"Cross-dock failed: {await response.Content.ReadAsStringAsync()}");
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("inboundJobId");
+        body.Should().Contain("outboundJobId");
+        body.Should().Contain("dependencyId");
+    }
+
+    // ── Phase 3: Milk-Run ────────────────────────────────────────
+
+    [Fact]
+    public async Task Planning_MilkRun_CreatesTemplateAndJob()
+    {
+        var client = await _factory.GetAuthenticatedClient();
+
+        var response = await client.PostAsJsonAsync("/api/planning/milk-runs", new
+        {
+            TemplateName = "Line-A Morning",
+            CronSchedule = "0 8 * * 1-5",
+            Stops = new[]
+            {
+                new { StationId = Guid.NewGuid(), SequenceOrder = 1, ArrivalOffsetMinutes = (int?)0, DwellMinutes = 3 },
+                new { StationId = Guid.NewGuid(), SequenceOrder = 2, ArrivalOffsetMinutes = (int?)10, DwellMinutes = 5 },
+                new { StationId = Guid.NewGuid(), SequenceOrder = 3, ArrivalOffsetMinutes = (int?)25, DwellMinutes = 3 }
+            },
+            Priority = "Normal"
+        });
+
+        response.IsSuccessStatusCode.Should().BeTrue($"Milk-run failed: {await response.Content.ReadAsStringAsync()}");
+        var templateId = await response.Content.ReadFromJsonAsync<Guid>();
+        templateId.Should().NotBe(Guid.Empty);
+    }
+
+    // ── Phase 3: Multi-Pick Multi-Drop ───────────────────────────
+
+    [Fact]
+    public async Task Planning_MultiPickDrop_CreatesJobWithPairs()
+    {
+        var client = await _factory.GetAuthenticatedClient();
+
+        var response = await client.PostAsJsonAsync("/api/planning/multi-pick-drop", new
+        {
+            DeliveryOrderId = Guid.NewGuid(),
+            Pairs = new[]
+            {
+                new { PickupStationId = Guid.NewGuid(), DropStationId = Guid.NewGuid(), Weight = 5.0 },
+                new { PickupStationId = Guid.NewGuid(), DropStationId = Guid.NewGuid(), Weight = 8.0 },
+                new { PickupStationId = Guid.NewGuid(), DropStationId = Guid.NewGuid(), Weight = 3.5 }
+            },
+            Priority = "High",
+            RequiredCapability = "LIFT"
+        });
+
+        response.IsSuccessStatusCode.Should().BeTrue($"Multi-pick-drop failed: {await response.Content.ReadAsStringAsync()}");
+        var jobId = await response.Content.ReadFromJsonAsync<Guid>();
+        jobId.Should().NotBe(Guid.Empty);
+    }
+
     private record TokenResponse(string Token, DateTime ExpiresAt);
 }
-

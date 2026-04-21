@@ -10,6 +10,9 @@ public class PlanningDbContext : DbContext
     public DbSet<Job> Jobs { get; set; } = null!;
     public DbSet<Leg> Legs { get; set; } = null!;
     public DbSet<Stop> Stops { get; set; } = null!;
+    public DbSet<JobDependency> JobDependencies { get; set; } = null!;
+    public DbSet<MilkRunTemplate> MilkRunTemplates { get; set; } = null!;
+    public DbSet<MilkRunStop> MilkRunStops { get; set; } = null!;
 
     public PlanningDbContext(DbContextOptions<PlanningDbContext> options) : base(options) { }
 
@@ -26,7 +29,6 @@ public class PlanningDbContext : DbContext
             builder.Property(j => j.RequiredCapability).HasMaxLength(50);
             builder.Property(j => j.TotalWeight);
 
-            // Store DerivedFromOrders as JSON column
             builder.Property(j => j.DerivedFromOrders)
                    .HasColumnType("jsonb");
 
@@ -50,6 +52,31 @@ public class PlanningDbContext : DbContext
         {
             builder.HasKey(s => s.Id);
             builder.Property(s => s.Type).HasConversion<string>().HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<JobDependency>(builder =>
+        {
+            builder.HasKey(d => d.Id);
+            builder.Property(d => d.DependencyType).HasMaxLength(30);
+            builder.HasIndex(d => d.PredecessorJobId);
+            builder.HasIndex(d => d.SuccessorJobId);
+        });
+
+        modelBuilder.Entity<MilkRunTemplate>(builder =>
+        {
+            builder.HasKey(t => t.Id);
+            builder.Property(t => t.TemplateName).HasMaxLength(100);
+            builder.Property(t => t.CronSchedule).HasMaxLength(50);
+
+            builder.HasMany(t => t.Stops)
+                   .WithOne()
+                   .HasForeignKey(s => s.TemplateId)
+                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MilkRunStop>(builder =>
+        {
+            builder.HasKey(s => s.Id);
         });
     }
 }
