@@ -95,3 +95,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/obj/DeliveryOrder.IntegrationTests/debug/DeliveryOrder.IntegrationTests.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/DeliveryOrder.IntegrationTests/debug/DeliveryOrder.IntegrationTests.genruntimeconfig.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/DeliveryOrder.IntegrationTests/debug/ref/DeliveryOrder.IntegrationTests.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/DeliveryOrder.IntegrationTests/debug/DeliveryOrder.IntegrationTests.sourcelink.json

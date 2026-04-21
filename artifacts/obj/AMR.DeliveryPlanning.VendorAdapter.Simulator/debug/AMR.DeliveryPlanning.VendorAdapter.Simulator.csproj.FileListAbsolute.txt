@@ -15,3 +15,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.SharedKernel.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj.AssemblyReference.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.Deli.F6725956.Up2Date
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.VendorAdapter.Simulator.sourcelink.json

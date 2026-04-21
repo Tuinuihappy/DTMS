@@ -9,3 +9,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Facility.IntegrationEvents/debug/refint/AMR.DeliveryPlanning.Facility.IntegrationEvents.dll
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Facility.IntegrationEvents/debug/AMR.DeliveryPlanning.Facility.IntegrationEvents.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Facility.IntegrationEvents/debug/ref/AMR.DeliveryPlanning.Facility.IntegrationEvents.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Facility.IntegrationEvents/debug/AMR.DeliveryPlanning.Facility.IntegrationEvents.sourcelink.json

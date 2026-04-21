@@ -95,3 +95,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/obj/Fleet.UnitTests/debug/Fleet.UnitTests.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/Fleet.UnitTests/debug/Fleet.UnitTests.genruntimeconfig.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/Fleet.UnitTests/debug/ref/Fleet.UnitTests.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/Fleet.UnitTests/debug/Fleet.UnitTests.sourcelink.json

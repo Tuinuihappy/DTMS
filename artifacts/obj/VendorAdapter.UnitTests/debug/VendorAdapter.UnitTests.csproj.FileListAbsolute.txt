@@ -95,3 +95,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/obj/VendorAdapter.UnitTests/debug/VendorAdapter.UnitTests.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/VendorAdapter.UnitTests/debug/VendorAdapter.UnitTests.genruntimeconfig.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/VendorAdapter.UnitTests/debug/ref/VendorAdapter.UnitTests.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/VendorAdapter.UnitTests/debug/VendorAdapter.UnitTests.sourcelink.json

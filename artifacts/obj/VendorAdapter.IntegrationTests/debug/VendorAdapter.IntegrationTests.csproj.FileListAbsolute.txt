@@ -95,3 +95,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/obj/VendorAdapter.IntegrationTests/debug/VendorAdapter.IntegrationTests.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/VendorAdapter.IntegrationTests/debug/VendorAdapter.IntegrationTests.genruntimeconfig.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/VendorAdapter.IntegrationTests/debug/ref/VendorAdapter.IntegrationTests.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/VendorAdapter.IntegrationTests/debug/VendorAdapter.IntegrationTests.sourcelink.json

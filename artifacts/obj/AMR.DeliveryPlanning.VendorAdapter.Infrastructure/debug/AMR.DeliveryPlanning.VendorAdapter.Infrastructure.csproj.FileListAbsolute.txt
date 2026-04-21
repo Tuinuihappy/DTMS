@@ -15,3 +15,8 @@
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.SharedKernel.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.csproj.AssemblyReference.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.Deli.D067BD05.Up2Date
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Riot3.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Simulator.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Riot3.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Simulator.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.sourcelink.json

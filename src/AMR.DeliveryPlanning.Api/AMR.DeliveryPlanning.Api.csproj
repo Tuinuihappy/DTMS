@@ -14,6 +14,18 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AMR.DeliveryPlanning.SharedKernel\AMR.DeliveryPlanning.SharedKernel.csproj" />
+    <ProjectReference Include="..\Modules\Facility\AMR.DeliveryPlanning.Facility.Presentation\AMR.DeliveryPlanning.Facility.Presentation.csproj" />
+    <ProjectReference Include="..\Modules\Facility\AMR.DeliveryPlanning.Facility.Infrastructure\AMR.DeliveryPlanning.Facility.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Fleet\AMR.DeliveryPlanning.Fleet.Presentation\AMR.DeliveryPlanning.Fleet.Presentation.csproj" />
+    <ProjectReference Include="..\Modules\Fleet\AMR.DeliveryPlanning.Fleet.Infrastructure\AMR.DeliveryPlanning.Fleet.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Presentation\AMR.DeliveryPlanning.DeliveryOrder.Presentation.csproj" />
+    <ProjectReference Include="..\Modules\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Infrastructure\AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Planning\AMR.DeliveryPlanning.Planning.Presentation\AMR.DeliveryPlanning.Planning.Presentation.csproj" />
+    <ProjectReference Include="..\Modules\Planning\AMR.DeliveryPlanning.Planning.Infrastructure\AMR.DeliveryPlanning.Planning.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Dispatch\AMR.DeliveryPlanning.Dispatch.Presentation\AMR.DeliveryPlanning.Dispatch.Presentation.csproj" />
+    <ProjectReference Include="..\Modules\Dispatch\AMR.DeliveryPlanning.Dispatch.Infrastructure\AMR.DeliveryPlanning.Dispatch.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\VendorAdapter\AMR.DeliveryPlanning.VendorAdapter.Infrastructure\AMR.DeliveryPlanning.VendorAdapter.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\VendorAdapter\AMR.DeliveryPlanning.VendorAdapter.Feeder\AMR.DeliveryPlanning.VendorAdapter.Feeder.csproj" />
   </ItemGroup>
 
 </Project>

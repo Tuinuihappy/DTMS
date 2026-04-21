@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AMR.DeliveryPlanning.DeliveryOrder.Domain")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7c8cff64f6fa09fffe53ff8ad08f139ca5eb275b")]
 [assembly: System.Reflection.AssemblyProductAttribute("AMR.DeliveryPlanning.DeliveryOrder.Domain")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AMR.DeliveryPlanning.DeliveryOrder.Domain")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

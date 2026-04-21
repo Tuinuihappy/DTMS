@@ -95,3 +95,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.ArchitectureTests/debug/AMR.DeliveryPlanning.ArchitectureTests.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.ArchitectureTests/debug/AMR.DeliveryPlanning.ArchitectureTests.genruntimeconfig.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.ArchitectureTests/debug/ref/AMR.DeliveryPlanning.ArchitectureTests.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.ArchitectureTests/debug/AMR.DeliveryPlanning.ArchitectureTests.sourcelink.json

@@ -377,6 +377,35 @@
         "runtime": {
           "bin/placeholder/AMR.DeliveryPlanning.VendorAdapter.Abstractions.dll": {}
         }
+      },
+      "AMR.DeliveryPlanning.VendorAdapter.Riot3/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0",
+          "AMR.DeliveryPlanning.VendorAdapter.Abstractions": "1.0.0",
+          "Microsoft.Extensions.Http": "10.0.6"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.VendorAdapter.Riot3.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.VendorAdapter.Riot3.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.VendorAdapter.Simulator/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0",
+          "AMR.DeliveryPlanning.VendorAdapter.Abstractions": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.VendorAdapter.Simulator.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.VendorAdapter.Simulator.dll": {}
+        }
       }
     }
   },
@@ -953,11 +982,23 @@
       "type": "project",
       "path": "../AMR.DeliveryPlanning.VendorAdapter.Abstractions/AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj",
       "msbuildProject": "../AMR.DeliveryPlanning.VendorAdapter.Abstractions/AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj"
+    },
+    "AMR.DeliveryPlanning.VendorAdapter.Riot3/1.0.0": {
+      "type": "project",
+      "path": "../AMR.DeliveryPlanning.VendorAdapter.Riot3/AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj",
+      "msbuildProject": "../AMR.DeliveryPlanning.VendorAdapter.Riot3/AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj"
+    },
+    "AMR.DeliveryPlanning.VendorAdapter.Simulator/1.0.0": {
+      "type": "project",
+      "path": "../AMR.DeliveryPlanning.VendorAdapter.Simulator/AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj",
+      "msbuildProject": "../AMR.DeliveryPlanning.VendorAdapter.Simulator/AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj"
     }
   },
   "projectFileDependencyGroups": {
     "net10.0": [
       "AMR.DeliveryPlanning.VendorAdapter.Abstractions >= 1.0.0",
+      "AMR.DeliveryPlanning.VendorAdapter.Riot3 >= 1.0.0",
+      "AMR.DeliveryPlanning.VendorAdapter.Simulator >= 1.0.0",
       "Microsoft.Extensions.Http.Polly >= 10.0.6"
     ]
   },
@@ -989,6 +1030,12 @@
           "projectReferences": {
             "/Users/tuinui/Projects/DTMS/src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Abstractions/AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj": {
               "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Abstractions/AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Riot3/AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Riot3/AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Simulator/AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Simulator/AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj"
             }
           }
         }

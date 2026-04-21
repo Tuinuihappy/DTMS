@@ -17,3 +17,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Fleet.Infrastructure/debug/AMR.DeliveryPlanning.Fleet.Domain.pdb
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Fleet.Infrastructure/debug/AMR.DeliveryPlanning.SharedKernel.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Infrastructure/debug/AMR.Deli.A72E6B6B.Up2Date
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Infrastructure/debug/AMR.DeliveryPlanning.Fleet.Infrastructure.sourcelink.json

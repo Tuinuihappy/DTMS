@@ -95,3 +95,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/obj/Dispatch.UnitTests/debug/Dispatch.UnitTests.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/Dispatch.UnitTests/debug/Dispatch.UnitTests.genruntimeconfig.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/Dispatch.UnitTests/debug/ref/Dispatch.UnitTests.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/Dispatch.UnitTests/debug/Dispatch.UnitTests.sourcelink.json
