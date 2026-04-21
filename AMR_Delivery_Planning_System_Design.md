@@ -709,7 +709,7 @@ Predictive replanning, battery-aware dispatch, cost-model tuning per tenant, pla
 | Phase | Status | Scope |
 |---|---|---|
 | **Phase 1 — MVP** | ✅ Complete | All 6 contexts + Docker + Event Bus + JWT Auth + Consumer Flow + 30 tests (23 unit + 7 integration) |
-| **Phase 2 — Multi-Stop + Consolidation** | ❌ Not started | TSP solver, consolidation window |
+| **Phase 2 — Multi-Stop + Consolidation** | ✅ Complete | Pattern classifier, TSP solver, consolidation engine, replan, capability-based assignment + 43 tests (33 unit + 10 integration) |
 | **Phase 3 — Full pattern coverage** | ❌ Not started | Cross-dock, milk-run, CVRPPD |
 | **Phase 4 — Multi-vendor** | ❌ Not started | Feeder adapter, capability matrix |
 | **Phase 5 — Advanced optimization** | ❌ Not started | Predictive replanning, battery-aware |

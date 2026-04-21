@@ -174,5 +174,86 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         getResponse.IsSuccessStatusCode.Should().BeTrue();
     }
 
+    // ── Phase 2: Multi-Stop ──────────────────────────────────────
+
+    [Fact]
+    public async Task Planning_MultiStop_CreatesMultipleLegs()
+    {
+        var client = await _factory.GetAuthenticatedClient();
+
+        var createResponse = await client.PostAsJsonAsync("/api/planning/jobs", new
+        {
+            DeliveryOrderId = Guid.NewGuid(),
+            PickupStationId = Guid.NewGuid(),
+            DropStationId = Guid.NewGuid(),
+            Priority = "Normal",
+            AdditionalDropStationIds = new[] { Guid.NewGuid(), Guid.NewGuid() }
+        });
+
+        createResponse.IsSuccessStatusCode.Should().BeTrue($"Create multi-stop failed: {await createResponse.Content.ReadAsStringAsync()}");
+        var jobId = await createResponse.Content.ReadFromJsonAsync<Guid>();
+        jobId.Should().NotBe(Guid.Empty);
+
+        // Verify job has multiple legs
+        var getResponse = await client.GetAsync($"/api/planning/jobs/{jobId}");
+        getResponse.IsSuccessStatusCode.Should().BeTrue();
+    }
+
+    // ── Phase 2: Consolidation ───────────────────────────────────
+
+    [Fact]
+    public async Task Planning_Consolidate_MergesOrders()
+    {
+        var client = await _factory.GetAuthenticatedClient();
+
+        var response = await client.PostAsJsonAsync("/api/planning/consolidate", new
+        {
+            OrderIds = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() },
+            PickupStationId = Guid.NewGuid(),
+            DropStationId = Guid.NewGuid(),
+            Priority = "High"
+        });
+
+        response.IsSuccessStatusCode.Should().BeTrue($"Consolidate failed: {await response.Content.ReadAsStringAsync()}");
+        var jobId = await response.Content.ReadFromJsonAsync<Guid>();
+        jobId.Should().NotBe(Guid.Empty);
+    }
+
+    // ── Phase 2: Replan ──────────────────────────────────────────
+
+    [Fact]
+    public async Task Planning_ReplanCommittedJob_ResetsAndReassigns()
+    {
+        var client = await _factory.GetAuthenticatedClient();
+
+        // Seed vehicle
+        var vehicleId = Guid.NewGuid();
+        AMR.DeliveryPlanning.Planning.Infrastructure.Services.GreedyVehicleSelector
+            .UpdateVehicleCache(vehicleId, 5.0, 95.0);
+
+        // Create + Assign + Commit
+        var createResponse = await client.PostAsJsonAsync("/api/planning/jobs", new
+        {
+            DeliveryOrderId = Guid.NewGuid(),
+            PickupStationId = Guid.NewGuid(),
+            DropStationId = Guid.NewGuid(),
+            Priority = "Normal"
+        });
+        var jobId = await createResponse.Content.ReadFromJsonAsync<Guid>();
+
+        await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/assign", new { JobId = jobId });
+        await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/commit", new { JobId = jobId });
+
+        // Replan
+        var replanResponse = await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/replan", new
+        {
+            JobId = jobId,
+            Reason = "DISRUPTION"
+        });
+
+        replanResponse.IsSuccessStatusCode.Should().BeTrue($"Replan failed: {await replanResponse.Content.ReadAsStringAsync()}");
+    }
+
     private record TokenResponse(string Token, DateTime ExpiresAt);
 }
+

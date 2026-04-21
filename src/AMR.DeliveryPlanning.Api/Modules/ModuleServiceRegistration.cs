@@ -50,6 +50,8 @@ public static class ModuleServiceRegistration
         services.AddScoped<IJobRepository, JobRepository>();
         services.AddScoped<IVehicleSelector, GreedyVehicleSelector>();
         services.AddScoped<IRouteCostCalculator, SimpleRouteCostCalculator>();
+        services.AddScoped<IPatternClassifier, PatternClassifier>();
+        services.AddScoped<IRouteSolver, NearestNeighborTspSolver>();
 
         // ── Dispatch Module ───────────────────────────────────────────
         services.AddDbContext<DispatchDbContext>(o => o.UseNpgsql(connectionString));

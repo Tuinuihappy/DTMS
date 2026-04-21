@@ -1,6 +1,8 @@
 using AMR.DeliveryPlanning.Planning.Application.Commands.AssignVehicleToJob;
 using AMR.DeliveryPlanning.Planning.Application.Commands.CommitPlan;
+using AMR.DeliveryPlanning.Planning.Application.Commands.ConsolidateOrders;
 using AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder;
+using AMR.DeliveryPlanning.Planning.Application.Commands.ReplanJob;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobById;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetPendingJobs;
 using MediatR;
@@ -39,6 +41,14 @@ public static class PlanningEndpoints
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         });
 
+        // POST /api/planning/jobs/{id}/replan — Replan a committed job
+        group.MapPost("/{id:guid}/replan", async (Guid id, ReplanJobCommand command, ISender sender) =>
+        {
+            if (id != command.JobId) return Results.BadRequest("ID mismatch");
+            var result = await sender.Send(command);
+            return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
+        });
+
         // GET /api/planning/jobs/{id} — Get job details
         group.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
         {
@@ -51,6 +61,18 @@ public static class PlanningEndpoints
         {
             var result = await sender.Send(new GetPendingJobsQuery());
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
+        // Consolidation endpoint under /api/planning
+        var planningGroup = app.MapGroup("/api/planning").WithTags("Planning").RequireAuthorization();
+
+        // POST /api/planning/consolidate — Consolidate multiple orders into 1 job
+        planningGroup.MapPost("/consolidate", async (ConsolidateOrdersCommand command, ISender sender) =>
+        {
+            var result = await sender.Send(command);
+            return result.IsSuccess
+                ? Results.Created($"/api/planning/jobs/{result.Value}", result.Value)
+                : Results.BadRequest(result.Error);
         });
     }
 }

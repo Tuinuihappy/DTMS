@@ -6,5 +6,8 @@ public record CreateJobFromOrderCommand(
     Guid DeliveryOrderId,
     Guid PickupStationId,
     Guid DropStationId,
-    string Priority
+    string Priority,
+    List<Guid>? AdditionalDropStationIds = null,
+    string? RequiredCapability = null,
+    double TotalWeight = 0
 ) : ICommand<Guid>;
