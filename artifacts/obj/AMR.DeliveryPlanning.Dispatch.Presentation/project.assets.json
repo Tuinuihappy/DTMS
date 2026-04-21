@@ -15,6 +15,35 @@
           }
         }
       },
+      "MassTransit/8.2.1": {
+        "type": "package",
+        "dependencies": {
+          "MassTransit.Abstractions": "8.2.1"
+        },
+        "compile": {
+          "lib/net8.0/MassTransit.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/MassTransit.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "MassTransit.Abstractions/8.2.1": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/MassTransit.Abstractions.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/MassTransit.Abstractions.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "MediatR/12.2.0": {
         "type": "package",
         "dependencies": {
@@ -76,6 +105,7 @@
         "framework": ".NETCoreApp,Version=v10.0",
         "dependencies": {
           "FluentValidation": "11.9.0",
+          "MassTransit": "8.2.1",
           "MediatR": "12.2.0"
         },
         "compile": {
@@ -111,6 +141,56 @@
         "lib/netstandard2.0/FluentValidation.xml",
         "lib/netstandard2.1/FluentValidation.dll",
         "lib/netstandard2.1/FluentValidation.xml"
+      ]
+    },
+    "MassTransit/8.2.1": {
+      "sha512": "bjDmaE+XaYYRytDM2W5hFm62lb+gQpJtsZD9Eyol1ULBwQxlnQAIszKovc1GHmgJ2cLmwl8gI5KjCj23ev9ilg==",
+      "type": "package",
+      "path": "masstransit/8.2.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "NuGet.README.md",
+        "lib/net472/MassTransit.dll",
+        "lib/net472/MassTransit.xml",
+        "lib/net6.0/MassTransit.dll",
+        "lib/net6.0/MassTransit.xml",
+        "lib/net7.0/MassTransit.dll",
+        "lib/net7.0/MassTransit.xml",
+        "lib/net8.0/MassTransit.dll",
+        "lib/net8.0/MassTransit.xml",
+        "lib/netstandard2.0/MassTransit.dll",
+        "lib/netstandard2.0/MassTransit.xml",
+        "lib/netstandard2.1/MassTransit.dll",
+        "lib/netstandard2.1/MassTransit.xml",
+        "masstransit.8.2.1.nupkg.sha512",
+        "masstransit.nuspec",
+        "mt-logo-small.png"
+      ]
+    },
+    "MassTransit.Abstractions/8.2.1": {
+      "sha512": "9dk3hcAlXXXEVPZC+5UPJnYnQ9Hcv71kXtkHL85w5wtQ43go1Ieso6QJYvCVj++mq61LCjnhJSPlN/eWgScbkw==",
+      "type": "package",
+      "path": "masstransit.abstractions/8.2.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "NuGet.README.md",
+        "lib/net472/MassTransit.Abstractions.dll",
+        "lib/net472/MassTransit.Abstractions.xml",
+        "lib/net6.0/MassTransit.Abstractions.dll",
+        "lib/net6.0/MassTransit.Abstractions.xml",
+        "lib/net7.0/MassTransit.Abstractions.dll",
+        "lib/net7.0/MassTransit.Abstractions.xml",
+        "lib/net8.0/MassTransit.Abstractions.dll",
+        "lib/net8.0/MassTransit.Abstractions.xml",
+        "lib/netstandard2.0/MassTransit.Abstractions.dll",
+        "lib/netstandard2.0/MassTransit.Abstractions.xml",
+        "lib/netstandard2.1/MassTransit.Abstractions.dll",
+        "lib/netstandard2.1/MassTransit.Abstractions.xml",
+        "masstransit.abstractions.8.2.1.nupkg.sha512",
+        "masstransit.abstractions.nuspec",
+        "mt-logo-small.png"
       ]
     },
     "MediatR/12.2.0": {

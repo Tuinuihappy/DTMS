@@ -51,6 +51,11 @@
               "version": "[11.9.0, )",
               "versionCentrallyManaged": true
             },
+            "MassTransit": {
+              "target": "Package",
+              "version": "[8.2.1, )",
+              "versionCentrallyManaged": true
+            },
             "MediatR": {
               "target": "Package",
               "version": "[12.2.0, )",

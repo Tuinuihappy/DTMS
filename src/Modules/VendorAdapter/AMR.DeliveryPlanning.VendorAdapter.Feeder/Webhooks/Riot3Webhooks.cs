@@ -14,7 +14,7 @@ public static class Riot3Webhooks
     {
         var group = app.MapGroup("/api/webhooks/riot3").WithTags("Webhooks");
 
-        group.MapPost("/status", async (RiotStatusPayload payload, ILogger<RiotStatusPayload> logger) =>
+        group.MapPost("/status", async (RiotStatusPayload payload, IEventBus eventBus, ILogger<RiotStatusPayload> logger) =>
         {
             logger.LogInformation("Received status update from Riot3 robot {RobotId}: State={State}, Battery={Battery}", payload.RobotId, payload.State, payload.Battery);
 
@@ -32,9 +32,8 @@ public static class Riot3Webhooks
                 CurrentNodeId: payload.CurrentNode != null ? Guid.Parse(payload.CurrentNode) : null
             );
 
-            // TODO: Publish via MassTransit when wired up
-            // await eventBus.PublishAsync(integrationEvent, CancellationToken.None);
-            logger.LogInformation("Integration event prepared: {EventType} for Vehicle {VehicleId}", nameof(VehicleStateChangedIntegrationEvent), vehicleId);
+            await eventBus.PublishAsync(integrationEvent, CancellationToken.None);
+            logger.LogInformation("Published {EventType} for Vehicle {VehicleId}", nameof(VehicleStateChangedIntegrationEvent), vehicleId);
 
             return Results.Ok();
         });

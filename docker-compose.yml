@@ -1,54 +1,55 @@
-version: '3.8'
-
 services:
   postgres:
-    image: postgres:15-alpine
-    container_name: amr_postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: amr_delivery_db
+    image: postgres:16-alpine
+    container_name: dtms-postgres
     ports:
-      - "5432:5432"
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: amr_delivery_planning
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d amr_delivery_db"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
       timeout: 5s
       retries: 5
 
   rabbitmq:
-    image: rabbitmq:3.12-management-alpine
-    container_name: amr_rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+    image: rabbitmq:3.13-management-alpine
+    container_name: dtms-rabbitmq
     ports:
       - "5672:5672"
       - "15672:15672"
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
-    container_name: amr_redis
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dtms-api
     ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - "5219:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=amr_delivery_planning;Username=postgres;Password=postgres
+      - RabbitMq__Host=rabbitmq
+      - RabbitMq__Username=guest
+      - RabbitMq__Password=guest
+      - VendorAdapter__Riot3__BaseUrl=http://host.docker.internal:5100
 
 volumes:
-  postgres_data:
-  rabbitmq_data:
-  redis_data:
+  pgdata:
