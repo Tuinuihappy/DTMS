@@ -1,0 +1,17 @@
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/AMR.DeliveryPlanning.VendorAdapter.Riot3.deps.json
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/AMR.DeliveryPlanning.VendorAdapter.Riot3.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/AMR.DeliveryPlanning.VendorAdapter.Riot3.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/AMR.DeliveryPlanning.VendorAdapter.Riot3.GeneratedMSBuildEditorConfig.editorconfig
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/AMR.DeliveryPlanning.VendorAdapter.Riot3.AssemblyInfoInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/AMR.DeliveryPlanning.VendorAdapter.Riot3.AssemblyInfo.cs
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj.CoreCompileInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/AMR.DeliveryPlanning.VendorAdapter.Riot3.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/refint/AMR.DeliveryPlanning.VendorAdapter.Riot3.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/AMR.DeliveryPlanning.VendorAdapter.Riot3.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/ref/AMR.DeliveryPlanning.VendorAdapter.Riot3.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/AMR.DeliveryPlanning.SharedKernel.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/AMR.DeliveryPlanning.VendorAdapter.Abstractions.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/AMR.DeliveryPlanning.VendorAdapter.Abstractions.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/AMR.DeliveryPlanning.SharedKernel.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj.AssemblyReference.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Riot3/debug/AMR.Deli.76A5C586.Up2Date

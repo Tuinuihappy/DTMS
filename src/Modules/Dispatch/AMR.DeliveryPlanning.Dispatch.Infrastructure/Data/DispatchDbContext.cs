@@ -1,0 +1,51 @@
+using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
+
+public class DispatchDbContext : DbContext
+{
+    public const string Schema = "dispatch";
+
+    public DbSet<Trip> Trips { get; set; } = null!;
+    public DbSet<RobotTask> RobotTasks { get; set; } = null!;
+    public DbSet<ExecutionEvent> ExecutionEvents { get; set; } = null!;
+
+    public DispatchDbContext(DbContextOptions<DispatchDbContext> options) : base(options) { }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.HasDefaultSchema(Schema);
+
+        modelBuilder.Entity<Trip>(builder =>
+        {
+            builder.HasKey(t => t.Id);
+            builder.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);
+
+            builder.HasMany(t => t.Tasks)
+                   .WithOne()
+                   .HasForeignKey(rt => rt.TripId)
+                   .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasMany(t => t.Events)
+                   .WithOne()
+                   .HasForeignKey(e => e.TripId)
+                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RobotTask>(builder =>
+        {
+            builder.HasKey(rt => rt.Id);
+            builder.Property(rt => rt.Type).HasConversion<string>().HasMaxLength(20);
+            builder.Property(rt => rt.Status).HasConversion<string>().HasMaxLength(20);
+            builder.Property(rt => rt.FailureReason).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<ExecutionEvent>(builder =>
+        {
+            builder.HasKey(e => e.Id);
+            builder.Property(e => e.EventType).HasMaxLength(50);
+            builder.Property(e => e.Details).HasMaxLength(500);
+        });
+    }
+}

@@ -1,0 +1,17 @@
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Planning.Infrastructure.deps.json
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Planning.Infrastructure.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Planning.Infrastructure.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Planning.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Planning.Infrastructure.AssemblyInfoInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Planning.Infrastructure.AssemblyInfo.cs
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Planning.Infrastructure.csproj.CoreCompileInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Planning.Infrastructure.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Infrastructure/debug/refint/AMR.DeliveryPlanning.Planning.Infrastructure.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Planning.Infrastructure.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Infrastructure/debug/ref/AMR.DeliveryPlanning.Planning.Infrastructure.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Planning.Domain.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.SharedKernel.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Planning.Domain.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.SharedKernel.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Planning.Infrastructure.csproj.AssemblyReference.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.Deli.3645EDD7.Up2Date

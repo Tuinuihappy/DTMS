@@ -1,0 +1,17 @@
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.VendorAdapter.Simulator.deps.json
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.VendorAdapter.Simulator.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.VendorAdapter.Simulator.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.VendorAdapter.Simulator.GeneratedMSBuildEditorConfig.editorconfig
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.VendorAdapter.Simulator.AssemblyInfoInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.VendorAdapter.Simulator.AssemblyInfo.cs
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj.CoreCompileInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.VendorAdapter.Simulator.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/refint/AMR.DeliveryPlanning.VendorAdapter.Simulator.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.VendorAdapter.Simulator.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/ref/AMR.DeliveryPlanning.VendorAdapter.Simulator.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.SharedKernel.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.VendorAdapter.Abstractions.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.VendorAdapter.Abstractions.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.SharedKernel.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj.AssemblyReference.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Simulator/debug/AMR.Deli.F6725956.Up2Date

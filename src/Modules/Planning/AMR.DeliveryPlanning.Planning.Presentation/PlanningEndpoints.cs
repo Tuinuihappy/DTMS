@@ -1,0 +1,56 @@
+using AMR.DeliveryPlanning.Planning.Application.Commands.AssignVehicleToJob;
+using AMR.DeliveryPlanning.Planning.Application.Commands.CommitPlan;
+using AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder;
+using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobById;
+using AMR.DeliveryPlanning.Planning.Application.Queries.GetPendingJobs;
+using MediatR;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+
+namespace AMR.DeliveryPlanning.Planning.Presentation;
+
+public static class PlanningEndpoints
+{
+    public static void MapPlanningEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/planning/jobs").WithTags("Planning");
+
+        // POST /api/planning/jobs — Create a Job from a DeliveryOrder
+        group.MapPost("/", async (CreateJobFromOrderCommand command, ISender sender) =>
+        {
+            var result = await sender.Send(command);
+            return result.IsSuccess
+                ? Results.Created($"/api/planning/jobs/{result.Value}", result.Value)
+                : Results.BadRequest(result.Error);
+        });
+
+        // POST /api/planning/jobs/{id}/assign — Assign a vehicle (Greedy)
+        group.MapPost("/{id:guid}/assign", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new AssignVehicleToJobCommand(id));
+            return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
+        });
+
+        // POST /api/planning/jobs/{id}/commit — Commit the plan
+        group.MapPost("/{id:guid}/commit", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new CommitPlanCommand(id));
+            return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
+        });
+
+        // GET /api/planning/jobs/{id} — Get job details
+        group.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new GetJobByIdQuery(id));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
+        });
+
+        // GET /api/planning/jobs/pending — Get all pending jobs
+        group.MapGet("/pending", async (ISender sender) =>
+        {
+            var result = await sender.Send(new GetPendingJobsQuery());
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+    }
+}

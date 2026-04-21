@@ -1,0 +1,15 @@
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Domain/debug/AMR.DeliveryPlanning.Planning.Domain.deps.json
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Domain/debug/AMR.DeliveryPlanning.Planning.Domain.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Domain/debug/AMR.DeliveryPlanning.Planning.Domain.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Domain/debug/AMR.DeliveryPlanning.Planning.Domain.GeneratedMSBuildEditorConfig.editorconfig
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Domain/debug/AMR.DeliveryPlanning.Planning.Domain.AssemblyInfoInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Domain/debug/AMR.DeliveryPlanning.Planning.Domain.AssemblyInfo.cs
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Domain/debug/AMR.DeliveryPlanning.Planning.Domain.csproj.CoreCompileInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Domain/debug/AMR.DeliveryPlanning.Planning.Domain.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Domain/debug/refint/AMR.DeliveryPlanning.Planning.Domain.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Domain/debug/AMR.DeliveryPlanning.Planning.Domain.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Domain/debug/ref/AMR.DeliveryPlanning.Planning.Domain.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Domain/debug/AMR.DeliveryPlanning.SharedKernel.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Domain/debug/AMR.DeliveryPlanning.SharedKernel.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Domain/debug/AMR.DeliveryPlanning.Planning.Domain.csproj.AssemblyReference.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Domain/debug/AMR.Deli.CEBA722F.Up2Date

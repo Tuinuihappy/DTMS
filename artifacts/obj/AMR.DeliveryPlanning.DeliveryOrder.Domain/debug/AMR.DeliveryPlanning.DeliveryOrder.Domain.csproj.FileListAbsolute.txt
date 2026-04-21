@@ -1,0 +1,15 @@
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Domain/debug/AMR.DeliveryPlanning.DeliveryOrder.Domain.deps.json
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Domain/debug/AMR.DeliveryPlanning.DeliveryOrder.Domain.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Domain/debug/AMR.DeliveryPlanning.DeliveryOrder.Domain.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Domain/debug/AMR.DeliveryPlanning.DeliveryOrder.Domain.GeneratedMSBuildEditorConfig.editorconfig
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Domain/debug/AMR.DeliveryPlanning.DeliveryOrder.Domain.AssemblyInfoInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Domain/debug/AMR.DeliveryPlanning.DeliveryOrder.Domain.AssemblyInfo.cs
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Domain/debug/AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj.CoreCompileInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Domain/debug/AMR.DeliveryPlanning.DeliveryOrder.Domain.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Domain/debug/refint/AMR.DeliveryPlanning.DeliveryOrder.Domain.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Domain/debug/AMR.DeliveryPlanning.DeliveryOrder.Domain.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Domain/debug/ref/AMR.DeliveryPlanning.DeliveryOrder.Domain.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Domain/debug/AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj.AssemblyReference.cache
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Domain/debug/AMR.DeliveryPlanning.SharedKernel.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Domain/debug/AMR.DeliveryPlanning.SharedKernel.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Domain/debug/AMR.Deli.8726528B.Up2Date
