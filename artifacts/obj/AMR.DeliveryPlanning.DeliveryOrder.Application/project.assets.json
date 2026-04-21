@@ -276,6 +276,32 @@
           "bin/placeholder/AMR.DeliveryPlanning.DeliveryOrder.Domain.dll": {}
         }
       },
+      "AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Dispatch.IntegrationEvents/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Dispatch.IntegrationEvents.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Dispatch.IntegrationEvents.dll": {}
+        }
+      },
       "AMR.DeliveryPlanning.SharedKernel/1.0.0": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v10.0",
@@ -742,6 +768,16 @@
       "path": "../AMR.DeliveryPlanning.DeliveryOrder.Domain/AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj",
       "msbuildProject": "../AMR.DeliveryPlanning.DeliveryOrder.Domain/AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj"
     },
+    "AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents/1.0.0": {
+      "type": "project",
+      "path": "../AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.csproj",
+      "msbuildProject": "../AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.csproj"
+    },
+    "AMR.DeliveryPlanning.Dispatch.IntegrationEvents/1.0.0": {
+      "type": "project",
+      "path": "../../Dispatch/AMR.DeliveryPlanning.Dispatch.IntegrationEvents/AMR.DeliveryPlanning.Dispatch.IntegrationEvents.csproj",
+      "msbuildProject": "../../Dispatch/AMR.DeliveryPlanning.Dispatch.IntegrationEvents/AMR.DeliveryPlanning.Dispatch.IntegrationEvents.csproj"
+    },
     "AMR.DeliveryPlanning.SharedKernel/1.0.0": {
       "type": "project",
       "path": "../../../AMR.DeliveryPlanning.SharedKernel/AMR.DeliveryPlanning.SharedKernel.csproj",
@@ -751,8 +787,11 @@
   "projectFileDependencyGroups": {
     "net10.0": [
       "AMR.DeliveryPlanning.DeliveryOrder.Domain >= 1.0.0",
+      "AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents >= 1.0.0",
+      "AMR.DeliveryPlanning.Dispatch.IntegrationEvents >= 1.0.0",
       "AMR.DeliveryPlanning.SharedKernel >= 1.0.0",
-      "FluentValidation >= 11.9.0"
+      "FluentValidation >= 11.9.0",
+      "MassTransit >= 8.2.1"
     ]
   },
   "packageFolders": {
@@ -786,6 +825,12 @@
             },
             "/Users/tuinui/Projects/DTMS/src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Domain/AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj": {
               "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Domain/AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.IntegrationEvents/AMR.DeliveryPlanning.Dispatch.IntegrationEvents.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.IntegrationEvents/AMR.DeliveryPlanning.Dispatch.IntegrationEvents.csproj"
             }
           }
         }
@@ -811,6 +856,11 @@
             "target": "Package",
             "version": "[11.9.0, )",
             "versionCentrallyManaged": true
+          },
+          "MassTransit": {
+            "target": "Package",
+            "version": "[8.2.1, )",
+            "versionCentrallyManaged": true
           }
         },
         "centralPackageVersions": {
@@ -823,6 +873,8 @@
           "MassTransit": "8.2.1",
           "MassTransit.RabbitMQ": "8.2.1",
           "MediatR": "12.2.0",
+          "Microsoft.AspNetCore.Authentication.JwtBearer": "10.0.6",
+          "Microsoft.AspNetCore.Mvc.Testing": "10.0.0",
           "Microsoft.AspNetCore.OpenApi": "10.0.0",
           "Microsoft.EntityFrameworkCore": "10.0.0",
           "Microsoft.EntityFrameworkCore.Design": "10.0.0",

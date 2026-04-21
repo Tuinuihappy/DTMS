@@ -11,7 +11,7 @@ public static class MapEndpoints
 {
     public static void MapFacilityEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/facility/maps").WithTags("Facility");
+        var group = app.MapGroup("/api/facility/maps").WithTags("Facility").RequireAuthorization();
 
         group.MapPost("/", async (CreateMapCommand command, ISender sender) =>
         {

@@ -68,4 +68,12 @@ public class DeliveryOrder : AggregateRoot<Guid>
         Status = OrderStatus.Cancelled;
         AddDomainEvent(new DeliveryOrderCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
     }
+
+    public void MarkAsCompleted()
+    {
+        if (Status == OrderStatus.Cancelled)
+            throw new InvalidOperationException("Cannot complete a cancelled order.");
+
+        Status = OrderStatus.Completed;
+    }
 }

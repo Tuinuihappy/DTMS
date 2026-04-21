@@ -13,7 +13,7 @@ public static class DispatchEndpoints
 {
     public static void MapDispatchEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/dispatch").WithTags("Dispatch");
+        var group = app.MapGroup("/api/dispatch").WithTags("Dispatch").RequireAuthorization();
 
         // POST /api/dispatch/trips — Dispatch a new trip from a committed job
         group.MapPost("/trips", async (DispatchTripCommand command, ISender sender) =>

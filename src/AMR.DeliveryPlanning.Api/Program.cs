@@ -1,7 +1,11 @@
+using System.Text;
+using AMR.DeliveryPlanning.Api.Auth;
 using AMR.DeliveryPlanning.Api.Middlewares;
 using AMR.DeliveryPlanning.Api.Modules;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,6 +16,28 @@ builder.Host.UseSerilog((context, configuration) =>
 
 // Add services to the container.
 builder.Services.AddOpenApi();
+builder.Services.AddAuthorization();
+
+// Configure JWT Authentication
+var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>();
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSettings?.Issuer ?? "AMR.DeliveryPlanning",
+        ValidAudience = jwtSettings?.Audience ?? "AMR.DeliveryPlanning.Api",
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(jwtSettings?.Secret ?? "super-secret-key-for-development-minimum-32-chars!"))
+    };
+});
 
 // Configure MediatR — scan all module Application assemblies
 builder.Services.AddMediatR(cfg =>
@@ -99,7 +125,13 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseSerilogRequestLogging();
 app.UseHttpsRedirection();
 
-// Map all module Minimal API endpoints
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Map auth endpoint (anonymous)
+app.MapAuthEndpoints();
+
+// Map all module Minimal API endpoints (require auth)
 app.MapAllModuleEndpoints();
 
 app.Run();

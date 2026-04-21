@@ -3,6 +3,11 @@
   <ItemGroup>
     <ProjectReference Include="..\AMR.DeliveryPlanning.Dispatch.Domain\AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
     <ProjectReference Include="..\..\..\AMR.DeliveryPlanning.SharedKernel\AMR.DeliveryPlanning.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\Planning\AMR.DeliveryPlanning.Planning.IntegrationEvents\AMR.DeliveryPlanning.Planning.IntegrationEvents.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MassTransit" />
   </ItemGroup>
 
   <PropertyGroup>
