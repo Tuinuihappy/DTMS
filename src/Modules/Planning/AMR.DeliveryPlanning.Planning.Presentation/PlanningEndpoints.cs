@@ -1,7 +1,10 @@
 using AMR.DeliveryPlanning.Planning.Application.Commands.AssignVehicleToJob;
 using AMR.DeliveryPlanning.Planning.Application.Commands.CommitPlan;
 using AMR.DeliveryPlanning.Planning.Application.Commands.ConsolidateOrders;
+using AMR.DeliveryPlanning.Planning.Application.Commands.CreateCrossDockJobs;
 using AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder;
+using AMR.DeliveryPlanning.Planning.Application.Commands.CreateMilkRun;
+using AMR.DeliveryPlanning.Planning.Application.Commands.CreateMultiPickDropJob;
 using AMR.DeliveryPlanning.Planning.Application.Commands.ReplanJob;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobById;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetPendingJobs;
@@ -63,11 +66,38 @@ public static class PlanningEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
-        // Consolidation endpoint under /api/planning
+        // Consolidation + Phase 3 endpoints under /api/planning
         var planningGroup = app.MapGroup("/api/planning").WithTags("Planning").RequireAuthorization();
 
         // POST /api/planning/consolidate — Consolidate multiple orders into 1 job
         planningGroup.MapPost("/consolidate", async (ConsolidateOrdersCommand command, ISender sender) =>
+        {
+            var result = await sender.Send(command);
+            return result.IsSuccess
+                ? Results.Created($"/api/planning/jobs/{result.Value}", result.Value)
+                : Results.BadRequest(result.Error);
+        });
+
+        // POST /api/planning/cross-dock — Create linked inbound/outbound cross-dock jobs
+        planningGroup.MapPost("/cross-dock", async (CreateCrossDockJobsCommand command, ISender sender) =>
+        {
+            var result = await sender.Send(command);
+            return result.IsSuccess
+                ? Results.Created($"/api/planning/jobs/{result.Value.InboundJobId}", result.Value)
+                : Results.BadRequest(result.Error);
+        });
+
+        // POST /api/planning/milk-runs — Create a milk-run template + initial job
+        planningGroup.MapPost("/milk-runs", async (CreateMilkRunCommand command, ISender sender) =>
+        {
+            var result = await sender.Send(command);
+            return result.IsSuccess
+                ? Results.Created($"/api/planning/milk-runs/{result.Value}", result.Value)
+                : Results.BadRequest(result.Error);
+        });
+
+        // POST /api/planning/multi-pick-drop — Create a CVRPPD job with pickup-delivery pairs
+        planningGroup.MapPost("/multi-pick-drop", async (CreateMultiPickDropJobCommand command, ISender sender) =>
         {
             var result = await sender.Send(command);
             return result.IsSuccess
