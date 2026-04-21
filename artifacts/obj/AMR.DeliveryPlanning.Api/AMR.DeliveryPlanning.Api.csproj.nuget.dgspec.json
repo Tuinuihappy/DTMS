@@ -112,6 +112,11 @@
               "target": "Package",
               "version": "[8.0.1, )",
               "versionCentrallyManaged": true
+            },
+            "Swashbuckle.AspNetCore.SwaggerUI": {
+              "target": "Package",
+              "version": "[10.1.7, )",
+              "versionCentrallyManaged": true
             }
           },
           "centralPackageVersions": {
