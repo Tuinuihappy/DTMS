@@ -544,3 +544,204 @@ Predictive replanning, battery-aware dispatch, cost-model tuning per tenant, pla
 - Is there an existing identity provider (SSO)? Drives auth integration.
 - Real-time streaming of telemetry to BI/monitoring required, or periodic export acceptable?
 - Regulatory requirements (e.g., hazmat audit, medical device traceability, food cold-chain)? May require specialized order attributes and evidence capture.
+
+---
+
+## 8. Implementation Progress
+
+> **Last Updated**: 2026-04-21 | **Architecture**: Modular Monolith (.NET 10) | **Pattern**: CQRS + MediatR + Clean Architecture
+
+### 8.1 Architecture Decisions (Implemented)
+
+| Decision | Design Spec | Implementation |
+|----------|-------------|----------------|
+| Architecture | Microservices / Modular | **Modular Monolith** (single deployable, module isolation via schemas) |
+| Event Bus | Kafka / NATS | **RabbitMQ + MassTransit** |
+| Persistence | Postgres | **PostgreSQL 16** (per-module schema isolation) |
+| API Style | REST / GraphQL | **Minimal API (.NET 10)** with Swagger UI |
+| API Docs | — | **Swagger UI** at `/swagger` |
+| Containerization | — | **Docker Compose** (PostgreSQL:5434, RabbitMQ:5672/15672, API:5219) |
+| CQRS | Implied | **MediatR** with ICommand/IQuery separation |
+| DDD Base Classes | Implied | `AggregateRoot<T>`, `Entity<T>`, `ValueObject`, `IDomainEvent` |
+
+### 8.2 Bounded Context Progress
+
+#### Context 1 — Delivery Order Management ✅ Core Implemented
+
+| Spec Feature | Status | Implementation |
+|---|---|---|
+| `DeliveryOrder` aggregate | ✅ Done | `DeliveryOrder.cs` — OrderKey, Priority, Status, SLA, PickupStationId, DropStationId |
+| `OrderLine` entity | ✅ Done | `OrderLine.cs` — ItemCode, Quantity, Weight, Remarks |
+| `RecurringSchedule` entity | ✅ Done | `RecurringSchedule.cs` — CronExpression, ValidFrom, ValidUntil |
+| State machine | ⚡ Partial | Submitted → Validated → Cancelled (missing: DRAFT, READY_TO_PLAN, PLANNING, PLANNED, DISPATCHED, IN_PROGRESS, COMPLETED, HELD, FAILED, AMENDED) |
+| `POST /api/delivery-orders` | ✅ Done | SubmitDeliveryOrderCommand + Handler |
+| `DEL /api/delivery-orders/{id}` | ✅ Done | CancelDeliveryOrderCommand + Handler |
+| Domain events | ✅ Done | DeliveryOrderSubmittedDomainEvent, ValidatedDomainEvent, CancelledDomainEvent |
+| Integration events | ✅ Done | DeliveryOrderSubmittedIntegrationEvent |
+| DbContext + Schema | ✅ Done | `deliveryorder` schema — 3 tables (DeliveryOrders, OrderLines, RecurringSchedules) |
+| Unit Tests | ✅ Done | 7 tests — create, validate, cancel, schedule |
+| Bulk import | ❌ Not started | `POST /api/v1/orders:bulk` |
+| Amendment history | ❌ Not started | OrderAmendment entity + append-only |
+| Idempotency key | ❌ Not started | Header-based dedup |
+| SLA validation | ❌ Not started | Service window feasibility check |
+| Order Templates | ❌ Not started | Recurring order generation |
+
+#### Context 2 — Planning & Optimization ✅ Core Implemented
+
+| Spec Feature | Status | Implementation |
+|---|---|---|
+| `Job` aggregate | ✅ Done | `Job.cs` — DeliveryOrderId, Status, AssignedVehicleId, Priority, EstimatedDuration/Distance |
+| `Leg` entity | ✅ Done | `Leg.cs` — FromStationId, ToStationId, SequenceOrder, EstimatedCost |
+| `Stop` entity | ✅ Done | `Stop.cs` — StationType (Pick/Drop/Charge/Park/Wait) |
+| Vehicle Assignment | ✅ Done | `GreedyVehicleSelector` — nearest-compatible heuristic |
+| Route Cost Calculator | ✅ Done | `SimpleRouteCostCalculator` — Euclidean distance (placeholder) |
+| `POST /api/planning/jobs` | ✅ Done | CreateJobFromOrderCommand + Handler |
+| `POST /api/planning/jobs/{id}/assign` | ✅ Done | AssignVehicleCommand + Handler |
+| `POST /api/planning/jobs/{id}/commit` | ✅ Done | CommitJobCommand + Handler |
+| `GET /api/planning/jobs/{id}` | ✅ Done | GetJobByIdQuery + Handler |
+| `GET /api/planning/jobs/pending` | ✅ Done | GetPendingJobsQuery + Handler |
+| Domain events | ✅ Done | JobCreated, JobAssigned, JobCommitted |
+| Integration events | ✅ Done | JobAssignedIntegrationEvent |
+| DbContext + Schema | ✅ Done | `planning` schema — 3 tables (Jobs, Legs, Stops) |
+| Unit Tests | ✅ Done | 7 tests — create, assign, commit, legs |
+| Pattern classifier | ❌ Not started | Auto-detect Point-to-Point vs Multi-Stop etc. |
+| CVRP/MILP solver | ❌ Not started | OR-Tools integration for batch optimization |
+| Consolidation engine | ❌ Not started | Time-window grouping |
+| Reservation system | ❌ Not started | Resource locking (lifts, chargers, traffic areas) |
+| What-if simulation | ❌ Not started | `/api/v1/plans:simulate` |
+| Replanning | ❌ Not started | Disruption-triggered replan |
+
+#### Context 3 — Dispatch & Execution ✅ Core Implemented
+
+| Spec Feature | Status | Implementation |
+|---|---|---|
+| `Trip` aggregate | ✅ Done | `Trip.cs` — JobId, VehicleId, Status, auto-dispatch chain |
+| `RobotTask` entity | ✅ Done | `RobotTask.cs` — TaskType (Move/Lift/Drop/Act/Charge/Park), SequenceOrder, Status |
+| `ExecutionEvent` entity | ✅ Done | `ExecutionEvent.cs` — EventType, Details, OccurredAt |
+| Auto-dispatch chain | ✅ Done | Trip.Start() dispatches first task; CompleteTask() auto-dispatches next |
+| `POST /api/dispatch/trips` | ✅ Done | DispatchTripCommand + Handler |
+| `POST /api/dispatch/trips/{tripId}/tasks/{taskId}/complete` | ✅ Done | ReportTaskCompletedCommand |
+| `POST /api/dispatch/trips/{tripId}/tasks/{taskId}/fail` | ✅ Done | ReportTaskFailedCommand |
+| `GET /api/dispatch/trips/{id}` | ✅ Done | GetTripByIdQuery |
+| `GET /api/dispatch/vehicles/{vehicleId}/trips` | ✅ Done | GetTripsByVehicleQuery |
+| Domain events | ✅ Done | TripStarted, TripCompleted, TaskDispatched, TaskCompleted, TaskFailed |
+| Integration events | ✅ Done | TripStartedIntegrationEvent |
+| DbContext + Schema | ✅ Done | `dispatch` schema — 3 tables (Trips, RobotTasks, ExecutionEvents) |
+| Unit Tests | ✅ Done | 9 tests — lifecycle, auto-dispatch, failure |
+| Pause / Resume / Cancel | ❌ Not started | Live job operations |
+| Reassign (operator takeover) | ❌ Not started | Force new vehicle |
+| Exception handling | ❌ Not started | Blocked path, emergency stop |
+| Proof of Delivery | ❌ Not started | Scan, photo, signature |
+
+#### Context 4 — Fleet & Asset Management ✅ Core Implemented
+
+| Spec Feature | Status | Implementation |
+|---|---|---|
+| `Vehicle` entity | ✅ Done | `Vehicle.cs` — VehicleName, VehicleTypeId, State (Idle/Moving/Charging/Error/Offline) |
+| `VehicleType` entity | ✅ Done | `VehicleType.cs` — TypeName, MaxPayloadKg, Capabilities |
+| `POST /api/fleet/vehicles/register-state` | ✅ Done | RegisterVehicleStateCommand |
+| `GET /api/fleet/vehicles/available` | ✅ Done | GetAvailableVehiclesQuery |
+| `GET /api/fleet/vehicle-types` | ✅ Done | GetVehicleTypesQuery |
+| Integration events | ✅ Done | VehicleStateChangedIntegrationEvent |
+| DbContext + Schema | ✅ Done | `fleet` schema — 2 tables (Vehicles, VehicleTypes) |
+| Charging strategy | ❌ Not started | ChargingPolicy entity |
+| Maintenance records | ❌ Not started | Scheduled + corrective |
+| Vehicle groups | ❌ Not started | Pool-based dispatch |
+| Utilization analytics | ❌ Not started | MTBF, availability % |
+
+#### Context 5 — Facility & Topology ✅ Core Implemented
+
+| Spec Feature | Status | Implementation |
+|---|---|---|
+| `Map` aggregate | ✅ Done | `Map.cs` — Name, Version, Width, Height, MapData (JSONB) |
+| `Station` entity | ✅ Done | `Station.cs` — Name, StationType, Coordinate (X, Y, Theta) |
+| `Zone` entity | ✅ Done | `Zone.cs` — Name, ZoneType, Polygon |
+| `RouteEdge` entity | ✅ Done | `RouteEdge.cs` — FromStationId, ToStationId, DistanceMm |
+| `POST /api/facility/maps` | ✅ Done | CreateMapCommand + Handler |
+| `GET /api/facility/maps/{id}` | ✅ Done | GetMapByIdQuery + Handler |
+| DbContext + Schema | ✅ Done | `facility` schema — 4 tables (Maps, Stations, Zones, RouteEdges) |
+| Route cost proxy | ❌ Not started | Cache + proxy to vendor `/api/v4/route/costs` |
+| Topology overlays | ❌ Not started | Temporary blockage |
+| Facility resources | ❌ Not started | Door, elevator, charger, stopper control |
+| Map synchronization | ❌ Not started | Push/pull from vendor |
+
+#### Context 6 — Vendor Adapter (ACL) ✅ Core Implemented
+
+| Spec Feature | Status | Implementation |
+|---|---|---|
+| Adapter interface | ✅ Done | `IVehicleCommandService.cs` — canonical contract |
+| RIOT3 Adapter | ✅ Done | `Riot3CommandService.cs` — HttpClient + Polly resilience |
+| Simulator Adapter | ✅ Done | `SimulatorCommandService.cs` — for test environments |
+| Adapter factory | ✅ Done | `VendorAdapterFactory.cs` — multi-vendor selection |
+| RIOT3 Webhooks | ✅ Done | `Riot3Webhooks.cs` — status callback → VehicleStateChangedIntegrationEvent |
+| Resilience (Polly) | ✅ Done | Retry + Circuit Breaker via `ResilienceExtensions.cs` |
+| RiotStatusPayload model | ✅ Done | `RiotStatusPayload.cs` |
+| RiotTaskRequest model | ✅ Done | `RiotTaskRequest.cs` |
+| Canonical action models | ✅ Done | `RobotActionType.cs`, `RobotTaskCommand.cs`, `StandardRobotState.cs` |
+| Action catalog mapping | ❌ Not started | Data-driven per (tenant, vehicleType) |
+| Event normalization | ❌ Not started | Full RIOT3.0 `/api/v4/notify` → canonical events |
+| Feeder type adapter | ❌ Not started | Program-number protocol (Image 1) |
+
+### 8.3 Infrastructure & Cross-Cutting
+
+| Component | Status | Details |
+|---|---|---|
+| Docker Compose | ✅ Done | 3 containers: PostgreSQL (5434), RabbitMQ (5672/15672), API (5219) |
+| Dockerfile | ✅ Done | Multi-stage build (.NET 10 SDK → runtime) |
+| Auto-migration | ✅ Done | 5 schemas, 15 tables created on startup (idempotent) |
+| MassTransit + RabbitMQ | ✅ Done | Event bus with auto consumer scanning |
+| MassTransitEventBus | ✅ Done | `IEventBus` → `IPublishEndpoint` |
+| Swagger UI | ✅ Done | 18 endpoints at `/swagger` |
+| Serilog | ✅ Done | Structured logging |
+| MediatR | ✅ Done | CQRS pipeline with behaviors |
+| Exception Middleware | ✅ Done | Global error handling |
+| Unit Tests | ✅ Done | 23 tests (Dispatch 9, Planning 7, DeliveryOrder 7) |
+| Integration Tests | ❌ Not started | Testcontainers + WebApplicationFactory |
+| JWT Auth | ❌ Not started | AuthN/AuthZ |
+| OpenTelemetry | ❌ Not started | Distributed tracing |
+| Outbox Pattern | ⚡ Scaffolded | Interface + model exist, no processor |
+| Redis Caching | ❌ Not started | Route cost cache |
+| CI/CD | ❌ Not started | GitHub Actions |
+
+### 8.4 Roadmap Progress
+
+| Phase | Status | Scope |
+|---|---|---|
+| **Phase 1 — MVP** | ⚡ ~70% | All 6 contexts scaffolded with core CRUD + DB + Docker + Event Bus. Missing: end-to-end wire (Consumer-driven cross-module flow), auth, and integration tests. |
+| **Phase 2 — Multi-Stop + Consolidation** | ❌ Not started | TSP solver, consolidation window |
+| **Phase 3 — Full pattern coverage** | ❌ Not started | Cross-dock, milk-run, CVRPPD |
+| **Phase 4 — Multi-vendor** | ❌ Not started | Feeder adapter, capability matrix |
+| **Phase 5 — Advanced optimization** | ❌ Not started | Predictive replanning, battery-aware |
+
+### 8.5 API Endpoints (18 implemented)
+
+| # | Method | Path | Module |
+|---|---|---|---|
+| 1 | POST | `/api/facility/maps` | Facility |
+| 2 | GET | `/api/facility/maps/{id}` | Facility |
+| 3 | POST | `/api/fleet/vehicles/register-state` | Fleet |
+| 4 | GET | `/api/fleet/vehicles/available` | Fleet |
+| 5 | GET | `/api/fleet/vehicle-types` | Fleet |
+| 6 | POST | `/api/delivery-orders` | DeliveryOrder |
+| 7 | DEL | `/api/delivery-orders/{id}` | DeliveryOrder |
+| 8 | POST | `/api/planning/jobs` | Planning |
+| 9 | POST | `/api/planning/jobs/{id}/assign` | Planning |
+| 10 | POST | `/api/planning/jobs/{id}/commit` | Planning |
+| 11 | GET | `/api/planning/jobs/{id}` | Planning |
+| 12 | GET | `/api/planning/jobs/pending` | Planning |
+| 13 | POST | `/api/dispatch/trips` | Dispatch |
+| 14 | POST | `/api/dispatch/trips/{tripId}/tasks/{taskId}/complete` | Dispatch |
+| 15 | POST | `/api/dispatch/trips/{tripId}/tasks/{taskId}/fail` | Dispatch |
+| 16 | GET | `/api/dispatch/trips/{id}` | Dispatch |
+| 17 | GET | `/api/dispatch/vehicles/{vehicleId}/trips` | Dispatch |
+| 18 | POST | `/api/webhooks/riot3/status` | VendorAdapter |
+
+### 8.6 Database Schema (15 tables)
+
+| Schema | Tables |
+|---|---|
+| `facility` | Maps, Stations, Zones, RouteEdges |
+| `fleet` | Vehicles, VehicleTypes |
+| `deliveryorder` | DeliveryOrders, OrderLines, RecurringSchedules |
+| `planning` | Jobs, Legs, Stops |
+| `dispatch` | Trips, RobotTasks, ExecutionEvents |
