@@ -1,0 +1,11 @@
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Facility.IntegrationEvents/debug/AMR.DeliveryPlanning.Facility.IntegrationEvents.deps.json
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Facility.IntegrationEvents/debug/AMR.DeliveryPlanning.Facility.IntegrationEvents.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Facility.IntegrationEvents/debug/AMR.DeliveryPlanning.Facility.IntegrationEvents.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Facility.IntegrationEvents/debug/AMR.DeliveryPlanning.Facility.IntegrationEvents.GeneratedMSBuildEditorConfig.editorconfig
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Facility.IntegrationEvents/debug/AMR.DeliveryPlanning.Facility.IntegrationEvents.AssemblyInfoInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Facility.IntegrationEvents/debug/AMR.DeliveryPlanning.Facility.IntegrationEvents.AssemblyInfo.cs
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Facility.IntegrationEvents/debug/AMR.DeliveryPlanning.Facility.IntegrationEvents.csproj.CoreCompileInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Facility.IntegrationEvents/debug/AMR.DeliveryPlanning.Facility.IntegrationEvents.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Facility.IntegrationEvents/debug/refint/AMR.DeliveryPlanning.Facility.IntegrationEvents.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Facility.IntegrationEvents/debug/AMR.DeliveryPlanning.Facility.IntegrationEvents.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Facility.IntegrationEvents/debug/ref/AMR.DeliveryPlanning.Facility.IntegrationEvents.dll

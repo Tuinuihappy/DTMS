@@ -1,0 +1,17 @@
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.Application.deps.json
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.Application.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.Application.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.Application.GeneratedMSBuildEditorConfig.editorconfig
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.Application.AssemblyInfoInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.Application.AssemblyInfo.cs
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.Application.csproj.CoreCompileInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.Application.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/refint/AMR.DeliveryPlanning.DeliveryOrder.Application.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.Application.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/ref/AMR.DeliveryPlanning.DeliveryOrder.Application.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.Domain.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.SharedKernel.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.Domain.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.SharedKernel.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.DeliveryPlanning.DeliveryOrder.Application.csproj.AssemblyReference.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.DeliveryOrder.Application/debug/AMR.Deli.01C32964.Up2Date

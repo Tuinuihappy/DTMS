@@ -1,0 +1,17 @@
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.deps.json
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.AssemblyInfoInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.AssemblyInfo.cs
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.csproj.CoreCompileInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/refint/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/ref/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.SharedKernel.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Abstractions.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Abstractions.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.SharedKernel.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.csproj.AssemblyReference.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/debug/AMR.Deli.D067BD05.Up2Date

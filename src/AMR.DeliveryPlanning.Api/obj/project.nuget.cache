@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "SVH7k44fWIw=",
+  "success": true,
+  "projectFilePath": "/Users/tuinui/Projects/DTMS/src/AMR.DeliveryPlanning.Api/AMR.DeliveryPlanning.Api.csproj",
+  "expectedPackageFiles": [
+    "/Users/tuinui/.nuget/packages/microsoft.aspnetcore.openapi/10.0.1/microsoft.aspnetcore.openapi.10.0.1.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.openapi/2.0.0/microsoft.openapi.2.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

@@ -1,0 +1,375 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "AMR.DeliveryPlanning.Api/1.0.0": {
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0",
+          "Microsoft.AspNetCore.OpenApi": "10.0.0",
+          "Serilog.AspNetCore": "8.0.1",
+          "Swashbuckle.AspNetCore": "6.5.0"
+        },
+        "runtime": {
+          "AMR.DeliveryPlanning.Api.dll": {}
+        }
+      },
+      "FluentValidation/11.9.0": {
+        "runtime": {
+          "lib/net8.0/FluentValidation.dll": {
+            "assemblyVersion": "11.0.0.0",
+            "fileVersion": "11.9.0.0"
+          }
+        }
+      },
+      "MediatR/12.2.0": {
+        "dependencies": {
+          "MediatR.Contracts": "2.0.1"
+        },
+        "runtime": {
+          "lib/net6.0/MediatR.dll": {
+            "assemblyVersion": "12.0.0.0",
+            "fileVersion": "12.2.0.0"
+          }
+        }
+      },
+      "MediatR.Contracts/2.0.1": {
+        "runtime": {
+          "lib/netstandard2.0/MediatR.Contracts.dll": {
+            "assemblyVersion": "2.0.1.0",
+            "fileVersion": "2.0.1.0"
+          }
+        }
+      },
+      "Microsoft.AspNetCore.OpenApi/10.0.0": {
+        "dependencies": {
+          "Microsoft.OpenApi": "2.0.0"
+        },
+        "runtime": {
+          "lib/net10.0/Microsoft.AspNetCore.OpenApi.dll": {
+            "assemblyVersion": "10.0.0.0",
+            "fileVersion": "10.0.25.52411"
+          }
+        }
+      },
+      "Microsoft.Extensions.DependencyModel/8.0.0": {
+        "runtime": {
+          "lib/net8.0/Microsoft.Extensions.DependencyModel.dll": {
+            "assemblyVersion": "8.0.0.0",
+            "fileVersion": "8.0.23.53103"
+          }
+        }
+      },
+      "Microsoft.OpenApi/2.0.0": {
+        "runtime": {
+          "lib/net8.0/Microsoft.OpenApi.dll": {
+            "assemblyVersion": "2.0.0.0",
+            "fileVersion": "2.0.0.0"
+          }
+        }
+      },
+      "Serilog/3.1.1": {
+        "runtime": {
+          "lib/net7.0/Serilog.dll": {
+            "assemblyVersion": "2.0.0.0",
+            "fileVersion": "3.1.1.0"
+          }
+        }
+      },
+      "Serilog.AspNetCore/8.0.1": {
+        "dependencies": {
+          "Serilog": "3.1.1",
+          "Serilog.Extensions.Hosting": "8.0.0",
+          "Serilog.Extensions.Logging": "8.0.0",
+          "Serilog.Formatting.Compact": "2.0.0",
+          "Serilog.Settings.Configuration": "8.0.0",
+          "Serilog.Sinks.Console": "5.0.0",
+          "Serilog.Sinks.Debug": "2.0.0",
+          "Serilog.Sinks.File": "5.0.0"
+        },
+        "runtime": {
+          "lib/net8.0/Serilog.AspNetCore.dll": {
+            "assemblyVersion": "8.0.1.0",
+            "fileVersion": "8.0.1.0"
+          }
+        }
+      },
+      "Serilog.Extensions.Hosting/8.0.0": {
+        "dependencies": {
+          "Serilog": "3.1.1",
+          "Serilog.Extensions.Logging": "8.0.0"
+        },
+        "runtime": {
+          "lib/net8.0/Serilog.Extensions.Hosting.dll": {
+            "assemblyVersion": "7.0.0.0",
+            "fileVersion": "8.0.0.0"
+          }
+        }
+      },
+      "Serilog.Extensions.Logging/8.0.0": {
+        "dependencies": {
+          "Serilog": "3.1.1"
+        },
+        "runtime": {
+          "lib/net8.0/Serilog.Extensions.Logging.dll": {
+            "assemblyVersion": "7.0.0.0",
+            "fileVersion": "8.0.0.0"
+          }
+        }
+      },
+      "Serilog.Formatting.Compact/2.0.0": {
+        "dependencies": {
+          "Serilog": "3.1.1"
+        },
+        "runtime": {
+          "lib/net7.0/Serilog.Formatting.Compact.dll": {
+            "assemblyVersion": "2.0.0.0",
+            "fileVersion": "2.0.0.0"
+          }
+        }
+      },
+      "Serilog.Settings.Configuration/8.0.0": {
+        "dependencies": {
+          "Microsoft.Extensions.DependencyModel": "8.0.0",
+          "Serilog": "3.1.1"
+        },
+        "runtime": {
+          "lib/net8.0/Serilog.Settings.Configuration.dll": {
+            "assemblyVersion": "8.0.0.0",
+            "fileVersion": "8.0.0.0"
+          }
+        }
+      },
+      "Serilog.Sinks.Console/5.0.0": {
+        "dependencies": {
+          "Serilog": "3.1.1"
+        },
+        "runtime": {
+          "lib/net7.0/Serilog.Sinks.Console.dll": {
+            "assemblyVersion": "5.0.0.0",
+            "fileVersion": "5.0.0.0"
+          }
+        }
+      },
+      "Serilog.Sinks.Debug/2.0.0": {
+        "dependencies": {
+          "Serilog": "3.1.1"
+        },
+        "runtime": {
+          "lib/netstandard2.1/Serilog.Sinks.Debug.dll": {
+            "assemblyVersion": "2.0.0.0",
+            "fileVersion": "2.0.0.0"
+          }
+        }
+      },
+      "Serilog.Sinks.File/5.0.0": {
+        "dependencies": {
+          "Serilog": "3.1.1"
+        },
+        "runtime": {
+          "lib/net5.0/Serilog.Sinks.File.dll": {
+            "assemblyVersion": "5.0.0.0",
+            "fileVersion": "5.0.0.0"
+          }
+        }
+      },
+      "Swashbuckle.AspNetCore/6.5.0": {
+        "dependencies": {
+          "Swashbuckle.AspNetCore.Swagger": "6.5.0",
+          "Swashbuckle.AspNetCore.SwaggerGen": "6.5.0",
+          "Swashbuckle.AspNetCore.SwaggerUI": "6.5.0"
+        }
+      },
+      "Swashbuckle.AspNetCore.Swagger/6.5.0": {
+        "dependencies": {
+          "Microsoft.OpenApi": "2.0.0"
+        },
+        "runtime": {
+          "lib/net7.0/Swashbuckle.AspNetCore.Swagger.dll": {
+            "assemblyVersion": "6.5.0.0",
+            "fileVersion": "6.5.0.0"
+          }
+        }
+      },
+      "Swashbuckle.AspNetCore.SwaggerGen/6.5.0": {
+        "dependencies": {
+          "Swashbuckle.AspNetCore.Swagger": "6.5.0"
+        },
+        "runtime": {
+          "lib/net7.0/Swashbuckle.AspNetCore.SwaggerGen.dll": {
+            "assemblyVersion": "6.5.0.0",
+            "fileVersion": "6.5.0.0"
+          }
+        }
+      },
+      "Swashbuckle.AspNetCore.SwaggerUI/6.5.0": {
+        "runtime": {
+          "lib/net7.0/Swashbuckle.AspNetCore.SwaggerUI.dll": {
+            "assemblyVersion": "6.5.0.0",
+            "fileVersion": "6.5.0.0"
+          }
+        }
+      },
+      "AMR.DeliveryPlanning.SharedKernel/1.0.0": {
+        "dependencies": {
+          "FluentValidation": "11.9.0",
+          "MediatR": "12.2.0"
+        },
+        "runtime": {
+          "AMR.DeliveryPlanning.SharedKernel.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "AMR.DeliveryPlanning.Api/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "FluentValidation/11.9.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-VneVlTvwYDkfHV5av3QrQ0amALgrLX6LV94wlYyEsh0B/klJBW7C8y2eAtj5tOZ3jH6CAVpr4s1ZGgew/QWyig==",
+      "path": "fluentvalidation/11.9.0",
+      "hashPath": "fluentvalidation.11.9.0.nupkg.sha512"
+    },
+    "MediatR/12.2.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-8TUFrHapKi6D74PhnSNEguRsH91HNGyP3R4ZQdgDorJgl9Wac5Prh0vA33QfrniAaS6L2xNNhc6vxzg+5AIbwA==",
+      "path": "mediatr/12.2.0",
+      "hashPath": "mediatr.12.2.0.nupkg.sha512"
+    },
+    "MediatR.Contracts/2.0.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-FYv95bNT4UwcNA+G/J1oX5OpRiSUxteXaUt2BJbRSdRNiIUNbggJF69wy6mnk2wYToaanpdXZdCwVylt96MpwQ==",
+      "path": "mediatr.contracts/2.0.1",
+      "hashPath": "mediatr.contracts.2.0.1.nupkg.sha512"
+    },
+    "Microsoft.AspNetCore.OpenApi/10.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-0aqIF1t+sA2T62LIeMtXGSiaV7keGQaJnvwwmu+htQdjCaKYARfXAeqp4nHH9y2etpilyZ/tnQzZg4Ilmo/c4Q==",
+      "path": "microsoft.aspnetcore.openapi/10.0.0",
+      "hashPath": "microsoft.aspnetcore.openapi.10.0.0.nupkg.sha512"
+    },
+    "Microsoft.Extensions.DependencyModel/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-NSmDw3K0ozNDgShSIpsZcbFIzBX4w28nDag+TfaQujkXGazBm+lid5onlWoCBy4VsLxqnnKjEBbGSJVWJMf43g==",
+      "path": "microsoft.extensions.dependencymodel/8.0.0",
+      "hashPath": "microsoft.extensions.dependencymodel.8.0.0.nupkg.sha512"
+    },
+    "Microsoft.OpenApi/2.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-GGYLfzV/G/ct80OZ45JxnWP7NvMX1BCugn/lX7TH5o0lcVaviavsLMTxmFV2AybXWjbi3h6FF1vgZiTK6PXndw==",
+      "path": "microsoft.openapi/2.0.0",
+      "hashPath": "microsoft.openapi.2.0.0.nupkg.sha512"
+    },
+    "Serilog/3.1.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-P6G4/4Kt9bT635bhuwdXlJ2SCqqn2nhh4gqFqQueCOr9bK/e7W9ll/IoX1Ter948cV2Z/5+5v8pAfJYUISY03A==",
+      "path": "serilog/3.1.1",
+      "hashPath": "serilog.3.1.1.nupkg.sha512"
+    },
+    "Serilog.AspNetCore/8.0.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-B/X+wAfS7yWLVOTD83B+Ip9yl4MkhioaXj90JSoWi1Ayi8XHepEnsBdrkojg08eodCnmOKmShFUN2GgEc6c0CQ==",
+      "path": "serilog.aspnetcore/8.0.1",
+      "hashPath": "serilog.aspnetcore.8.0.1.nupkg.sha512"
+    },
+    "Serilog.Extensions.Hosting/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-db0OcbWeSCvYQkHWu6n0v40N4kKaTAXNjlM3BKvcbwvNzYphQFcBR+36eQ/7hMMwOkJvAyLC2a9/jNdUL5NjtQ==",
+      "path": "serilog.extensions.hosting/8.0.0",
+      "hashPath": "serilog.extensions.hosting.8.0.0.nupkg.sha512"
+    },
+    "Serilog.Extensions.Logging/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-YEAMWu1UnWgf1c1KP85l1SgXGfiVo0Rz6x08pCiPOIBt2Qe18tcZLvdBUuV5o1QHvrs8FAry9wTIhgBRtjIlEg==",
+      "path": "serilog.extensions.logging/8.0.0",
+      "hashPath": "serilog.extensions.logging.8.0.0.nupkg.sha512"
+    },
+    "Serilog.Formatting.Compact/2.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-ob6z3ikzFM3D1xalhFuBIK1IOWf+XrQq+H4KeH4VqBcPpNcmUgZlRQ2h3Q7wvthpdZBBoY86qZOI2LCXNaLlNA==",
+      "path": "serilog.formatting.compact/2.0.0",
+      "hashPath": "serilog.formatting.compact.2.0.0.nupkg.sha512"
+    },
+    "Serilog.Settings.Configuration/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-nR0iL5HwKj5v6ULo3/zpP8NMcq9E2pxYA6XKTSWCbugVs4YqPyvaqaKOY+OMpPivKp7zMEpax2UKHnDodbRB0Q==",
+      "path": "serilog.settings.configuration/8.0.0",
+      "hashPath": "serilog.settings.configuration.8.0.0.nupkg.sha512"
+    },
+    "Serilog.Sinks.Console/5.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-IZ6bn79k+3SRXOBpwSOClUHikSkp2toGPCZ0teUkscv4dpDg9E2R2xVsNkLmwddE4OpNVO3N0xiYsAH556vN8Q==",
+      "path": "serilog.sinks.console/5.0.0",
+      "hashPath": "serilog.sinks.console.5.0.0.nupkg.sha512"
+    },
+    "Serilog.Sinks.Debug/2.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Y6g3OBJ4JzTyyw16fDqtFcQ41qQAydnEvEqmXjhwhgjsnG/FaJ8GUqF5ldsC/bVkK8KYmqrPhDO+tm4dF6xx4A==",
+      "path": "serilog.sinks.debug/2.0.0",
+      "hashPath": "serilog.sinks.debug.2.0.0.nupkg.sha512"
+    },
+    "Serilog.Sinks.File/5.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-uwV5hdhWPwUH1szhO8PJpFiahqXmzPzJT/sOijH/kFgUx+cyoDTMM8MHD0adw9+Iem6itoibbUXHYslzXsLEAg==",
+      "path": "serilog.sinks.file/5.0.0",
+      "hashPath": "serilog.sinks.file.5.0.0.nupkg.sha512"
+    },
+    "Swashbuckle.AspNetCore/6.5.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-FK05XokgjgwlCI6wCT+D4/abtQkL1X1/B9Oas6uIwHFmYrIO9WUD5aLC9IzMs9GnHfUXOtXZ2S43gN1mhs5+aA==",
+      "path": "swashbuckle.aspnetcore/6.5.0",
+      "hashPath": "swashbuckle.aspnetcore.6.5.0.nupkg.sha512"
+    },
+    "Swashbuckle.AspNetCore.Swagger/6.5.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-XWmCmqyFmoItXKFsQSwQbEAsjDKcxlNf1l+/Ki42hcb6LjKL8m5Db69OTvz5vLonMSRntYO1XLqz0OP+n3vKnA==",
+      "path": "swashbuckle.aspnetcore.swagger/6.5.0",
+      "hashPath": "swashbuckle.aspnetcore.swagger.6.5.0.nupkg.sha512"
+    },
+    "Swashbuckle.AspNetCore.SwaggerGen/6.5.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Y/qW8Qdg9OEs7V013tt+94OdPxbRdbhcEbw4NiwGvf4YBcfhL/y7qp/Mjv/cENsQ2L3NqJ2AOu94weBy/h4KvA==",
+      "path": "swashbuckle.aspnetcore.swaggergen/6.5.0",
+      "hashPath": "swashbuckle.aspnetcore.swaggergen.6.5.0.nupkg.sha512"
+    },
+    "Swashbuckle.AspNetCore.SwaggerUI/6.5.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-OvbvxX+wL8skxTBttcBsVxdh73Fag4xwqEU2edh4JMn7Ws/xJHnY/JB1e9RoCb6XpDxUF3hD9A0Z1lEUx40Pfw==",
+      "path": "swashbuckle.aspnetcore.swaggerui/6.5.0",
+      "hashPath": "swashbuckle.aspnetcore.swaggerui.6.5.0.nupkg.sha512"
+    },
+    "AMR.DeliveryPlanning.SharedKernel/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

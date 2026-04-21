@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "dgSpecHash": "W5/FWFy1LGc=",
+  "success": true,
+  "projectFilePath": "/Users/tuinui/Projects/DTMS/src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.csproj",
+  "expectedPackageFiles": [
+    "/Users/tuinui/.nuget/packages/fluentvalidation/11.9.0/fluentvalidation.11.9.0.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/mediatr/12.2.0/mediatr.12.2.0.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/mediatr.contracts/2.0.1/mediatr.contracts.2.0.1.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.configuration/10.0.6/microsoft.extensions.configuration.10.0.6.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.configuration.abstractions/10.0.6/microsoft.extensions.configuration.abstractions.10.0.6.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.configuration.binder/10.0.6/microsoft.extensions.configuration.binder.10.0.6.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.dependencyinjection/10.0.6/microsoft.extensions.dependencyinjection.10.0.6.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.dependencyinjection.abstractions/10.0.6/microsoft.extensions.dependencyinjection.abstractions.10.0.6.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.diagnostics/10.0.6/microsoft.extensions.diagnostics.10.0.6.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.diagnostics.abstractions/10.0.6/microsoft.extensions.diagnostics.abstractions.10.0.6.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.http/10.0.6/microsoft.extensions.http.10.0.6.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.http.polly/10.0.6/microsoft.extensions.http.polly.10.0.6.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.logging/10.0.6/microsoft.extensions.logging.10.0.6.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.logging.abstractions/10.0.6/microsoft.extensions.logging.abstractions.10.0.6.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.options/10.0.6/microsoft.extensions.options.10.0.6.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.options.configurationextensions/10.0.6/microsoft.extensions.options.configurationextensions.10.0.6.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.primitives/10.0.6/microsoft.extensions.primitives.10.0.6.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/polly/7.2.4/polly.7.2.4.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/polly.extensions.http/3.0.0/polly.extensions.http.3.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

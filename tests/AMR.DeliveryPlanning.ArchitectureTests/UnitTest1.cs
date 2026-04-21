@@ -1,0 +1,10 @@
+﻿namespace AMR.DeliveryPlanning.ArchitectureTests;
+
+public class UnitTest1
+{
+    [Fact]
+    public void Test1()
+    {
+
+    }
+}

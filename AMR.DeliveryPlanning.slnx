@@ -1,0 +1,67 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AMR.DeliveryPlanning.Api/AMR.DeliveryPlanning.Api.csproj" />
+    <Project Path="src/AMR.DeliveryPlanning.SharedKernel/AMR.DeliveryPlanning.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/DeliveryOrder/">
+    <Project Path="src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Application/AMR.DeliveryPlanning.DeliveryOrder.Application.csproj" />
+    <Project Path="src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Domain/AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj" />
+    <Project Path="src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.csproj" />
+    <Project Path="src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.csproj" />
+    <Project Path="src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Presentation/AMR.DeliveryPlanning.DeliveryOrder.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Dispatch/">
+    <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Application/AMR.DeliveryPlanning.Dispatch.Application.csproj" />
+    <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Domain/AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
+    <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Infrastructure/AMR.DeliveryPlanning.Dispatch.Infrastructure.csproj" />
+    <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.IntegrationEvents/AMR.DeliveryPlanning.Dispatch.IntegrationEvents.csproj" />
+    <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Presentation/AMR.DeliveryPlanning.Dispatch.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Facility/">
+    <Project Path="src/Modules/Facility/AMR.DeliveryPlanning.Facility.Application/AMR.DeliveryPlanning.Facility.Application.csproj" />
+    <Project Path="src/Modules/Facility/AMR.DeliveryPlanning.Facility.Domain/AMR.DeliveryPlanning.Facility.Domain.csproj" />
+    <Project Path="src/Modules/Facility/AMR.DeliveryPlanning.Facility.Infrastructure/AMR.DeliveryPlanning.Facility.Infrastructure.csproj" />
+    <Project Path="src/Modules/Facility/AMR.DeliveryPlanning.Facility.IntegrationEvents/AMR.DeliveryPlanning.Facility.IntegrationEvents.csproj" />
+    <Project Path="src/Modules/Facility/AMR.DeliveryPlanning.Facility.Presentation/AMR.DeliveryPlanning.Facility.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Fleet/">
+    <Project Path="src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Application/AMR.DeliveryPlanning.Fleet.Application.csproj" />
+    <Project Path="src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Domain/AMR.DeliveryPlanning.Fleet.Domain.csproj" />
+    <Project Path="src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/AMR.DeliveryPlanning.Fleet.Infrastructure.csproj" />
+    <Project Path="src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.IntegrationEvents/AMR.DeliveryPlanning.Fleet.IntegrationEvents.csproj" />
+    <Project Path="src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Presentation/AMR.DeliveryPlanning.Fleet.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Planning/">
+    <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.Application/AMR.DeliveryPlanning.Planning.Application.csproj" />
+    <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.Domain/AMR.DeliveryPlanning.Planning.Domain.csproj" />
+    <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.Infrastructure/AMR.DeliveryPlanning.Planning.Infrastructure.csproj" />
+    <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.IntegrationEvents/AMR.DeliveryPlanning.Planning.IntegrationEvents.csproj" />
+    <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.Presentation/AMR.DeliveryPlanning.Planning.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/VendorAdapter/">
+    <Project Path="src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Abstractions/AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj" />
+    <Project Path="src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Feeder/AMR.DeliveryPlanning.VendorAdapter.Feeder.csproj" />
+    <Project Path="src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.csproj" />
+    <Project Path="src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Riot3/AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj" />
+    <Project Path="src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Simulator/AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AMR.DeliveryPlanning.ArchitectureTests/AMR.DeliveryPlanning.ArchitectureTests.csproj" />
+    <Project Path="tests/AMR.DeliveryPlanning.FunctionalTests/AMR.DeliveryPlanning.FunctionalTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Modules/">
+    <Project Path="tests/Modules/DeliveryOrder.IntegrationTests/DeliveryOrder.IntegrationTests.csproj" />
+    <Project Path="tests/Modules/DeliveryOrder.UnitTests/DeliveryOrder.UnitTests.csproj" />
+    <Project Path="tests/Modules/Dispatch.IntegrationTests/Dispatch.IntegrationTests.csproj" />
+    <Project Path="tests/Modules/Dispatch.UnitTests/Dispatch.UnitTests.csproj" />
+    <Project Path="tests/Modules/Facility.IntegrationTests/Facility.IntegrationTests.csproj" />
+    <Project Path="tests/Modules/Facility.UnitTests/Facility.UnitTests.csproj" />
+    <Project Path="tests/Modules/Fleet.IntegrationTests/Fleet.IntegrationTests.csproj" />
+    <Project Path="tests/Modules/Fleet.UnitTests/Fleet.UnitTests.csproj" />
+    <Project Path="tests/Modules/Planning.IntegrationTests/Planning.IntegrationTests.csproj" />
+    <Project Path="tests/Modules/Planning.UnitTests/Planning.UnitTests.csproj" />
+    <Project Path="tests/Modules/VendorAdapter.IntegrationTests/VendorAdapter.IntegrationTests.csproj" />
+    <Project Path="tests/Modules/VendorAdapter.UnitTests/VendorAdapter.UnitTests.csproj" />
+  </Folder>
+</Solution>

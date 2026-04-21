@@ -1,0 +1,17 @@
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.Fleet.Application.deps.json
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.Fleet.Application.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.Fleet.Application.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.Fleet.Application.GeneratedMSBuildEditorConfig.editorconfig
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.Fleet.Application.AssemblyInfoInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.Fleet.Application.AssemblyInfo.cs
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.Fleet.Application.csproj.CoreCompileInputs.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.Fleet.Application.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Application/debug/refint/AMR.DeliveryPlanning.Fleet.Application.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.Fleet.Application.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Application/debug/ref/AMR.DeliveryPlanning.Fleet.Application.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.Fleet.Application.csproj.AssemblyReference.cache
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.Fleet.Domain.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.SharedKernel.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.Fleet.Domain.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.SharedKernel.pdb
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.Deli.3F953D83.Up2Date

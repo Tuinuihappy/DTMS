@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "dgSpecHash": "DucHVQtPKT4=",
+  "success": true,
+  "projectFilePath": "/Users/tuinui/Projects/DTMS/src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Application/AMR.DeliveryPlanning.Fleet.Application.csproj",
+  "expectedPackageFiles": [
+    "/Users/tuinui/.nuget/packages/fluentvalidation/11.9.0/fluentvalidation.11.9.0.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/mediatr/12.2.0/mediatr.12.2.0.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/mediatr.contracts/2.0.1/mediatr.contracts.2.0.1.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.dependencyinjection.abstractions/10.0.6/microsoft.extensions.dependencyinjection.abstractions.10.0.6.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/microsoft.extensions.logging.abstractions/10.0.6/microsoft.extensions.logging.abstractions.10.0.6.nupkg.sha512"
+  ],
+  "logs": []
+}
