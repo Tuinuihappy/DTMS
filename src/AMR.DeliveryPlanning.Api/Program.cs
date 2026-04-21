@@ -80,8 +80,15 @@ using (var scope = app.Services.CreateScope())
     var dispatchDb = scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Dispatch.Infrastructure.Data.DispatchDbContext>();
     await CreateSchemaAndTables(dispatchDb, "dispatch", logger);
 
+    // 6. Auth
+    var authDb = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+    await CreateSchemaAndTables(authDb, "auth", logger);
+
     logger.LogInformation("Database migrations applied successfully.");
 }
+
+// Seed default admin user
+await AuthEndpoints.SeedDefaultUserAsync(app.Services);
 
 static async Task CreateSchemaAndTables(DbContext db, string schemaName, Microsoft.Extensions.Logging.ILogger logger)
 {

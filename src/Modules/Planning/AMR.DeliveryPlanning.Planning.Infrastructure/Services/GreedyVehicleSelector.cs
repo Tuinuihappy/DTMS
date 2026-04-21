@@ -4,55 +4,71 @@ using Microsoft.Extensions.Logging;
 namespace AMR.DeliveryPlanning.Planning.Infrastructure.Services;
 
 /// <summary>
-/// Greedy vehicle selector: picks the closest idle vehicle with sufficient battery.
-/// In MVP, this uses a local cache of vehicle states populated via Integration Events.
+/// Greedy vehicle selector that queries the Fleet module's DB for idle vehicles.
+/// Falls back to the in-memory cache for backward compatibility in tests.
 /// </summary>
 public class GreedyVehicleSelector : IVehicleSelector
 {
+    private readonly IFleetVehicleProvider _fleetProvider;
     private readonly ILogger<GreedyVehicleSelector> _logger;
 
-    // In-memory cache of available vehicles (populated by event handlers in production)
-    // For MVP, this acts as a simple placeholder until MassTransit consumers are wired up.
+    // Static cache kept for integration test seeding (backward compat)
     private static readonly List<VehicleCandidate> _cachedVehicles = new();
 
-    public GreedyVehicleSelector(ILogger<GreedyVehicleSelector> logger)
+    public GreedyVehicleSelector(IFleetVehicleProvider fleetProvider, ILogger<GreedyVehicleSelector> logger)
     {
+        _fleetProvider = fleetProvider;
         _logger = logger;
     }
 
     /// <summary>
-    /// Register a vehicle into the local cache (called by Integration Event handler).
+    /// Register a vehicle into the local cache (used by tests and event handlers).
     /// </summary>
     public static void UpdateVehicleCache(Guid vehicleId, double distanceToOrigin, double batteryLevel)
     {
         _cachedVehicles.RemoveAll(v => v.VehicleId == vehicleId);
-        if (batteryLevel > 20) // Only consider vehicles with > 20% battery
+        if (batteryLevel > 20)
         {
             _cachedVehicles.Add(new VehicleCandidate(vehicleId, distanceToOrigin, batteryLevel));
         }
     }
 
-    public Task<VehicleCandidate?> SelectBestVehicleAsync(Guid pickupStationId, CancellationToken cancellationToken = default)
+    public async Task<VehicleCandidate?> SelectBestVehicleAsync(Guid pickupStationId, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Selecting best vehicle for pickup station {StationId} from {Count} candidates",
-            pickupStationId, _cachedVehicles.Count);
+        // 1. Try Fleet DB first
+        var dbCandidates = await _fleetProvider.GetIdleVehiclesAsync(cancellationToken);
 
-        // Greedy: pick the vehicle with lowest distance, breaking ties by highest battery
-        var best = _cachedVehicles
+        if (dbCandidates.Count > 0)
+        {
+            _logger.LogInformation("Found {Count} idle vehicles from Fleet DB", dbCandidates.Count);
+
+            var best = dbCandidates
+                .OrderBy(v => v.DistanceToPickup)
+                .ThenByDescending(v => v.BatteryLevel)
+                .First();
+
+            _logger.LogInformation("Selected vehicle {VehicleId} from Fleet DB (battery={Battery}%)",
+                best.VehicleId, best.BatteryLevel);
+            return best;
+        }
+
+        // 2. Fallback to in-memory cache (tests, event-seeded)
+        _logger.LogInformation("Fleet DB empty, checking in-memory cache ({Count} candidates)", _cachedVehicles.Count);
+
+        var cached = _cachedVehicles
             .OrderBy(v => v.DistanceToPickup)
             .ThenByDescending(v => v.BatteryLevel)
             .FirstOrDefault();
 
-        if (best != null)
+        if (cached != null)
         {
-            _logger.LogInformation("Selected vehicle {VehicleId} (distance={Distance}, battery={Battery}%)",
-                best.VehicleId, best.DistanceToPickup, best.BatteryLevel);
+            _logger.LogInformation("Selected vehicle {VehicleId} from cache", cached.VehicleId);
         }
         else
         {
             _logger.LogWarning("No available vehicles found for pickup station {StationId}", pickupStationId);
         }
 
-        return Task.FromResult(best);
+        return cached;
     }
 }

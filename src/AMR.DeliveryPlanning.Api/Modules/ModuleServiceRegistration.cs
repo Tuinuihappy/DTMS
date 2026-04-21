@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Api.Auth;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Repositories;
@@ -32,6 +33,9 @@ public static class ModuleServiceRegistration
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection");
 
+        // ── Auth Module ────────────────────────────────────────────────
+        services.AddDbContext<AuthDbContext>(o => o.UseNpgsql(connectionString));
+
         // ── Facility Module ───────────────────────────────────────────
         services.AddDbContext<FacilityDbContext>(o => o.UseNpgsql(connectionString));
         services.AddScoped<IMapRepository, MapRepository>();
@@ -52,6 +56,7 @@ public static class ModuleServiceRegistration
         services.AddScoped<IRouteCostCalculator, SimpleRouteCostCalculator>();
         services.AddScoped<IPatternClassifier, PatternClassifier>();
         services.AddScoped<IRouteSolver, NearestNeighborTspSolver>();
+        services.AddScoped<IFleetVehicleProvider, FleetVehicleProvider>();
 
         // ── Dispatch Module ───────────────────────────────────────────
         services.AddDbContext<DispatchDbContext>(o => o.UseNpgsql(connectionString));
