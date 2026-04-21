@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.Api.Middlewares;
 using AMR.DeliveryPlanning.Api.Modules;
+using Scalar.AspNetCore;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,8 +10,7 @@ builder.Host.UseSerilog((context, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration));
 
 // Add services to the container.
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddOpenApi();
 
 // Configure MediatR — scan all module Application assemblies
 builder.Services.AddMediatR(cfg =>
@@ -30,8 +30,8 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();

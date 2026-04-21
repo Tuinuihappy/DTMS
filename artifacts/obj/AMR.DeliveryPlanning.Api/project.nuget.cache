@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "EF+lyJuQga4=",
+  "dgSpecHash": "9CuNAHe/UDY=",
   "success": true,
   "projectFilePath": "/Users/tuinui/Projects/DTMS/src/AMR.DeliveryPlanning.Api/AMR.DeliveryPlanning.Api.csproj",
   "expectedPackageFiles": [
@@ -12,7 +12,6 @@
     "/Users/tuinui/.nuget/packages/microsoft.entityframeworkcore.abstractions/10.0.0/microsoft.entityframeworkcore.abstractions.10.0.0.nupkg.sha512",
     "/Users/tuinui/.nuget/packages/microsoft.entityframeworkcore.analyzers/10.0.0/microsoft.entityframeworkcore.analyzers.10.0.0.nupkg.sha512",
     "/Users/tuinui/.nuget/packages/microsoft.entityframeworkcore.relational/10.0.0/microsoft.entityframeworkcore.relational.10.0.0.nupkg.sha512",
-    "/Users/tuinui/.nuget/packages/microsoft.extensions.apidescription.server/6.0.5/microsoft.extensions.apidescription.server.6.0.5.nupkg.sha512",
     "/Users/tuinui/.nuget/packages/microsoft.extensions.dependencymodel/8.0.0/microsoft.extensions.dependencymodel.8.0.0.nupkg.sha512",
     "/Users/tuinui/.nuget/packages/microsoft.extensions.http.polly/10.0.6/microsoft.extensions.http.polly.10.0.6.nupkg.sha512",
     "/Users/tuinui/.nuget/packages/microsoft.openapi/2.0.0/microsoft.openapi.2.0.0.nupkg.sha512",
@@ -20,6 +19,7 @@
     "/Users/tuinui/.nuget/packages/npgsql.entityframeworkcore.postgresql/10.0.0/npgsql.entityframeworkcore.postgresql.10.0.0.nupkg.sha512",
     "/Users/tuinui/.nuget/packages/polly/7.2.4/polly.7.2.4.nupkg.sha512",
     "/Users/tuinui/.nuget/packages/polly.extensions.http/3.0.0/polly.extensions.http.3.0.0.nupkg.sha512",
+    "/Users/tuinui/.nuget/packages/scalar.aspnetcore/2.4.12/scalar.aspnetcore.2.4.12.nupkg.sha512",
     "/Users/tuinui/.nuget/packages/serilog/3.1.1/serilog.3.1.1.nupkg.sha512",
     "/Users/tuinui/.nuget/packages/serilog.aspnetcore/8.0.1/serilog.aspnetcore.8.0.1.nupkg.sha512",
     "/Users/tuinui/.nuget/packages/serilog.extensions.hosting/8.0.0/serilog.extensions.hosting.8.0.0.nupkg.sha512",
@@ -28,11 +28,7 @@
     "/Users/tuinui/.nuget/packages/serilog.settings.configuration/8.0.0/serilog.settings.configuration.8.0.0.nupkg.sha512",
     "/Users/tuinui/.nuget/packages/serilog.sinks.console/5.0.0/serilog.sinks.console.5.0.0.nupkg.sha512",
     "/Users/tuinui/.nuget/packages/serilog.sinks.debug/2.0.0/serilog.sinks.debug.2.0.0.nupkg.sha512",
-    "/Users/tuinui/.nuget/packages/serilog.sinks.file/5.0.0/serilog.sinks.file.5.0.0.nupkg.sha512",
-    "/Users/tuinui/.nuget/packages/swashbuckle.aspnetcore/6.5.0/swashbuckle.aspnetcore.6.5.0.nupkg.sha512",
-    "/Users/tuinui/.nuget/packages/swashbuckle.aspnetcore.swagger/6.5.0/swashbuckle.aspnetcore.swagger.6.5.0.nupkg.sha512",
-    "/Users/tuinui/.nuget/packages/swashbuckle.aspnetcore.swaggergen/6.5.0/swashbuckle.aspnetcore.swaggergen.6.5.0.nupkg.sha512",
-    "/Users/tuinui/.nuget/packages/swashbuckle.aspnetcore.swaggerui/6.5.0/swashbuckle.aspnetcore.swaggerui.6.5.0.nupkg.sha512"
+    "/Users/tuinui/.nuget/packages/serilog.sinks.file/5.0.0/serilog.sinks.file.5.0.0.nupkg.sha512"
   ],
   "logs": []
 }

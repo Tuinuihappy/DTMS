@@ -22,8 +22,8 @@
           "AMR.DeliveryPlanning.VendorAdapter.Feeder": "1.0.0",
           "AMR.DeliveryPlanning.VendorAdapter.Infrastructure": "1.0.0",
           "Microsoft.AspNetCore.OpenApi": "10.0.0",
-          "Serilog.AspNetCore": "8.0.1",
-          "Swashbuckle.AspNetCore": "6.5.0"
+          "Scalar.AspNetCore": "2.4.12",
+          "Serilog.AspNetCore": "8.0.1"
         },
         "runtime": {
           "AMR.DeliveryPlanning.Api.dll": {}
@@ -165,6 +165,14 @@
           }
         }
       },
+      "Scalar.AspNetCore/2.4.12": {
+        "runtime": {
+          "lib/net9.0/Scalar.AspNetCore.dll": {
+            "assemblyVersion": "2.4.12.0",
+            "fileVersion": "2.4.12.0"
+          }
+        }
+      },
       "Serilog/3.1.1": {
         "runtime": {
           "lib/net7.0/Serilog.dll": {
@@ -267,43 +275,6 @@
           "lib/net5.0/Serilog.Sinks.File.dll": {
             "assemblyVersion": "5.0.0.0",
             "fileVersion": "5.0.0.0"
-          }
-        }
-      },
-      "Swashbuckle.AspNetCore/6.5.0": {
-        "dependencies": {
-          "Swashbuckle.AspNetCore.Swagger": "6.5.0",
-          "Swashbuckle.AspNetCore.SwaggerGen": "6.5.0",
-          "Swashbuckle.AspNetCore.SwaggerUI": "6.5.0"
-        }
-      },
-      "Swashbuckle.AspNetCore.Swagger/6.5.0": {
-        "dependencies": {
-          "Microsoft.OpenApi": "2.0.0"
-        },
-        "runtime": {
-          "lib/net7.0/Swashbuckle.AspNetCore.Swagger.dll": {
-            "assemblyVersion": "6.5.0.0",
-            "fileVersion": "6.5.0.0"
-          }
-        }
-      },
-      "Swashbuckle.AspNetCore.SwaggerGen/6.5.0": {
-        "dependencies": {
-          "Swashbuckle.AspNetCore.Swagger": "6.5.0"
-        },
-        "runtime": {
-          "lib/net7.0/Swashbuckle.AspNetCore.SwaggerGen.dll": {
-            "assemblyVersion": "6.5.0.0",
-            "fileVersion": "6.5.0.0"
-          }
-        }
-      },
-      "Swashbuckle.AspNetCore.SwaggerUI/6.5.0": {
-        "runtime": {
-          "lib/net7.0/Swashbuckle.AspNetCore.SwaggerUI.dll": {
-            "assemblyVersion": "6.5.0.0",
-            "fileVersion": "6.5.0.0"
           }
         }
       },
@@ -740,6 +711,13 @@
       "path": "polly.extensions.http/3.0.0",
       "hashPath": "polly.extensions.http.3.0.0.nupkg.sha512"
     },
+    "Scalar.AspNetCore/2.4.12": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-KPLUjBrdOdWRqplUY2/3J92l+UO0Q+1xVbcfotogKtpcvHr4uaGXb4BgA11bbAZ9ND+incL2pgxmhJlyPr4/9Q==",
+      "path": "scalar.aspnetcore/2.4.12",
+      "hashPath": "scalar.aspnetcore.2.4.12.nupkg.sha512"
+    },
     "Serilog/3.1.1": {
       "type": "package",
       "serviceable": true,
@@ -802,34 +780,6 @@
       "sha512": "sha512-uwV5hdhWPwUH1szhO8PJpFiahqXmzPzJT/sOijH/kFgUx+cyoDTMM8MHD0adw9+Iem6itoibbUXHYslzXsLEAg==",
       "path": "serilog.sinks.file/5.0.0",
       "hashPath": "serilog.sinks.file.5.0.0.nupkg.sha512"
-    },
-    "Swashbuckle.AspNetCore/6.5.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-FK05XokgjgwlCI6wCT+D4/abtQkL1X1/B9Oas6uIwHFmYrIO9WUD5aLC9IzMs9GnHfUXOtXZ2S43gN1mhs5+aA==",
-      "path": "swashbuckle.aspnetcore/6.5.0",
-      "hashPath": "swashbuckle.aspnetcore.6.5.0.nupkg.sha512"
-    },
-    "Swashbuckle.AspNetCore.Swagger/6.5.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-XWmCmqyFmoItXKFsQSwQbEAsjDKcxlNf1l+/Ki42hcb6LjKL8m5Db69OTvz5vLonMSRntYO1XLqz0OP+n3vKnA==",
-      "path": "swashbuckle.aspnetcore.swagger/6.5.0",
-      "hashPath": "swashbuckle.aspnetcore.swagger.6.5.0.nupkg.sha512"
-    },
-    "Swashbuckle.AspNetCore.SwaggerGen/6.5.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-Y/qW8Qdg9OEs7V013tt+94OdPxbRdbhcEbw4NiwGvf4YBcfhL/y7qp/Mjv/cENsQ2L3NqJ2AOu94weBy/h4KvA==",
-      "path": "swashbuckle.aspnetcore.swaggergen/6.5.0",
-      "hashPath": "swashbuckle.aspnetcore.swaggergen.6.5.0.nupkg.sha512"
-    },
-    "Swashbuckle.AspNetCore.SwaggerUI/6.5.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-OvbvxX+wL8skxTBttcBsVxdh73Fag4xwqEU2edh4JMn7Ws/xJHnY/JB1e9RoCb6XpDxUF3hD9A0Z1lEUx40Pfw==",
-      "path": "swashbuckle.aspnetcore.swaggerui/6.5.0",
-      "hashPath": "swashbuckle.aspnetcore.swaggerui.6.5.0.nupkg.sha512"
     },
     "AMR.DeliveryPlanning.DeliveryOrder.Application/1.0.0": {
       "type": "project",
