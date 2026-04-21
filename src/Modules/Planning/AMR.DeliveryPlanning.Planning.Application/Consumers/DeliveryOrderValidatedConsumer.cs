@@ -1,4 +1,6 @@
 using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
+using AMR.DeliveryPlanning.Planning.Application.Commands.AssignVehicleToJob;
+using AMR.DeliveryPlanning.Planning.Application.Commands.CommitPlan;
 using AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder;
 using MassTransit;
 using MediatR;
@@ -7,8 +9,8 @@ using Microsoft.Extensions.Logging;
 namespace AMR.DeliveryPlanning.Planning.Application.Consumers;
 
 /// <summary>
-/// Listens for DeliveryOrderReadyForPlanningIntegrationEvent and auto-creates a Job.
-/// Flow: DeliveryOrder (Validated) → Planning (Create Job)
+/// Full Auto Planning Pipeline:
+///   DeliveryOrder (Validated) → Create Job → Assign Vehicle → Commit Plan → Trip (auto via PlanCommittedConsumer)
 /// </summary>
 public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderReadyForPlanningIntegrationEvent>
 {
@@ -24,19 +26,49 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderReadyForPla
     public async Task Consume(ConsumeContext<DeliveryOrderReadyForPlanningIntegrationEvent> context)
     {
         var evt = context.Message;
-        _logger.LogInformation("Received DeliveryOrderReady event for Order {OrderId}, creating Job...", evt.DeliveryOrderId);
+        _logger.LogInformation("[AutoPlan] Received Order {OrderId} — starting full auto planning...", evt.DeliveryOrderId);
 
-        var command = new CreateJobFromOrderCommand(
+        // ── Step 1: Create Job ──
+        var createCommand = new CreateJobFromOrderCommand(
             evt.DeliveryOrderId,
             evt.PickupStationId,
             evt.DropStationId,
             evt.Priority);
 
-        var result = await _sender.Send(command, context.CancellationToken);
+        var createResult = await _sender.Send(createCommand, context.CancellationToken);
 
-        if (result.IsSuccess)
-            _logger.LogInformation("Job {JobId} created for DeliveryOrder {OrderId}", result.Value, evt.DeliveryOrderId);
-        else
-            _logger.LogWarning("Failed to create Job for DeliveryOrder {OrderId}: {Error}", evt.DeliveryOrderId, result.Error);
+        if (!createResult.IsSuccess)
+        {
+            _logger.LogWarning("[AutoPlan] Failed to create Job for Order {OrderId}: {Error}", evt.DeliveryOrderId, createResult.Error);
+            return;
+        }
+
+        var jobId = createResult.Value;
+        _logger.LogInformation("[AutoPlan] Step 1/3 ✓ Job {JobId} created", jobId);
+
+        // ── Step 2: Assign Vehicle ──
+        var assignResult = await _sender.Send(new AssignVehicleToJobCommand(jobId), context.CancellationToken);
+
+        if (!assignResult.IsSuccess)
+        {
+            _logger.LogWarning("[AutoPlan] Step 2/3 ✗ No vehicle available for Job {JobId}: {Error}. Job remains Created — can be manually assigned later.",
+                jobId, assignResult.Error);
+            return;
+        }
+
+        _logger.LogInformation("[AutoPlan] Step 2/3 ✓ Vehicle assigned to Job {JobId}", jobId);
+
+        // ── Step 3: Commit Plan ──
+        var commitResult = await _sender.Send(new CommitPlanCommand(jobId), context.CancellationToken);
+
+        if (!commitResult.IsSuccess)
+        {
+            _logger.LogWarning("[AutoPlan] Step 3/3 ✗ Failed to commit Job {JobId}: {Error}", jobId, commitResult.Error);
+            return;
+        }
+
+        _logger.LogInformation("[AutoPlan] Step 3/3 ✓ Job {JobId} committed — Trip will be auto-dispatched via event", jobId);
+        _logger.LogInformation("[AutoPlan] ═══ Full pipeline complete: Order {OrderId} → Job {JobId} → Trip (pending) ═══",
+            evt.DeliveryOrderId, jobId);
     }
 }
