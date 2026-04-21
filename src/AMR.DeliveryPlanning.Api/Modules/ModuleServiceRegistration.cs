@@ -15,8 +15,9 @@ using AMR.DeliveryPlanning.Planning.Domain.Services;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Repositories;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Services;
-using AMR.DeliveryPlanning.VendorAdapter.Abstractions;
+using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.VendorAdapter.Infrastructure;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.Api.Modules;
@@ -56,6 +57,31 @@ public static class ModuleServiceRegistration
 
         // ── VendorAdapter Module ──────────────────────────────────────
         services.AddVendorAdapterInfrastructure(configuration);
+
+        // ── MassTransit + RabbitMQ ────────────────────────────────────
+        services.AddMassTransit(bus =>
+        {
+            // Auto-scan consumers from all module Application assemblies
+            bus.AddConsumers(
+                typeof(AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly,
+                typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly,
+                typeof(AMR.DeliveryPlanning.Dispatch.Application.Commands.DispatchTrip.DispatchTripCommand).Assembly
+            );
+
+            bus.UsingRabbitMq((context, cfg) =>
+            {
+                var rabbitConfig = configuration.GetSection("RabbitMq");
+                cfg.Host(rabbitConfig["Host"] ?? "localhost", h =>
+                {
+                    h.Username(rabbitConfig["Username"] ?? "guest");
+                    h.Password(rabbitConfig["Password"] ?? "guest");
+                });
+
+                cfg.ConfigureEndpoints(context);
+            });
+        });
+
+        services.AddScoped<IEventBus, MassTransitEventBus>();
 
         return services;
     }

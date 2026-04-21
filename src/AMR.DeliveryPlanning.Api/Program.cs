@@ -27,6 +27,30 @@ builder.Services.AddAllModules(builder.Configuration);
 
 var app = builder.Build();
 
+// Auto-migrate all module databases on startup
+using (var scope = app.Services.CreateScope())
+{
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    logger.LogInformation("Applying database migrations...");
+
+    var facilityDb = scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Facility.Infrastructure.Data.FacilityDbContext>();
+    await facilityDb.Database.EnsureCreatedAsync();
+
+    var fleetDb = scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Fleet.Infrastructure.Data.FleetDbContext>();
+    await fleetDb.Database.EnsureCreatedAsync();
+
+    var deliveryOrderDb = scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data.DeliveryOrderDbContext>();
+    await deliveryOrderDb.Database.EnsureCreatedAsync();
+
+    var planningDb = scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Planning.Infrastructure.Data.PlanningDbContext>();
+    await planningDb.Database.EnsureCreatedAsync();
+
+    var dispatchDb = scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Dispatch.Infrastructure.Data.DispatchDbContext>();
+    await dispatchDb.Database.EnsureCreatedAsync();
+
+    logger.LogInformation("Database migrations applied successfully.");
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
