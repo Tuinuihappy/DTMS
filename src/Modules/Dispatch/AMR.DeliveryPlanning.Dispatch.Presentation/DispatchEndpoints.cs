@@ -1,6 +1,7 @@
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.DispatchTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.ReportTaskCompleted;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.ReportTaskFailed;
+using AMR.DeliveryPlanning.Dispatch.Application.Commands.StartTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripById;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
@@ -22,6 +23,13 @@ public static class DispatchEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/dispatch/trips/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
+        });
+
+        // POST /api/dispatch/trips/{id}/start — Start a created trip
+        group.MapPost("/trips/{id:guid}/start", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new StartTripCommand(id));
+            return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         });
 
         // POST /api/dispatch/trips/{tripId}/tasks/{taskId}/complete — Report task completed

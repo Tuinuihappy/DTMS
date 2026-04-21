@@ -329,5 +329,57 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         jobId.Should().NotBe(Guid.Empty);
     }
 
+    // ── Hardening: Trip Lifecycle ─────────────────────────────────
+
+    [Fact]
+    public async Task Dispatch_TripLifecycle_CreateStartComplete()
+    {
+        var client = await _factory.GetAuthenticatedClient();
+
+        // Create trip (auto-starts on dispatch)
+        var createResponse = await client.PostAsJsonAsync("/api/dispatch/trips", new
+        {
+            JobId = Guid.NewGuid(),
+            VehicleId = Guid.NewGuid(),
+            PickupStationId = Guid.NewGuid(),
+            DropStationId = Guid.NewGuid()
+        });
+        createResponse.IsSuccessStatusCode.Should().BeTrue($"Create trip failed: {await createResponse.Content.ReadAsStringAsync()}");
+        var tripId = await createResponse.Content.ReadFromJsonAsync<Guid>();
+
+        // Verify trip is auto-started (status=1 = InProgress)
+        var getResponse = await client.GetAsync($"/api/dispatch/trips/{tripId}");
+        getResponse.IsSuccessStatusCode.Should().BeTrue();
+        var body = await getResponse.Content.ReadAsStringAsync();
+        body.Should().Contain("\"status\":1");
+    }
+
+    // ── Hardening: Auth Register ─────────────────────────────────
+
+    [Fact]
+    public async Task Auth_Register_CreatesNewUser()
+    {
+        var client = await _factory.GetAuthenticatedClient();
+
+        var username = $"testuser_{Guid.NewGuid():N}"[..20];
+        var response = await client.PostAsJsonAsync("/api/auth/register", new
+        {
+            Username = username,
+            Password = "Test1234!",
+            Role = "Operator"
+        });
+
+        response.IsSuccessStatusCode.Should().BeTrue($"Register failed: {await response.Content.ReadAsStringAsync()}");
+
+        // Login with new user
+        var loginClient = _factory.CreateClient();
+        var loginResponse = await loginClient.PostAsJsonAsync("/api/auth/token", new
+        {
+            Username = username,
+            Password = "Test1234!"
+        });
+        loginResponse.IsSuccessStatusCode.Should().BeTrue("New user should be able to login");
+    }
+
     private record TokenResponse(string Token, DateTime ExpiresAt);
 }

@@ -1208,6 +1208,7 @@
       },
       "AMR.DeliveryPlanning.Planning.Infrastructure/1.0.0": {
         "dependencies": {
+          "AMR.DeliveryPlanning.Fleet.Infrastructure": "1.0.0",
           "AMR.DeliveryPlanning.Planning.Domain": "1.0.0",
           "Microsoft.EntityFrameworkCore": "10.0.0",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "10.0.0"

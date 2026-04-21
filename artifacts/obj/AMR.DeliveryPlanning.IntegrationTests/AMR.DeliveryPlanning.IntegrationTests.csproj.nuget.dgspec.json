@@ -9489,6 +9489,9 @@
           "net10.0": {
             "targetAlias": "net10.0",
             "projectReferences": {
+              "/Users/tuinui/Projects/DTMS/src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/AMR.DeliveryPlanning.Fleet.Infrastructure.csproj": {
+                "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/AMR.DeliveryPlanning.Fleet.Infrastructure.csproj"
+              },
               "/Users/tuinui/Projects/DTMS/src/Modules/Planning/AMR.DeliveryPlanning.Planning.Domain/AMR.DeliveryPlanning.Planning.Domain.csproj": {
                 "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/Planning/AMR.DeliveryPlanning.Planning.Domain/AMR.DeliveryPlanning.Planning.Domain.csproj"
               }

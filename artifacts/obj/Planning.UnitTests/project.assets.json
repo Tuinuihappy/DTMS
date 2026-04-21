@@ -877,6 +877,49 @@
           "build/net6.0/xunit.runner.visualstudio.props": {}
         }
       },
+      "AMR.DeliveryPlanning.Fleet.Application/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.Fleet.Domain": "1.0.0",
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.Application.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.Application.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Fleet.Domain/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.Domain.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.Domain.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Fleet.Infrastructure/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.Fleet.Application": "1.0.0",
+          "AMR.DeliveryPlanning.Fleet.Domain": "1.0.0",
+          "Microsoft.EntityFrameworkCore": "10.0.0",
+          "Npgsql.EntityFrameworkCore.PostgreSQL": "10.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.Infrastructure.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.Infrastructure.dll": {}
+        }
+      },
       "AMR.DeliveryPlanning.Planning.Domain/1.0.0": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v10.0",
@@ -894,6 +937,7 @@
         "type": "project",
         "framework": ".NETCoreApp,Version=v10.0",
         "dependencies": {
+          "AMR.DeliveryPlanning.Fleet.Infrastructure": "1.0.0",
           "AMR.DeliveryPlanning.Planning.Domain": "1.0.0",
           "Microsoft.EntityFrameworkCore": "10.0.0",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "10.0.0"
@@ -2174,6 +2218,21 @@
         "xunit.runner.visualstudio.2.5.7.nupkg.sha512",
         "xunit.runner.visualstudio.nuspec"
       ]
+    },
+    "AMR.DeliveryPlanning.Fleet.Application/1.0.0": {
+      "type": "project",
+      "path": "../../../src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Application/AMR.DeliveryPlanning.Fleet.Application.csproj",
+      "msbuildProject": "../../../src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Application/AMR.DeliveryPlanning.Fleet.Application.csproj"
+    },
+    "AMR.DeliveryPlanning.Fleet.Domain/1.0.0": {
+      "type": "project",
+      "path": "../../../src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Domain/AMR.DeliveryPlanning.Fleet.Domain.csproj",
+      "msbuildProject": "../../../src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Domain/AMR.DeliveryPlanning.Fleet.Domain.csproj"
+    },
+    "AMR.DeliveryPlanning.Fleet.Infrastructure/1.0.0": {
+      "type": "project",
+      "path": "../../../src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/AMR.DeliveryPlanning.Fleet.Infrastructure.csproj",
+      "msbuildProject": "../../../src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/AMR.DeliveryPlanning.Fleet.Infrastructure.csproj"
     },
     "AMR.DeliveryPlanning.Planning.Domain/1.0.0": {
       "type": "project",

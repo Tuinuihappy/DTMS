@@ -131,3 +131,9 @@
 /Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/Npgsql.EntityFrameworkCore.PostgreSQL.dll
 /Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/AMR.DeliveryPlanning.Planning.Infrastructure.dll
 /Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/AMR.DeliveryPlanning.Planning.Infrastructure.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/AMR.DeliveryPlanning.Fleet.Application.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/AMR.DeliveryPlanning.Fleet.Domain.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/AMR.DeliveryPlanning.Fleet.Infrastructure.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/AMR.DeliveryPlanning.Fleet.Application.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/AMR.DeliveryPlanning.Fleet.Domain.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/Planning.UnitTests/debug/AMR.DeliveryPlanning.Fleet.Infrastructure.pdb

@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AMR.DeliveryPlanning.Planning.Domain\AMR.DeliveryPlanning.Planning.Domain.csproj" />
+    <ProjectReference Include="..\..\Fleet\AMR.DeliveryPlanning.Fleet.Infrastructure\AMR.DeliveryPlanning.Fleet.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

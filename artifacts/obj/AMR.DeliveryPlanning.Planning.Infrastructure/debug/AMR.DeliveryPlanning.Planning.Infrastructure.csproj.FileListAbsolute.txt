@@ -16,3 +16,9 @@
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Planning.Infrastructure.csproj.AssemblyReference.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.Deli.3645EDD7.Up2Date
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Planning.Infrastructure.sourcelink.json
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Fleet.Application.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Fleet.Domain.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Fleet.Infrastructure.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Fleet.Infrastructure.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Fleet.Application.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.Infrastructure/debug/AMR.DeliveryPlanning.Fleet.Domain.pdb
