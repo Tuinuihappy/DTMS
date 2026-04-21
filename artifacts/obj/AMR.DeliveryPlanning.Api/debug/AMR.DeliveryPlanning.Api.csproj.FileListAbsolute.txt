@@ -252,3 +252,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/zh-Hans/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/zh-Hant/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/runtimes/win/lib/net9.0/System.Windows.Extensions.dll
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/Swashbuckle.AspNetCore.SwaggerUI.dll

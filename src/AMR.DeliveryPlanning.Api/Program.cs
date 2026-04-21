@@ -1,6 +1,7 @@
 using AMR.DeliveryPlanning.Api.Middlewares;
 using AMR.DeliveryPlanning.Api.Modules;
-using Scalar.AspNetCore;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -33,22 +34,53 @@ using (var scope = app.Services.CreateScope())
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     logger.LogInformation("Applying database migrations...");
 
+    // 1. Facility — creates the DB + its tables
     var facilityDb = scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Facility.Infrastructure.Data.FacilityDbContext>();
     await facilityDb.Database.EnsureCreatedAsync();
 
+    // 2. Fleet
     var fleetDb = scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Fleet.Infrastructure.Data.FleetDbContext>();
-    await fleetDb.Database.EnsureCreatedAsync();
+    await CreateSchemaAndTables(fleetDb, "fleet", logger);
 
+    // 3. DeliveryOrder
     var deliveryOrderDb = scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data.DeliveryOrderDbContext>();
-    await deliveryOrderDb.Database.EnsureCreatedAsync();
+    await CreateSchemaAndTables(deliveryOrderDb, "deliveryorder", logger);
 
+    // 4. Planning
     var planningDb = scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Planning.Infrastructure.Data.PlanningDbContext>();
-    await planningDb.Database.EnsureCreatedAsync();
+    await CreateSchemaAndTables(planningDb, "planning", logger);
 
+    // 5. Dispatch
     var dispatchDb = scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Dispatch.Infrastructure.Data.DispatchDbContext>();
-    await dispatchDb.Database.EnsureCreatedAsync();
+    await CreateSchemaAndTables(dispatchDb, "dispatch", logger);
 
     logger.LogInformation("Database migrations applied successfully.");
+}
+
+static async Task CreateSchemaAndTables(DbContext db, string schemaName, Microsoft.Extensions.Logging.ILogger logger)
+{
+    try
+    {
+        // Create schema — using NpgsqlCommand directly to avoid EF SQL injection checks
+        var conn = db.Database.GetDbConnection();
+        await conn.OpenAsync();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"CREATE SCHEMA IF NOT EXISTS \"{schemaName}\"";
+        await cmd.ExecuteNonQueryAsync();
+
+        // Create tables from model
+        var creator = db.Database.GetService<Microsoft.EntityFrameworkCore.Storage.IRelationalDatabaseCreator>();
+        await creator.CreateTablesAsync();
+        logger.LogInformation("Created tables for schema {Schema}", schemaName);
+    }
+    catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P07")
+    {
+        logger.LogInformation("Tables for schema {Schema} already exist, skipping.", schemaName);
+    }
+    finally
+    {
+        await db.Database.GetDbConnection().CloseAsync();
+    }
 }
 
 // Configure the HTTP request pipeline.

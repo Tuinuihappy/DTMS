@@ -4505,6 +4505,7 @@
           "Serilog.AspNetCore": "8.0.1",
           "Serilog.Enrichers.Environment": "3.0.1",
           "StackExchange.Redis": "2.7.33",
+          "Swashbuckle.AspNetCore.SwaggerUI": "10.1.7",
           "Testcontainers.PostgreSql": "3.8.0",
           "Testcontainers.RabbitMq": "3.8.0",
           "Testcontainers.Redis": "3.8.0",
