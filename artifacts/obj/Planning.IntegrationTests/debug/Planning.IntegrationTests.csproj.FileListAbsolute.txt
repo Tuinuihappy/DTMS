@@ -95,3 +95,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/obj/Planning.IntegrationTests/debug/Planning.IntegrationTests.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/Planning.IntegrationTests/debug/Planning.IntegrationTests.genruntimeconfig.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/Planning.IntegrationTests/debug/ref/Planning.IntegrationTests.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/Planning.IntegrationTests/debug/Planning.IntegrationTests.sourcelink.json

@@ -15,3 +15,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.Fleet.Domain.pdb
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.SharedKernel.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.Deli.3F953D83.Up2Date
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Application/debug/AMR.DeliveryPlanning.Fleet.Application.sourcelink.json

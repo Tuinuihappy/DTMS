@@ -12,6 +12,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AMR.DeliveryPlanning.VendorAdapter.Abstractions\AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj" />
+    <ProjectReference Include="..\AMR.DeliveryPlanning.VendorAdapter.Riot3\AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj" />
+    <ProjectReference Include="..\AMR.DeliveryPlanning.VendorAdapter.Simulator\AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj" />
   </ItemGroup>
 
 </Project>

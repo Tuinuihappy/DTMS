@@ -95,3 +95,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/obj/Planning.UnitTests/debug/Planning.UnitTests.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/Planning.UnitTests/debug/Planning.UnitTests.genruntimeconfig.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/Planning.UnitTests/debug/ref/Planning.UnitTests.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/Planning.UnitTests/debug/Planning.UnitTests.sourcelink.json

@@ -66,6 +66,58 @@
           "build/Microsoft.AspNetCore.OpenApi.targets": {}
         }
       },
+      "Microsoft.EntityFrameworkCore/10.0.0": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.EntityFrameworkCore.Abstractions": "10.0.0",
+          "Microsoft.EntityFrameworkCore.Analyzers": "10.0.0"
+        },
+        "compile": {
+          "lib/net10.0/Microsoft.EntityFrameworkCore.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/Microsoft.EntityFrameworkCore.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "buildTransitive/net10.0/Microsoft.EntityFrameworkCore.props": {}
+        }
+      },
+      "Microsoft.EntityFrameworkCore.Abstractions/10.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net10.0/Microsoft.EntityFrameworkCore.Abstractions.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/Microsoft.EntityFrameworkCore.Abstractions.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "Microsoft.EntityFrameworkCore.Analyzers/10.0.0": {
+        "type": "package"
+      },
+      "Microsoft.EntityFrameworkCore.Relational/10.0.0": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.EntityFrameworkCore": "10.0.0"
+        },
+        "compile": {
+          "lib/net10.0/Microsoft.EntityFrameworkCore.Relational.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/Microsoft.EntityFrameworkCore.Relational.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "Microsoft.Extensions.ApiDescription.Server/6.0.5": {
         "type": "package",
         "build": {
@@ -93,6 +145,23 @@
           "buildTransitive/net6.0/_._": {}
         }
       },
+      "Microsoft.Extensions.Http.Polly/10.0.6": {
+        "type": "package",
+        "dependencies": {
+          "Polly": "7.2.4",
+          "Polly.Extensions.Http": "3.0.0"
+        },
+        "compile": {
+          "lib/netstandard2.0/Microsoft.Extensions.Http.Polly.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/netstandard2.0/Microsoft.Extensions.Http.Polly.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "Microsoft.OpenApi/2.0.0": {
         "type": "package",
         "compile": {
@@ -103,6 +172,66 @@
         "runtime": {
           "lib/net8.0/Microsoft.OpenApi.dll": {
             "related": ".pdb;.xml"
+          }
+        }
+      },
+      "Npgsql/10.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net10.0/Npgsql.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/Npgsql.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "Npgsql.EntityFrameworkCore.PostgreSQL/10.0.0": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.EntityFrameworkCore": "[10.0.0, 11.0.0)",
+          "Microsoft.EntityFrameworkCore.Relational": "[10.0.0, 11.0.0)",
+          "Npgsql": "10.0.0"
+        },
+        "compile": {
+          "lib/net10.0/Npgsql.EntityFrameworkCore.PostgreSQL.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/Npgsql.EntityFrameworkCore.PostgreSQL.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "Polly/7.2.4": {
+        "type": "package",
+        "compile": {
+          "lib/netstandard2.0/Polly.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "runtime": {
+          "lib/netstandard2.0/Polly.dll": {
+            "related": ".pdb;.xml"
+          }
+        }
+      },
+      "Polly.Extensions.Http/3.0.0": {
+        "type": "package",
+        "dependencies": {
+          "Polly": "7.1.0"
+        },
+        "compile": {
+          "lib/netstandard2.0/Polly.Extensions.Http.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/netstandard2.0/Polly.Extensions.Http.dll": {
+            "related": ".xml"
           }
         }
       },
@@ -322,6 +451,316 @@
           "Microsoft.AspNetCore.App"
         ]
       },
+      "AMR.DeliveryPlanning.DeliveryOrder.Application/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.DeliveryOrder.Domain": "1.0.0",
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0",
+          "FluentValidation": "11.9.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.DeliveryOrder.Application.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.DeliveryOrder.Application.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.DeliveryOrder.Domain/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.DeliveryOrder.Domain.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.DeliveryOrder.Domain.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.DeliveryOrder.Infrastructure/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.DeliveryOrder.Domain": "1.0.0",
+          "Microsoft.EntityFrameworkCore": "10.0.0",
+          "Npgsql.EntityFrameworkCore.PostgreSQL": "10.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.DeliveryOrder.Presentation/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.DeliveryOrder.Application": "1.0.0",
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.DeliveryOrder.Presentation.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.DeliveryOrder.Presentation.dll": {}
+        },
+        "frameworkReferences": [
+          "Microsoft.AspNetCore.App"
+        ]
+      },
+      "AMR.DeliveryPlanning.Dispatch.Application/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.Dispatch.Domain": "1.0.0",
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Dispatch.Application.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Dispatch.Application.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Dispatch.Domain/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Dispatch.Domain.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Dispatch.Domain.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Dispatch.Infrastructure/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.Dispatch.Domain": "1.0.0",
+          "Microsoft.EntityFrameworkCore": "10.0.0",
+          "Npgsql.EntityFrameworkCore.PostgreSQL": "10.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Dispatch.Infrastructure.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Dispatch.Infrastructure.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Dispatch.Presentation/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.Dispatch.Application": "1.0.0",
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Dispatch.Presentation.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Dispatch.Presentation.dll": {}
+        },
+        "frameworkReferences": [
+          "Microsoft.AspNetCore.App"
+        ]
+      },
+      "AMR.DeliveryPlanning.Facility.Application/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.Facility.Domain": "1.0.0",
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Facility.Application.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Facility.Application.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Facility.Domain/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Facility.Domain.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Facility.Domain.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Facility.Infrastructure/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.Facility.Application": "1.0.0",
+          "AMR.DeliveryPlanning.Facility.Domain": "1.0.0",
+          "Microsoft.EntityFrameworkCore": "10.0.0",
+          "Npgsql.EntityFrameworkCore.PostgreSQL": "10.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Facility.Infrastructure.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Facility.Infrastructure.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Facility.Presentation/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.Facility.Application": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Facility.Presentation.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Facility.Presentation.dll": {}
+        },
+        "frameworkReferences": [
+          "Microsoft.AspNetCore.App"
+        ]
+      },
+      "AMR.DeliveryPlanning.Fleet.Application/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.Fleet.Domain": "1.0.0",
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.Application.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.Application.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Fleet.Domain/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.Domain.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.Domain.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Fleet.Infrastructure/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.Fleet.Application": "1.0.0",
+          "AMR.DeliveryPlanning.Fleet.Domain": "1.0.0",
+          "Microsoft.EntityFrameworkCore": "10.0.0",
+          "Npgsql.EntityFrameworkCore.PostgreSQL": "10.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.Infrastructure.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.Infrastructure.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Fleet.IntegrationEvents/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.IntegrationEvents.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.IntegrationEvents.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Fleet.Presentation/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.Fleet.Application": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.Presentation.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Fleet.Presentation.dll": {}
+        },
+        "frameworkReferences": [
+          "Microsoft.AspNetCore.App"
+        ]
+      },
+      "AMR.DeliveryPlanning.Planning.Application/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.Planning.Domain": "1.0.0",
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0",
+          "FluentValidation": "11.9.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Planning.Application.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Planning.Application.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Planning.Domain/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Planning.Domain.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Planning.Domain.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Planning.Infrastructure/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.Planning.Domain": "1.0.0",
+          "Microsoft.EntityFrameworkCore": "10.0.0",
+          "Npgsql.EntityFrameworkCore.PostgreSQL": "10.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Planning.Infrastructure.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Planning.Infrastructure.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.Planning.Presentation/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.Planning.Application": "1.0.0",
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.Planning.Presentation.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.Planning.Presentation.dll": {}
+        },
+        "frameworkReferences": [
+          "Microsoft.AspNetCore.App"
+        ]
+      },
       "AMR.DeliveryPlanning.SharedKernel/1.0.0": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v10.0",
@@ -334,6 +773,81 @@
         },
         "runtime": {
           "bin/placeholder/AMR.DeliveryPlanning.SharedKernel.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.VendorAdapter.Abstractions/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.VendorAdapter.Abstractions.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.VendorAdapter.Abstractions.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.VendorAdapter.Feeder/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.Fleet.IntegrationEvents": "1.0.0",
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0",
+          "AMR.DeliveryPlanning.VendorAdapter.Riot3": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.VendorAdapter.Feeder.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.VendorAdapter.Feeder.dll": {}
+        },
+        "frameworkReferences": [
+          "Microsoft.AspNetCore.App"
+        ]
+      },
+      "AMR.DeliveryPlanning.VendorAdapter.Infrastructure/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.VendorAdapter.Abstractions": "1.0.0",
+          "AMR.DeliveryPlanning.VendorAdapter.Riot3": "1.0.0",
+          "AMR.DeliveryPlanning.VendorAdapter.Simulator": "1.0.0",
+          "Microsoft.Extensions.Http.Polly": "10.0.6"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.VendorAdapter.Riot3/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0",
+          "AMR.DeliveryPlanning.VendorAdapter.Abstractions": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.VendorAdapter.Riot3.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.VendorAdapter.Riot3.dll": {}
+        }
+      },
+      "AMR.DeliveryPlanning.VendorAdapter.Simulator/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0",
+          "AMR.DeliveryPlanning.VendorAdapter.Abstractions": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/AMR.DeliveryPlanning.VendorAdapter.Simulator.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/AMR.DeliveryPlanning.VendorAdapter.Simulator.dll": {}
         }
       }
     }
@@ -410,6 +924,66 @@
         "lib/net10.0/Microsoft.AspNetCore.OpenApi.xml",
         "microsoft.aspnetcore.openapi.10.0.0.nupkg.sha512",
         "microsoft.aspnetcore.openapi.nuspec"
+      ]
+    },
+    "Microsoft.EntityFrameworkCore/10.0.0": {
+      "sha512": "hHa2amRjMyBLUH/KTML6FgIAhZ0VFYkhCKwWEax0rO6iNeM1P5MflyeQLE5dniSIOZHc3Oqyv5UIyTFO4e1Auw==",
+      "type": "package",
+      "path": "microsoft.entityframeworkcore/10.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "PACKAGE.md",
+        "buildTransitive/net10.0/Microsoft.EntityFrameworkCore.props",
+        "lib/net10.0/Microsoft.EntityFrameworkCore.dll",
+        "lib/net10.0/Microsoft.EntityFrameworkCore.xml",
+        "microsoft.entityframeworkcore.10.0.0.nupkg.sha512",
+        "microsoft.entityframeworkcore.nuspec"
+      ]
+    },
+    "Microsoft.EntityFrameworkCore.Abstractions/10.0.0": {
+      "sha512": "C+TT9k7f1GQ8agOfV512K9iwrzi76RXVSDiLx+iWC9pz3QhEpSF1Dyk+FpVvd8ULQ+rqymfM8KQ7g48ttQVyMg==",
+      "type": "package",
+      "path": "microsoft.entityframeworkcore.abstractions/10.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "PACKAGE.md",
+        "lib/net10.0/Microsoft.EntityFrameworkCore.Abstractions.dll",
+        "lib/net10.0/Microsoft.EntityFrameworkCore.Abstractions.xml",
+        "microsoft.entityframeworkcore.abstractions.10.0.0.nupkg.sha512",
+        "microsoft.entityframeworkcore.abstractions.nuspec"
+      ]
+    },
+    "Microsoft.EntityFrameworkCore.Analyzers/10.0.0": {
+      "sha512": "TxHQq0kn0tpYs2ljeRl8jtmWk720B0nteqI6mAZM77HWJpYT9Zj8SkkBBlj8K3Yeq18a6NBjz6YutE+shEk4Ag==",
+      "type": "package",
+      "path": "microsoft.entityframeworkcore.analyzers/10.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "analyzers/dotnet/cs/Microsoft.EntityFrameworkCore.Analyzers.dll",
+        "docs/PACKAGE.md",
+        "microsoft.entityframeworkcore.analyzers.10.0.0.nupkg.sha512",
+        "microsoft.entityframeworkcore.analyzers.nuspec"
+      ]
+    },
+    "Microsoft.EntityFrameworkCore.Relational/10.0.0": {
+      "sha512": "A3MX1ee7RDxWCUdx/KqP+74fbksz0UIhkVZh56YHvbPkEKsffCXgHU3LGkRDwqR/MrBNWLCWC/IVX79tzM30ZA==",
+      "type": "package",
+      "path": "microsoft.entityframeworkcore.relational/10.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "PACKAGE.md",
+        "lib/net10.0/Microsoft.EntityFrameworkCore.Relational.dll",
+        "lib/net10.0/Microsoft.EntityFrameworkCore.Relational.xml",
+        "microsoft.entityframeworkcore.relational.10.0.0.nupkg.sha512",
+        "microsoft.entityframeworkcore.relational.nuspec"
       ]
     },
     "Microsoft.Extensions.ApiDescription.Server/6.0.5": {
@@ -673,6 +1247,22 @@
         "useSharedDesignerContext.txt"
       ]
     },
+    "Microsoft.Extensions.Http.Polly/10.0.6": {
+      "sha512": "FffxO3VZVv3JgvyNuUTlM5IAmkhIrbnT07tkbD1IKH20qRUxiFF86Rjas1mIAFFeUu+FDKkALJHEiyiGwUnjzA==",
+      "type": "package",
+      "path": "microsoft.extensions.http.polly/10.0.6",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "PACKAGE.md",
+        "THIRD-PARTY-NOTICES.TXT",
+        "lib/netstandard2.0/Microsoft.Extensions.Http.Polly.dll",
+        "lib/netstandard2.0/Microsoft.Extensions.Http.Polly.xml",
+        "microsoft.extensions.http.polly.10.0.6.nupkg.sha512",
+        "microsoft.extensions.http.polly.nuspec"
+      ]
+    },
     "Microsoft.OpenApi/2.0.0": {
       "sha512": "GGYLfzV/G/ct80OZ45JxnWP7NvMX1BCugn/lX7TH5o0lcVaviavsLMTxmFV2AybXWjbi3h6FF1vgZiTK6PXndw==",
       "type": "package",
@@ -689,6 +1279,80 @@
         "lib/netstandard2.0/Microsoft.OpenApi.xml",
         "microsoft.openapi.2.0.0.nupkg.sha512",
         "microsoft.openapi.nuspec"
+      ]
+    },
+    "Npgsql/10.0.0": {
+      "sha512": "xZAYhPOU2rUIFpV48xsqhCx9vXs6Y+0jX2LCoSEfDFYMw9jtAOUk3iQsCnDLrFIv9NT3JGMihn7nnuZsPKqJmA==",
+      "type": "package",
+      "path": "npgsql/10.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net10.0/Npgsql.dll",
+        "lib/net10.0/Npgsql.xml",
+        "lib/net8.0/Npgsql.dll",
+        "lib/net8.0/Npgsql.xml",
+        "lib/net9.0/Npgsql.dll",
+        "lib/net9.0/Npgsql.xml",
+        "npgsql.10.0.0.nupkg.sha512",
+        "npgsql.nuspec",
+        "postgresql.png"
+      ]
+    },
+    "Npgsql.EntityFrameworkCore.PostgreSQL/10.0.0": {
+      "sha512": "E2+uSWxSB8LdsUVwPaqRWOcGOP92biry2JEwc0KJMdLJF+aZdczeIdEXVwEyv4nSVMQJH0o8tLhyAMiR6VF0lw==",
+      "type": "package",
+      "path": "npgsql.entityframeworkcore.postgresql/10.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net10.0/Npgsql.EntityFrameworkCore.PostgreSQL.dll",
+        "lib/net10.0/Npgsql.EntityFrameworkCore.PostgreSQL.xml",
+        "npgsql.entityframeworkcore.postgresql.10.0.0.nupkg.sha512",
+        "npgsql.entityframeworkcore.postgresql.nuspec",
+        "postgresql.png"
+      ]
+    },
+    "Polly/7.2.4": {
+      "sha512": "bw00Ck5sh6ekduDE3mnCo1ohzuad946uslCDEENu3091+6UKnBuKLo4e+yaNcCzXxOZCXWY2gV4a35+K1d4LDA==",
+      "type": "package",
+      "path": "polly/7.2.4",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net461/Polly.dll",
+        "lib/net461/Polly.pdb",
+        "lib/net461/Polly.xml",
+        "lib/net472/Polly.dll",
+        "lib/net472/Polly.pdb",
+        "lib/net472/Polly.xml",
+        "lib/netstandard1.1/Polly.dll",
+        "lib/netstandard1.1/Polly.pdb",
+        "lib/netstandard1.1/Polly.xml",
+        "lib/netstandard2.0/Polly.dll",
+        "lib/netstandard2.0/Polly.pdb",
+        "lib/netstandard2.0/Polly.xml",
+        "package-icon.png",
+        "polly.7.2.4.nupkg.sha512",
+        "polly.nuspec"
+      ]
+    },
+    "Polly.Extensions.Http/3.0.0": {
+      "sha512": "drrG+hB3pYFY7w1c3BD+lSGYvH2oIclH8GRSehgfyP5kjnFnHKQuuBhuHLv+PWyFuaTDyk/vfRpnxOzd11+J8g==",
+      "type": "package",
+      "path": "polly.extensions.http/3.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "lib/netstandard1.1/Polly.Extensions.Http.dll",
+        "lib/netstandard1.1/Polly.Extensions.Http.xml",
+        "lib/netstandard2.0/Polly.Extensions.Http.dll",
+        "lib/netstandard2.0/Polly.Extensions.Http.xml",
+        "polly.extensions.http.3.0.0.nupkg.sha512",
+        "polly.extensions.http.nuspec"
       ]
     },
     "Serilog/3.1.1": {
@@ -1003,15 +1667,157 @@
         "swashbuckle.aspnetcore.swaggerui.nuspec"
       ]
     },
+    "AMR.DeliveryPlanning.DeliveryOrder.Application/1.0.0": {
+      "type": "project",
+      "path": "../Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Application/AMR.DeliveryPlanning.DeliveryOrder.Application.csproj",
+      "msbuildProject": "../Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Application/AMR.DeliveryPlanning.DeliveryOrder.Application.csproj"
+    },
+    "AMR.DeliveryPlanning.DeliveryOrder.Domain/1.0.0": {
+      "type": "project",
+      "path": "../Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Domain/AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj",
+      "msbuildProject": "../Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Domain/AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj"
+    },
+    "AMR.DeliveryPlanning.DeliveryOrder.Infrastructure/1.0.0": {
+      "type": "project",
+      "path": "../Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.csproj",
+      "msbuildProject": "../Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.csproj"
+    },
+    "AMR.DeliveryPlanning.DeliveryOrder.Presentation/1.0.0": {
+      "type": "project",
+      "path": "../Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Presentation/AMR.DeliveryPlanning.DeliveryOrder.Presentation.csproj",
+      "msbuildProject": "../Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Presentation/AMR.DeliveryPlanning.DeliveryOrder.Presentation.csproj"
+    },
+    "AMR.DeliveryPlanning.Dispatch.Application/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Application/AMR.DeliveryPlanning.Dispatch.Application.csproj",
+      "msbuildProject": "../Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Application/AMR.DeliveryPlanning.Dispatch.Application.csproj"
+    },
+    "AMR.DeliveryPlanning.Dispatch.Domain/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Domain/AMR.DeliveryPlanning.Dispatch.Domain.csproj",
+      "msbuildProject": "../Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Domain/AMR.DeliveryPlanning.Dispatch.Domain.csproj"
+    },
+    "AMR.DeliveryPlanning.Dispatch.Infrastructure/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Infrastructure/AMR.DeliveryPlanning.Dispatch.Infrastructure.csproj",
+      "msbuildProject": "../Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Infrastructure/AMR.DeliveryPlanning.Dispatch.Infrastructure.csproj"
+    },
+    "AMR.DeliveryPlanning.Dispatch.Presentation/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Presentation/AMR.DeliveryPlanning.Dispatch.Presentation.csproj",
+      "msbuildProject": "../Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Presentation/AMR.DeliveryPlanning.Dispatch.Presentation.csproj"
+    },
+    "AMR.DeliveryPlanning.Facility.Application/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Facility/AMR.DeliveryPlanning.Facility.Application/AMR.DeliveryPlanning.Facility.Application.csproj",
+      "msbuildProject": "../Modules/Facility/AMR.DeliveryPlanning.Facility.Application/AMR.DeliveryPlanning.Facility.Application.csproj"
+    },
+    "AMR.DeliveryPlanning.Facility.Domain/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Facility/AMR.DeliveryPlanning.Facility.Domain/AMR.DeliveryPlanning.Facility.Domain.csproj",
+      "msbuildProject": "../Modules/Facility/AMR.DeliveryPlanning.Facility.Domain/AMR.DeliveryPlanning.Facility.Domain.csproj"
+    },
+    "AMR.DeliveryPlanning.Facility.Infrastructure/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Facility/AMR.DeliveryPlanning.Facility.Infrastructure/AMR.DeliveryPlanning.Facility.Infrastructure.csproj",
+      "msbuildProject": "../Modules/Facility/AMR.DeliveryPlanning.Facility.Infrastructure/AMR.DeliveryPlanning.Facility.Infrastructure.csproj"
+    },
+    "AMR.DeliveryPlanning.Facility.Presentation/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Facility/AMR.DeliveryPlanning.Facility.Presentation/AMR.DeliveryPlanning.Facility.Presentation.csproj",
+      "msbuildProject": "../Modules/Facility/AMR.DeliveryPlanning.Facility.Presentation/AMR.DeliveryPlanning.Facility.Presentation.csproj"
+    },
+    "AMR.DeliveryPlanning.Fleet.Application/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Fleet/AMR.DeliveryPlanning.Fleet.Application/AMR.DeliveryPlanning.Fleet.Application.csproj",
+      "msbuildProject": "../Modules/Fleet/AMR.DeliveryPlanning.Fleet.Application/AMR.DeliveryPlanning.Fleet.Application.csproj"
+    },
+    "AMR.DeliveryPlanning.Fleet.Domain/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Fleet/AMR.DeliveryPlanning.Fleet.Domain/AMR.DeliveryPlanning.Fleet.Domain.csproj",
+      "msbuildProject": "../Modules/Fleet/AMR.DeliveryPlanning.Fleet.Domain/AMR.DeliveryPlanning.Fleet.Domain.csproj"
+    },
+    "AMR.DeliveryPlanning.Fleet.Infrastructure/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/AMR.DeliveryPlanning.Fleet.Infrastructure.csproj",
+      "msbuildProject": "../Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/AMR.DeliveryPlanning.Fleet.Infrastructure.csproj"
+    },
+    "AMR.DeliveryPlanning.Fleet.IntegrationEvents/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Fleet/AMR.DeliveryPlanning.Fleet.IntegrationEvents/AMR.DeliveryPlanning.Fleet.IntegrationEvents.csproj",
+      "msbuildProject": "../Modules/Fleet/AMR.DeliveryPlanning.Fleet.IntegrationEvents/AMR.DeliveryPlanning.Fleet.IntegrationEvents.csproj"
+    },
+    "AMR.DeliveryPlanning.Fleet.Presentation/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Fleet/AMR.DeliveryPlanning.Fleet.Presentation/AMR.DeliveryPlanning.Fleet.Presentation.csproj",
+      "msbuildProject": "../Modules/Fleet/AMR.DeliveryPlanning.Fleet.Presentation/AMR.DeliveryPlanning.Fleet.Presentation.csproj"
+    },
+    "AMR.DeliveryPlanning.Planning.Application/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Planning/AMR.DeliveryPlanning.Planning.Application/AMR.DeliveryPlanning.Planning.Application.csproj",
+      "msbuildProject": "../Modules/Planning/AMR.DeliveryPlanning.Planning.Application/AMR.DeliveryPlanning.Planning.Application.csproj"
+    },
+    "AMR.DeliveryPlanning.Planning.Domain/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Planning/AMR.DeliveryPlanning.Planning.Domain/AMR.DeliveryPlanning.Planning.Domain.csproj",
+      "msbuildProject": "../Modules/Planning/AMR.DeliveryPlanning.Planning.Domain/AMR.DeliveryPlanning.Planning.Domain.csproj"
+    },
+    "AMR.DeliveryPlanning.Planning.Infrastructure/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Planning/AMR.DeliveryPlanning.Planning.Infrastructure/AMR.DeliveryPlanning.Planning.Infrastructure.csproj",
+      "msbuildProject": "../Modules/Planning/AMR.DeliveryPlanning.Planning.Infrastructure/AMR.DeliveryPlanning.Planning.Infrastructure.csproj"
+    },
+    "AMR.DeliveryPlanning.Planning.Presentation/1.0.0": {
+      "type": "project",
+      "path": "../Modules/Planning/AMR.DeliveryPlanning.Planning.Presentation/AMR.DeliveryPlanning.Planning.Presentation.csproj",
+      "msbuildProject": "../Modules/Planning/AMR.DeliveryPlanning.Planning.Presentation/AMR.DeliveryPlanning.Planning.Presentation.csproj"
+    },
     "AMR.DeliveryPlanning.SharedKernel/1.0.0": {
       "type": "project",
       "path": "../AMR.DeliveryPlanning.SharedKernel/AMR.DeliveryPlanning.SharedKernel.csproj",
       "msbuildProject": "../AMR.DeliveryPlanning.SharedKernel/AMR.DeliveryPlanning.SharedKernel.csproj"
+    },
+    "AMR.DeliveryPlanning.VendorAdapter.Abstractions/1.0.0": {
+      "type": "project",
+      "path": "../Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Abstractions/AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj",
+      "msbuildProject": "../Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Abstractions/AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj"
+    },
+    "AMR.DeliveryPlanning.VendorAdapter.Feeder/1.0.0": {
+      "type": "project",
+      "path": "../Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Feeder/AMR.DeliveryPlanning.VendorAdapter.Feeder.csproj",
+      "msbuildProject": "../Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Feeder/AMR.DeliveryPlanning.VendorAdapter.Feeder.csproj"
+    },
+    "AMR.DeliveryPlanning.VendorAdapter.Infrastructure/1.0.0": {
+      "type": "project",
+      "path": "../Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.csproj",
+      "msbuildProject": "../Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.csproj"
+    },
+    "AMR.DeliveryPlanning.VendorAdapter.Riot3/1.0.0": {
+      "type": "project",
+      "path": "../Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Riot3/AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj",
+      "msbuildProject": "../Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Riot3/AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj"
+    },
+    "AMR.DeliveryPlanning.VendorAdapter.Simulator/1.0.0": {
+      "type": "project",
+      "path": "../Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Simulator/AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj",
+      "msbuildProject": "../Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Simulator/AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj"
     }
   },
   "projectFileDependencyGroups": {
     "net10.0": [
+      "AMR.DeliveryPlanning.DeliveryOrder.Infrastructure >= 1.0.0",
+      "AMR.DeliveryPlanning.DeliveryOrder.Presentation >= 1.0.0",
+      "AMR.DeliveryPlanning.Dispatch.Infrastructure >= 1.0.0",
+      "AMR.DeliveryPlanning.Dispatch.Presentation >= 1.0.0",
+      "AMR.DeliveryPlanning.Facility.Infrastructure >= 1.0.0",
+      "AMR.DeliveryPlanning.Facility.Presentation >= 1.0.0",
+      "AMR.DeliveryPlanning.Fleet.Infrastructure >= 1.0.0",
+      "AMR.DeliveryPlanning.Fleet.Presentation >= 1.0.0",
+      "AMR.DeliveryPlanning.Planning.Infrastructure >= 1.0.0",
+      "AMR.DeliveryPlanning.Planning.Presentation >= 1.0.0",
       "AMR.DeliveryPlanning.SharedKernel >= 1.0.0",
+      "AMR.DeliveryPlanning.VendorAdapter.Feeder >= 1.0.0",
+      "AMR.DeliveryPlanning.VendorAdapter.Infrastructure >= 1.0.0",
       "Microsoft.AspNetCore.OpenApi >= 10.0.0",
       "Serilog.AspNetCore >= 8.0.1",
       "Swashbuckle.AspNetCore >= 6.5.0"
@@ -1045,6 +1851,42 @@
           "projectReferences": {
             "/Users/tuinui/Projects/DTMS/src/AMR.DeliveryPlanning.SharedKernel/AMR.DeliveryPlanning.SharedKernel.csproj": {
               "projectPath": "/Users/tuinui/Projects/DTMS/src/AMR.DeliveryPlanning.SharedKernel/AMR.DeliveryPlanning.SharedKernel.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Presentation/AMR.DeliveryPlanning.DeliveryOrder.Presentation.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Presentation/AMR.DeliveryPlanning.DeliveryOrder.Presentation.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Infrastructure/AMR.DeliveryPlanning.Dispatch.Infrastructure.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Infrastructure/AMR.DeliveryPlanning.Dispatch.Infrastructure.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Presentation/AMR.DeliveryPlanning.Dispatch.Presentation.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Presentation/AMR.DeliveryPlanning.Dispatch.Presentation.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/Facility/AMR.DeliveryPlanning.Facility.Infrastructure/AMR.DeliveryPlanning.Facility.Infrastructure.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/Facility/AMR.DeliveryPlanning.Facility.Infrastructure/AMR.DeliveryPlanning.Facility.Infrastructure.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/Facility/AMR.DeliveryPlanning.Facility.Presentation/AMR.DeliveryPlanning.Facility.Presentation.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/Facility/AMR.DeliveryPlanning.Facility.Presentation/AMR.DeliveryPlanning.Facility.Presentation.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/AMR.DeliveryPlanning.Fleet.Infrastructure.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/AMR.DeliveryPlanning.Fleet.Infrastructure.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Presentation/AMR.DeliveryPlanning.Fleet.Presentation.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Presentation/AMR.DeliveryPlanning.Fleet.Presentation.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/Planning/AMR.DeliveryPlanning.Planning.Infrastructure/AMR.DeliveryPlanning.Planning.Infrastructure.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/Planning/AMR.DeliveryPlanning.Planning.Infrastructure/AMR.DeliveryPlanning.Planning.Infrastructure.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/Planning/AMR.DeliveryPlanning.Planning.Presentation/AMR.DeliveryPlanning.Planning.Presentation.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/Planning/AMR.DeliveryPlanning.Planning.Presentation/AMR.DeliveryPlanning.Planning.Presentation.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Feeder/AMR.DeliveryPlanning.VendorAdapter.Feeder.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Feeder/AMR.DeliveryPlanning.VendorAdapter.Feeder.csproj"
+            },
+            "/Users/tuinui/Projects/DTMS/src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.csproj": {
+              "projectPath": "/Users/tuinui/Projects/DTMS/src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.csproj"
             }
           }
         }

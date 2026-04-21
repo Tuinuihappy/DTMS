@@ -95,3 +95,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/obj/Facility.IntegrationTests/debug/Facility.IntegrationTests.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/Facility.IntegrationTests/debug/Facility.IntegrationTests.genruntimeconfig.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/Facility.IntegrationTests/debug/ref/Facility.IntegrationTests.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/Facility.IntegrationTests/debug/Facility.IntegrationTests.sourcelink.json

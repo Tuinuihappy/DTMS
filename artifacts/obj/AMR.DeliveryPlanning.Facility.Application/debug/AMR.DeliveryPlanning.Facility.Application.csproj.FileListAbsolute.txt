@@ -15,3 +15,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Facility.Application/debug/AMR.DeliveryPlanning.Facility.Domain.pdb
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Facility.Application/debug/AMR.DeliveryPlanning.SharedKernel.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Facility.Application/debug/AMR.Deli.91AD118F.Up2Date
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Facility.Application/debug/AMR.DeliveryPlanning.Facility.Application.sourcelink.json

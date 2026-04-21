@@ -13,6 +13,7 @@
     ],
     "configProperties": {
       "System.GC.Server": true,
+      "System.Reflection.NullabilityInfoContext.IsSupported": true,
       "System.Runtime.Serialization.***REMOVED_RIOT3_TOKEN_PART***": false
     }
   }

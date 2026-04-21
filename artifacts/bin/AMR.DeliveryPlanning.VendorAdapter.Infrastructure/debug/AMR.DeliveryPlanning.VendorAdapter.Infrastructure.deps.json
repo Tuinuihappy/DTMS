@@ -9,6 +9,8 @@
       "AMR.DeliveryPlanning.VendorAdapter.Infrastructure/1.0.0": {
         "dependencies": {
           "AMR.DeliveryPlanning.VendorAdapter.Abstractions": "1.0.0",
+          "AMR.DeliveryPlanning.VendorAdapter.Riot3": "1.0.0",
+          "AMR.DeliveryPlanning.VendorAdapter.Simulator": "1.0.0",
           "Microsoft.Extensions.Http.Polly": "10.0.6"
         },
         "runtime": {
@@ -252,6 +254,31 @@
             "fileVersion": "1.0.0.0"
           }
         }
+      },
+      "AMR.DeliveryPlanning.VendorAdapter.Riot3/1.0.0": {
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0",
+          "AMR.DeliveryPlanning.VendorAdapter.Abstractions": "1.0.0",
+          "Microsoft.Extensions.Http": "10.0.6"
+        },
+        "runtime": {
+          "AMR.DeliveryPlanning.VendorAdapter.Riot3.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "AMR.DeliveryPlanning.VendorAdapter.Simulator/1.0.0": {
+        "dependencies": {
+          "AMR.DeliveryPlanning.SharedKernel": "1.0.0",
+          "AMR.DeliveryPlanning.VendorAdapter.Abstractions": "1.0.0"
+        },
+        "runtime": {
+          "AMR.DeliveryPlanning.VendorAdapter.Simulator.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
       }
     }
   },
@@ -400,6 +427,16 @@
       "sha512": ""
     },
     "AMR.DeliveryPlanning.VendorAdapter.Abstractions/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "AMR.DeliveryPlanning.VendorAdapter.Riot3/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "AMR.DeliveryPlanning.VendorAdapter.Simulator/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

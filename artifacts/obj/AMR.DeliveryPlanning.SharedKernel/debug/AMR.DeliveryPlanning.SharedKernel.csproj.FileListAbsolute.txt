@@ -10,3 +10,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.SharedKernel/debug/AMR.DeliveryPlanning.SharedKernel.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.SharedKernel/debug/ref/AMR.DeliveryPlanning.SharedKernel.dll
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.SharedKernel/debug/AMR.DeliveryPlanning.SharedKernel.csproj.AssemblyReference.cache
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.SharedKernel/debug/AMR.DeliveryPlanning.SharedKernel.sourcelink.json

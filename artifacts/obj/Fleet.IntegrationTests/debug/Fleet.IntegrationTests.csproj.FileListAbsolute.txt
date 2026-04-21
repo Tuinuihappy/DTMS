@@ -95,3 +95,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/obj/Fleet.IntegrationTests/debug/Fleet.IntegrationTests.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/Fleet.IntegrationTests/debug/Fleet.IntegrationTests.genruntimeconfig.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/Fleet.IntegrationTests/debug/ref/Fleet.IntegrationTests.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/Fleet.IntegrationTests/debug/Fleet.IntegrationTests.sourcelink.json

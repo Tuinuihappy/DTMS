@@ -17,3 +17,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Fleet.Presentation/debug/AMR.DeliveryPlanning.SharedKernel.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Presentation/debug/AMR.DeliveryPlanning.Fleet.Presentation.csproj.AssemblyReference.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Presentation/debug/AMR.Deli.16AC8B4F.Up2Date
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Fleet.Presentation/debug/AMR.DeliveryPlanning.Fleet.Presentation.sourcelink.json

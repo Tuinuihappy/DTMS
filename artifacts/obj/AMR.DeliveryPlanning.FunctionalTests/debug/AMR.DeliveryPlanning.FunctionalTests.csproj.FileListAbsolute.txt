@@ -95,3 +95,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.FunctionalTests/debug/AMR.DeliveryPlanning.FunctionalTests.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.FunctionalTests/debug/AMR.DeliveryPlanning.FunctionalTests.genruntimeconfig.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.FunctionalTests/debug/ref/AMR.DeliveryPlanning.FunctionalTests.dll
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.FunctionalTests/debug/AMR.DeliveryPlanning.FunctionalTests.sourcelink.json

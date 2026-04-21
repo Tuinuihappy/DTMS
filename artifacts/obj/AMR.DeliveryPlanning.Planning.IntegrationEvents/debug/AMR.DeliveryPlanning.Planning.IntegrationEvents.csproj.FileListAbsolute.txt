@@ -13,3 +13,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Planning.IntegrationEvents/debug/AMR.DeliveryPlanning.SharedKernel.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.IntegrationEvents/debug/AMR.DeliveryPlanning.Planning.IntegrationEvents.csproj.AssemblyReference.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.IntegrationEvents/debug/AMR.Deli.20640266.Up2Date
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Planning.IntegrationEvents/debug/AMR.DeliveryPlanning.Planning.IntegrationEvents.sourcelink.json

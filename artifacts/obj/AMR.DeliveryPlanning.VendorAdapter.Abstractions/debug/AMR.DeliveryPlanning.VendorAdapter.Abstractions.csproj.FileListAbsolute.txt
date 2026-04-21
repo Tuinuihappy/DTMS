@@ -13,3 +13,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.VendorAdapter.Abstractions/debug/AMR.DeliveryPlanning.SharedKernel.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Abstractions/debug/AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj.AssemblyReference.cache
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Abstractions/debug/AMR.Deli.7E6DCF8D.Up2Date
+/Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.VendorAdapter.Abstractions/debug/AMR.DeliveryPlanning.VendorAdapter.Abstractions.sourcelink.json
