@@ -44,9 +44,6 @@
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/Serilog.Sinks.Console.dll
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/Serilog.Sinks.Debug.dll
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/Serilog.Sinks.File.dll
-/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/Swashbuckle.AspNetCore.Swagger.dll
-/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/Swashbuckle.AspNetCore.SwaggerGen.dll
-/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/Swashbuckle.AspNetCore.SwaggerUI.dll
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/AMR.DeliveryPlanning.SharedKernel.dll
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/AMR.DeliveryPlanning.SharedKernel.pdb
 /Users/tuinui/Projects/DTMS/artifacts/obj/AMR.DeliveryPlanning.Api/debug/AMR.DeliveryPlanning.Api.sourcelink.json
@@ -110,3 +107,4 @@
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/AMR.DeliveryPlanning.VendorAdapter.Abstractions.pdb
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/AMR.DeliveryPlanning.VendorAdapter.Riot3.pdb
 /Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/AMR.DeliveryPlanning.VendorAdapter.Simulator.pdb
+/Users/tuinui/Projects/DTMS/artifacts/bin/AMR.DeliveryPlanning.Api/debug/Scalar.AspNetCore.dll
