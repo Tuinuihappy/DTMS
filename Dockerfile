@@ -8,7 +8,6 @@ WORKDIR /src
 # Copy solution-level files
 COPY Directory.Build.props ./
 COPY Directory.Packages.props ./
-COPY AMR.DeliveryPlanning.sln ./
 
 # Copy all project files for restore
 COPY src/AMR.DeliveryPlanning.Api/AMR.DeliveryPlanning.Api.csproj src/AMR.DeliveryPlanning.Api/
@@ -56,7 +55,7 @@ COPY src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Riot3/AMR.Deli
 COPY src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Simulator/AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Simulator/
 COPY src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Feeder/AMR.DeliveryPlanning.VendorAdapter.Feeder.csproj src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Feeder/
 
-RUN dotnet restore
+RUN dotnet restore src/AMR.DeliveryPlanning.Api/AMR.DeliveryPlanning.Api.csproj
 
 # Copy everything and build
 COPY src/ src/
