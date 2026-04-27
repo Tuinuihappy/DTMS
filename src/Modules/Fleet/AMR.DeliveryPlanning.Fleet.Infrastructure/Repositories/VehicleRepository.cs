@@ -23,7 +23,15 @@ public class VehicleRepository : IVehicleRepository
     public async Task<IReadOnlyList<Vehicle>> GetAvailableVehiclesAsync(CancellationToken cancellationToken = default)
     {
         return await _dbContext.Vehicles
-            .Where(v => v.State == VehicleState.Idle)
+            .Where(v => v.State != VehicleState.Offline && v.State != VehicleState.Error)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Vehicle>> GetByGroupAsync(Guid groupId, CancellationToken cancellationToken = default)
+    {
+        var groupIdStr = groupId.ToString();
+        return await _dbContext.Vehicles
+            .Where(v => EF.Property<string>(v, "GroupIds").Contains(groupIdStr))
             .ToListAsync(cancellationToken);
     }
 
