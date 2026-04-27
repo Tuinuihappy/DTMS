@@ -10,6 +10,8 @@ public class DispatchDbContext : DbContext
     public DbSet<Trip> Trips { get; set; } = null!;
     public DbSet<RobotTask> RobotTasks { get; set; } = null!;
     public DbSet<ExecutionEvent> ExecutionEvents { get; set; } = null!;
+    public DbSet<TripException> TripExceptions { get; set; } = null!;
+    public DbSet<ProofOfDelivery> ProofsOfDelivery { get; set; } = null!;
 
     public DispatchDbContext(DbContextOptions<DispatchDbContext> options) : base(options) { }
 
@@ -31,6 +33,16 @@ public class DispatchDbContext : DbContext
                    .WithOne()
                    .HasForeignKey(e => e.TripId)
                    .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasMany(t => t.Exceptions)
+                   .WithOne()
+                   .HasForeignKey(e => e.TripId)
+                   .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasMany(t => t.ProofsOfDelivery)
+                   .WithOne()
+                   .HasForeignKey(p => p.TripId)
+                   .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<RobotTask>(builder =>
@@ -46,6 +58,27 @@ public class DispatchDbContext : DbContext
             builder.HasKey(e => e.Id);
             builder.Property(e => e.EventType).HasMaxLength(50);
             builder.Property(e => e.Details).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<TripException>(builder =>
+        {
+            builder.HasKey(e => e.Id);
+            builder.Property(e => e.Code).HasMaxLength(100).IsRequired();
+            builder.Property(e => e.Severity).HasMaxLength(20).IsRequired();
+            builder.Property(e => e.Detail).HasMaxLength(1000);
+            builder.Property(e => e.Resolution).HasMaxLength(1000);
+            builder.Property(e => e.ResolvedBy).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<ProofOfDelivery>(builder =>
+        {
+            builder.HasKey(p => p.Id);
+            builder.Property(p => p.PhotoUrl).HasMaxLength(1000);
+            builder.Property(p => p.Notes).HasMaxLength(500);
+            builder.Property(p => p.ScannedIds)
+                   .HasConversion(
+                       v => string.Join(',', v),
+                       v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList());
         });
     }
 }
