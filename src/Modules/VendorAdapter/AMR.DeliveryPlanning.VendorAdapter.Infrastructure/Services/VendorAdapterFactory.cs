@@ -1,35 +1,55 @@
 using AMR.DeliveryPlanning.VendorAdapter.Abstractions.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Services;
 
 public class VendorAdapterFactory : IVendorAdapterFactory
 {
     private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<VendorAdapterFactory> _logger;
 
-    public VendorAdapterFactory(IServiceProvider serviceProvider)
+    // vehicleId → adapterKey mapping (populated at runtime when vehicles register)
+    private static readonly Dictionary<Guid, string> _vehicleAdapterMap = new();
+
+    public VendorAdapterFactory(IServiceProvider serviceProvider, ILogger<VendorAdapterFactory> logger)
     {
         _serviceProvider = serviceProvider;
+        _logger = logger;
     }
+
+    public static void RegisterVehicleAdapter(Guid vehicleId, string adapterKey)
+        => _vehicleAdapterMap[vehicleId] = adapterKey;
 
     public IVehicleCommandService GetAdapterForVehicle(Guid vehicleId)
     {
-        // In a real scenario, this would query the Fleet module or a cache to get the VehicleTypeId.
-        // For Phase 3, we assume we want to use the Riot3CommandService.
-        // Once multiple adapters are registered, we can resolve IEnumerable<IVehicleCommandService>
-        // and pick the right one.
-        
-        var services = _serviceProvider.GetServices<IVehicleCommandService>();
-        
-        // For demonstration, we'll try to find a Riot adapter first, else fallback
-        var adapter = services.FirstOrDefault(s => s.GetType().Name.Contains("Riot3")) 
+        // Check runtime mapping first
+        if (_vehicleAdapterMap.TryGetValue(vehicleId, out var key))
+        {
+            var mapped = ResolveByKey(key);
+            if (mapped != null) return mapped;
+        }
+
+        // Fall back to RIOT3 adapter (default for SEER AMRs)
+        var services = _serviceProvider.GetServices<IVehicleCommandService>().ToList();
+        var adapter = services.FirstOrDefault(s => s.GetType().Name.Contains("Riot3"))
                       ?? services.FirstOrDefault();
 
         if (adapter == null)
-        {
-            throw new InvalidOperationException("No suitable VendorAdapter found.");
-        }
+            throw new InvalidOperationException($"No VendorAdapter found for vehicle {vehicleId}.");
 
+        _logger.LogDebug("Using {Adapter} for vehicle {VehicleId}", adapter.GetType().Name, vehicleId);
         return adapter;
     }
+
+    private IVehicleCommandService? ResolveByKey(string key) => key switch
+    {
+        "feeder" => _serviceProvider.GetServices<IVehicleCommandService>()
+                        .FirstOrDefault(s => s.GetType().Name.Contains("Feeder")),
+        "riot3"  => _serviceProvider.GetServices<IVehicleCommandService>()
+                        .FirstOrDefault(s => s.GetType().Name.Contains("Riot3")),
+        "sim"    => _serviceProvider.GetServices<IVehicleCommandService>()
+                        .FirstOrDefault(s => s.GetType().Name.Contains("Simulator")),
+        _        => null
+    };
 }

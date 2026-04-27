@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\AMR.DeliveryPlanning.VendorAdapter.Abstractions\AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.IntegrationEvents\AMR.DeliveryPlanning.Dispatch.IntegrationEvents.csproj" />
     <ProjectReference Include="..\AMR.DeliveryPlanning.VendorAdapter.Riot3\AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj" />
     <ProjectReference Include="..\..\Fleet\AMR.DeliveryPlanning.Fleet.IntegrationEvents\AMR.DeliveryPlanning.Fleet.IntegrationEvents.csproj" />
     <ProjectReference Include="..\..\..\AMR.DeliveryPlanning.SharedKernel\AMR.DeliveryPlanning.SharedKernel.csproj" />
@@ -8,10 +10,13 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>  <PropertyGroup>
+      </ItemGroup>
+
+  <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
 </Project>
+

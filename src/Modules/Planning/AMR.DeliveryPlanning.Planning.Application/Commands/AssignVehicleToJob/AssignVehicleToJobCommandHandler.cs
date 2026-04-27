@@ -26,7 +26,9 @@ public class AssignVehicleToJobCommandHandler : ICommandHandler<AssignVehicleToJ
         if (firstLeg == null)
             return Result.Failure("Job has no legs defined.");
 
-        var candidate = await _vehicleSelector.SelectBestVehicleAsync(firstLeg.ToStationId, cancellationToken);
+        // Pass required capability from job (set when job was created from order)
+        var candidate = await _vehicleSelector.SelectBestVehicleAsync(
+            firstLeg.ToStationId, job.RequiredCapability, cancellationToken);
         if (candidate == null)
             return Result.Failure("No available vehicle found for this job.");
 
@@ -35,6 +37,8 @@ public class AssignVehicleToJobCommandHandler : ICommandHandler<AssignVehicleToJ
 
         try
         {
+            var trace = $"Selected vehicle {candidate.VehicleId} | battery={candidate.BatteryLevel:F0}% | distance={candidate.DistanceToPickup:F1} | capability={job.RequiredCapability ?? "any"} | at={DateTime.UtcNow:u}";
+            job.SetPlanningTrace(trace);
             job.AssignVehicle(candidate.VehicleId, estimatedDuration);
             await _jobRepository.UpdateAsync(job, cancellationToken);
             return Result.Success();
