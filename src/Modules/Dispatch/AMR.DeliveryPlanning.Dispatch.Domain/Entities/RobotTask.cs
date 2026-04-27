@@ -49,4 +49,10 @@ public class RobotTask : Entity<Guid>
         FailureReason = reason;
         CompletedAt = DateTime.UtcNow;
     }
+
+    public void ResetToPending()
+    {
+        Status = Enums.TaskStatus.Pending;
+        StartedAt = null;
+    }
 }

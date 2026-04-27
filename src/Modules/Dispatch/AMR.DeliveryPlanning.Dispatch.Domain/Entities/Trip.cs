@@ -19,6 +19,12 @@ public class Trip : AggregateRoot<Guid>
     private readonly List<ExecutionEvent> _events = new();
     public IReadOnlyCollection<ExecutionEvent> Events => _events.AsReadOnly();
 
+    private readonly List<TripException> _exceptions = new();
+    public IReadOnlyCollection<TripException> Exceptions => _exceptions.AsReadOnly();
+
+    private readonly List<ProofOfDelivery> _proofs = new();
+    public IReadOnlyCollection<ProofOfDelivery> ProofsOfDelivery => _proofs.AsReadOnly();
+
     private Trip() { }
 
     public Trip(Guid jobId, Guid vehicleId)
@@ -91,6 +97,81 @@ public class Trip : AggregateRoot<Guid>
         Status = TripStatus.Failed;
         AddDomainEvent(new TaskFailedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, taskId, reason));
         RecordEvent(taskId, "TaskFailed", reason);
+    }
+
+    public void Pause()
+    {
+        if (Status != TripStatus.InProgress)
+            throw new InvalidOperationException("Only InProgress trips can be paused.");
+
+        Status = TripStatus.Paused;
+        AddDomainEvent(new TripPausedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+        RecordEvent(null, "TripPaused", null);
+    }
+
+    public void Resume()
+    {
+        if (Status != TripStatus.Paused)
+            throw new InvalidOperationException("Only Paused trips can be resumed.");
+
+        Status = TripStatus.InProgress;
+        AddDomainEvent(new TripResumedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+        RecordEvent(null, "TripResumed", null);
+    }
+
+    public void Cancel(string reason)
+    {
+        if (Status == TripStatus.Completed || Status == TripStatus.Cancelled)
+            throw new InvalidOperationException($"Cannot cancel a trip in {Status} status.");
+
+        Status = TripStatus.Cancelled;
+        CompletedAt = DateTime.UtcNow;
+        AddDomainEvent(new TripCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+        RecordEvent(null, "TripCancelled", reason);
+    }
+
+    public void Reassign(Guid newVehicleId)
+    {
+        if (Status == TripStatus.Completed || Status == TripStatus.Cancelled)
+            throw new InvalidOperationException($"Cannot reassign a trip in {Status} status.");
+
+        var oldVehicleId = VehicleId;
+        VehicleId = newVehicleId;
+
+        // Reset dispatched tasks back to Pending so they can be re-sent to new vehicle
+        foreach (var task in _tasks.Where(t => t.Status == Enums.TaskStatus.Dispatched || t.Status == Enums.TaskStatus.InProgress))
+            task.ResetToPending();
+
+        AddDomainEvent(new TripReassignedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, newVehicleId));
+        RecordEvent(null, "TripReassigned", $"From {oldVehicleId} to {newVehicleId}");
+    }
+
+    public TripException RaiseException(string code, string severity, string detail)
+    {
+        var exception = new TripException(Id, code, severity, detail);
+        _exceptions.Add(exception);
+        AddDomainEvent(new ExceptionRaisedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, exception.Id, code, severity));
+        RecordEvent(null, "ExceptionRaised", $"[{severity}] {code}: {detail}");
+        return exception;
+    }
+
+    public void ResolveException(Guid exceptionId, string resolution, string resolvedBy)
+    {
+        var exception = _exceptions.FirstOrDefault(e => e.Id == exceptionId)
+            ?? throw new InvalidOperationException($"Exception {exceptionId} not found.");
+
+        exception.Resolve(resolution, resolvedBy);
+        AddDomainEvent(new ExceptionResolvedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, exceptionId, resolution));
+        RecordEvent(null, "ExceptionResolved", $"{exceptionId}: {resolution}");
+    }
+
+    public ProofOfDelivery CaptureProofOfDelivery(Guid stopId, string? photoUrl, string? signatureData, List<string>? scannedIds, string? notes)
+    {
+        var pod = new ProofOfDelivery(Id, stopId, photoUrl, signatureData, scannedIds, notes);
+        _proofs.Add(pod);
+        AddDomainEvent(new PodCapturedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, stopId));
+        RecordEvent(null, "PodCaptured", $"Stop {stopId}");
+        return pod;
     }
 
     private void RecordEvent(Guid? taskId, string eventType, string? details)
