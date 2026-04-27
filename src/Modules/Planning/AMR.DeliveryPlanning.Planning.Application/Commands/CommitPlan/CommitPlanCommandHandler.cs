@@ -26,12 +26,18 @@ public class CommitPlanCommandHandler : ICommandHandler<CommitPlanCommand>
             job.Commit();
             await _jobRepository.UpdateAsync(job, cancellationToken);
 
+            var legs = job.Legs
+                .OrderBy(l => l.SequenceOrder)
+                .Select(l => new PlannedLegDto(l.FromStationId, l.ToStationId, l.SequenceOrder))
+                .ToList();
+
             // Publish integration event → Dispatch module auto-creates a Trip
             await _eventBus.PublishAsync(new PlanCommittedIntegrationEvent(
                 Guid.NewGuid(),
                 DateTime.UtcNow,
                 job.Id,
-                job.AssignedVehicleId ?? Guid.Empty), cancellationToken);
+                job.AssignedVehicleId ?? Guid.Empty,
+                legs), cancellationToken);
 
             return Result.Success();
         }

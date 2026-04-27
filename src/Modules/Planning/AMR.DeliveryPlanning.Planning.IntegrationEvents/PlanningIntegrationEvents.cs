@@ -11,8 +11,14 @@ public record JobAssignedIntegrationEvent(
     Guid PickupStationId,
     Guid DropStationId) : IIntegrationEvent;
 
+public record PlannedLegDto(
+    Guid FromStationId,
+    Guid ToStationId,
+    int SequenceOrder);
+
 public record PlanCommittedIntegrationEvent(
     Guid EventId,
     DateTime OccurredOn,
     Guid JobId,
-    Guid VehicleId) : IIntegrationEvent;
+    Guid VehicleId,
+    List<PlannedLegDto> Legs) : IIntegrationEvent;

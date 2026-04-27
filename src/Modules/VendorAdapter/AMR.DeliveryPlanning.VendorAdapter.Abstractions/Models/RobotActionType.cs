@@ -5,5 +5,8 @@ public enum RobotActionType
     MOVE,
     LIFT,
     DROP,
-    CHARGE
+    CHARGE,
+    ACT,
+    PARK,
+    WAIT
 }
