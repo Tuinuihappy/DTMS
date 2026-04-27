@@ -28,6 +28,8 @@ public class PlanningDbContext : DbContext
             builder.Property(j => j.Pattern).HasConversion<string>().HasMaxLength(30);
             builder.Property(j => j.RequiredCapability).HasMaxLength(50);
             builder.Property(j => j.TotalWeight);
+            builder.Property(j => j.SlaDeadline);
+            builder.Property(j => j.PlanningTrace).HasColumnType("text");
 
             builder.Property(j => j.DerivedFromOrders)
                    .HasColumnType("jsonb");
