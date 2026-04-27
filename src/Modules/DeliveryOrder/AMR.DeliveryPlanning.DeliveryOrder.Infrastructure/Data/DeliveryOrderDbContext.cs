@@ -10,50 +10,67 @@ public class DeliveryOrderDbContext : DbContext
     public DbSet<Domain.Entities.DeliveryOrder> DeliveryOrders { get; set; } = null!;
     public DbSet<OrderLine> OrderLines { get; set; } = null!;
     public DbSet<RecurringSchedule> RecurringSchedules { get; set; } = null!;
+    public DbSet<OrderAmendment> OrderAmendments { get; set; } = null!;
+    public DbSet<OrderAuditEvent> OrderAuditEvents { get; set; } = null!;
 
-    public DeliveryOrderDbContext(DbContextOptions<DeliveryOrderDbContext> options) : base(options)
-    {
-    }
+    public DeliveryOrderDbContext(DbContextOptions<DeliveryOrderDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
 
-        modelBuilder.Entity<Domain.Entities.DeliveryOrder>(builder =>
+        modelBuilder.Entity<Domain.Entities.DeliveryOrder>(b =>
         {
-            builder.HasKey(o => o.Id);
-            builder.Property(o => o.OrderKey).HasMaxLength(50).IsRequired();
-            builder.Property(o => o.PickupLocationCode).HasMaxLength(50).IsRequired();
-            builder.Property(o => o.DropLocationCode).HasMaxLength(50).IsRequired();
-            
-            // Map Priority and Status as strings
-            builder.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20);
-            builder.Property(o => o.Status).HasConversion<string>().HasMaxLength(20);
+            b.HasKey(o => o.Id);
+            b.Property(o => o.OrderKey).HasMaxLength(50).IsRequired();
+            b.Property(o => o.PickupLocationCode).HasMaxLength(50).IsRequired();
+            b.Property(o => o.DropLocationCode).HasMaxLength(50).IsRequired();
+            b.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20);
+            b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
+            b.HasIndex(o => o.OrderKey).IsUnique();
 
-            // One-to-Many relationship with OrderLine
-            builder.HasMany(o => o.OrderLines)
-                   .WithOne()
-                   .HasForeignKey(l => l.DeliveryOrderId)
-                   .OnDelete(DeleteBehavior.Cascade);
+            b.HasMany(o => o.OrderLines)
+             .WithOne()
+             .HasForeignKey(l => l.DeliveryOrderId)
+             .OnDelete(DeleteBehavior.Cascade);
 
-            // One-to-One relationship with RecurringSchedule
-            builder.HasOne(o => o.Schedule)
-                   .WithOne()
-                   .HasForeignKey<RecurringSchedule>(s => s.DeliveryOrderId)
-                   .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(o => o.Schedule)
+             .WithOne()
+             .HasForeignKey<RecurringSchedule>(s => s.DeliveryOrderId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<OrderLine>(builder =>
+        modelBuilder.Entity<OrderLine>(b =>
         {
-            builder.HasKey(l => l.Id);
-            builder.Property(l => l.ItemCode).HasMaxLength(50).IsRequired();
-            builder.Property(l => l.Remarks).HasMaxLength(200);
+            b.HasKey(l => l.Id);
+            b.Property(l => l.ItemCode).HasMaxLength(50).IsRequired();
+            b.Property(l => l.Remarks).HasMaxLength(200);
         });
 
-        modelBuilder.Entity<RecurringSchedule>(builder =>
+        modelBuilder.Entity<RecurringSchedule>(b =>
         {
-            builder.HasKey(s => s.Id);
-            builder.Property(s => s.CronExpression).HasMaxLength(50).IsRequired();
+            b.HasKey(s => s.Id);
+            b.Property(s => s.CronExpression).HasMaxLength(50).IsRequired();
+        });
+
+        modelBuilder.Entity<OrderAmendment>(b =>
+        {
+            b.HasKey(a => a.Id);
+            b.Property(a => a.Type).HasConversion<string>().HasMaxLength(30);
+            b.Property(a => a.Reason).HasMaxLength(500);
+            b.Property(a => a.OriginalSnapshot).HasColumnType("jsonb");
+            b.Property(a => a.NewSnapshot).HasColumnType("jsonb");
+            b.Property(a => a.AmendedBy).HasMaxLength(200);
+            b.HasIndex(a => a.DeliveryOrderId);
+        });
+
+        modelBuilder.Entity<OrderAuditEvent>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.EventType).HasMaxLength(100).IsRequired();
+            b.Property(e => e.Details).HasMaxLength(1000);
+            b.Property(e => e.ActorId).HasMaxLength(200);
+            b.HasIndex(e => e.DeliveryOrderId);
         });
     }
 }

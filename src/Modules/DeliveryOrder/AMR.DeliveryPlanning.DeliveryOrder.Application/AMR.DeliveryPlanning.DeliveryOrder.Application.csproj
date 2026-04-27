@@ -9,7 +9,9 @@
 
   <ItemGroup>
     <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     <PackageReference Include="MassTransit" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
   </ItemGroup>
 
   <PropertyGroup>
