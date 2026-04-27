@@ -62,4 +62,14 @@ public class JobRepository : IJobRepository
             .Include(t => t.Stops)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<List<Job>> GetAtRiskJobsAsync(DateTime cutoffTime, CancellationToken cancellationToken = default)
+    {
+        return await _context.Jobs
+            .Where(j => (j.Status == JobStatus.Assigned || j.Status == JobStatus.Committed)
+                     && j.SlaDeadline.HasValue
+                     && j.SlaDeadline.Value <= cutoffTime)
+            .Include(j => j.Legs)
+            .ToListAsync(cancellationToken);
+    }
 }

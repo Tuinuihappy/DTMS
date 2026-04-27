@@ -6,6 +6,8 @@ using AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder;
 using AMR.DeliveryPlanning.Planning.Application.Commands.CreateMilkRun;
 using AMR.DeliveryPlanning.Planning.Application.Commands.CreateMultiPickDropJob;
 using AMR.DeliveryPlanning.Planning.Application.Commands.ReplanJob;
+using AMR.DeliveryPlanning.Planning.Application.Commands.UpdateCostModel;
+using AMR.DeliveryPlanning.Planning.Application.Queries.GetCostModel;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobById;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetPendingJobs;
 using MediatR;
@@ -103,6 +105,20 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/planning/jobs/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
+        });
+
+        // GET /api/planning/cost-model — Get current cost model config
+        planningGroup.MapGet("/cost-model", async (string? vehicleTypeKey, ISender sender) =>
+        {
+            var result = await sender.Send(new GetCostModelQuery(vehicleTypeKey));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
+        // PUT /api/planning/cost-model — Update cost model config
+        planningGroup.MapPut("/cost-model", async (UpdateCostModelCommand command, ISender sender) =>
+        {
+            var result = await sender.Send(command);
+            return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         });
     }
 }

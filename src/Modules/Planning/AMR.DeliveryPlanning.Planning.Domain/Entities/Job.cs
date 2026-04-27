@@ -19,6 +19,10 @@ public class Job : AggregateRoot<Guid>
     public string? RequiredCapability { get; private set; }
     public double TotalWeight { get; private set; }
 
+    // Phase 4+: Explainability + Predictive replanning
+    public string? PlanningTrace { get; private set; }
+    public DateTime? SlaDeadline { get; private set; }
+
     private readonly List<Guid> _derivedFromOrders = new();
     public IReadOnlyCollection<Guid> DerivedFromOrders => _derivedFromOrders.AsReadOnly();
 
@@ -58,6 +62,11 @@ public class Job : AggregateRoot<Guid>
     public void SetPattern(PatternType pattern) => Pattern = pattern;
     public void SetRequiredCapability(string capability) => RequiredCapability = capability;
     public void SetTotalWeight(double weight) => TotalWeight = weight;
+    public void SetSlaDeadline(DateTime deadline) => SlaDeadline = deadline;
+    public void SetPlanningTrace(string trace) => PlanningTrace = trace;
+
+    public bool IsSlaAtRisk(TimeSpan estimatedRemainingTime)
+        => SlaDeadline.HasValue && SlaDeadline.Value - DateTime.UtcNow <= estimatedRemainingTime;
 
     public Leg AddLeg(Guid fromStationId, Guid toStationId, int sequenceOrder, double estimatedCost)
     {

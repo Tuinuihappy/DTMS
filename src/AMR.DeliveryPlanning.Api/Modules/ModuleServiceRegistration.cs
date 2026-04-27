@@ -1,13 +1,20 @@
 using AMR.DeliveryPlanning.Api.Auth;
+using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Options;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Repositories;
+using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories;
+using AMR.DeliveryPlanning.Dispatch.Infrastructure.Services;
 using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using AMR.DeliveryPlanning.Facility.Domain.Services;
 using AMR.DeliveryPlanning.Facility.Infrastructure.Data;
 using AMR.DeliveryPlanning.Facility.Infrastructure.Repositories;
+using AMR.DeliveryPlanning.Facility.Infrastructure.Services;
+using AMR.DeliveryPlanning.Fleet.Application.Consumers;
 using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Repositories;
@@ -17,9 +24,11 @@ using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Repositories;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Services;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using AMR.DeliveryPlanning.SharedKernel.Outbox;
 using AMR.DeliveryPlanning.VendorAdapter.Infrastructure;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 
 namespace AMR.DeliveryPlanning.Api.Modules;
 
@@ -39,28 +48,49 @@ public static class ModuleServiceRegistration
         // ── Facility Module ───────────────────────────────────────────
         services.AddDbContext<FacilityDbContext>(o => o.UseNpgsql(connectionString));
         services.AddScoped<IMapRepository, MapRepository>();
+        services.AddScoped<IStationRepository, StationRepository>();
+        services.AddScoped<IRouteEdgeRepository, RouteEdgeRepository>();
+        services.AddScoped<ITopologyOverlayRepository, TopologyOverlayRepository>();
+        services.AddScoped<IFacilityResourceRepository, FacilityResourceRepository>();
+        services.AddHttpClient<IFacilityResourceCommandService, Riot3FacilityResourceCommandService>(client =>
+        {
+            var baseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
+            client.BaseAddress = new Uri(baseUrl);
+        });
+        services.AddHostedService<TopologyOverlayExpiryService>();
 
         // ── Fleet Module ──────────────────────────────────────────────
         services.AddDbContext<FleetDbContext>(o => o.UseNpgsql(connectionString));
         services.AddScoped<IVehicleRepository, VehicleRepository>();
         services.AddScoped<IVehicleTypeRepository, VehicleTypeRepository>();
+        services.AddScoped<IChargingPolicyRepository, ChargingPolicyRepository>();
+        services.AddScoped<IMaintenanceRecordRepository, MaintenanceRecordRepository>();
+        services.AddScoped<IVehicleGroupRepository, VehicleGroupRepository>();
 
         // ── DeliveryOrder Module ──────────────────────────────────────
         services.AddDbContext<DeliveryOrderDbContext>(o => o.UseNpgsql(connectionString));
         services.AddScoped<IDeliveryOrderRepository, DeliveryOrderRepository>();
+        services.AddScoped<IOrderAmendmentRepository, OrderAmendmentRepository>();
+        services.AddScoped<IOrderAuditEventRepository, OrderAuditEventRepository>();
+        services.Configure<DeliveryOrderOptions>(
+            configuration.GetSection(DeliveryOrderOptions.SectionName));
 
         // ── Planning Module ───────────────────────────────────────────
         services.AddDbContext<PlanningDbContext>(o => o.UseNpgsql(connectionString));
         services.AddScoped<IJobRepository, JobRepository>();
+        services.AddSingleton<ICostModelService, InMemoryCostModelService>();
         services.AddScoped<IVehicleSelector, GreedyVehicleSelector>();
-        services.AddScoped<IRouteCostCalculator, SimpleRouteCostCalculator>();
+        services.AddScoped<SimpleRouteCostCalculator>();
+        services.AddScoped<IRouteCostCalculator, CachedRouteCostCalculator>();
         services.AddScoped<IPatternClassifier, PatternClassifier>();
         services.AddScoped<IRouteSolver, NearestNeighborTspSolver>();
         services.AddScoped<IFleetVehicleProvider, FleetVehicleProvider>();
+        services.AddHostedService<SlaRiskBackgroundService>();
 
         // ── Dispatch Module ───────────────────────────────────────────
         services.AddDbContext<DispatchDbContext>(o => o.UseNpgsql(connectionString));
         services.AddScoped<ITripRepository, TripRepository>();
+        services.AddScoped<ITaskDispatcher, VendorAdapterTaskDispatcher>();
 
         // ── VendorAdapter Module ──────────────────────────────────────
         services.AddVendorAdapterInfrastructure(configuration);
@@ -72,7 +102,8 @@ public static class ModuleServiceRegistration
             bus.AddConsumers(
                 typeof(AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly,
                 typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly,
-                typeof(AMR.DeliveryPlanning.Dispatch.Application.Commands.DispatchTrip.DispatchTripCommand).Assembly
+                typeof(AMR.DeliveryPlanning.Dispatch.Application.Commands.DispatchTrip.DispatchTripCommand).Assembly,
+                typeof(VehicleStateChangedConsumer).Assembly
             );
 
             bus.UsingRabbitMq((context, cfg) =>
@@ -88,7 +119,17 @@ public static class ModuleServiceRegistration
             });
         });
 
-        services.AddScoped<IEventBus, MassTransitEventBus>();
+        // Use OutboxEventBus for at-least-once delivery guarantee
+        services.AddScoped<IEventBus, OutboxEventBus>();
+
+        // Outbox infrastructure
+        services.AddDbContext<OutboxDbContext>(o => o.UseNpgsql(connectionString));
+        services.AddSingleton<IOutboxProcessor, OutboxProcessorService>();
+        services.AddHostedService<OutboxProcessorService>();
+
+        // Redis distributed cache
+        var redisConnection = configuration.GetConnectionString("Redis") ?? "localhost:6379";
+        services.AddStackExchangeRedisCache(o => o.Configuration = redisConnection);
 
         return services;
     }
