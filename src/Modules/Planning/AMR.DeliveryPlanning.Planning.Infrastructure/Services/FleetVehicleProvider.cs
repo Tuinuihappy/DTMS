@@ -5,18 +5,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.Planning.Infrastructure.Services;
 
-/// <summary>
-/// Queries the Fleet module's database for idle vehicles with sufficient battery.
-/// This is the cross-module bridge: Planning.Infrastructure → Fleet.Infrastructure.
-/// </summary>
 public class FleetVehicleProvider : IFleetVehicleProvider
 {
     private readonly FleetDbContext _fleetDb;
 
-    public FleetVehicleProvider(FleetDbContext fleetDb)
-    {
-        _fleetDb = fleetDb;
-    }
+    public FleetVehicleProvider(FleetDbContext fleetDb) => _fleetDb = fleetDb;
 
     public async Task<List<VehicleCandidate>> GetIdleVehiclesAsync(CancellationToken cancellationToken = default)
     {
@@ -24,10 +17,21 @@ public class FleetVehicleProvider : IFleetVehicleProvider
             .Where(v => v.State == VehicleState.Idle && v.BatteryLevel > 20)
             .ToListAsync(cancellationToken);
 
-        return vehicles.Select(v => new VehicleCandidate(
-            v.Id,
-            DistanceToPickup: 10.0, // Default distance; will use real map cost in future
-            v.BatteryLevel
-        )).ToList();
+        // Load vehicle types with capabilities
+        var typeIds = vehicles.Select(v => v.VehicleTypeId).Distinct().ToList();
+        var vehicleTypes = await _fleetDb.VehicleTypes
+            .Where(vt => typeIds.Contains(vt.Id))
+            .ToDictionaryAsync(vt => vt.Id, cancellationToken);
+
+        return vehicles.Select(v =>
+        {
+            vehicleTypes.TryGetValue(v.VehicleTypeId, out var vt);
+            return new VehicleCandidate(
+                VehicleId: v.Id,
+                DistanceToPickup: 10.0,
+                BatteryLevel: v.BatteryLevel,
+                VehicleTypeId: v.VehicleTypeId,
+                Capabilities: vt?.Capabilities);
+        }).ToList();
     }
 }

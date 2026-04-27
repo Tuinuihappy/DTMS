@@ -32,7 +32,7 @@ public class ReplanJobCommandHandler : ICommandHandler<ReplanJobCommand>
 
             // Re-assign vehicle
             var pickupStationId = job.Legs.FirstOrDefault()?.ToStationId ?? Guid.Empty;
-            var candidate = await _vehicleSelector.SelectBestVehicleAsync(pickupStationId, cancellationToken);
+            var candidate = await _vehicleSelector.SelectBestVehicleAsync(pickupStationId, job.RequiredCapability, cancellationToken);
 
             if (candidate != null)
             {
