@@ -1,11 +1,14 @@
 using System.Text;
 using AMR.DeliveryPlanning.Api.Auth;
+using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
 using AMR.DeliveryPlanning.Api.Middlewares;
 using AMR.DeliveryPlanning.Api.Modules;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.IdentityModel.Tokens;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -42,8 +45,8 @@ builder.Services.AddAuthentication(options =>
 // Configure MediatR — scan all module Application assemblies
 builder.Services.AddMediatR(cfg =>
 {
-    cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Facility.Application.Class1).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Fleet.Application.Class1).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Facility.Application.Queries.GetRouteCost.GetRouteCostQuery).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Fleet.Application.Consumers.VehicleStateChangedConsumer).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Dispatch.Application.Commands.DispatchTrip.DispatchTripCommand).Assembly);
@@ -51,6 +54,15 @@ builder.Services.AddMediatR(cfg =>
 
 // Register all module services (DbContexts, Repositories, Domain Services, HttpClients)
 builder.Services.AddAllModules(builder.Configuration);
+
+// OpenTelemetry
+var otelEndpoint = builder.Configuration["OpenTelemetry:Endpoint"] ?? "http://localhost:4317";
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService("AMR.DeliveryPlanning.Api"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)));
 
 var app = builder.Build();
 
@@ -83,6 +95,10 @@ using (var scope = app.Services.CreateScope())
     // 6. Auth
     var authDb = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
     await CreateSchemaAndTables(authDb, "auth", logger);
+
+    // 7. Outbox
+    var outboxDb = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+    await CreateSchemaAndTables(outboxDb, "outbox", logger);
 
     logger.LogInformation("Database migrations applied successfully.");
 }
