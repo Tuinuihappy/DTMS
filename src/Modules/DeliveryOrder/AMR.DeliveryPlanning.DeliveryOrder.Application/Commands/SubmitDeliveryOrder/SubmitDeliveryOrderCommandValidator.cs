@@ -1,18 +1,27 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Options;
 using FluentValidation;
+using Microsoft.Extensions.Options;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
 
 public class SubmitDeliveryOrderCommandValidator : AbstractValidator<SubmitDeliveryOrderCommand>
 {
-    public SubmitDeliveryOrderCommandValidator()
+    public SubmitDeliveryOrderCommandValidator(IOptions<DeliveryOrderOptions> options)
     {
-        RuleFor(x => x.OrderKey).NotEmpty();
+        var minLeadTime = TimeSpan.FromMinutes(options.Value.MinimumSlaLeadTimeMinutes);
+
+        RuleFor(x => x.OrderKey).NotEmpty().MaximumLength(50);
         RuleFor(x => x.PickupLocationCode).NotEmpty();
         RuleFor(x => x.DropLocationCode).NotEmpty();
-        RuleFor(x => x.DropLocationCode).NotEqual(x => x.PickupLocationCode).WithMessage("Pickup and Drop locations must be different.");
-        
-        RuleFor(x => x.SLA).GreaterThan(DateTime.UtcNow).When(x => x.SLA.HasValue).WithMessage("SLA must be in the future.");
+        RuleFor(x => x.DropLocationCode)
+            .NotEqual(x => x.PickupLocationCode)
+            .WithMessage("Pickup and Drop locations must be different.");
 
+        RuleFor(x => x.SLA)
+            .Must(sla => sla == null || sla > DateTime.UtcNow.Add(minLeadTime))
+            .WithMessage($"SLA must be at least {minLeadTime.TotalMinutes} minutes in the future.");
+
+        RuleFor(x => x.Lines).NotEmpty().WithMessage("At least one order line is required.");
         RuleForEach(x => x.Lines).ChildRules(lines =>
         {
             lines.RuleFor(l => l.ItemCode).NotEmpty();
