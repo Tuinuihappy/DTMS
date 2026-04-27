@@ -11,53 +11,73 @@ public class FacilityDbContext : DbContext
     public DbSet<Station> Stations { get; set; } = null!;
     public DbSet<Zone> Zones { get; set; } = null!;
     public DbSet<RouteEdge> RouteEdges { get; set; } = null!;
+    public DbSet<TopologyOverlay> TopologyOverlays { get; set; } = null!;
+    public DbSet<FacilityResource> FacilityResources { get; set; } = null!;
 
-    public FacilityDbContext(DbContextOptions<FacilityDbContext> options) : base(options)
-    {
-    }
+    public FacilityDbContext(DbContextOptions<FacilityDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
 
-        modelBuilder.Entity<Map>(builder =>
+        modelBuilder.Entity<Map>(b =>
         {
-            builder.HasKey(m => m.Id);
-            builder.Property(m => m.Name).HasMaxLength(100).IsRequired();
-            builder.Property(m => m.Version).HasMaxLength(50).IsRequired();
-            // Store MapData as JSONB
-            builder.Property(m => m.MapData).HasColumnType("jsonb");
-
-            // Ignore domain properties
-            builder.Ignore(m => m.DomainEvents);
-            builder.Ignore(m => m.Stations);
-            builder.Ignore(m => m.Zones);
-            builder.Ignore(m => m.RouteEdges);
+            b.HasKey(m => m.Id);
+            b.Property(m => m.Name).HasMaxLength(100).IsRequired();
+            b.Property(m => m.Version).HasMaxLength(50).IsRequired();
+            b.Property(m => m.MapData).HasColumnType("jsonb");
+            b.Ignore(m => m.DomainEvents);
+            b.Ignore(m => m.Stations);
+            b.Ignore(m => m.Zones);
+            b.Ignore(m => m.RouteEdges);
         });
 
-        modelBuilder.Entity<Station>(builder =>
+        modelBuilder.Entity<Station>(b =>
         {
-            builder.HasKey(s => s.Id);
-            builder.Property(s => s.Name).HasMaxLength(100).IsRequired();
-            builder.OwnsOne(s => s.Coordinate, cb =>
+            b.HasKey(s => s.Id);
+            b.Property(s => s.Name).HasMaxLength(100).IsRequired();
+            b.Property(s => s.Type).HasConversion<string>().HasMaxLength(20);
+            b.OwnsOne(s => s.Coordinate, cb =>
             {
                 cb.Property(c => c.X).HasColumnName("CoordinateX");
                 cb.Property(c => c.Y).HasColumnName("CoordinateY");
                 cb.Property(c => c.Theta).HasColumnName("CoordinateTheta");
             });
+            b.Property(s => s.CompatibleVehicleTypes)
+             .HasConversion(
+                 v => string.Join(',', v),
+                 v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList())
+             .HasColumnName("CompatibleVehicleTypes");
         });
 
-        modelBuilder.Entity<Zone>(builder =>
+        modelBuilder.Entity<Zone>(b =>
         {
-            builder.HasKey(z => z.Id);
-            builder.Property(z => z.Name).HasMaxLength(100).IsRequired();
-            // In a real app, polygon would be stored via NetTopologySuite or JSON array
-            builder.Ignore(z => z.Polygon);
+            b.HasKey(z => z.Id);
+            b.Property(z => z.Name).HasMaxLength(100).IsRequired();
+            b.Ignore(z => z.Polygon);
         });
 
-        modelBuilder.Entity<RouteEdge>(builder =>
+        modelBuilder.Entity<RouteEdge>(b =>
         {
-            builder.HasKey(e => e.Id);
+            b.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<TopologyOverlay>(b =>
+        {
+            b.HasKey(o => o.Id);
+            b.Property(o => o.Type).HasConversion<string>().HasMaxLength(30);
+            b.Property(o => o.Reason).HasMaxLength(500);
+            b.Property(o => o.PolygonJson).HasColumnType("jsonb");
+            b.HasIndex(o => new { o.MapId, o.ValidUntil });
+        });
+
+        modelBuilder.Entity<FacilityResource>(b =>
+        {
+            b.HasKey(r => r.Id);
+            b.Property(r => r.ResourceKey).HasMaxLength(100).IsRequired();
+            b.Property(r => r.ResourceType).HasConversion<string>().HasMaxLength(30);
+            b.Property(r => r.VendorRef).HasMaxLength(200);
+            b.Property(r => r.Description).HasMaxLength(500);
         });
 
         base.OnModelCreating(modelBuilder);
