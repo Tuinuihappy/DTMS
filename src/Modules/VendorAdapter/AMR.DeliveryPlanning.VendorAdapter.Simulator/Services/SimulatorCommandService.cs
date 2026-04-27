@@ -49,4 +49,19 @@ public class SimulatorCommandService : IVehicleCommandService
         await Task.Delay(200, cancellationToken);
         return Result.Success();
     }
+
+    public Task<StandardRobotState?> GetVehicleStateAsync(Guid vehicleId, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Simulator: Getting state for vehicle {VehicleId}", vehicleId);
+        var state = new StandardRobotState
+        {
+            VehicleId = vehicleId,
+            State = StandardState.Idle,
+            BatteryLevel = 0.85,
+            CurrentX = 0,
+            CurrentY = 0,
+            Timestamp = DateTime.UtcNow
+        };
+        return Task.FromResult<StandardRobotState?>(state);
+    }
 }

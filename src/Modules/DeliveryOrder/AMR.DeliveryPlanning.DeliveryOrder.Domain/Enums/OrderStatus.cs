@@ -4,8 +4,14 @@ public enum OrderStatus
 {
     Submitted,
     Validated,
+    ReadyToPlan,
+    Planning,
     Planned,
-    Executing,
+    Dispatched,
+    InProgress,
     Completed,
+    Held,
+    Failed,
+    Amended,
     Cancelled
 }

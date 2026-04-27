@@ -20,55 +20,205 @@ public class Riot3CommandService : IVehicleCommandService
 
     public async Task<Result> SendTaskAsync(Guid vehicleId, RobotTaskCommand command, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Sending task {TaskId} to Riot3 robot {VehicleId}", command.TaskId, vehicleId);
+        _logger.LogInformation("Sending task {TaskId} ({Action}) to RIOT3 vehicle {VehicleId}", command.TaskId, command.Action, vehicleId);
 
-        var request = new RiotTaskRequest
+        var mission = BuildMission(command);
+        var request = new Riot3OrderRequest
         {
-            TaskId = command.TaskId.ToString(),
-            ActionType = command.Action.ToString(), // MOVE, LIFT, DROP, CHARGE
-            Destination = command.TargetNodeId,
-            Params = command.AdditionalParameters
+            UpperKey = command.TaskId.ToString(),
+            OrderName = $"Task-{command.TaskId}",
+            OrderType = "WORK",
+            Priority = 10,
+            StructureType = "sequence",
+            AppointVehicleKey = vehicleId.ToString(),
+            Missions = new List<Riot3Mission> { mission }
         };
 
         try
         {
-            var response = await _httpClient.PostAsJsonAsync($"/api/v1/robots/{vehicleId}/tasks", request, cancellationToken);
+            var response = await _httpClient.PostAsJsonAsync("/api/v4/orders", request, cancellationToken);
             response.EnsureSuccessStatusCode();
+            _logger.LogInformation("RIOT3 order accepted for task {TaskId}", command.TaskId);
             return Result.Success();
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Failed to send task to Riot3 robot {VehicleId}", vehicleId);
-            return Result.Failure($"Failed to communicate with Riot3 API: {ex.Message}");
+            _logger.LogError(ex, "Failed to send task {TaskId} to RIOT3", command.TaskId);
+            return Result.Failure($"RIOT3 API error: {ex.Message}");
         }
     }
 
     public async Task<Result> CancelTaskAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Cancelling task {TaskId} for Riot3 robot {VehicleId}", taskId, vehicleId);
-        
+        _logger.LogInformation("Cancelling task {TaskId} via RIOT3 order cancel", taskId);
+
+        var operationRequest = new Riot3OrderOperationRequest { OrderCommandType = Riot3OrderCommandType.Cancel };
+
         try
         {
-            var response = await _httpClient.PostAsync($"/api/v1/robots/{vehicleId}/tasks/{taskId}/cancel", null, cancellationToken);
+            var upperKey = taskId.ToString();
+            var response = await _httpClient.PutAsJsonAsync(
+                $"/api/v4/orders/{upperKey}/operation?isUpper=true",
+                operationRequest,
+                cancellationToken);
             response.EnsureSuccessStatusCode();
             return Result.Success();
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Failed to cancel task for Riot3 robot {VehicleId}", vehicleId);
-            return Result.Failure($"Failed to cancel Riot3 task: {ex.Message}");
+            _logger.LogError(ex, "Failed to cancel RIOT3 order for task {TaskId}", taskId);
+            return Result.Failure($"RIOT3 cancel error: {ex.Message}");
         }
     }
 
-    public Task<Result> PauseTaskAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
+    public async Task<Result> PauseTaskAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
     {
-        // Implementation for Pause
-        return Task.FromResult(Result.Success());
+        _logger.LogInformation("Pausing task {TaskId} via RIOT3 order hold", taskId);
+
+        var operationRequest = new Riot3OrderOperationRequest { OrderCommandType = Riot3OrderCommandType.Hold };
+
+        try
+        {
+            var upperKey = taskId.ToString();
+            var response = await _httpClient.PutAsJsonAsync(
+                $"/api/v4/orders/{upperKey}/operation?isUpper=true",
+                operationRequest,
+                cancellationToken);
+            response.EnsureSuccessStatusCode();
+            return Result.Success();
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Failed to pause RIOT3 order for task {TaskId}", taskId);
+            return Result.Failure($"RIOT3 pause error: {ex.Message}");
+        }
     }
 
-    public Task<Result> ResumeTaskAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
+    public async Task<Result> ResumeTaskAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
     {
-        // Implementation for Resume
-        return Task.FromResult(Result.Success());
+        _logger.LogInformation("Resuming task {TaskId} via RIOT3 order resume", taskId);
+
+        var operationRequest = new Riot3OrderOperationRequest { OrderCommandType = Riot3OrderCommandType.Resume };
+
+        try
+        {
+            var upperKey = taskId.ToString();
+            var response = await _httpClient.PutAsJsonAsync(
+                $"/api/v4/orders/{upperKey}/operation?isUpper=true",
+                operationRequest,
+                cancellationToken);
+            response.EnsureSuccessStatusCode();
+            return Result.Success();
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Failed to resume RIOT3 order for task {TaskId}", taskId);
+            return Result.Failure($"RIOT3 resume error: {ex.Message}");
+        }
     }
+
+    public async Task<StandardRobotState?> GetVehicleStateAsync(Guid vehicleId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.GetFromJsonAsync<Riot3VehicleResponse>(
+                $"/api/v4/robots/{vehicleId}",
+                cancellationToken);
+
+            if (response == null) return null;
+
+            return new StandardRobotState
+            {
+                VehicleId = vehicleId,
+                State = MapSystemState(response.SystemState),
+                BatteryLevel = response.BatteryLevel / 100.0,
+                CurrentX = response.Position?.X,
+                CurrentY = response.Position?.Y,
+                Timestamp = DateTime.UtcNow
+            };
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Failed to get vehicle state for {VehicleId} from RIOT3", vehicleId);
+            return null;
+        }
+    }
+
+    private static Riot3Mission BuildMission(RobotTaskCommand command)
+    {
+        var mission = new Riot3Mission
+        {
+            MissionId = command.TaskId.ToString(),
+            MissionName = $"{command.Action}-{command.TaskId}",
+            BlockingType = "HARD"
+        };
+
+        switch (command.Action)
+        {
+            case RobotActionType.MOVE:
+                mission.Type = "MOVE";
+                mission.MapId = command.MapId;
+                mission.StationId = command.TargetNodeId;
+                break;
+
+            case RobotActionType.LIFT:
+                mission.Type = "ACT";
+                mission.ActionType = 4;
+                mission.Parameters = new List<Riot3ActionParam>
+                {
+                    new() { Key = "0", Value = "1" },
+                    new() { Key = "1", Value = "0" }
+                };
+                break;
+
+            case RobotActionType.DROP:
+                mission.Type = "ACT";
+                mission.ActionType = 4;
+                mission.Parameters = new List<Riot3ActionParam>
+                {
+                    new() { Key = "0", Value = "2" },
+                    new() { Key = "1", Value = "0" }
+                };
+                break;
+
+            case RobotActionType.CHARGE:
+                mission.Type = "MOVE";
+                mission.MapId = command.MapId;
+                mission.StationId = command.TargetNodeId;
+                break;
+
+            case RobotActionType.ACT:
+                mission.Type = "ACT";
+                if (command.AdditionalParameters != null)
+                {
+                    if (command.AdditionalParameters.TryGetValue("actionType", out var actionTypeStr)
+                        && int.TryParse(actionTypeStr, out var actionType))
+                        mission.ActionType = actionType;
+
+                    mission.Parameters = command.AdditionalParameters
+                        .Where(kv => kv.Key != "actionType")
+                        .Select(kv => new Riot3ActionParam { Key = kv.Key, Value = kv.Value })
+                        .ToList();
+                }
+                break;
+
+            default:
+                mission.Type = "MOVE";
+                mission.MapId = command.MapId;
+                mission.StationId = command.TargetNodeId;
+                break;
+        }
+
+        return mission;
+    }
+
+    private static StandardState MapSystemState(string systemState) => systemState?.ToUpperInvariant() switch
+    {
+        "IDLE" => StandardState.Idle,
+        "BUSY" => StandardState.Moving,
+        "ERROR" => StandardState.Error,
+        "CHARGING" => StandardState.Charging,
+        "MAINTENANCE" => StandardState.Maintenance,
+        _ => StandardState.Offline
+    };
 }

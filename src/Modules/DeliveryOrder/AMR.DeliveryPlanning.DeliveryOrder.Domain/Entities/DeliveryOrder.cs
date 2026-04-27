@@ -60,10 +60,82 @@ public class DeliveryOrder : AggregateRoot<Guid>
         AddDomainEvent(new DeliveryOrderValidatedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
+    public void MarkReadyToPlan()
+    {
+        if (Status != OrderStatus.Validated)
+            throw new InvalidOperationException("Only validated orders can be marked ready to plan.");
+
+        Status = OrderStatus.ReadyToPlan;
+        AddDomainEvent(new DeliveryOrderReadyToPlanDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+    }
+
+    public void MarkPlanning()
+    {
+        if (Status != OrderStatus.ReadyToPlan)
+            throw new InvalidOperationException("Only ReadyToPlan orders can enter Planning.");
+
+        Status = OrderStatus.Planning;
+        AddDomainEvent(new DeliveryOrderPlanningStartedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+    }
+
+    public void MarkPlanned()
+    {
+        if (Status != OrderStatus.Planning)
+            throw new InvalidOperationException("Only Planning orders can be marked Planned.");
+
+        Status = OrderStatus.Planned;
+        AddDomainEvent(new DeliveryOrderPlannedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+    }
+
+    public void MarkDispatched()
+    {
+        if (Status != OrderStatus.Planned)
+            throw new InvalidOperationException("Only Planned orders can be dispatched.");
+
+        Status = OrderStatus.Dispatched;
+        AddDomainEvent(new DeliveryOrderDispatchedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+    }
+
+    public void MarkInProgress()
+    {
+        if (Status != OrderStatus.Dispatched)
+            throw new InvalidOperationException("Only Dispatched orders can be in progress.");
+
+        Status = OrderStatus.InProgress;
+        AddDomainEvent(new DeliveryOrderInProgressDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+    }
+
+    public void Hold(string reason)
+    {
+        if (Status == OrderStatus.Completed || Status == OrderStatus.Cancelled || Status == OrderStatus.Failed)
+            throw new InvalidOperationException($"Cannot hold an order in {Status} status.");
+
+        Status = OrderStatus.Held;
+        AddDomainEvent(new DeliveryOrderHeldDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+    }
+
+    public void Release()
+    {
+        if (Status != OrderStatus.Held)
+            throw new InvalidOperationException("Only held orders can be released.");
+
+        Status = OrderStatus.ReadyToPlan;
+        AddDomainEvent(new DeliveryOrderReleasedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+    }
+
+    public void MarkFailed(string reason)
+    {
+        if (Status == OrderStatus.Completed || Status == OrderStatus.Cancelled)
+            throw new InvalidOperationException($"Cannot fail an order in {Status} status.");
+
+        Status = OrderStatus.Failed;
+        AddDomainEvent(new DeliveryOrderFailedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+    }
+
     public void Cancel(string reason)
     {
-        if (Status == OrderStatus.Completed || Status == OrderStatus.Executing)
-            throw new InvalidOperationException("Cannot cancel an order that is executing or completed.");
+        if (Status == OrderStatus.Completed || Status == OrderStatus.InProgress)
+            throw new InvalidOperationException("Cannot cancel an order that is in progress or completed.");
 
         Status = OrderStatus.Cancelled;
         AddDomainEvent(new DeliveryOrderCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
@@ -71,9 +143,29 @@ public class DeliveryOrder : AggregateRoot<Guid>
 
     public void MarkAsCompleted()
     {
-        if (Status == OrderStatus.Cancelled)
-            throw new InvalidOperationException("Cannot complete a cancelled order.");
+        if (Status != OrderStatus.InProgress && Status != OrderStatus.Dispatched)
+            throw new InvalidOperationException($"Cannot complete an order in {Status} status.");
 
         Status = OrderStatus.Completed;
+    }
+
+    public void AmendPriority(OrderPriority newPriority, string reason)
+    {
+        if (Status == OrderStatus.Completed || Status == OrderStatus.Cancelled)
+            throw new InvalidOperationException($"Cannot amend a {Status} order.");
+
+        Priority = newPriority;
+        Status = OrderStatus.Amended;
+        AddDomainEvent(new DeliveryOrderAmendedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+    }
+
+    public void AmendSla(DateTime newSla, string reason)
+    {
+        if (Status == OrderStatus.Completed || Status == OrderStatus.Cancelled)
+            throw new InvalidOperationException($"Cannot amend a {Status} order.");
+
+        SLA = newSla;
+        Status = OrderStatus.Amended;
+        AddDomainEvent(new DeliveryOrderAmendedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
     }
 }

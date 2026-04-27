@@ -24,10 +24,13 @@ public class PlanCommittedConsumer : IConsumer<PlanCommittedIntegrationEvent>
     public async Task Consume(ConsumeContext<PlanCommittedIntegrationEvent> context)
     {
         var evt = context.Message;
-        _logger.LogInformation("Received PlanCommitted event for Job {JobId}, creating Trip...", evt.JobId);
+        _logger.LogInformation("Received PlanCommitted event for Job {JobId} with {LegCount} legs, creating Trip...", evt.JobId, evt.Legs.Count);
 
-        // For MVP, use placeholder station IDs — in production these would come from the Job's legs
-        var command = new DispatchTripCommand(evt.JobId, evt.VehicleId, Guid.Empty, Guid.Empty);
+        var legs = evt.Legs
+            .Select(l => new DispatchLegInfo(l.FromStationId, l.ToStationId, l.SequenceOrder))
+            .ToList();
+
+        var command = new DispatchTripCommand(evt.JobId, evt.VehicleId, legs);
 
         var result = await _sender.Send(command, context.CancellationToken);
 

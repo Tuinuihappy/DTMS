@@ -4,6 +4,7 @@ public class RobotTaskCommand
 {
     public Guid TaskId { get; set; }
     public RobotActionType Action { get; set; }
+    public string? MapId { get; set; }
     public string? TargetNodeId { get; set; }
     public double? TargetX { get; set; }
     public double? TargetY { get; set; }
