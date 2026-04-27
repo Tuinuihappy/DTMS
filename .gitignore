@@ -1,0 +1,63 @@
+## .NET Build Outputs
+artifacts/bin/
+artifacts/obj/
+src/*/bin/
+src/*/obj/
+tests/*/bin/
+tests/*/obj/
+
+## NuGet
+*.nupkg
+*.snupkg
+*.nuspec
+project.lock.json
+packages/
+!**/[Pp]ackages/build/
+.nuget/
+
+## Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+## Rider
+.idea/
+
+## VS Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Logs
+*.log
+logs/
+
+## Docker
+docker-compose.override.yml
+
+## Secrets / Environment
+*.env
+.env
+.env.*
+!.env.example
+appsettings.Development.json
+appsettings.Local.json
+**/secrets.json
+
+## Test Results
+TestResults/
+coverage/
+*.trx
+*.coveragexml
+
+## Publish Output
+publish/
