@@ -11,6 +11,10 @@ public class Vehicle : AggregateRoot<Guid>
     public VehicleState State { get; private set; }
     public double BatteryLevel { get; private set; }
     public Guid? CurrentNodeId { get; private set; }
+    public bool IsInMaintenance => State == VehicleState.Maintenance;
+
+    private readonly List<Guid> _groupIds = new();
+    public IReadOnlyCollection<Guid> GroupIds => _groupIds.AsReadOnly();
 
     private Vehicle() { }
 
@@ -27,6 +31,9 @@ public class Vehicle : AggregateRoot<Guid>
 
     public void UpdateState(VehicleState newState, double batteryLevel, Guid? currentNodeId)
     {
+        if (IsInMaintenance && newState != VehicleState.Maintenance)
+            throw new InvalidOperationException("Vehicle is in maintenance. Complete maintenance before changing state.");
+
         var oldState = State;
         State = newState;
         BatteryLevel = batteryLevel;
@@ -34,4 +41,26 @@ public class Vehicle : AggregateRoot<Guid>
 
         AddDomainEvent(new VehicleStateChangedDomainEvent(this.Id, oldState, newState, batteryLevel));
     }
+
+    public void EnterMaintenance()
+    {
+        if (IsInMaintenance) throw new InvalidOperationException("Vehicle is already in maintenance.");
+        var oldState = State;
+        State = VehicleState.Maintenance;
+        AddDomainEvent(new VehicleMaintenanceEnteredDomainEvent(Id, oldState));
+    }
+
+    public void ExitMaintenance()
+    {
+        if (!IsInMaintenance) throw new InvalidOperationException("Vehicle is not in maintenance.");
+        State = VehicleState.Idle;
+        AddDomainEvent(new VehicleMaintenanceExitedDomainEvent(Id));
+    }
+
+    public void AddToGroup(Guid groupId)
+    {
+        if (!_groupIds.Contains(groupId)) _groupIds.Add(groupId);
+    }
+
+    public void RemoveFromGroup(Guid groupId) => _groupIds.Remove(groupId);
 }
