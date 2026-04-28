@@ -14,6 +14,6 @@ public class DispatchDbContextFactory : IDesignTimeDbContextFactory<DispatchDbCo
             .UseNpgsql(connStr)
             .Options;
 
-        return new DispatchDbContext(options);
+        return new DispatchDbContext(options, new AMR.DeliveryPlanning.SharedKernel.Tenancy.TenantContext());
     }
 }

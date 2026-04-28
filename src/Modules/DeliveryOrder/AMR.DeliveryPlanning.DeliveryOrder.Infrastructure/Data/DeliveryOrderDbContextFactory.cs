@@ -14,6 +14,6 @@ public class DeliveryOrderDbContextFactory : IDesignTimeDbContextFactory<Deliver
             .UseNpgsql(connStr)
             .Options;
 
-        return new DeliveryOrderDbContext(options);
+        return new DeliveryOrderDbContext(options, new AMR.DeliveryPlanning.SharedKernel.Tenancy.TenantContext());
     }
 }

@@ -14,6 +14,6 @@ public class PlanningDbContextFactory : IDesignTimeDbContextFactory<PlanningDbCo
             .UseNpgsql(connStr)
             .Options;
 
-        return new PlanningDbContext(options);
+        return new PlanningDbContext(options, new AMR.DeliveryPlanning.SharedKernel.Tenancy.TenantContext());
     }
 }
