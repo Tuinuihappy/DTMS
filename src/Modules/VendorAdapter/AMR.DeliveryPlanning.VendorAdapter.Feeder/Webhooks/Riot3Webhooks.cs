@@ -58,7 +58,7 @@ public static class Riot3Webhooks
         });
 
         // RIOT3.0 action callback mid-task
-        group.MapPost("/action-callback", async (Riot3ActionCallbackPayload payload, ILogger<Riot3ActionCallbackPayload> logger) =>
+        group.MapPost("/action-callback", (Riot3ActionCallbackPayload payload, ILogger<Riot3ActionCallbackPayload> logger) =>
         {
             logger.LogInformation("RIOT3 action callback: taskId={TaskId} result={Result}", payload.TaskId, payload.Result);
             return Results.Ok();

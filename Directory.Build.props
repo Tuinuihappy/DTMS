@@ -7,4 +7,12 @@
     <!-- Use artifacts output layout -->
     <UseArtifactsOutput>true</UseArtifactsOutput>
   </PropertyGroup>
+  <!-- Suppress CVE in System.Security.Cryptography.Xml brought in by Microsoft.Build.Tasks.Core via
+       Microsoft.EntityFrameworkCore.Design. This package is design-time-only tooling (EF migrations CLI);
+       it is not deployed to production and our code never calls XML signing APIs. Re-evaluate when a
+       patched Microsoft.EntityFrameworkCore.Design is available. -->
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-37gx-xxp4-5rgx" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-w3x6-4m5h-cxqf" />
+  </ItemGroup>
 </Project>

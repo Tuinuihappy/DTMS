@@ -4,6 +4,7 @@
     <ProjectReference Include="..\AMR.DeliveryPlanning.Planning.Domain\AMR.DeliveryPlanning.Planning.Domain.csproj" />
     <ProjectReference Include="..\AMR.DeliveryPlanning.Planning.Application\AMR.DeliveryPlanning.Planning.Application.csproj" />
     <ProjectReference Include="..\..\Fleet\AMR.DeliveryPlanning.Fleet.Infrastructure\AMR.DeliveryPlanning.Fleet.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Facility\AMR.DeliveryPlanning.Facility.Infrastructure\AMR.DeliveryPlanning.Facility.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

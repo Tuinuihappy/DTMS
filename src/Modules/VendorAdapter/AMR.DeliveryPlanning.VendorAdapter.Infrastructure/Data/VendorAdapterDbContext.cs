@@ -23,7 +23,6 @@ public class VendorAdapterDbContext : DbContext
             b.Property(e => e.AdapterKey).HasMaxLength(50).IsRequired();
             b.Property(e => e.VendorParamsJson).HasColumnType("jsonb");
             b.HasIndex(e => new { e.VehicleTypeKey, e.CanonicalAction }).IsUnique();
-            b.Ignore(e => e.DomainEvents);
         });
     }
 }

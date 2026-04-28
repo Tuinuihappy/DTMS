@@ -1,9 +1,10 @@
 # Production Readiness Checklist
 
-> **Last Updated:** 2026-04-28
-> **Build Status:** Passing | **Tests:** 44/44
+> **Last Updated:** 2026-04-29
+> **Build Status:** Passing | **Tests:** 54 unit + 20 integration (74 total)
 > **Current State:** Staging-ready prototype — NOT production-ready
-> **Fixed (2026-04-28):** C1, C2, C3, C4, C5, H1, M2, M4
+> **Fixed (2026-04-28):** C1, C2, C3, C4, C5, H1, H2, M1, M2, M4, M5
+> **Fixed (2026-04-29):** H3 (Multi-tenancy), Phase 0 baseline fixes, Phase 1 EF Migrations, Pre-Phase 3 integration test bugs
 
 ---
 
@@ -19,6 +20,10 @@
 | P6 — DeliveryOrder | Amendment history, Idempotency key, SLA validation, Bulk import, Timeline | Done |
 | P7 — Multi-vendor | Feeder adapter, Action catalog, RIOT3 event normalization, Capability assignment | Done |
 | P8 — Advanced | Battery-aware dispatch, Predictive replanning, Explainability, Cost model | Done |
+| **Hardening Phase 0** | Baseline fixes (build errors, EnsureCreated, health endpoints) | **Done 2026-04-29** |
+| **Hardening Phase 1** | EF Migrations (8 DbContexts), MigrateAsync path, production guard | **Done 2026-04-29** |
+| **Hardening Phase 2** | Multi-tenancy H3: ITenantContext, query filters, events, consumers, AppUser JWT | **Done 2026-04-29** |
+| **Pre-Phase 3 Bug Fixes** | Station save (MapRepository), Trip Legs, VehicleType seed, migration gaps | **Done 2026-04-29** |
 
 ---
 
@@ -198,17 +203,34 @@ dotnet user-secrets set "RabbitMq:Password" "<secret>"
 
 ---
 
-### H3. ไม่มี Multi-Tenancy
+### ~~H3. ไม่มี Multi-Tenancy~~ ✅ Fixed 2026-04-29
 
-**Problem:** ไม่มี `tenantId` ในทุก entity และ query — ข้อมูล tenant ปนกัน
+**Files created:**
+- [SharedKernel/Tenancy/ITenantContext.cs](src/AMR.DeliveryPlanning.SharedKernel/Tenancy/ITenantContext.cs) — read-only scoped interface
+- [SharedKernel/Tenancy/TenantContext.cs](src/AMR.DeliveryPlanning.SharedKernel/Tenancy/TenantContext.cs) — scoped implementation with `Set(Guid)`
+- [Api/Middlewares/TenantContextMiddleware.cs](src/AMR.DeliveryPlanning.Api/Middlewares/TenantContextMiddleware.cs) — resolves `tenant_id` JWT claim per request
+- [tests/Integration/.../TenantIsolationTests.cs](tests/Integration/AMR.DeliveryPlanning.IntegrationTests/TenantIsolationTests.cs) — 5 cross-tenant isolation tests
 
-**Fix:**
-1. เพิ่ม `TenantId` column ใน tables หลัก (DeliveryOrders, Jobs, Trips, Vehicles)
-2. เพิ่ม Global Query Filter ใน EF Core:
-```csharp
-modelBuilder.Entity<Job>().HasQueryFilter(j => j.TenantId == _tenantContext.TenantId);
-```
-3. Inject `ITenantContext` จาก JWT claims
+**Domain entities with TenantId added:**
+- `DeliveryOrder`, `Job`, `Trip`, `Vehicle`, `VehicleGroup` — constructors require `tenantId`
+- 8 command handlers inject `ITenantContext` and pass `TenantId` to constructors
+
+**EF Global Query Filters:**
+- `DeliveryOrderDbContext`, `PlanningDbContext`, `DispatchDbContext`, `FleetDbContext` — inject `ITenantContext`
+- `HasQueryFilter(e => e.TenantId == _tenantContext.TenantId)` on all 5 tenant-owned aggregate roots
+- `OrderKey` unique index changed to `(TenantId, OrderKey)` for tenant-local uniqueness
+
+**Events and Consumers:**
+- `DeliveryOrderReadyForPlanningIntegrationEvent`, `PlanCommittedIntegrationEvent`, `TripCompletedIntegrationEvent` — added `TenantId`
+- Cross-module consumers set `TenantContext` from event `TenantId` before DB access
+- RIOT3 webhook consumers use `IgnoreQueryFilters()` to resolve trip, then set tenant from found trip
+
+**Auth:**
+- `AppUser.TenantId` added; JWT issues `tenant_id` claim
+- Register endpoint reads `X-Tenant-Id` header; seeded admin uses `SystemTenantId`
+- `AddTenantId` migration scaffolded for Auth schema
+
+**Migrations scaffolded:** `AddTenantId` for DeliveryOrder, Planning, Dispatch, Fleet, Auth (5 modules)
 
 ---
 
@@ -388,8 +410,10 @@ open http://localhost:15672   # guest:guest
 | Phase | งาน | ประมาณ | สถานะ |
 |---|---|---|---|
 | ~~Critical Fixes~~ | ~~C1–C5~~ | ~~3–5 วัน~~ | ✅ Done 2026-04-28 |
-| Security Hardening | H1 ✅ · H2 ✅ · **H3 ยังค้าง** | 3–5 วัน | H1+H2 Done · H3 pending |
-| Operational | M3 ยังค้าง · M1 ✅ · M2 ✅ · M4 ✅ · M5 ✅ | 1–2 วัน | M1+M2+M4+M5 Done |
-| Integration Testing | test cases ครบ | 5–7 วัน | Pending |
+| ~~Security Hardening~~ | ~~H1 · H2 · H3~~ | ~~3–5 วัน~~ | ✅ Done 2026-04-29 |
+| ~~Operational (partial)~~ | ~~M1 · M2 · M4 · M5~~ | ~~1 วัน~~ | ✅ Done 2026-04-28 |
+| Operational | **M3 ยังค้าง** (Integration test cases) | 5–7 วัน | Pending |
+| Integration Testing | test scenarios ครบ | 5–7 วัน | Pending |
 | Load / Stress Testing | verify NFR (500 orders/min) | 2–3 วัน | Pending |
-| **รวม (เหลือ)** | H2, H3, M1, M3, M5 + Testing | **~2.5 สัปดาห์** | |
+| Release Gate | secrets, runbook, vendor contract | 1–2 วัน | Pending |
+| **รวม (เหลือ)** | **M3 + Integration Tests + Load + Release Gate** | **~2 สัปดาห์** | |

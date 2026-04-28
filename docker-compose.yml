@@ -74,6 +74,8 @@ services:
       - RabbitMq__Password=guest
       - VendorAdapter__Riot3__BaseUrl=http://host.docker.internal:5100
       - OpenTelemetry__Endpoint=http://jaeger:4317
+      # Dev-only placeholder secret — NOT for production (production uses Vault/KMS)
+      - Jwt__Secret=dev-only-secret-min-32-chars-placeholder!
 
 volumes:
   pgdata:

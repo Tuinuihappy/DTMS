@@ -1,5 +1,6 @@
 using System.Text;
 using System.Threading.RateLimiting;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using AMR.DeliveryPlanning.Api.Auth;
 using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
 using AMR.DeliveryPlanning.Api.Middlewares;
@@ -7,6 +8,8 @@ using AMR.DeliveryPlanning.Api.Modules;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Resources;
@@ -22,6 +25,11 @@ builder.Host.UseSerilog((context, configuration) =>
 // Add services to the container.
 builder.Services.AddOpenApi();
 builder.Services.AddAuthorization();
+
+// Tenant context — scoped per request; populated by TenantContextMiddleware from JWT tenant_id claim
+builder.Services.AddScoped<TenantContext>();
+builder.Services.AddScoped<AMR.DeliveryPlanning.SharedKernel.Tenancy.ITenantContext>(
+    sp => sp.GetRequiredService<TenantContext>());
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>();
@@ -104,7 +112,7 @@ builder.Services.AddHealthChecks()
         {
             return HealthCheckResult.Degraded(ex.Message);
         }
-    }, failureStatus: HealthStatus.Degraded, tags: ["ready"]);
+    }, tags: ["ready"]);
 
 // Rate limiting — fixed window, 100 req/min, applied globally
 builder.Services.AddRateLimiter(options =>
@@ -130,14 +138,14 @@ using (var scope = app.Services.CreateScope())
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     logger.LogInformation("Applying database migrations...");
 
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Facility.Infrastructure.Data.FacilityDbContext>(), logger);
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Fleet.Infrastructure.Data.FleetDbContext>(), logger);
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data.DeliveryOrderDbContext>(), logger);
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Planning.Infrastructure.Data.PlanningDbContext>(), logger);
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Dispatch.Infrastructure.Data.DispatchDbContext>(), logger);
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AuthDbContext>(), logger);
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<OutboxDbContext>(), logger);
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data.VendorAdapterDbContext>(), logger);
+    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Facility.Infrastructure.Data.FacilityDbContext>(), logger, app.Environment);
+    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Fleet.Infrastructure.Data.FleetDbContext>(), logger, app.Environment);
+    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data.DeliveryOrderDbContext>(), logger, app.Environment);
+    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Planning.Infrastructure.Data.PlanningDbContext>(), logger, app.Environment);
+    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Dispatch.Infrastructure.Data.DispatchDbContext>(), logger, app.Environment);
+    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AuthDbContext>(), logger, app.Environment);
+    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<OutboxDbContext>(), logger, app.Environment);
+    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data.VendorAdapterDbContext>(), logger, app.Environment);
 
     logger.LogInformation("Database migrations applied successfully.");
 }
@@ -198,14 +206,10 @@ static async Task SeedActionCatalogAsync(IServiceProvider services)
     }
 }
 
-static async Task ApplyMigrationsAsync(DbContext db, Microsoft.Extensions.Logging.ILogger logger)
+static async Task ApplyMigrationsAsync(DbContext db, Microsoft.Extensions.Logging.ILogger logger, IWebHostEnvironment env)
 {
     var dbName = db.GetType().Name;
 
-    // If migrations have been scaffolded for this context, apply them.
-    // If not yet scaffolded (empty Migrations assembly), fall back to EnsureCreated
-    // so local dev still works. Run 'dotnet ef migrations add InitialCreate' per module
-    // to graduate to the proper migration path.
     var hasMigrations = db.Database.GetMigrations().Any();
     if (hasMigrations)
     {
@@ -221,13 +225,37 @@ static async Task ApplyMigrationsAsync(DbContext db, Microsoft.Extensions.Loggin
             logger.LogDebug("{Context} schema is up to date", dbName);
         }
     }
+    else if (env.IsProduction())
+    {
+        // Hard fail: production must never start without migrations. If this throws,
+        // it means a new DbContext was added without running 'dotnet ef migrations add'.
+        throw new InvalidOperationException(
+            $"Production startup aborted: {dbName} has no EF migrations. " +
+            "Run: dotnet ef migrations add InitialCreate --project <InfraProject> --startup-project src/AMR.DeliveryPlanning.Api");
+    }
     else
     {
         logger.LogWarning(
             "{Context} has no EF migrations — using EnsureCreated (dev fallback). " +
             "Run: dotnet ef migrations add InitialCreate --project <InfraProject> --startup-project src/AMR.DeliveryPlanning.Api",
             dbName);
-        await db.Database.EnsureCreatedAsync();
+        var created = await db.Database.EnsureCreatedAsync();
+        if (!created)
+        {
+            // Database already existed (e.g. created by POSTGRES_DB env var before API started).
+            // EnsureCreated returns false and skips table creation in this case, so we
+            // call CreateTablesAsync explicitly to create any missing schema/tables.
+            try
+            {
+                var creator = db.GetService<IRelationalDatabaseCreator>();
+                await creator.CreateTablesAsync();
+                logger.LogInformation("{Context} schema created via CreateTablesAsync", dbName);
+            }
+            catch (Exception ex)
+            {
+                logger.LogDebug("{Context} tables already exist or creation skipped: {Message}", dbName, ex.Message);
+            }
+        }
     }
 }
 
@@ -251,6 +279,7 @@ app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<TenantContextMiddleware>();
 
 // Liveness probe (always 200 if process is up)
 app.MapHealthChecks("/health").AllowAnonymous();
