@@ -8,7 +8,11 @@ namespace AMR.DeliveryPlanning.Api.Auth;
 /// </summary>
 public class AppUser
 {
+    // Well-known tenant for seeded system/admin accounts.
+    public static readonly Guid SystemTenantId = new("00000000-0000-0000-0000-000000000001");
+
     public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
     public string Username { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public string Role { get; set; } = "Operator";

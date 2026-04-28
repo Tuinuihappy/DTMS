@@ -6,13 +6,14 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 
 public class DeliveryOrder : AggregateRoot<Guid>
 {
+    public Guid TenantId { get; private set; }
     public string OrderKey { get; private set; } = string.Empty;
     public string PickupLocationCode { get; private set; } = string.Empty;
     public string DropLocationCode { get; private set; } = string.Empty;
     public OrderPriority Priority { get; private set; }
     public OrderStatus Status { get; private set; }
     public DateTime? SLA { get; private set; }
-    
+
     // Mapped later during validation
     public Guid? PickupStationId { get; private set; }
     public Guid? DropStationId { get; private set; }
@@ -24,9 +25,10 @@ public class DeliveryOrder : AggregateRoot<Guid>
 
     private DeliveryOrder() { } // For EF Core
 
-    public DeliveryOrder(string orderKey, string pickupLocationCode, string dropLocationCode, OrderPriority priority, DateTime? sla)
+    public DeliveryOrder(Guid tenantId, string orderKey, string pickupLocationCode, string dropLocationCode, OrderPriority priority, DateTime? sla)
     {
         Id = Guid.NewGuid();
+        TenantId = tenantId;
         OrderKey = orderKey;
         PickupLocationCode = pickupLocationCode;
         DropLocationCode = dropLocationCode;

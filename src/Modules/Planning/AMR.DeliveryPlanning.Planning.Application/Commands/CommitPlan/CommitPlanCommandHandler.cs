@@ -1,6 +1,7 @@
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.Planning.IntegrationEvents;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Commands.CommitPlan;
 
@@ -8,11 +9,13 @@ public class CommitPlanCommandHandler : ICommandHandler<CommitPlanCommand>
 {
     private readonly IJobRepository _jobRepository;
     private readonly IEventBus _eventBus;
+    private readonly ITenantContext _tenantContext;
 
-    public CommitPlanCommandHandler(IJobRepository jobRepository, IEventBus eventBus)
+    public CommitPlanCommandHandler(IJobRepository jobRepository, IEventBus eventBus, ITenantContext tenantContext)
     {
         _jobRepository = jobRepository;
         _eventBus = eventBus;
+        _tenantContext = tenantContext;
     }
 
     public async Task<Result> Handle(CommitPlanCommand request, CancellationToken cancellationToken)
@@ -35,6 +38,7 @@ public class CommitPlanCommandHandler : ICommandHandler<CommitPlanCommand>
             await _eventBus.PublishAsync(new PlanCommittedIntegrationEvent(
                 Guid.NewGuid(),
                 DateTime.UtcNow,
+                _tenantContext.TenantId,
                 job.Id,
                 job.AssignedVehicleId ?? Guid.Empty,
                 legs), cancellationToken);

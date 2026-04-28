@@ -2,6 +2,7 @@ using AMR.DeliveryPlanning.Fleet.Domain.Entities;
 using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Exceptions;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 
 namespace AMR.DeliveryPlanning.Fleet.Application.Commands.RegisterVehicle;
 
@@ -9,11 +10,13 @@ internal sealed class RegisterVehicleCommandHandler : ICommandHandler<RegisterVe
 {
     private readonly IVehicleRepository _vehicleRepository;
     private readonly IVehicleTypeRepository _vehicleTypeRepository;
+    private readonly ITenantContext _tenantContext;
 
-    public RegisterVehicleCommandHandler(IVehicleRepository vehicleRepository, IVehicleTypeRepository vehicleTypeRepository)
+    public RegisterVehicleCommandHandler(IVehicleRepository vehicleRepository, IVehicleTypeRepository vehicleTypeRepository, ITenantContext tenantContext)
     {
         _vehicleRepository = vehicleRepository;
         _vehicleTypeRepository = vehicleTypeRepository;
+        _tenantContext = tenantContext;
     }
 
     public async Task<Result<Guid>> Handle(RegisterVehicleCommand request, CancellationToken cancellationToken)
@@ -24,7 +27,7 @@ internal sealed class RegisterVehicleCommandHandler : ICommandHandler<RegisterVe
             throw new NotFoundException($"VehicleType with ID {request.VehicleTypeId} not found.");
         }
 
-        var vehicle = new Vehicle(Guid.NewGuid(), request.VehicleName, request.VehicleTypeId, request.AdapterKey);
+        var vehicle = new Vehicle(Guid.NewGuid(), _tenantContext.TenantId, request.VehicleName, request.VehicleTypeId, request.AdapterKey);
 
         await _vehicleRepository.AddAsync(vehicle, cancellationToken);
         await _vehicleRepository.SaveChangesAsync(cancellationToken);

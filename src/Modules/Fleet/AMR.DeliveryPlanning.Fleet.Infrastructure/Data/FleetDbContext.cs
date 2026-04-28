@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.Fleet.Domain.Entities;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
@@ -7,6 +8,8 @@ public class FleetDbContext : DbContext
 {
     public const string Schema = "fleet";
 
+    private readonly ITenantContext _tenantContext;
+
     public DbSet<Vehicle> Vehicles { get; set; } = null!;
     public DbSet<VehicleType> VehicleTypes { get; set; } = null!;
     public DbSet<ChargingPolicy> ChargingPolicies { get; set; } = null!;
@@ -14,7 +17,11 @@ public class FleetDbContext : DbContext
     public DbSet<VehicleGroup> VehicleGroups { get; set; } = null!;
     internal DbSet<VehicleGroupMember> VehicleGroupMembers { get; set; } = null!;
 
-    public FleetDbContext(DbContextOptions<FleetDbContext> options) : base(options) { }
+    public FleetDbContext(DbContextOptions<FleetDbContext> options, ITenantContext tenantContext)
+        : base(options)
+    {
+        _tenantContext = tenantContext;
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -23,6 +30,8 @@ public class FleetDbContext : DbContext
         modelBuilder.Entity<Vehicle>(b =>
         {
             b.HasKey(v => v.Id);
+            b.Property(v => v.TenantId).IsRequired();
+            b.HasQueryFilter(v => v.TenantId == _tenantContext.TenantId);
             b.Property(v => v.VehicleName).HasMaxLength(100).IsRequired();
             b.Property(v => v.State).HasConversion<string>().HasMaxLength(20);
             b.Property(v => v.AdapterKey).HasMaxLength(20).IsRequired().HasDefaultValue("riot3");
@@ -58,6 +67,8 @@ public class FleetDbContext : DbContext
         modelBuilder.Entity<VehicleGroup>(b =>
         {
             b.HasKey(g => g.Id);
+            b.Property(g => g.TenantId).IsRequired();
+            b.HasQueryFilter(g => g.TenantId == _tenantContext.TenantId);
             b.Property(g => g.Name).HasMaxLength(100).IsRequired();
             b.Property(g => g.Description).HasMaxLength(500);
             b.Property(g => g.Tags)

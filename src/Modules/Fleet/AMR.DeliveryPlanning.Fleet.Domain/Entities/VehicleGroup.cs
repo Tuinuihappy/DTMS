@@ -4,6 +4,7 @@ namespace AMR.DeliveryPlanning.Fleet.Domain.Entities;
 
 public class VehicleGroup : Entity<Guid>
 {
+    public Guid TenantId { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string Description { get; private set; } = string.Empty;
     public List<string> Tags { get; private set; } = new();
@@ -13,9 +14,10 @@ public class VehicleGroup : Entity<Guid>
 
     private VehicleGroup() { }
 
-    public VehicleGroup(string name, string description, IEnumerable<string>? tags = null)
+    public VehicleGroup(Guid tenantId, string name, string description, IEnumerable<string>? tags = null)
     {
         Id = Guid.NewGuid();
+        TenantId = tenantId;
         Name = name;
         Description = description;
         Tags = tags?.ToList() ?? new List<string>();

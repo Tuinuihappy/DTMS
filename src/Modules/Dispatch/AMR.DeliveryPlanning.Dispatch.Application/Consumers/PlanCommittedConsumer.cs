@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.DispatchTrip;
 using AMR.DeliveryPlanning.Planning.IntegrationEvents;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using MassTransit;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -14,16 +15,19 @@ public class PlanCommittedConsumer : IConsumer<PlanCommittedIntegrationEvent>
 {
     private readonly ISender _sender;
     private readonly ILogger<PlanCommittedConsumer> _logger;
+    private readonly TenantContext _tenantContext;
 
-    public PlanCommittedConsumer(ISender sender, ILogger<PlanCommittedConsumer> logger)
+    public PlanCommittedConsumer(ISender sender, ILogger<PlanCommittedConsumer> logger, TenantContext tenantContext)
     {
         _sender = sender;
         _logger = logger;
+        _tenantContext = tenantContext;
     }
 
     public async Task Consume(ConsumeContext<PlanCommittedIntegrationEvent> context)
     {
         var evt = context.Message;
+        _tenantContext.Set(evt.TenantId);
         _logger.LogInformation("Received PlanCommitted event for Job {JobId} with {LegCount} legs, creating Trip...", evt.JobId, evt.Legs.Count);
 
         var legs = evt.Legs

@@ -25,7 +25,7 @@ public class Phase3DomainTests
     [Fact]
     public void CrossDockJob_HasCorrectPattern()
     {
-        var job = new Job(Guid.NewGuid(), "Normal");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "Normal");
         job.SetPattern(PatternType.CrossDock);
 
         job.Pattern.Should().Be(PatternType.CrossDock);
@@ -62,7 +62,7 @@ public class Phase3DomainTests
     [Fact]
     public void MilkRunJob_HasCorrectPattern()
     {
-        var job = new Job(Guid.NewGuid(), "Normal");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "Normal");
         job.SetPattern(PatternType.MilkRun);
 
         job.Pattern.Should().Be(PatternType.MilkRun);
@@ -73,7 +73,7 @@ public class Phase3DomainTests
     [Fact]
     public void MultiPickDropJob_HasCorrectPattern()
     {
-        var job = new Job(Guid.NewGuid(), "Normal");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "Normal");
         job.SetPattern(PatternType.MultiPickMultiDrop);
         job.SetTotalWeight(45.5);
 
@@ -84,7 +84,7 @@ public class Phase3DomainTests
     [Fact]
     public void MultiPickDropJob_MultipleLegs_MaintainOrder()
     {
-        var job = new Job(Guid.NewGuid(), "Normal");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "Normal");
         var s1 = Guid.NewGuid();
         var s2 = Guid.NewGuid();
         var s3 = Guid.NewGuid();

@@ -19,6 +19,7 @@ public record PlannedLegDto(
 public record PlanCommittedIntegrationEvent(
     Guid EventId,
     DateTime OccurredOn,
+    Guid TenantId,
     Guid JobId,
     Guid VehicleId,
     List<PlannedLegDto> Legs) : IIntegrationEvent;

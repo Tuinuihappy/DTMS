@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.Planning.Domain.Entities;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data.Records;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.Planning.Infrastructure.Data;
@@ -7,6 +8,8 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Data;
 public class PlanningDbContext : DbContext
 {
     public const string Schema = "planning";
+
+    private readonly ITenantContext _tenantContext;
 
     public DbSet<Job> Jobs { get; set; } = null!;
     public DbSet<Leg> Legs { get; set; } = null!;
@@ -16,7 +19,11 @@ public class PlanningDbContext : DbContext
     public DbSet<MilkRunStop> MilkRunStops { get; set; } = null!;
     public DbSet<CostModelConfigRecord> CostModelConfigs { get; set; } = null!;
 
-    public PlanningDbContext(DbContextOptions<PlanningDbContext> options) : base(options) { }
+    public PlanningDbContext(DbContextOptions<PlanningDbContext> options, ITenantContext tenantContext)
+        : base(options)
+    {
+        _tenantContext = tenantContext;
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -25,6 +32,8 @@ public class PlanningDbContext : DbContext
         modelBuilder.Entity<Job>(builder =>
         {
             builder.HasKey(j => j.Id);
+            builder.Property(j => j.TenantId).IsRequired();
+            builder.HasQueryFilter(j => j.TenantId == _tenantContext.TenantId);
             builder.Property(j => j.Priority).HasMaxLength(20);
             builder.Property(j => j.Status).HasConversion<string>().HasMaxLength(20);
             builder.Property(j => j.Pattern).HasConversion<string>().HasMaxLength(30);

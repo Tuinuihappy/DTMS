@@ -3,6 +3,7 @@ using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.Planning.Domain.Services;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Commands.CreateMilkRun;
 
@@ -10,11 +11,13 @@ public class CreateMilkRunCommandHandler : ICommandHandler<CreateMilkRunCommand,
 {
     private readonly IJobRepository _jobRepository;
     private readonly IRouteCostCalculator _costCalc;
+    private readonly ITenantContext _tenantContext;
 
-    public CreateMilkRunCommandHandler(IJobRepository jobRepository, IRouteCostCalculator costCalc)
+    public CreateMilkRunCommandHandler(IJobRepository jobRepository, IRouteCostCalculator costCalc, ITenantContext tenantContext)
     {
         _jobRepository = jobRepository;
         _costCalc = costCalc;
+        _tenantContext = tenantContext;
     }
 
     public async Task<Result<Guid>> Handle(CreateMilkRunCommand request, CancellationToken cancellationToken)
@@ -36,7 +39,7 @@ public class CreateMilkRunCommandHandler : ICommandHandler<CreateMilkRunCommand,
         await _jobRepository.AddMilkRunTemplateAsync(template, cancellationToken);
 
         // Create an initial Job from the template
-        var job = new Job(Guid.Empty, request.Priority);
+        var job = new Job(_tenantContext.TenantId, Guid.Empty, request.Priority);
         job.SetPattern(PatternType.MilkRun);
 
         var orderedStops = request.Stops.OrderBy(s => s.SequenceOrder).ToList();

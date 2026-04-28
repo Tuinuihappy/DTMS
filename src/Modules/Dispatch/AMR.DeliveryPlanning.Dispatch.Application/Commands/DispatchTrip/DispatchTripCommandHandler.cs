@@ -3,6 +3,7 @@ using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.DispatchTrip;
@@ -12,20 +13,23 @@ public class DispatchTripCommandHandler : ICommandHandler<DispatchTripCommand, G
     private readonly ITripRepository _tripRepository;
     private readonly ITaskDispatcher _taskDispatcher;
     private readonly ILogger<DispatchTripCommandHandler> _logger;
+    private readonly ITenantContext _tenantContext;
 
     public DispatchTripCommandHandler(
         ITripRepository tripRepository,
         ITaskDispatcher taskDispatcher,
-        ILogger<DispatchTripCommandHandler> logger)
+        ILogger<DispatchTripCommandHandler> logger,
+        ITenantContext tenantContext)
     {
         _tripRepository = tripRepository;
         _taskDispatcher = taskDispatcher;
         _logger = logger;
+        _tenantContext = tenantContext;
     }
 
     public async Task<Result<Guid>> Handle(DispatchTripCommand request, CancellationToken cancellationToken)
     {
-        var trip = new Trip(request.JobId, request.VehicleId);
+        var trip = new Trip(_tenantContext.TenantId, request.JobId, request.VehicleId);
 
         var legs = request.Legs.OrderBy(l => l.SequenceOrder).ToList();
 

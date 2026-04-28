@@ -6,6 +6,7 @@ namespace AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 
 public class Trip : AggregateRoot<Guid>
 {
+    public Guid TenantId { get; private set; }
     public Guid JobId { get; private set; }
     public Guid VehicleId { get; private set; }
     public TripStatus Status { get; private set; }
@@ -27,9 +28,10 @@ public class Trip : AggregateRoot<Guid>
 
     private Trip() { }
 
-    public Trip(Guid jobId, Guid vehicleId)
+    public Trip(Guid tenantId, Guid jobId, Guid vehicleId)
     {
         Id = Guid.NewGuid();
+        TenantId = tenantId;
         JobId = jobId;
         VehicleId = vehicleId;
         Status = TripStatus.Created;

@@ -9,7 +9,7 @@ public class DeliveryOrderTests
     [Fact]
     public void NewOrder_ShouldHaveSubmittedStatus()
     {
-        var order = new AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder(
+        var order = new AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder(Guid.Empty, 
             "WMS-001", "LOC-A", "LOC-B", OrderPriority.Normal, null);
 
         order.Status.Should().Be(OrderStatus.Submitted);
@@ -21,7 +21,7 @@ public class DeliveryOrderTests
     [Fact]
     public void AddOrderLine_ShouldAddToCollection()
     {
-        var order = new AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder(
+        var order = new AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder(Guid.Empty, 
             "WMS-002", "LOC-A", "LOC-B", OrderPriority.High, null);
 
         order.AddOrderLine("ITEM-001", 5, 2.5, "Handle with care");
@@ -33,7 +33,7 @@ public class DeliveryOrderTests
     [Fact]
     public void MarkAsValidated_ShouldSetStationIds()
     {
-        var order = new AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder(
+        var order = new AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder(Guid.Empty, 
             "WMS-003", "LOC-A", "LOC-B", OrderPriority.Normal, null);
         var pickupId = Guid.NewGuid();
         var dropId = Guid.NewGuid();
@@ -48,7 +48,7 @@ public class DeliveryOrderTests
     [Fact]
     public void MarkAsValidated_WhenNotSubmitted_ShouldThrow()
     {
-        var order = new AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder(
+        var order = new AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder(Guid.Empty, 
             "WMS-004", "LOC-A", "LOC-B", OrderPriority.Normal, null);
         order.MarkAsValidated(Guid.NewGuid(), Guid.NewGuid());
 
@@ -60,7 +60,7 @@ public class DeliveryOrderTests
     [Fact]
     public void Cancel_ShouldSetCancelledStatus()
     {
-        var order = new AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder(
+        var order = new AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder(Guid.Empty, 
             "WMS-005", "LOC-A", "LOC-B", OrderPriority.Normal, null);
 
         order.Cancel("No longer needed");
@@ -71,7 +71,7 @@ public class DeliveryOrderTests
     [Fact]
     public void Cancel_WhenCompleted_ShouldThrow()
     {
-        var order = new AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder(
+        var order = new AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder(Guid.Empty, 
             "WMS-006", "LOC-A", "LOC-B", OrderPriority.Normal, null);
 
         // Cannot test Completed directly (no public method), but Executing should also throw
@@ -86,7 +86,7 @@ public class DeliveryOrderTests
     [Fact]
     public void SetRecurringSchedule_ShouldSetSchedule()
     {
-        var order = new AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder(
+        var order = new AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder(Guid.Empty, 
             "WMS-007", "LOC-A", "LOC-B", OrderPriority.Normal, null);
 
         order.SetRecurringSchedule("0 */2 * * *", DateTime.UtcNow, DateTime.UtcNow.AddDays(30));

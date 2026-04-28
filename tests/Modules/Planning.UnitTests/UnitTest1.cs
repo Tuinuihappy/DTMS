@@ -9,7 +9,7 @@ public class JobTests
     [Fact]
     public void NewJob_ShouldHaveCreatedStatus()
     {
-        var job = new Job(Guid.NewGuid(), "High");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "High");
 
         job.Status.Should().Be(JobStatus.Created);
         job.Priority.Should().Be("High");
@@ -20,7 +20,7 @@ public class JobTests
     [Fact]
     public void AddLeg_ShouldAddToCollection()
     {
-        var job = new Job(Guid.NewGuid(), "Normal");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "Normal");
         var from = Guid.NewGuid();
         var to = Guid.NewGuid();
 
@@ -35,7 +35,7 @@ public class JobTests
     [Fact]
     public void AssignVehicle_ShouldChangeStatusToAssigned()
     {
-        var job = new Job(Guid.NewGuid(), "Normal");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "Normal");
         var vehicleId = Guid.NewGuid();
 
         job.AssignVehicle(vehicleId, 120);
@@ -48,7 +48,7 @@ public class JobTests
     [Fact]
     public void AssignVehicle_WhenNotCreated_ShouldThrow()
     {
-        var job = new Job(Guid.NewGuid(), "Normal");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "Normal");
         job.AssignVehicle(Guid.NewGuid(), 60);
 
         var act = () => job.AssignVehicle(Guid.NewGuid(), 60);
@@ -59,7 +59,7 @@ public class JobTests
     [Fact]
     public void Commit_ShouldChangeStatusToCommitted()
     {
-        var job = new Job(Guid.NewGuid(), "Normal");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "Normal");
         job.AssignVehicle(Guid.NewGuid(), 60);
 
         job.Commit();
@@ -70,7 +70,7 @@ public class JobTests
     [Fact]
     public void Commit_WhenNotAssigned_ShouldThrow()
     {
-        var job = new Job(Guid.NewGuid(), "Normal");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "Normal");
 
         var act = () => job.Commit();
 
@@ -80,7 +80,7 @@ public class JobTests
     [Fact]
     public void AddMultipleLegs_ShouldAccumulateDistance()
     {
-        var job = new Job(Guid.NewGuid(), "Normal");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "Normal");
 
         job.AddLeg(Guid.NewGuid(), Guid.NewGuid(), 1, 10.0);
         job.AddLeg(Guid.NewGuid(), Guid.NewGuid(), 2, 20.0);

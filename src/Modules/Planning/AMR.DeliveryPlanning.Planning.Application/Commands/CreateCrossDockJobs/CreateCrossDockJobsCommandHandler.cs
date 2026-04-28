@@ -3,6 +3,7 @@ using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.Planning.Domain.Services;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Commands.CreateCrossDockJobs;
 
@@ -10,17 +11,19 @@ public class CreateCrossDockJobsCommandHandler : ICommandHandler<CreateCrossDock
 {
     private readonly IJobRepository _jobRepository;
     private readonly IRouteCostCalculator _costCalc;
+    private readonly ITenantContext _tenantContext;
 
-    public CreateCrossDockJobsCommandHandler(IJobRepository jobRepository, IRouteCostCalculator costCalc)
+    public CreateCrossDockJobsCommandHandler(IJobRepository jobRepository, IRouteCostCalculator costCalc, ITenantContext tenantContext)
     {
         _jobRepository = jobRepository;
         _costCalc = costCalc;
+        _tenantContext = tenantContext;
     }
 
     public async Task<Result<CrossDockResult>> Handle(CreateCrossDockJobsCommand request, CancellationToken cancellationToken)
     {
         // ── Inbound Job: pickup → dock ──
-        var inboundJob = new Job(request.InboundOrderId, request.Priority);
+        var inboundJob = new Job(_tenantContext.TenantId, request.InboundOrderId, request.Priority);
         inboundJob.SetPattern(PatternType.CrossDock);
 
         var pickupCost = await _costCalc.CalculateCostAsync(Guid.Empty, request.InboundPickupStationId, cancellationToken);
@@ -34,7 +37,7 @@ public class CreateCrossDockJobsCommandHandler : ICommandHandler<CreateCrossDock
         await _jobRepository.AddAsync(inboundJob, cancellationToken);
 
         // ── Outbound Job: dock → drop ──
-        var outboundJob = new Job(request.OutboundOrderId, request.Priority);
+        var outboundJob = new Job(_tenantContext.TenantId, request.OutboundOrderId, request.Priority);
         outboundJob.SetPattern(PatternType.CrossDock);
 
         var fromDockCost = await _costCalc.CalculateCostAsync(Guid.Empty, request.DockStationId, cancellationToken);

@@ -17,8 +17,9 @@ public class AuthDbContext : DbContext
         modelBuilder.Entity<AppUser>(builder =>
         {
             builder.HasKey(u => u.Id);
+            builder.Property(u => u.TenantId).IsRequired();
             builder.Property(u => u.Username).HasMaxLength(50);
-            builder.HasIndex(u => u.Username).IsUnique();
+            builder.HasIndex(u => new { u.TenantId, u.Username }).IsUnique();
             builder.Property(u => u.PasswordHash).HasMaxLength(100);
             builder.Property(u => u.Role).HasMaxLength(30);
         });

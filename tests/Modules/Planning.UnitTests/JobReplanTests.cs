@@ -9,7 +9,7 @@ public class JobReplanTests
     [Fact]
     public void Replan_CommittedJob_ResetsToCreated()
     {
-        var job = new Job(Guid.NewGuid(), "Normal");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "Normal");
         job.AssignVehicle(Guid.NewGuid(), 30.0);
         job.Commit();
 
@@ -22,7 +22,7 @@ public class JobReplanTests
     [Fact]
     public void Replan_AssignedJob_ResetsToCreated()
     {
-        var job = new Job(Guid.NewGuid(), "Normal");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "Normal");
         job.AssignVehicle(Guid.NewGuid(), 30.0);
 
         job.Replan("PRIORITY_CHANGE");
@@ -33,7 +33,7 @@ public class JobReplanTests
     [Fact]
     public void Replan_CreatedJob_Throws()
     {
-        var job = new Job(Guid.NewGuid(), "Normal");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "Normal");
 
         var act = () => job.Replan("TEST");
 
@@ -45,7 +45,7 @@ public class JobReplanTests
     {
         var orderIds = new List<Guid> { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
 
-        var job = new Job(orderIds, "High", PatternType.Consolidation);
+        var job = new Job(Guid.Empty, orderIds, "High", PatternType.Consolidation);
 
         job.Pattern.Should().Be(PatternType.Consolidation);
         job.DerivedFromOrders.Should().HaveCount(3);
@@ -55,7 +55,7 @@ public class JobReplanTests
     [Fact]
     public void SetPattern_UpdatesPattern()
     {
-        var job = new Job(Guid.NewGuid(), "Normal");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "Normal");
 
         job.SetPattern(PatternType.MultiStop);
 
@@ -65,7 +65,7 @@ public class JobReplanTests
     [Fact]
     public void SetRequiredCapability_UpdatesCapability()
     {
-        var job = new Job(Guid.NewGuid(), "Normal");
+        var job = new Job(Guid.Empty, Guid.NewGuid(), "Normal");
 
         job.SetRequiredCapability("LIFT");
 

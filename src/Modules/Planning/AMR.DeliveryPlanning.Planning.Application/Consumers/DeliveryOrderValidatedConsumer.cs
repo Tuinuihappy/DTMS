@@ -2,6 +2,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
 using AMR.DeliveryPlanning.Planning.Application.Commands.AssignVehicleToJob;
 using AMR.DeliveryPlanning.Planning.Application.Commands.CommitPlan;
 using AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using MassTransit;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -16,16 +17,19 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderReadyForPla
 {
     private readonly ISender _sender;
     private readonly ILogger<DeliveryOrderValidatedConsumer> _logger;
+    private readonly TenantContext _tenantContext;
 
-    public DeliveryOrderValidatedConsumer(ISender sender, ILogger<DeliveryOrderValidatedConsumer> logger)
+    public DeliveryOrderValidatedConsumer(ISender sender, ILogger<DeliveryOrderValidatedConsumer> logger, TenantContext tenantContext)
     {
         _sender = sender;
         _logger = logger;
+        _tenantContext = tenantContext;
     }
 
     public async Task Consume(ConsumeContext<DeliveryOrderReadyForPlanningIntegrationEvent> context)
     {
         var evt = context.Message;
+        _tenantContext.Set(evt.TenantId);
         _logger.LogInformation("[AutoPlan] Received Order {OrderId} — starting full auto planning...", evt.DeliveryOrderId);
 
         // ── Step 1: Create Job ──

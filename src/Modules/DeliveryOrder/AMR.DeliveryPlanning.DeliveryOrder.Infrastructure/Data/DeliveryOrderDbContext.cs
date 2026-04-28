@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
@@ -7,13 +8,19 @@ public class DeliveryOrderDbContext : DbContext
 {
     public const string Schema = "deliveryorder";
 
+    private readonly ITenantContext _tenantContext;
+
     public DbSet<Domain.Entities.DeliveryOrder> DeliveryOrders { get; set; } = null!;
     public DbSet<OrderLine> OrderLines { get; set; } = null!;
     public DbSet<RecurringSchedule> RecurringSchedules { get; set; } = null!;
     public DbSet<OrderAmendment> OrderAmendments { get; set; } = null!;
     public DbSet<OrderAuditEvent> OrderAuditEvents { get; set; } = null!;
 
-    public DeliveryOrderDbContext(DbContextOptions<DeliveryOrderDbContext> options) : base(options) { }
+    public DeliveryOrderDbContext(DbContextOptions<DeliveryOrderDbContext> options, ITenantContext tenantContext)
+        : base(options)
+    {
+        _tenantContext = tenantContext;
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -22,12 +29,14 @@ public class DeliveryOrderDbContext : DbContext
         modelBuilder.Entity<Domain.Entities.DeliveryOrder>(b =>
         {
             b.HasKey(o => o.Id);
+            b.Property(o => o.TenantId).IsRequired();
             b.Property(o => o.OrderKey).HasMaxLength(50).IsRequired();
             b.Property(o => o.PickupLocationCode).HasMaxLength(50).IsRequired();
             b.Property(o => o.DropLocationCode).HasMaxLength(50).IsRequired();
             b.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20);
             b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
-            b.HasIndex(o => o.OrderKey).IsUnique();
+            b.HasIndex(o => new { o.TenantId, o.OrderKey }).IsUnique();
+            b.HasQueryFilter(o => o.TenantId == _tenantContext.TenantId);
 
             b.HasMany(o => o.OrderLines)
              .WithOne()

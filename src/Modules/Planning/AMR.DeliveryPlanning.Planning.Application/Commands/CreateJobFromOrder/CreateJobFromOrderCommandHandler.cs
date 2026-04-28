@@ -3,6 +3,7 @@ using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.Planning.Domain.Services;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder;
 
@@ -11,15 +12,18 @@ public class CreateJobFromOrderCommandHandler : ICommandHandler<CreateJobFromOrd
     private readonly IJobRepository _jobRepository;
     private readonly IRouteCostCalculator _routeCostCalculator;
     private readonly IRouteSolver _routeSolver;
+    private readonly ITenantContext _tenantContext;
 
     public CreateJobFromOrderCommandHandler(
         IJobRepository jobRepository,
         IRouteCostCalculator routeCostCalculator,
-        IRouteSolver routeSolver)
+        IRouteSolver routeSolver,
+        ITenantContext tenantContext)
     {
         _jobRepository = jobRepository;
         _routeCostCalculator = routeCostCalculator;
         _routeSolver = routeSolver;
+        _tenantContext = tenantContext;
     }
 
     public async Task<Result<Guid>> Handle(CreateJobFromOrderCommand request, CancellationToken cancellationToken)
@@ -32,7 +36,7 @@ public class CreateJobFromOrderCommandHandler : ICommandHandler<CreateJobFromOrd
         // Classify pattern
         var pattern = allDrops.Count > 1 ? PatternType.MultiStop : PatternType.PointToPoint;
 
-        var job = new Job(request.DeliveryOrderId, request.Priority);
+        var job = new Job(_tenantContext.TenantId, request.DeliveryOrderId, request.Priority);
         job.SetPattern(pattern);
 
         if (!string.IsNullOrEmpty(request.RequiredCapability))

@@ -3,6 +3,7 @@ using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.Planning.Domain.Services;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Commands.CreateMultiPickDropJob;
 
@@ -10,11 +11,13 @@ public class CreateMultiPickDropJobCommandHandler : ICommandHandler<CreateMultiP
 {
     private readonly IJobRepository _jobRepository;
     private readonly IRouteCostCalculator _costCalc;
+    private readonly ITenantContext _tenantContext;
 
-    public CreateMultiPickDropJobCommandHandler(IJobRepository jobRepository, IRouteCostCalculator costCalc)
+    public CreateMultiPickDropJobCommandHandler(IJobRepository jobRepository, IRouteCostCalculator costCalc, ITenantContext tenantContext)
     {
         _jobRepository = jobRepository;
         _costCalc = costCalc;
+        _tenantContext = tenantContext;
     }
 
     public async Task<Result<Guid>> Handle(CreateMultiPickDropJobCommand request, CancellationToken cancellationToken)
@@ -22,7 +25,7 @@ public class CreateMultiPickDropJobCommandHandler : ICommandHandler<CreateMultiP
         if (request.Pairs.Count == 0)
             return Result<Guid>.Failure("At least one pickup-delivery pair is required.");
 
-        var job = new Job(request.DeliveryOrderId, request.Priority);
+        var job = new Job(_tenantContext.TenantId, request.DeliveryOrderId, request.Priority);
         job.SetPattern(PatternType.MultiPickMultiDrop);
         job.SetTotalWeight(request.Pairs.Sum(p => p.Weight));
 

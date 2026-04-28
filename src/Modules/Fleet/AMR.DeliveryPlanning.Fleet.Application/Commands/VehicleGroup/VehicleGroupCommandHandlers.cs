@@ -1,16 +1,22 @@
 using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 
 namespace AMR.DeliveryPlanning.Fleet.Application.Commands.VehicleGroup;
 
 public class CreateVehicleGroupCommandHandler : ICommandHandler<CreateVehicleGroupCommand, Guid>
 {
     private readonly IVehicleGroupRepository _repo;
-    public CreateVehicleGroupCommandHandler(IVehicleGroupRepository repo) => _repo = repo;
+    private readonly ITenantContext _tenantContext;
+    public CreateVehicleGroupCommandHandler(IVehicleGroupRepository repo, ITenantContext tenantContext)
+    {
+        _repo = repo;
+        _tenantContext = tenantContext;
+    }
 
     public async Task<Result<Guid>> Handle(CreateVehicleGroupCommand request, CancellationToken cancellationToken)
     {
-        var group = new Domain.Entities.VehicleGroup(request.Name, request.Description, request.Tags);
+        var group = new Domain.Entities.VehicleGroup(_tenantContext.TenantId, request.Name, request.Description, request.Tags);
         await _repo.AddAsync(group, cancellationToken);
         await _repo.SaveChangesAsync(cancellationToken);
         return Result<Guid>.Success(group.Id);

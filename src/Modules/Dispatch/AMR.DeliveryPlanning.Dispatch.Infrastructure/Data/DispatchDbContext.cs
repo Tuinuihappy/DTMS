@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
@@ -7,13 +8,19 @@ public class DispatchDbContext : DbContext
 {
     public const string Schema = "dispatch";
 
+    private readonly ITenantContext _tenantContext;
+
     public DbSet<Trip> Trips { get; set; } = null!;
     public DbSet<RobotTask> RobotTasks { get; set; } = null!;
     public DbSet<ExecutionEvent> ExecutionEvents { get; set; } = null!;
     public DbSet<TripException> TripExceptions { get; set; } = null!;
     public DbSet<ProofOfDelivery> ProofsOfDelivery { get; set; } = null!;
 
-    public DispatchDbContext(DbContextOptions<DispatchDbContext> options) : base(options) { }
+    public DispatchDbContext(DbContextOptions<DispatchDbContext> options, ITenantContext tenantContext)
+        : base(options)
+    {
+        _tenantContext = tenantContext;
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -22,6 +29,8 @@ public class DispatchDbContext : DbContext
         modelBuilder.Entity<Trip>(builder =>
         {
             builder.HasKey(t => t.Id);
+            builder.Property(t => t.TenantId).IsRequired();
+            builder.HasQueryFilter(t => t.TenantId == _tenantContext.TenantId);
             builder.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);
 
             builder.HasMany(t => t.Tasks)

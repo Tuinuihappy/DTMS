@@ -1,6 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkSubmitDeliveryOrders;
 
@@ -8,11 +9,13 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
 {
     private readonly IDeliveryOrderRepository _repo;
     private readonly IEventBus _eventBus;
+    private readonly ITenantContext _tenantContext;
 
-    public BulkSubmitDeliveryOrdersCommandHandler(IDeliveryOrderRepository repo, IEventBus eventBus)
+    public BulkSubmitDeliveryOrdersCommandHandler(IDeliveryOrderRepository repo, IEventBus eventBus, ITenantContext tenantContext)
     {
         _repo = repo;
         _eventBus = eventBus;
+        _tenantContext = tenantContext;
     }
 
     public async Task<Result<List<Guid>>> Handle(BulkSubmitDeliveryOrdersCommand request, CancellationToken cancellationToken)
@@ -25,7 +28,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         foreach (var cmd in request.Orders)
         {
             var order = new Domain.Entities.DeliveryOrder(
-                cmd.OrderKey, cmd.PickupLocationCode, cmd.DropLocationCode, cmd.Priority, cmd.SLA);
+                _tenantContext.TenantId, cmd.OrderKey, cmd.PickupLocationCode, cmd.DropLocationCode, cmd.Priority, cmd.SLA);
 
             foreach (var line in cmd.Lines)
                 order.AddOrderLine(line.ItemCode, line.Quantity, line.Weight, line.Remarks);
@@ -43,6 +46,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         {
             await _eventBus.PublishAsync(new DeliveryOrderReadyForPlanningIntegrationEvent(
                 Guid.NewGuid(), DateTime.UtcNow,
+                _tenantContext.TenantId,
                 order.Id, order.Priority.ToString(),
                 Guid.Parse(order.PickupLocationCode),
                 Guid.Parse(order.DropLocationCode)), cancellationToken);

@@ -8,7 +8,7 @@ public class TripTests
 {
     private Trip CreateTripWithTasks()
     {
-        var trip = new Trip(Guid.NewGuid(), Guid.NewGuid());
+        var trip = new Trip(Guid.Empty, Guid.NewGuid(), Guid.NewGuid());
         trip.AddTask(TaskType.Move, 1, Guid.NewGuid());
         trip.AddTask(TaskType.Lift, 2);
         trip.AddTask(TaskType.Move, 3, Guid.NewGuid());
@@ -19,7 +19,7 @@ public class TripTests
     [Fact]
     public void NewTrip_ShouldHaveCreatedStatus()
     {
-        var trip = new Trip(Guid.NewGuid(), Guid.NewGuid());
+        var trip = new Trip(Guid.Empty, Guid.NewGuid(), Guid.NewGuid());
 
         trip.Status.Should().Be(TripStatus.Created);
         trip.Tasks.Should().BeEmpty();
