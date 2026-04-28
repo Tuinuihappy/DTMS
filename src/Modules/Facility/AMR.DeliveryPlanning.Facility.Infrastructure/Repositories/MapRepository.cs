@@ -26,6 +26,15 @@ public class MapRepository : IMapRepository
 
     public void Update(Map map)
     {
+        // b.Ignore(m => m.Stations) tells EF not to use Stations as a navigation property,
+        // so new stations added to the map's collection are not auto-detected by change tracking.
+        // Explicitly attach any detached (new) stations so they get INSERTed on SaveChanges.
+        foreach (var station in map.Stations)
+        {
+            if (_dbContext.Entry(station).State == Microsoft.EntityFrameworkCore.EntityState.Detached)
+                _dbContext.Stations.Add(station);
+        }
+
         _dbContext.Maps.Update(map);
     }
 

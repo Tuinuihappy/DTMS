@@ -1,4 +1,6 @@
 using System.Net.Http.Json;
+using AMR.DeliveryPlanning.Fleet.Domain.Entities;
+using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Caching.Distributed;
@@ -84,6 +86,27 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
 
         return (pickupId, dropId);
     }
+
+    /// <summary>
+    /// Inserts a VehicleType directly via EF (no HTTP endpoint exists for this) and returns its Id.
+    /// Required before registering vehicles, since RegisterVehicleCommandHandler validates the type exists.
+    /// </summary>
+    public async Task<Guid> CreateVehicleTypeAsync()
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<FleetDbContext>();
+        var vehicleType = new VehicleType(Guid.NewGuid(), "TestAMR", 100.0, new[] { "MOVE" });
+        db.VehicleTypes.Add(vehicleType);
+        await db.SaveChangesAsync();
+        return vehicleType.Id;
+    }
+
+    /// <summary>Builds a minimal single-leg Legs list for DispatchTripCommand.</summary>
+    public static List<object> BuildSingleLeg(Guid pickupStationId, Guid dropStationId) =>
+        new()
+        {
+            new { FromStationId = pickupStationId, ToStationId = dropStationId, SequenceOrder = 1 }
+        };
 
     async Task IAsyncLifetime.DisposeAsync() => await _postgres.DisposeAsync();
 

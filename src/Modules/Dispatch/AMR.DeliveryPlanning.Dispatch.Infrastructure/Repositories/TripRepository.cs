@@ -25,6 +25,7 @@ public class TripRepository : ITripRepository
 
     public async Task<Trip?> GetTripByTaskIdAsync(Guid taskId, CancellationToken cancellationToken = default)
     {
+        // RobotTasks has no global filter; look up the owning TripId first.
         var tripId = await _context.RobotTasks
             .Where(rt => rt.Id == taskId)
             .Select(rt => rt.TripId)
@@ -32,7 +33,11 @@ public class TripRepository : ITripRepository
 
         if (tripId == Guid.Empty) return null;
 
+        // IgnoreQueryFilters: RIOT3 vendor callbacks carry no tenant claim.
+        // We look up by TripId (which is RIOT3-internal), so there is no cross-tenant
+        // ambiguity — one TaskId maps to exactly one Trip.
         return await _context.Trips
+            .IgnoreQueryFilters()
             .Include(t => t.Tasks)
             .Include(t => t.Events)
             .FirstOrDefaultAsync(t => t.Id == tripId, cancellationToken);

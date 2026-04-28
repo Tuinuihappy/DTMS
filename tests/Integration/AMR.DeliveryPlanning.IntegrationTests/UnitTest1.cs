@@ -116,10 +116,11 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         var client = await _factory.GetAuthenticatedClient();
 
         // 0. Register an idle vehicle so GreedyVehicleSelector can find it via DB
+        var vehicleTypeId = await _factory.CreateVehicleTypeAsync();
         var regResponse = await client.PostAsJsonAsync("/api/fleet/vehicles", new
         {
             VehicleName = "TestVehicle-Assign",
-            VehicleTypeId = Guid.NewGuid()
+            VehicleTypeId = vehicleTypeId
         });
         regResponse.IsSuccessStatusCode.Should().BeTrue($"Register vehicle failed: {await regResponse.Content.ReadAsStringAsync()}");
         var vehicleId = await regResponse.Content.ReadFromJsonAsync<Guid>();
@@ -171,13 +172,14 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
     public async Task Dispatch_CreateTrip_FullFlow()
     {
         var client = await _factory.GetAuthenticatedClient();
+        var pickupId = Guid.NewGuid();
+        var dropId = Guid.NewGuid();
 
         var tripResponse = await client.PostAsJsonAsync("/api/dispatch/trips", new
         {
             JobId = Guid.NewGuid(),
             VehicleId = Guid.NewGuid(),
-            PickupStationId = Guid.NewGuid(),
-            DropStationId = Guid.NewGuid()
+            Legs = DtmsWebApplicationFactory.BuildSingleLeg(pickupId, dropId)
         });
 
         tripResponse.IsSuccessStatusCode.Should().BeTrue($"Create trip failed: {await tripResponse.Content.ReadAsStringAsync()}");
@@ -241,10 +243,11 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         var client = await _factory.GetAuthenticatedClient();
 
         // Register an idle vehicle so GreedyVehicleSelector can find it via DB
+        var replanVehicleTypeId = await _factory.CreateVehicleTypeAsync();
         var regResponse = await client.PostAsJsonAsync("/api/fleet/vehicles", new
         {
             VehicleName = "TestVehicle-Replan",
-            VehicleTypeId = Guid.NewGuid()
+            VehicleTypeId = replanVehicleTypeId
         });
         regResponse.IsSuccessStatusCode.Should().BeTrue($"Register vehicle failed: {await regResponse.Content.ReadAsStringAsync()}");
         var vehicleId = await regResponse.Content.ReadFromJsonAsync<Guid>();
@@ -364,12 +367,12 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         var client = await _factory.GetAuthenticatedClient();
 
         // Create trip (auto-starts on dispatch)
+        var p = Guid.NewGuid(); var d = Guid.NewGuid();
         var createResponse = await client.PostAsJsonAsync("/api/dispatch/trips", new
         {
             JobId = Guid.NewGuid(),
             VehicleId = Guid.NewGuid(),
-            PickupStationId = Guid.NewGuid(),
-            DropStationId = Guid.NewGuid()
+            Legs = DtmsWebApplicationFactory.BuildSingleLeg(p, d)
         });
         createResponse.IsSuccessStatusCode.Should().BeTrue($"Create trip failed: {await createResponse.Content.ReadAsStringAsync()}");
         var tripId = await createResponse.Content.ReadFromJsonAsync<Guid>();
