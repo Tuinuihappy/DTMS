@@ -1,402 +1,307 @@
 # Production Implementation Plan
 
-> Based on `PRODUCTION_READINESS.md` last updated 2026-04-28.
-> Current state: staging-ready prototype, not production-ready.
-> Goal: close the remaining production blockers and produce deployable evidence.
+> Based on `PRODUCTION_READINESS.md` last updated 2026-04-29.
+> Current state: Phase 0–2 complete. Phase 3–5 remaining.
+> Tests: 54 unit + 20 integration = 74 total passing.
 
 ## Executive Summary
 
-Most critical runtime defects are already fixed: C1-C5, H1-H2, M1-M2, M4-M5.
-The remaining work is production hardening, not another feature sprint.
+Phases 0–2 and pre-Phase 3 bug fixes are complete.
 
-Primary blockers:
+**Completed blockers (2026-04-29):**
+1. ~~H3 Multi-tenancy~~ — ITenantContext, EF query filters, JWT tenant claim, cross-tenant isolation tests
+2. ~~EF migrations~~ — InitialCreate + AddTenantId + FixTenantIndexes scaffolded and verified for all 8 DbContexts
+3. ~~Build/runtime bugs~~ — station persistence (MapRepository), Trip Legs format, VehicleType seeding, migration gaps
 
-1. H3 Multi-tenancy is not implemented.
-2. EF migrations infrastructure exists, but initial migrations still need to be scaffolded and verified.
-3. Integration tests are incomplete for readiness scenarios.
-4. Load/stress testing has not been defined or executed against the 500 orders/minute target.
-5. Release-gate evidence is missing: secrets, readiness checks, observability, backup/restore, rollback, RIOT3 contract verification.
-6. `PRODUCTION_READINESS.md` has document drift in the final estimate row: it still lists H2, M1, and M5 as remaining even though those sections are marked fixed.
+**Remaining work (2–3 weeks):**
+1. Phase 3 — Integration test scenarios (8 readiness cases still pending)
+2. Phase 4 — Load/stress testing against 500 orders/min NFR
+3. Phase 5 — Release gate evidence
 
 ## Production Definition Of Done
 
-The system is production-ready only when all of these are true:
+| Criteria | Status |
+|---|---|
+| Production starts with EF migrations, not `EnsureCreated` | ✅ Done — all 8 contexts use `MigrateAsync()`; Production guard throws if no migrations |
+| Tenant-owned data isolated at API, repository, EF query filter, event, consumer | ✅ Done — query filters on 5 aggregate roots; events carry TenantId; consumers set tenant context |
+| Cross-tenant reads/writes covered by automated tests | ✅ Done — 5 cross-tenant isolation tests in `TenantIsolationTests.cs` |
+| Readiness integration scenarios run in CI without manual DB setup | ⏳ Partial — harness ready, 20 tests pass; 8 specific readiness scenarios pending (Phase 3) |
+| Staging-like load test proves target throughput | ❌ Pending — Phase 4 |
+| No production secrets committed or defaulted | ✅ Done — H1 fixed; docker-compose has dev placeholder only |
+| `/health` and `/health/ready` reflect process and dependency health | ✅ Done — M2 fixed |
+| Deployment, rollback, backup, restore, vendor-contract checks have evidence | ❌ Pending — Phase 5 |
 
-- Production starts with EF migrations, not `EnsureCreated`.
-- Tenant-owned data is isolated by `TenantId` at API, repository, EF query filter, event, and background-consumer boundaries.
-- Cross-tenant reads and writes are covered by automated tests.
-- Readiness integration scenarios run in CI without manual database setup.
-- A staging-like load test proves the target throughput or documents the revised target.
-- No production secrets are committed or defaulted.
-- `/health` and `/health/ready` reflect process and dependency health.
-- Deployment, rollback, backup, restore, and vendor-contract checks have owner/date/evidence.
+---
 
-## Phase 0 - Baseline Verification
+## ~~Phase 0 - Baseline Verification~~ ✅ Done 2026-04-29
 
-**Objective:** confirm the current code and readiness document match reality before changing schema or tenant behavior.
+**Results:**
+- 54/54 unit tests pass (was 44, 10 new after TspSolverTests fixed)
+- 20/20 Testcontainer integration tests pass (harness was broken before)
+- `/health` → 200, `/health/ready` → 200, `/swagger` → 200
+- All 9 DB schemas created on fresh Docker start
 
-**Tasks**
+**Bugs fixed during baseline:**
+- `NuGetAuditSuppress` for `System.Security.Cryptography.Xml` 9.0.0 (design-time CVE, not runtime)
+- `InternalsVisibleTo("Fleet.Infrastructure")` for `VehicleGroup.LoadVehicleIds`
+- `Planning.Infrastructure.csproj` → add `Facility.Infrastructure` reference
+- `Riot3RouteModels.cs` → `internal` → `public` (interface return type mismatch)
+- `Riot3Webhooks.cs` → remove `async` from lambda with no `await` (CS1998)
+- `VendorAdapterDbContext.cs` → remove `Ignore(DomainEvents)` on `Entity<Guid>`
+- `Program.cs` → fix EnsureCreated when DB pre-created by `POSTGRES_DB` env var
+- `TspSolverTests.cs` → replace `SimpleRouteCostCalculator` with `FlatCostCalculator` stub
 
-- Run the full solution test suite:
-  - `dotnet test AMR.DeliveryPlanning.slnx`
-- Run the central integration project directly:
-  - `dotnet test tests/Integration/AMR.DeliveryPlanning.IntegrationTests/AMR.DeliveryPlanning.IntegrationTests.csproj`
-- Start local dependencies:
-  - `docker compose up -d`
-- Start the API with user-secrets or environment variables configured.
-- Verify endpoints:
-  - `GET /health`
-  - `GET /health/ready`
-  - `/swagger`
-- Update `PRODUCTION_READINESS.md` document drift:
-  - Header fixed list should include H2, M1, M5 if they are verified.
-  - Final estimate row should not list H2, M1, or M5 as remaining.
-  - Test count should reflect the actual current result, not the old `44/44` value if it changed.
+---
 
-**Acceptance Criteria**
+## ~~Phase 1 - EF Migrations For Production~~ ✅ Done 2026-04-29
 
-- Current build/test status is known.
-- Local infrastructure boots cleanly.
-- Health endpoints return expected results.
-- Readiness document has no contradiction between fixed sections and remaining-work summary.
+**All 8 DbContexts have migrations:**
 
-**Estimate:** 0.5 day
+```
+src/AMR.DeliveryPlanning.Api/Auth/Migrations/
+  20260428142845_InitialCreate
+  20260428145806_AddTenantId        ← empty (captured later in FixTenantIndexes)
+  20260428215055_FixTenantIndexes   ← drops IX_Username, adds TenantId column + IX_TenantId_Username
 
-## Phase 1 - EF Migrations For Production
+src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/Migrations/
+  20260428142846_InitialCreate
 
-**Objective:** remove production dependence on `EnsureCreated` fallback.
+src/Modules/DeliveryOrder/.../Migrations/
+  20260428142834_InitialCreate
+  20260428144758_AddTenantId
+  20260428215054_FixTenantIndexes   ← drops IX_OrderKey, creates IX_TenantId_OrderKey
 
-**Implementation Order**
+src/Modules/Dispatch/.../Migrations/
+  20260428142837_InitialCreate
+  20260428144800_AddTenantId
 
-1. Scaffold initial migrations for all contexts:
-   - Facility
-   - Fleet
-   - DeliveryOrder
-   - Planning
-   - Dispatch
-   - VendorAdapter
-   - AuthDbContext
-   - OutboxDbContext
+src/Modules/Facility/.../Migrations/
+  20260428142823_InitialCreate
 
-2. Review generated migrations:
-   - Schema names are correct.
-   - Indexes match the DbContext model.
-   - FK cascade behavior is intentional.
-   - PostgreSQL-specific mappings are correct, especially `xmin`.
-   - Unique indexes that may become tenant-local are identified before Phase 2.
+src/Modules/Fleet/.../Migrations/
+  20260428142833_InitialCreate
+  20260428144801_AddTenantId        ← Vehicle.TenantId + VehicleGroup.TenantId
 
-3. Verify migrations:
-   - Run against a clean PostgreSQL database.
-   - Run API startup and confirm `MigrateAsync()` path is used.
-   - Run existing tests after migrations are present.
+src/Modules/Planning/.../Migrations/
+  20260428142836_InitialCreate
+  20260428144759_AddTenantId
 
-4. Add production guard:
-   - Production must fail fast if no migrations exist and the app would fall back to `EnsureCreated`.
-   - Development may keep fallback behavior if explicitly limited to non-production environments.
+src/Modules/VendorAdapter/.../Migrations/
+  20260428142838_InitialCreate
+```
 
-**Key Files**
+**Production guard in `Program.cs`:**
+```csharp
+else if (env.IsProduction())
+    throw new InvalidOperationException(
+        $"Production startup aborted: {dbName} has no EF migrations.");
+```
 
-- `src/AMR.DeliveryPlanning.Api/Program.cs`
-- `src/**/Infrastructure/Data/*DbContext.cs`
-- `src/**/Infrastructure/Data/*DbContextFactory.cs`
-- `src/AMR.DeliveryPlanning.Api/Auth/AuthDbContext.cs`
-- `src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/OutboxDbContext.cs`
+**Run migrations (macOS/Linux):**
+```bash
+export ConnectionStrings__DefaultConnection="Host=localhost;Port=5434;Database=amr_delivery_planning;..."
 
-**Acceptance Criteria**
+# Example — repeat for each module
+dotnet ef migrations add <MigrationName> \
+  --context FacilityDbContext \
+  --project src/Modules/Facility/AMR.DeliveryPlanning.Facility.Infrastructure \
+  --startup-project src/AMR.DeliveryPlanning.Api \
+  --output-dir Migrations
+```
 
-- A clean database can be created only from migrations.
-- API startup applies migrations automatically when migrations exist.
-- Production cannot silently use `EnsureCreated`.
-- Migration commands are documented for macOS/Linux and Windows.
+---
 
-**Estimate:** 1-2 days
+## ~~Phase 2 - Multi-Tenancy~~ ✅ Done 2026-04-29
 
-## Phase 2 - Multi-Tenancy
+### 2.1 Tenant Context ✅
 
-**Objective:** enforce tenant isolation across all tenant-owned business data.
+- `ITenantContext` (read-only) + `TenantContext` (scoped, `Set(Guid)`)
+- `TenantContextMiddleware` — reads `User.FindFirstValue("tenant_id")` after `UseAuthorization`
+- `builder.Services.AddScoped<TenantContext>()` + `AddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantContext>())`
 
-### 2.1 Tenant Context
+### 2.2 Domain & Persistence ✅
 
-**Tasks**
+**Tenant-owned (TenantId added):** DeliveryOrder, Job, Trip, Vehicle, VehicleGroup
 
-- Add shared tenant abstractions:
-  - `ITenantContext`
-  - `TenantContext`
-  - optional `ITenantContextAccessor` if background consumers need scoped mutation.
-- Resolve tenant from JWT claims in API requests.
-- Define required claim name, for example `tenant_id`.
-- Define system/background behavior:
-  - Consumers must establish tenant context from integration-event metadata.
-  - Startup seeders must run with explicit system/global tenant behavior.
-  - Global reference data must be documented as tenant-shared or tenant-owned.
+**Shared/global (no TenantId):** Map, Station, RouteEdge, Zone, TopologyOverlay, FacilityResource, VehicleType, ChargingPolicy, ActionCatalogEntry, CostModelConfig
 
-**Acceptance Criteria**
+**Constructors:** all require `tenantId` as first parameter; 8 command handlers inject `ITenantContext`
 
-- Tenant is available as a scoped service during API requests.
-- Tenant-protected endpoints reject missing tenant claims.
-- System code cannot accidentally run with an empty tenant unless explicitly allowed.
+### 2.3 EF Query Filters ✅
 
-### 2.2 Domain And Persistence Model
+```csharp
+// In each tenant-scoped DbContext constructor:
+public XyzDbContext(DbContextOptions<XyzDbContext> options, ITenantContext tenantContext)
 
-**Tenant-owned tables, minimum scope**
+// In OnModelCreating:
+builder.HasQueryFilter(e => e.TenantId == _tenantContext.TenantId);
+```
 
-- DeliveryOrder:
-  - `DeliveryOrders`
-  - `OrderLines`
-  - amendments/history/timeline records if persisted separately
-- Planning:
-  - `Jobs`
-  - `Legs`
-  - `Stops`
-  - `JobDependencies`
-  - cost model configs if tenant-specific
-- Dispatch:
-  - `Trips`
-  - `RobotTasks`
-  - execution events
-  - exceptions
-  - proof of delivery
-- Fleet:
-  - `Vehicles`
-  - `VehicleGroups`
-  - `VehicleGroupMembers`
-  - charging policies
-  - maintenance records
-- Facility:
-  - Decide whether `Maps`, `Stations`, `RouteEdges`, resources, and topology overlays are tenant-owned or shared.
-- VendorAdapter:
-  - Decide whether action catalog is global or tenant-scoped.
+Applied to: DeliveryOrder, Job, Trip, Vehicle, VehicleGroup
 
-**Tasks**
+`IgnoreQueryFilters()` used only in `TripRepository.GetTripByTaskIdAsync` — RIOT3 webhook has no tenant, resolves tenant from found trip.
 
-- Add `TenantId` to aggregate roots and tenant-owned records.
-- Pass tenant into constructors/factories instead of assigning it ad hoc after creation.
-- Include `TenantId` in tenant-local unique indexes.
-- Include `TenantId` in join tables where both sides are tenant-owned.
-- Add migrations for all tenant columns and indexes.
+### 2.4 Events, Outbox, Consumers ✅
 
-**Acceptance Criteria**
+- `TenantId` added to: `DeliveryOrderReadyForPlanningIntegrationEvent`, `PlanCommittedIntegrationEvent`, `TripCompletedIntegrationEvent`
+- Consumers: `DeliveryOrderValidatedConsumer`, `PlanCommittedConsumer`, `Riot3TaskCompletedConsumer`, `Riot3TaskFailedConsumer` all call `_tenantContext.Set(tenantId)` before DB access
 
-- Tenant-owned tables contain non-null `TenantId`.
-- Tenant-local uniqueness works independently per tenant.
-- Join tables cannot link records across tenants.
+### 2.5 API & Auth ✅
 
-### 2.3 EF Query Filters And Repositories
+- `AppUser.TenantId` + `AppUser.SystemTenantId = new Guid("00000000-0000-0000-0000-000000000001")`
+- JWT claims: `tenant_id` added to issued tokens
+- Register endpoint: reads `X-Tenant-Id` header
+- `AuthHelper.GetClientForTenantAsync(tenantId)` — registers + authenticates per-tenant client
+- `TenantIsolationTests.cs` — 5 tests: order, list, trip, vehicle, job cross-tenant isolation
 
-**Tasks**
+---
 
-- Inject tenant context into each tenant-owned DbContext.
-- Add global query filters:
-  - `entity.TenantId == tenantContext.TenantId`
-- Ensure repositories do not use `IgnoreQueryFilters()` except in explicitly reviewed admin/system paths.
-- Audit raw SQL and cross-module lookups.
-- Ensure background handlers set tenant context before DbContext is first used.
+## Pre-Phase 3 Bug Fixes ✅ Done 2026-04-29
 
-**Acceptance Criteria**
+Discovered when running Testcontainer integration tests for the first time.
 
-- Normal repositories automatically filter by tenant.
-- Cross-tenant read by ID returns the designed safe response, usually 404.
-- Cross-tenant mutation is rejected.
+| Bug | Root Cause | Fix |
+|---|---|---|
+| Station not persisted | `b.Ignore(m => m.Stations)` prevents EF from tracking Map's Stations navigation. `AddStationCommandHandler` adds to in-memory collection only. | `MapRepository.Update`: iterate `map.Stations`, `_dbContext.Stations.Add(s)` for detached entries |
+| Trip creation 500 (NullRef) | Tests sent `PickupStationId/DropStationId` but `DispatchTripCommand` requires `Legs` list | Add `DtmsWebApplicationFactory.BuildSingleLeg()` helper; update tests |
+| VehicleType not found | Tests used `VehicleTypeId = Guid.NewGuid()` (doesn't exist in DB); no HTTP endpoint to create VehicleType | Add `DtmsWebApplicationFactory.CreateVehicleTypeAsync()` — inserts VehicleType directly via EF |
+| List returns `[]` | `GetDeliveryOrdersQuery` defaults to `OrderStatus.Submitted`; orders are `ReadyToPlan` after submit flow | Update test query to `?status=ReadyToPlan` |
+| Migration pending changes warning | `AddTenantId` migration captured column add but not index change | Scaffold `FixTenantIndexes` for DeliveryOrderDbContext + AuthDbContext |
 
-### 2.4 Events, Outbox, And Consumers
-
-**Tasks**
-
-- Add `TenantId` to tenant-owned integration events.
-- Ensure domain events converted to outbox messages carry tenant metadata.
-- Ensure MassTransit consumers establish tenant context before DB access.
-- Ensure RIOT3 webhook handling can resolve tenant safely:
-  - Prefer task/trip lookup through a tenant-aware vendor reference mapping.
-  - If webhook lacks tenant, define a deterministic lookup path and reject ambiguous matches.
-
-**Acceptance Criteria**
-
-- Events that create or mutate tenant-owned state carry tenant identity.
-- Consumers cannot write tenant-owned data without tenant context.
-- RIOT3 callbacks cannot update another tenant's task/trip.
-
-### 2.5 API And Auth
-
-**Tasks**
-
-- Add tenant claim to issued tokens or test auth helper.
-- Update auth/test token helpers.
-- Make tenant behavior explicit for admin/system endpoints.
-- Add API tests for:
-  - Missing tenant claim.
-  - Tenant A cannot read Tenant B order/trip/vehicle.
-  - Tenant A cannot mutate Tenant B order/trip/vehicle.
-
-**Acceptance Criteria**
-
-- Tenant-protected endpoints require tenant identity.
-- Tests prove cross-tenant isolation.
-- Existing tests use a default tenant fixture.
-
-**Estimate:** 4-7 days
+---
 
 ## Phase 3 - Integration Test Completion
 
-**Objective:** automate the readiness scenarios that currently remain unchecked.
+**Objective:** automate the 8 readiness scenarios that remain unchecked.
+
+**Current state:** harness is ready, 20 basic tests pass. Need 8 specific scenario tests.
 
 **Use Existing Harness**
 
-- `tests/Integration/AMR.DeliveryPlanning.IntegrationTests/DtmsWebApplicationFactory.cs`
-- PostgreSQL Testcontainers
-- In-memory distributed cache replacement for Redis
-- Auth helper for token-backed clients
+- [DtmsWebApplicationFactory.cs](tests/Integration/AMR.DeliveryPlanning.IntegrationTests/DtmsWebApplicationFactory.cs) — PostgreSQL Testcontainers, in-memory Redis, `CreateVehicleTypeAsync()`, `CreateStationPairAsync()`, `BuildSingleLeg()`
+- [AuthHelper.cs](tests/Integration/AMR.DeliveryPlanning.IntegrationTests/AuthHelper.cs) — `GetAuthenticatedClient()`, `GetClientForTenantAsync(tenantId)`
 
-**Priority Test Cases**
+**Pending Test Cases**
 
-1. End-to-end delivery flow:
-   - Submit order.
-   - Validate station IDs.
-   - Plan job.
-   - Assign vehicle.
-   - Commit plan.
-   - Dispatch trip.
-   - Complete RIOT3 task event.
+1. **E2E full pipeline** — Submit order → Auto-plan (DeliveryOrderValidatedConsumer) → Auto-dispatch (PlanCommittedConsumer) → RIOT3 task complete → order marked Completed
+   > Note: requires MassTransit in-process bus or simulated consumer trigger
 
-2. RIOT3 webhook behavior:
-   - `finished` event updates task/trip state.
-   - `failed` event records dispatch exception or failure state.
-   - Unknown task ID returns a safe response and does not crash.
+2. **RIOT3 webhook behavior:**
+   - `taskEventType=finished` → trip task marked complete, next task dispatched
+   - `taskEventType=failed` → exception raised, error code recorded
+   - Unknown taskId → safe 200/warning log, no crash
 
-3. Idempotency:
-   - Duplicate `POST /api/delivery-orders` with the same `Idempotency-Key` returns the same order ID.
-   - Same body with a different key creates a new order as designed.
+3. **Idempotency:**
+   - Duplicate `POST /api/delivery-orders` with same `Idempotency-Key` → same orderId
+   - Same body, different key → new orderId
 
-4. SLA validation:
-   - SLA below minimum threshold is rejected.
-   - Valid SLA moves order to `ReadyToPlan`.
+4. **SLA validation:**
+   - SLA < 30 min from now → `BadRequest`
+   - Valid SLA → `ReadyToPlan` status
 
-5. Charging policy:
-   - Battery below threshold records or emits `VehicleBatteryLowIntegrationEvent`.
+5. **Charging policy:**
+   - `PUT /api/fleet/vehicles/{id}/state` with `BatteryLevel < threshold` → `VehicleBatteryLowIntegrationEvent` written to outbox
 
-6. Outbox:
-   - Domain/integration event writes an outbox row.
-   - Outbox processor marks message processed.
-   - Failure keeps message retryable.
+6. **Outbox processor:**
+   - Domain event write → outbox row exists
+   - Outbox processor picks up → marks `ProcessedAt`
+   - On error → row remains retryable
 
-7. Capability assignment:
-   - Job requiring `LIFT` only selects a vehicle/group with matching capability.
+7. **Capability assignment:**
+   - Vehicle registered with `LIFT` capability
+   - Job created with `RequiredCapability = "LIFT"`
+   - Only `LIFT` vehicle gets assigned
 
-8. Amendment and timeline:
-   - Patch order creates an amendment record.
-   - Timeline exposes amendment/audit event.
-
-9. Multi-tenancy regression:
-   - Tenant A cannot see Tenant B delivery order.
-   - Tenant A cannot dispatch Tenant B trip.
-   - Tenant A cannot assign Tenant B vehicle.
+8. **Amendment and timeline:**
+   - `PATCH /api/delivery-orders/{id}` → amendment record created
+   - `GET /api/delivery-orders/{id}/timeline` → includes amendment event
 
 **Acceptance Criteria**
 
-- Readiness scenarios are automated.
-- Tests run in CI without manual PostgreSQL setup.
-- External dependencies are mocked, simulated, or contract-tested.
-- Tests fail if tenant filtering is removed.
+- All 8 scenarios automated in `tests/Integration/AMR.DeliveryPlanning.IntegrationTests/`
+- Tests run via `dotnet test` with no external dependencies beyond Testcontainers
+- Tests fail if EF query filters are removed (tenant isolation regression)
 
-**Estimate:** 4-6 days
+**Estimate:** 4–6 days
+
+---
 
 ## Phase 4 - Load And Stress Testing
 
-**Objective:** prove the non-functional target and expose bottlenecks before launch.
-
-**Target**
-
-- Validate at least 500 orders/minute, or document a revised product-approved target.
+**Objective:** prove the 500 orders/minute NFR before launch.
 
 **Tasks**
 
-- Add repeatable load scripts, preferably `k6`.
-- Cover:
-  - Auth/token setup.
-  - Map/station/vehicle seed.
-  - Order submit burst.
-  - Planning and assignment mix.
-  - Dispatch webhook callbacks.
-- Capture:
-  - p50/p95/p99 latency.
-  - Error rate.
-  - Database CPU, locks, connections, slow queries.
-  - Redis hit rate.
-  - Outbox backlog.
-  - RabbitMQ queue depth.
-  - API memory and thread pool behavior.
-- Run:
-  - Short smoke load.
-  - 30-60 minute soak.
-  - Spike test above target.
-- Document bottlenecks and tuning values.
+- Add `k6` scripts in `tests/load/`:
+  - `setup.js` — auth, seed map/stations/vehicle type/vehicle
+  - `submit_burst.js` — burst order submission
+  - `mixed.js` — planning + assignment + dispatch mix
+  - `webhook_callbacks.js` — simulate RIOT3 task completion callbacks
+- Capture: p50/p95/p99 latency, error rate, DB CPU/locks, Redis hit rate, outbox backlog, RabbitMQ queue depth
+- Run: smoke (1 min), soak (30–60 min), spike (2× target)
+- Document bottlenecks and tuning values
 
 **Acceptance Criteria**
 
-- Target throughput is met with acceptable latency and error rate.
-- Outbox does not grow unbounded.
-- Database connection pool remains stable.
-- Rate limiting behavior is understood under load.
+- ≥ 500 orders/min with p95 < 500ms and error rate < 0.1%
+- Outbox backlog stays bounded
+- DB connection pool stable
+- Rate limiting (100 req/min) does not interfere with load test design
 
-**Estimate:** 2-3 days
+**Estimate:** 2–3 days
+
+---
 
 ## Phase 5 - Release Gate
 
-**Objective:** make go-live a checklist with evidence, not a judgment call.
+**Objective:** checklist with owner/date/evidence, not a judgment call.
 
-**Tasks**
+**Checklist**
 
-- Confirm secrets are supplied by environment variables or Vault/KMS:
-  - `Jwt:Secret`
-  - `ConnectionStrings:DefaultConnection`
-  - `RabbitMq:*`
-  - RIOT3 credentials/base URL
-- Confirm readiness checks include required dependencies.
-- Confirm logs, traces, and metrics are visible in the target environment.
-- Confirm PostgreSQL backup and restore process.
-- Confirm rollback procedure.
-- Confirm RIOT3 route-cost response shape against the real vendor spec.
-- Confirm action catalog with RIOT3 vendor spec.
-- Confirm deployment runbook includes migrations.
-- Update `PRODUCTION_READINESS.md` with:
-  - final status,
-  - test evidence,
-  - load-test evidence,
-  - owner/date for each release gate.
+- [ ] Secrets via env vars or Vault/KMS: `Jwt:Secret`, `ConnectionStrings:DefaultConnection`, `RabbitMq:*`, RIOT3 credentials
+- [ ] Readiness check covers all required dependencies (add RabbitMQ check)
+- [ ] Logs, traces (Jaeger/OTLP), metrics visible in target environment
+- [ ] PostgreSQL backup and restore procedure tested
+- [ ] Rollback procedure documented and tested
+- [ ] RIOT3 `Riot3RouteModels.cs` response shape verified against vendor spec
+- [ ] Action catalog verified against RIOT3 vendor spec (22 actions, 2 vehicle types)
+- [ ] Deployment runbook includes `dotnet ef database update` step
+- [ ] `PRODUCTION_READINESS.md` updated: final status, test evidence, load-test evidence, owner/date per gate
 
-**Acceptance Criteria**
+**Estimate:** 1–2 days
 
-- No hardcoded secrets.
-- Production starts only with valid configuration.
-- Release checklist has owner/date/evidence.
-- Final readiness state can be changed to `Production-ready`.
+---
 
-**Estimate:** 1-2 days
+## Execution Sequence
 
-## Recommended Execution Sequence
-
-1. Phase 0: verify baseline and fix documentation drift.
-2. Phase 1: scaffold and verify migrations before broad schema changes.
-3. Phase 2: implement multi-tenancy and update test fixtures.
-4. Phase 3: complete readiness integration tests against the tenant-aware model.
-5. Phase 4: run load and stress tests on staging-like infrastructure.
-6. Phase 5: complete release gate and update production readiness evidence.
+| # | Phase | Status |
+|---|---|---|
+| 0 | Baseline verification | ✅ Done |
+| 1 | EF migrations | ✅ Done |
+| 2 | Multi-tenancy | ✅ Done |
+| Pre | Bug fixes before integration tests | ✅ Done |
+| **3** | **Integration test scenarios** | **Next** |
+| 4 | Load/stress testing | Pending |
+| 5 | Release gate | Pending |
 
 ## Rough Timeline
 
-| Phase | Estimate |
-|---|---:|
-| Baseline verification | 0.5 day |
-| EF migrations | 1-2 days |
-| Multi-tenancy | 4-7 days |
-| Integration tests | 4-6 days |
-| Load/stress testing | 2-3 days |
-| Release gate | 1-2 days |
-| **Total** | **2-3 weeks** |
+| Phase | Estimate | Status |
+|---|---:|---|
+| ~~Baseline verification~~ | ~~0.5 day~~ | ✅ Done |
+| ~~EF migrations~~ | ~~1–2 days~~ | ✅ Done |
+| ~~Multi-tenancy~~ | ~~4–7 days~~ | ✅ Done |
+| ~~Pre-Phase 3 bug fixes~~ | ~~0.5 day~~ | ✅ Done |
+| **Integration tests** | **4–6 days** | **Next** |
+| Load/stress testing | 2–3 days | Pending |
+| Release gate | 1–2 days | Pending |
+| **Remaining total** | **~1.5 weeks** | |
 
-## Immediate Next Actions
+## Immediate Next Actions (Phase 3)
 
-1. Run baseline verification and update the true test count.
-2. Fix `PRODUCTION_READINESS.md` drift in the header/final estimate.
-3. Scaffold migrations and remove production `EnsureCreated` fallback.
-4. Start H3 with tenant context and API auth behavior before touching every entity.
-5. Add cross-tenant integration tests as soon as the first tenant-owned aggregate is migrated.
+1. Set up in-process MassTransit bus in `DtmsWebApplicationFactory` (or use OutboxEventBus with manual pump) to enable E2E consumer-driven flow in tests.
+2. Write `EndToEndPipelineTests.cs` — full Submit → Plan → Dispatch → Complete flow.
+3. Write `Riot3WebhookTests.cs` — finished/failed/unknown scenarios.
+4. Write `IdempotencyTests.cs`, `SlaValidationTests.cs`, `OutboxTests.cs`, `CapabilityTests.cs`, `AmendmentTests.cs`.
+5. Run all 8 new tests + existing 20 = 28+ integration tests passing.
+6. Proceed to Phase 4 (k6 load scripts) once all integration tests green.

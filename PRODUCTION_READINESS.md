@@ -4,7 +4,7 @@
 > **Build Status:** Passing | **Tests:** 54 unit + 20 integration (74 total)
 > **Current State:** Staging-ready prototype — NOT production-ready
 > **Fixed (2026-04-28):** C1, C2, C3, C4, C5, H1, H2, M1, M2, M4, M5
-> **Fixed (2026-04-29):** H3 (Multi-tenancy), Phase 0 baseline fixes, Phase 1 EF Migrations, Pre-Phase 3 integration test bugs
+> **Fixed (2026-04-29):** H3 (Multi-tenancy), Phase 0–2 hardening, Pre-Phase 3 integration test bugs
 
 ---
 
@@ -33,8 +33,8 @@
 
 **Files changed:**
 - [ITripRepository.cs](src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Domain/Repositories/ITripRepository.cs) — เพิ่ม `GetTripByTaskIdAsync(Guid taskId)`
-- [TripRepository.cs](src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Infrastructure/Repositories/TripRepository.cs) — implement ด้วย `RobotTasks` → `TripId` → load Trip
-- [Riot3TaskEventConsumer.cs](src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Application/Consumers/Riot3TaskEventConsumer.cs) — ทั้งสอง consumer ใช้ `GetTripByTaskIdAsync` แทน `GetActiveTripsByVehicleAsync(Guid.Empty)`
+- [TripRepository.cs](src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Infrastructure/Repositories/TripRepository.cs) — implement ด้วย `RobotTasks` → `TripId` → load Trip; ใช้ `IgnoreQueryFilters()` เพราะ RIOT3 webhook ไม่มี tenant claim (Phase 2)
+- [Riot3TaskEventConsumer.cs](src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Application/Consumers/Riot3TaskEventConsumer.cs) — ทั้งสอง consumer ใช้ `GetTripByTaskIdAsync` แทน `GetActiveTripsByVehicleAsync(Guid.Empty)`; set `TenantContext` จาก trip ที่พบ (Phase 2)
 
 ---
 
@@ -54,23 +54,10 @@
 **Files changed:**
 - [VehicleGroupMember.cs](src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/Data/VehicleGroupMember.cs) _(new)_ — infrastructure-only entity, composite PK `(VehicleGroupId, VehicleId)`
 - [FleetDbContext.cs](src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/Data/FleetDbContext.cs):
-  - เพิ่ม `DbSet<VehicleGroupMember> VehicleGroupMembers`
-  - ลบ value conversion สำหรับ `VehicleIds`, เพิ่ม `b.Ignore(g => g.VehicleIds)`
-  - FK cascade จาก `VehicleGroupId` → `VehicleGroups` และ `VehicleId` → `Vehicles`
-  - Index บน `VehicleId` สำหรับ reverse lookup
-  - `xmin` PostgreSQL system column เป็น optimistic-concurrency token (auto-increment ทุก UPDATE — EF throw `DbUpdateConcurrencyException` ถ้า concurrent write)
-- [VehicleGroup.cs](src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Domain/Entities/VehicleGroup.cs) — เพิ่ม `internal void LoadVehicleIds(IEnumerable<Guid>)` สำหรับ repository reconstitution (แยกออกจาก domain operation `AddVehicle`)
-- [VehicleGroupRepository.cs](src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/Repositories/VehicleGroupRepository.cs) — เขียนใหม่ทั้งหมด:
-  - `GetByIdAsync` — load group + query members แยก
-  - `GetAllAsync` — **single query สำหรับ members ทั้งหมด** (ไม่มี N+1), group ด้วย dictionary
-  - `AddAsync` — insert members พร้อมกัน
-  - `UpdateAsync` — delete-then-reinsert members (safe for small collections)
-
-**Additional fixes (2026-04-28):**
-- [Vehicle.cs](src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Domain/Entities/Vehicle.cs) — ลบ `_groupIds`, `GroupIds`, `AddToGroup()`, `RemoveFromGroup()` ออก — `VehicleGroupMembers` คือ single source of truth
-- [FleetDbContext.cs](src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/Data/FleetDbContext.cs) — ลบ `GroupIds` value conversion ออกจาก Vehicle mapping
-- [VehicleRepository.cs](src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/Repositories/VehicleRepository.cs) — `GetByGroupAsync` ใช้ inner join กับ `VehicleGroupMembers` แทน string `.Contains()`
-- [VehicleGroupCommandHandlers.cs](src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Application/Commands/VehicleGroup/VehicleGroupCommandHandlers.cs) — `AddVehicleToGroup` / `RemoveVehicleFromGroup` save เพียงครั้งเดียวผ่าน `_groupRepo` เท่านั้น — ไม่มี split-transaction อีกต่อไป, `RemoveVehicleFromGroup` ไม่ต้องการ `IVehicleRepository` เลย
+  - เพิ่ม `DbSet<VehicleGroupMember> VehicleGroupMembers`; FK cascade; Index บน `VehicleId`
+  - `xmin` PostgreSQL system column เป็น optimistic-concurrency token
+- [VehicleGroup.cs](src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Domain/Entities/VehicleGroup.cs) — เพิ่ม `internal void LoadVehicleIds(IEnumerable<Guid>)` + `TenantId` (Phase 2)
+- [VehicleGroupRepository.cs](src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/Repositories/VehicleGroupRepository.cs) — เขียนใหม่ทั้งหมด: single query ไม่มี N+1
 
 ---
 
@@ -94,66 +81,26 @@ SimpleRouteCostCalculator  ──── facility.RouteEdges (DB)
                                 RIOT3  /api/v4/route/costs/{mapVendorRef}/{stationVendorRef}
 ```
 
-**Files changed / created:**
-
-- [SimpleRouteCostCalculator.cs](src/Modules/Planning/AMR.DeliveryPlanning.Planning.Infrastructure/Services/SimpleRouteCostCalculator.cs) — inject `FacilityDbContext`, query `RouteEdges` จริง; log `Warning` ชัดเจนพร้อมคำแนะนำเมื่อ edge ไม่พบ (แทน silent 999.0)
-- [Map.cs](src/Modules/Facility/AMR.DeliveryPlanning.Facility.Domain/Entities/Map.cs) + [Station.cs](src/Modules/Facility/AMR.DeliveryPlanning.Facility.Domain/Entities/Station.cs) — เพิ่ม `VendorRef string?` + `SetVendorRef()` (consistent กับ `FacilityResource.VendorRef`)
-- [FacilityDbContext.cs](src/Modules/Facility/AMR.DeliveryPlanning.Facility.Infrastructure/Data/FacilityDbContext.cs) — map `VendorRef`, unique partial index บนทั้งสอง entity
-- [Riot3RouteModels.cs](src/Modules/Facility/AMR.DeliveryPlanning.Facility.Infrastructure/Services/Riot3RouteModels.cs) _(new)_ — response models สำหรับ RIOT3 route cost API
-- [Riot3RouteClient.cs](src/Modules/Facility/AMR.DeliveryPlanning.Facility.Infrastructure/Services/Riot3RouteClient.cs) _(new)_ — `IRiot3RouteClient` + implementation พร้อม error handling, ไม่ crash เมื่อ RIOT3 down
-- [RouteEdgeSyncService.cs](src/Modules/Facility/AMR.DeliveryPlanning.Facility.Infrastructure/Services/RouteEdgeSyncService.cs) _(new)_ — `BackgroundService`: sync ทุก 30 min, SemaphoreSlim 5 concurrent calls, atomic delete+insert ต่อ map ใน transaction เดียว
-- [ModuleServiceRegistration.cs](src/AMR.DeliveryPlanning.Api/Modules/ModuleServiceRegistration.cs) + [appsettings.json](src/AMR.DeliveryPlanning.Api/appsettings.json) — register `IRiot3RouteClient`, `RouteEdgeSyncService`; config `VendorAdapter:Riot3:RouteSync:IntervalMinutes`
-
-**วิธีเปิดใช้ sync:**
-```bash
-# Set VendorRef บน Map และ Station ที่ต้องการ sync ผ่าน Facility API
-# PATCH /api/facility/maps/{id}     { "vendorRef": "map_floor1" }
-# PATCH /api/facility/stations/{id} { "vendorRef": "ST_A1" }
-# → RouteEdgeSyncService จะ sync อัตโนมัติภายใน 15s หลัง startup แล้วทุก 30 min
-```
-
 > **Note:** RIOT3 response shape ใน `Riot3RouteModels.cs` เป็น approximation — verify กับ vendor spec จริงก่อน go-live
 
 ---
 
 ### ~~C4. Distance to Pickup Hardcoded = 10.0~~ ✅ Fixed (Production-grade) 2026-04-28
 
-**Files changed:**
-- [IFleetVehicleProvider.cs](src/Modules/Planning/AMR.DeliveryPlanning.Planning.Domain/Services/IFleetVehicleProvider.cs) — เพิ่ม `Guid pickupStationId` parameter
-- [FleetVehicleProvider.cs](src/Modules/Planning/AMR.DeliveryPlanning.Planning.Infrastructure/Services/FleetVehicleProvider.cs):
-  - inject `IRouteCostCalculator`, คำนวณจาก `vehicle.CurrentNodeId` จริง (fallback `999.0` ถ้า null)
-  - **เปลี่ยนจาก sequential `foreach` เป็น `Task.WhenAll`** — N vehicles = N parallel Redis lookups แทน N sequential round-trips
-- [GreedyVehicleSelector.cs](src/Modules/Planning/AMR.DeliveryPlanning.Planning.Infrastructure/Services/GreedyVehicleSelector.cs):
-  - ส่ง `pickupStationId` เข้า `GetIdleVehiclesAsync`
-  - **ลบ `_cachedVehicles` static `List<VehicleCandidate>`** — thread-unsafe (`RemoveAll` + `Add` ไม่ atomic), race condition ถ้า MassTransit consumers เรียกพร้อมกัน
-  - **ลบ `UpdateVehicleCache()` static method** — dead code ที่ไม่มี caller ใดเรียกเลย
-  - **ลบ in-memory fallback path** — ถ้าไม่มี idle vehicle ให้ return `null` ตรงๆ แทนที่จะ fallback ไปยัง list ว่างที่ทำให้เข้าใจผิด
+- `FleetVehicleProvider`: inject `IRouteCostCalculator`, คำนวณจาก `vehicle.CurrentNodeId` จริง (fallback `999.0`)
+- `GreedyVehicleSelector`: ลบ `_cachedVehicles` static list (thread-unsafe), ลบ in-memory fallback
 
 ---
 
 ### ~~C5. SubmitDeliveryOrder Parse LocationCode เป็น Guid โดยตรง~~ ✅ Fixed (Option B) 2026-04-28
 
-**Root cause:** fix เดิม (`Guid.TryParse` only) มี latent bug — ไม่เคยเรียก `order.MarkAsValidated()` ทำให้ `order.Status` ค้างที่ `Submitted` และ `order.PickupStationId` = `null` ตลอด
-
-**Fix — Option B (Query Station จาก Facility DB):**
-
-**Files created:**
-- [IStationLookup.cs](src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Application/Services/IStationLookup.cs) _(new)_ — cross-module abstraction ใน Application layer
-- [FacilityStationLookup.cs](src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure/Services/FacilityStationLookup.cs) _(new)_ — implementation ผ่าน `FacilityDbContext.Stations.AnyAsync`
-
-**Files changed:**
-- [DeliveryOrder.Infrastructure.csproj](src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.csproj) — เพิ่ม reference ไปยัง `Facility.Infrastructure` (same pattern กับ Planning → Fleet)
-- [SubmitDeliveryOrderCommandHandler.cs](src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Application/Commands/SubmitDeliveryOrder/SubmitDeliveryOrderCommandHandler.cs):
-  1. `Guid.TryParse` → `Result.Failure` ถ้า format ผิด
-  2. `IStationLookup.ExistsAsync` → `Result.Failure` ถ้า station ไม่มีอยู่ใน Facility DB
-  3. `order.MarkAsValidated(pickupStationId, dropStationId)` → set `PickupStationId`/`DropStationId`, Status: `Validated`
-  4. `order.MarkReadyToPlan()` → Status: `ReadyToPlan` ก่อน publish event
-- [ModuleServiceRegistration.cs](src/AMR.DeliveryPlanning.Api/Modules/ModuleServiceRegistration.cs) — register `IStationLookup → FacilityStationLookup`
-
 **Domain status flow ที่ถูกต้อง:**
 ```
 Submit → Submitted → MarkAsValidated → Validated → MarkReadyToPlan → ReadyToPlan → publish event
 ```
+
+- `IStationLookup.ExistsAsync` ตรวจ station ใน FacilityDB ก่อน validate
+- `order.MarkAsValidated(pickupId, dropId)` + `order.MarkReadyToPlan()` เรียกแน่นอน
 
 ---
 
@@ -161,20 +108,18 @@ Submit → Submitted → MarkAsValidated → Validated → MarkReadyToPlan → R
 
 ### ~~H1. JWT Secret และ Credentials Hardcoded~~ ✅ Fixed 2026-04-28
 
-**Files changed:**
-- [appsettings.json](src/AMR.DeliveryPlanning.Api/appsettings.json) — ล้าง plaintext secrets (`Jwt:Secret`, `ConnectionStrings`, `RabbitMq:Password`) เป็นค่าว่าง
-- [Program.cs](src/AMR.DeliveryPlanning.Api/Program.cs) — เพิ่ม fail-fast: throw `InvalidOperationException` ถ้า `Jwt:Secret` ไม่ถูก set (ไม่มี silent fallback อีกต่อไป)
-- `.gitignore` มี `appsettings.Development.json` อยู่แล้ว — ไม่ต้องแก้เพิ่ม
+- `appsettings.json` ล้าง plaintext secrets
+- `Program.cs` fail-fast: throw ถ้า `Jwt:Secret` ไม่ถูก set
 
-**Dev setup (ต้องทำครั้งเดียวต่อ machine):**
+**Dev setup:**
 ```bash
 dotnet user-secrets set "Jwt:Secret" "<strong-random-key-min-32-chars>"
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5434;Database=amr_delivery_planning;Username=postgres;Password=<secret>"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5434;..."
 dotnet user-secrets set "RabbitMq:Username" "guest"
 dotnet user-secrets set "RabbitMq:Password" "<secret>"
 ```
 
-**Production:** ใช้ environment variables หรือ Vault/KMS — อย่า commit ค่าใด ๆ ลง appsettings
+**docker-compose dev:** `Jwt__Secret=dev-only-secret-min-32-chars-placeholder!` (ไม่ใช่ production)
 
 ---
 
@@ -186,21 +131,6 @@ dotnet user-secrets set "RabbitMq:Password" "<secret>"
 | `InMemoryCostModelService` | Process memory (Singleton) | `planning.CostModelConfigs` table (Scoped, write-through) |
 | `VendorAdapterFactory._vehicleAdapterMap` | Static dict | `fleet.Vehicles.AdapterKey` column |
 
-**Files created:**
-- [VendorAdapterDbContext.cs](src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/Data/VendorAdapterDbContext.cs) _(new)_ — schema: `vendoradapter`, maps `ActionCatalogEntries`
-- [DbActionCatalogService.cs](src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/Services/DbActionCatalogService.cs) _(new)_ — EF-backed, replaces `InMemoryActionCatalogService`
-- [CostModelConfigRecord.cs](src/Modules/Planning/AMR.DeliveryPlanning.Planning.Infrastructure/Data/Records/CostModelConfigRecord.cs) _(new)_ — persistence record (null VehicleTypeKey = global default)
-- [DbCostModelService.cs](src/Modules/Planning/AMR.DeliveryPlanning.Planning.Infrastructure/Services/DbCostModelService.cs) _(new)_ — write-through: load from DB on first request, sync on `UpdateConfig`
-
-**Files changed:**
-- [Vehicle.cs](src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Domain/Entities/Vehicle.cs) — เพิ่ม `AdapterKey string` (default `"riot3"`)
-- [FleetDbContext.cs](src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/Data/FleetDbContext.cs) — map `AdapterKey` column
-- [RegisterVehicleCommand.cs](src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Application/Commands/RegisterVehicle/RegisterVehicleCommand.cs) + handler — เพิ่ม optional `AdapterKey` parameter (default `"riot3"`)
-- [VendorAdapterFactory.cs](src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/Services/VendorAdapterFactory.cs) — inject `FleetDbContext`, query `Vehicle.AdapterKey` แทน static dict; ลบ `_vehicleAdapterMap` + `RegisterVehicleAdapter`
-- [VendorAdapterServiceRegistration.cs](src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/VendorAdapterServiceRegistration.cs) — register `VendorAdapterDbContext`, swap `DbActionCatalogService`
-- [ModuleServiceRegistration.cs](src/AMR.DeliveryPlanning.Api/Modules/ModuleServiceRegistration.cs) — swap `DbCostModelService` (Scoped แทน Singleton)
-- [Program.cs](src/AMR.DeliveryPlanning.Api/Program.cs) — init `vendoradapter` schema + `SeedActionCatalogAsync` (upsert defaults ทุก startup)
-
 ---
 
 ### ~~H3. ไม่มี Multi-Tenancy~~ ✅ Fixed 2026-04-29
@@ -209,152 +139,94 @@ dotnet user-secrets set "RabbitMq:Password" "<secret>"
 - [SharedKernel/Tenancy/ITenantContext.cs](src/AMR.DeliveryPlanning.SharedKernel/Tenancy/ITenantContext.cs) — read-only scoped interface
 - [SharedKernel/Tenancy/TenantContext.cs](src/AMR.DeliveryPlanning.SharedKernel/Tenancy/TenantContext.cs) — scoped implementation with `Set(Guid)`
 - [Api/Middlewares/TenantContextMiddleware.cs](src/AMR.DeliveryPlanning.Api/Middlewares/TenantContextMiddleware.cs) — resolves `tenant_id` JWT claim per request
-- [tests/Integration/.../TenantIsolationTests.cs](tests/Integration/AMR.DeliveryPlanning.IntegrationTests/TenantIsolationTests.cs) — 5 cross-tenant isolation tests
+- [tests/Integration/.../TenantIsolationTests.cs](tests/Integration/AMR.DeliveryPlanning.IntegrationTests/TenantIsolationTests.cs) — 5 cross-tenant isolation tests (all pass)
 
 **Domain entities with TenantId added:**
 - `DeliveryOrder`, `Job`, `Trip`, `Vehicle`, `VehicleGroup` — constructors require `tenantId`
-- 8 command handlers inject `ITenantContext` and pass `TenantId` to constructors
+- 8 command handlers inject `ITenantContext`
 
 **EF Global Query Filters:**
-- `DeliveryOrderDbContext`, `PlanningDbContext`, `DispatchDbContext`, `FleetDbContext` — inject `ITenantContext`
-- `HasQueryFilter(e => e.TenantId == _tenantContext.TenantId)` on all 5 tenant-owned aggregate roots
-- `OrderKey` unique index changed to `(TenantId, OrderKey)` for tenant-local uniqueness
+- `DeliveryOrderDbContext`, `PlanningDbContext`, `DispatchDbContext`, `FleetDbContext`
+- `HasQueryFilter(e => e.TenantId == _tenantContext.TenantId)` on 5 aggregate roots
+- `OrderKey` unique index → `(TenantId, OrderKey)`; `Username` unique index → `(TenantId, Username)`
 
 **Events and Consumers:**
-- `DeliveryOrderReadyForPlanningIntegrationEvent`, `PlanCommittedIntegrationEvent`, `TripCompletedIntegrationEvent` — added `TenantId`
-- Cross-module consumers set `TenantContext` from event `TenantId` before DB access
-- RIOT3 webhook consumers use `IgnoreQueryFilters()` to resolve trip, then set tenant from found trip
+- `DeliveryOrderReadyForPlanningIntegrationEvent`, `PlanCommittedIntegrationEvent`, `TripCompletedIntegrationEvent` — TenantId added
+- RIOT3 consumers: `IgnoreQueryFilters()` → set tenant from found trip
 
 **Auth:**
-- `AppUser.TenantId` added; JWT issues `tenant_id` claim
-- Register endpoint reads `X-Tenant-Id` header; seeded admin uses `SystemTenantId`
-- `AddTenantId` migration scaffolded for Auth schema
+- `AppUser.TenantId`; `SystemTenantId` constant for seeded admin
+- JWT issues `tenant_id` claim; register endpoint reads `X-Tenant-Id` header
 
-**Migrations scaffolded:** `AddTenantId` for DeliveryOrder, Planning, Dispatch, Fleet, Auth (5 modules)
+**Decisions:**
+- Facility (Maps, Stations, RouteEdges) — **shared/global** (shared physical infrastructure)
+- VendorAdapter (ActionCatalog) — **global** (same vendor protocol for all tenants)
 
 ---
 
 ## Medium — Operational Gaps
 
-### ~~M1. ใช้ `EnsureCreated` แทน EF Migrations~~ ✅ Infrastructure Ready 2026-04-28
+### ~~M1. ใช้ `EnsureCreated` แทน EF Migrations~~ ✅ Fully Done 2026-04-29
 
-**Files changed:**
-- [Program.cs](src/AMR.DeliveryPlanning.Api/Program.cs) — แทน `EnsureCreated`/`CreateSchemaAndTables` ด้วย `ApplyMigrationsAsync`:
-  - ถ้ามี migrations scaffolded: ใช้ `MigrateAsync()` (production path)
-  - ถ้ายังไม่มี migrations: log warning + `EnsureCreated` fallback (dev path)
-- `Microsoft.EntityFrameworkCore.Design` เพิ่มใน 6 infrastructure projects
-- `IDesignTimeDbContextFactory<T>` สร้างใน **ทุก** module (8 factories) — อ่าน connection string จาก env `ConnectionStrings__DefaultConnection`
+**Migrations scaffolded (all 8 DbContexts):**
 
-**⚠️ ขั้นตอนที่ต้องทำก่อน deploy production — scaffold migrations 1 ครั้ง:**
-```bash
-cd d:\DTMS
+| Context | Schema | Migrations |
+|---|---|---|
+| FacilityDbContext | `facility` | InitialCreate |
+| FleetDbContext | `fleet` | InitialCreate, AddTenantId |
+| DeliveryOrderDbContext | `deliveryorder` | InitialCreate, AddTenantId, FixTenantIndexes |
+| PlanningDbContext | `planning` | InitialCreate, AddTenantId |
+| DispatchDbContext | `dispatch` | InitialCreate, AddTenantId |
+| VendorAdapterDbContext | `vendoradapter` | InitialCreate |
+| AuthDbContext | `auth` | InitialCreate, AddTenantId, FixTenantIndexes |
+| OutboxDbContext | `outbox` | InitialCreate |
 
-# Facility
-dotnet ef migrations add InitialCreate \
-  --project src/Modules/Facility/AMR.DeliveryPlanning.Facility.Infrastructure \
-  --startup-project src/AMR.DeliveryPlanning.Api \
-  --output-dir Migrations
+**Production guard:** `ASPNETCORE_ENVIRONMENT=Production` + no migrations → `InvalidOperationException` at startup (no silent fallback)
 
-# Fleet
-dotnet ef migrations add InitialCreate \
-  --project src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure \
-  --startup-project src/AMR.DeliveryPlanning.Api \
-  --output-dir Migrations
+**Dev fallback:** DB pre-created by `POSTGRES_DB` env var → `CreateTablesAsync()` ensures all schemas created
 
-# DeliveryOrder
-dotnet ef migrations add InitialCreate \
-  --project src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure \
-  --startup-project src/AMR.DeliveryPlanning.Api \
-  --output-dir Migrations
-
-# Planning
-dotnet ef migrations add InitialCreate \
-  --project src/Modules/Planning/AMR.DeliveryPlanning.Planning.Infrastructure \
-  --startup-project src/AMR.DeliveryPlanning.Api \
-  --output-dir Migrations
-
-# Dispatch
-dotnet ef migrations add InitialCreate \
-  --project src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Infrastructure \
-  --startup-project src/AMR.DeliveryPlanning.Api \
-  --output-dir Migrations
-
-# VendorAdapter
-dotnet ef migrations add InitialCreate \
-  --project src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure \
-  --startup-project src/AMR.DeliveryPlanning.Api \
-  --output-dir Migrations
-
-# Auth + Outbox (ใน API project เอง)
-dotnet ef migrations add InitialCreate \
-  --context AuthDbContext \
-  --project src/AMR.DeliveryPlanning.Api \
-  --output-dir Auth/Migrations
-
-dotnet ef migrations add InitialCreate \
-  --context OutboxDbContext \
-  --project src/AMR.DeliveryPlanning.Api \
-  --output-dir Infrastructure/Outbox/Migrations
-```
-
-> **Dev workflow ปัจจุบัน:** ยังใช้ `EnsureCreated` fallback อยู่ (log warning จะขึ้นทุก startup) — ทำงานได้ปกติ
-> **Production:** ต้อง scaffold migrations ตามคำสั่งข้างต้นก่อน จากนั้น `ApplyMigrationsAsync` จะใช้ `MigrateAsync()` อัตโนมัติ
+**Verified:** all 8 contexts log `"Applying N pending migration(s)"` on fresh DB; 32 tables created
 
 ---
 
 ### ~~M2. ไม่มี Health Checks~~ ✅ Fixed 2026-04-28
 
-**File changed:** [Program.cs](src/AMR.DeliveryPlanning.Api/Program.cs)
-
 | Endpoint | พฤติกรรม |
 |---|---|
-| `GET /health` | Liveness — 200 ถ้า process alive (ไม่ต้องการ auth) |
+| `GET /health` | Liveness — 200 ถ้า process alive (anonymous) |
 | `GET /health/ready` | Readiness — ตรวจ postgres + redis (tag: `ready`) |
-
-ใช้ inline lambda checks กับ `Npgsql.NpgsqlConnection` และ `StackExchange.Redis.ConnectionMultiplexer` ที่มีอยู่แล้ว โดยไม่ต้องเพิ่ม package ใหม่
-
-> **TODO (post-launch):** เปลี่ยนเป็น `AspNetCore.HealthChecks.Npgsql` / `.RabbitMQ` / `.Redis` เมื่อ pin version ใน `Directory.Packages.props` แล้ว
 
 ---
 
-### M3. Integration Tests เป็น Stubs
+### M3. Integration Tests — Infrastructure Complete, Scenarios Pending
 
-**Problem:** `*IntegrationTests` แต่ละ project มีแค่ 1 placeholder test
+**สถานะปัจจุบัน:**
+- ✅ Testcontainer harness พร้อม (`DtmsWebApplicationFactory`, PostgreSQL Testcontainers, in-memory Redis)
+- ✅ Auth helper รองรับ multi-tenant JWT (`GetClientForTenantAsync`)
+- ✅ 20 integration tests ผ่าน (basic E2E flows + cross-tenant isolation)
+- ✅ Bug fixes: station persistence (MapRepository), Trip Legs format, VehicleType seeding
 
-**Priority test scenarios:**
-- [ ] End-to-end: Submit order → Plan → Dispatch → Task completion (RIOT3 simulate)
-- [ ] RIOT3 webhook: `taskEventType=finished/failed` → Dispatch update
-- [ ] Idempotency key: duplicate POST → return same orderId
-- [ ] SLA validation: SLA ภายใน 30 นาที → rejection
+**Scenarios ที่ยังค้าง (Phase 3 work):**
+- [ ] E2E full pipeline: Submit order → Auto-plan → Auto-dispatch → RIOT3 task complete
+- [ ] RIOT3 webhook: `finished`/`failed` → Dispatch state update
+- [ ] Idempotency key: duplicate POST returns same orderId
+- [ ] SLA validation: SLA < 30 min → rejection
 - [ ] ChargingPolicy: battery below threshold → `VehicleBatteryLowIntegrationEvent`
-- [ ] Outbox processor: message written → published via MassTransit
-- [ ] Capability assignment: job requires "LIFT" → only liftup vehicles selected
-- [ ] Amendment: PATCH order → amendment record created
+- [ ] Outbox processor: message written → marked processed → retryable on failure
+- [ ] Capability assignment: job requires "LIFT" → only matching vehicles selected
+- [ ] Amendment: PATCH order → amendment record + timeline event
 
 ---
 
 ### ~~M4. ไม่มี Rate Limiting~~ ✅ Fixed 2026-04-28
 
-**File changed:** [Program.cs](src/AMR.DeliveryPlanning.Api/Program.cs)
-— Global fixed-window limiter: **100 req/min** partition by client IP
-— ใช้ `GlobalLimiter` (แทน named policy) เพื่อครอบคลุมทุก endpoint อัตโนมัติ
-— เกินลิมิต → HTTP `429 Too Many Requests`
+Global fixed-window: **100 req/min** per client IP → HTTP `429 Too Many Requests`
 
 ---
 
 ### ~~M5. Feeder Adapter Endpoints ยังสมมติ~~ ✅ Fixed 2026-04-28
 
-**Root cause ที่แก้:** feeder และ liftup เป็น **vendor เดียวกัน** — ทั้งคู่ใช้ RIOT3 API + format เดียวกัน (`actionType / 0 / 1`)
-
-**Files changed:**
-- [Program.cs](src/AMR.DeliveryPlanning.Api/Program.cs) — `SeedActionCatalogAsync` อัปเดตครบตาม vendor spec:
-  - liftup (OASIS): 11 actions (LIFT, DROP, LIFT_FRONT_REAR, LIFT_PLATFORM_SAFE, LIFT_PLATFORM, ROTATE_PLATFORM, SYNC_ROTATE_ON/OFF, PLATFORM_INIT, SHELF_CORRECT, LIFT_CALIBRATE)
-  - feeder: 11 actions (INIT, LIFT, DROP, RIGHT_LOAD/UNLOAD, FRONT_PROBE, FRONT_AXIS_HOME, LEFT/RIGHT_STOP_HOME/BLOCK)
-  - **adapterKey เปลี่ยนจาก `"feeder"` เป็น `"riot3"`** สำหรับทุก feeder actions
-  - JSON format unified: `{"actionType":"<ID>","0":"<P0>","1":"<P1>"}` ทั้งสองประเภท
-- [VendorAdapterFactory.cs](src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/Services/VendorAdapterFactory.cs) — `"feeder"` adapterKey resolve เป็น Riot3CommandService (pattern match รวมกับ `"riot3"`)
-
-> **Note:** `FeederCommandService` ยังคงอยู่ใน codebase สำหรับ vendor ที่ใช้ protocol ต่างหากในอนาคต
+Feeder + liftup unified under `riot3` adapterKey; 22 actions seeded (11 liftup OASIS + 11 feeder)
 
 ---
 
@@ -366,8 +238,9 @@ dotnet ef migrations add InitialCreate \
 | WebSocket / SSE สำหรับ real-time trip progress | Operator console ต้องการ live push |
 | Operator UI / Dashboard | Web-based monitoring สำหรับ trips, exceptions, KPI |
 | Map synchronization กับ RIOT3 vendor | Auto-sync station/map data จาก AMR vendor |
-| EF Migrations per-module setup | Clean schema evolution |
 | Multi-facility routing | Cross-facility job planning |
+| POST /api/fleet/vehicle-types endpoint | ปัจจุบัน VehicleType ต้องสร้างผ่าน EF โดยตรง (no HTTP API) |
+| RabbitMQ health check | ปัจจุบัน `health/ready` ตรวจแค่ postgres + redis |
 
 ---
 
@@ -396,6 +269,10 @@ docker compose up -d
 # Swagger UI
 open http://localhost:5219/swagger
 
+# Health checks
+curl http://localhost:5219/health        # → Healthy
+curl http://localhost:5219/health/ready  # → Healthy (postgres + redis)
+
 # Jaeger (distributed traces)
 open http://localhost:16686
 
@@ -411,9 +288,9 @@ open http://localhost:15672   # guest:guest
 |---|---|---|---|
 | ~~Critical Fixes~~ | ~~C1–C5~~ | ~~3–5 วัน~~ | ✅ Done 2026-04-28 |
 | ~~Security Hardening~~ | ~~H1 · H2 · H3~~ | ~~3–5 วัน~~ | ✅ Done 2026-04-29 |
-| ~~Operational (partial)~~ | ~~M1 · M2 · M4 · M5~~ | ~~1 วัน~~ | ✅ Done 2026-04-28 |
-| Operational | **M3 ยังค้าง** (Integration test cases) | 5–7 วัน | Pending |
-| Integration Testing | test scenarios ครบ | 5–7 วัน | Pending |
-| Load / Stress Testing | verify NFR (500 orders/min) | 2–3 วัน | Pending |
-| Release Gate | secrets, runbook, vendor contract | 1–2 วัน | Pending |
-| **รวม (เหลือ)** | **M3 + Integration Tests + Load + Release Gate** | **~2 สัปดาห์** | |
+| ~~Operational (M1–M2, M4–M5)~~ | ~~Migrations, Health, Rate limit, Feeder~~ | ~~1 วัน~~ | ✅ Done 2026-04-28/29 |
+| ~~Baseline + Migration + Multi-tenancy~~ | ~~Phase 0, 1, 2~~ | ~~1–2 สัปดาห์~~ | ✅ Done 2026-04-29 |
+| **Integration Testing (M3)** | Readiness scenarios (8 test cases) | **5–7 วัน** | **Pending — Phase 3** |
+| **Load / Stress Testing** | verify NFR (500 orders/min) via k6 | **2–3 วัน** | **Pending — Phase 4** |
+| **Release Gate** | secrets, observability, backup/restore, runbook, vendor contract | **1–2 วัน** | **Pending — Phase 5** |
+| **รวม (เหลือ)** | **Integration Tests + Load + Release Gate** | **~1.5 สัปดาห์** | |
