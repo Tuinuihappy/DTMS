@@ -33,16 +33,15 @@ public class AddVehicleToGroupCommandHandler : ICommandHandler<AddVehicleToGroup
         var group = await _groupRepo.GetByIdAsync(request.GroupId, cancellationToken);
         if (group == null) return Result.Failure($"Group {request.GroupId} not found.");
 
-        var vehicle = await _vehicleRepo.GetByIdAsync(request.VehicleId, cancellationToken);
-        if (vehicle == null) return Result.Failure($"Vehicle {request.VehicleId} not found.");
+        // Validate vehicle exists — FK on VehicleGroupMembers will also enforce this,
+        // but a pre-check gives a clearer error message to the caller.
+        var vehicleExists = await _vehicleRepo.GetByIdAsync(request.VehicleId, cancellationToken) != null;
+        if (!vehicleExists) return Result.Failure($"Vehicle {request.VehicleId} not found.");
 
         group.AddVehicle(request.VehicleId);
-        vehicle.AddToGroup(request.GroupId);
 
         await _groupRepo.UpdateAsync(group, cancellationToken);
         await _groupRepo.SaveChangesAsync(cancellationToken);
-        _vehicleRepo.Update(vehicle);
-        await _vehicleRepo.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }
@@ -51,12 +50,10 @@ public class AddVehicleToGroupCommandHandler : ICommandHandler<AddVehicleToGroup
 public class RemoveVehicleFromGroupCommandHandler : ICommandHandler<RemoveVehicleFromGroupCommand>
 {
     private readonly IVehicleGroupRepository _groupRepo;
-    private readonly IVehicleRepository _vehicleRepo;
 
-    public RemoveVehicleFromGroupCommandHandler(IVehicleGroupRepository groupRepo, IVehicleRepository vehicleRepo)
+    public RemoveVehicleFromGroupCommandHandler(IVehicleGroupRepository groupRepo)
     {
         _groupRepo = groupRepo;
-        _vehicleRepo = vehicleRepo;
     }
 
     public async Task<Result> Handle(RemoveVehicleFromGroupCommand request, CancellationToken cancellationToken)
@@ -64,16 +61,10 @@ public class RemoveVehicleFromGroupCommandHandler : ICommandHandler<RemoveVehicl
         var group = await _groupRepo.GetByIdAsync(request.GroupId, cancellationToken);
         if (group == null) return Result.Failure($"Group {request.GroupId} not found.");
 
-        var vehicle = await _vehicleRepo.GetByIdAsync(request.VehicleId, cancellationToken);
-        if (vehicle == null) return Result.Failure($"Vehicle {request.VehicleId} not found.");
-
         group.RemoveVehicle(request.VehicleId);
-        vehicle.RemoveFromGroup(request.GroupId);
 
         await _groupRepo.UpdateAsync(group, cancellationToken);
         await _groupRepo.SaveChangesAsync(cancellationToken);
-        _vehicleRepo.Update(vehicle);
-        await _vehicleRepo.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

@@ -12,6 +12,7 @@ public class FleetDbContext : DbContext
     public DbSet<ChargingPolicy> ChargingPolicies { get; set; } = null!;
     public DbSet<MaintenanceRecord> MaintenanceRecords { get; set; } = null!;
     public DbSet<VehicleGroup> VehicleGroups { get; set; } = null!;
+    internal DbSet<VehicleGroupMember> VehicleGroupMembers { get; set; } = null!;
 
     public FleetDbContext(DbContextOptions<FleetDbContext> options) : base(options) { }
 
@@ -24,12 +25,7 @@ public class FleetDbContext : DbContext
             b.HasKey(v => v.Id);
             b.Property(v => v.VehicleName).HasMaxLength(100).IsRequired();
             b.Property(v => v.State).HasConversion<string>().HasMaxLength(20);
-            b.Property(v => v.GroupIds)
-             .HasConversion(
-                 v => string.Join(',', v),
-                 v => v.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                        .Select(Guid.Parse).ToList())
-             .HasColumnName("GroupIds");
+            b.Property(v => v.AdapterKey).HasMaxLength(20).IsRequired().HasDefaultValue("riot3");
             b.Ignore(v => v.DomainEvents);
         });
 
@@ -69,12 +65,35 @@ public class FleetDbContext : DbContext
                  v => string.Join(',', v),
                  v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList())
              .HasColumnName("Tags");
-            b.Property(g => g.VehicleIds)
-             .HasConversion(
-                 v => string.Join(',', v),
-                 v => v.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                        .Select(Guid.Parse).ToList())
-             .HasColumnName("VehicleIds");
+
+            // VehicleIds is now owned by the join table — do not persist on this entity
+            b.Ignore(g => g.VehicleIds);
+
+            // xmin = PostgreSQL system column; EF uses it as an optimistic-concurrency token.
+            // Any concurrent UPDATE on the same row increments xmin automatically,
+            // causing a DbUpdateConcurrencyException for the losing writer.
+            b.Property<uint>("xmin").IsRowVersion().HasColumnName("xmin");
+        });
+
+        modelBuilder.Entity<VehicleGroupMember>(b =>
+        {
+            b.ToTable("VehicleGroupMembers");
+            b.HasKey(m => new { m.VehicleGroupId, m.VehicleId });
+
+            // Reverse-lookup: "which groups does vehicle X belong to?"
+            b.HasIndex(m => m.VehicleId);
+
+            // Cascade-delete: removing a VehicleGroup removes all its memberships
+            b.HasOne<VehicleGroup>()
+             .WithMany()
+             .HasForeignKey(m => m.VehicleGroupId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            // Referential integrity: VehicleId must exist in fleet.Vehicles
+            b.HasOne<Vehicle>()
+             .WithMany()
+             .HasForeignKey(m => m.VehicleId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
 
         base.OnModelCreating(modelBuilder);

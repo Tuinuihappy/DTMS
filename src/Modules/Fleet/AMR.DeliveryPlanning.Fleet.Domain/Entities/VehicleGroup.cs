@@ -29,6 +29,14 @@ public class VehicleGroup : Entity<Guid>
 
     public void RemoveVehicle(Guid vehicleId) => _vehicleIds.Remove(vehicleId);
 
+    // Called by the repository after loading from the join table.
+    // Separated from AddVehicle to keep domain semantics clean.
+    internal void LoadVehicleIds(IEnumerable<Guid> vehicleIds)
+    {
+        _vehicleIds.Clear();
+        _vehicleIds.AddRange(vehicleIds);
+    }
+
     public void Update(string name, string description, IEnumerable<string>? tags)
     {
         Name = name;

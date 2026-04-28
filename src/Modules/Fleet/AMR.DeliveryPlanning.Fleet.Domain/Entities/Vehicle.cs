@@ -12,16 +12,16 @@ public class Vehicle : AggregateRoot<Guid>
     public double BatteryLevel { get; private set; }
     public Guid? CurrentNodeId { get; private set; }
     public bool IsInMaintenance => State == VehicleState.Maintenance;
-
-    private readonly List<Guid> _groupIds = new();
-    public IReadOnlyCollection<Guid> GroupIds => _groupIds.AsReadOnly();
+    // Identifies which vendor adapter handles this vehicle ("riot3" | "feeder" | "sim")
+    public string AdapterKey { get; private set; } = "riot3";
 
     private Vehicle() { }
 
-    public Vehicle(Guid id, string vehicleName, Guid vehicleTypeId) : base(id)
+    public Vehicle(Guid id, string vehicleName, Guid vehicleTypeId, string adapterKey = "riot3") : base(id)
     {
         VehicleName = vehicleName;
         VehicleTypeId = vehicleTypeId;
+        AdapterKey = adapterKey;
         State = VehicleState.Offline;
         BatteryLevel = 100.0;
         CurrentNodeId = null;
@@ -57,10 +57,4 @@ public class Vehicle : AggregateRoot<Guid>
         AddDomainEvent(new VehicleMaintenanceExitedDomainEvent(Id));
     }
 
-    public void AddToGroup(Guid groupId)
-    {
-        if (!_groupIds.Contains(groupId)) _groupIds.Add(groupId);
-    }
-
-    public void RemoveFromGroup(Guid groupId) => _groupIds.Remove(groupId);
 }

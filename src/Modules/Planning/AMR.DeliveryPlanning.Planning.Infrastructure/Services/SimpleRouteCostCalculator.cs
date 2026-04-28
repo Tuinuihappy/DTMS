@@ -1,37 +1,48 @@
+using AMR.DeliveryPlanning.Facility.Infrastructure.Data;
 using AMR.DeliveryPlanning.Planning.Domain.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.Planning.Infrastructure.Services;
 
-/// <summary>
-/// Simple route cost calculator using Euclidean distance approximation.
-/// In future phases, this will be replaced with actual graph traversal from Facility module.
-/// </summary>
 public class SimpleRouteCostCalculator : IRouteCostCalculator
 {
+    private readonly FacilityDbContext _facilityDb;
     private readonly ILogger<SimpleRouteCostCalculator> _logger;
 
-    public SimpleRouteCostCalculator(ILogger<SimpleRouteCostCalculator> logger)
+    public SimpleRouteCostCalculator(FacilityDbContext facilityDb, ILogger<SimpleRouteCostCalculator> logger)
     {
+        _facilityDb = facilityDb;
         _logger = logger;
     }
 
-    public Task<double> CalculateCostAsync(Guid fromStationId, Guid toStationId, CancellationToken cancellationToken = default)
+    public async Task<double> CalculateCostAsync(Guid fromStationId, Guid toStationId, CancellationToken cancellationToken = default)
     {
-        double cost = Calculate(fromStationId, toStationId);
-        return Task.FromResult(cost);
+        if (fromStationId == Guid.Empty || toStationId == Guid.Empty)
+            return 999.0;
+
+        var edge = await _facilityDb.RouteEdges.FirstOrDefaultAsync(e =>
+            (e.SourceStationId == fromStationId && e.TargetStationId == toStationId) ||
+            (e.IsBidirectional && e.SourceStationId == toStationId && e.TargetStationId == fromStationId),
+            cancellationToken);
+
+        if (edge == null)
+        {
+            _logger.LogWarning(
+                "No RouteEdge found for {From}→{To}. Returning fallback cost 999.0 — " +
+                "vehicle assignment and TSP results will be incorrect. " +
+                "Either populate facility.RouteEdges manually or set VendorRef on Maps/Stations " +
+                "to enable RouteEdgeSyncService auto-sync from RIOT3.",
+                fromStationId, toStationId);
+            return 999.0;
+        }
+
+        _logger.LogDebug("Route cost {From} → {To}: {Cost} (edge={EdgeId})",
+            fromStationId, toStationId, edge.Cost, edge.Id);
+        return edge.Cost;
     }
 
+    // Sync path used by TSP solver — blocks on the async query (safe in ASP.NET Core, no SynchronizationContext)
     public double Calculate(Guid fromStationId, Guid toStationId)
-    {
-        if (fromStationId == Guid.Empty)
-            return 10.0;
-
-        // Use hashcode-based pseudo-distance so TSP produces meaningful ordering
-        var diff = Math.Abs(fromStationId.GetHashCode() - toStationId.GetHashCode());
-        double cost = (diff % 100) + 1.0;
-
-        _logger.LogDebug("Route cost {From} → {To}: {Cost}", fromStationId, toStationId, cost);
-        return cost;
-    }
+        => CalculateCostAsync(fromStationId, toStationId).GetAwaiter().GetResult();
 }

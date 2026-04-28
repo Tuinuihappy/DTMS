@@ -499,3 +499,11 @@ Proprietary. Contact the project team for usage terms.
 Project team — AMR Delivery Planning Working Group
 
 *Last updated: April 2026*
+
+
+RIOT
+Url: http://10.204.212.28:12000
+Auth: API Key
+Key: Authorization
+Value: ***REMOVED_RIOT3_TOKEN***
+Add to: Header

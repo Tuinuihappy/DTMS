@@ -26,6 +26,8 @@ public class FacilityDbContext : DbContext
             b.Property(m => m.Name).HasMaxLength(100).IsRequired();
             b.Property(m => m.Version).HasMaxLength(50).IsRequired();
             b.Property(m => m.MapData).HasColumnType("jsonb");
+            b.Property(m => m.VendorRef).HasMaxLength(200);
+            b.HasIndex(m => m.VendorRef).IsUnique().HasFilter("\"VendorRef\" IS NOT NULL");
             b.Ignore(m => m.DomainEvents);
             b.Ignore(m => m.Stations);
             b.Ignore(m => m.Zones);
@@ -48,6 +50,8 @@ public class FacilityDbContext : DbContext
                  v => string.Join(',', v),
                  v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList())
              .HasColumnName("CompatibleVehicleTypes");
+            b.Property(s => s.VendorRef).HasMaxLength(200);
+            b.HasIndex(s => new { s.MapId, s.VendorRef }).IsUnique().HasFilter("\"VendorRef\" IS NOT NULL");
         });
 
         modelBuilder.Entity<Zone>(b =>

@@ -8,30 +8,44 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Services;
 public class FleetVehicleProvider : IFleetVehicleProvider
 {
     private readonly FleetDbContext _fleetDb;
+    private readonly IRouteCostCalculator _routeCostCalc;
 
-    public FleetVehicleProvider(FleetDbContext fleetDb) => _fleetDb = fleetDb;
+    public FleetVehicleProvider(FleetDbContext fleetDb, IRouteCostCalculator routeCostCalc)
+    {
+        _fleetDb = fleetDb;
+        _routeCostCalc = routeCostCalc;
+    }
 
-    public async Task<List<VehicleCandidate>> GetIdleVehiclesAsync(CancellationToken cancellationToken = default)
+    public async Task<List<VehicleCandidate>> GetIdleVehiclesAsync(Guid pickupStationId, CancellationToken cancellationToken = default)
     {
         var vehicles = await _fleetDb.Vehicles
             .Where(v => v.State == VehicleState.Idle && v.BatteryLevel > 20)
             .ToListAsync(cancellationToken);
 
-        // Load vehicle types with capabilities
         var typeIds = vehicles.Select(v => v.VehicleTypeId).Distinct().ToList();
         var vehicleTypes = await _fleetDb.VehicleTypes
             .Where(vt => typeIds.Contains(vt.Id))
             .ToDictionaryAsync(vt => vt.Id, cancellationToken);
 
-        return vehicles.Select(v =>
+        // Fetch all route costs in parallel — one Redis lookup per vehicle, not sequential
+        var distanceTasks = vehicles.Select(v => v.CurrentNodeId.HasValue
+            ? _routeCostCalc.CalculateCostAsync(v.CurrentNodeId.Value, pickupStationId, cancellationToken)
+            : Task.FromResult(999.0));
+        var distances = await Task.WhenAll(distanceTasks);
+
+        var candidates = new List<VehicleCandidate>(vehicles.Count);
+        for (var i = 0; i < vehicles.Count; i++)
         {
+            var v = vehicles[i];
             vehicleTypes.TryGetValue(v.VehicleTypeId, out var vt);
-            return new VehicleCandidate(
+            candidates.Add(new VehicleCandidate(
                 VehicleId: v.Id,
-                DistanceToPickup: 10.0,
+                DistanceToPickup: distances[i],
                 BatteryLevel: v.BatteryLevel,
                 VehicleTypeId: v.VehicleTypeId,
-                Capabilities: vt?.Capabilities);
-        }).ToList();
+                Capabilities: vt?.Capabilities));
+        }
+
+        return candidates;
     }
 }

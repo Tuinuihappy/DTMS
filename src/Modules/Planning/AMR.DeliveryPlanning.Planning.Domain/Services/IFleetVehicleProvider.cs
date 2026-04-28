@@ -6,5 +6,5 @@ namespace AMR.DeliveryPlanning.Planning.Domain.Services;
 /// </summary>
 public interface IFleetVehicleProvider
 {
-    Task<List<VehicleCandidate>> GetIdleVehiclesAsync(CancellationToken cancellationToken = default);
+    Task<List<VehicleCandidate>> GetIdleVehiclesAsync(Guid pickupStationId, CancellationToken cancellationToken = default);
 }

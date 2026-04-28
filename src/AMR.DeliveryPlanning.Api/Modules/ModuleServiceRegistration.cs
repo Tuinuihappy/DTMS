@@ -1,9 +1,11 @@
 using AMR.DeliveryPlanning.Api.Auth;
 using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Options;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Repositories;
+using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
@@ -14,6 +16,7 @@ using AMR.DeliveryPlanning.Facility.Domain.Services;
 using AMR.DeliveryPlanning.Facility.Infrastructure.Data;
 using AMR.DeliveryPlanning.Facility.Infrastructure.Repositories;
 using AMR.DeliveryPlanning.Facility.Infrastructure.Services;
+using Microsoft.Extensions.Logging;
 using AMR.DeliveryPlanning.Fleet.Application.Consumers;
 using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
@@ -57,6 +60,21 @@ public static class ModuleServiceRegistration
             var baseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
             client.BaseAddress = new Uri(baseUrl);
         });
+
+        // Route edge sync — pulls live costs from RIOT3 and upserts into facility.RouteEdges
+        var riot3BaseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
+        var syncIntervalMinutes = configuration.GetValue<int>("VendorAdapter:Riot3:RouteSync:IntervalMinutes", 30);
+        services.AddHttpClient<IRiot3RouteClient, Riot3RouteClient>(client =>
+        {
+            client.BaseAddress = new Uri(riot3BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+        services.AddHostedService(sp => new RouteEdgeSyncService(
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            sp.GetRequiredService<IRiot3RouteClient>(),
+            sp.GetRequiredService<ILogger<RouteEdgeSyncService>>(),
+            TimeSpan.FromMinutes(syncIntervalMinutes)));
+
         services.AddHostedService<TopologyOverlayExpiryService>();
 
         // ── Fleet Module ──────────────────────────────────────────────
@@ -70,6 +88,7 @@ public static class ModuleServiceRegistration
         // ── DeliveryOrder Module ──────────────────────────────────────
         services.AddDbContext<DeliveryOrderDbContext>(o => o.UseNpgsql(connectionString));
         services.AddScoped<IDeliveryOrderRepository, DeliveryOrderRepository>();
+        services.AddScoped<IStationLookup, FacilityStationLookup>();
         services.AddScoped<IOrderAmendmentRepository, OrderAmendmentRepository>();
         services.AddScoped<IOrderAuditEventRepository, OrderAuditEventRepository>();
         services.Configure<DeliveryOrderOptions>(
@@ -78,7 +97,7 @@ public static class ModuleServiceRegistration
         // ── Planning Module ───────────────────────────────────────────
         services.AddDbContext<PlanningDbContext>(o => o.UseNpgsql(connectionString));
         services.AddScoped<IJobRepository, JobRepository>();
-        services.AddSingleton<ICostModelService, InMemoryCostModelService>();
+        services.AddScoped<ICostModelService, DbCostModelService>();
         services.AddScoped<IVehicleSelector, GreedyVehicleSelector>();
         services.AddScoped<SimpleRouteCostCalculator>();
         services.AddScoped<IRouteCostCalculator, CachedRouteCostCalculator>();

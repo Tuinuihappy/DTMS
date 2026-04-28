@@ -88,8 +88,9 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
     public async Task DeliveryOrder_SubmitOrder_ReturnsOrderId()
     {
         var client = await _factory.GetAuthenticatedClient();
-        var pickupId = Guid.NewGuid();
-        var dropId = Guid.NewGuid();
+
+        // Must create real stations first — C5 validates station existence in Facility DB
+        var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
 
         var response = await client.PostAsJsonAsync("/api/delivery-orders", new
         {
@@ -114,10 +115,23 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
 
-        // 0. Seed a vehicle into GreedyVehicleSelector's in-memory cache
-        var vehicleId = Guid.NewGuid();
-        AMR.DeliveryPlanning.Planning.Infrastructure.Services.GreedyVehicleSelector
-            .UpdateVehicleCache(vehicleId, distanceToOrigin: 10.0, batteryLevel: 90.0);
+        // 0. Register an idle vehicle so GreedyVehicleSelector can find it via DB
+        var regResponse = await client.PostAsJsonAsync("/api/fleet/vehicles", new
+        {
+            VehicleName = "TestVehicle-Assign",
+            VehicleTypeId = Guid.NewGuid()
+        });
+        regResponse.IsSuccessStatusCode.Should().BeTrue($"Register vehicle failed: {await regResponse.Content.ReadAsStringAsync()}");
+        var vehicleId = await regResponse.Content.ReadFromJsonAsync<Guid>();
+
+        var stateResponse = await client.PutAsJsonAsync($"/api/fleet/vehicles/{vehicleId}/state", new
+        {
+            VehicleId = vehicleId,
+            NewState = 1, // VehicleState.Idle
+            BatteryLevel = 90.0,
+            CurrentNodeId = (Guid?)null
+        });
+        stateResponse.IsSuccessStatusCode.Should().BeTrue($"Set vehicle state failed: {await stateResponse.Content.ReadAsStringAsync()}");
 
         // 1. Create Job
         var createResponse = await client.PostAsJsonAsync("/api/planning/jobs", new
@@ -226,10 +240,23 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
 
-        // Seed vehicle
-        var vehicleId = Guid.NewGuid();
-        AMR.DeliveryPlanning.Planning.Infrastructure.Services.GreedyVehicleSelector
-            .UpdateVehicleCache(vehicleId, 5.0, 95.0);
+        // Register an idle vehicle so GreedyVehicleSelector can find it via DB
+        var regResponse = await client.PostAsJsonAsync("/api/fleet/vehicles", new
+        {
+            VehicleName = "TestVehicle-Replan",
+            VehicleTypeId = Guid.NewGuid()
+        });
+        regResponse.IsSuccessStatusCode.Should().BeTrue($"Register vehicle failed: {await regResponse.Content.ReadAsStringAsync()}");
+        var vehicleId = await regResponse.Content.ReadFromJsonAsync<Guid>();
+
+        var stateResponse = await client.PutAsJsonAsync($"/api/fleet/vehicles/{vehicleId}/state", new
+        {
+            VehicleId = vehicleId,
+            NewState = 1, // VehicleState.Idle
+            BatteryLevel = 95.0,
+            CurrentNodeId = (Guid?)null
+        });
+        stateResponse.IsSuccessStatusCode.Should().BeTrue($"Set vehicle state failed: {await stateResponse.Content.ReadAsStringAsync()}");
 
         // Create + Assign + Commit
         var createResponse = await client.PostAsJsonAsync("/api/planning/jobs", new

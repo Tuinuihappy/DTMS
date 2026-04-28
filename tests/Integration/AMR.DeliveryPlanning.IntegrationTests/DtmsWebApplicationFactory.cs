@@ -1,13 +1,18 @@
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
 
 namespace AMR.DeliveryPlanning.IntegrationTests;
 
 /// <summary>
-/// Custom WebApplicationFactory that uses Testcontainers for PostgreSQL
-/// and disables RabbitMQ (uses InMemory transport for MassTransit).
+/// Custom WebApplicationFactory backed by a real PostgreSQL Testcontainer.
+/// Redis is replaced with an in-memory distributed cache so tests run
+/// without a Redis instance. MassTransit uses OutboxEventBus, so event
+/// publishing is DB-backed and does not require RabbitMQ for most scenarios.
 /// </summary>
 public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
@@ -18,6 +23,8 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         .WithPassword("test")
         .Build();
 
+    public string ConnectionString => _postgres.GetConnectionString();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
@@ -27,15 +34,65 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseSetting("Jwt:Secret", "super-secret-key-for-testing-minimum-32-characters!");
         builder.UseSetting("Jwt:Issuer", "AMR.DeliveryPlanning");
         builder.UseSetting("Jwt:Audience", "AMR.DeliveryPlanning.Api");
+
+        builder.ConfigureServices(services =>
+        {
+            // Replace Redis distributed cache with in-memory so tests need no Redis instance.
+            // Route cost cache (15s TTL) still works — just not shared across processes.
+            services.RemoveAll<IDistributedCache>();
+            services.AddDistributedMemoryCache();
+        });
     }
 
-    public async Task InitializeAsync()
+    public async Task InitializeAsync() => await _postgres.StartAsync();
+
+    public async Task<(Guid PickupId, Guid DropId)> CreateStationPairAsync(HttpClient client)
     {
-        await _postgres.StartAsync();
+        var mapResponse = await client.PostAsJsonAsync("/api/facility/maps", new
+        {
+            Name = $"TestMap-{Guid.NewGuid():N}",
+            Version = "1.0",
+            Width = 100.0,
+            Height = 100.0,
+            MapData = "{\"floor\":1}"
+        });
+        await EnsureSuccessAsync(mapResponse, "Create map failed");
+
+        var mapId = await mapResponse.Content.ReadFromJsonAsync<Guid>();
+
+        var pickupResponse = await client.PostAsJsonAsync($"/api/facility/maps/{mapId}/stations", new
+        {
+            Name = $"Pickup-{Guid.NewGuid():N}",
+            X = 10.0,
+            Y = 10.0,
+            Theta = 0.0,
+            Type = 2
+        });
+        await EnsureSuccessAsync(pickupResponse, "Create pickup station failed");
+        var pickupId = await pickupResponse.Content.ReadFromJsonAsync<Guid>();
+
+        var dropResponse = await client.PostAsJsonAsync($"/api/facility/maps/{mapId}/stations", new
+        {
+            Name = $"Drop-{Guid.NewGuid():N}",
+            X = 80.0,
+            Y = 80.0,
+            Theta = 0.0,
+            Type = 3
+        });
+        await EnsureSuccessAsync(dropResponse, "Create drop station failed");
+        var dropId = await dropResponse.Content.ReadFromJsonAsync<Guid>();
+
+        return (pickupId, dropId);
     }
 
-    async Task IAsyncLifetime.DisposeAsync()
+    async Task IAsyncLifetime.DisposeAsync() => await _postgres.DisposeAsync();
+
+    private static async Task EnsureSuccessAsync(HttpResponseMessage response, string message)
     {
-        await _postgres.DisposeAsync();
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"{message}: {(int)response.StatusCode} {response.StatusCode}: {body}");
+        }
     }
 }

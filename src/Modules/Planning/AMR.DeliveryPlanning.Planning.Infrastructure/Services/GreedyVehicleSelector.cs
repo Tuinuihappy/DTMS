@@ -9,8 +9,6 @@ public class GreedyVehicleSelector : IVehicleSelector
     private readonly ICostModelService _costModel;
     private readonly ILogger<GreedyVehicleSelector> _logger;
 
-    private static readonly List<VehicleCandidate> _cachedVehicles = new();
-
     public GreedyVehicleSelector(
         IFleetVehicleProvider fleetProvider,
         ICostModelService costModel,
@@ -21,46 +19,29 @@ public class GreedyVehicleSelector : IVehicleSelector
         _logger = logger;
     }
 
-    public static void UpdateVehicleCache(Guid vehicleId, double distanceToOrigin, double batteryLevel)
-    {
-        _cachedVehicles.RemoveAll(v => v.VehicleId == vehicleId);
-        if (batteryLevel > 20)
-            _cachedVehicles.Add(new VehicleCandidate(vehicleId, distanceToOrigin, batteryLevel));
-    }
-
     public async Task<VehicleCandidate?> SelectBestVehicleAsync(
         Guid pickupStationId,
         string? requiredCapability = null,
         CancellationToken cancellationToken = default)
     {
-        var dbCandidates = await _fleetProvider.GetIdleVehiclesAsync(cancellationToken);
+        var dbCandidates = await _fleetProvider.GetIdleVehiclesAsync(pickupStationId, cancellationToken);
 
-        if (dbCandidates.Count > 0)
+        var filtered = FilterByCapability(dbCandidates, requiredCapability).ToList();
+        var best = SelectByScore(filtered);
+
+        if (best != null)
         {
-            var filtered = FilterByCapability(dbCandidates, requiredCapability).ToList();
-            var best = SelectByScore(filtered);
-
-            if (best != null)
-            {
-                _logger.LogInformation(
-                    "Selected vehicle {VehicleId} (battery={Battery}%, dist={Dist}, capability={Cap})",
-                    best.VehicleId, best.BatteryLevel, best.DistanceToPickup, requiredCapability ?? "any");
-                return best;
-            }
-
-            _logger.LogWarning("No vehicle with capability '{Cap}' found among {Total} idle vehicles",
-                requiredCapability, dbCandidates.Count);
+            _logger.LogInformation(
+                "Selected vehicle {VehicleId} (battery={Battery}%, dist={Dist}, capability={Cap})",
+                best.VehicleId, best.BatteryLevel, best.DistanceToPickup, requiredCapability ?? "any");
+            return best;
         }
 
-        // Fallback to in-memory cache (tests)
-        var cached = FilterByCapability(_cachedVehicles, requiredCapability).ToList();
-        var cachedBest = SelectByScore(cached);
+        _logger.LogWarning(
+            "No available vehicle for pickup station {StationId} (capability={Cap}, idle vehicles={Total})",
+            pickupStationId, requiredCapability ?? "any", dbCandidates.Count);
 
-        if (cachedBest == null)
-            _logger.LogWarning("No available vehicles for pickup station {StationId} (capability={Cap})",
-                pickupStationId, requiredCapability ?? "any");
-
-        return cachedBest;
+        return null;
     }
 
     private VehicleCandidate? SelectByScore(List<VehicleCandidate> candidates)

@@ -23,6 +23,21 @@ public class TripRepository : ITripRepository
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
     }
 
+    public async Task<Trip?> GetTripByTaskIdAsync(Guid taskId, CancellationToken cancellationToken = default)
+    {
+        var tripId = await _context.RobotTasks
+            .Where(rt => rt.Id == taskId)
+            .Select(rt => rt.TripId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (tripId == Guid.Empty) return null;
+
+        return await _context.Trips
+            .Include(t => t.Tasks)
+            .Include(t => t.Events)
+            .FirstOrDefaultAsync(t => t.Id == tripId, cancellationToken);
+    }
+
     public async Task<List<Trip>> GetActiveTripsByVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default)
     {
         return await _context.Trips

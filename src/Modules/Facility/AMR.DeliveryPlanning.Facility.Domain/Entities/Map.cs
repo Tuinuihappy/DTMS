@@ -10,6 +10,8 @@ public class Map : AggregateRoot<Guid>
     public double Width { get; private set; }
     public double Height { get; private set; }
     public string MapData { get; private set; } = string.Empty; // JSON grid representation
+    // RIOT3 map identifier — used by RouteEdgeSyncService to call /api/v4/route/costs/{VendorRef}/...
+    public string? VendorRef { get; private set; }
     
     private readonly List<Station> _stations = new();
     public IReadOnlyCollection<Station> Stations => _stations.AsReadOnly();
@@ -50,6 +52,8 @@ public class Map : AggregateRoot<Guid>
     {
         _zones.Add(zone);
     }
+
+    public void SetVendorRef(string vendorRef) => VendorRef = vendorRef;
 
     public void AddRouteEdge(RouteEdge edge)
     {

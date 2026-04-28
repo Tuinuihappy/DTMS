@@ -1,9 +1,11 @@
 using AMR.DeliveryPlanning.VendorAdapter.Abstractions.Services;
 using AMR.DeliveryPlanning.VendorAdapter.Feeder.Services;
+using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data;
 using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Extensions;
 using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Services;
 using AMR.DeliveryPlanning.VendorAdapter.Riot3.Services;
 using AMR.DeliveryPlanning.VendorAdapter.Simulator.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,6 +15,9 @@ public static class VendorAdapterServiceRegistration
 {
     public static IServiceCollection AddVendorAdapterInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        var connectionString = configuration.GetConnectionString("DefaultConnection");
+        services.AddDbContext<VendorAdapterDbContext>(o => o.UseNpgsql(connectionString));
+
         var riot3BaseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
         var feederBaseUrl = configuration.GetValue<string>("VendorAdapter:Feeder:BaseUrl") ?? "http://localhost:5200";
 
@@ -42,8 +47,8 @@ public static class VendorAdapterServiceRegistration
         // Register the adapter factory
         services.AddScoped<IVendorAdapterFactory, VendorAdapterFactory>();
 
-        // Action catalog (singleton in-memory; swap for DB-backed impl in production)
-        services.AddSingleton<IActionCatalogService, InMemoryActionCatalogService>();
+        // Action catalog — DB-backed, seeded with defaults on first use
+        services.AddScoped<IActionCatalogService, DbActionCatalogService>();
 
         return services;
     }

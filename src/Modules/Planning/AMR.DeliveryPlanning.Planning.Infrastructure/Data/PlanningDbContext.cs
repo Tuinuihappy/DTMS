@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.Planning.Domain.Entities;
+using AMR.DeliveryPlanning.Planning.Infrastructure.Data.Records;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.Planning.Infrastructure.Data;
@@ -13,6 +14,7 @@ public class PlanningDbContext : DbContext
     public DbSet<JobDependency> JobDependencies { get; set; } = null!;
     public DbSet<MilkRunTemplate> MilkRunTemplates { get; set; } = null!;
     public DbSet<MilkRunStop> MilkRunStops { get; set; } = null!;
+    public DbSet<CostModelConfigRecord> CostModelConfigs { get; set; } = null!;
 
     public PlanningDbContext(DbContextOptions<PlanningDbContext> options) : base(options) { }
 
@@ -79,6 +81,13 @@ public class PlanningDbContext : DbContext
         modelBuilder.Entity<MilkRunStop>(builder =>
         {
             builder.HasKey(s => s.Id);
+        });
+
+        modelBuilder.Entity<CostModelConfigRecord>(b =>
+        {
+            b.HasKey(c => c.Id);
+            // null VehicleTypeKey = the global default config
+            b.HasIndex(c => c.VehicleTypeKey).IsUnique().HasFilter("\"VehicleTypeKey\" IS NOT NULL");
         });
     }
 }

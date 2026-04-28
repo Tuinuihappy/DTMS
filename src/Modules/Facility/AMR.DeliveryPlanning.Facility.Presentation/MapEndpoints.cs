@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Facility.Application.Commands.AddStation;
 using AMR.DeliveryPlanning.Facility.Application.Commands.CreateMap;
 using AMR.DeliveryPlanning.Facility.Application.Commands.FacilityResource;
 using AMR.DeliveryPlanning.Facility.Application.Commands.TopologyOverlay;
@@ -32,6 +33,16 @@ public static class MapEndpoints
         });
 
         // ── Stations ───────────────────────────────────────────────────────
+        // POST /api/facility/maps/{mapId}/stations
+        group.MapPost("/maps/{mapId:guid}/stations", async (Guid mapId, AddStationRequest req, ISender sender) =>
+        {
+            var result = await sender.Send(new AddStationCommand(
+                mapId, req.Name, req.X, req.Y, req.Theta, req.Type));
+            return result.IsSuccess
+                ? Results.Created($"/api/facility/stations/{result.Value}", result.Value)
+                : Results.BadRequest(result.Error);
+        });
+
         // GET /api/facility/stations?mapId=&type=&zoneId=&compatibleWith=
         group.MapGet("/stations", async (Guid? mapId, string? type, Guid? zoneId, string? compatibleWith, ISender sender) =>
         {
@@ -81,3 +92,4 @@ public static class MapEndpoints
 }
 
 public record ResourceCommandRequest(string Command);
+public record AddStationRequest(string Name, double X, double Y, double? Theta, StationType Type = StationType.Normal);

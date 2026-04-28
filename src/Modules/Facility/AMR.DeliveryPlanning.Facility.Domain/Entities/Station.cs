@@ -13,8 +13,12 @@ public class Station : Entity<Guid>
     public Coordinate Coordinate { get; private set; } = default!;
     public StationType Type { get; private set; }
     public List<string> CompatibleVehicleTypes { get; private set; } = new();
+    // RIOT3 station identifier — used by RouteEdgeSyncService to call /api/v4/route/costs/.../VendorRef
+    public string? VendorRef { get; private set; }
 
     private Station() { }
+
+    public void SetVendorRef(string vendorRef) => VendorRef = vendorRef;
 
     public Station(Guid id, Guid mapId, string name, Coordinate coordinate, StationType type,
         Guid? zoneId = null, IEnumerable<string>? compatibleVehicleTypes = null) : base(id)

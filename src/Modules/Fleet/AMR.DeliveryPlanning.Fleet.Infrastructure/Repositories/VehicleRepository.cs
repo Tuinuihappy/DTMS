@@ -29,9 +29,12 @@ public class VehicleRepository : IVehicleRepository
 
     public async Task<IReadOnlyList<Vehicle>> GetByGroupAsync(Guid groupId, CancellationToken cancellationToken = default)
     {
-        var groupIdStr = groupId.ToString();
-        return await _dbContext.Vehicles
-            .Where(v => EF.Property<string>(v, "GroupIds").Contains(groupIdStr))
+        return await _dbContext.VehicleGroupMembers
+            .Where(m => m.VehicleGroupId == groupId)
+            .Join(_dbContext.Vehicles,
+                m => m.VehicleId,
+                v => v.Id,
+                (_, v) => v)
             .ToListAsync(cancellationToken);
     }
 
