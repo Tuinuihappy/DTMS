@@ -19,6 +19,7 @@ public static class VendorAdapterServiceRegistration
         services.AddDbContext<VendorAdapterDbContext>(o => o.UseNpgsql(connectionString));
 
         var riot3BaseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
+        var riot3ApiKey = configuration.GetValue<string>("VendorAdapter:Riot3:ApiKey");
         var feederBaseUrl = configuration.GetValue<string>("VendorAdapter:Feeder:BaseUrl") ?? "http://localhost:5200";
 
         // RIOT3 adapter HttpClient with Polly resilience
@@ -26,6 +27,8 @@ public static class VendorAdapterServiceRegistration
         {
             client.BaseAddress = new Uri(riot3BaseUrl);
             client.Timeout = TimeSpan.FromSeconds(30);
+            if (!string.IsNullOrWhiteSpace(riot3ApiKey))
+                client.DefaultRequestHeaders.Add("Authorization", riot3ApiKey);
         })
         .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
         .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());

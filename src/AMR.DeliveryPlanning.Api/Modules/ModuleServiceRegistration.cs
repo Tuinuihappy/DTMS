@@ -55,19 +55,23 @@ public static class ModuleServiceRegistration
         services.AddScoped<IRouteEdgeRepository, RouteEdgeRepository>();
         services.AddScoped<ITopologyOverlayRepository, TopologyOverlayRepository>();
         services.AddScoped<IFacilityResourceRepository, FacilityResourceRepository>();
+        var riot3BaseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
+        var riot3ApiKey = configuration.GetValue<string>("VendorAdapter:Riot3:ApiKey");
         services.AddHttpClient<IFacilityResourceCommandService, Riot3FacilityResourceCommandService>(client =>
         {
-            var baseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
-            client.BaseAddress = new Uri(baseUrl);
+            client.BaseAddress = new Uri(riot3BaseUrl);
+            if (!string.IsNullOrWhiteSpace(riot3ApiKey))
+                client.DefaultRequestHeaders.Add("Authorization", riot3ApiKey);
         });
 
         // Route edge sync — pulls live costs from RIOT3 and upserts into facility.RouteEdges
-        var riot3BaseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
         var syncIntervalMinutes = configuration.GetValue<int>("VendorAdapter:Riot3:RouteSync:IntervalMinutes", 30);
         services.AddHttpClient<IRiot3RouteClient, Riot3RouteClient>(client =>
         {
             client.BaseAddress = new Uri(riot3BaseUrl);
             client.Timeout = TimeSpan.FromSeconds(10);
+            if (!string.IsNullOrWhiteSpace(riot3ApiKey))
+                client.DefaultRequestHeaders.Add("Authorization", riot3ApiKey);
         });
         services.AddHostedService(sp => new RouteEdgeSyncService(
             sp.GetRequiredService<IServiceScopeFactory>(),

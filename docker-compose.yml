@@ -72,7 +72,8 @@ services:
       - RabbitMq__Host=rabbitmq
       - RabbitMq__Username=guest
       - RabbitMq__Password=guest
-      - VendorAdapter__Riot3__BaseUrl=http://host.docker.internal:5100
+      - VendorAdapter__Riot3__BaseUrl=http://10.204.212.28:12000
+      - VendorAdapter__Riot3__ApiKey=***REMOVED_RIOT3_TOKEN***
       - OpenTelemetry__Endpoint=http://jaeger:4317
       # Dev-only placeholder secret — NOT for production (production uses Vault/KMS)
       - Jwt__Secret=dev-only-secret-min-32-chars-placeholder!
