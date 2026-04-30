@@ -14,7 +14,7 @@
 | Production starts with EF migrations, not `EnsureCreated` | ✅ Done — all 8 contexts use `MigrateAsync()`; Production guard throws if no migrations |
 | Tenant-owned data isolated at API, EF query filter, event, consumer | ✅ Done — query filters on 5 aggregate roots; events carry TenantId |
 | Cross-tenant reads/writes covered by automated tests | ✅ Done — 5 cross-tenant isolation tests pass |
-| Readiness integration scenarios run in CI without manual DB setup | ⏳ Partial — harness ready, 20 tests pass; 8 specific scenarios pending (Phase 3) |
+| Readiness integration scenarios run in CI without manual DB setup | ✅ Done — 85 tests pass (8 readiness scenarios + 11 RIOT3 real); Phase 3 complete 2026-04-30 |
 | Staging-like load test proves target throughput | ❌ Pending — Phase 4 |
 | No production secrets committed or defaulted | ✅ Done — H1 fixed; docker-compose has dev placeholder only |
 | `/health` and `/health/ready` reflect process and dependency health | ✅ Done — M2 fixed |
@@ -286,6 +286,78 @@ dotnet test --filter "Category=Riot3Real"
 
 ---
 
+## ⚙️ RIOT3 Production Setup — ต้องทำก่อนใช้งานจริง
+
+Auth และ connectivity พร้อมแล้ว (11/11 tests pass) แต่ต้องทำ 3 ขั้นตอนนี้ก่อน end-to-end จะทำงานได้จริงกับ robot จริง
+
+### 1. ลงทะเบียน Vehicle ให้ตรงกับ RIOT3 Robot
+
+VehicleId ใน app ต้องตรงกับ `deviceKey` ของ robot จริงใน RIOT3:
+
+```bash
+# ดู robot list จาก RIOT3 ก่อน
+curl -H "Authorization: app <token>" http://10.204.212.28:12000/api/v4/robots
+
+# ลงทะเบียนใน app โดยใช้ VehicleName ที่ระบุตัวตนได้
+POST /api/fleet/vehicles
+{
+  "VehicleName": "AMR-01",
+  "VehicleTypeId": "<vehicle-type-id>",
+  "AdapterKey": "riot3"
+}
+# → ได้ vehicleId (Guid) กลับมา ต้องผูกกับ deviceKey ใน RIOT3
+```
+
+> **ข้อจำกัดปัจจุบัน:** app ส่ง `appointVehicleKey = vehicleId.ToString()` ไปใน RIOT3 order
+> แต่ RIOT3 ใช้ `deviceKey` (ซึ่งอาจเป็น string อื่น เช่น "SEER-001")
+> ถ้า key ไม่ตรง RIOT3 จะ return E320003 (vehicle not found) แทนที่จะรัน task
+> → ต้องตกลงกับทีม RIOT3 ว่าจะใช้ Guid ของ app หรือ map deviceKey ที่ฝั่ง vehicle registration
+
+### 2. ตั้ง Webhook Callback URL ใน RIOT3 Admin
+
+RIOT3 ต้อง POST กลับมาที่ app เมื่อ task เสร็จ/ล้มเหลว:
+
+```
+http://<app-host>:<port>/api/webhooks/riot3/notify
+```
+
+ขั้นตอน:
+1. Login http://10.204.212.28:12000 as admin
+2. Settings → Notification / Webhook → Add callback URL
+3. ตั้งเป็น URL ที่ RIOT3 server เข้าถึงได้ (ไม่ใช่ localhost)
+
+> **ถ้ารัน local ระหว่าง dev:** ใช้ [ngrok](https://ngrok.com/) expose port 5219
+> ```bash
+> ngrok http 5219
+> # ใช้ URL ที่ได้ เช่น https://abc123.ngrok.io/api/webhooks/riot3/notify
+> ```
+
+### 3. ยืนยัน Network Path
+
+| ทิศทาง | ต้องการ | สถานะ |
+|---|---|---|
+| App → RIOT3 (10.204.212.28:12000) | ส่ง order/cancel | ✅ ยืนยันแล้ว |
+| RIOT3 → App (webhook) | รับ task complete/failed | ⚠️ ต้องตรวจสอบว่า RIOT3 เข้าถึง app ได้ |
+
+```bash
+# ทดสอบจาก RIOT3 server ว่าเรียก app webhook ได้ไหม
+curl -X POST http://<app-host>:<port>/api/webhooks/riot3/notify \
+     -H "Content-Type: application/json" \
+     -d '{"type":"task","taskEventType":"finished","upperKey":"test-id"}'
+# → ต้องได้ 200 OK
+```
+
+### Checklist ก่อน Go-Live กับ RIOT3
+
+- [ ] ได้รายการ `deviceKey` ของ robot ทุกตัวจากทีม RIOT3
+- [ ] ตัดสินใจ vehicle ID mapping strategy (Guid vs deviceKey)
+- [ ] ลงทะเบียน vehicle ทุกตัวใน app ด้วย `AdapterKey = "riot3"`
+- [ ] ตั้ง webhook callback URL ใน RIOT3 admin
+- [ ] ยืนยัน RIOT3 server POST มาที่ app webhook ได้ (network path open)
+- [ ] ทดสอบ end-to-end: dispatch trip จาก app → robot เคลื่อนที่ → webhook กลับ → trip Completed
+
+---
+
 ## ⏳ Phase 4 — Load & Stress Testing
 
 **Objective:** prove 500 orders/min NFR before launch.
@@ -328,10 +400,10 @@ dotnet test --filter "Category=Riot3Real"
 
 | Phase | Estimate |
 |---|---:|
-| **3 — Integration tests** | **4–6 days** |
+| ~~**3 — Integration tests**~~ | ~~4–6 days~~ → **✅ Done 2026-04-30** |
 | **4 — Load/stress testing** | **2–3 days** |
 | **5 — Release gate** | **1–2 days** |
-| **Total remaining** | **~1.5 weeks** |
+| **Total remaining** | **~1 week** |
 
 ---
 
