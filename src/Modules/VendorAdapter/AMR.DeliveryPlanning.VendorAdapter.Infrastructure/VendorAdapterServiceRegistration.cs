@@ -49,6 +49,7 @@ public static class VendorAdapterServiceRegistration
 
         // Register the adapter factory
         services.AddScoped<IVendorAdapterFactory, VendorAdapterFactory>();
+        services.AddScoped<IVehicleIdentityResolver, VehicleIdentityResolver>();
 
         // Action catalog — DB-backed, seeded with defaults on first use
         services.AddScoped<IActionCatalogService, DbActionCatalogService>();

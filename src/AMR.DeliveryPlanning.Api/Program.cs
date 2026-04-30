@@ -6,6 +6,7 @@ using AMR.DeliveryPlanning.Api.Auth;
 using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
 using AMR.DeliveryPlanning.Api.Middlewares;
 using AMR.DeliveryPlanning.Api.Modules;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +19,8 @@ using OpenTelemetry.Trace;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+var devAuthBypassEnabled = builder.Environment.IsDevelopment()
+    && builder.Configuration.GetValue<bool>("Auth:Disable");
 
 // Add Serilog
 builder.Host.UseSerilog((context, configuration) =>
@@ -32,28 +35,42 @@ builder.Services.AddScoped<TenantContext>();
 builder.Services.AddScoped<AMR.DeliveryPlanning.SharedKernel.Tenancy.ITenantContext>(
     sp => sp.GetRequiredService<TenantContext>());
 
-// Configure JWT Authentication
-var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>();
-builder.Services.AddAuthentication(options =>
+// Configure authentication. Auth:Disable is honored only in Development and
+// supplies a tenant claim so tenant-scoped APIs still behave realistically.
+if (devAuthBypassEnabled)
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-}).AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
+    builder.Services.AddAuthentication(options =>
     {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtSettings?.Issuer ?? "AMR.DeliveryPlanning",
-        ValidAudience = jwtSettings?.Audience ?? "AMR.DeliveryPlanning.Api",
-        IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(
-                jwtSettings?.Secret
-                ?? throw new InvalidOperationException("Jwt:Secret is not configured. Set it via environment variable or dotnet user-secrets.")))
-    };
-});
+        options.DefaultAuthenticateScheme = DevAuthenticationHandler.SchemeName;
+        options.DefaultChallengeScheme = DevAuthenticationHandler.SchemeName;
+    }).AddScheme<AuthenticationSchemeOptions, DevAuthenticationHandler>(
+        DevAuthenticationHandler.SchemeName,
+        _ => { });
+}
+else
+{
+    var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>();
+    builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    }).AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSettings?.Issuer ?? "AMR.DeliveryPlanning",
+            ValidAudience = jwtSettings?.Audience ?? "AMR.DeliveryPlanning.Api",
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(
+                    jwtSettings?.Secret
+                    ?? throw new InvalidOperationException("Jwt:Secret is not configured. Set it via environment variable or dotnet user-secrets.")))
+        };
+    });
+}
 
 // Configure MediatR — scan all module Application assemblies
 builder.Services.AddMediatR(cfg =>

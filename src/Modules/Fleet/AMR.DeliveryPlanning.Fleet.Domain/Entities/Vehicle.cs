@@ -15,15 +15,18 @@ public class Vehicle : AggregateRoot<Guid>
     public bool IsInMaintenance => State == VehicleState.Maintenance;
     // Identifies which vendor adapter handles this vehicle ("riot3" | "feeder" | "sim")
     public string AdapterKey { get; private set; } = "riot3";
+    // External robot identity used by the vendor adapter, for example RIOT3 deviceKey.
+    public string? VendorVehicleKey { get; private set; }
 
     private Vehicle() { }
 
-    public Vehicle(Guid id, Guid tenantId, string vehicleName, Guid vehicleTypeId, string adapterKey = "riot3") : base(id)
+    public Vehicle(Guid id, Guid tenantId, string vehicleName, Guid vehicleTypeId, string adapterKey = "riot3", string? vendorVehicleKey = null) : base(id)
     {
         TenantId = tenantId;
         VehicleName = vehicleName;
         VehicleTypeId = vehicleTypeId;
-        AdapterKey = adapterKey;
+        AdapterKey = NormalizeAdapterKey(adapterKey);
+        VendorVehicleKey = NormalizeVendorVehicleKey(vendorVehicleKey);
         State = VehicleState.Offline;
         BatteryLevel = 100.0;
         CurrentNodeId = null;
@@ -59,4 +62,9 @@ public class Vehicle : AggregateRoot<Guid>
         AddDomainEvent(new VehicleMaintenanceExitedDomainEvent(Id));
     }
 
+    private static string NormalizeAdapterKey(string? adapterKey)
+        => string.IsNullOrWhiteSpace(adapterKey) ? "riot3" : adapterKey.Trim().ToLowerInvariant();
+
+    private static string? NormalizeVendorVehicleKey(string? vendorVehicleKey)
+        => string.IsNullOrWhiteSpace(vendorVehicleKey) ? null : vendorVehicleKey.Trim();
 }

@@ -23,20 +23,23 @@ public class VendorAdapterFactory : IVendorAdapterFactory
     }
 
     public IVehicleCommandService GetAdapterForVehicle(Guid vehicleId)
+        => GetAdapterResolutionForVehicle(vehicleId).Adapter;
+
+    public VehicleAdapterResolution GetAdapterResolutionForVehicle(Guid vehicleId)
     {
         // Look up the adapter key persisted when the vehicle was registered
-        var adapterKey = _fleetDb.Vehicles
+        var vehicleIdentity = _fleetDb.Vehicles
             .Where(v => v.Id == vehicleId)
-            .Select(v => v.AdapterKey)
+            .Select(v => new { v.AdapterKey, v.VendorVehicleKey })
             .FirstOrDefault();
 
-        if (adapterKey != null)
+        if (vehicleIdentity != null)
         {
-            var mapped = ResolveByKey(adapterKey);
+            var mapped = ResolveByKey(vehicleIdentity.AdapterKey);
             if (mapped != null)
             {
-                _logger.LogDebug("Using {Adapter} adapter for vehicle {VehicleId}", adapterKey, vehicleId);
-                return mapped;
+                _logger.LogDebug("Using {Adapter} adapter for vehicle {VehicleId}", vehicleIdentity.AdapterKey, vehicleId);
+                return new VehicleAdapterResolution(mapped, vehicleIdentity.AdapterKey, vehicleIdentity.VendorVehicleKey);
             }
         }
 
@@ -47,7 +50,7 @@ public class VendorAdapterFactory : IVendorAdapterFactory
                       ?? throw new InvalidOperationException($"No VendorAdapter found for vehicle {vehicleId}.");
 
         _logger.LogDebug("Using RIOT3 fallback adapter for vehicle {VehicleId}", vehicleId);
-        return adapter;
+        return new VehicleAdapterResolution(adapter, "riot3", null);
     }
 
     private IVehicleCommandService? ResolveByKey(string key) => key switch

@@ -20,9 +20,11 @@ public class VendorAdapterTaskDispatcher : ITaskDispatcher
 
     public async Task DispatchAsync(Guid vehicleId, RobotTask task, CancellationToken cancellationToken = default)
     {
-        var adapter = _adapterFactory.GetAdapterForVehicle(vehicleId);
+        var resolution = _adapterFactory.GetAdapterResolutionForVehicle(vehicleId);
         var command = MapToVendorCommand(task);
-        var result = await adapter.SendTaskAsync(vehicleId, command, cancellationToken);
+        command.VendorVehicleKey = resolution.VendorVehicleKey;
+
+        var result = await resolution.Adapter.SendTaskAsync(vehicleId, command, cancellationToken);
         if (!result.IsSuccess)
             _logger.LogWarning("Vendor rejected task {TaskId} for vehicle {VehicleId}: {Error}", task.Id, vehicleId, result.Error);
     }

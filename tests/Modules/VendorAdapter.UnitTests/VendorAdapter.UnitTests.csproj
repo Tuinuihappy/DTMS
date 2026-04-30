@@ -18,4 +18,8 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Modules\VendorAdapter\AMR.DeliveryPlanning.VendorAdapter.Riot3\AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj" />
+  </ItemGroup>
+
 </Project>

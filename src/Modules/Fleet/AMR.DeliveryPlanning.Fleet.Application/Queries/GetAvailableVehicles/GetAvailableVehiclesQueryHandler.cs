@@ -20,6 +20,8 @@ internal sealed class GetAvailableVehiclesQueryHandler : IQueryHandler<GetAvaila
             v.Id,
             v.VehicleName,
             v.VehicleTypeId,
+            v.AdapterKey,
+            v.VendorVehicleKey,
             v.State,
             v.BatteryLevel,
             v.CurrentNodeId)).ToList();

@@ -35,6 +35,10 @@ public class FleetDbContext : DbContext
             b.Property(v => v.VehicleName).HasMaxLength(100).IsRequired();
             b.Property(v => v.State).HasConversion<string>().HasMaxLength(20);
             b.Property(v => v.AdapterKey).HasMaxLength(20).IsRequired().HasDefaultValue("riot3");
+            b.Property(v => v.VendorVehicleKey).HasMaxLength(100);
+            b.HasIndex(v => new { v.TenantId, v.AdapterKey, v.VendorVehicleKey })
+             .IsUnique()
+             .HasFilter("\"VendorVehicleKey\" IS NOT NULL");
             b.Ignore(v => v.DomainEvents);
         });
 

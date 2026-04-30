@@ -3,6 +3,7 @@ using AMR.DeliveryPlanning.Fleet.Application.Commands.Maintenance;
 using AMR.DeliveryPlanning.Fleet.Application.Commands.RegisterVehicle;
 using AMR.DeliveryPlanning.Fleet.Application.Commands.UpdateVehicleState;
 using AMR.DeliveryPlanning.Fleet.Application.Commands.VehicleGroup;
+using AMR.DeliveryPlanning.Fleet.Application.Commands.VehicleType;
 using AMR.DeliveryPlanning.Fleet.Application.Queries.GetAvailableVehicles;
 using AMR.DeliveryPlanning.Fleet.Application.Queries.GetFleetKpi;
 using AMR.DeliveryPlanning.Fleet.Domain.Entities;
@@ -18,6 +19,14 @@ public static class VehicleEndpoints
     public static void MapFleetEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/fleet").WithTags("Fleet").RequireAuthorization();
+
+        group.MapPost("/vehicle-types", async (CreateVehicleTypeCommand command, ISender sender) =>
+        {
+            var result = await sender.Send(command);
+            return result.IsSuccess
+                ? Results.Created($"/api/fleet/vehicle-types/{result.Value}", result.Value)
+                : Results.BadRequest(result.Error);
+        });
 
         // ── Vehicles ───────────────────────────────────────────────────────
         group.MapPost("/vehicles", async (RegisterVehicleCommand command, ISender sender) =>

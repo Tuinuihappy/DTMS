@@ -72,8 +72,10 @@ services:
       - RabbitMq__Host=rabbitmq
       - RabbitMq__Username=guest
       - RabbitMq__Password=guest
+      - Auth__Disable=true
+      - Auth__DevTenantId=00000000-0000-0000-0000-000000000001
       - VendorAdapter__Riot3__BaseUrl=http://10.204.212.28:12000
-      - VendorAdapter__Riot3__ApiKey=***REMOVED_RIOT3_TOKEN***
+      - VendorAdapter__Riot3__ApiKey=${RIOT3_API_KEY:-}
       - OpenTelemetry__Endpoint=http://jaeger:4317
       # Dev-only placeholder secret — NOT for production (production uses Vault/KMS)
       - Jwt__Secret=dev-only-secret-min-32-chars-placeholder!

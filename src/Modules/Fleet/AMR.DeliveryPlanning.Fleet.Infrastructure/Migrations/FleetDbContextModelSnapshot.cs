@@ -124,7 +124,15 @@ namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Migrations
                     b.Property<Guid>("VehicleTypeId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("VendorVehicleKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "AdapterKey", "VendorVehicleKey")
+                        .IsUnique()
+                        .HasFilter("\"VendorVehicleKey\" IS NOT NULL");
 
                     b.ToTable("Vehicles", "fleet");
                 });

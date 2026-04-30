@@ -3,6 +3,7 @@ namespace AMR.DeliveryPlanning.VendorAdapter.Abstractions.Models;
 public class RobotTaskCommand
 {
     public Guid TaskId { get; set; }
+    public string? VendorVehicleKey { get; set; }
     public RobotActionType Action { get; set; }
     public string? MapId { get; set; }
     public string? TargetNodeId { get; set; }

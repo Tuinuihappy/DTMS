@@ -131,4 +131,47 @@ public class Riot3WebhookTests : IClassFixture<DtmsWebApplicationFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK,
             "webhook must gracefully handle invalid upperKey without 5xx");
     }
+
+    [Fact]
+    public async Task Notify_VehicleEventWithVendorDeviceKey_MapsToAppVehicleId()
+    {
+        var client = await _factory.GetAuthenticatedClient();
+        var vehicleTypeId = await _factory.CreateVehicleTypeAsync();
+        var deviceKey = $"SEER-{Guid.NewGuid():N}"[..20];
+
+        var regResp = await client.PostAsJsonAsync("/api/fleet/vehicles", new
+        {
+            VehicleName = $"RIOT3-{Guid.NewGuid():N}"[..20],
+            VehicleTypeId = vehicleTypeId,
+            AdapterKey = "riot3",
+            VendorVehicleKey = deviceKey
+        });
+        regResp.IsSuccessStatusCode.Should().BeTrue(
+            $"Vehicle registration failed: {await regResp.Content.ReadAsStringAsync()}");
+        var vehicleId = await regResp.Content.ReadFromJsonAsync<Guid>();
+
+        var response = await client.PostAsJsonAsync("/api/webhooks/riot3/notify", new
+        {
+            type = "vehicle",
+            vehicle = new
+            {
+                deviceKey,
+                batteryLevel = 80,
+                systemState = "IDLE",
+                safetyState = "NORMAL"
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var messages = await db.OutboxMessages
+            .Where(m => m.Type.Contains("VehicleStateChangedIntegrationEvent")
+                     && m.Content.Contains(vehicleId.ToString()))
+            .ToListAsync();
+
+        messages.Should().HaveCount(1,
+            "RIOT3 vehicle deviceKey must be resolved to the app VehicleId before publishing state events");
+    }
 }

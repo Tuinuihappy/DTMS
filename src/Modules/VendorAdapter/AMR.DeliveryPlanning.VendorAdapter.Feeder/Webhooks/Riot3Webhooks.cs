@@ -1,6 +1,7 @@
 using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.Fleet.IntegrationEvents;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using AMR.DeliveryPlanning.VendorAdapter.Abstractions.Services;
 using AMR.DeliveryPlanning.VendorAdapter.Riot3.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -16,7 +17,12 @@ public static class Riot3Webhooks
         var group = app.MapGroup("/api/webhooks/riot3").WithTags("Webhooks");
 
         // Full RIOT3.0 /api/v4/notify endpoint
-        group.MapPost("/notify", async (Riot3NotifyPayload payload, IEventBus eventBus, ILogger<Riot3NotifyPayload> logger) =>
+        group.MapPost("/notify", async (
+            Riot3NotifyPayload payload,
+            IEventBus eventBus,
+            IVehicleIdentityResolver vehicleIdentityResolver,
+            ILogger<Riot3NotifyPayload> logger,
+            CancellationToken cancellationToken) =>
         {
             logger.LogDebug("RIOT3 notify: type={Type} taskEvent={TaskEvent} vehicleEvent={VehicleEvent}",
                 payload.Type, payload.TaskEventType, payload.VehicleEventType);
@@ -32,7 +38,7 @@ public static class Riot3Webhooks
                     break;
 
                 case "vehicle":
-                    await HandleVehicleEvent(payload, eventBus, logger);
+                    await HandleVehicleEvent(payload, eventBus, vehicleIdentityResolver, logger, cancellationToken);
                     break;
 
                 default:
@@ -118,27 +124,39 @@ public static class Riot3Webhooks
         }
     }
 
-    private static async Task HandleVehicleEvent(Riot3NotifyPayload payload, IEventBus eventBus, ILogger logger)
+    private static async Task HandleVehicleEvent(
+        Riot3NotifyPayload payload,
+        IEventBus eventBus,
+        IVehicleIdentityResolver vehicleIdentityResolver,
+        ILogger logger,
+        CancellationToken cancellationToken)
     {
         var vehicle = payload.Vehicle;
-        if (vehicle == null || !Guid.TryParse(vehicle.DeviceKey, out var vehicleId)) return;
+        if (vehicle == null || string.IsNullOrWhiteSpace(vehicle.DeviceKey)) return;
+
+        var vehicleId = await vehicleIdentityResolver.ResolveVehicleIdAsync("riot3", vehicle.DeviceKey, cancellationToken);
+        if (!vehicleId.HasValue)
+        {
+            logger.LogWarning("RIOT3 vehicle event ignored because deviceKey {DeviceKey} is not mapped", vehicle.DeviceKey);
+            return;
+        }
 
         var canonicalState = MapRiotSystemState(vehicle.SystemState);
         var batteryPct = vehicle.BatteryLevel / 100.0;
 
         await eventBus.PublishAsync(new VehicleStateChangedIntegrationEvent(
-            Guid.NewGuid(), DateTime.UtcNow, vehicleId, canonicalState, batteryPct, null));
+            Guid.NewGuid(), DateTime.UtcNow, vehicleId.Value, canonicalState, batteryPct, null));
 
         if (payload.VehicleEventType?.ToLower() == "emergency_triggered" ||
             vehicle.SafetyState?.Contains("EMERGENCY") == true)
         {
-            logger.LogWarning("RIOT3 emergency triggered for vehicle {VehicleId}", vehicleId);
+            logger.LogWarning("RIOT3 emergency triggered for vehicle {VehicleId}", vehicleId.Value);
         }
 
         if (batteryPct < 0.20)
         {
             await eventBus.PublishAsync(new VehicleBatteryLowIntegrationEvent(
-                Guid.NewGuid(), DateTime.UtcNow, vehicleId, Guid.Empty, batteryPct));
+                Guid.NewGuid(), DateTime.UtcNow, vehicleId.Value, Guid.Empty, batteryPct));
         }
     }
 

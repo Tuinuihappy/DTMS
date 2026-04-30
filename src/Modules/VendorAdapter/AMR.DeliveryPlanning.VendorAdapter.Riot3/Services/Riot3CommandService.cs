@@ -20,7 +20,16 @@ public class Riot3CommandService : IVehicleCommandService
 
     public async Task<Result> SendTaskAsync(Guid vehicleId, RobotTaskCommand command, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Sending task {TaskId} ({Action}) to RIOT3 vehicle {VehicleId}", command.TaskId, command.Action, vehicleId);
+        var riot3VehicleKey = command.VendorVehicleKey;
+        if (string.IsNullOrWhiteSpace(riot3VehicleKey))
+        {
+            _logger.LogWarning("RIOT3 vehicle {VehicleId} has no VendorVehicleKey/deviceKey; task {TaskId} was not sent",
+                vehicleId, command.TaskId);
+            return Result.Failure($"RIOT3 vehicle {vehicleId} has no configured VendorVehicleKey/deviceKey.");
+        }
+
+        _logger.LogInformation("Sending task {TaskId} ({Action}) to RIOT3 vehicle {VehicleId} ({DeviceKey})",
+            command.TaskId, command.Action, vehicleId, riot3VehicleKey);
 
         var mission = BuildMission(command);
         var request = new Riot3OrderRequest
@@ -30,7 +39,7 @@ public class Riot3CommandService : IVehicleCommandService
             OrderType = "WORK",
             Priority = 10,
             StructureType = "sequence",
-            AppointVehicleKey = vehicleId.ToString(),
+            AppointVehicleKey = riot3VehicleKey,
             Missions = new List<Riot3Mission> { mission }
         };
 

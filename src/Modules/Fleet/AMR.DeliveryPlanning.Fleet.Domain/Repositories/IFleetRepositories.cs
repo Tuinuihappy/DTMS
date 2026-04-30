@@ -16,6 +16,7 @@ public interface IVehicleTypeRepository
 {
     Task<VehicleType?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task AddAsync(VehicleType vehicleType, CancellationToken cancellationToken = default);
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 
 public interface IChargingPolicyRepository

@@ -23,4 +23,9 @@ public class VehicleTypeRepository : IVehicleTypeRepository
     {
         await _dbContext.VehicleTypes.AddAsync(vehicleType, cancellationToken);
     }
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        return _dbContext.SaveChangesAsync(cancellationToken);
+    }
 }

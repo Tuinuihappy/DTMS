@@ -6,6 +6,8 @@ public record VehicleDto(
     Guid Id,
     string VehicleName,
     Guid VehicleTypeId,
+    string AdapterKey,
+    string? VendorVehicleKey,
     VehicleState State,
     double BatteryLevel,
     Guid? CurrentNodeId);

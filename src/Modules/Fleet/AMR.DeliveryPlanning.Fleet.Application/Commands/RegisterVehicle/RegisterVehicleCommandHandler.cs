@@ -27,7 +27,13 @@ internal sealed class RegisterVehicleCommandHandler : ICommandHandler<RegisterVe
             throw new NotFoundException($"VehicleType with ID {request.VehicleTypeId} not found.");
         }
 
-        var vehicle = new Vehicle(Guid.NewGuid(), _tenantContext.TenantId, request.VehicleName, request.VehicleTypeId, request.AdapterKey);
+        var vehicle = new Vehicle(
+            Guid.NewGuid(),
+            _tenantContext.TenantId,
+            request.VehicleName,
+            request.VehicleTypeId,
+            request.AdapterKey,
+            request.VendorVehicleKey);
 
         await _vehicleRepository.AddAsync(vehicle, cancellationToken);
         await _vehicleRepository.SaveChangesAsync(cancellationToken);

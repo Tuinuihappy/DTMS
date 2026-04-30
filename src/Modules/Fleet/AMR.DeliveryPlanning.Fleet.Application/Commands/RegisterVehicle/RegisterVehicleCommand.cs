@@ -5,4 +5,5 @@ namespace AMR.DeliveryPlanning.Fleet.Application.Commands.RegisterVehicle;
 public record RegisterVehicleCommand(
     string VehicleName,
     Guid VehicleTypeId,
-    string AdapterKey = "riot3") : ICommand<Guid>;
+    string AdapterKey = "riot3",
+    string? VendorVehicleKey = null) : ICommand<Guid>;

@@ -505,5 +505,5 @@ RIOT
 Url: http://10.204.212.28:12000
 Auth: API Key
 Key: Authorization
-Value: ***REMOVED_RIOT3_TOKEN***
+Value: app <token>
 Add to: Header
