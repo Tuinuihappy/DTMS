@@ -5,6 +5,7 @@ using AMR.DeliveryPlanning.SharedKernel.Messaging;
 namespace AMR.DeliveryPlanning.Facility.Application.Queries.GetStations;
 
 public record StationDto(Guid Id, Guid MapId, string Name, StationType Type, double X, double Y, double? Theta,
+    string? VendorRef,
     Guid? ZoneId, List<string> CompatibleVehicleTypes);
 
 public record GetStationsQuery(Guid? MapId, StationType? Type, Guid? ZoneId, string? CompatibleVehicleType) : IQuery<List<StationDto>>;
@@ -20,6 +21,7 @@ public class GetStationsQueryHandler : IQueryHandler<GetStationsQuery, List<Stat
         var dtos = stations.Select(s => new StationDto(
             s.Id, s.MapId, s.Name, s.Type,
             s.Coordinate.X, s.Coordinate.Y, s.Coordinate.Theta,
+            s.VendorRef,
             s.ZoneId, s.CompatibleVehicleTypes)).ToList();
         return Result<List<StationDto>>.Success(dtos);
     }

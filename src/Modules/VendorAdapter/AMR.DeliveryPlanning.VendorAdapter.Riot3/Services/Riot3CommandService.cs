@@ -31,6 +31,15 @@ public class Riot3CommandService : IVehicleCommandService
         _logger.LogInformation("Sending task {TaskId} ({Action}) to RIOT3 vehicle {VehicleId} ({DeviceKey})",
             command.TaskId, command.Action, vehicleId, riot3VehicleKey);
 
+        if (RequiresStationTarget(command)
+            && (string.IsNullOrWhiteSpace(command.MapId) || string.IsNullOrWhiteSpace(command.TargetNodeId)))
+        {
+            _logger.LogWarning(
+                "RIOT3 task {TaskId} ({Action}) has incomplete target: MapId={MapId}, TargetNodeId={TargetNodeId}",
+                command.TaskId, command.Action, command.MapId, command.TargetNodeId);
+            return Result.Failure("RIOT3 MOVE/CHARGE task requires map vendor ref and station vendor ref.");
+        }
+
         var mission = BuildMission(command);
         var request = new Riot3OrderRequest
         {
@@ -152,6 +161,9 @@ public class Riot3CommandService : IVehicleCommandService
             return null;
         }
     }
+
+    private static bool RequiresStationTarget(RobotTaskCommand command)
+        => command.Action is RobotActionType.MOVE or RobotActionType.CHARGE;
 
     private static Riot3Mission BuildMission(RobotTaskCommand command)
     {

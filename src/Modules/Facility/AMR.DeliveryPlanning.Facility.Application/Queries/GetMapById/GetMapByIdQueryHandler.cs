@@ -27,7 +27,8 @@ internal sealed class GetMapByIdQueryHandler : IQueryHandler<GetMapByIdQuery, Ma
             map.Version,
             map.Width,
             map.Height,
-            map.MapData);
+            map.MapData,
+            map.VendorRef);
 
         return Result<MapDto>.Success(mapDto);
     }

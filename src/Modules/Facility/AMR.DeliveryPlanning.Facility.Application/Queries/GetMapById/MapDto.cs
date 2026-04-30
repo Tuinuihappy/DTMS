@@ -6,4 +6,5 @@ public record MapDto(
     string Version,
     double Width,
     double Height,
-    string MapData);
+    string MapData,
+    string? VendorRef);

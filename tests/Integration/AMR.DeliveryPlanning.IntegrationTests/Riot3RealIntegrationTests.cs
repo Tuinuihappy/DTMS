@@ -30,6 +30,9 @@ namespace AMR.DeliveryPlanning.IntegrationTests;
 public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory>, IAsyncLifetime
 {
     private const string Riot3BaseUrl = "http://10.204.212.28:12000";
+    private const string Riot3ApiKey =
+        "***REMOVED_RIOT3_TOKEN***" +
+        ".***REMOVED_RIOT3_TOKEN_PART***";
 
     private readonly DtmsWebApplicationFactory _factory;
     private HttpClient _riot3Client = null!;
@@ -42,9 +45,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
         _riot3Client = new HttpClient { BaseAddress = new Uri(Riot3BaseUrl), Timeout = TimeSpan.FromSeconds(10) };
         // TryAddWithoutValidation bypasses .NET's header validation so custom schemes
         // like "app <jwt>" are sent as-is without being rejected or silently dropped.
-        var riot3ApiKey = Environment.GetEnvironmentVariable("RIOT3_API_KEY");
-        if (!string.IsNullOrWhiteSpace(riot3ApiKey))
-            _riot3Client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
+        _riot3Client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", Riot3ApiKey);
         _riot3Reachable = await CheckConnectivityAsync();
     }
 
@@ -80,7 +81,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
     /// FAILS when token is expired or revoked — request a new token from RIOT3 admin:
     ///   1. Log in to http://10.204.212.28:12000 as admin
     ///   2. Go to Settings → App Management → regenerate token for Delta6FAN1
-    ///   3. Set RIOT3_API_KEY in the environment before running these tests
+    ///   3. Update ApiKey in appsettings.Development.json and Riot3ApiKey constant here
     /// </summary>
     [Fact]
     public async Task Direct_ApiKey_IsAcceptedByRiot3()

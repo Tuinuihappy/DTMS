@@ -23,6 +23,11 @@ internal sealed class CreateMapCommandHandler : ICommandHandler<CreateMapCommand
             request.Height,
             request.MapData);
 
+        if (!string.IsNullOrWhiteSpace(request.VendorRef))
+        {
+            map.SetVendorRef(request.VendorRef.Trim());
+        }
+
         await _mapRepository.AddAsync(map, cancellationToken);
         await _mapRepository.SaveChangesAsync(cancellationToken);
 

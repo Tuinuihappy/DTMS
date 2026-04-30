@@ -9,4 +9,5 @@ public record AddStationCommand(
     double X,
     double Y,
     double? Theta,
-    StationType Type) : ICommand<Guid>;
+    StationType Type,
+    string? VendorRef = null) : ICommand<Guid>;

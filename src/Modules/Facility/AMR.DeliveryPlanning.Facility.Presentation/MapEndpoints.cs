@@ -37,7 +37,7 @@ public static class MapEndpoints
         group.MapPost("/maps/{mapId:guid}/stations", async (Guid mapId, AddStationRequest req, ISender sender) =>
         {
             var result = await sender.Send(new AddStationCommand(
-                mapId, req.Name, req.X, req.Y, req.Theta, req.Type));
+                mapId, req.Name, req.X, req.Y, req.Theta, req.Type, req.VendorRef));
             return result.IsSuccess
                 ? Results.Created($"/api/facility/stations/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
@@ -92,4 +92,5 @@ public static class MapEndpoints
 }
 
 public record ResourceCommandRequest(string Command);
-public record AddStationRequest(string Name, double X, double Y, double? Theta, StationType Type = StationType.Normal);
+public record AddStationRequest(string Name, double X, double Y, double? Theta, StationType Type = StationType.Normal,
+    string? VendorRef = null);

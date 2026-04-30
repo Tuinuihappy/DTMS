@@ -25,6 +25,10 @@ internal sealed class AddStationCommandHandler : ICommandHandler<AddStationComma
 
         var coordinate = new Coordinate(request.X, request.Y, request.Theta);
         var station = new Station(Guid.NewGuid(), request.MapId, request.Name, coordinate, request.Type);
+        if (!string.IsNullOrWhiteSpace(request.VendorRef))
+        {
+            station.SetVendorRef(request.VendorRef.Trim());
+        }
 
         map.AddStation(station);
 

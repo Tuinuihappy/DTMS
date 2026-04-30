@@ -27,7 +27,7 @@ public static class Riot3Webhooks
             logger.LogDebug("RIOT3 notify: type={Type} taskEvent={TaskEvent} vehicleEvent={VehicleEvent}",
                 payload.Type, payload.TaskEventType, payload.VehicleEventType);
 
-            switch (payload.Type?.ToLower())
+            switch (NormalizeNotifyType(payload.Type))
             {
                 case "task":
                     await HandleTaskEvent(payload, eventBus, logger);
@@ -72,6 +72,14 @@ public static class Riot3Webhooks
     }
 
     // ── task event handlers ──────────────────────────────────────────────────
+
+    private static string NormalizeNotifyType(string? type) => type?.Trim().ToLowerInvariant() switch
+    {
+        "task" or "tasknotify" => "task",
+        "subtask" or "subtasknotify" => "subtask",
+        "vehicle" or "vehiclenotify" => "vehicle",
+        var value => value ?? string.Empty
+    };
 
     private static async Task HandleTaskEvent(Riot3NotifyPayload payload, IEventBus eventBus, ILogger logger)
     {
@@ -173,7 +181,7 @@ public static class Riot3Webhooks
     private static string MapRiotSystemState(string? systemState) => systemState?.ToUpper() switch
     {
         "IDLE" => "Idle",
-        "BUSY" => "Moving",
+        "BUSY" or "RUNNING" or "EXECUTING" => "Moving",
         "ERROR" => "Error",
         "CHARGING" => "Charging",
         _ => "Offline"

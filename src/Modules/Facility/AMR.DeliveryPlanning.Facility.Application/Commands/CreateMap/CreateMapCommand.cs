@@ -7,4 +7,5 @@ public record CreateMapCommand(
     string Version,
     double Width,
     double Height,
-    string MapData) : ICommand<Guid>;
+    string MapData,
+    string? VendorRef = null) : ICommand<Guid>;

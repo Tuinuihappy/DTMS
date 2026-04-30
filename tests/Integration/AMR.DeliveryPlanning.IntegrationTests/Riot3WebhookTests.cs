@@ -47,6 +47,32 @@ public class Riot3WebhookTests : IClassFixture<DtmsWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Notify_TaskNotifyAlias_WritesCompletedEventToOutbox()
+    {
+        var client = await _factory.GetAuthenticatedClient();
+        var taskId = Guid.NewGuid();
+
+        var response = await client.PostAsJsonAsync("/api/webhooks/riot3/notify", new
+        {
+            type = "taskNotify",
+            taskEventType = "finished",
+            orderKey = $"ORD-{Guid.NewGuid():N}",
+            upperKey = taskId.ToString()
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var messages = await db.OutboxMessages
+            .Where(m => m.Type.Contains("Riot3TaskCompletedIntegrationEvent")
+                     && m.Content.Contains(taskId.ToString()))
+            .ToListAsync();
+
+        messages.Should().HaveCount(1, "RIOT3 real callbacks use taskNotify as the top-level type");
+    }
+
+    [Fact]
     public async Task Notify_TaskFailed_WritesFailedEventToOutbox()
     {
         var client = await _factory.GetAuthenticatedClient();
@@ -173,5 +199,48 @@ public class Riot3WebhookTests : IClassFixture<DtmsWebApplicationFactory>
 
         messages.Should().HaveCount(1,
             "RIOT3 vehicle deviceKey must be resolved to the app VehicleId before publishing state events");
+    }
+
+    [Fact]
+    public async Task Notify_VehicleNotifyAliasWithExecutingState_MapsToMovingState()
+    {
+        var client = await _factory.GetAuthenticatedClient();
+        var vehicleTypeId = await _factory.CreateVehicleTypeAsync();
+        var deviceKey = $"SEER-{Guid.NewGuid():N}"[..20];
+
+        var regResp = await client.PostAsJsonAsync("/api/fleet/vehicles", new
+        {
+            VehicleName = $"RIOT3-{Guid.NewGuid():N}"[..20],
+            VehicleTypeId = vehicleTypeId,
+            AdapterKey = "riot3",
+            VendorVehicleKey = deviceKey
+        });
+        regResp.IsSuccessStatusCode.Should().BeTrue(
+            $"Vehicle registration failed: {await regResp.Content.ReadAsStringAsync()}");
+        var vehicleId = await regResp.Content.ReadFromJsonAsync<Guid>();
+
+        var response = await client.PostAsJsonAsync("/api/webhooks/riot3/notify", new
+        {
+            type = "vehicleNotify",
+            vehicle = new
+            {
+                deviceKey,
+                batteryLevel = 63,
+                systemState = "EXECUTING",
+                safetyState = "NORMAL"
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var messages = await db.OutboxMessages
+            .Where(m => m.Type.Contains("VehicleStateChangedIntegrationEvent")
+                     && m.Content.Contains(vehicleId.ToString()))
+            .ToListAsync();
+
+        messages.Should().HaveCount(1, "RIOT3 real callbacks use vehicleNotify as the top-level type");
+        messages[0].Content.Should().Contain("\"State\":\"Moving\"");
     }
 }
