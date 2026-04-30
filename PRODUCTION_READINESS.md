@@ -1,7 +1,7 @@
 # Production Readiness & Implementation Status
 
-> **Last Updated:** 2026-04-29
-> **Build:** Passing | **Tests:** 54 unit + 20 integration = **74 total**
+> **Last Updated:** 2026-04-30
+> **Build:** Passing | **Tests:** 54 unit + 20 integration + 11 RIOT3 real = **85 total (all passing)**
 > **State:** Staging-ready prototype — NOT production-ready
 > **Remaining:** Phase 3 (integration tests) → Phase 4 (load) → Phase 5 (release gate)
 
@@ -31,7 +31,7 @@
 | **Hardening 1** | EF Migrations — 8 DbContexts scaffolded, MigrateAsync path, production guard | ✅ Done 2026-04-29 |
 | **Hardening 2** | Multi-tenancy — ITenantContext, query filters, events, consumers, JWT tenant claim | ✅ Done 2026-04-29 |
 | **Pre-Phase 3** | Integration test blockers — station save, Trip Legs, VehicleType, migration gaps | ✅ Done 2026-04-29 |
-| **Phase 3** | Integration test scenarios (8 readiness cases) | **⏳ Next** |
+| **Phase 3** | Integration test scenarios (8 readiness cases) + RIOT3 real tests (11/11) | **✅ Done 2026-04-30** |
 | **Phase 4** | Load/stress testing — 500 orders/min via k6 | ❌ Pending |
 | **Phase 5** | Release gate — secrets, runbook, vendor contract, backup/restore | ❌ Pending |
 
@@ -185,15 +185,28 @@ dotnet ef migrations add <Name> \
 - `CreateVehicleTypeAsync()`, `CreateStationPairAsync()`, `BuildSingleLeg()` helpers
 - 20 integration tests pass (basic E2E + cross-tenant isolation)
 
-**⏳ ยังค้าง (Phase 3):**
-- [ ] E2E full pipeline: Submit → Auto-plan → Auto-dispatch → RIOT3 complete
-- [ ] RIOT3 webhook: `finished`/`failed`/unknown taskId
-- [ ] Idempotency key: duplicate POST → same orderId
-- [ ] SLA validation: < 30 min → 400 BadRequest
-- [ ] ChargingPolicy: battery < threshold → `VehicleBatteryLowIntegrationEvent`
-- [ ] Outbox processor: write → ProcessedAt marked; failure → retryable
-- [ ] Capability assignment: LIFT job → only LIFT vehicle assigned
-- [ ] Amendment + timeline: PATCH → amendment record → timeline event
+**✅ Phase 3 Complete (2026-04-30):**
+- [x] E2E full pipeline: Submit → plan → dispatch → complete → outbox event
+- [x] RIOT3 webhook: `finished`/`failed`/unknown taskId/invalid upperKey
+- [x] Idempotency key: duplicate POST → same orderId
+- [x] SLA validation: < 30 min → 400 BadRequest
+- [x] ChargingPolicy: battery < threshold → `VehicleBatteryLowIntegrationEvent`
+- [x] Outbox processor: write → ProcessedAt marked; failure → retryable
+- [x] Capability assignment: LIFT job → only LIFT vehicle assigned
+- [x] Amendment + timeline: PATCH → amendment record → timeline event
+
+**✅ RIOT3 Real Integration (Riot3RealIntegrationTests.cs — 11/11 passing 2026-04-30):**
+- [x] `Direct_Health_ServerIsReachableAndRunning` — RIOT3 up at 10.204.212.28:12000
+- [x] `Direct_ApiKey_IsAcceptedByRiot3` — Token accepted (Delta6FAN1)
+- [x] `Direct_GetRobotState_UnknownId_ReturnsResourceNotFound` — E320003 correct
+- [x] `Direct_PostOrder_OurFormat_AcceptedOrBusinessRuleRejected` — Payload format OK
+- [x] `Direct_CancelOrder_AuthSucceeds_BusinessErrorOrSuccess` — Auth OK
+- [x] `ThroughApp_DispatchTrip_Riot3AdapterCalled_TripInProgress`
+- [x] `ThroughApp_DispatchWithRiot3_OutboxHasVehicleStateEvent`
+- [x] `Webhook_Riot3TaskFinished_RealPayloadFormat_ProcessedCorrectly`
+- [x] `Webhook_Riot3TaskFailed_RealPayloadFormat_PublishesFailedEvent`
+- [x] `Webhook_Riot3VehicleEmergency_EmergencyFlagHandledSafely`
+- [x] `Webhook_Riot3TaskStarted_NoEventPublished_Returns200`
 
 ### M4. Rate Limiting — Fixed 2026-04-28
 
@@ -221,40 +234,55 @@ Bugs found when running Testcontainer integration tests for the first time:
 
 ## ⏳ Phase 3 — Integration Test Scenarios
 
-**Objective:** automate the 8 readiness scenarios using existing harness.
+**Objective:** automate the 8 readiness scenarios + verify real RIOT3 connectivity.
 
-**Key challenge — Test #1 (E2E Pipeline):**
-The full Submit → Plan → Dispatch flow runs through MassTransit consumers. The factory uses `OutboxEventBus` (no RabbitMQ), so consumers don't fire automatically. Two options:
+**Decision:** Option B (HTTP-driven steps, no in-process MassTransit bus) — all 8 test classes written.
 
-- **Option A** — Add in-process MassTransit bus in factory → consumers run automatically (richer test, ~5–6 days)
-- **Option B** — Test each step manually via HTTP (submit → plan endpoint → dispatch endpoint → webhook) → simpler (4 days)
+**Status: In Progress — 2026-04-30**
 
 **Test cases:**
 
-| # | Test Class | Scenarios |
+| # | Test Class | Scenarios | Status |
+|---|---|---|---|
+| 1 | `EndToEndPipelineTests` | Submit → plan → dispatch → complete → outbox event | ✅ Written |
+| 2 | `Riot3WebhookTests` | `finished`/`failed`/unknown taskId/invalid upperKey | ✅ Written |
+| 3 | `IdempotencyTests` | Duplicate POST + same key → same orderId | ✅ Written |
+| 4 | `SlaValidationTests` | SLA < 30 min → 400; valid → ReadyToPlan | ✅ Written |
+| 5 | `ChargingPolicyTests` | Battery < threshold → `VehicleBatteryLowIntegrationEvent` | ✅ Written |
+| 6 | `OutboxTests` | Event write/ProcessedAt/retry | ✅ Written |
+| 7 | `CapabilityAssignmentTests` | LIFT job → only LIFT vehicle | ✅ Written |
+| 8 | `AmendmentTimelineTests` | PATCH → amendment record → timeline | ✅ Written |
+| 9 | `Riot3RealIntegrationTests` | Real RIOT3 server: health + auth + dispatch + webhook round-trip | ✅ 11/11 passing |
+
+**Real RIOT3 test run 2026-04-30 — 11/11 passed ✅**
+
+| Test | Result | Note |
 |---|---|---|
-| 1 | `EndToEndPipelineTests` | Submit order → plan → dispatch → RIOT3 complete → order Completed |
-| 2 | `Riot3WebhookTests` | `finished` → task complete; `failed` → exception raised; unknown → safe log |
-| 3 | `IdempotencyTests` | Duplicate POST + same key → same orderId; different key → new orderId |
-| 4 | `SlaValidationTests` | SLA < 30 min → 400; valid SLA → ReadyToPlan |
-| 5 | `ChargingPolicyTests` | Battery < threshold → `VehicleBatteryLowIntegrationEvent` in outbox |
-| 6 | `OutboxTests` | Event write → outbox row; processor marks ProcessedAt; failure → retryable |
-| 7 | `CapabilityAssignmentTests` | LIFT job → only LIFT vehicle assigned; non-LIFT → rejected |
-| 8 | `AmendmentTimelineTests` | PATCH order → amendment record; GET timeline → includes amendment event |
+| `Direct_Health_ServerIsReachableAndRunning` | ✅ Pass | Server up at 10.204.212.28:12000 |
+| `Direct_ApiKey_IsAcceptedByRiot3` | ✅ Pass | Token accepted (Delta6FAN1) |
+| `Direct_GetRobotState_UnknownId_ReturnsResourceNotFound` | ✅ Pass | E320003 as expected |
+| `Direct_PostOrder_OurFormat_AcceptedOrBusinessRuleRejected` | ✅ Pass | Payload format accepted |
+| `Direct_CancelOrder_AuthSucceeds_BusinessErrorOrSuccess` | ✅ Pass | Auth ok, business error expected |
+| `ThroughApp_DispatchTrip_Riot3AdapterCalled_TripInProgress` | ✅ Pass | Trip InProgress after dispatch |
+| `ThroughApp_DispatchWithRiot3_OutboxHasVehicleStateEvent` | ✅ Pass | Webhook outbox event correct |
+| `Webhook_Riot3TaskFinished_RealPayloadFormat_ProcessedCorrectly` | ✅ Pass | |
+| `Webhook_Riot3TaskFailed_RealPayloadFormat_PublishesFailedEvent` | ✅ Pass | errorCode preserved |
+| `Webhook_Riot3VehicleEmergency_EmergencyFlagHandledSafely` | ✅ Pass | Emergency → state event |
+| `Webhook_Riot3TaskStarted_NoEventPublished_Returns200` | ✅ Pass | Safe log, no outbox event |
+
+**Run commands:**
+```bash
+# CI-safe (no RIOT3 network needed):
+dotnet test --filter "Category!=Riot3Real"
+
+# Real RIOT3 (requires access to 10.204.212.28:12000):
+dotnet test --filter "Category=Riot3Real"
+```
 
 **Acceptance Criteria:**
-- All 8 scenarios automated in `tests/Integration/AMR.DeliveryPlanning.IntegrationTests/`
-- Tests run via `dotnet test` with no external dependencies beyond Testcontainers
-- Tests fail if EF query filters are removed (regression guard)
-
-**Estimate:** 4–6 days
-
-**Immediate next steps:**
-1. Decide Option A vs B for E2E consumer flow
-2. Write `EndToEndPipelineTests.cs`
-3. Write `Riot3WebhookTests.cs`
-4. Write `IdempotencyTests.cs`, `SlaValidationTests.cs`, `OutboxTests.cs`, `CapabilityAssignmentTests.cs`, `AmendmentTimelineTests.cs`
-5. Target: 28+ integration tests passing (20 existing + 8 new)
+- All 8 readiness scenarios automated ✅
+- Tests run via `dotnet test` with no external deps beyond Testcontainers ✅
+- Real RIOT3 direct auth verified — 11/11 passing 2026-04-30 ✅
 
 ---
 

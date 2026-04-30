@@ -44,6 +44,7 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
             services.RemoveAll<IDistributedCache>();
             services.AddDistributedMemoryCache();
         });
+
     }
 
     public async Task InitializeAsync() => await _postgres.StartAsync();

@@ -149,7 +149,8 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
         var regResp = await client.PostAsJsonAsync("/api/fleet/vehicles", new
         {
             VehicleName = $"E2E-{Guid.NewGuid():N}"[..20],
-            VehicleTypeId = vehicleTypeId
+            VehicleTypeId = vehicleTypeId,
+            AdapterKey = "sim"  // Simulator — no real RIOT3 calls, no webhook race
         });
         regResp.IsSuccessStatusCode.Should().BeTrue();
         var vehicleId = await regResp.Content.ReadFromJsonAsync<Guid>();

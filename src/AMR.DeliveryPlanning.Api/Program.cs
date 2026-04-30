@@ -1,5 +1,6 @@
 using System.Text;
 using System.Threading.RateLimiting;
+using FluentValidation;
 using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using AMR.DeliveryPlanning.Api.Auth;
 using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
@@ -62,7 +63,12 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Dispatch.Application.Commands.DispatchTrip.DispatchTripCommand).Assembly);
+    cfg.AddOpenBehavior(typeof(AMR.DeliveryPlanning.SharedKernel.Behaviors.ValidationBehavior<,>));
 });
+
+// Register FluentValidation validators from all module Application assemblies
+builder.Services.AddValidatorsFromAssembly(typeof(AMR.DeliveryPlanning.Facility.Application.Queries.GetRouteCost.GetRouteCostQuery).Assembly);
+builder.Services.AddValidatorsFromAssembly(typeof(AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly);
 
 // Register all module services (DbContexts, Repositories, Domain Services, HttpClients)
 builder.Services.AddAllModules(builder.Configuration);

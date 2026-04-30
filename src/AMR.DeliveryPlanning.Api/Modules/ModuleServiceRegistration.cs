@@ -61,7 +61,7 @@ public static class ModuleServiceRegistration
         {
             client.BaseAddress = new Uri(riot3BaseUrl);
             if (!string.IsNullOrWhiteSpace(riot3ApiKey))
-                client.DefaultRequestHeaders.Add("Authorization", riot3ApiKey);
+                client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
         });
 
         // Route edge sync — pulls live costs from RIOT3 and upserts into facility.RouteEdges
@@ -71,7 +71,7 @@ public static class ModuleServiceRegistration
             client.BaseAddress = new Uri(riot3BaseUrl);
             client.Timeout = TimeSpan.FromSeconds(10);
             if (!string.IsNullOrWhiteSpace(riot3ApiKey))
-                client.DefaultRequestHeaders.Add("Authorization", riot3ApiKey);
+                client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
         });
         services.AddHostedService(sp => new RouteEdgeSyncService(
             sp.GetRequiredService<IServiceScopeFactory>(),

@@ -1,6 +1,7 @@
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
@@ -10,15 +11,18 @@ public class ReportTaskCompletedCommandHandler : ICommandHandler<ReportTaskCompl
 {
     private readonly ITripRepository _tripRepository;
     private readonly ITaskDispatcher _taskDispatcher;
+    private readonly IEventBus _eventBus;
     private readonly ILogger<ReportTaskCompletedCommandHandler> _logger;
 
     public ReportTaskCompletedCommandHandler(
         ITripRepository tripRepository,
         ITaskDispatcher taskDispatcher,
+        IEventBus eventBus,
         ILogger<ReportTaskCompletedCommandHandler> logger)
     {
         _tripRepository = tripRepository;
         _taskDispatcher = taskDispatcher;
+        _eventBus = eventBus;
         _logger = logger;
     }
 
@@ -33,8 +37,13 @@ public class ReportTaskCompletedCommandHandler : ICommandHandler<ReportTaskCompl
             trip.CompleteTask(request.TaskId);
             await _tripRepository.UpdateAsync(trip, cancellationToken);
 
-            // If trip is still in progress, send the next dispatched task to vendor
-            if (trip.Status == TripStatus.InProgress)
+            if (trip.Status == TripStatus.Completed)
+            {
+                await _eventBus.PublishAsync(new TripCompletedIntegrationEvent(
+                    Guid.NewGuid(), DateTime.UtcNow, trip.TenantId, trip.Id, trip.JobId),
+                    cancellationToken);
+            }
+            else if (trip.Status == TripStatus.InProgress)
             {
                 var nextTask = trip.Tasks
                     .OrderBy(t => t.SequenceOrder)

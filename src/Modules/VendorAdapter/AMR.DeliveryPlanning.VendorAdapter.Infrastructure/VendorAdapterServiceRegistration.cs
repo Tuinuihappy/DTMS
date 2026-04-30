@@ -28,7 +28,7 @@ public static class VendorAdapterServiceRegistration
             client.BaseAddress = new Uri(riot3BaseUrl);
             client.Timeout = TimeSpan.FromSeconds(30);
             if (!string.IsNullOrWhiteSpace(riot3ApiKey))
-                client.DefaultRequestHeaders.Add("Authorization", riot3ApiKey);
+                client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
         })
         .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
         .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());

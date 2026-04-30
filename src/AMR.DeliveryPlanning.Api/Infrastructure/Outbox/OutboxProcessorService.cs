@@ -67,7 +67,13 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
 
                 var payload = JsonSerializer.Deserialize(message.Content, type);
                 if (payload is IIntegrationEvent integrationEvent)
-                    await publisher.Publish(integrationEvent, type, cancellationToken);
+                {
+                    // Per-publish timeout: fail fast when MassTransit bus is unavailable
+                    // (e.g., RabbitMQ not reachable) rather than blocking indefinitely.
+                    using var publishCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    publishCts.CancelAfter(TimeSpan.FromSeconds(10));
+                    await publisher.Publish(integrationEvent, type, publishCts.Token);
+                }
 
                 message.MarkAsProcessed(DateTime.UtcNow);
             }

@@ -59,7 +59,39 @@ public class TripRepository : ITripRepository
 
     public async Task UpdateAsync(Trip trip, CancellationToken cancellationToken = default)
     {
-        _context.Trips.Update(trip);
-        await _context.SaveChangesAsync(cancellationToken);
+        // Direct SQL updates via ExecuteUpdateAsync bypass EF change-tracking.
+        await _context.Trips
+            .Where(t => t.Id == trip.Id)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(t => t.Status, trip.Status)
+                .SetProperty(t => t.CompletedAt, trip.CompletedAt),
+                cancellationToken);
+
+        foreach (var task in trip.Tasks)
+        {
+            await _context.RobotTasks
+                .Where(rt => rt.Id == task.Id)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(rt => rt.Status, task.Status)
+                    .SetProperty(rt => rt.StartedAt, task.StartedAt)
+                    .SetProperty(rt => rt.CompletedAt, task.CompletedAt)
+                    .SetProperty(rt => rt.FailureReason, task.FailureReason),
+                    cancellationToken);
+        }
+
+        // Persist new ExecutionEvents added by domain operations (RecordEvent).
+        // Detach all tracked entities first to avoid stale snapshot conflicts,
+        // then add only new events as fresh Added entities.
+        _context.ChangeTracker.Clear();
+        foreach (var evt in trip.Events)
+        {
+            var existing = await _context.ExecutionEvents
+                .AsNoTracking()
+                .AnyAsync(e => e.Id == evt.Id, cancellationToken);
+            if (!existing)
+                _context.ExecutionEvents.Add(evt);
+        }
+        if (_context.ChangeTracker.HasChanges())
+            await _context.SaveChangesAsync(cancellationToken);
     }
 }

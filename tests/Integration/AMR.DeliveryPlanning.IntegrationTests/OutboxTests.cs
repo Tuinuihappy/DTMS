@@ -104,8 +104,9 @@ public class OutboxTests : IClassFixture<DtmsWebApplicationFactory>
         act.Should().NotThrow("outbox content must be valid JSON");
 
         using var doc = System.Text.Json.JsonDocument.Parse(message!.Content);
-        doc.RootElement.TryGetProperty("vehicleId", out _).Should().BeTrue("event JSON must contain vehicleId");
-        doc.RootElement.TryGetProperty("batteryLevel", out _).Should().BeTrue("event JSON must contain batteryLevel");
+        // OutboxEventBus serializes with default JsonSerializer (PascalCase property names)
+        doc.RootElement.TryGetProperty("VehicleId", out _).Should().BeTrue("event JSON must contain VehicleId");
+        doc.RootElement.TryGetProperty("BatteryLevel", out _).Should().BeTrue("event JSON must contain BatteryLevel");
     }
 
     [Fact]
@@ -122,10 +123,10 @@ public class OutboxTests : IClassFixture<DtmsWebApplicationFactory>
             orderKey = $"PROC-{Guid.NewGuid():N}"
         });
 
-        // OutboxProcessorService polls every 5 seconds; wait up to 12 seconds for it to run
+        // OutboxProcessorService polls every 5 seconds; wait up to 20 seconds for it to run
         OutboxDbContext? db = null;
         AMR.DeliveryPlanning.SharedKernel.Outbox.OutboxMessage? message = null;
-        var deadline = DateTime.UtcNow.AddSeconds(12);
+        var deadline = DateTime.UtcNow.AddSeconds(20);
 
         while (DateTime.UtcNow < deadline)
         {

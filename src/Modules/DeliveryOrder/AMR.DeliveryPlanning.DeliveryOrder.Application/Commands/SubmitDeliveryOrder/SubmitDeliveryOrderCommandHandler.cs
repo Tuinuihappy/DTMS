@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
@@ -9,17 +10,20 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDelivery
 public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryOrderCommand, Guid>
 {
     private readonly IDeliveryOrderRepository _repository;
+    private readonly IOrderAuditEventRepository _auditRepo;
     private readonly IEventBus _eventBus;
     private readonly IStationLookup _stationLookup;
     private readonly ITenantContext _tenantContext;
 
     public SubmitDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
+        IOrderAuditEventRepository auditRepo,
         IEventBus eventBus,
         IStationLookup stationLookup,
         ITenantContext tenantContext)
     {
         _repository = repository;
+        _auditRepo = auditRepo;
         _eventBus = eventBus;
         _stationLookup = stationLookup;
         _tenantContext = tenantContext;
@@ -59,6 +63,12 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
         order.MarkReadyToPlan();
 
         await _repository.AddAsync(order, cancellationToken);
+
+        await _auditRepo.AddAsync(new OrderAuditEvent(
+            order.Id, "OrderSubmitted",
+            $"Order {request.OrderKey} submitted with priority {request.Priority}",
+            _tenantContext.TenantId.ToString()), cancellationToken);
+        await _auditRepo.SaveChangesAsync(cancellationToken);
 
         await _eventBus.PublishAsync(new DeliveryOrderReadyForPlanningIntegrationEvent(
             Guid.NewGuid(),

@@ -130,13 +130,17 @@ public class AmendmentTimelineTests : IClassFixture<DtmsWebApplicationFactory>
     }
 
     [Fact]
-    public async Task GetTimeline_NonExistentOrder_Returns404()
+    public async Task GetTimeline_NonExistentOrder_ReturnsEmptyArray()
     {
         var client = await _factory.GetAuthenticatedClient();
 
         var resp = await client.GetAsync($"/api/delivery-orders/{Guid.NewGuid()}/timeline");
 
-        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        // Timeline query always succeeds — returns empty array for unknown orderId
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        doc.RootElement.GetArrayLength().Should().Be(0, "non-existent order has no timeline entries");
     }
 
     // ── helper ──────────────────────────────────────────────────────────────────
