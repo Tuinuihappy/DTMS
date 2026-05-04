@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.Fleet.Domain.Entities;
+using AMR.DeliveryPlanning.SharedKernel.Outbox;
 using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +16,7 @@ public class FleetDbContext : DbContext
     public DbSet<ChargingPolicy> ChargingPolicies { get; set; } = null!;
     public DbSet<MaintenanceRecord> MaintenanceRecords { get; set; } = null!;
     public DbSet<VehicleGroup> VehicleGroups { get; set; } = null!;
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     internal DbSet<VehicleGroupMember> VehicleGroupMembers { get; set; } = null!;
 
     public FleetDbContext(DbContextOptions<FleetDbContext> options, ITenantContext tenantContext)
@@ -109,6 +111,15 @@ public class FleetDbContext : DbContext
              .WithMany()
              .HasForeignKey(m => m.VehicleId)
              .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OutboxMessage>(b =>
+        {
+            b.ToTable("OutboxMessages");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Type).HasMaxLength(500).IsRequired();
+            b.Property(e => e.Content).HasColumnType("text").IsRequired();
+            b.HasIndex(e => e.ProcessedOnUtc);
         });
 
         base.OnModelCreating(modelBuilder);

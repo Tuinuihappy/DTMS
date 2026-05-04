@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
+using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -60,7 +60,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
     /// <summary>
     /// GET /api/v4/health does NOT require authentication — verifies server is up.
     /// </summary>
-    [Fact]
+    [Riot3RealFact]
     public async Task Direct_Health_ServerIsReachableAndRunning()
     {
         SkipIfUnreachable();
@@ -83,7 +83,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
     ///   2. Go to Settings → App Management → regenerate token for Delta6FAN1
     ///   3. Update ApiKey in appsettings.Development.json and Riot3ApiKey constant here
     /// </summary>
-    [Fact]
+    [Riot3RealFact]
     public async Task Direct_ApiKey_IsAcceptedByRiot3()
     {
         SkipIfUnreachable();
@@ -100,7 +100,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
             $"API key lacks permission. Response: {body}");
     }
 
-    [Fact]
+    [Riot3RealFact]
     public async Task Direct_GetRobotState_UnknownId_ReturnsResourceNotFound()
     {
         SkipIfUnreachable();
@@ -118,7 +118,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
             $"Unknown robot should return E320003 (resource not found). Body: {body}");
     }
 
-    [Fact]
+    [Riot3RealFact]
     public async Task Direct_PostOrder_OurFormat_AcceptedOrBusinessRuleRejected()
     {
         SkipIfUnreachable();
@@ -138,7 +138,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
         // E320003=vehicle not found, E380xxx=business rule — all acceptable; just not auth errors
     }
 
-    [Fact]
+    [Riot3RealFact]
     public async Task Direct_CancelOrder_AuthSucceeds_BusinessErrorOrSuccess()
     {
         SkipIfUnreachable();
@@ -156,7 +156,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
 
     // ── Section 2: Through-app dispatch with real RIOT3 adapter ─────────────────
 
-    [Fact]
+    [Riot3RealFact]
     public async Task ThroughApp_DispatchTrip_Riot3AdapterCalled_TripInProgress()
     {
         SkipIfUnreachable();
@@ -219,7 +219,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
             "Trip must be InProgress even if RIOT3 rejects unknown vehicle — app must handle RIOT3 errors gracefully");
     }
 
-    [Fact]
+    [Riot3RealFact]
     public async Task ThroughApp_DispatchWithRiot3_OutboxHasVehicleStateEvent()
     {
         SkipIfUnreachable();
@@ -243,7 +243,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var messages = await db.OutboxMessages
             .Where(m => m.Type.Contains("VehicleStateChangedIntegrationEvent")
                      && m.Content.Contains(vehicleId.ToString()))
@@ -257,7 +257,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
     // (RIOT3 cannot reach the Testcontainer server directly, so we simulate the
     //  inbound call RIOT3 would make after processing a dispatched task)
 
-    [Fact]
+    [Riot3RealFact]
     public async Task Webhook_Riot3TaskFinished_RealPayloadFormat_ProcessedCorrectly()
     {
         SkipIfUnreachable();
@@ -282,7 +282,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
             "RIOT3 'finished' webhook must be accepted with 200 OK");
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var evt = await db.OutboxMessages
             .Where(m => m.Type.Contains("Riot3TaskCompletedIntegrationEvent")
                      && m.Content.Contains(taskId.ToString()))
@@ -291,7 +291,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
         evt.Should().NotBeNull("finished webhook must publish Riot3TaskCompletedIntegrationEvent");
     }
 
-    [Fact]
+    [Riot3RealFact]
     public async Task Webhook_Riot3TaskFailed_RealPayloadFormat_PublishesFailedEvent()
     {
         SkipIfUnreachable();
@@ -318,7 +318,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
         webhookResp.StatusCode.Should().Be(HttpStatusCode.OK);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var evt = await db.OutboxMessages
             .Where(m => m.Type.Contains("Riot3TaskFailedIntegrationEvent")
                      && m.Content.Contains(taskId.ToString()))
@@ -328,7 +328,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
         evt!.Content.Should().Contain(errorCode, "error code must be preserved in the event");
     }
 
-    [Fact]
+    [Riot3RealFact]
     public async Task Webhook_Riot3VehicleEmergency_EmergencyFlagHandledSafely()
     {
         SkipIfUnreachable();
@@ -357,7 +357,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
             "Emergency event must be accepted gracefully — RIOT3 does not retry on non-200");
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var stateEvt = await db.OutboxMessages
             .Where(m => m.Type.Contains("VehicleStateChangedIntegrationEvent")
                      && m.Content.Contains(vehicleId.ToString()))
@@ -366,7 +366,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
         stateEvt.Should().NotBeNull("emergency vehicle event must still publish VehicleStateChangedIntegrationEvent");
     }
 
-    [Fact]
+    [Riot3RealFact]
     public async Task Webhook_Riot3TaskStarted_NoEventPublished_Returns200()
     {
         SkipIfUnreachable();
@@ -408,7 +408,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
     private void SkipIfUnreachable()
     {
         if (!_riot3Reachable)
-            throw new Exception($"RIOT3 server at {Riot3BaseUrl} is not reachable. " +
+            throw new InvalidOperationException($"RIOT3 server at {Riot3BaseUrl} is not reachable. " +
                 "Run with --filter \"Category=Riot3Real\" only when RIOT3 is accessible.");
     }
 
@@ -431,4 +431,45 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
             }
         }
     };
+}
+
+public sealed class Riot3RealFactAttribute : FactAttribute
+{
+    private const string Riot3BaseUrl = "http://10.204.212.28:12000";
+
+    public Riot3RealFactAttribute()
+    {
+        if (!Riot3Availability.IsReachable)
+        {
+            Skip = $"RIOT3 server at {Riot3BaseUrl} is not reachable. " +
+                "Run with --filter \"Category=Riot3Real\" only when RIOT3 is accessible.";
+        }
+    }
+
+    private static class Riot3Availability
+    {
+        public static readonly bool IsReachable = Check();
+
+        private static bool Check()
+        {
+            try
+            {
+                using var client = new HttpClient
+                {
+                    BaseAddress = new Uri(Riot3BaseUrl),
+                    Timeout = TimeSpan.FromSeconds(2)
+                };
+
+                using var response = client
+                    .GetAsync($"/api/v4/robots/{Guid.NewGuid()}")
+                    .GetAwaiter()
+                    .GetResult();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
 }

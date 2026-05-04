@@ -97,7 +97,18 @@ public class Job : AggregateRoot<Guid>
             throw new InvalidOperationException("Only assigned jobs can be committed.");
 
         Status = JobStatus.Committed;
-        AddDomainEvent(new JobCommittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+        var legs = _legs
+            .OrderBy(l => l.SequenceOrder)
+            .Select(l => new CommittedLegSnapshot(l.FromStationId, l.ToStationId, l.SequenceOrder))
+            .ToList();
+
+        AddDomainEvent(new JobCommittedDomainEvent(
+            Guid.NewGuid(),
+            DateTime.UtcNow,
+            TenantId,
+            Id,
+            AssignedVehicleId!.Value,
+            legs));
     }
 
     /// <summary>

@@ -211,6 +211,37 @@ namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Migrations
                     b.ToTable("VehicleGroupMembers", "fleet");
                 });
 
+            modelBuilder.Entity("AMR.DeliveryPlanning.SharedKernel.Outbox.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("OccurredOnUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ProcessedOnUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessedOnUtc");
+
+                    b.ToTable("OutboxMessages", "fleet");
+                });
+
             modelBuilder.Entity("AMR.DeliveryPlanning.Fleet.Infrastructure.Data.VehicleGroupMember", b =>
                 {
                     b.HasOne("AMR.DeliveryPlanning.Fleet.Domain.Entities.VehicleGroup", null)

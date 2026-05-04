@@ -42,14 +42,14 @@ public static class VendorAdapterServiceRegistration
         .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
         .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
 
-        // Register all command services (resolved by factory)
-        services.AddScoped<IVehicleCommandService, Riot3CommandService>();
-        services.AddScoped<IVehicleCommandService, FeederCommandService>();
-        services.AddScoped<IVehicleCommandService, SimulatorCommandService>();
+        services.AddScoped<SimulatorCommandService>();
 
-        // Register the adapter factory
+        // Register the adapter registry/factory. Adapters are resolved by explicit keys,
+        // never by concrete type name or fallback behavior.
+        services.AddScoped<IVendorAdapterRegistry, VendorAdapterRegistry>();
         services.AddScoped<IVendorAdapterFactory, VendorAdapterFactory>();
         services.AddScoped<IVehicleIdentityResolver, VehicleIdentityResolver>();
+        services.AddScoped<IVendorAdapterOutbox, VendorAdapterOutbox>();
 
         // Action catalog — DB-backed, seeded with defaults on first use
         services.AddScoped<IActionCatalogService, DbActionCatalogService>();

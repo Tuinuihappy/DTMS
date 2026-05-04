@@ -68,7 +68,14 @@ public class DeliveryOrder : AggregateRoot<Guid>
             throw new InvalidOperationException("Only validated orders can be marked ready to plan.");
 
         Status = OrderStatus.ReadyToPlan;
-        AddDomainEvent(new DeliveryOrderReadyToPlanDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+        AddDomainEvent(new DeliveryOrderReadyToPlanDomainEvent(
+            Guid.NewGuid(),
+            DateTime.UtcNow,
+            TenantId,
+            Id,
+            Priority.ToString(),
+            PickupStationId!.Value,
+            DropStationId!.Value));
     }
 
     public void MarkPlanning()

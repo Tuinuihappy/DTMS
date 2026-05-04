@@ -1,6 +1,5 @@
 using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.Fleet.IntegrationEvents;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.VendorAdapter.Abstractions.Services;
 using AMR.DeliveryPlanning.VendorAdapter.Riot3.Models;
 using Microsoft.AspNetCore.Builder;
@@ -19,7 +18,7 @@ public static class Riot3Webhooks
         // Full RIOT3.0 /api/v4/notify endpoint
         group.MapPost("/notify", async (
             Riot3NotifyPayload payload,
-            IEventBus eventBus,
+            IVendorAdapterOutbox outbox,
             IVehicleIdentityResolver vehicleIdentityResolver,
             ILogger<Riot3NotifyPayload> logger,
             CancellationToken cancellationToken) =>
@@ -30,15 +29,15 @@ public static class Riot3Webhooks
             switch (NormalizeNotifyType(payload.Type))
             {
                 case "task":
-                    await HandleTaskEvent(payload, eventBus, logger);
+                    await HandleTaskEvent(payload, outbox, logger, cancellationToken);
                     break;
 
                 case "subtask":
-                    await HandleSubTaskEvent(payload, eventBus, logger);
+                    await HandleSubTaskEvent(payload, outbox, logger, cancellationToken);
                     break;
 
                 case "vehicle":
-                    await HandleVehicleEvent(payload, eventBus, vehicleIdentityResolver, logger, cancellationToken);
+                    await HandleVehicleEvent(payload, outbox, vehicleIdentityResolver, logger, cancellationToken);
                     break;
 
                 default:
@@ -46,19 +45,26 @@ public static class Riot3Webhooks
                     break;
             }
 
+            await outbox.SaveChangesAsync(cancellationToken);
             return Results.Ok();
         });
 
         // Legacy simple status endpoint (kept for backward compatibility)
-        group.MapPost("/status", async (RiotStatusPayload payload, IEventBus eventBus, ILogger<RiotStatusPayload> logger) =>
+        group.MapPost("/status", async (
+            RiotStatusPayload payload,
+            IVendorAdapterOutbox outbox,
+            ILogger<RiotStatusPayload> logger,
+            CancellationToken cancellationToken) =>
         {
             if (!Guid.TryParse(payload.RobotId, out var vehicleId))
                 return Results.BadRequest("Invalid RobotId format.");
 
-            await eventBus.PublishAsync(new VehicleStateChangedIntegrationEvent(
+            await outbox.AddAsync(new VehicleStateChangedIntegrationEvent(
                 Guid.NewGuid(), DateTime.UtcNow, vehicleId,
                 MapRiotState(payload.State), payload.Battery,
-                payload.CurrentNode != null && Guid.TryParse(payload.CurrentNode, out var nodeId) ? nodeId : null));
+                payload.CurrentNode != null && Guid.TryParse(payload.CurrentNode, out var nodeId) ? nodeId : null),
+                cancellationToken);
+            await outbox.SaveChangesAsync(cancellationToken);
 
             return Results.Ok();
         });
@@ -81,7 +87,11 @@ public static class Riot3Webhooks
         var value => value ?? string.Empty
     };
 
-    private static async Task HandleTaskEvent(Riot3NotifyPayload payload, IEventBus eventBus, ILogger logger)
+    private static async Task HandleTaskEvent(
+        Riot3NotifyPayload payload,
+        IVendorAdapterOutbox outbox,
+        ILogger logger,
+        CancellationToken cancellationToken)
     {
         // upperKey = our TaskId (used as idempotency key when submitting)
         if (!Guid.TryParse(payload.UpperKey, out var taskId)) return;
@@ -90,16 +100,16 @@ public static class Riot3Webhooks
         {
             case "finished":
                 logger.LogInformation("RIOT3 task finished: {TaskId}", taskId);
-                await eventBus.PublishAsync(new Riot3TaskCompletedIntegrationEvent(
-                    Guid.NewGuid(), DateTime.UtcNow, taskId, payload.OrderKey ?? string.Empty));
+                await outbox.AddAsync(new Riot3TaskCompletedIntegrationEvent(
+                    Guid.NewGuid(), DateTime.UtcNow, taskId, payload.OrderKey ?? string.Empty), cancellationToken);
                 break;
 
             case "failed":
                 var errorCode = payload.FailResult?.ErrorCode ?? "UNKNOWN";
                 var errorMsg = payload.FailResult?.ErrorMsg ?? "Task failed";
                 logger.LogWarning("RIOT3 task failed: {TaskId} [{Code}] {Msg}", taskId, errorCode, errorMsg);
-                await eventBus.PublishAsync(new Riot3TaskFailedIntegrationEvent(
-                    Guid.NewGuid(), DateTime.UtcNow, taskId, payload.OrderKey ?? string.Empty, errorCode, errorMsg));
+                await outbox.AddAsync(new Riot3TaskFailedIntegrationEvent(
+                    Guid.NewGuid(), DateTime.UtcNow, taskId, payload.OrderKey ?? string.Empty, errorCode, errorMsg), cancellationToken);
                 break;
 
             case "started":
@@ -112,29 +122,33 @@ public static class Riot3Webhooks
         }
     }
 
-    private static async Task HandleSubTaskEvent(Riot3NotifyPayload payload, IEventBus eventBus, ILogger logger)
+    private static async Task HandleSubTaskEvent(
+        Riot3NotifyPayload payload,
+        IVendorAdapterOutbox outbox,
+        ILogger logger,
+        CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(payload.TaskId, out var subTaskId)) return;
 
         switch (payload.TaskEventType?.ToLower())
         {
             case "finished":
-                await eventBus.PublishAsync(new Riot3TaskCompletedIntegrationEvent(
-                    Guid.NewGuid(), DateTime.UtcNow, subTaskId, payload.OrderKey ?? string.Empty));
+                await outbox.AddAsync(new Riot3TaskCompletedIntegrationEvent(
+                    Guid.NewGuid(), DateTime.UtcNow, subTaskId, payload.OrderKey ?? string.Empty), cancellationToken);
                 break;
 
             case "failed":
                 var code = payload.FailResult?.ErrorCode ?? "UNKNOWN";
                 var msg = payload.FailResult?.ErrorMsg ?? "SubTask failed";
-                await eventBus.PublishAsync(new Riot3TaskFailedIntegrationEvent(
-                    Guid.NewGuid(), DateTime.UtcNow, subTaskId, payload.OrderKey ?? string.Empty, code, msg));
+                await outbox.AddAsync(new Riot3TaskFailedIntegrationEvent(
+                    Guid.NewGuid(), DateTime.UtcNow, subTaskId, payload.OrderKey ?? string.Empty, code, msg), cancellationToken);
                 break;
         }
     }
 
     private static async Task HandleVehicleEvent(
         Riot3NotifyPayload payload,
-        IEventBus eventBus,
+        IVendorAdapterOutbox outbox,
         IVehicleIdentityResolver vehicleIdentityResolver,
         ILogger logger,
         CancellationToken cancellationToken)
@@ -152,8 +166,8 @@ public static class Riot3Webhooks
         var canonicalState = MapRiotSystemState(vehicle.SystemState);
         var batteryPct = vehicle.BatteryLevel / 100.0;
 
-        await eventBus.PublishAsync(new VehicleStateChangedIntegrationEvent(
-            Guid.NewGuid(), DateTime.UtcNow, vehicleId.Value, canonicalState, batteryPct, null));
+        await outbox.AddAsync(new VehicleStateChangedIntegrationEvent(
+            Guid.NewGuid(), DateTime.UtcNow, vehicleId.Value, canonicalState, batteryPct, null), cancellationToken);
 
         if (payload.VehicleEventType?.ToLower() == "emergency_triggered" ||
             vehicle.SafetyState?.Contains("EMERGENCY") == true)
@@ -163,8 +177,8 @@ public static class Riot3Webhooks
 
         if (batteryPct < 0.20)
         {
-            await eventBus.PublishAsync(new VehicleBatteryLowIntegrationEvent(
-                Guid.NewGuid(), DateTime.UtcNow, vehicleId.Value, Guid.Empty, batteryPct));
+            await outbox.AddAsync(new VehicleBatteryLowIntegrationEvent(
+                Guid.NewGuid(), DateTime.UtcNow, vehicleId.Value, Guid.Empty, batteryPct), cancellationToken);
         }
     }
 

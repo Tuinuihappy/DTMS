@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.Planning.Domain.Entities;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data.Records;
+using AMR.DeliveryPlanning.SharedKernel.Outbox;
 using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,6 +19,7 @@ public class PlanningDbContext : DbContext
     public DbSet<MilkRunTemplate> MilkRunTemplates { get; set; } = null!;
     public DbSet<MilkRunStop> MilkRunStops { get; set; } = null!;
     public DbSet<CostModelConfigRecord> CostModelConfigs { get; set; } = null!;
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public PlanningDbContext(DbContextOptions<PlanningDbContext> options, ITenantContext tenantContext)
         : base(options)
@@ -41,6 +43,7 @@ public class PlanningDbContext : DbContext
             builder.Property(j => j.TotalWeight);
             builder.Property(j => j.SlaDeadline);
             builder.Property(j => j.PlanningTrace).HasColumnType("text");
+            builder.Ignore(j => j.DomainEvents);
 
             builder.Property(j => j.DerivedFromOrders)
                    .HasColumnType("jsonb");
@@ -97,6 +100,15 @@ public class PlanningDbContext : DbContext
             b.HasKey(c => c.Id);
             // null VehicleTypeKey = the global default config
             b.HasIndex(c => c.VehicleTypeKey).IsUnique().HasFilter("\"VehicleTypeKey\" IS NOT NULL");
+        });
+
+        modelBuilder.Entity<OutboxMessage>(b =>
+        {
+            b.ToTable("OutboxMessages");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Type).HasMaxLength(500).IsRequired();
+            b.Property(e => e.Content).HasColumnType("text").IsRequired();
+            b.HasIndex(e => e.ProcessedOnUtc);
         });
     }
 }

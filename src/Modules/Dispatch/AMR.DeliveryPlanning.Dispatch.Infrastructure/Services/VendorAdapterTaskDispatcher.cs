@@ -1,10 +1,9 @@
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
-using AMR.DeliveryPlanning.Facility.Infrastructure.Data;
+using AMR.DeliveryPlanning.Facility.Application.Services;
 using AMR.DeliveryPlanning.VendorAdapter.Abstractions.Models;
 using AMR.DeliveryPlanning.VendorAdapter.Abstractions.Services;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Services;
@@ -12,22 +11,22 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Services;
 public class VendorAdapterTaskDispatcher : ITaskDispatcher
 {
     private readonly IVendorAdapterFactory _adapterFactory;
-    private readonly FacilityDbContext _facilityDbContext;
+    private readonly IFacilityReadService _facilityReadService;
     private readonly ILogger<VendorAdapterTaskDispatcher> _logger;
 
     public VendorAdapterTaskDispatcher(
         IVendorAdapterFactory adapterFactory,
-        FacilityDbContext facilityDbContext,
+        IFacilityReadService facilityReadService,
         ILogger<VendorAdapterTaskDispatcher> logger)
     {
         _adapterFactory = adapterFactory;
-        _facilityDbContext = facilityDbContext;
+        _facilityReadService = facilityReadService;
         _logger = logger;
     }
 
     public async Task DispatchAsync(Guid vehicleId, RobotTask task, CancellationToken cancellationToken = default)
     {
-        var resolution = _adapterFactory.GetAdapterResolutionForVehicle(vehicleId);
+        var resolution = await _adapterFactory.GetAdapterResolutionForVehicleAsync(vehicleId, cancellationToken);
         var command = await MapToVendorCommandAsync(task, resolution.AdapterKey, cancellationToken);
         if (command is null)
         {
@@ -45,7 +44,7 @@ public class VendorAdapterTaskDispatcher : ITaskDispatcher
 
     public async Task CancelAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
     {
-        var adapter = _adapterFactory.GetAdapterForVehicle(vehicleId);
+        var adapter = await _adapterFactory.GetAdapterForVehicleAsync(vehicleId, cancellationToken);
         var result = await adapter.CancelTaskAsync(vehicleId, taskId, cancellationToken);
         if (!result.IsSuccess)
             _logger.LogWarning("Failed to cancel task {TaskId} for vehicle {VehicleId}: {Error}", taskId, vehicleId, result.Error);
@@ -53,7 +52,7 @@ public class VendorAdapterTaskDispatcher : ITaskDispatcher
 
     public async Task PauseAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
     {
-        var adapter = _adapterFactory.GetAdapterForVehicle(vehicleId);
+        var adapter = await _adapterFactory.GetAdapterForVehicleAsync(vehicleId, cancellationToken);
         var result = await adapter.PauseTaskAsync(vehicleId, taskId, cancellationToken);
         if (!result.IsSuccess)
             _logger.LogWarning("Failed to pause task {TaskId} for vehicle {VehicleId}: {Error}", taskId, vehicleId, result.Error);
@@ -61,7 +60,7 @@ public class VendorAdapterTaskDispatcher : ITaskDispatcher
 
     public async Task ResumeAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
     {
-        var adapter = _adapterFactory.GetAdapterForVehicle(vehicleId);
+        var adapter = await _adapterFactory.GetAdapterForVehicleAsync(vehicleId, cancellationToken);
         var result = await adapter.ResumeTaskAsync(vehicleId, taskId, cancellationToken);
         if (!result.IsSuccess)
             _logger.LogWarning("Failed to resume task {TaskId} for vehicle {VehicleId}: {Error}", taskId, vehicleId, result.Error);
@@ -100,36 +99,19 @@ public class VendorAdapterTaskDispatcher : ITaskDispatcher
             return null;
         }
 
-        var station = await _facilityDbContext.Stations
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == task.TargetStationId.Value, cancellationToken);
-        if (station is null)
+        var vendorTarget = await _facilityReadService.GetStationVendorTargetAsync(
+            task.TargetStationId.Value,
+            cancellationToken);
+        if (vendorTarget is null)
         {
-            _logger.LogError("RIOT3 task {TaskId} target station {StationId} was not found",
+            _logger.LogError(
+                "RIOT3 task {TaskId} requires a station with configured map/station vendor refs; station {StationId}",
                 task.Id, task.TargetStationId.Value);
             return null;
         }
 
-        var map = await _facilityDbContext.Maps
-            .AsNoTracking()
-            .FirstOrDefaultAsync(m => m.Id == station.MapId, cancellationToken);
-        if (map is null)
-        {
-            _logger.LogError("RIOT3 task {TaskId} map {MapId} for station {StationId} was not found",
-                task.Id, station.MapId, station.Id);
-            return null;
-        }
-
-        if (string.IsNullOrWhiteSpace(station.VendorRef) || string.IsNullOrWhiteSpace(map.VendorRef))
-        {
-            _logger.LogError(
-                "RIOT3 task {TaskId} requires vendor refs but map {MapId} VendorRef={MapVendorRef} station {StationId} VendorRef={StationVendorRef}",
-                task.Id, map.Id, map.VendorRef, station.Id, station.VendorRef);
-            return null;
-        }
-
-        command.MapId = map.VendorRef.Trim();
-        command.TargetNodeId = station.VendorRef.Trim();
+        command.MapId = vendorTarget.MapVendorRef;
+        command.TargetNodeId = vendorTarget.StationVendorRef;
         return command;
     }
 

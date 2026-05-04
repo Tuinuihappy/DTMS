@@ -1,6 +1,6 @@
 namespace AMR.DeliveryPlanning.SharedKernel.Domain;
 
-public abstract class AggregateRoot<TId> : Entity<TId>
+public abstract class AggregateRoot<TId> : Entity<TId>, IAggregateRoot
 {
     private readonly List<IDomainEvent> _domainEvents = new();
     

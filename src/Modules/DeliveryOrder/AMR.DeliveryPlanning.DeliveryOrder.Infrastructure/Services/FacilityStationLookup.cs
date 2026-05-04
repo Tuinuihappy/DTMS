@@ -1,16 +1,15 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
-using AMR.DeliveryPlanning.Facility.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
+using AMR.DeliveryPlanning.Facility.Application.Services;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
 
 public class FacilityStationLookup : IStationLookup
 {
-    private readonly FacilityDbContext _facilityDb;
+    private readonly IFacilityReadService _facilityReadService;
 
-    public FacilityStationLookup(FacilityDbContext facilityDb)
-        => _facilityDb = facilityDb;
+    public FacilityStationLookup(IFacilityReadService facilityReadService)
+        => _facilityReadService = facilityReadService;
 
     public Task<bool> ExistsAsync(Guid stationId, CancellationToken ct = default)
-        => _facilityDb.Stations.AnyAsync(s => s.Id == stationId, ct);
+        => _facilityReadService.StationExistsAsync(stationId, ct);
 }

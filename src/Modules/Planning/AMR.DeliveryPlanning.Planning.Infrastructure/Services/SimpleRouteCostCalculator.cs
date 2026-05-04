@@ -1,18 +1,17 @@
-using AMR.DeliveryPlanning.Facility.Infrastructure.Data;
+using AMR.DeliveryPlanning.Facility.Application.Services;
 using AMR.DeliveryPlanning.Planning.Domain.Services;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.Planning.Infrastructure.Services;
 
 public class SimpleRouteCostCalculator : IRouteCostCalculator
 {
-    private readonly FacilityDbContext _facilityDb;
+    private readonly IFacilityReadService _facilityReadService;
     private readonly ILogger<SimpleRouteCostCalculator> _logger;
 
-    public SimpleRouteCostCalculator(FacilityDbContext facilityDb, ILogger<SimpleRouteCostCalculator> logger)
+    public SimpleRouteCostCalculator(IFacilityReadService facilityReadService, ILogger<SimpleRouteCostCalculator> logger)
     {
-        _facilityDb = facilityDb;
+        _facilityReadService = facilityReadService;
         _logger = logger;
     }
 
@@ -21,12 +20,12 @@ public class SimpleRouteCostCalculator : IRouteCostCalculator
         if (fromStationId == Guid.Empty || toStationId == Guid.Empty)
             return 999.0;
 
-        var edge = await _facilityDb.RouteEdges.FirstOrDefaultAsync(e =>
-            (e.SourceStationId == fromStationId && e.TargetStationId == toStationId) ||
-            (e.IsBidirectional && e.SourceStationId == toStationId && e.TargetStationId == fromStationId),
+        var cost = await _facilityReadService.GetRouteCostAsync(
+            fromStationId,
+            toStationId,
             cancellationToken);
 
-        if (edge == null)
+        if (!cost.HasValue)
         {
             _logger.LogWarning(
                 "No RouteEdge found for {From}→{To}. Returning fallback cost 999.0 — " +
@@ -37,9 +36,8 @@ public class SimpleRouteCostCalculator : IRouteCostCalculator
             return 999.0;
         }
 
-        _logger.LogDebug("Route cost {From} → {To}: {Cost} (edge={EdgeId})",
-            fromStationId, toStationId, edge.Cost, edge.Id);
-        return edge.Cost;
+        _logger.LogDebug("Route cost {From} → {To}: {Cost}", fromStationId, toStationId, cost.Value);
+        return cost.Value;
     }
 
     // Sync path used by TSP solver — blocks on the async query (safe in ASP.NET Core, no SynchronizationContext)

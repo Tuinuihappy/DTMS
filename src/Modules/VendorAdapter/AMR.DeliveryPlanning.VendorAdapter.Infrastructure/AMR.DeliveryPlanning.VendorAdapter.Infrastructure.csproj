@@ -21,7 +21,7 @@
     <ProjectReference Include="..\AMR.DeliveryPlanning.VendorAdapter.Feeder\AMR.DeliveryPlanning.VendorAdapter.Feeder.csproj" />
     <ProjectReference Include="..\AMR.DeliveryPlanning.VendorAdapter.Riot3\AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj" />
     <ProjectReference Include="..\AMR.DeliveryPlanning.VendorAdapter.Simulator\AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj" />
-    <ProjectReference Include="..\..\Fleet\AMR.DeliveryPlanning.Fleet.Infrastructure\AMR.DeliveryPlanning.Fleet.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Fleet\AMR.DeliveryPlanning.Fleet.Application\AMR.DeliveryPlanning.Fleet.Application.csproj" />
   </ItemGroup>
 
 </Project>

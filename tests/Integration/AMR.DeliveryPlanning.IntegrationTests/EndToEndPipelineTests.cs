@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
+using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -117,8 +117,8 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
 
         // Verify TripCompletedIntegrationEvent written to outbox
         using var scope = _factory.Services.CreateScope();
-        var outboxDb = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
-        var messages = await outboxDb.OutboxMessages
+        var dispatchDb = scope.ServiceProvider.GetRequiredService<DispatchDbContext>();
+        var messages = await dispatchDb.OutboxMessages
             .Where(m => m.Type.Contains("TripCompletedIntegrationEvent"))
             .ToListAsync();
 

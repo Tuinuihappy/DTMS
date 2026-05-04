@@ -1,5 +1,4 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
-using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 
@@ -8,13 +7,11 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkSubmitDeli
 public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmitDeliveryOrdersCommand, List<Guid>>
 {
     private readonly IDeliveryOrderRepository _repo;
-    private readonly IEventBus _eventBus;
     private readonly ITenantContext _tenantContext;
 
-    public BulkSubmitDeliveryOrdersCommandHandler(IDeliveryOrderRepository repo, IEventBus eventBus, ITenantContext tenantContext)
+    public BulkSubmitDeliveryOrdersCommandHandler(IDeliveryOrderRepository repo, ITenantContext tenantContext)
     {
         _repo = repo;
-        _eventBus = eventBus;
         _tenantContext = tenantContext;
     }
 
@@ -36,21 +33,20 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
             if (cmd.Schedule != null)
                 order.SetRecurringSchedule(cmd.Schedule.CronExpression, cmd.Schedule.ValidFrom, cmd.Schedule.ValidUntil);
 
+            if (!Guid.TryParse(cmd.PickupLocationCode, out var pickupStationId))
+                return Result<List<Guid>>.Failure($"PickupLocationCode '{cmd.PickupLocationCode}' is not a valid station ID (Guid).");
+
+            if (!Guid.TryParse(cmd.DropLocationCode, out var dropStationId))
+                return Result<List<Guid>>.Failure($"DropLocationCode '{cmd.DropLocationCode}' is not a valid station ID (Guid).");
+
+            order.MarkAsValidated(pickupStationId, dropStationId);
+            order.MarkReadyToPlan();
+
             orders.Add(order);
         }
 
         await _repo.AddRangeAsync(orders, cancellationToken);
         await _repo.SaveChangesAsync(cancellationToken);
-
-        foreach (var order in orders)
-        {
-            await _eventBus.PublishAsync(new DeliveryOrderReadyForPlanningIntegrationEvent(
-                Guid.NewGuid(), DateTime.UtcNow,
-                _tenantContext.TenantId,
-                order.Id, order.Priority.ToString(),
-                Guid.Parse(order.PickupLocationCode),
-                Guid.Parse(order.DropLocationCode)), cancellationToken);
-        }
 
         return Result<List<Guid>>.Success(orders.Select(o => o.Id).ToList());
     }

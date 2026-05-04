@@ -9,13 +9,19 @@ public record VehicleRegisteredDomainEvent(Guid VehicleId, string VehicleName) :
     public DateTime OccurredOn { get; init; } = DateTime.UtcNow;
 }
 
-public record VehicleStateChangedDomainEvent(Guid VehicleId, VehicleState OldState, VehicleState NewState, double BatteryLevel) : IDomainEvent
+public record VehicleStateChangedDomainEvent(
+    Guid VehicleId,
+    Guid VehicleTypeId,
+    VehicleState OldState,
+    VehicleState NewState,
+    double BatteryLevel,
+    Guid? CurrentNodeId) : IDomainEvent
 {
     public Guid EventId { get; init; } = Guid.NewGuid();
     public DateTime OccurredOn { get; init; } = DateTime.UtcNow;
 }
 
-public record VehicleMaintenanceEnteredDomainEvent(Guid VehicleId, VehicleState PreviousState) : IDomainEvent
+public record VehicleMaintenanceEnteredDomainEvent(Guid VehicleId, Guid MaintenanceRecordId, VehicleState PreviousState) : IDomainEvent
 {
     public Guid EventId { get; init; } = Guid.NewGuid();
     public DateTime OccurredOn { get; init; } = DateTime.UtcNow;

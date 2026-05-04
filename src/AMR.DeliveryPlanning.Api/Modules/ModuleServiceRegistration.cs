@@ -11,6 +11,7 @@ using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Services;
+using AMR.DeliveryPlanning.Facility.Application.Services;
 using AMR.DeliveryPlanning.Facility.Domain.Repositories;
 using AMR.DeliveryPlanning.Facility.Domain.Services;
 using AMR.DeliveryPlanning.Facility.Infrastructure.Data;
@@ -18,9 +19,11 @@ using AMR.DeliveryPlanning.Facility.Infrastructure.Repositories;
 using AMR.DeliveryPlanning.Facility.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using AMR.DeliveryPlanning.Fleet.Application.Consumers;
+using AMR.DeliveryPlanning.Fleet.Application.Services;
 using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Repositories;
+using AMR.DeliveryPlanning.Fleet.Infrastructure.Services;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.Planning.Domain.Services;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
@@ -55,6 +58,7 @@ public static class ModuleServiceRegistration
         services.AddScoped<IRouteEdgeRepository, RouteEdgeRepository>();
         services.AddScoped<ITopologyOverlayRepository, TopologyOverlayRepository>();
         services.AddScoped<IFacilityResourceRepository, FacilityResourceRepository>();
+        services.AddScoped<IFacilityReadService, FacilityReadService>();
         var riot3BaseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
         var riot3ApiKey = configuration.GetValue<string>("VendorAdapter:Riot3:ApiKey");
         services.AddHttpClient<IFacilityResourceCommandService, Riot3FacilityResourceCommandService>(client =>
@@ -82,15 +86,25 @@ public static class ModuleServiceRegistration
         services.AddHostedService<TopologyOverlayExpiryService>();
 
         // ── Fleet Module ──────────────────────────────────────────────
-        services.AddDbContext<FleetDbContext>(o => o.UseNpgsql(connectionString));
+        services.AddScoped<FleetDomainEventMapper>();
+        services.AddDbContext<FleetDbContext>((sp, o) => o
+            .UseNpgsql(connectionString)
+            .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
+                sp.GetRequiredService<FleetDomainEventMapper>())));
         services.AddScoped<IVehicleRepository, VehicleRepository>();
         services.AddScoped<IVehicleTypeRepository, VehicleTypeRepository>();
         services.AddScoped<IChargingPolicyRepository, ChargingPolicyRepository>();
         services.AddScoped<IMaintenanceRecordRepository, MaintenanceRecordRepository>();
         services.AddScoped<IVehicleGroupRepository, VehicleGroupRepository>();
+        services.AddScoped<IFleetReadService, FleetReadService>();
+        services.AddScoped<IFleetOutbox, FleetOutbox>();
 
         // ── DeliveryOrder Module ──────────────────────────────────────
-        services.AddDbContext<DeliveryOrderDbContext>(o => o.UseNpgsql(connectionString));
+        services.AddScoped<DeliveryOrderDomainEventMapper>();
+        services.AddDbContext<DeliveryOrderDbContext>((sp, o) => o
+            .UseNpgsql(connectionString)
+            .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
+                sp.GetRequiredService<DeliveryOrderDomainEventMapper>())));
         services.AddScoped<IDeliveryOrderRepository, DeliveryOrderRepository>();
         services.AddScoped<IStationLookup, FacilityStationLookup>();
         services.AddScoped<IOrderAmendmentRepository, OrderAmendmentRepository>();
@@ -99,7 +113,11 @@ public static class ModuleServiceRegistration
             configuration.GetSection(DeliveryOrderOptions.SectionName));
 
         // ── Planning Module ───────────────────────────────────────────
-        services.AddDbContext<PlanningDbContext>(o => o.UseNpgsql(connectionString));
+        services.AddScoped<PlanningDomainEventMapper>();
+        services.AddDbContext<PlanningDbContext>((sp, o) => o
+            .UseNpgsql(connectionString)
+            .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
+                sp.GetRequiredService<PlanningDomainEventMapper>())));
         services.AddScoped<IJobRepository, JobRepository>();
         services.AddScoped<ICostModelService, DbCostModelService>();
         services.AddScoped<IVehicleSelector, GreedyVehicleSelector>();
@@ -111,7 +129,11 @@ public static class ModuleServiceRegistration
         services.AddHostedService<SlaRiskBackgroundService>();
 
         // ── Dispatch Module ───────────────────────────────────────────
-        services.AddDbContext<DispatchDbContext>(o => o.UseNpgsql(connectionString));
+        services.AddScoped<DispatchDomainEventMapper>();
+        services.AddDbContext<DispatchDbContext>((sp, o) => o
+            .UseNpgsql(connectionString)
+            .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
+                sp.GetRequiredService<DispatchDomainEventMapper>())));
         services.AddScoped<ITripRepository, TripRepository>();
         services.AddScoped<ITaskDispatcher, VendorAdapterTaskDispatcher>();
 

@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
+using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,7 +33,7 @@ public class OutboxTests : IClassFixture<DtmsWebApplicationFactory>
         });
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
 
         var message = await db.OutboxMessages
             .Where(m => m.Content.Contains(taskId.ToString()))
@@ -59,7 +59,7 @@ public class OutboxTests : IClassFixture<DtmsWebApplicationFactory>
         });
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var message = await db.OutboxMessages
             .Where(m => m.Type.Contains("Riot3TaskFailedIntegrationEvent")
                      && m.Content.Contains(taskId.ToString()))
@@ -91,7 +91,7 @@ public class OutboxTests : IClassFixture<DtmsWebApplicationFactory>
         });
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var message = await db.OutboxMessages
             .Where(m => m.Type.Contains("VehicleBatteryLowIntegrationEvent")
                      && m.Content.Contains(vehicleId.ToString()))
@@ -124,7 +124,7 @@ public class OutboxTests : IClassFixture<DtmsWebApplicationFactory>
         });
 
         // OutboxProcessorService polls every 5 seconds; wait up to 20 seconds for it to run
-        OutboxDbContext? db = null;
+        VendorAdapterDbContext? db = null;
         AMR.DeliveryPlanning.SharedKernel.Outbox.OutboxMessage? message = null;
         var deadline = DateTime.UtcNow.AddSeconds(20);
 
@@ -132,7 +132,7 @@ public class OutboxTests : IClassFixture<DtmsWebApplicationFactory>
         {
             await Task.Delay(500);
             using var scope = _factory.Services.CreateScope();
-            db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+            db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
             message = await db.OutboxMessages
                 .Where(m => m.Type.Contains("Riot3TaskCompletedIntegrationEvent")
                          && m.Content.Contains(taskId.ToString()))
@@ -167,7 +167,7 @@ public class OutboxTests : IClassFixture<DtmsWebApplicationFactory>
         });
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var messages = await db.OutboxMessages
             .Where(m => m.Content.Contains(vehicleId.ToString()))
             .ToListAsync();

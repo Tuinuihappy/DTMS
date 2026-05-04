@@ -44,15 +44,15 @@ public class Vehicle : AggregateRoot<Guid>
         BatteryLevel = batteryLevel;
         CurrentNodeId = currentNodeId;
 
-        AddDomainEvent(new VehicleStateChangedDomainEvent(this.Id, oldState, newState, batteryLevel));
+        AddDomainEvent(new VehicleStateChangedDomainEvent(this.Id, VehicleTypeId, oldState, newState, batteryLevel, currentNodeId));
     }
 
-    public void EnterMaintenance()
+    public void EnterMaintenance(Guid maintenanceRecordId)
     {
         if (IsInMaintenance) throw new InvalidOperationException("Vehicle is already in maintenance.");
         var oldState = State;
         State = VehicleState.Maintenance;
-        AddDomainEvent(new VehicleMaintenanceEnteredDomainEvent(Id, oldState));
+        AddDomainEvent(new VehicleMaintenanceEnteredDomainEvent(Id, maintenanceRecordId, oldState));
     }
 
     public void ExitMaintenance()

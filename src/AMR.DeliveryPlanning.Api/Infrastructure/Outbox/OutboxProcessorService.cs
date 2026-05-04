@@ -1,6 +1,11 @@
 using System.Text.Json;
+using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
+using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
+using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
+using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
 using AMR.DeliveryPlanning.SharedKernel.Domain;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
+using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
@@ -40,10 +45,26 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
     public async Task ProcessUnpublishedEventsAsync(CancellationToken cancellationToken = default)
     {
         using var scope = _scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
         var publisher = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
-        var messages = await db.OutboxMessages
+        await ProcessOutboxAsync<OutboxDbContext>(scope, publisher, "outbox", cancellationToken);
+        await ProcessOutboxAsync<DeliveryOrderDbContext>(scope, publisher, DeliveryOrderDbContext.Schema, cancellationToken);
+        await ProcessOutboxAsync<PlanningDbContext>(scope, publisher, PlanningDbContext.Schema, cancellationToken);
+        await ProcessOutboxAsync<DispatchDbContext>(scope, publisher, DispatchDbContext.Schema, cancellationToken);
+        await ProcessOutboxAsync<FleetDbContext>(scope, publisher, FleetDbContext.Schema, cancellationToken);
+        await ProcessOutboxAsync<VendorAdapterDbContext>(scope, publisher, VendorAdapterDbContext.Schema, cancellationToken);
+    }
+
+    private async Task ProcessOutboxAsync<TDbContext>(
+        IServiceScope scope,
+        IPublishEndpoint publisher,
+        string source,
+        CancellationToken cancellationToken)
+        where TDbContext : DbContext
+    {
+        var db = scope.ServiceProvider.GetRequiredService<TDbContext>();
+
+        var messages = await db.Set<OutboxMessage>()
             .Where(m => m.ProcessedOnUtc == null)
             .OrderBy(m => m.OccurredOnUtc)
             .Take(50)
@@ -51,7 +72,7 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
 
         if (messages.Count == 0) return;
 
-        _logger.LogDebug("Processing {Count} outbox messages", messages.Count);
+        _logger.LogDebug("Processing {Count} outbox messages from {Source}", messages.Count, source);
 
         foreach (var message in messages)
         {
@@ -60,7 +81,7 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
                 var type = Type.GetType(message.Type);
                 if (type == null)
                 {
-                    _logger.LogWarning("Cannot resolve type {Type} for outbox message {Id}", message.Type, message.Id);
+                    _logger.LogWarning("Cannot resolve type {Type} for outbox message {Id} from {Source}", message.Type, message.Id, source);
                     message.MarkAsFailed(DateTime.UtcNow, $"Type not found: {message.Type}");
                     continue;
                 }
@@ -79,7 +100,7 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to publish outbox message {Id}", message.Id);
+                _logger.LogError(ex, "Failed to publish outbox message {Id} from {Source}", message.Id, source);
                 message.MarkAsFailed(DateTime.UtcNow, ex.Message);
             }
         }

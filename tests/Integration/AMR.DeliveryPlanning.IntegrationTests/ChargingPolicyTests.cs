@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
+using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -52,7 +52,7 @@ public class ChargingPolicyTests : IClassFixture<DtmsWebApplicationFactory>
 
         // VehicleBatteryLowIntegrationEvent must appear in outbox
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var messages = await db.OutboxMessages
             .Where(m => m.Type.Contains("VehicleBatteryLowIntegrationEvent")
                      && m.Content.Contains(vehicleId.ToString()))
@@ -85,7 +85,7 @@ public class ChargingPolicyTests : IClassFixture<DtmsWebApplicationFactory>
 
         // No VehicleBatteryLowIntegrationEvent expected
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var count = await db.OutboxMessages
             .CountAsync(m => m.Type.Contains("VehicleBatteryLowIntegrationEvent")
                           && m.Content.Contains(vehicleId.ToString()));
@@ -114,7 +114,7 @@ public class ChargingPolicyTests : IClassFixture<DtmsWebApplicationFactory>
         webhookResp.StatusCode.Should().Be(HttpStatusCode.OK);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var messages = await db.OutboxMessages
             .Where(m => m.Type.Contains("VehicleBatteryLowIntegrationEvent")
                      && m.Content.Contains(vehicleId.ToString()))
@@ -143,7 +143,7 @@ public class ChargingPolicyTests : IClassFixture<DtmsWebApplicationFactory>
 
         // VehicleStateChangedIntegrationEvent is always published for vehicle events
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var messages = await db.OutboxMessages
             .Where(m => m.Type.Contains("VehicleStateChangedIntegrationEvent")
                      && m.Content.Contains(vehicleId.ToString()))

@@ -85,7 +85,7 @@ public class Trip : AggregateRoot<Guid>
             // All tasks done → complete the trip
             Status = TripStatus.Completed;
             CompletedAt = DateTime.UtcNow;
-            AddDomainEvent(new TripCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+            AddDomainEvent(new TripCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, JobId));
             RecordEvent(null, "TripCompleted", null);
         }
     }
@@ -128,7 +128,7 @@ public class Trip : AggregateRoot<Guid>
 
         Status = TripStatus.Cancelled;
         CompletedAt = DateTime.UtcNow;
-        AddDomainEvent(new TripCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+        AddDomainEvent(new TripCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, JobId, reason));
         RecordEvent(null, "TripCancelled", reason);
     }
 
@@ -152,7 +152,7 @@ public class Trip : AggregateRoot<Guid>
     {
         var exception = new TripException(Id, code, severity, detail);
         _exceptions.Add(exception);
-        AddDomainEvent(new ExceptionRaisedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, exception.Id, code, severity));
+        AddDomainEvent(new ExceptionRaisedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, JobId, exception.Id, code, severity, detail));
         RecordEvent(null, "ExceptionRaised", $"[{severity}] {code}: {detail}");
         return exception;
     }

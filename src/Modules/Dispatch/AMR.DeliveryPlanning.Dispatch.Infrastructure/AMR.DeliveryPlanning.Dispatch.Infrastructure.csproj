@@ -3,7 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AMR.DeliveryPlanning.Dispatch.Domain\AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
     <ProjectReference Include="..\AMR.DeliveryPlanning.Dispatch.Application\AMR.DeliveryPlanning.Dispatch.Application.csproj" />
-    <ProjectReference Include="..\..\Facility\AMR.DeliveryPlanning.Facility.Infrastructure\AMR.DeliveryPlanning.Facility.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Facility\AMR.DeliveryPlanning.Facility.Application\AMR.DeliveryPlanning.Facility.Application.csproj" />
     <ProjectReference Include="..\..\VendorAdapter\AMR.DeliveryPlanning.VendorAdapter.Abstractions\AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj" />
   </ItemGroup>
 

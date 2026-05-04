@@ -31,7 +31,6 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
     public async Task AddAsync(Domain.Entities.DeliveryOrder order, CancellationToken cancellationToken = default)
     {
         await _context.DeliveryOrders.AddAsync(order, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task AddRangeAsync(IEnumerable<Domain.Entities.DeliveryOrder> orders, CancellationToken cancellationToken = default)

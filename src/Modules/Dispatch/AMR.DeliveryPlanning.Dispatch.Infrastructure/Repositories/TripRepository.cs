@@ -20,6 +20,8 @@ public class TripRepository : ITripRepository
         return await _context.Trips
             .Include(t => t.Tasks)
             .Include(t => t.Events)
+            .Include(t => t.Exceptions)
+            .Include(t => t.ProofsOfDelivery)
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
     }
 
@@ -40,6 +42,8 @@ public class TripRepository : ITripRepository
             .IgnoreQueryFilters()
             .Include(t => t.Tasks)
             .Include(t => t.Events)
+            .Include(t => t.Exceptions)
+            .Include(t => t.ProofsOfDelivery)
             .FirstOrDefaultAsync(t => t.Id == tripId, cancellationToken);
     }
 
@@ -59,39 +63,87 @@ public class TripRepository : ITripRepository
 
     public async Task UpdateAsync(Trip trip, CancellationToken cancellationToken = default)
     {
-        // Direct SQL updates via ExecuteUpdateAsync bypass EF change-tracking.
-        await _context.Trips
-            .Where(t => t.Id == trip.Id)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(t => t.Status, trip.Status)
-                .SetProperty(t => t.CompletedAt, trip.CompletedAt),
-                cancellationToken);
+        var trackedEntry = _context.ChangeTracker
+            .Entries<Trip>()
+            .FirstOrDefault(e => e.Entity.Id == trip.Id);
 
-        foreach (var task in trip.Tasks)
+        if (trackedEntry == null)
         {
-            await _context.RobotTasks
-                .Where(rt => rt.Id == task.Id)
-                .ExecuteUpdateAsync(s => s
-                    .SetProperty(rt => rt.Status, task.Status)
-                    .SetProperty(rt => rt.StartedAt, task.StartedAt)
-                    .SetProperty(rt => rt.CompletedAt, task.CompletedAt)
-                    .SetProperty(rt => rt.FailureReason, task.FailureReason),
-                    cancellationToken);
+            _context.Trips.Attach(trip);
+            var entry = _context.Entry(trip);
+            entry.Property(t => t.Status).IsModified = true;
+            entry.Property(t => t.StartedAt).IsModified = true;
+            entry.Property(t => t.CompletedAt).IsModified = true;
+
+            foreach (var task in trip.Tasks)
+            {
+                _context.RobotTasks.Attach(task);
+                var taskEntry = _context.Entry(task);
+                taskEntry.Property(t => t.Status).IsModified = true;
+                taskEntry.Property(t => t.StartedAt).IsModified = true;
+                taskEntry.Property(t => t.CompletedAt).IsModified = true;
+                taskEntry.Property(t => t.FailureReason).IsModified = true;
+            }
+
+            foreach (var exception in trip.Exceptions)
+            {
+                _context.TripExceptions.Attach(exception);
+                var exceptionEntry = _context.Entry(exception);
+                exceptionEntry.Property(e => e.Resolution).IsModified = true;
+                exceptionEntry.Property(e => e.ResolvedBy).IsModified = true;
+                exceptionEntry.Property(e => e.ResolvedAt).IsModified = true;
+            }
         }
 
-        // Persist new ExecutionEvents added by domain operations (RecordEvent).
-        // Detach all tracked entities first to avoid stale snapshot conflicts,
-        // then add only new events as fresh Added entities.
-        _context.ChangeTracker.Clear();
-        foreach (var evt in trip.Events)
+        await AddNewExecutionEventsAsync(trip, cancellationToken);
+        await AddNewTripExceptionsAsync(trip, cancellationToken);
+        await AddNewProofsOfDeliveryAsync(trip, cancellationToken);
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task AddNewExecutionEventsAsync(Trip trip, CancellationToken cancellationToken)
+    {
+        foreach (var executionEvent in trip.Events)
         {
-            var existing = await _context.ExecutionEvents
-                .AsNoTracking()
-                .AnyAsync(e => e.Id == evt.Id, cancellationToken);
-            if (!existing)
-                _context.ExecutionEvents.Add(evt);
+            var entry = _context.Entry(executionEvent);
+            if (entry.State == EntityState.Added)
+                continue;
+
+            var exists = await _context.ExecutionEvents
+                .AnyAsync(e => e.Id == executionEvent.Id, cancellationToken);
+            if (!exists)
+                entry.State = EntityState.Added;
         }
-        if (_context.ChangeTracker.HasChanges())
-            await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task AddNewTripExceptionsAsync(Trip trip, CancellationToken cancellationToken)
+    {
+        foreach (var exception in trip.Exceptions)
+        {
+            var entry = _context.Entry(exception);
+            if (entry.State == EntityState.Added)
+                continue;
+
+            var exists = await _context.TripExceptions
+                .AnyAsync(e => e.Id == exception.Id, cancellationToken);
+            if (!exists)
+                entry.State = EntityState.Added;
+        }
+    }
+
+    private async Task AddNewProofsOfDeliveryAsync(Trip trip, CancellationToken cancellationToken)
+    {
+        foreach (var proofOfDelivery in trip.ProofsOfDelivery)
+        {
+            var entry = _context.Entry(proofOfDelivery);
+            if (entry.State == EntityState.Added)
+                continue;
+
+            var exists = await _context.ProofsOfDelivery
+                .AnyAsync(p => p.Id == proofOfDelivery.Id, cancellationToken);
+            if (!exists)
+                entry.State = EntityState.Added;
+        }
     }
 }

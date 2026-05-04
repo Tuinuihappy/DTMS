@@ -1,4 +1,3 @@
-using System.Text.Json;
 using AMR.DeliveryPlanning.SharedKernel.Domain;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
@@ -17,13 +16,7 @@ public class OutboxEventBus : IEventBus
     public async Task PublishAsync<T>(T integrationEvent, CancellationToken cancellationToken = default)
         where T : IIntegrationEvent
     {
-        var message = new OutboxMessage(
-            Guid.NewGuid(),
-            typeof(T).AssemblyQualifiedName!,
-            JsonSerializer.Serialize(integrationEvent),
-            DateTime.UtcNow);
-
-        _outboxDb.OutboxMessages.Add(message);
+        _outboxDb.OutboxMessages.Add(OutboxMessageFactory.FromIntegrationEvent(integrationEvent));
         await _outboxDb.SaveChangesAsync(cancellationToken);
     }
 }

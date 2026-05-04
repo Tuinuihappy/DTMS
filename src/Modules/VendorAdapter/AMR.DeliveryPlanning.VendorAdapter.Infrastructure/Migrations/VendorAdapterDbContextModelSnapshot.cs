@@ -23,6 +23,37 @@ namespace AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("AMR.DeliveryPlanning.SharedKernel.Outbox.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("OccurredOnUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ProcessedOnUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessedOnUtc");
+
+                    b.ToTable("OutboxMessages", "vendoradapter");
+                });
+
             modelBuilder.Entity("AMR.DeliveryPlanning.VendorAdapter.Abstractions.Models.ActionCatalogEntry", b =>
                 {
                     b.Property<Guid>("Id")

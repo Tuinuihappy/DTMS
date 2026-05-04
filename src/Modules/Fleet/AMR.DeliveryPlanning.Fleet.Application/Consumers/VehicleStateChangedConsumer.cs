@@ -1,6 +1,6 @@
+using AMR.DeliveryPlanning.Fleet.Application.Services;
 using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
 using AMR.DeliveryPlanning.Fleet.IntegrationEvents;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
@@ -10,18 +10,18 @@ public class VehicleStateChangedConsumer : IConsumer<VehicleStateChangedIntegrat
 {
     private readonly IVehicleRepository _vehicleRepo;
     private readonly IChargingPolicyRepository _policyRepo;
-    private readonly IEventBus _eventBus;
+    private readonly IFleetOutbox _outbox;
     private readonly ILogger<VehicleStateChangedConsumer> _logger;
 
     public VehicleStateChangedConsumer(
         IVehicleRepository vehicleRepo,
         IChargingPolicyRepository policyRepo,
-        IEventBus eventBus,
+        IFleetOutbox outbox,
         ILogger<VehicleStateChangedConsumer> logger)
     {
         _vehicleRepo = vehicleRepo;
         _policyRepo = policyRepo;
-        _eventBus = eventBus;
+        _outbox = outbox;
         _logger = logger;
     }
 
@@ -40,9 +40,10 @@ public class VehicleStateChangedConsumer : IConsumer<VehicleStateChangedIntegrat
             _logger.LogWarning("Vehicle {VehicleId} battery at {Battery}% — below threshold {Threshold}%",
                 evt.VehicleId, evt.BatteryLevel, policy.LowThresholdPct);
 
-            await _eventBus.PublishAsync(new VehicleBatteryLowIntegrationEvent(
+            await _outbox.AddAsync(new VehicleBatteryLowIntegrationEvent(
                 Guid.NewGuid(), DateTime.UtcNow,
                 evt.VehicleId, vehicle.VehicleTypeId, evt.BatteryLevel), context.CancellationToken);
+            await _outbox.SaveChangesAsync(context.CancellationToken);
         }
     }
 }

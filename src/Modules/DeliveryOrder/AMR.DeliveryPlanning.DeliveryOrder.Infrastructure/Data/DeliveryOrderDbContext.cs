@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
+using AMR.DeliveryPlanning.SharedKernel.Outbox;
 using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +16,7 @@ public class DeliveryOrderDbContext : DbContext
     public DbSet<RecurringSchedule> RecurringSchedules { get; set; } = null!;
     public DbSet<OrderAmendment> OrderAmendments { get; set; } = null!;
     public DbSet<OrderAuditEvent> OrderAuditEvents { get; set; } = null!;
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public DeliveryOrderDbContext(DbContextOptions<DeliveryOrderDbContext> options, ITenantContext tenantContext)
         : base(options)
@@ -37,6 +39,7 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
             b.HasIndex(o => new { o.TenantId, o.OrderKey }).IsUnique();
             b.HasQueryFilter(o => o.TenantId == _tenantContext.TenantId);
+            b.Ignore(o => o.DomainEvents);
 
             b.HasMany(o => o.OrderLines)
              .WithOne()
@@ -80,6 +83,15 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(e => e.Details).HasMaxLength(1000);
             b.Property(e => e.ActorId).HasMaxLength(200);
             b.HasIndex(e => e.DeliveryOrderId);
+        });
+
+        modelBuilder.Entity<OutboxMessage>(b =>
+        {
+            b.ToTable("OutboxMessages");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Type).HasMaxLength(500).IsRequired();
+            b.Property(e => e.Content).HasColumnType("text").IsRequired();
+            b.HasIndex(e => e.ProcessedOnUtc);
         });
     }
 }

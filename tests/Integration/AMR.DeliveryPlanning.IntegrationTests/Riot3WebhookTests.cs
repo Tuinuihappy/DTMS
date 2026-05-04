@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
+using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,7 +35,7 @@ public class Riot3WebhookTests : IClassFixture<DtmsWebApplicationFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var messages = await db.OutboxMessages
             .Where(m => m.Type.Contains("Riot3TaskCompletedIntegrationEvent")
                      && m.Content.Contains(taskId.ToString()))
@@ -63,7 +63,7 @@ public class Riot3WebhookTests : IClassFixture<DtmsWebApplicationFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var messages = await db.OutboxMessages
             .Where(m => m.Type.Contains("Riot3TaskCompletedIntegrationEvent")
                      && m.Content.Contains(taskId.ToString()))
@@ -91,7 +91,7 @@ public class Riot3WebhookTests : IClassFixture<DtmsWebApplicationFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var messages = await db.OutboxMessages
             .Where(m => m.Type.Contains("Riot3TaskFailedIntegrationEvent")
                      && m.Content.Contains(taskId.ToString()))
@@ -119,7 +119,7 @@ public class Riot3WebhookTests : IClassFixture<DtmsWebApplicationFactory>
 
         // No event written to outbox for unrecognised task event types
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var count = await db.OutboxMessages
             .CountAsync(m => m.Content.Contains(taskId.ToString()));
         count.Should().Be(0, "unknown task event type must not produce any outbox event");
@@ -191,7 +191,7 @@ public class Riot3WebhookTests : IClassFixture<DtmsWebApplicationFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var messages = await db.OutboxMessages
             .Where(m => m.Type.Contains("VehicleStateChangedIntegrationEvent")
                      && m.Content.Contains(vehicleId.ToString()))
@@ -234,7 +234,7 @@ public class Riot3WebhookTests : IClassFixture<DtmsWebApplicationFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>();
         var messages = await db.OutboxMessages
             .Where(m => m.Type.Contains("VehicleStateChangedIntegrationEvent")
                      && m.Content.Contains(vehicleId.ToString()))

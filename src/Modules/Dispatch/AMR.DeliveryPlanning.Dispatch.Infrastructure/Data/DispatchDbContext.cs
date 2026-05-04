@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
+using AMR.DeliveryPlanning.SharedKernel.Outbox;
 using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +16,7 @@ public class DispatchDbContext : DbContext
     public DbSet<ExecutionEvent> ExecutionEvents { get; set; } = null!;
     public DbSet<TripException> TripExceptions { get; set; } = null!;
     public DbSet<ProofOfDelivery> ProofsOfDelivery { get; set; } = null!;
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public DispatchDbContext(DbContextOptions<DispatchDbContext> options, ITenantContext tenantContext)
         : base(options)
@@ -32,26 +34,39 @@ public class DispatchDbContext : DbContext
             builder.Property(t => t.TenantId).IsRequired();
             builder.HasQueryFilter(t => t.TenantId == _tenantContext.TenantId);
             builder.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);
+            builder.Ignore(t => t.DomainEvents);
 
             builder.HasMany(t => t.Tasks)
                    .WithOne()
                    .HasForeignKey(rt => rt.TripId)
                    .OnDelete(DeleteBehavior.Cascade);
+            builder.Navigation(t => t.Tasks)
+                   .HasField("_tasks")
+                   .UsePropertyAccessMode(PropertyAccessMode.Field);
 
             builder.HasMany(t => t.Events)
                    .WithOne()
                    .HasForeignKey(e => e.TripId)
                    .OnDelete(DeleteBehavior.Cascade);
+            builder.Navigation(t => t.Events)
+                   .HasField("_events")
+                   .UsePropertyAccessMode(PropertyAccessMode.Field);
 
             builder.HasMany(t => t.Exceptions)
                    .WithOne()
                    .HasForeignKey(e => e.TripId)
                    .OnDelete(DeleteBehavior.Cascade);
+            builder.Navigation(t => t.Exceptions)
+                   .HasField("_exceptions")
+                   .UsePropertyAccessMode(PropertyAccessMode.Field);
 
             builder.HasMany(t => t.ProofsOfDelivery)
                    .WithOne()
                    .HasForeignKey(p => p.TripId)
                    .OnDelete(DeleteBehavior.Cascade);
+            builder.Navigation(t => t.ProofsOfDelivery)
+                   .HasField("_proofs")
+                   .UsePropertyAccessMode(PropertyAccessMode.Field);
         });
 
         modelBuilder.Entity<RobotTask>(builder =>
@@ -88,6 +103,15 @@ public class DispatchDbContext : DbContext
                    .HasConversion(
                        v => string.Join(',', v),
                        v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList());
+        });
+
+        modelBuilder.Entity<OutboxMessage>(builder =>
+        {
+            builder.ToTable("OutboxMessages");
+            builder.HasKey(e => e.Id);
+            builder.Property(e => e.Type).HasMaxLength(500).IsRequired();
+            builder.Property(e => e.Content).HasColumnType("text").IsRequired();
+            builder.HasIndex(e => e.ProcessedOnUtc);
         });
     }
 }
