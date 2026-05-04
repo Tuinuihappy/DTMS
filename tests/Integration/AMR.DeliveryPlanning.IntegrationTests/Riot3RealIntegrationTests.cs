@@ -5,6 +5,7 @@ using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit.Sdk;
 
 namespace AMR.DeliveryPlanning.IntegrationTests;
 
@@ -13,6 +14,10 @@ namespace AMR.DeliveryPlanning.IntegrationTests;
 ///
 /// Run these tests separately:
 ///   dotnet test --filter "Category=Riot3Real"
+///
+/// Configure credentials outside the repo:
+///   RIOT3_API_KEY or VendorAdapter__Riot3__ApiKey
+///   RIOT3_BASE_URL or VendorAdapter__Riot3__BaseUrl
 ///
 /// Exclude from CI (no RIOT3 access):
 ///   dotnet test --filter "Category!=Riot3Real"
@@ -29,11 +34,6 @@ namespace AMR.DeliveryPlanning.IntegrationTests;
 [Trait("Category", "Riot3Real")]
 public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory>, IAsyncLifetime
 {
-    private const string Riot3BaseUrl = "http://10.204.212.28:12000";
-    private const string Riot3ApiKey =
-        "***REMOVED_RIOT3_TOKEN***" +
-        ".***REMOVED_RIOT3_TOKEN_PART***";
-
     private readonly DtmsWebApplicationFactory _factory;
     private HttpClient _riot3Client = null!;
     private bool _riot3Reachable;
@@ -42,10 +42,19 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
 
     public async Task InitializeAsync()
     {
-        _riot3Client = new HttpClient { BaseAddress = new Uri(Riot3BaseUrl), Timeout = TimeSpan.FromSeconds(10) };
+        _riot3Client = new HttpClient
+        {
+            BaseAddress = new Uri(Riot3RealConfiguration.BaseUrl),
+            Timeout = TimeSpan.FromSeconds(10)
+        };
+
         // TryAddWithoutValidation bypasses .NET's header validation so custom schemes
         // like "app <jwt>" are sent as-is without being rejected or silently dropped.
-        _riot3Client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", Riot3ApiKey);
+        if (!string.IsNullOrWhiteSpace(Riot3RealConfiguration.ApiKey))
+        {
+            _riot3Client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", Riot3RealConfiguration.ApiKey);
+        }
+
         _riot3Reachable = await CheckConnectivityAsync();
     }
 
@@ -66,7 +75,12 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
         SkipIfUnreachable();
 
         // Health endpoint is public — no auth header needed
-        using var openClient = new HttpClient { BaseAddress = new Uri(Riot3BaseUrl), Timeout = TimeSpan.FromSeconds(10) };
+        using var openClient = new HttpClient
+        {
+            BaseAddress = new Uri(Riot3RealConfiguration.BaseUrl),
+            Timeout = TimeSpan.FromSeconds(10)
+        };
+
         var response = await openClient.GetAsync("/api/v4/health");
         var body = await response.Content.ReadAsStringAsync();
 
@@ -81,7 +95,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
     /// FAILS when token is expired or revoked — request a new token from RIOT3 admin:
     ///   1. Log in to http://10.204.212.28:12000 as admin
     ///   2. Go to Settings → App Management → regenerate token for Delta6FAN1
-    ///   3. Update ApiKey in appsettings.Development.json and Riot3ApiKey constant here
+    ///   3. Set RIOT3_API_KEY or VendorAdapter__Riot3__ApiKey outside the repo
     /// </summary>
     [Riot3RealFact]
     public async Task Direct_ApiKey_IsAcceptedByRiot3()
@@ -407,8 +421,11 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
 
     private void SkipIfUnreachable()
     {
+        if (!Riot3RealConfiguration.HasApiKey)
+            throw SkipException.ForSkip("RIOT3 API key is not configured. Set RIOT3_API_KEY or VendorAdapter__Riot3__ApiKey.");
+
         if (!_riot3Reachable)
-            throw new InvalidOperationException($"RIOT3 server at {Riot3BaseUrl} is not reachable. " +
+            throw SkipException.ForSkip($"RIOT3 server at {Riot3RealConfiguration.BaseUrl} is not reachable. " +
                 "Run with --filter \"Category=Riot3Real\" only when RIOT3 is accessible.");
     }
 
@@ -435,13 +452,17 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
 
 public sealed class Riot3RealFactAttribute : FactAttribute
 {
-    private const string Riot3BaseUrl = "http://10.204.212.28:12000";
-
     public Riot3RealFactAttribute()
     {
+        if (!Riot3RealConfiguration.HasApiKey)
+        {
+            Skip = "RIOT3 API key is not configured. Set RIOT3_API_KEY or VendorAdapter__Riot3__ApiKey.";
+            return;
+        }
+
         if (!Riot3Availability.IsReachable)
         {
-            Skip = $"RIOT3 server at {Riot3BaseUrl} is not reachable. " +
+            Skip = $"RIOT3 server at {Riot3RealConfiguration.BaseUrl} is not reachable. " +
                 "Run with --filter \"Category=Riot3Real\" only when RIOT3 is accessible.";
         }
     }
@@ -456,7 +477,7 @@ public sealed class Riot3RealFactAttribute : FactAttribute
             {
                 using var client = new HttpClient
                 {
-                    BaseAddress = new Uri(Riot3BaseUrl),
+                    BaseAddress = new Uri(Riot3RealConfiguration.BaseUrl),
                     Timeout = TimeSpan.FromSeconds(2)
                 };
 
@@ -471,5 +492,32 @@ public sealed class Riot3RealFactAttribute : FactAttribute
                 return false;
             }
         }
+    }
+}
+
+internal static class Riot3RealConfiguration
+{
+    public const string DefaultBaseUrl = "http://10.204.212.28:12000";
+
+    public static string BaseUrl =>
+        FirstConfiguredValue("RIOT3_BASE_URL", "VendorAdapter__Riot3__BaseUrl") ?? DefaultBaseUrl;
+
+    public static string? ApiKey =>
+        FirstConfiguredValue("RIOT3_API_KEY", "VendorAdapter__Riot3__ApiKey");
+
+    public static bool HasApiKey => !string.IsNullOrWhiteSpace(ApiKey);
+
+    private static string? FirstConfiguredValue(params string[] names)
+    {
+        foreach (var name in names)
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return null;
     }
 }

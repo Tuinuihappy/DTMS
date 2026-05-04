@@ -1,4 +1,6 @@
-﻿namespace AMR.DeliveryPlanning.ArchitectureTests;
+﻿using System.Text.RegularExpressions;
+
+namespace AMR.DeliveryPlanning.ArchitectureTests;
 
 public class ModuleBoundaryTests
 {
@@ -123,6 +125,25 @@ public class ModuleBoundaryTests
             string.Join('\n', violations));
     }
 
+    [Fact]
+    public void SourceFiles_DoNotContainRiot3AppTokens()
+    {
+        var repoRoot = FindRepoRoot();
+        var tokenPattern = new Regex(@"\bapp\s+eyJ[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+){2}\b", RegexOptions.Compiled);
+
+        var violations = EnumerateSecurityScannedFiles(repoRoot)
+            .Where(path => tokenPattern.IsMatch(File.ReadAllText(path)))
+            .Select(path => Path.GetRelativePath(repoRoot, path))
+            .OrderBy(path => path)
+            .ToList();
+
+        Assert.True(
+            violations.Count == 0,
+            "Source files must not contain RIOT3 app tokens. Store them in environment variables, " +
+            "user-secrets, or a production secret manager instead.\n" +
+            string.Join('\n', violations));
+    }
+
     private static IEnumerable<string> FindForbiddenInfrastructureReferences(string repoRoot, string projectPath)
     {
         var projectModule = GetModuleName(projectPath);
@@ -157,6 +178,54 @@ public class ModuleBoundaryTests
         }
 
         return [];
+    }
+
+    private static IEnumerable<string> EnumerateSecurityScannedFiles(string repoRoot)
+    {
+        var sourceRoots = new[]
+        {
+            repoRoot,
+            Path.Combine(repoRoot, "src"),
+            Path.Combine(repoRoot, "tests")
+        };
+
+        foreach (var root in sourceRoots.Where(Directory.Exists))
+        {
+            foreach (var file in Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories))
+            {
+                if (IsSecurityScannedFile(repoRoot, file))
+                {
+                    yield return file;
+                }
+            }
+        }
+
+        var readme = Path.Combine(repoRoot, "README.md");
+        if (File.Exists(readme))
+        {
+            yield return readme;
+        }
+    }
+
+    private static bool IsSecurityScannedFile(string repoRoot, string path)
+    {
+        var parts = path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (parts.Any(part => part is ".git" or "artifacts" or "bin" or "obj"))
+        {
+            return false;
+        }
+
+        if (Path.GetRelativePath(repoRoot, path).StartsWith("artifacts", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var extension = Path.GetExtension(path);
+        return extension.Equals(".cs", StringComparison.OrdinalIgnoreCase) ||
+               extension.Equals(".json", StringComparison.OrdinalIgnoreCase) ||
+               extension.Equals(".md", StringComparison.OrdinalIgnoreCase) ||
+               extension.Equals(".yml", StringComparison.OrdinalIgnoreCase) ||
+               extension.Equals(".yaml", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string GetModuleName(string path)

@@ -505,5 +505,21 @@ RIOT
 Url: http://10.204.212.28:12000
 Auth: API Key
 Key: Authorization
-Value: ***REMOVED_RIOT3_TOKEN***
+Value: app <RIOT3_APP_TOKEN>
 Add to: Header
+
+Local development:
+
+```bash
+dotnet user-secrets set "VendorAdapter:Riot3:ApiKey" "app <RIOT3_APP_TOKEN>" --project src/AMR.DeliveryPlanning.Api/AMR.DeliveryPlanning.Api.csproj
+dotnet user-secrets set "VendorAdapter:Riot3:BaseUrl" "http://10.204.212.28:12000" --project src/AMR.DeliveryPlanning.Api/AMR.DeliveryPlanning.Api.csproj
+```
+
+CI or shell-based runs:
+
+```bash
+export VendorAdapter__Riot3__ApiKey="app <RIOT3_APP_TOKEN>"
+export VendorAdapter__Riot3__BaseUrl="http://10.204.212.28:12000"
+export RIOT3_API_KEY="$VendorAdapter__Riot3__ApiKey"
+export RIOT3_BASE_URL="$VendorAdapter__Riot3__BaseUrl"
+```
