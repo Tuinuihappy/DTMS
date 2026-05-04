@@ -8,30 +8,25 @@ public class DeliveryOrder : AggregateRoot<Guid>
 {
     public Guid TenantId { get; private set; }
     public string OrderKey { get; private set; } = string.Empty;
-    public string PickupLocationCode { get; private set; } = string.Empty;
-    public string DropLocationCode { get; private set; } = string.Empty;
     public OrderPriority Priority { get; private set; }
     public OrderStatus Status { get; private set; }
     public DateTime? SLA { get; private set; }
 
-    // Mapped later during validation
-    public Guid? PickupStationId { get; private set; }
-    public Guid? DropStationId { get; private set; }
+    private readonly List<DeliveryLeg> _legs = new();
+    public IReadOnlyCollection<DeliveryLeg> Legs => _legs.AsReadOnly();
 
-    private readonly List<OrderLine> _orderLines = new();
-    public IReadOnlyCollection<OrderLine> OrderLines => _orderLines.AsReadOnly();
+    public IReadOnlyCollection<OrderLine> AllOrderLines =>
+        _legs.SelectMany(l => l.OrderLines).ToList().AsReadOnly();
 
     public RecurringSchedule? Schedule { get; private set; }
 
     private DeliveryOrder() { } // For EF Core
 
-    public DeliveryOrder(Guid tenantId, string orderKey, string pickupLocationCode, string dropLocationCode, OrderPriority priority, DateTime? sla)
+    public DeliveryOrder(Guid tenantId, string orderKey, OrderPriority priority, DateTime? sla)
     {
         Id = Guid.NewGuid();
         TenantId = tenantId;
         OrderKey = orderKey;
-        PickupLocationCode = pickupLocationCode;
-        DropLocationCode = dropLocationCode;
         Priority = priority;
         SLA = sla;
         Status = OrderStatus.Submitted;
@@ -39,10 +34,27 @@ public class DeliveryOrder : AggregateRoot<Guid>
         AddDomainEvent(new DeliveryOrderSubmittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, OrderKey));
     }
 
-    public void AddOrderLine(string itemCode, double quantity, double weight, string? remarks = null)
+    public void AddOrderLine(string pickupLocationCode, string dropLocationCode,
+        int workOrderId, string workOrder, int itemId, string itemNumber,
+        string itemDescription, double quantity, double weight, string? remarks = null)
     {
-        var line = new OrderLine(Id, itemCode, quantity, weight, remarks);
-        _orderLines.Add(line);
+        var leg = _legs.FirstOrDefault(l =>
+            l.PickupLocationCode == pickupLocationCode &&
+            l.DropLocationCode == dropLocationCode);
+
+        if (leg is null)
+        {
+            leg = new DeliveryLeg(Id, _legs.Count + 1, pickupLocationCode, dropLocationCode);
+            _legs.Add(leg);
+        }
+
+        leg.AddItem(workOrderId, workOrder, itemId, itemNumber, itemDescription, quantity, weight, remarks);
+    }
+
+    public void UpdateAllItemStatuses(Enums.OrderLineStatus status)
+    {
+        foreach (var leg in _legs)
+            leg.UpdateAllItemStatuses(status);
     }
 
     public void SetRecurringSchedule(string cronExpression, DateTime? validFrom, DateTime? validUntil)
@@ -50,15 +62,19 @@ public class DeliveryOrder : AggregateRoot<Guid>
         Schedule = new RecurringSchedule(Id, cronExpression, validFrom, validUntil);
     }
 
-    public void MarkAsValidated(Guid pickupStationId, Guid dropStationId)
+    public void MarkAsValidated(IReadOnlyDictionary<(string pickup, string drop), (Guid pickupStationId, Guid dropStationId)> stationMap)
     {
         if (Status != OrderStatus.Submitted)
             throw new InvalidOperationException("Only submitted orders can be validated.");
 
-        PickupStationId = pickupStationId;
-        DropStationId = dropStationId;
-        Status = OrderStatus.Validated;
+        foreach (var leg in _legs)
+        {
+            if (!stationMap.TryGetValue((leg.PickupLocationCode, leg.DropLocationCode), out var stations))
+                throw new InvalidOperationException($"Missing station mapping for leg {leg.PickupLocationCode} → {leg.DropLocationCode}.");
+            leg.SetStationIds(stations.pickupStationId, stations.dropStationId);
+        }
 
+        Status = OrderStatus.Validated;
         AddDomainEvent(new DeliveryOrderValidatedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
@@ -68,14 +84,14 @@ public class DeliveryOrder : AggregateRoot<Guid>
             throw new InvalidOperationException("Only validated orders can be marked ready to plan.");
 
         Status = OrderStatus.ReadyToPlan;
+
+        var legDtos = _legs
+            .OrderBy(l => l.Sequence)
+            .Select(l => new DeliveryLegEventDto(l.Id, l.Sequence, l.PickupStationId!.Value, l.DropStationId!.Value))
+            .ToList();
+
         AddDomainEvent(new DeliveryOrderReadyToPlanDomainEvent(
-            Guid.NewGuid(),
-            DateTime.UtcNow,
-            TenantId,
-            Id,
-            Priority.ToString(),
-            PickupStationId!.Value,
-            DropStationId!.Value));
+            Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, Priority.ToString(), legDtos));
     }
 
     public void MarkPlanning()
@@ -138,7 +154,7 @@ public class DeliveryOrder : AggregateRoot<Guid>
             throw new InvalidOperationException($"Cannot fail an order in {Status} status.");
 
         Status = OrderStatus.Failed;
-        AddDomainEvent(new DeliveryOrderFailedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+        AddDomainEvent(new DeliveryOrderFailedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, reason));
     }
 
     public void Cancel(string reason)
@@ -147,7 +163,7 @@ public class DeliveryOrder : AggregateRoot<Guid>
             throw new InvalidOperationException("Cannot cancel an order that is in progress or completed.");
 
         Status = OrderStatus.Cancelled;
-        AddDomainEvent(new DeliveryOrderCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+        AddDomainEvent(new DeliveryOrderCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, reason));
     }
 
     public void MarkAsCompleted()
@@ -156,6 +172,7 @@ public class DeliveryOrder : AggregateRoot<Guid>
             throw new InvalidOperationException($"Cannot complete an order in {Status} status.");
 
         Status = OrderStatus.Completed;
+        AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, TenantId, Id));
     }
 
     public void AmendPriority(OrderPriority newPriority, string reason)

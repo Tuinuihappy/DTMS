@@ -14,13 +14,20 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             DeliveryOrderReadyToPlanDomainEvent evt =>
             [
                 new DeliveryOrderReadyForPlanningIntegrationEvent(
-                    evt.EventId,
-                    evt.OccurredOn,
-                    evt.TenantId,
-                    evt.OrderId,
-                    evt.Priority,
-                    evt.PickupStationId,
-                    evt.DropStationId)
+                    evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId, evt.Priority,
+                    evt.Legs.Select(l => new DeliveryLegDto(l.LegId, l.Sequence, l.PickupStationId, l.DropStationId)).ToList())
+            ],
+            DeliveryOrderCancelledDomainEvent evt =>
+            [
+                new DeliveryOrderCancelledIntegrationEvent(evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId, evt.Reason)
+            ],
+            DeliveryOrderFailedDomainEvent evt =>
+            [
+                new DeliveryOrderFailedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId, evt.Reason)
+            ],
+            DeliveryOrderCompletedDomainEvent evt =>
+            [
+                new DeliveryOrderCompletedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId)
             ],
             _ => []
         };

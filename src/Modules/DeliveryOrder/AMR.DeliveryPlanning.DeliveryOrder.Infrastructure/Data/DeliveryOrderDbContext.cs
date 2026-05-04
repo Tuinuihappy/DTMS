@@ -12,6 +12,7 @@ public class DeliveryOrderDbContext : DbContext
     private readonly ITenantContext _tenantContext;
 
     public DbSet<Domain.Entities.DeliveryOrder> DeliveryOrders { get; set; } = null!;
+    public DbSet<DeliveryLeg> DeliveryLegs { get; set; } = null!;
     public DbSet<OrderLine> OrderLines { get; set; } = null!;
     public DbSet<RecurringSchedule> RecurringSchedules { get; set; } = null!;
     public DbSet<OrderAmendment> OrderAmendments { get; set; } = null!;
@@ -33,15 +34,16 @@ public class DeliveryOrderDbContext : DbContext
             b.HasKey(o => o.Id);
             b.Property(o => o.TenantId).IsRequired();
             b.Property(o => o.OrderKey).HasMaxLength(50).IsRequired();
-            b.Property(o => o.PickupLocationCode).HasMaxLength(50).IsRequired();
-            b.Property(o => o.DropLocationCode).HasMaxLength(50).IsRequired();
             b.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20);
             b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
             b.HasIndex(o => new { o.TenantId, o.OrderKey }).IsUnique();
             b.HasQueryFilter(o => o.TenantId == _tenantContext.TenantId);
+            // Map PostgreSQL system column xmin as optimistic concurrency token (no DDL needed — xmin is auto-maintained)
+            b.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion().IsConcurrencyToken();
             b.Ignore(o => o.DomainEvents);
+            b.Ignore(o => o.AllOrderLines);
 
-            b.HasMany(o => o.OrderLines)
+            b.HasMany(o => o.Legs)
              .WithOne()
              .HasForeignKey(l => l.DeliveryOrderId)
              .OnDelete(DeleteBehavior.Cascade);
@@ -52,11 +54,28 @@ public class DeliveryOrderDbContext : DbContext
              .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<DeliveryLeg>(b =>
+        {
+            b.HasKey(l => l.Id);
+            b.Property(l => l.PickupLocationCode).HasMaxLength(50).IsRequired();
+            b.Property(l => l.DropLocationCode).HasMaxLength(50).IsRequired();
+
+            b.HasMany(l => l.OrderLines)
+             .WithOne()
+             .HasForeignKey(ol => ol.DeliveryLegId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<OrderLine>(b =>
         {
             b.HasKey(l => l.Id);
-            b.Property(l => l.ItemCode).HasMaxLength(50).IsRequired();
+            b.Property(l => l.WorkOrderId).IsRequired();
+            b.Property(l => l.WorkOrder).HasMaxLength(50).IsRequired();
+            b.Property(l => l.ItemId).IsRequired();
+            b.Property(l => l.ItemNumber).HasMaxLength(50).IsRequired();
+            b.Property(l => l.ItemDescription).HasMaxLength(200).IsRequired();
             b.Property(l => l.Remarks).HasMaxLength(200);
+            b.Property(l => l.ItemStatus).HasConversion<string>().HasMaxLength(20);
         });
 
         modelBuilder.Entity<RecurringSchedule>(b =>

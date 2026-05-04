@@ -8,10 +8,13 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Caching.Distributed;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Presentation;
+
+public record CancelOrderRequest(string Reason);
 
 public static class DeliveryOrderEndpoints
 {
@@ -64,9 +67,9 @@ public static class DeliveryOrderEndpoints
         });
 
         // DELETE /api/delivery-orders/{id}
-        group.MapDelete("/{id:guid}", async (Guid id, string reason, ISender sender) =>
+        group.MapDelete("/{id:guid}", async (Guid id, [FromBody] CancelOrderRequest body, ISender sender) =>
         {
-            var result = await sender.Send(new CancelDeliveryOrderCommand(id, reason));
+            var result = await sender.Send(new CancelDeliveryOrderCommand(id, body.Reason));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
         });
 

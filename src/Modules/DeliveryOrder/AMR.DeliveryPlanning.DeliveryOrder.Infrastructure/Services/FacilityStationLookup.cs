@@ -12,4 +12,7 @@ public class FacilityStationLookup : IStationLookup
 
     public Task<bool> ExistsAsync(Guid stationId, CancellationToken ct = default)
         => _facilityReadService.StationExistsAsync(stationId, ct);
+
+    public Task<Guid?> ResolveByCodeAsync(string code, CancellationToken ct = default)
+        => _facilityReadService.ResolveStationByCodeAsync(code, ct);
 }

@@ -4,10 +4,34 @@ using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 
+public record OrderLineDto(
+    Guid Id,
+    int WorkOrderId,
+    string WorkOrder,
+    int ItemId,
+    string ItemNumber,
+    string ItemDescription,
+    double Quantity,
+    double Weight,
+    string? Remarks,
+    string ItemStatus);
+
+public record DeliveryLegDto(
+    Guid Id,
+    int Sequence,
+    string PickupLocationCode,
+    string DropLocationCode,
+    Guid? PickupStationId,
+    Guid? DropStationId,
+    IReadOnlyList<OrderLineDto> Lines);
+
 public record DeliveryOrderDto(
-    Guid Id, string OrderKey, string PickupLocationCode, string DropLocationCode,
-    string Priority, string Status, DateTime? SLA, Guid? PickupStationId,
-    int LineCount);
+    Guid Id,
+    string OrderKey,
+    string Priority,
+    string Status,
+    DateTime? SLA,
+    IReadOnlyList<DeliveryLegDto> Legs);
 
 public record GetDeliveryOrderQuery(Guid OrderId) : IQuery<DeliveryOrderDto>;
 
@@ -21,11 +45,7 @@ public class GetDeliveryOrderQueryHandler : IQueryHandler<GetDeliveryOrderQuery,
         var order = await _repo.GetByIdAsync(request.OrderId, cancellationToken);
         if (order == null) return Result<DeliveryOrderDto>.Failure($"Order {request.OrderId} not found.");
 
-        return Result<DeliveryOrderDto>.Success(new DeliveryOrderDto(
-            order.Id, order.OrderKey, order.PickupLocationCode, order.DropLocationCode,
-            order.Priority.ToString(), order.Status.ToString(), order.SLA,
-            order.PickupStationId,
-            order.OrderLines.Count));
+        return Result<DeliveryOrderDto>.Success(DeliveryOrderMapper.MapToDto(order));
     }
 }
 
@@ -40,13 +60,33 @@ public class GetDeliveryOrdersQueryHandler : IQueryHandler<GetDeliveryOrdersQuer
     {
         var orders = request.Status.HasValue
             ? await _repo.GetByStatusAsync(request.Status.Value, request.Page, request.PageSize, cancellationToken)
-            : await _repo.GetByStatusAsync(OrderStatus.Submitted, request.Page, request.PageSize, cancellationToken);
+            : await _repo.GetAllAsync(request.Page, request.PageSize, cancellationToken);
 
-        var dtos = orders.Select(o => new DeliveryOrderDto(
-            o.Id, o.OrderKey, o.PickupLocationCode, o.DropLocationCode,
-            o.Priority.ToString(), o.Status.ToString(), o.SLA, o.PickupStationId,
-            o.OrderLines.Count)).ToList();
-
-        return Result<List<DeliveryOrderDto>>.Success(dtos);
+        return Result<List<DeliveryOrderDto>>.Success(orders.Select(DeliveryOrderMapper.MapToDto).ToList());
     }
+}
+
+file static class DeliveryOrderMapper
+{
+    public static DeliveryOrderDto MapToDto(Domain.Entities.DeliveryOrder order) =>
+        new(
+            order.Id,
+            order.OrderKey,
+            order.Priority.ToString(),
+            order.Status.ToString(),
+            order.SLA,
+            order.Legs
+                .OrderBy(l => l.Sequence)
+                .Select(l => new DeliveryLegDto(
+                    l.Id,
+                    l.Sequence,
+                    l.PickupLocationCode,
+                    l.DropLocationCode,
+                    l.PickupStationId,
+                    l.DropStationId,
+                    l.OrderLines.Select(ol => new OrderLineDto(
+                        ol.Id, ol.WorkOrderId, ol.WorkOrder, ol.ItemId, ol.ItemNumber,
+                        ol.ItemDescription, ol.Quantity, ol.Weight, ol.Remarks,
+                        ol.ItemStatus.ToString())).ToList()))
+                .ToList());
 }

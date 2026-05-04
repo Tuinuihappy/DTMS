@@ -52,6 +52,8 @@ public class FacilityDbContext : DbContext
              .HasColumnName("CompatibleVehicleTypes");
             b.Property(s => s.VendorRef).HasMaxLength(200);
             b.HasIndex(s => new { s.MapId, s.VendorRef }).IsUnique().HasFilter("\"VendorRef\" IS NOT NULL");
+            b.Property(s => s.Code).HasMaxLength(50);
+            b.HasIndex(s => new { s.MapId, s.Code }).IsUnique().HasFilter("\"Code\" IS NOT NULL");
         });
 
         modelBuilder.Entity<Zone>(b =>

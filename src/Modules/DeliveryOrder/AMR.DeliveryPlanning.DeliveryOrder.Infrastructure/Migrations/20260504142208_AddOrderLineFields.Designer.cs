@@ -3,6 +3,7 @@ using System;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 {
     [DbContext(typeof(DeliveryOrderDbContext))]
-    partial class DeliveryOrderDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260504142208_AddOrderLineFields")]
+    partial class AddOrderLineFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -184,8 +187,10 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<int>("ItemId")
-                        .HasColumnType("integer");
+                    b.Property<string>("ItemId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("ItemNumber")
                         .IsRequired()
@@ -212,8 +217,10 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<int>("WorkOrderId")
-                        .HasColumnType("integer");
+                    b.Property<string>("WorkOrderId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 

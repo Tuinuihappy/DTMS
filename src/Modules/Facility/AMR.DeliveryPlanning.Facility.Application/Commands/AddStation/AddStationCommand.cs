@@ -10,4 +10,5 @@ public record AddStationCommand(
     double Y,
     double? Theta,
     StationType Type,
-    string? VendorRef = null) : ICommand<Guid>;
+    string? VendorRef = null,
+    string? Code = null) : ICommand<Guid>;

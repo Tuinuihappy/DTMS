@@ -3,6 +3,7 @@ using System;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 {
     [DbContext(typeof(DeliveryOrderDbContext))]
-    partial class DeliveryOrderDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260504131547_AddDeliveryLegs")]
+    partial class AddDeliveryLegs
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -179,23 +182,10 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.Property<Guid>("DeliveryLegId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ItemDescription")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<int>("ItemId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ItemNumber")
+                    b.Property<string>("ItemCode")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
-
-                    b.Property<string>("ItemStatus")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
 
                     b.Property<double>("Quantity")
                         .HasColumnType("double precision");
@@ -206,14 +196,6 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 
                     b.Property<double>("Weight")
                         .HasColumnType("double precision");
-
-                    b.Property<string>("WorkOrder")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<int>("WorkOrderId")
-                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 

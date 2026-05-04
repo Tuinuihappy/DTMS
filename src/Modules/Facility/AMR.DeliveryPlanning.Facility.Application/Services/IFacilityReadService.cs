@@ -10,6 +10,8 @@ public interface IFacilityReadService
 {
     Task<bool> StationExistsAsync(Guid stationId, CancellationToken cancellationToken = default);
 
+    Task<Guid?> ResolveStationByCodeAsync(string code, CancellationToken cancellationToken = default);
+
     Task<StationVendorTarget?> GetStationVendorTargetAsync(
         Guid stationId,
         CancellationToken cancellationToken = default);

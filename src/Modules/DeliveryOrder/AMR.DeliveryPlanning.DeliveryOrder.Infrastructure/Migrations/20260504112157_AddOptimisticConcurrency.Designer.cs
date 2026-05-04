@@ -3,6 +3,7 @@ using System;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 {
     [DbContext(typeof(DeliveryOrderDbContext))]
-    partial class DeliveryOrderDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260504112157_AddOptimisticConcurrency")]
+    partial class AddOptimisticConcurrency
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -23,13 +26,10 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryLeg", b =>
+            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("DeliveryOrderId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("DropLocationCode")
@@ -40,6 +40,11 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.Property<Guid?>("DropStationId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("OrderKey")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<string>("PickupLocationCode")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -47,27 +52,6 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 
                     b.Property<Guid?>("PickupStationId")
                         .HasColumnType("uuid");
-
-                    b.Property<int>("Sequence")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DeliveryOrderId");
-
-                    b.ToTable("DeliveryLegs", "deliveryorder");
-                });
-
-            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("OrderKey")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Priority")
                         .IsRequired()
@@ -176,26 +160,13 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("DeliveryLegId")
+                    b.Property<Guid>("DeliveryOrderId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ItemDescription")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<int>("ItemId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ItemNumber")
+                    b.Property<string>("ItemCode")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
-
-                    b.Property<string>("ItemStatus")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
 
                     b.Property<double>("Quantity")
                         .HasColumnType("double precision");
@@ -207,17 +178,9 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.Property<double>("Weight")
                         .HasColumnType("double precision");
 
-                    b.Property<string>("WorkOrder")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<int>("WorkOrderId")
-                        .HasColumnType("integer");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("DeliveryLegId");
+                    b.HasIndex("DeliveryOrderId");
 
                     b.ToTable("OrderLines", "deliveryorder");
                 });
@@ -281,20 +244,11 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.ToTable("OutboxMessages", "deliveryorder");
                 });
 
-            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryLeg", b =>
-                {
-                    b.HasOne("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder", null)
-                        .WithMany("Legs")
-                        .HasForeignKey("DeliveryOrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.OrderLine", b =>
                 {
-                    b.HasOne("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryLeg", null)
+                    b.HasOne("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder", null)
                         .WithMany("OrderLines")
-                        .HasForeignKey("DeliveryLegId")
+                        .HasForeignKey("DeliveryOrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -308,14 +262,9 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryLeg", b =>
-                {
-                    b.Navigation("OrderLines");
-                });
-
             modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder", b =>
                 {
-                    b.Navigation("Legs");
+                    b.Navigation("OrderLines");
 
                     b.Navigation("Schedule");
                 });

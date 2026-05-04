@@ -107,6 +107,7 @@ public static class ModuleServiceRegistration
                 sp.GetRequiredService<DeliveryOrderDomainEventMapper>())));
         services.AddScoped<IDeliveryOrderRepository, DeliveryOrderRepository>();
         services.AddScoped<IStationLookup, FacilityStationLookup>();
+        services.AddScoped<StationValidationService>();
         services.AddScoped<IOrderAmendmentRepository, OrderAmendmentRepository>();
         services.AddScoped<IOrderAuditEventRepository, OrderAuditEventRepository>();
         services.Configure<DeliveryOrderOptions>(

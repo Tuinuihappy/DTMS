@@ -16,6 +16,12 @@ public sealed class FacilityReadService : IFacilityReadService
     public Task<bool> StationExistsAsync(Guid stationId, CancellationToken cancellationToken = default)
         => _db.Stations.AnyAsync(s => s.Id == stationId, cancellationToken);
 
+    public Task<Guid?> ResolveStationByCodeAsync(string code, CancellationToken cancellationToken = default)
+        => _db.Stations.AsNoTracking()
+            .Where(s => s.Code == code)
+            .Select(s => (Guid?)s.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<StationVendorTarget?> GetStationVendorTargetAsync(
         Guid stationId,
         CancellationToken cancellationToken = default)

@@ -2,7 +2,7 @@ using AMR.DeliveryPlanning.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 
-public enum AmendmentType { PriorityChange, LocationChange, SlaChange, Cancel, Hold, Release, StatusTransition }
+public enum AmendmentType { PriorityChange, LocationChange, SlaChange, CombinedChange, Cancel, Hold, Release, StatusTransition }
 
 public class OrderAmendment : Entity<Guid>
 {

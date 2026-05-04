@@ -13,7 +13,7 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
 
     public Task<Domain.Entities.DeliveryOrder?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => _context.DeliveryOrders
-            .Include(o => o.OrderLines)
+            .Include(o => o.Legs).ThenInclude(l => l.OrderLines)
             .Include(o => o.Schedule)
             .FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
 
@@ -23,6 +23,13 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
     public async Task<List<Domain.Entities.DeliveryOrder>> GetByStatusAsync(OrderStatus status, int page, int pageSize, CancellationToken cancellationToken = default)
         => await _context.DeliveryOrders
             .Where(o => o.Status == status)
+            .OrderByDescending(o => o.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+    public async Task<List<Domain.Entities.DeliveryOrder>> GetAllAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+        => await _context.DeliveryOrders
             .OrderByDescending(o => o.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)

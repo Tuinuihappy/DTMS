@@ -1,3 +1,5 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.SharedKernel.Tenancy;
@@ -7,11 +9,16 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkSubmitDeli
 public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmitDeliveryOrdersCommand, List<Guid>>
 {
     private readonly IDeliveryOrderRepository _repo;
+    private readonly StationValidationService _stationValidation;
     private readonly ITenantContext _tenantContext;
 
-    public BulkSubmitDeliveryOrdersCommandHandler(IDeliveryOrderRepository repo, ITenantContext tenantContext)
+    public BulkSubmitDeliveryOrdersCommandHandler(
+        IDeliveryOrderRepository repo,
+        StationValidationService stationValidation,
+        ITenantContext tenantContext)
     {
         _repo = repo;
+        _stationValidation = stationValidation;
         _tenantContext = tenantContext;
     }
 
@@ -24,22 +31,21 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
 
         foreach (var cmd in request.Orders)
         {
+            var stationMap = await BuildStationMapAsync(cmd.Lines, cancellationToken);
+            if (stationMap.IsFailure) return Result<List<Guid>>.Failure(stationMap.Error);
+
             var order = new Domain.Entities.DeliveryOrder(
-                _tenantContext.TenantId, cmd.OrderKey, cmd.PickupLocationCode, cmd.DropLocationCode, cmd.Priority, cmd.SLA);
+                _tenantContext.TenantId, cmd.OrderKey, cmd.Priority, cmd.SLA);
 
             foreach (var line in cmd.Lines)
-                order.AddOrderLine(line.ItemCode, line.Quantity, line.Weight, line.Remarks);
+                order.AddOrderLine(line.PickupLocationCode, line.DropLocationCode,
+                    line.WorkOrderId, line.WorkOrder, line.ItemId, line.ItemNumber,
+                    line.ItemDescription, line.Quantity, line.Weight, line.Remarks);
 
             if (cmd.Schedule != null)
                 order.SetRecurringSchedule(cmd.Schedule.CronExpression, cmd.Schedule.ValidFrom, cmd.Schedule.ValidUntil);
 
-            if (!Guid.TryParse(cmd.PickupLocationCode, out var pickupStationId))
-                return Result<List<Guid>>.Failure($"PickupLocationCode '{cmd.PickupLocationCode}' is not a valid station ID (Guid).");
-
-            if (!Guid.TryParse(cmd.DropLocationCode, out var dropStationId))
-                return Result<List<Guid>>.Failure($"DropLocationCode '{cmd.DropLocationCode}' is not a valid station ID (Guid).");
-
-            order.MarkAsValidated(pickupStationId, dropStationId);
+            order.MarkAsValidated(stationMap.Value);
             order.MarkReadyToPlan();
 
             orders.Add(order);
@@ -49,5 +55,31 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         await _repo.SaveChangesAsync(cancellationToken);
 
         return Result<List<Guid>>.Success(orders.Select(o => o.Id).ToList());
+    }
+
+    private async Task<Result<IReadOnlyDictionary<(string pickup, string drop), (Guid pickupStationId, Guid dropStationId)>>>
+        BuildStationMapAsync(IEnumerable<OrderLineDto> lines, CancellationToken cancellationToken)
+    {
+        var uniquePairs = lines
+            .Select(l => (l.PickupLocationCode, l.DropLocationCode))
+            .Distinct()
+            .ToList();
+
+        var map = new Dictionary<(string, string), (Guid, Guid)>();
+
+        foreach (var (pickup, drop) in uniquePairs)
+        {
+            var (pickupOk, pickupStationId, pickupErr) = await _stationValidation.ResolveAndValidateAsync(
+                pickup, "PickupLocationCode", cancellationToken);
+            if (!pickupOk) return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Failure(pickupErr!);
+
+            var (dropOk, dropStationId, dropErr) = await _stationValidation.ResolveAndValidateAsync(
+                drop, "DropLocationCode", cancellationToken);
+            if (!dropOk) return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Failure(dropErr!);
+
+            map[(pickup, drop)] = (pickupStationId, dropStationId);
+        }
+
+        return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Success(map);
     }
 }

@@ -15,10 +15,13 @@ public class Station : Entity<Guid>
     public List<string> CompatibleVehicleTypes { get; private set; } = new();
     // RIOT3 station identifier — used by RouteEdgeSyncService to call /api/v4/route/costs/.../VendorRef
     public string? VendorRef { get; private set; }
+    // Human-readable client-facing identifier (e.g. "WH-NORTH") for use in delivery order submissions
+    public string? Code { get; private set; }
 
     private Station() { }
 
     public void SetVendorRef(string vendorRef) => VendorRef = vendorRef;
+    public void SetCode(string code) => Code = code.Trim().ToUpperInvariant();
 
     public Station(Guid id, Guid mapId, string name, Coordinate coordinate, StationType type,
         Guid? zoneId = null, IEnumerable<string>? compatibleVehicleTypes = null) : base(id)

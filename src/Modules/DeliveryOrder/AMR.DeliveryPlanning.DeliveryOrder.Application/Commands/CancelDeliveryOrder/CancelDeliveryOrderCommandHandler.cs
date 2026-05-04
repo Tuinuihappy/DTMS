@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CancelDeliveryOrder;
 
@@ -24,11 +25,16 @@ public class CancelDeliveryOrderCommandHandler : ICommandHandler<CancelDeliveryO
         {
             order.Cancel(request.Reason);
             await _repository.UpdateAsync(order, cancellationToken);
+            await _repository.SaveChangesAsync(cancellationToken);
             return Result.Success();
         }
         catch (InvalidOperationException ex)
         {
             return Result.Failure(ex.Message);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure("The order was modified by another process. Please retry.");
         }
     }
 }

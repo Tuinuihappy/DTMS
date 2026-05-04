@@ -22,6 +22,7 @@ public class UnitTest1
             TaskId = Guid.NewGuid(),
             VendorVehicleKey = deviceKey,
             Action = RobotActionType.MOVE,
+            MapId = "MAP-001",
             TargetNodeId = "ST-001"
         });
 
