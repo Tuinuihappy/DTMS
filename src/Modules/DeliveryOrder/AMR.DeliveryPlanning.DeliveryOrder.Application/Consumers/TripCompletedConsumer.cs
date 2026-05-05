@@ -39,7 +39,7 @@ public class TripCompletedConsumer : IConsumer<TripCompletedIntegrationEvent>
         try
         {
             order.MarkAsCompleted();
-            order.UpdateAllItemStatuses(OrderLineStatus.Delivered);
+            order.UpdateAllItemStatuses(OrderItemStatus.Delivered);
             await _repository.UpdateAsync(order, context.CancellationToken);
             await _repository.SaveChangesAsync(context.CancellationToken);
             _logger.LogInformation("DeliveryOrder {OrderId} marked Completed via Trip {TripId}", order.Id, evt.TripId);

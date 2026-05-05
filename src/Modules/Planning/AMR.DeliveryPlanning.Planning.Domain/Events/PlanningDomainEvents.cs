@@ -10,5 +10,5 @@ public record JobCommittedDomainEvent(
     DateTime OccurredOn,
     Guid TenantId,
     Guid JobId,
-    Guid VehicleId,
+    Guid? VehicleId,
     IReadOnlyCollection<CommittedLegSnapshot> Legs) : IDomainEvent;

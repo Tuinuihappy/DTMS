@@ -10,14 +10,16 @@ public class SubmitDeliveryOrderCommandValidator : AbstractValidator<SubmitDeliv
     {
         var minLeadTime = TimeSpan.FromMinutes(options.Value.MinimumSlaLeadTimeMinutes);
 
-        RuleFor(x => x.OrderKey).NotEmpty().MaximumLength(50);
+        RuleFor(x => x.OrderId).GreaterThan(0);
+        RuleFor(x => x.OrderNo).NotEmpty().MaximumLength(50);
+        RuleFor(x => x.CreateBy).NotEmpty().MaximumLength(100);
 
         RuleFor(x => x.SLA)
             .Must(sla => sla == null || sla > DateTime.UtcNow.Add(minLeadTime))
             .WithMessage($"SLA must be at least {minLeadTime.TotalMinutes} minutes in the future.");
 
-        RuleFor(x => x.Lines).NotEmpty().WithMessage("At least one order line is required.");
-        RuleForEach(x => x.Lines).ChildRules(line =>
+        RuleFor(x => x.OrderItems).NotEmpty().WithMessage("At least one order line is required.");
+        RuleForEach(x => x.OrderItems).ChildRules(line =>
         {
             line.RuleFor(l => l.PickupLocationCode).NotEmpty();
             line.RuleFor(l => l.DropLocationCode).NotEmpty();
@@ -31,6 +33,8 @@ public class SubmitDeliveryOrderCommandValidator : AbstractValidator<SubmitDeliv
             line.RuleFor(l => l.ItemDescription).NotEmpty().MaximumLength(200);
             line.RuleFor(l => l.Quantity).GreaterThan(0);
             line.RuleFor(l => l.Weight).GreaterThan(0);
+            line.RuleFor(l => l.Line).MaximumLength(100).When(l => l.Line != null);
+            line.RuleFor(l => l.Model).MaximumLength(100).When(l => l.Model != null);
         });
 
         When(x => x.Schedule != null, () =>

@@ -24,44 +24,81 @@ public class VendorAdapterTaskDispatcher : ITaskDispatcher
         _logger = logger;
     }
 
-    public async Task DispatchAsync(Guid vehicleId, RobotTask task, CancellationToken cancellationToken = default)
+    private const string DefaultAdapterKey = "riot3";
+
+    public async Task DispatchAsync(Guid? vehicleId, RobotTask task, CancellationToken cancellationToken = default)
     {
-        var resolution = await _adapterFactory.GetAdapterResolutionForVehicleAsync(vehicleId, cancellationToken);
-        var command = await MapToVendorCommandAsync(task, resolution.AdapterKey, cancellationToken);
+        string adapterKey;
+        string? vendorVehicleKey;
+        IVehicleCommandService adapter;
+
+        if (vehicleId.HasValue)
+        {
+            var resolution = await _adapterFactory.GetAdapterResolutionForVehicleAsync(vehicleId.Value, cancellationToken);
+            adapterKey = resolution.AdapterKey;
+            vendorVehicleKey = resolution.VendorVehicleKey;
+            adapter = resolution.Adapter;
+        }
+        else
+        {
+            // No vehicle assigned — let RIOT3 auto-select by omitting AppointVehicleKey
+            adapterKey = DefaultAdapterKey;
+            vendorVehicleKey = null;
+            adapter = _adapterFactory.GetAdapterByKey(DefaultAdapterKey);
+        }
+
+        var command = await MapToVendorCommandAsync(task, adapterKey, cancellationToken);
         if (command is null)
         {
-            _logger.LogError("Task {TaskId} for vehicle {VehicleId} was not sent because vendor target mapping is incomplete",
-                task.Id, vehicleId);
+            _logger.LogError("Task {TaskId} was not sent because vendor target mapping is incomplete", task.Id);
             return;
         }
 
-        command.VendorVehicleKey = resolution.VendorVehicleKey;
+        command.VendorVehicleKey = vendorVehicleKey;
 
-        var result = await resolution.Adapter.SendTaskAsync(vehicleId, command, cancellationToken);
+        var result = await adapter.SendTaskAsync(vehicleId ?? Guid.Empty, command, cancellationToken);
         if (!result.IsSuccess)
-            _logger.LogWarning("Vendor rejected task {TaskId} for vehicle {VehicleId}: {Error}", task.Id, vehicleId, result.Error);
+            _logger.LogWarning("Vendor rejected task {TaskId}: {Error}", task.Id, result.Error);
     }
 
-    public async Task CancelAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
+    public async Task CancelAsync(Guid? vehicleId, Guid taskId, CancellationToken cancellationToken = default)
     {
-        var adapter = await _adapterFactory.GetAdapterForVehicleAsync(vehicleId, cancellationToken);
-        var result = await adapter.CancelTaskAsync(vehicleId, taskId, cancellationToken);
+        if (!vehicleId.HasValue)
+        {
+            _logger.LogWarning("Cannot cancel task {TaskId}: no vehicle assigned to trip", taskId);
+            return;
+        }
+
+        var adapter = await _adapterFactory.GetAdapterForVehicleAsync(vehicleId.Value, cancellationToken);
+        var result = await adapter.CancelTaskAsync(vehicleId.Value, taskId, cancellationToken);
         if (!result.IsSuccess)
             _logger.LogWarning("Failed to cancel task {TaskId} for vehicle {VehicleId}: {Error}", taskId, vehicleId, result.Error);
     }
 
-    public async Task PauseAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
+    public async Task PauseAsync(Guid? vehicleId, Guid taskId, CancellationToken cancellationToken = default)
     {
-        var adapter = await _adapterFactory.GetAdapterForVehicleAsync(vehicleId, cancellationToken);
-        var result = await adapter.PauseTaskAsync(vehicleId, taskId, cancellationToken);
+        if (!vehicleId.HasValue)
+        {
+            _logger.LogWarning("Cannot pause task {TaskId}: no vehicle assigned to trip", taskId);
+            return;
+        }
+
+        var adapter = await _adapterFactory.GetAdapterForVehicleAsync(vehicleId.Value, cancellationToken);
+        var result = await adapter.PauseTaskAsync(vehicleId.Value, taskId, cancellationToken);
         if (!result.IsSuccess)
             _logger.LogWarning("Failed to pause task {TaskId} for vehicle {VehicleId}: {Error}", taskId, vehicleId, result.Error);
     }
 
-    public async Task ResumeAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
+    public async Task ResumeAsync(Guid? vehicleId, Guid taskId, CancellationToken cancellationToken = default)
     {
-        var adapter = await _adapterFactory.GetAdapterForVehicleAsync(vehicleId, cancellationToken);
-        var result = await adapter.ResumeTaskAsync(vehicleId, taskId, cancellationToken);
+        if (!vehicleId.HasValue)
+        {
+            _logger.LogWarning("Cannot resume task {TaskId}: no vehicle assigned to trip", taskId);
+            return;
+        }
+
+        var adapter = await _adapterFactory.GetAdapterForVehicleAsync(vehicleId.Value, cancellationToken);
+        var result = await adapter.ResumeTaskAsync(vehicleId.Value, taskId, cancellationToken);
         if (!result.IsSuccess)
             _logger.LogWarning("Failed to resume task {TaskId} for vehicle {VehicleId}: {Error}", taskId, vehicleId, result.Error);
     }

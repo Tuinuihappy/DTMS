@@ -1,6 +1,6 @@
 namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 
-public enum OrderLineStatus
+public enum OrderItemStatus
 {
     Pending,
     Picked,

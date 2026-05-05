@@ -3,6 +3,7 @@ using System;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 {
     [DbContext(typeof(DeliveryOrderDbContext))]
-    partial class DeliveryOrderDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260505022801_AddOrderIdOrderNoCreateByLineModel")]
+    partial class AddOrderIdOrderNoCreateByLineModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -180,7 +183,7 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.ToTable("OrderAuditEvents", "deliveryorder");
                 });
 
-            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.OrderItem", b =>
+            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.OrderLine", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -237,7 +240,7 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 
                     b.HasIndex("DeliveryLegId");
 
-                    b.ToTable("OrderItems", "deliveryorder");
+                    b.ToTable("OrderLines", "deliveryorder");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.RecurringSchedule", b =>
@@ -308,10 +311,10 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.OrderItem", b =>
+            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.OrderLine", b =>
                 {
                     b.HasOne("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryLeg", null)
-                        .WithMany("OrderItems")
+                        .WithMany("OrderLines")
                         .HasForeignKey("DeliveryLegId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -328,7 +331,7 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 
             modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryLeg", b =>
                 {
-                    b.Navigation("OrderItems");
+                    b.Navigation("OrderLines");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder", b =>

@@ -48,4 +48,15 @@ public class VendorAdapterFactory : IVendorAdapterFactory
         _logger.LogDebug("Using {AdapterKey} adapter for vehicle {VehicleId}", adapterKey, vehicleId);
         return new VehicleAdapterResolution(adapter, adapterKey, vehicleIdentity.VendorVehicleKey);
     }
+
+    public IVehicleCommandService GetAdapterByKey(string adapterKey)
+    {
+        var key = adapterKey.Trim().ToLowerInvariant();
+        var adapter = _registry.Resolve(key);
+        if (adapter is null)
+            throw new InvalidOperationException(
+                $"Adapter key '{adapterKey}' is not registered. " +
+                $"Registered keys: {string.Join(", ", _registry.RegisteredKeys.OrderBy(k => k))}.");
+        return adapter;
+    }
 }

@@ -81,12 +81,14 @@ public class IdempotencyTests : IClassFixture<DtmsWebApplicationFactory>
         {
             Content = JsonContent.Create(new
             {
-                OrderKey = $"IDEM-{Guid.NewGuid():N}",
+                OrderId = 5001,
+            OrderNo = $"IDEM-{Guid.NewGuid():N}",
+            CreateBy = "test-user",
                 PickupLocationCode = pickupId.ToString(),
                 DropLocationCode = dropId.ToString(),
                 Priority = 0,
                 SLA = DateTime.UtcNow.AddHours(4),
-                Lines = new[] { new { ItemCode = "X", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
+                OrderItems = new[] { new { ItemCode = "X", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
             })
         };
 

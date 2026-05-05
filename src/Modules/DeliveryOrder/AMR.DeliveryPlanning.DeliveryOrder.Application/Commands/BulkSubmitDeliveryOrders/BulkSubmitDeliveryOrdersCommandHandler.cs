@@ -31,16 +31,16 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
 
         foreach (var cmd in request.Orders)
         {
-            var stationMap = await BuildStationMapAsync(cmd.Lines, cancellationToken);
+            var stationMap = await BuildStationMapAsync(cmd.OrderItems, cancellationToken);
             if (stationMap.IsFailure) return Result<List<Guid>>.Failure(stationMap.Error);
 
             var order = new Domain.Entities.DeliveryOrder(
-                _tenantContext.TenantId, cmd.OrderKey, cmd.Priority, cmd.SLA);
+                _tenantContext.TenantId, cmd.OrderId, cmd.OrderNo, cmd.CreateBy, cmd.Priority, cmd.SLA);
 
-            foreach (var line in cmd.Lines)
-                order.AddOrderLine(line.PickupLocationCode, line.DropLocationCode,
+            foreach (var line in cmd.OrderItems)
+                order.AddOrderItem(line.PickupLocationCode, line.DropLocationCode,
                     line.WorkOrderId, line.WorkOrder, line.ItemId, line.ItemNumber,
-                    line.ItemDescription, line.Quantity, line.Weight, line.Remarks);
+                    line.ItemDescription, line.Quantity, line.Weight, line.Line, line.Model, line.Remarks);
 
             if (cmd.Schedule != null)
                 order.SetRecurringSchedule(cmd.Schedule.CronExpression, cmd.Schedule.ValidFrom, cmd.Schedule.ValidUntil);
@@ -58,7 +58,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
     }
 
     private async Task<Result<IReadOnlyDictionary<(string pickup, string drop), (Guid pickupStationId, Guid dropStationId)>>>
-        BuildStationMapAsync(IEnumerable<OrderLineDto> lines, CancellationToken cancellationToken)
+        BuildStationMapAsync(IEnumerable<OrderItemDto> lines, CancellationToken cancellationToken)
     {
         var uniquePairs = lines
             .Select(l => (l.PickupLocationCode, l.DropLocationCode))

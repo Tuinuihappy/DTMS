@@ -27,19 +27,21 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
 
     public async Task<Result<Guid>> Handle(SubmitDeliveryOrderCommand request, CancellationToken cancellationToken)
     {
-        var stationMap = await BuildStationMapAsync(request.Lines, cancellationToken);
+        var stationMap = await BuildStationMapAsync(request.OrderItems, cancellationToken);
         if (stationMap.IsFailure) return Result<Guid>.Failure(stationMap.Error);
 
         var order = new Domain.Entities.DeliveryOrder(
             _tenantContext.TenantId,
-            request.OrderKey,
+            request.OrderId,
+            request.OrderNo,
+            request.CreateBy,
             request.Priority,
             request.SLA);
 
-        foreach (var line in request.Lines)
-            order.AddOrderLine(line.PickupLocationCode, line.DropLocationCode,
+        foreach (var line in request.OrderItems)
+            order.AddOrderItem(line.PickupLocationCode, line.DropLocationCode,
                 line.WorkOrderId, line.WorkOrder, line.ItemId, line.ItemNumber,
-                line.ItemDescription, line.Quantity, line.Weight, line.Remarks);
+                line.ItemDescription, line.Quantity, line.Weight, line.Line, line.Model, line.Remarks);
 
         if (request.Schedule != null)
             order.SetRecurringSchedule(request.Schedule.CronExpression, request.Schedule.ValidFrom, request.Schedule.ValidUntil);
@@ -51,7 +53,7 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
 
         await _auditRepo.AddAsync(new OrderAuditEvent(
             order.Id, "OrderSubmitted",
-            $"Order {request.OrderKey} submitted with priority {request.Priority}",
+            $"Order {request.OrderNo} submitted with priority {request.Priority}",
             _tenantContext.TenantId.ToString()), cancellationToken);
 
         await _repository.SaveChangesAsync(cancellationToken);
@@ -60,7 +62,7 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
     }
 
     private async Task<Result<IReadOnlyDictionary<(string pickup, string drop), (Guid pickupStationId, Guid dropStationId)>>>
-        BuildStationMapAsync(IEnumerable<OrderLineDto> lines, CancellationToken cancellationToken)
+        BuildStationMapAsync(IEnumerable<OrderItemDto> lines, CancellationToken cancellationToken)
     {
         var uniquePairs = lines
             .Select(l => (l.PickupLocationCode, l.DropLocationCode))

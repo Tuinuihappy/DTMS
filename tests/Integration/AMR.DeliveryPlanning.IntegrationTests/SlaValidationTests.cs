@@ -89,12 +89,14 @@ public class SlaValidationTests : IClassFixture<DtmsWebApplicationFactory>
     {
         return await client.PostAsJsonAsync("/api/delivery-orders", new
         {
-            OrderKey = $"SLA-{Guid.NewGuid():N}",
+            OrderId = 4001,
+            OrderNo = $"SLA-{Guid.NewGuid():N}",
+            CreateBy = "test-user",
             PickupLocationCode = pickupId.ToString(),
             DropLocationCode = dropId.ToString(),
             Priority = 0,
             SLA = sla,
-            Lines = new[] { new { ItemCode = "ITEM", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
+            OrderItems = new[] { new { ItemCode = "ITEM", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
         });
     }
 }

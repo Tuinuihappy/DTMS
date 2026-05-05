@@ -93,8 +93,8 @@ public class Job : AggregateRoot<Guid>
 
     public void Commit()
     {
-        if (Status != JobStatus.Assigned)
-            throw new InvalidOperationException("Only assigned jobs can be committed.");
+        if (Status != JobStatus.Assigned && Status != JobStatus.Created)
+            throw new InvalidOperationException("Only Created or Assigned jobs can be committed.");
 
         Status = JobStatus.Committed;
         var legs = _legs
@@ -107,7 +107,7 @@ public class Job : AggregateRoot<Guid>
             DateTime.UtcNow,
             TenantId,
             Id,
-            AssignedVehicleId!.Value,
+            AssignedVehicleId,
             legs));
     }
 

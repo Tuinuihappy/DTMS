@@ -112,6 +112,7 @@ public static class ModuleServiceRegistration
         services.AddScoped<IOrderAuditEventRepository, OrderAuditEventRepository>();
         services.Configure<DeliveryOrderOptions>(
             configuration.GetSection(DeliveryOrderOptions.SectionName));
+        services.AddScoped<InternalOrderNoGenerator>();
 
         // ── Planning Module ───────────────────────────────────────────
         services.AddScoped<PlanningDomainEventMapper>();

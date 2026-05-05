@@ -7,7 +7,9 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 public class DeliveryOrder : AggregateRoot<Guid>
 {
     public Guid TenantId { get; private set; }
-    public string OrderKey { get; private set; } = string.Empty;
+    public int OrderId { get; private set; }
+    public string OrderNo { get; private set; } = string.Empty;
+    public string CreateBy { get; private set; } = string.Empty;
     public OrderPriority Priority { get; private set; }
     public OrderStatus Status { get; private set; }
     public DateTime? SLA { get; private set; }
@@ -15,28 +17,31 @@ public class DeliveryOrder : AggregateRoot<Guid>
     private readonly List<DeliveryLeg> _legs = new();
     public IReadOnlyCollection<DeliveryLeg> Legs => _legs.AsReadOnly();
 
-    public IReadOnlyCollection<OrderLine> AllOrderLines =>
-        _legs.SelectMany(l => l.OrderLines).ToList().AsReadOnly();
+    public IReadOnlyCollection<OrderItem> AllOrderItems =>
+        _legs.SelectMany(l => l.OrderItems).ToList().AsReadOnly();
 
     public RecurringSchedule? Schedule { get; private set; }
 
     private DeliveryOrder() { } // For EF Core
 
-    public DeliveryOrder(Guid tenantId, string orderKey, OrderPriority priority, DateTime? sla)
+    public DeliveryOrder(Guid tenantId, int orderId, string orderNo, string createBy, OrderPriority priority, DateTime? sla)
     {
         Id = Guid.NewGuid();
         TenantId = tenantId;
-        OrderKey = orderKey;
+        OrderId = orderId;
+        OrderNo = orderNo;
+        CreateBy = createBy;
         Priority = priority;
         SLA = sla;
         Status = OrderStatus.Submitted;
 
-        AddDomainEvent(new DeliveryOrderSubmittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, OrderKey));
+        AddDomainEvent(new DeliveryOrderSubmittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, OrderNo));
     }
 
-    public void AddOrderLine(string pickupLocationCode, string dropLocationCode,
+    public void AddOrderItem(string pickupLocationCode, string dropLocationCode,
         int workOrderId, string workOrder, int itemId, string itemNumber,
-        string itemDescription, double quantity, double weight, string? remarks = null)
+        string itemDescription, double quantity, double weight,
+        string? line = null, string? model = null, string? remarks = null)
     {
         var leg = _legs.FirstOrDefault(l =>
             l.PickupLocationCode == pickupLocationCode &&
@@ -48,10 +53,10 @@ public class DeliveryOrder : AggregateRoot<Guid>
             _legs.Add(leg);
         }
 
-        leg.AddItem(workOrderId, workOrder, itemId, itemNumber, itemDescription, quantity, weight, remarks);
+        leg.AddItem(workOrderId, workOrder, itemId, itemNumber, itemDescription, quantity, weight, line, model, remarks);
     }
 
-    public void UpdateAllItemStatuses(Enums.OrderLineStatus status)
+    public void UpdateAllItemStatuses(Enums.OrderItemStatus status)
     {
         foreach (var leg in _legs)
             leg.UpdateAllItemStatuses(status);

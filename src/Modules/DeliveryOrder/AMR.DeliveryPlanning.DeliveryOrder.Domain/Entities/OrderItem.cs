@@ -3,7 +3,7 @@ using AMR.DeliveryPlanning.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 
-public class OrderLine : Entity<Guid>
+public class OrderItem : Entity<Guid>
 {
     public Guid DeliveryLegId { get; private set; }
     public int WorkOrderId { get; private set; }
@@ -13,13 +13,16 @@ public class OrderLine : Entity<Guid>
     public string ItemDescription { get; private set; } = string.Empty;
     public double Quantity { get; private set; }
     public double Weight { get; private set; }
+    public string? Line { get; private set; }
+    public string? Model { get; private set; }
     public string? Remarks { get; private set; }
-    public OrderLineStatus ItemStatus { get; private set; }
+    public OrderItemStatus ItemStatus { get; private set; }
 
-    private OrderLine() { } // For EF Core
+    private OrderItem() { } // For EF Core
 
-    internal OrderLine(Guid deliveryLegId, int workOrderId, string workOrder, int itemId,
-        string itemNumber, string itemDescription, double quantity, double weight, string? remarks)
+    internal OrderItem(Guid deliveryLegId, int workOrderId, string workOrder, int itemId,
+        string itemNumber, string itemDescription, double quantity, double weight,
+        string? line, string? model, string? remarks)
     {
         Id = Guid.NewGuid();
         DeliveryLegId = deliveryLegId;
@@ -30,11 +33,13 @@ public class OrderLine : Entity<Guid>
         ItemDescription = itemDescription;
         Quantity = quantity;
         Weight = weight;
+        Line = line;
+        Model = model;
         Remarks = remarks;
-        ItemStatus = OrderLineStatus.Pending;
+        ItemStatus = OrderItemStatus.Pending;
     }
 
-    internal void UpdateStatus(OrderLineStatus status)
+    internal void UpdateStatus(OrderItemStatus status)
     {
         ItemStatus = status;
     }

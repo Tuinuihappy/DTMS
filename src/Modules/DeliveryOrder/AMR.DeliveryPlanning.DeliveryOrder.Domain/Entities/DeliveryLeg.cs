@@ -12,8 +12,8 @@ public class DeliveryLeg : Entity<Guid>
     public Guid? PickupStationId { get; private set; }
     public Guid? DropStationId { get; private set; }
 
-    private readonly List<OrderLine> _orderLines = new();
-    public IReadOnlyCollection<OrderLine> OrderLines => _orderLines.AsReadOnly();
+    private readonly List<OrderItem> _orderItems = new();
+    public IReadOnlyCollection<OrderItem> OrderItems => _orderItems.AsReadOnly();
 
     private DeliveryLeg() { } // For EF Core
 
@@ -27,15 +27,16 @@ public class DeliveryLeg : Entity<Guid>
     }
 
     internal void AddItem(int workOrderId, string workOrder, int itemId, string itemNumber,
-        string itemDescription, double quantity, double weight, string? remarks = null)
+        string itemDescription, double quantity, double weight,
+        string? line = null, string? model = null, string? remarks = null)
     {
-        _orderLines.Add(new OrderLine(Id, workOrderId, workOrder, itemId, itemNumber, itemDescription, quantity, weight, remarks));
+        _orderItems.Add(new OrderItem(Id, workOrderId, workOrder, itemId, itemNumber, itemDescription, quantity, weight, line, model, remarks));
     }
 
-    internal void UpdateAllItemStatuses(OrderLineStatus status)
+    internal void UpdateAllItemStatuses(OrderItemStatus status)
     {
-        foreach (var line in _orderLines)
-            line.UpdateStatus(status);
+        foreach (var item in _orderItems)
+            item.UpdateStatus(status);
     }
 
     internal void SetStationIds(Guid pickupStationId, Guid dropStationId)

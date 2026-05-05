@@ -9,6 +9,8 @@ public interface IVendorAdapterFactory
     Task<VehicleAdapterResolution> GetAdapterResolutionForVehicleAsync(
         Guid vehicleId,
         CancellationToken cancellationToken = default);
+
+    IVehicleCommandService GetAdapterByKey(string adapterKey);
 }
 
 public sealed record VehicleAdapterResolution(

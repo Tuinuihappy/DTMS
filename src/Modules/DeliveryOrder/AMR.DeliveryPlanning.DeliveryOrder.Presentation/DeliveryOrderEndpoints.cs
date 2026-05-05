@@ -59,7 +59,7 @@ public static class DeliveryOrderEndpoints
         });
 
         // GET /api/delivery-orders?status=&page=&pageSize=
-        group.MapGet("/", async (string? status, int page, int pageSize, ISender sender) =>
+        group.MapGet("/", async (string? status, ISender sender, int page = 1, int pageSize = 20) =>
         {
             OrderStatus? orderStatus = status != null && Enum.TryParse<OrderStatus>(status, true, out var s) ? s : null;
             var result = await sender.Send(new GetDeliveryOrdersQuery(orderStatus, page <= 0 ? 1 : page, pageSize <= 0 ? 20 : pageSize));

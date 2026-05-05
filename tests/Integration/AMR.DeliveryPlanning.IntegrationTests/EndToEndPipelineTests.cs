@@ -133,12 +133,14 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var resp = await client.PostAsJsonAsync("/api/delivery-orders", new
         {
-            OrderKey = $"E2E-{Guid.NewGuid():N}",
+            OrderId = 2001,
+            OrderNo = $"E2E-{Guid.NewGuid():N}",
+            CreateBy = "test-user",
             PickupLocationCode = pickupId.ToString(),
             DropLocationCode = dropId.ToString(),
             Priority = 0,
             SLA = DateTime.UtcNow.AddHours(4),
-            Lines = new[] { new { ItemCode = "ITEM-A", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
+            OrderItems = new[] { new { ItemCode = "ITEM-A", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
         });
         resp.IsSuccessStatusCode.Should().BeTrue($"Submit order failed: {await resp.Content.ReadAsStringAsync()}");
         return await resp.Content.ReadFromJsonAsync<Guid>();

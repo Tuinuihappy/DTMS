@@ -21,5 +21,5 @@ public record PlanCommittedIntegrationEvent(
     DateTime OccurredOn,
     Guid TenantId,
     Guid JobId,
-    Guid VehicleId,
+    Guid? VehicleId,
     List<PlannedLegDto> Legs) : IIntegrationEvent;

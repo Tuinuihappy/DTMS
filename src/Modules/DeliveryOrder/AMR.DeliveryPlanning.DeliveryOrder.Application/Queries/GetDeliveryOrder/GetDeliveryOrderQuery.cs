@@ -4,7 +4,7 @@ using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 
-public record OrderLineDto(
+public record OrderItemDto(
     Guid Id,
     int WorkOrderId,
     string WorkOrder,
@@ -13,6 +13,8 @@ public record OrderLineDto(
     string ItemDescription,
     double Quantity,
     double Weight,
+    string? Line,
+    string? Model,
     string? Remarks,
     string ItemStatus);
 
@@ -23,11 +25,13 @@ public record DeliveryLegDto(
     string DropLocationCode,
     Guid? PickupStationId,
     Guid? DropStationId,
-    IReadOnlyList<OrderLineDto> Lines);
+    IReadOnlyList<OrderItemDto> OrderItems);
 
 public record DeliveryOrderDto(
     Guid Id,
-    string OrderKey,
+    int OrderId,
+    string OrderNo,
+    string CreateBy,
     string Priority,
     string Status,
     DateTime? SLA,
@@ -71,7 +75,9 @@ file static class DeliveryOrderMapper
     public static DeliveryOrderDto MapToDto(Domain.Entities.DeliveryOrder order) =>
         new(
             order.Id,
-            order.OrderKey,
+            order.OrderId,
+            order.OrderNo,
+            order.CreateBy,
             order.Priority.ToString(),
             order.Status.ToString(),
             order.SLA,
@@ -84,9 +90,9 @@ file static class DeliveryOrderMapper
                     l.DropLocationCode,
                     l.PickupStationId,
                     l.DropStationId,
-                    l.OrderLines.Select(ol => new OrderLineDto(
+                    l.OrderItems.Select(ol => new OrderItemDto(
                         ol.Id, ol.WorkOrderId, ol.WorkOrder, ol.ItemId, ol.ItemNumber,
-                        ol.ItemDescription, ol.Quantity, ol.Weight, ol.Remarks,
-                        ol.ItemStatus.ToString())).ToList()))
+                        ol.ItemDescription, ol.Quantity, ol.Weight, ol.Line, ol.Model,
+                        ol.Remarks, ol.ItemStatus.ToString())).ToList()))
                 .ToList());
 }

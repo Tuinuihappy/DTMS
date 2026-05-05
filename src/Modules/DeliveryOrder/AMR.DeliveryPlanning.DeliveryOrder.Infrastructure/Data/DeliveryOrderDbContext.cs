@@ -13,7 +13,7 @@ public class DeliveryOrderDbContext : DbContext
 
     public DbSet<Domain.Entities.DeliveryOrder> DeliveryOrders { get; set; } = null!;
     public DbSet<DeliveryLeg> DeliveryLegs { get; set; } = null!;
-    public DbSet<OrderLine> OrderLines { get; set; } = null!;
+    public DbSet<OrderItem> OrderItems { get; set; } = null!;
     public DbSet<RecurringSchedule> RecurringSchedules { get; set; } = null!;
     public DbSet<OrderAmendment> OrderAmendments { get; set; } = null!;
     public DbSet<OrderAuditEvent> OrderAuditEvents { get; set; } = null!;
@@ -33,15 +33,18 @@ public class DeliveryOrderDbContext : DbContext
         {
             b.HasKey(o => o.Id);
             b.Property(o => o.TenantId).IsRequired();
-            b.Property(o => o.OrderKey).HasMaxLength(50).IsRequired();
+            b.Property(o => o.OrderId).IsRequired();
+            b.Property(o => o.OrderNo).HasMaxLength(50).IsRequired();
+            b.Property(o => o.CreateBy).HasMaxLength(100).IsRequired();
             b.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20);
             b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
-            b.HasIndex(o => new { o.TenantId, o.OrderKey }).IsUnique();
+            b.HasIndex(o => new { o.TenantId, o.OrderNo }).IsUnique();
+            b.HasIndex(o => o.OrderId);
             b.HasQueryFilter(o => o.TenantId == _tenantContext.TenantId);
             // Map PostgreSQL system column xmin as optimistic concurrency token (no DDL needed — xmin is auto-maintained)
             b.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion().IsConcurrencyToken();
             b.Ignore(o => o.DomainEvents);
-            b.Ignore(o => o.AllOrderLines);
+            b.Ignore(o => o.AllOrderItems);
 
             b.HasMany(o => o.Legs)
              .WithOne()
@@ -60,13 +63,13 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(l => l.PickupLocationCode).HasMaxLength(50).IsRequired();
             b.Property(l => l.DropLocationCode).HasMaxLength(50).IsRequired();
 
-            b.HasMany(l => l.OrderLines)
+            b.HasMany(l => l.OrderItems)
              .WithOne()
              .HasForeignKey(ol => ol.DeliveryLegId)
              .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<OrderLine>(b =>
+        modelBuilder.Entity<OrderItem>(b =>
         {
             b.HasKey(l => l.Id);
             b.Property(l => l.WorkOrderId).IsRequired();
@@ -74,6 +77,8 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(l => l.ItemId).IsRequired();
             b.Property(l => l.ItemNumber).HasMaxLength(50).IsRequired();
             b.Property(l => l.ItemDescription).HasMaxLength(200).IsRequired();
+            b.Property(l => l.Line).HasMaxLength(100);
+            b.Property(l => l.Model).HasMaxLength(100);
             b.Property(l => l.Remarks).HasMaxLength(200);
             b.Property(l => l.ItemStatus).HasConversion<string>().HasMaxLength(20);
         });

@@ -8,7 +8,7 @@ public class Trip : AggregateRoot<Guid>
 {
     public Guid TenantId { get; private set; }
     public Guid JobId { get; private set; }
-    public Guid VehicleId { get; private set; }
+    public Guid? VehicleId { get; private set; }
     public TripStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? StartedAt { get; private set; }
@@ -28,7 +28,7 @@ public class Trip : AggregateRoot<Guid>
 
     private Trip() { }
 
-    public Trip(Guid tenantId, Guid jobId, Guid vehicleId)
+    public Trip(Guid tenantId, Guid jobId, Guid? vehicleId)
     {
         Id = Guid.NewGuid();
         TenantId = tenantId;

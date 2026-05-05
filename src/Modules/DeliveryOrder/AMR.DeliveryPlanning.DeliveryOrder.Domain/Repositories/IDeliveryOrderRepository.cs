@@ -6,7 +6,7 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 public interface IDeliveryOrderRepository
 {
     Task<Entities.DeliveryOrder?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<Entities.DeliveryOrder?> GetByOrderKeyAsync(string orderKey, CancellationToken cancellationToken = default);
+    Task<Entities.DeliveryOrder?> GetByOrderNoAsync(string orderNo, CancellationToken cancellationToken = default);
     Task<List<Entities.DeliveryOrder>> GetByStatusAsync(OrderStatus status, int page, int pageSize, CancellationToken cancellationToken = default);
     Task<List<Entities.DeliveryOrder>> GetAllAsync(int page, int pageSize, CancellationToken cancellationToken = default);
     Task AddAsync(Entities.DeliveryOrder order, CancellationToken cancellationToken = default);

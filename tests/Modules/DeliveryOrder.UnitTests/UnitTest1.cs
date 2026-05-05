@@ -6,14 +6,14 @@ namespace DeliveryOrder.UnitTests;
 
 public class DeliveryOrderTests
 {
-    private static AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder CreateOrder(string orderKey = "WMS-001")
-        => new(Guid.Empty, orderKey, OrderPriority.Normal, null);
+    private static AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder CreateOrder(string orderNo = "WMS-001")
+        => new(Guid.Empty, 1001, orderNo, "test-user", OrderPriority.Normal, null);
 
     private static void AddLine(
         AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder order,
         string pickupLocationCode = "LOC-A",
         string dropLocationCode = "LOC-B")
-        => order.AddOrderLine(
+        => order.AddOrderItem(
             pickupLocationCode,
             dropLocationCode,
             workOrderId: 1001,
@@ -38,12 +38,12 @@ public class DeliveryOrderTests
         var order = CreateOrder();
 
         order.Status.Should().Be(OrderStatus.Submitted);
-        order.OrderKey.Should().Be("WMS-001");
+        order.OrderNo.Should().Be("WMS-001");
         order.Legs.Should().BeEmpty();
     }
 
     [Fact]
-    public void AddOrderLine_ShouldAddLineToLeg()
+    public void AddOrderItem_ShouldAddLineToLeg()
     {
         var order = CreateOrder("WMS-002");
 
@@ -52,8 +52,8 @@ public class DeliveryOrderTests
         order.Legs.Should().HaveCount(1);
         order.Legs.First().PickupLocationCode.Should().Be("LOC-A");
         order.Legs.First().DropLocationCode.Should().Be("LOC-B");
-        order.AllOrderLines.Should().ContainSingle();
-        order.AllOrderLines.First().ItemNumber.Should().Be("ITEM-001");
+        order.AllOrderItems.Should().ContainSingle();
+        order.AllOrderItems.First().ItemNumber.Should().Be("ITEM-001");
     }
 
     [Fact]

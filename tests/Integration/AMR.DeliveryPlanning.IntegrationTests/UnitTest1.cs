@@ -94,12 +94,14 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
 
         var response = await client.PostAsJsonAsync("/api/delivery-orders", new
         {
-            OrderKey = $"TEST-{Guid.NewGuid():N}",
+            OrderId = 1001,
+            OrderNo = $"TEST-{Guid.NewGuid():N}",
+            CreateBy = "test-user",
             PickupLocationCode = pickupId.ToString(),
             DropLocationCode = dropId.ToString(),
             Priority = 0,
             SLA = DateTime.UtcNow.AddHours(4),
-            Lines = new[]
+            OrderItems = new[]
             {
                 new { ItemCode = "ITEM-A", Quantity = 10, Weight = 5.0, Remarks = "Test item" }
             }

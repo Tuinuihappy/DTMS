@@ -21,15 +21,13 @@ public class Riot3CommandService : IVehicleCommandService
     public async Task<Result> SendTaskAsync(Guid vehicleId, RobotTaskCommand command, CancellationToken cancellationToken = default)
     {
         var riot3VehicleKey = command.VendorVehicleKey;
-        if (string.IsNullOrWhiteSpace(riot3VehicleKey))
-        {
-            _logger.LogWarning("RIOT3 vehicle {VehicleId} has no VendorVehicleKey/deviceKey; task {TaskId} was not sent",
-                vehicleId, command.TaskId);
-            return Result.Failure($"RIOT3 vehicle {vehicleId} has no configured VendorVehicleKey/deviceKey.");
-        }
 
-        _logger.LogInformation("Sending task {TaskId} ({Action}) to RIOT3 vehicle {VehicleId} ({DeviceKey})",
-            command.TaskId, command.Action, vehicleId, riot3VehicleKey);
+        if (string.IsNullOrWhiteSpace(riot3VehicleKey))
+            _logger.LogInformation("Sending task {TaskId} ({Action}) to RIOT3 without AppointVehicleKey — RIOT3 will auto-assign",
+                command.TaskId, command.Action);
+        else
+            _logger.LogInformation("Sending task {TaskId} ({Action}) to RIOT3 vehicle {VehicleId} ({DeviceKey})",
+                command.TaskId, command.Action, vehicleId, riot3VehicleKey);
 
         if (RequiresStationTarget(command)
             && (string.IsNullOrWhiteSpace(command.MapId) || string.IsNullOrWhiteSpace(command.TargetNodeId)))
@@ -48,7 +46,7 @@ public class Riot3CommandService : IVehicleCommandService
             OrderType = "WORK",
             Priority = 10,
             StructureType = "sequence",
-            AppointVehicleKey = riot3VehicleKey,
+            AppointVehicleKey = string.IsNullOrWhiteSpace(riot3VehicleKey) ? null : riot3VehicleKey,
             Missions = new List<Riot3Mission> { mission }
         };
 

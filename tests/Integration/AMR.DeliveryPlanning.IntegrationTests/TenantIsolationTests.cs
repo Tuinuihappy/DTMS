@@ -34,12 +34,14 @@ public class TenantIsolationTests : IClassFixture<DtmsWebApplicationFactory>
 
         var orderResp = await clientB.PostAsJsonAsync("/api/delivery-orders", new
         {
-            OrderKey = $"ISO-B-{Guid.NewGuid():N}",
+            OrderId = 3001,
+            OrderNo = $"ISO-B-{Guid.NewGuid():N}",
+            CreateBy = "test-user",
             PickupLocationCode = pickupId.ToString(),
             DropLocationCode = dropId.ToString(),
             Priority = 0,
             SLA = DateTime.UtcNow.AddHours(4),
-            Lines = new[] { new { ItemCode = "X", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
+            OrderItems = new[] { new { ItemCode = "X", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
         });
         orderResp.IsSuccessStatusCode.Should().BeTrue(
             $"Tenant B should be able to submit an order: {await orderResp.Content.ReadAsStringAsync()}");
@@ -65,24 +67,28 @@ public class TenantIsolationTests : IClassFixture<DtmsWebApplicationFactory>
 
         var orderAResp = await clientA.PostAsJsonAsync("/api/delivery-orders", new
         {
-            OrderKey = keyA,
+            OrderId = 3002,
+            OrderNo = keyA,
+            CreateBy = "test-user",
             PickupLocationCode = pickupId.ToString(),
             DropLocationCode = dropId.ToString(),
             Priority = 0,
             SLA = DateTime.UtcNow.AddHours(4),
-            Lines = new[] { new { ItemCode = "A", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
+            OrderItems = new[] { new { ItemCode = "A", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
         });
         orderAResp.IsSuccessStatusCode.Should().BeTrue(
             $"Tenant A order creation failed: {await orderAResp.Content.ReadAsStringAsync()}");
 
         var orderBResp = await clientB.PostAsJsonAsync("/api/delivery-orders", new
         {
-            OrderKey = keyB,
+            OrderId = 3003,
+            OrderNo = keyB,
+            CreateBy = "test-user",
             PickupLocationCode = pickupId.ToString(),
             DropLocationCode = dropId.ToString(),
             Priority = 0,
             SLA = DateTime.UtcNow.AddHours(4),
-            Lines = new[] { new { ItemCode = "B", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
+            OrderItems = new[] { new { ItemCode = "B", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
         });
         orderBResp.IsSuccessStatusCode.Should().BeTrue(
             $"Tenant B order creation failed: {await orderBResp.Content.ReadAsStringAsync()}");
