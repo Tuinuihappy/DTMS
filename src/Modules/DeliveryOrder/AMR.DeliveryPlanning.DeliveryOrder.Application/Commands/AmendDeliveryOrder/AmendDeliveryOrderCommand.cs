@@ -1,11 +1,11 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AmendDeliveryOrder;
 
+public record AmendServiceWindowDto(DateTime? Earliest, DateTime? Latest);
+
 public record AmendDeliveryOrderCommand(
     Guid OrderId,
     string Reason,
-    OrderPriority? NewPriority,
-    DateTime? NewSla,
+    AmendServiceWindowDto? NewServiceWindow,
     string? AmendedBy) : ICommand<Guid>;

@@ -2,6 +2,7 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 
 public enum OrderStatus
 {
+    Draft,
     Submitted,
     Validated,
     ReadyToPlan,

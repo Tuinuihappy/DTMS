@@ -3,6 +3,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.SharedKernel.Tenancy;
+using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
 
@@ -27,44 +28,44 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
 
     public async Task<Result<Guid>> Handle(SubmitDeliveryOrderCommand request, CancellationToken cancellationToken)
     {
-        var stationMap = await BuildStationMapAsync(request.OrderItems, cancellationToken);
+        var order = await _repository.GetByIdAsync(request.OrderId, cancellationToken);
+        if (order is null)
+            return Result<Guid>.Failure($"Order {request.OrderId} not found.");
+
+        var stationMap = await BuildStationMapAsync(order.Legs, cancellationToken);
         if (stationMap.IsFailure) return Result<Guid>.Failure(stationMap.Error);
 
-        var order = new Domain.Entities.DeliveryOrder(
-            _tenantContext.TenantId,
-            request.OrderId,
-            request.OrderNo,
-            request.CreateBy,
-            request.Priority,
-            request.SLA);
+        try
+        {
+            order.Submit();
+            order.MarkAsValidated(stationMap.Value);
+            order.MarkReadyToPlan();
 
-        foreach (var line in request.OrderItems)
-            order.AddOrderItem(line.PickupLocationCode, line.DropLocationCode,
-                line.WorkOrderId, line.WorkOrder, line.ItemId, line.ItemNumber,
-                line.ItemDescription, line.Quantity, line.Weight, line.Line, line.Model, line.Remarks);
+            await _repository.UpdateAsync(order, cancellationToken);
 
-        if (request.Schedule != null)
-            order.SetRecurringSchedule(request.Schedule.CronExpression, request.Schedule.ValidFrom, request.Schedule.ValidUntil);
+            await _auditRepo.AddAsync(new OrderAuditEvent(
+                order.Id, "OrderSubmitted",
+                $"Order '{order.OrderName}' submitted with SLA tier {order.SlaTier}",
+                _tenantContext.TenantId.ToString()), cancellationToken);
 
-        order.MarkAsValidated(stationMap.Value);
-        order.MarkReadyToPlan();
+            await _repository.SaveChangesAsync(cancellationToken);
 
-        await _repository.AddAsync(order, cancellationToken);
-
-        await _auditRepo.AddAsync(new OrderAuditEvent(
-            order.Id, "OrderSubmitted",
-            $"Order {request.OrderNo} submitted with priority {request.Priority}",
-            _tenantContext.TenantId.ToString()), cancellationToken);
-
-        await _repository.SaveChangesAsync(cancellationToken);
-
-        return Result<Guid>.Success(order.Id);
+            return Result<Guid>.Success(order.Id);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result<Guid>.Failure(ex.Message);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result<Guid>.Failure("The order was modified by another process. Please retry.");
+        }
     }
 
     private async Task<Result<IReadOnlyDictionary<(string pickup, string drop), (Guid pickupStationId, Guid dropStationId)>>>
-        BuildStationMapAsync(IEnumerable<OrderItemDto> lines, CancellationToken cancellationToken)
+        BuildStationMapAsync(IEnumerable<Domain.Entities.DeliveryLeg> legs, CancellationToken cancellationToken)
     {
-        var uniquePairs = lines
+        var uniquePairs = legs
             .Select(l => (l.PickupLocationCode, l.DropLocationCode))
             .Distinct()
             .ToList();

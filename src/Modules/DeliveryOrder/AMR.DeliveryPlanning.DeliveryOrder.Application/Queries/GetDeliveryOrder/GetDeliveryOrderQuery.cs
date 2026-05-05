@@ -4,15 +4,21 @@ using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 
+public record DimsDto(double LengthMm, double WidthMm, double HeightMm);
+public record TemperatureRangeDto(double? MinCelsius, double? MaxCelsius);
+
 public record OrderItemDto(
     Guid Id,
-    int WorkOrderId,
-    string WorkOrder,
-    int ItemId,
+    string? WorkOrder,
     string ItemNumber,
     string ItemDescription,
     double Quantity,
-    double Weight,
+    double? Weight,
+    string LoadUnitType,
+    DimsDto? Dims,
+    int? HazmatClass,
+    TemperatureRangeDto? TemperatureRange,
+    List<string> HandlingInstructions,
     string? Line,
     string? Model,
     string? Remarks,
@@ -27,14 +33,16 @@ public record DeliveryLegDto(
     Guid? DropStationId,
     IReadOnlyList<OrderItemDto> OrderItems);
 
+public record ServiceWindowDto(DateTime? Earliest, DateTime? Latest);
+
 public record DeliveryOrderDto(
     Guid Id,
-    int OrderId,
-    string OrderNo,
-    string CreateBy,
-    string Priority,
+    string OrderName,
+    string SlaTier,
+    string StructureType,
     string Status,
-    DateTime? SLA,
+    ServiceWindowDto ServiceWindow,
+    List<string> Tags,
     IReadOnlyList<DeliveryLegDto> Legs);
 
 public record GetDeliveryOrderQuery(Guid OrderId) : IQuery<DeliveryOrderDto>;
@@ -75,12 +83,12 @@ file static class DeliveryOrderMapper
     public static DeliveryOrderDto MapToDto(Domain.Entities.DeliveryOrder order) =>
         new(
             order.Id,
-            order.OrderId,
-            order.OrderNo,
-            order.CreateBy,
-            order.Priority.ToString(),
+            order.OrderName,
+            order.SlaTier.ToString(),
+            order.StructureType.ToString(),
             order.Status.ToString(),
-            order.SLA,
+            new ServiceWindowDto(order.ServiceWindow.Earliest, order.ServiceWindow.Latest),
+            order.Tags,
             order.Legs
                 .OrderBy(l => l.Sequence)
                 .Select(l => new DeliveryLegDto(
@@ -91,8 +99,14 @@ file static class DeliveryOrderMapper
                     l.PickupStationId,
                     l.DropStationId,
                     l.OrderItems.Select(ol => new OrderItemDto(
-                        ol.Id, ol.WorkOrderId, ol.WorkOrder, ol.ItemId, ol.ItemNumber,
-                        ol.ItemDescription, ol.Quantity, ol.Weight, ol.Line, ol.Model,
-                        ol.Remarks, ol.ItemStatus.ToString())).ToList()))
+                        ol.Id, ol.WorkOrder, ol.ItemNumber, ol.ItemDescription,
+                        ol.Quantity, ol.Weight,
+                        ol.LoadUnitType.ToString(),
+                        ol.Dims is null ? null : new DimsDto(ol.Dims.LengthMm, ol.Dims.WidthMm, ol.Dims.HeightMm),
+                        ol.HazmatClass,
+                        ol.TemperatureRange is null ? null : new TemperatureRangeDto(ol.TemperatureRange.MinCelsius, ol.TemperatureRange.MaxCelsius),
+                        ol.HandlingInstructions.Select(h => h.ToString()).ToList(),
+                        ol.Line, ol.Model, ol.Remarks,
+                        ol.ItemStatus.ToString())).ToList()))
                 .ToList());
 }

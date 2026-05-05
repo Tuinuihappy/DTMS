@@ -17,9 +17,6 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
             .Include(o => o.Schedule)
             .FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
 
-    public Task<Domain.Entities.DeliveryOrder?> GetByOrderNoAsync(string orderNo, CancellationToken cancellationToken = default)
-        => _context.DeliveryOrders.FirstOrDefaultAsync(o => o.OrderNo == orderNo, cancellationToken);
-
     public async Task<List<Domain.Entities.DeliveryOrder>> GetByStatusAsync(OrderStatus status, int page, int pageSize, CancellationToken cancellationToken = default)
         => await _context.DeliveryOrders
             .Where(o => o.Status == status)

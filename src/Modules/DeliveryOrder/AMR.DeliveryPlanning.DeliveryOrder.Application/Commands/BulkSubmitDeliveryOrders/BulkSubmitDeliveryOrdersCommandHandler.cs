@@ -1,6 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 
@@ -31,20 +32,34 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
 
         foreach (var cmd in request.Orders)
         {
-            var stationMap = await BuildStationMapAsync(cmd.OrderItems, cancellationToken);
-            if (stationMap.IsFailure) return Result<List<Guid>>.Failure(stationMap.Error);
+            var serviceWindow = new ServiceWindow(
+                cmd.ServiceWindow?.Earliest,
+                cmd.ServiceWindow?.Latest);
 
-            var order = new Domain.Entities.DeliveryOrder(
-                _tenantContext.TenantId, cmd.OrderId, cmd.OrderNo, cmd.CreateBy, cmd.Priority, cmd.SLA);
+            var order = Domain.Entities.DeliveryOrder.Create(
+                _tenantContext.TenantId, cmd.OrderName,
+                cmd.SlaTier, serviceWindow, cmd.StructureType, cmd.Tags);
 
-            foreach (var line in cmd.OrderItems)
-                order.AddOrderItem(line.PickupLocationCode, line.DropLocationCode,
-                    line.WorkOrderId, line.WorkOrder, line.ItemId, line.ItemNumber,
-                    line.ItemDescription, line.Quantity, line.Weight, line.Line, line.Model, line.Remarks);
+            foreach (var item in cmd.OrderItems)
+            {
+                var dims = item.Dims is null ? null : new Dims(item.Dims.LengthMm, item.Dims.WidthMm, item.Dims.HeightMm);
+                var tempRange = item.TemperatureRange is null ? null
+                    : new TemperatureRange(item.TemperatureRange.MinCelsius, item.TemperatureRange.MaxCelsius);
+
+                order.AddOrderItem(item.PickupLocationCode, item.DropLocationCode,
+                    item.WorkOrder, item.ItemNumber, item.ItemDescription,
+                    item.Quantity, item.Weight, item.LoadUnitType,
+                    item.Line, item.Model, item.Remarks,
+                    dims, item.HazmatClass, tempRange, item.HandlingInstructions);
+            }
 
             if (cmd.Schedule != null)
                 order.SetRecurringSchedule(cmd.Schedule.CronExpression, cmd.Schedule.ValidFrom, cmd.Schedule.ValidUntil);
 
+            var stationMap = await BuildStationMapAsync(order.Legs, cancellationToken);
+            if (stationMap.IsFailure) return Result<List<Guid>>.Failure(stationMap.Error);
+
+            order.Submit();
             order.MarkAsValidated(stationMap.Value);
             order.MarkReadyToPlan();
 
@@ -58,9 +73,9 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
     }
 
     private async Task<Result<IReadOnlyDictionary<(string pickup, string drop), (Guid pickupStationId, Guid dropStationId)>>>
-        BuildStationMapAsync(IEnumerable<OrderItemDto> lines, CancellationToken cancellationToken)
+        BuildStationMapAsync(IEnumerable<Domain.Entities.DeliveryLeg> legs, CancellationToken cancellationToken)
     {
-        var uniquePairs = lines
+        var uniquePairs = legs
             .Select(l => (l.PickupLocationCode, l.DropLocationCode))
             .Distinct()
             .ToList();

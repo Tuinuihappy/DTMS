@@ -1,6 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AmendDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkSubmitDeliveryOrders;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CancelDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderTimeline;
@@ -22,8 +23,8 @@ public static class DeliveryOrderEndpoints
     {
         var group = app.MapGroup("/api/delivery-orders").WithTags("DeliveryOrders").RequireAuthorization();
 
-        // POST /api/delivery-orders — with Idempotency-Key header
-        group.MapPost("/", async (SubmitDeliveryOrderCommand command, HttpContext ctx, ISender sender, IDistributedCache cache) =>
+        // POST /api/delivery-orders — create draft (supports Idempotency-Key header)
+        group.MapPost("/", async (CreateDraftDeliveryOrderCommand command, HttpContext ctx, ISender sender, IDistributedCache cache) =>
         {
             var idempotencyKey = ctx.Request.Headers["Idempotency-Key"].FirstOrDefault();
 
@@ -42,6 +43,13 @@ public static class DeliveryOrderEndpoints
                     new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24) });
 
             return Results.Created($"/api/delivery-orders/{result.Value}", result.Value);
+        });
+
+        // POST /api/delivery-orders/{id}/submit — submit draft (validate + ready to plan)
+        group.MapPost("/{id:guid}/submit", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new SubmitDeliveryOrderCommand(id));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
         // POST /api/delivery-orders/bulk

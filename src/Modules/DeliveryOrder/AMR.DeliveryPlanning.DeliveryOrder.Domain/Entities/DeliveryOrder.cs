@@ -1,18 +1,20 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Domain;
+
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 
 public class DeliveryOrder : AggregateRoot<Guid>
 {
     public Guid TenantId { get; private set; }
-    public int OrderId { get; private set; }
-    public string OrderNo { get; private set; } = string.Empty;
-    public string CreateBy { get; private set; } = string.Empty;
-    public OrderPriority Priority { get; private set; }
+    public string OrderName { get; private set; } = string.Empty;
+    public SlaTier SlaTier { get; private set; }
+    public StructureType StructureType { get; private set; }
     public OrderStatus Status { get; private set; }
-    public DateTime? SLA { get; private set; }
+    public ServiceWindow ServiceWindow { get; private set; } = null!;
+    public List<string> Tags { get; private set; } = [];
 
     private readonly List<DeliveryLeg> _legs = new();
     public IReadOnlyCollection<DeliveryLeg> Legs => _legs.AsReadOnly();
@@ -24,24 +26,43 @@ public class DeliveryOrder : AggregateRoot<Guid>
 
     private DeliveryOrder() { } // For EF Core
 
-    public DeliveryOrder(Guid tenantId, int orderId, string orderNo, string createBy, OrderPriority priority, DateTime? sla)
+    public static DeliveryOrder Create(Guid tenantId, string orderName, SlaTier slaTier,
+        ServiceWindow serviceWindow, StructureType structureType = StructureType.Sequence,
+        IEnumerable<string>? tags = null)
     {
-        Id = Guid.NewGuid();
-        TenantId = tenantId;
-        OrderId = orderId;
-        OrderNo = orderNo;
-        CreateBy = createBy;
-        Priority = priority;
-        SLA = sla;
-        Status = OrderStatus.Submitted;
+        var order = new DeliveryOrder
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            OrderName = orderName,
+            SlaTier = slaTier,
+            ServiceWindow = serviceWindow,
+            StructureType = structureType,
+            Tags = tags?.ToList() ?? [],
+            Status = OrderStatus.Draft
+        };
 
-        AddDomainEvent(new DeliveryOrderSubmittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, OrderNo));
+        order.AddDomainEvent(new DeliveryOrderDraftedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, order.Id));
+        return order;
+    }
+
+    public void Submit()
+    {
+        if (Status != OrderStatus.Draft)
+            throw new InvalidOperationException("Only Draft orders can be submitted.");
+
+        Status = OrderStatus.Submitted;
+        AddDomainEvent(new DeliveryOrderSubmittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
     public void AddOrderItem(string pickupLocationCode, string dropLocationCode,
-        int workOrderId, string workOrder, int itemId, string itemNumber,
-        string itemDescription, double quantity, double weight,
-        string? line = null, string? model = null, string? remarks = null)
+        string? workOrder, string itemNumber,
+        string itemDescription, double quantity, double? weight,
+        LoadUnitType loadUnitType,
+        string? line = null, string? model = null, string? remarks = null,
+        Dims? dims = null, int? hazmatClass = null,
+        TemperatureRange? temperatureRange = null,
+        IEnumerable<HandlingInstruction>? handlingInstructions = null)
     {
         var leg = _legs.FirstOrDefault(l =>
             l.PickupLocationCode == pickupLocationCode &&
@@ -53,7 +74,8 @@ public class DeliveryOrder : AggregateRoot<Guid>
             _legs.Add(leg);
         }
 
-        leg.AddItem(workOrderId, workOrder, itemId, itemNumber, itemDescription, quantity, weight, line, model, remarks);
+        leg.AddItem(workOrder, itemNumber, itemDescription, quantity, weight,
+            loadUnitType, line, model, remarks, dims, hazmatClass, temperatureRange, handlingInstructions);
     }
 
     public void UpdateAllItemStatuses(Enums.OrderItemStatus status)
@@ -65,6 +87,17 @@ public class DeliveryOrder : AggregateRoot<Guid>
     public void SetRecurringSchedule(string cronExpression, DateTime? validFrom, DateTime? validUntil)
     {
         Schedule = new RecurringSchedule(Id, cronExpression, validFrom, validUntil);
+    }
+
+    public void AddTag(string tag)
+    {
+        if (!Tags.Contains(tag, StringComparer.OrdinalIgnoreCase))
+            Tags.Add(tag);
+    }
+
+    public void RemoveTag(string tag)
+    {
+        Tags.RemoveAll(t => t.Equals(tag, StringComparison.OrdinalIgnoreCase));
     }
 
     public void MarkAsValidated(IReadOnlyDictionary<(string pickup, string drop), (Guid pickupStationId, Guid dropStationId)> stationMap)
@@ -96,7 +129,7 @@ public class DeliveryOrder : AggregateRoot<Guid>
             .ToList();
 
         AddDomainEvent(new DeliveryOrderReadyToPlanDomainEvent(
-            Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, Priority.ToString(), legDtos));
+            Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, SlaTier.ToString(), legDtos));
     }
 
     public void MarkPlanning()
@@ -180,22 +213,12 @@ public class DeliveryOrder : AggregateRoot<Guid>
         AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, TenantId, Id));
     }
 
-    public void AmendPriority(OrderPriority newPriority, string reason)
+    public void AmendServiceWindow(ServiceWindow newServiceWindow, string reason)
     {
         if (Status == OrderStatus.Completed || Status == OrderStatus.Cancelled)
             throw new InvalidOperationException($"Cannot amend a {Status} order.");
 
-        Priority = newPriority;
-        Status = OrderStatus.Amended;
-        AddDomainEvent(new DeliveryOrderAmendedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
-    }
-
-    public void AmendSla(DateTime newSla, string reason)
-    {
-        if (Status == OrderStatus.Completed || Status == OrderStatus.Cancelled)
-            throw new InvalidOperationException($"Cannot amend a {Status} order.");
-
-        SLA = newSla;
+        ServiceWindow = newServiceWindow;
         Status = OrderStatus.Amended;
         AddDomainEvent(new DeliveryOrderAmendedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
     }

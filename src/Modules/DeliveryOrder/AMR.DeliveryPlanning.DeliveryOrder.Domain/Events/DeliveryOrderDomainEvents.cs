@@ -4,7 +4,8 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
 
 public record DeliveryLegEventDto(Guid LegId, int Sequence, Guid PickupStationId, Guid DropStationId);
 
-public record DeliveryOrderSubmittedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string OrderNo) : IDomainEvent;
+public record DeliveryOrderDraftedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
+public record DeliveryOrderSubmittedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
 public record DeliveryOrderValidatedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
 public record DeliveryOrderCancelledDomainEvent(Guid EventId, DateTime OccurredOn, Guid TenantId, Guid OrderId, string Reason) : IDomainEvent;
 public record DeliveryOrderReadyToPlanDomainEvent(
@@ -12,7 +13,7 @@ public record DeliveryOrderReadyToPlanDomainEvent(
     DateTime OccurredOn,
     Guid TenantId,
     Guid OrderId,
-    string Priority,
+    string SlaTier,
     IReadOnlyList<DeliveryLegEventDto> Legs) : IDomainEvent;
 public record DeliveryOrderPlanningStartedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
 public record DeliveryOrderPlannedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;

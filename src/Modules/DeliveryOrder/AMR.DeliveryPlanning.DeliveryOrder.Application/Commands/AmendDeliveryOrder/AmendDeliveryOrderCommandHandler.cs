@@ -1,6 +1,7 @@
 using System.Text.Json;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,35 +25,33 @@ public class AmendDeliveryOrderCommandHandler : ICommandHandler<AmendDeliveryOrd
         var order = await _orderRepo.GetByIdAsync(request.OrderId, cancellationToken);
         if (order == null) return Result<Guid>.Failure($"Order {request.OrderId} not found.");
 
+        if (request.NewServiceWindow is null)
+            return Result<Guid>.Failure("At least one amendment field (NewServiceWindow) must be provided.");
+
         var originalSnapshot = JsonSerializer.Serialize(new
         {
-            order.Priority,
-            order.SLA,
+            ServiceWindowEarliest = order.ServiceWindow.Earliest,
+            ServiceWindowLatest = order.ServiceWindow.Latest,
             order.Status
         });
 
-        if (!request.NewPriority.HasValue && !request.NewSla.HasValue)
-            return Result<Guid>.Failure("At least one amendment field (NewPriority or NewSla) must be provided.");
-
         try
         {
-            if (request.NewPriority.HasValue)
-                order.AmendPriority(request.NewPriority.Value, request.Reason);
-
-            if (request.NewSla.HasValue)
-                order.AmendSla(request.NewSla.Value, request.Reason);
-
-            var amendmentType = (request.NewPriority.HasValue, request.NewSla.HasValue) switch
-            {
-                (true, true)  => AmendmentType.CombinedChange,
-                (true, false) => AmendmentType.PriorityChange,
-                _             => AmendmentType.SlaChange
-            };
+            var newWindow = new ServiceWindow(request.NewServiceWindow.Earliest, request.NewServiceWindow.Latest);
+            order.AmendServiceWindow(newWindow, request.Reason);
 
             await _orderRepo.UpdateAsync(order, cancellationToken);
 
-            var newSnapshot = JsonSerializer.Serialize(new { order.Priority, order.SLA, order.Status });
-            var amendment = new OrderAmendment(order.Id, amendmentType, request.Reason, originalSnapshot, newSnapshot, request.AmendedBy);
+            var newSnapshot = JsonSerializer.Serialize(new
+            {
+                ServiceWindowEarliest = order.ServiceWindow.Earliest,
+                ServiceWindowLatest = order.ServiceWindow.Latest,
+                order.Status
+            });
+
+            var amendment = new OrderAmendment(
+                order.Id, AmendmentType.SlaChange, request.Reason,
+                originalSnapshot, newSnapshot, request.AmendedBy);
 
             await _amendmentRepo.AddAsync(amendment, cancellationToken);
             await _orderRepo.SaveChangesAsync(cancellationToken);

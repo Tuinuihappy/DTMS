@@ -43,7 +43,7 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderReadyForPla
                 evt.DeliveryOrderId,
                 leg.PickupStationId,
                 leg.DropStationId,
-                evt.Priority);
+                evt.SlaTier);
 
             var createResult = await _sender.Send(createCommand, context.CancellationToken);
 

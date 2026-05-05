@@ -9,5 +9,5 @@ public record DeliveryOrderReadyForPlanningIntegrationEvent(
     DateTime OccurredOn,
     Guid TenantId,
     Guid DeliveryOrderId,
-    string Priority,
+    string SlaTier,
     IReadOnlyList<DeliveryLegDto> Legs) : IIntegrationEvent;

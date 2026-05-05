@@ -1,4 +1,6 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
 using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -33,18 +35,21 @@ public class DeliveryOrderDbContext : DbContext
         {
             b.HasKey(o => o.Id);
             b.Property(o => o.TenantId).IsRequired();
-            b.Property(o => o.OrderId).IsRequired();
-            b.Property(o => o.OrderNo).HasMaxLength(50).IsRequired();
-            b.Property(o => o.CreateBy).HasMaxLength(100).IsRequired();
-            b.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20);
+            b.Property(o => o.OrderName).HasMaxLength(200).IsRequired();
+            b.Property(o => o.SlaTier).HasConversion<string>().HasMaxLength(20).IsRequired();
+            b.Property(o => o.StructureType).HasConversion<string>().HasMaxLength(20).IsRequired();
+            b.Property(o => o.Tags).HasColumnType("text[]");
             b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
-            b.HasIndex(o => new { o.TenantId, o.OrderNo }).IsUnique();
-            b.HasIndex(o => o.OrderId);
             b.HasQueryFilter(o => o.TenantId == _tenantContext.TenantId);
-            // Map PostgreSQL system column xmin as optimistic concurrency token (no DDL needed — xmin is auto-maintained)
             b.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion().IsConcurrencyToken();
             b.Ignore(o => o.DomainEvents);
             b.Ignore(o => o.AllOrderItems);
+
+            b.OwnsOne(o => o.ServiceWindow, sw =>
+            {
+                sw.Property(s => s.Earliest).HasColumnName("ServiceWindowEarliest");
+                sw.Property(s => s.Latest).HasColumnName("ServiceWindowLatest");
+            });
 
             b.HasMany(o => o.Legs)
              .WithOne()
@@ -72,15 +77,33 @@ public class DeliveryOrderDbContext : DbContext
         modelBuilder.Entity<OrderItem>(b =>
         {
             b.HasKey(l => l.Id);
-            b.Property(l => l.WorkOrderId).IsRequired();
-            b.Property(l => l.WorkOrder).HasMaxLength(50).IsRequired();
-            b.Property(l => l.ItemId).IsRequired();
+            b.Property(l => l.WorkOrder).HasMaxLength(50);
             b.Property(l => l.ItemNumber).HasMaxLength(50).IsRequired();
             b.Property(l => l.ItemDescription).HasMaxLength(200).IsRequired();
+            b.Property(l => l.LoadUnitType).HasConversion<string>().HasMaxLength(20).IsRequired();
+            b.Property(l => l.HazmatClass);
+            b.Property(l => l.HandlingInstructions)
+                .HasConversion(
+                    v => v.Select(x => x.ToString()).ToArray(),
+                    v => v.Select(x => Enum.Parse<HandlingInstruction>(x)).ToList())
+                .HasColumnType("text[]");
             b.Property(l => l.Line).HasMaxLength(100);
             b.Property(l => l.Model).HasMaxLength(100);
             b.Property(l => l.Remarks).HasMaxLength(200);
             b.Property(l => l.ItemStatus).HasConversion<string>().HasMaxLength(20);
+
+            b.OwnsOne(l => l.Dims, d =>
+            {
+                d.Property(x => x.LengthMm).HasColumnName("DimsLengthMm");
+                d.Property(x => x.WidthMm).HasColumnName("DimsWidthMm");
+                d.Property(x => x.HeightMm).HasColumnName("DimsHeightMm");
+            });
+
+            b.OwnsOne(l => l.TemperatureRange, t =>
+            {
+                t.Property(x => x.MinCelsius).HasColumnName("TempRangeMinCelsius");
+                t.Property(x => x.MaxCelsius).HasColumnName("TempRangeMaxCelsius");
+            });
         });
 
         modelBuilder.Entity<RecurringSchedule>(b =>

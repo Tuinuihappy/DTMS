@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
@@ -26,11 +27,17 @@ public class DeliveryLeg : Entity<Guid>
         DropLocationCode = dropLocationCode;
     }
 
-    internal void AddItem(int workOrderId, string workOrder, int itemId, string itemNumber,
-        string itemDescription, double quantity, double weight,
-        string? line = null, string? model = null, string? remarks = null)
+    internal void AddItem(string? workOrder, string itemNumber,
+        string itemDescription, double quantity, double? weight,
+        LoadUnitType loadUnitType,
+        string? line = null, string? model = null, string? remarks = null,
+        Dims? dims = null, int? hazmatClass = null,
+        TemperatureRange? temperatureRange = null,
+        IEnumerable<HandlingInstruction>? handlingInstructions = null)
     {
-        _orderItems.Add(new OrderItem(Id, workOrderId, workOrder, itemId, itemNumber, itemDescription, quantity, weight, line, model, remarks));
+        _orderItems.Add(new OrderItem(Id, workOrder, itemNumber, itemDescription,
+            quantity, weight, loadUnitType, line, model, remarks,
+            dims, hazmatClass, temperatureRange, handlingInstructions));
     }
 
     internal void UpdateAllItemStatuses(OrderItemStatus status)
