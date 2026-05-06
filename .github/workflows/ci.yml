@@ -62,22 +62,14 @@ jobs:
       - name: Unit Tests
         run: >
           dotnet test --no-build --configuration Release
-          --filter "Category!=Integration"
+          tests/Modules/
           --logger "trx;LogFileName=unit-tests.trx"
           --results-directory ./test-results
 
       - name: Integration Tests
-        env:
-          ConnectionStrings__DefaultConnection: >-
-            Host=localhost;Port=5432;Database=amr_delivery_planning_test;
-            Username=postgres;Password=postgres
-          ConnectionStrings__Redis: localhost:6379
-          RabbitMq__Host: localhost
-          RabbitMq__Username: guest
-          RabbitMq__Password: guest
         run: >
           dotnet test --no-build --configuration Release
-          --filter "Category=Integration"
+          tests/Integration/AMR.DeliveryPlanning.IntegrationTests/
           --logger "trx;LogFileName=integration-tests.trx"
           --results-directory ./test-results
 
