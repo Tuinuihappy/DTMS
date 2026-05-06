@@ -1,9 +1,11 @@
 namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 
-public enum OrderItemStatus
+public enum PackageStatus
 {
     Pending,
     Picked,
     Delivered,
-    Failed
+    Failed,
+    Returned,
+    Cancelled
 }

@@ -4,34 +4,25 @@ using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 
-public record DimsDto(double LengthMm, double WidthMm, double HeightMm);
-public record TemperatureRangeDto(double? MinCelsius, double? MaxCelsius);
+public record PackageContentDto(string ItemNumber, double Quantity);
 
-public record OrderItemDto(
+public record PackageUnitDto(
     Guid Id,
-    string? WorkOrder,
-    string ItemNumber,
-    string ItemDescription,
-    double Quantity,
-    double? Weight,
-    string LoadUnitType,
-    DimsDto? Dims,
-    int? HazmatClass,
-    TemperatureRangeDto? TemperatureRange,
-    List<string> HandlingInstructions,
-    string? Line,
-    string? Model,
-    string? Remarks,
-    string ItemStatus);
+    string Barcode,
+    string LoadUnitProfileCode,
+    double GrossWeightKg,
+    string Status,
+    IReadOnlyList<PackageContentDto> Contents);
 
 public record DeliveryLegDto(
     Guid Id,
     int Sequence,
     string PickupLocationCode,
     string DropLocationCode,
+    string CarrierTypeCode,
     Guid? PickupStationId,
     Guid? DropStationId,
-    IReadOnlyList<OrderItemDto> OrderItems);
+    IReadOnlyList<PackageUnitDto> Packages);
 
 public record ServiceWindowDto(DateTime? Earliest, DateTime? Latest);
 
@@ -96,17 +87,16 @@ file static class DeliveryOrderMapper
                     l.Sequence,
                     l.PickupLocationCode,
                     l.DropLocationCode,
+                    l.CarrierTypeCode,
                     l.PickupStationId,
                     l.DropStationId,
-                    l.OrderItems.Select(ol => new OrderItemDto(
-                        ol.Id, ol.WorkOrder, ol.ItemNumber, ol.ItemDescription,
-                        ol.Quantity, ol.Weight,
-                        ol.LoadUnitType.ToString(),
-                        ol.Dims is null ? null : new DimsDto(ol.Dims.LengthMm, ol.Dims.WidthMm, ol.Dims.HeightMm),
-                        ol.HazmatClass,
-                        ol.TemperatureRange is null ? null : new TemperatureRangeDto(ol.TemperatureRange.MinCelsius, ol.TemperatureRange.MaxCelsius),
-                        ol.HandlingInstructions.Select(h => h.ToString()).ToList(),
-                        ol.Line, ol.Model, ol.Remarks,
-                        ol.ItemStatus.ToString())).ToList()))
+                    l.Packages.Select(p => new PackageUnitDto(
+                        p.Id,
+                        p.Barcode,
+                        p.LoadUnitProfileCode,
+                        p.GrossWeightKg,
+                        p.Status.ToString(),
+                        p.Contents.Select(c => new PackageContentDto(c.ItemNumber, c.Quantity)).ToList()
+                    )).ToList()))
                 .ToList());
 }

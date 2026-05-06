@@ -48,6 +48,10 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                     b.Property<double>("EstimatedDuration")
                         .HasColumnType("double precision");
 
+                    b.Property<string>("PackageBarcodes")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("Pattern")
                         .IsRequired()
                         .HasMaxLength(30)

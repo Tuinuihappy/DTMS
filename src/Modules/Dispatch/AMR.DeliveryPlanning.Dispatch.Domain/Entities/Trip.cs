@@ -171,8 +171,10 @@ public class Trip : AggregateRoot<Guid>
     {
         var pod = new ProofOfDelivery(Id, stopId, photoUrl, signatureData, scannedIds, notes);
         _proofs.Add(pod);
-        AddDomainEvent(new PodCapturedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, stopId));
-        RecordEvent(null, "PodCaptured", $"Stop {stopId}");
+        AddDomainEvent(new PodCapturedDomainEvent(
+            Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, stopId,
+            (scannedIds ?? []).AsReadOnly()));
+        RecordEvent(null, "PodCaptured", $"Stop {stopId}, {scannedIds?.Count ?? 0} item(s) scanned");
         return pod;
     }
 

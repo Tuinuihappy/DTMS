@@ -30,7 +30,7 @@ public class DomainEventMapperTests
         var dropStationId = Guid.NewGuid();
         var legs = new List<DeliveryLegEventDto>
         {
-            new(legId, 1, pickupStationId, dropStationId)
+            new(legId, 1, pickupStationId, dropStationId, "FEEDER", 1, 5.5)
         };
 
         var integrationEvent = new DeliveryOrderDomainEventMapper()
@@ -52,9 +52,9 @@ public class DomainEventMapperTests
         integrationEvent.OccurredOn.Should().Be(occurredOn);
         integrationEvent.TenantId.Should().Be(tenantId);
         integrationEvent.DeliveryOrderId.Should().Be(orderId);
-        integrationEvent.Priority.Should().Be("High");
+        integrationEvent.SlaTier.Should().Be("High");
         integrationEvent.Legs.Should().ContainSingle()
-            .Which.Should().BeEquivalentTo(new DeliveryLegDto(legId, 1, pickupStationId, dropStationId));
+            .Which.Should().BeEquivalentTo(new DeliveryLegDto(legId, 1, pickupStationId, dropStationId, "FEEDER", 1, 5.5));
     }
 
     [Fact]

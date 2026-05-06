@@ -26,25 +26,22 @@ public class CreateDraftDeliveryOrderCommandValidator : AbstractValidator<Create
                 .WithMessage("ServiceWindow.Earliest must be before ServiceWindow.Latest.");
         });
 
-        RuleFor(x => x.OrderItems).NotEmpty().WithMessage("At least one order item is required.");
-        RuleForEach(x => x.OrderItems).ChildRules(item =>
+        RuleFor(x => x.OrderItems).NotEmpty().WithMessage("At least one package is required.");
+        RuleForEach(x => x.OrderItems).ChildRules(pkg =>
         {
-            item.RuleFor(i => i.PickupLocationCode).NotEmpty();
-            item.RuleFor(i => i.DropLocationCode).NotEmpty();
-            item.RuleFor(i => i.DropLocationCode)
-                .NotEqual(i => i.PickupLocationCode)
+            pkg.RuleFor(p => p.PickupLocationCode).NotEmpty();
+            pkg.RuleFor(p => p.DropLocationCode).NotEmpty();
+            pkg.RuleFor(p => p.DropLocationCode)
+                .NotEqual(p => p.PickupLocationCode)
                 .WithMessage("Pickup and Drop locations must be different.");
-            item.RuleFor(i => i.WorkOrder).MaximumLength(50).When(i => i.WorkOrder != null);
-            item.RuleFor(i => i.ItemNumber).NotEmpty().MaximumLength(50);
-            item.RuleFor(i => i.ItemDescription).NotEmpty().MaximumLength(200);
-            item.RuleFor(i => i.Quantity).GreaterThan(0);
-            item.RuleFor(i => i.Weight).GreaterThan(0).When(i => i.Weight.HasValue);
-            item.RuleFor(i => i.HazmatClass)
-                .InclusiveBetween(1, 9)
-                .When(i => i.HazmatClass.HasValue)
-                .WithMessage("HazmatClass must be between 1 and 9 (UN classification).");
-            item.RuleFor(i => i.Line).MaximumLength(100).When(i => i.Line != null);
-            item.RuleFor(i => i.Model).MaximumLength(100).When(i => i.Model != null);
+            pkg.RuleFor(p => p.Barcode).NotEmpty().MaximumLength(100);
+            pkg.RuleFor(p => p.LoadUnitProfileCode).NotEmpty().MaximumLength(50);
+            pkg.RuleFor(p => p.GrossWeightKg).GreaterThan(0);
+            pkg.RuleForEach(p => p.Contents).ChildRules(content =>
+            {
+                content.RuleFor(c => c.ItemNumber).NotEmpty().MaximumLength(100);
+                content.RuleFor(c => c.Quantity).GreaterThan(0);
+            }).When(p => p.Contents is { Count: > 0 });
         });
 
         When(x => x.Schedule != null, () =>

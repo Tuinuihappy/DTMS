@@ -48,6 +48,14 @@ public class PlanningDbContext : DbContext
             builder.Property(j => j.DerivedFromOrders)
                    .HasColumnType("jsonb");
 
+            builder.Property(j => j.PackageBarcodes)
+                   .HasConversion(
+                       v => string.Join(',', v),
+                       v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList())
+                   .HasColumnType("text")
+                   .HasField("_packageBarcodes")
+                   .UsePropertyAccessMode(PropertyAccessMode.Field);
+
             builder.HasMany(j => j.Legs)
                    .WithOne()
                    .HasForeignKey(l => l.JobId)

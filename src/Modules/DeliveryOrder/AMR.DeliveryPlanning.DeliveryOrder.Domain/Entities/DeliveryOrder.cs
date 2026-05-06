@@ -3,7 +3,6 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Domain;
 
-
 namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 
 public class DeliveryOrder : AggregateRoot<Guid>
@@ -19,12 +18,12 @@ public class DeliveryOrder : AggregateRoot<Guid>
     private readonly List<DeliveryLeg> _legs = new();
     public IReadOnlyCollection<DeliveryLeg> Legs => _legs.AsReadOnly();
 
-    public IReadOnlyCollection<OrderItem> AllOrderItems =>
-        _legs.SelectMany(l => l.OrderItems).ToList().AsReadOnly();
+    public IReadOnlyCollection<PackageUnit> AllPackages =>
+        _legs.SelectMany(l => l.Packages).ToList().AsReadOnly();
 
     public RecurringSchedule? Schedule { get; private set; }
 
-    private DeliveryOrder() { } // For EF Core
+    private DeliveryOrder() { }
 
     public static DeliveryOrder Create(Guid tenantId, string orderName, SlaTier slaTier,
         ServiceWindow serviceWindow, StructureType structureType = StructureType.Sequence,
@@ -55,33 +54,41 @@ public class DeliveryOrder : AggregateRoot<Guid>
         AddDomainEvent(new DeliveryOrderSubmittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
-    public void AddOrderItem(string pickupLocationCode, string dropLocationCode,
-        string? workOrder, string itemNumber,
-        string itemDescription, double quantity, double? weight,
-        LoadUnitType loadUnitType,
-        string? line = null, string? model = null, string? remarks = null,
-        Dims? dims = null, int? hazmatClass = null,
-        TemperatureRange? temperatureRange = null,
-        IEnumerable<HandlingInstruction>? handlingInstructions = null)
+    public void AddPackage(
+        string pickupLocationCode, string dropLocationCode,
+        string carrierTypeCode,
+        string barcode,
+        string loadUnitProfileCode,
+        double grossWeightKg,
+        IEnumerable<(string itemNumber, double quantity)>? contents = null)
     {
         var leg = _legs.FirstOrDefault(l =>
             l.PickupLocationCode == pickupLocationCode &&
-            l.DropLocationCode == dropLocationCode);
+            l.DropLocationCode == dropLocationCode &&
+            l.CarrierTypeCode == carrierTypeCode);
 
         if (leg is null)
         {
-            leg = new DeliveryLeg(Id, _legs.Count + 1, pickupLocationCode, dropLocationCode);
+            leg = new DeliveryLeg(Id, _legs.Count + 1, pickupLocationCode, dropLocationCode, carrierTypeCode);
             _legs.Add(leg);
         }
 
-        leg.AddItem(workOrder, itemNumber, itemDescription, quantity, weight,
-            loadUnitType, line, model, remarks, dims, hazmatClass, temperatureRange, handlingInstructions);
+        leg.AddPackage(barcode, loadUnitProfileCode, grossWeightKg, contents);
     }
 
-    public void UpdateAllItemStatuses(Enums.OrderItemStatus status)
+    public void UpdateAllPackageStatuses(PackageStatus status)
     {
         foreach (var leg in _legs)
-            leg.UpdateAllItemStatuses(status);
+            leg.UpdateAllPackageStatuses(status);
+    }
+
+    public void MarkPackagesDelivered(IEnumerable<string> barcodes)
+    {
+        var barcodeSet = new HashSet<string>(barcodes, StringComparer.OrdinalIgnoreCase);
+        foreach (var leg in _legs)
+            foreach (var pkg in leg.Packages)
+                if (barcodeSet.Contains(pkg.Barcode))
+                    pkg.UpdateStatus(PackageStatus.Delivered);
     }
 
     public void SetRecurringSchedule(string cronExpression, DateTime? validFrom, DateTime? validUntil)
@@ -125,7 +132,16 @@ public class DeliveryOrder : AggregateRoot<Guid>
 
         var legDtos = _legs
             .OrderBy(l => l.Sequence)
-            .Select(l => new DeliveryLegEventDto(l.Id, l.Sequence, l.PickupStationId!.Value, l.DropStationId!.Value))
+            .Select(l => new DeliveryLegEventDto(
+                l.Id,
+                l.Sequence,
+                l.PickupStationId!.Value,
+                l.DropStationId!.Value,
+                l.CarrierTypeCode,
+                l.Packages.Count,
+                l.Packages.Sum(p => p.GrossWeightKg),
+                l.Packages.Select(p => new PackageSummaryEventDto(
+                    p.Barcode, p.LoadUnitProfileCode, p.GrossWeightKg)).ToList()))
             .ToList();
 
         AddDomainEvent(new DeliveryOrderReadyToPlanDomainEvent(

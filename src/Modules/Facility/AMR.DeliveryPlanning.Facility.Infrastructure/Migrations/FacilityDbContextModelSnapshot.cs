@@ -23,6 +23,45 @@ namespace AMR.DeliveryPlanning.Facility.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("AMR.DeliveryPlanning.Facility.Domain.Entities.CarrierTypeProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AMRCapability")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("MaxSlots")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("MaxWeightKg")
+                        .HasColumnType("double precision");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("CarrierTypeProfiles", "facility");
+                });
+
             modelBuilder.Entity("AMR.DeliveryPlanning.Facility.Domain.Entities.FacilityResource", b =>
                 {
                     b.Property<Guid>("Id")
@@ -53,6 +92,49 @@ namespace AMR.DeliveryPlanning.Facility.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("FacilityResources", "facility");
+                });
+
+            modelBuilder.Entity("AMR.DeliveryPlanning.Facility.Domain.Entities.LoadUnitProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CarrierTypeCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<double>("HeightMm")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("LengthMm")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("MaxGrossWeightKg")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("WidthMm")
+                        .HasColumnType("double precision");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CarrierTypeCode");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("LoadUnitProfiles", "facility");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.Facility.Domain.Entities.Map", b =>
@@ -121,6 +203,44 @@ namespace AMR.DeliveryPlanning.Facility.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("RouteEdges", "facility");
+                });
+
+            modelBuilder.Entity("AMR.DeliveryPlanning.Facility.Domain.Entities.Shelf", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CurrentStationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MapId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("MaxSlots")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("MaxWeightKg")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Rfid")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MapId");
+
+                    b.HasIndex("Rfid")
+                        .IsUnique();
+
+                    b.ToTable("Shelves", "facility");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.Facility.Domain.Entities.Station", b =>

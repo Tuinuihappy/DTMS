@@ -30,6 +30,11 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CarrierTypeCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<Guid>("DeliveryOrderId")
                         .HasColumnType("uuid");
 
@@ -174,69 +179,65 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.ToTable("OrderAuditEvents", "deliveryorder");
                 });
 
-            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.OrderItem", b =>
+            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.PackageContent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("DeliveryLegId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string[]>("HandlingInstructions")
-                        .IsRequired()
-                        .HasColumnType("text[]");
-
-                    b.Property<int?>("HazmatClass")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ItemDescription")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
                     b.Property<string>("ItemNumber")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("ItemStatus")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("Line")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<string>("LoadUnitType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("Model")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                    b.Property<Guid>("PackageUnitId")
+                        .HasColumnType("uuid");
 
                     b.Property<double>("Quantity")
                         .HasColumnType("double precision");
 
-                    b.Property<string>("Remarks")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                    b.HasKey("Id");
 
-                    b.Property<double?>("Weight")
+                    b.HasIndex("PackageUnitId");
+
+                    b.ToTable("PackageContents", "deliveryorder");
+                });
+
+            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.PackageUnit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Barcode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("DeliveryLegId")
+                        .HasColumnType("uuid");
+
+                    b.Property<double>("GrossWeightKg")
                         .HasColumnType("double precision");
 
-                    b.Property<string>("WorkOrder")
+                    b.Property<string>("LoadUnitProfileCode")
+                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("Barcode")
+                        .IsUnique();
 
                     b.HasIndex("DeliveryLegId");
 
-                    b.ToTable("OrderItems", "deliveryorder");
+                    b.ToTable("PackageUnits", "deliveryorder");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.RecurringSchedule", b =>
@@ -334,63 +335,22 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.OrderItem", b =>
+            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.PackageContent", b =>
+                {
+                    b.HasOne("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.PackageUnit", null)
+                        .WithMany("Contents")
+                        .HasForeignKey("PackageUnitId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.PackageUnit", b =>
                 {
                     b.HasOne("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryLeg", null)
-                        .WithMany("OrderItems")
+                        .WithMany("Packages")
                         .HasForeignKey("DeliveryLegId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.OwnsOne("AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects.Dims", "Dims", b1 =>
-                        {
-                            b1.Property<Guid>("OrderItemId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<double>("HeightMm")
-                                .HasColumnType("double precision")
-                                .HasColumnName("DimsHeightMm");
-
-                            b1.Property<double>("LengthMm")
-                                .HasColumnType("double precision")
-                                .HasColumnName("DimsLengthMm");
-
-                            b1.Property<double>("WidthMm")
-                                .HasColumnType("double precision")
-                                .HasColumnName("DimsWidthMm");
-
-                            b1.HasKey("OrderItemId");
-
-                            b1.ToTable("OrderItems", "deliveryorder");
-
-                            b1.WithOwner()
-                                .HasForeignKey("OrderItemId");
-                        });
-
-                    b.OwnsOne("AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects.TemperatureRange", "TemperatureRange", b1 =>
-                        {
-                            b1.Property<Guid>("OrderItemId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<double?>("MaxCelsius")
-                                .HasColumnType("double precision")
-                                .HasColumnName("TempRangeMaxCelsius");
-
-                            b1.Property<double?>("MinCelsius")
-                                .HasColumnType("double precision")
-                                .HasColumnName("TempRangeMinCelsius");
-
-                            b1.HasKey("OrderItemId");
-
-                            b1.ToTable("OrderItems", "deliveryorder");
-
-                            b1.WithOwner()
-                                .HasForeignKey("OrderItemId");
-                        });
-
-                    b.Navigation("Dims");
-
-                    b.Navigation("TemperatureRange");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.RecurringSchedule", b =>
@@ -404,7 +364,7 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 
             modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryLeg", b =>
                 {
-                    b.Navigation("OrderItems");
+                    b.Navigation("Packages");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder", b =>
@@ -412,6 +372,11 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.Navigation("Legs");
 
                     b.Navigation("Schedule");
+                });
+
+            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.PackageUnit", b =>
+                {
+                    b.Navigation("Contents");
                 });
 #pragma warning restore 612, 618
         }

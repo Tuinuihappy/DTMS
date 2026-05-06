@@ -1,26 +1,41 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+using AMR.DeliveryPlanning.Facility.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.SharedKernel.Tenancy;
-
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 
 public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraftDeliveryOrderCommand, Guid>
 {
     private readonly IDeliveryOrderRepository _repository;
+    private readonly ILoadUnitProfileRepository _loadUnitProfileRepository;
     private readonly ITenantContext _tenantContext;
 
     public CreateDraftDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
+        ILoadUnitProfileRepository loadUnitProfileRepository,
         ITenantContext tenantContext)
     {
         _repository = repository;
+        _loadUnitProfileRepository = loadUnitProfileRepository;
         _tenantContext = tenantContext;
     }
 
     public async Task<Result<Guid>> Handle(CreateDraftDeliveryOrderCommand request, CancellationToken cancellationToken)
     {
+        // Pre-load all distinct LoadUnitProfiles to resolve CarrierTypeCode
+        var profileCodes = request.OrderItems.Select(p => p.LoadUnitProfileCode).Distinct().ToList();
+        var carrierTypeLookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var code in profileCodes)
+        {
+            var profile = await _loadUnitProfileRepository.GetByCodeAsync(code, cancellationToken);
+            if (profile is null)
+                return Result<Guid>.Failure($"LoadUnitProfile '{code}' not found.");
+            carrierTypeLookup[code] = profile.CarrierTypeCode;
+        }
+
         var serviceWindow = new ServiceWindow(
             request.ServiceWindow?.Earliest,
             request.ServiceWindow?.Latest);
@@ -33,17 +48,19 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
             request.StructureType,
             request.Tags);
 
-        foreach (var item in request.OrderItems)
+        foreach (var pkg in request.OrderItems)
         {
-            var dims = item.Dims is null ? null : new Dims(item.Dims.LengthMm, item.Dims.WidthMm, item.Dims.HeightMm);
-            var tempRange = item.TemperatureRange is null ? null
-                : new TemperatureRange(item.TemperatureRange.MinCelsius, item.TemperatureRange.MaxCelsius);
+            var carrierTypeCode = carrierTypeLookup[pkg.LoadUnitProfileCode];
+            var contents = pkg.Contents?
+                .Select(c => (c.ItemNumber, c.Quantity));
 
-            order.AddOrderItem(item.PickupLocationCode, item.DropLocationCode,
-                item.WorkOrder, item.ItemNumber, item.ItemDescription,
-                item.Quantity, item.Weight, item.LoadUnitType,
-                item.Line, item.Model, item.Remarks,
-                dims, item.HazmatClass, tempRange, item.HandlingInstructions);
+            order.AddPackage(
+                pkg.PickupLocationCode, pkg.DropLocationCode,
+                carrierTypeCode,
+                pkg.Barcode,
+                pkg.LoadUnitProfileCode,
+                pkg.GrossWeightKg,
+                contents);
         }
 
         if (request.Schedule != null)

@@ -16,7 +16,12 @@ public record ExceptionRaisedIntegrationEvent(
     string Code, string Severity, string Detail) : IIntegrationEvent;
 
 public record PodCapturedIntegrationEvent(
-    Guid EventId, DateTime OccurredOn, Guid TripId, Guid StopId) : IIntegrationEvent;
+    Guid EventId,
+    DateTime OccurredOn,
+    Guid TenantId,
+    Guid TripId,
+    Guid StopId,
+    IReadOnlyList<string> ScannedIds) : IIntegrationEvent;
 
 // RIOT3 vendor callbacks → Dispatch consumers route these to ReportTaskCompleted/Failed
 public record Riot3TaskCompletedIntegrationEvent(

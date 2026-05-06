@@ -58,6 +58,9 @@ public static class ModuleServiceRegistration
         services.AddScoped<IRouteEdgeRepository, RouteEdgeRepository>();
         services.AddScoped<ITopologyOverlayRepository, TopologyOverlayRepository>();
         services.AddScoped<IFacilityResourceRepository, FacilityResourceRepository>();
+        services.AddScoped<IShelfRepository, ShelfRepository>();
+        services.AddScoped<ICarrierTypeProfileRepository, CarrierTypeProfileRepository>();
+        services.AddScoped<ILoadUnitProfileRepository, LoadUnitProfileRepository>();
         services.AddScoped<IFacilityReadService, FacilityReadService>();
         var riot3BaseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
         var riot3ApiKey = configuration.GetValue<string>("VendorAdapter:Riot3:ApiKey");
@@ -136,6 +139,7 @@ public static class ModuleServiceRegistration
             .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
                 sp.GetRequiredService<DispatchDomainEventMapper>())));
         services.AddScoped<ITripRepository, TripRepository>();
+        services.AddScoped<IShelfManifestRepository, ShelfManifestRepository>();
         services.AddScoped<ITaskDispatcher, VendorAdapterTaskDispatcher>();
 
         // ── VendorAdapter Module ──────────────────────────────────────

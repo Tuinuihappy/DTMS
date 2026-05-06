@@ -1,7 +1,12 @@
 using AMR.DeliveryPlanning.Facility.Application.Commands.AddStation;
 using AMR.DeliveryPlanning.Facility.Application.Commands.CreateMap;
 using AMR.DeliveryPlanning.Facility.Application.Commands.FacilityResource;
+using AMR.DeliveryPlanning.Facility.Application.Commands.RegisterCarrierTypeProfile;
+using AMR.DeliveryPlanning.Facility.Application.Commands.ReleaseShelf;
+using AMR.DeliveryPlanning.Facility.Application.Commands.RegisterLoadUnitProfile;
 using AMR.DeliveryPlanning.Facility.Application.Commands.TopologyOverlay;
+using AMR.DeliveryPlanning.Facility.Application.Queries.GetCarrierTypeProfiles;
+using AMR.DeliveryPlanning.Facility.Application.Queries.GetLoadUnitProfiles;
 using AMR.DeliveryPlanning.Facility.Application.Queries.GetMapById;
 using AMR.DeliveryPlanning.Facility.Application.Queries.GetRouteCost;
 using AMR.DeliveryPlanning.Facility.Application.Queries.GetStations;
@@ -72,6 +77,43 @@ public static class MapEndpoints
         {
             var result = await sender.Send(new ExpireTopologyOverlayCommand(id));
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
+        });
+
+        // ── Shelves ────────────────────────────────────────────────────────
+        group.MapPost("/shelves/{rfid}/release", async (string rfid, ISender sender) =>
+        {
+            var result = await sender.Send(new ReleaseShelfCommand(rfid));
+            return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
+        });
+
+        // ── Carrier Type Profiles ─────────────────────────────────────────
+        group.MapPost("/carrier-type-profiles", async (RegisterCarrierTypeProfileCommand command, ISender sender) =>
+        {
+            var result = await sender.Send(command);
+            return result.IsSuccess
+                ? Results.Created($"/api/facility/carrier-type-profiles/{result.Value}", result.Value)
+                : Results.BadRequest(result.Error);
+        });
+
+        group.MapGet("/carrier-type-profiles", async (ISender sender) =>
+        {
+            var result = await sender.Send(new GetCarrierTypeProfilesQuery());
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
+        // ── Load Unit Profiles ────────────────────────────────────────────
+        group.MapPost("/load-unit-profiles", async (RegisterLoadUnitProfileCommand command, ISender sender) =>
+        {
+            var result = await sender.Send(command);
+            return result.IsSuccess
+                ? Results.Created($"/api/facility/load-unit-profiles/{result.Value}", result.Value)
+                : Results.BadRequest(result.Error);
+        });
+
+        group.MapGet("/load-unit-profiles", async (string? carrierTypeCode, ISender sender) =>
+        {
+            var result = await sender.Send(new GetLoadUnitProfilesQuery(carrierTypeCode));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
         // ── Facility Resources ─────────────────────────────────────────────

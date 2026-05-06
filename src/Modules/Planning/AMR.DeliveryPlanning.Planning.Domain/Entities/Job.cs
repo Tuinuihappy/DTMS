@@ -20,6 +20,10 @@ public class Job : AggregateRoot<Guid>
     public string? RequiredCapability { get; private set; }
     public double TotalWeight { get; private set; }
 
+    // Phase 4: Package assignment
+    private readonly List<string> _packageBarcodes = new();
+    public IReadOnlyCollection<string> PackageBarcodes => _packageBarcodes.AsReadOnly();
+
     // Phase 4+: Explainability + Predictive replanning
     public string? PlanningTrace { get; private set; }
     public DateTime? SlaDeadline { get; private set; }
@@ -67,6 +71,12 @@ public class Job : AggregateRoot<Guid>
     public void SetTotalWeight(double weight) => TotalWeight = weight;
     public void SetSlaDeadline(DateTime deadline) => SlaDeadline = deadline;
     public void SetPlanningTrace(string trace) => PlanningTrace = trace;
+
+    public void SetPackageBarcodes(IEnumerable<string> barcodes)
+    {
+        _packageBarcodes.Clear();
+        _packageBarcodes.AddRange(barcodes);
+    }
 
     public bool IsSlaAtRisk(TimeSpan estimatedRemainingTime)
         => SlaDeadline.HasValue && SlaDeadline.Value - DateTime.UtcNow <= estimatedRemainingTime;

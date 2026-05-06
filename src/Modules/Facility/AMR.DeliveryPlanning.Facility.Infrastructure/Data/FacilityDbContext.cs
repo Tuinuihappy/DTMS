@@ -13,6 +13,9 @@ public class FacilityDbContext : DbContext
     public DbSet<RouteEdge> RouteEdges { get; set; } = null!;
     public DbSet<TopologyOverlay> TopologyOverlays { get; set; } = null!;
     public DbSet<FacilityResource> FacilityResources { get; set; } = null!;
+    public DbSet<Shelf> Shelves { get; set; } = null!;
+    public DbSet<CarrierTypeProfile> CarrierTypeProfiles { get; set; } = null!;
+    public DbSet<LoadUnitProfile> LoadUnitProfiles { get; set; } = null!;
 
     public FacilityDbContext(DbContextOptions<FacilityDbContext> options) : base(options) { }
 
@@ -84,6 +87,44 @@ public class FacilityDbContext : DbContext
             b.Property(r => r.ResourceType).HasConversion<string>().HasMaxLength(30);
             b.Property(r => r.VendorRef).HasMaxLength(200);
             b.Property(r => r.Description).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<Shelf>(b =>
+        {
+            b.HasKey(s => s.Id);
+            b.Ignore(s => s.DomainEvents);
+            b.Property(s => s.Rfid).HasMaxLength(100).IsRequired();
+            b.HasIndex(s => s.Rfid).IsUnique();
+            b.HasIndex(s => s.MapId);
+            b.Property(s => s.MaxWeightKg).IsRequired();
+            b.Property(s => s.MaxSlots).IsRequired();
+            b.Property(s => s.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+        });
+
+        modelBuilder.Entity<CarrierTypeProfile>(b =>
+        {
+            b.HasKey(c => c.Id);
+            b.Property(c => c.Code).HasMaxLength(50).IsRequired();
+            b.HasIndex(c => c.Code).IsUnique();
+            b.Property(c => c.DisplayName).HasMaxLength(200).IsRequired();
+            b.Property(c => c.AMRCapability).HasMaxLength(50).IsRequired();
+            b.Property(c => c.MaxWeightKg);
+            b.Property(c => c.MaxSlots);
+            b.Property(c => c.Description).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<LoadUnitProfile>(b =>
+        {
+            b.HasKey(p => p.Id);
+            b.Property(p => p.Code).HasMaxLength(50).IsRequired();
+            b.HasIndex(p => p.Code).IsUnique();
+            b.Property(p => p.DisplayName).HasMaxLength(200).IsRequired();
+            b.Property(p => p.LengthMm).IsRequired();
+            b.Property(p => p.WidthMm).IsRequired();
+            b.Property(p => p.HeightMm).IsRequired();
+            b.Property(p => p.MaxGrossWeightKg).IsRequired();
+            b.Property(p => p.CarrierTypeCode).HasMaxLength(50).IsRequired();
+            b.HasIndex(p => p.CarrierTypeCode);
         });
 
         base.OnModelCreating(modelBuilder);

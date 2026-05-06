@@ -46,8 +46,10 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                 new PodCapturedIntegrationEvent(
                     evt.EventId,
                     evt.OccurredOn,
+                    evt.TenantId,
                     evt.TripId,
-                    evt.StopId)
+                    evt.StopId,
+                    evt.ScannedIds)
             ],
             _ => []
         };

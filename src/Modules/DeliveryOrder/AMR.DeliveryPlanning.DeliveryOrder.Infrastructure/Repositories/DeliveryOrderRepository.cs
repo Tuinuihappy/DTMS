@@ -13,7 +13,7 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
 
     public Task<Domain.Entities.DeliveryOrder?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => _context.DeliveryOrders
-            .Include(o => o.Legs).ThenInclude(l => l.OrderItems)
+            .Include(o => o.Legs).ThenInclude(l => l.Packages).ThenInclude(p => p.Contents)
             .Include(o => o.Schedule)
             .FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
 
@@ -31,6 +31,16 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
+
+    public async Task<List<Domain.Entities.DeliveryOrder>> GetOrdersByPackageBarcodesAsync(
+        IEnumerable<string> barcodes, CancellationToken cancellationToken = default)
+    {
+        var barcodeList = barcodes.ToList();
+        return await _context.DeliveryOrders
+            .Include(o => o.Legs).ThenInclude(l => l.Packages).ThenInclude(p => p.Contents)
+            .Where(o => o.Legs.Any(l => l.Packages.Any(p => barcodeList.Contains(p.Barcode))))
+            .ToListAsync(cancellationToken);
+    }
 
     public async Task AddAsync(Domain.Entities.DeliveryOrder order, CancellationToken cancellationToken = default)
     {

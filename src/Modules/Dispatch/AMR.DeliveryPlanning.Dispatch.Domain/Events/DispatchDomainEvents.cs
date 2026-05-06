@@ -21,4 +21,10 @@ public record ExceptionRaisedDomainEvent(
     string Severity,
     string Detail) : IDomainEvent;
 public record ExceptionResolvedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid ExceptionId, string Resolution) : IDomainEvent;
-public record PodCapturedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid StopId) : IDomainEvent;
+public record PodCapturedDomainEvent(
+    Guid EventId,
+    DateTime OccurredOn,
+    Guid TenantId,
+    Guid TripId,
+    Guid StopId,
+    IReadOnlyList<string> ScannedIds) : IDomainEvent;

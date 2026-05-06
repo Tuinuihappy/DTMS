@@ -2,6 +2,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliver
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+using AMR.DeliveryPlanning.Facility.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 
@@ -10,15 +11,18 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkSubmitDeli
 public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmitDeliveryOrdersCommand, List<Guid>>
 {
     private readonly IDeliveryOrderRepository _repo;
+    private readonly ILoadUnitProfileRepository _loadUnitProfileRepository;
     private readonly StationValidationService _stationValidation;
     private readonly ITenantContext _tenantContext;
 
     public BulkSubmitDeliveryOrdersCommandHandler(
         IDeliveryOrderRepository repo,
+        ILoadUnitProfileRepository loadUnitProfileRepository,
         StationValidationService stationValidation,
         ITenantContext tenantContext)
     {
         _repo = repo;
+        _loadUnitProfileRepository = loadUnitProfileRepository;
         _stationValidation = stationValidation;
         _tenantContext = tenantContext;
     }
@@ -27,6 +31,21 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
     {
         if (request.Orders.Count == 0)
             return Result<List<Guid>>.Failure("No orders provided.");
+
+        // Pre-load all distinct profiles across all orders
+        var allProfileCodes = request.Orders
+            .SelectMany(o => o.OrderItems.Select(p => p.LoadUnitProfileCode))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var carrierTypeLookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var code in allProfileCodes)
+        {
+            var profile = await _loadUnitProfileRepository.GetByCodeAsync(code, cancellationToken);
+            if (profile is null)
+                return Result<List<Guid>>.Failure($"LoadUnitProfile '{code}' not found.");
+            carrierTypeLookup[code] = profile.CarrierTypeCode;
+        }
 
         var orders = new List<Domain.Entities.DeliveryOrder>();
 
@@ -40,17 +59,18 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                 _tenantContext.TenantId, cmd.OrderName,
                 cmd.SlaTier, serviceWindow, cmd.StructureType, cmd.Tags);
 
-            foreach (var item in cmd.OrderItems)
+            foreach (var pkg in cmd.OrderItems)
             {
-                var dims = item.Dims is null ? null : new Dims(item.Dims.LengthMm, item.Dims.WidthMm, item.Dims.HeightMm);
-                var tempRange = item.TemperatureRange is null ? null
-                    : new TemperatureRange(item.TemperatureRange.MinCelsius, item.TemperatureRange.MaxCelsius);
+                var carrierTypeCode = carrierTypeLookup[pkg.LoadUnitProfileCode];
+                var contents = pkg.Contents?.Select(c => (c.ItemNumber, c.Quantity));
 
-                order.AddOrderItem(item.PickupLocationCode, item.DropLocationCode,
-                    item.WorkOrder, item.ItemNumber, item.ItemDescription,
-                    item.Quantity, item.Weight, item.LoadUnitType,
-                    item.Line, item.Model, item.Remarks,
-                    dims, item.HazmatClass, tempRange, item.HandlingInstructions);
+                order.AddPackage(
+                    pkg.PickupLocationCode, pkg.DropLocationCode,
+                    carrierTypeCode,
+                    pkg.Barcode,
+                    pkg.LoadUnitProfileCode,
+                    pkg.GrossWeightKg,
+                    contents);
             }
 
             if (cmd.Schedule != null)

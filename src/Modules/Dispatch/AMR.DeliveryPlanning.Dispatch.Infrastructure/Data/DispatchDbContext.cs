@@ -16,6 +16,7 @@ public class DispatchDbContext : DbContext
     public DbSet<ExecutionEvent> ExecutionEvents { get; set; } = null!;
     public DbSet<TripException> TripExceptions { get; set; } = null!;
     public DbSet<ProofOfDelivery> ProofsOfDelivery { get; set; } = null!;
+    public DbSet<ShelfManifest> ShelfManifests { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public DispatchDbContext(DbContextOptions<DispatchDbContext> options, ITenantContext tenantContext)
@@ -103,6 +104,19 @@ public class DispatchDbContext : DbContext
                    .HasConversion(
                        v => string.Join(',', v),
                        v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList());
+        });
+
+        modelBuilder.Entity<ShelfManifest>(builder =>
+        {
+            builder.HasKey(s => s.Id);
+            builder.HasIndex(s => s.JobId).IsUnique();
+            builder.HasIndex(s => s.TripId).HasFilter("\"TripId\" IS NOT NULL");
+            builder.Property(s => s.ShelfRfid).HasMaxLength(100).IsRequired();
+            builder.Property(s => s.PackageBarcodes)
+                .HasConversion(
+                    v => string.Join(',', v),
+                    v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList())
+                .HasColumnType("text");
         });
 
         modelBuilder.Entity<OutboxMessage>(builder =>
