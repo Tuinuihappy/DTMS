@@ -19,17 +19,16 @@ public class IdempotencyTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
         var idempotencyKey = $"idem-{Guid.NewGuid():N}";
 
-        // First call — creates the order and caches the result
-        var firstResp = await SubmitWithKeyAsync(client, pickupId, dropId, idempotencyKey);
+        var firstResp = await SubmitWithKeyAsync(client, pickupId, dropId, profileCode, idempotencyKey);
         (firstResp.StatusCode == HttpStatusCode.Created || firstResp.StatusCode == HttpStatusCode.OK)
             .Should().BeTrue("first submission should succeed");
         var firstId = await firstResp.Content.ReadFromJsonAsync<Guid>();
         firstId.Should().NotBe(Guid.Empty);
 
-        // Second call with the SAME key — must return cached orderId, not create a new one
-        var secondResp = await SubmitWithKeyAsync(client, pickupId, dropId, idempotencyKey);
+        var secondResp = await SubmitWithKeyAsync(client, pickupId, dropId, profileCode, idempotencyKey);
         secondResp.StatusCode.Should().Be(HttpStatusCode.OK,
             "duplicate with same idempotency key must return 200 from cache");
         var secondId = await secondResp.Content.ReadFromJsonAsync<Guid>();
@@ -42,12 +41,13 @@ public class IdempotencyTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
 
-        var firstResp = await SubmitWithKeyAsync(client, pickupId, dropId, $"idem-A-{Guid.NewGuid():N}");
+        var firstResp = await SubmitWithKeyAsync(client, pickupId, dropId, profileCode, $"idem-A-{Guid.NewGuid():N}");
         firstResp.IsSuccessStatusCode.Should().BeTrue();
         var firstId = await firstResp.Content.ReadFromJsonAsync<Guid>();
 
-        var secondResp = await SubmitWithKeyAsync(client, pickupId, dropId, $"idem-B-{Guid.NewGuid():N}");
+        var secondResp = await SubmitWithKeyAsync(client, pickupId, dropId, profileCode, $"idem-B-{Guid.NewGuid():N}");
         secondResp.IsSuccessStatusCode.Should().BeTrue();
         var secondId = await secondResp.Content.ReadFromJsonAsync<Guid>();
 
@@ -59,9 +59,10 @@ public class IdempotencyTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
 
-        var firstResp = await SubmitWithKeyAsync(client, pickupId, dropId, idempotencyKey: null);
-        var secondResp = await SubmitWithKeyAsync(client, pickupId, dropId, idempotencyKey: null);
+        var firstResp = await SubmitWithKeyAsync(client, pickupId, dropId, profileCode, idempotencyKey: null);
+        var secondResp = await SubmitWithKeyAsync(client, pickupId, dropId, profileCode, idempotencyKey: null);
 
         firstResp.IsSuccessStatusCode.Should().BeTrue();
         secondResp.IsSuccessStatusCode.Should().BeTrue();
@@ -75,21 +76,13 @@ public class IdempotencyTests : IClassFixture<DtmsWebApplicationFactory>
     // ── helper ──────────────────────────────────────────────────────────────────
 
     private static async Task<HttpResponseMessage> SubmitWithKeyAsync(
-        HttpClient client, Guid pickupId, Guid dropId, string? idempotencyKey)
+        HttpClient client, Guid pickupId, Guid dropId, string profileCode, string? idempotencyKey)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/delivery-orders")
         {
-            Content = JsonContent.Create(new
-            {
-                OrderId = 5001,
-            OrderNo = $"IDEM-{Guid.NewGuid():N}",
-            CreateBy = "test-user",
-                PickupLocationCode = pickupId.ToString(),
-                DropLocationCode = dropId.ToString(),
-                Priority = 0,
-                SLA = DateTime.UtcNow.AddHours(4),
-                OrderItems = new[] { new { ItemCode = "X", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
-            })
+            Content = JsonContent.Create(
+                DtmsWebApplicationFactory.BuildOrderRequest(pickupId, dropId, profileCode,
+                    sla: DateTime.UtcNow.AddHours(4)))
         };
 
         if (idempotencyKey != null)

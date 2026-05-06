@@ -19,9 +19,9 @@ public class SlaValidationTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
 
-        // SLA only 10 minutes in the future — must be rejected
-        var response = await SubmitOrderAsync(client, pickupId, dropId,
+        var response = await SubmitOrderAsync(client, pickupId, dropId, profileCode,
             sla: DateTime.UtcNow.AddMinutes(10));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
@@ -33,8 +33,9 @@ public class SlaValidationTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
 
-        var response = await SubmitOrderAsync(client, pickupId, dropId,
+        var response = await SubmitOrderAsync(client, pickupId, dropId, profileCode,
             sla: DateTime.UtcNow.AddMinutes(29));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
@@ -46,8 +47,9 @@ public class SlaValidationTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
 
-        var response = await SubmitOrderAsync(client, pickupId, dropId,
+        var response = await SubmitOrderAsync(client, pickupId, dropId, profileCode,
             sla: DateTime.UtcNow.AddHours(-1));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
@@ -59,8 +61,9 @@ public class SlaValidationTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
 
-        var response = await SubmitOrderAsync(client, pickupId, dropId,
+        var response = await SubmitOrderAsync(client, pickupId, dropId, profileCode,
             sla: DateTime.UtcNow.AddHours(4));
 
         response.IsSuccessStatusCode.Should().BeTrue(
@@ -74,9 +77,9 @@ public class SlaValidationTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
 
-        // SLA is optional — null means no deadline constraint
-        var response = await SubmitOrderAsync(client, pickupId, dropId, sla: null);
+        var response = await SubmitOrderAsync(client, pickupId, dropId, profileCode, sla: null);
 
         response.IsSuccessStatusCode.Should().BeTrue(
             $"Order without SLA must be accepted: {await response.Content.ReadAsStringAsync()}");
@@ -84,19 +87,8 @@ public class SlaValidationTests : IClassFixture<DtmsWebApplicationFactory>
 
     // ── helper ──────────────────────────────────────────────────────────────────
 
-    private static async Task<HttpResponseMessage> SubmitOrderAsync(
-        HttpClient client, Guid pickupId, Guid dropId, DateTime? sla)
-    {
-        return await client.PostAsJsonAsync("/api/delivery-orders", new
-        {
-            OrderId = 4001,
-            OrderNo = $"SLA-{Guid.NewGuid():N}",
-            CreateBy = "test-user",
-            PickupLocationCode = pickupId.ToString(),
-            DropLocationCode = dropId.ToString(),
-            Priority = 0,
-            SLA = sla,
-            OrderItems = new[] { new { ItemCode = "ITEM", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
-        });
-    }
+    private static Task<HttpResponseMessage> SubmitOrderAsync(
+        HttpClient client, Guid pickupId, Guid dropId, string profileCode, DateTime? sla)
+        => client.PostAsJsonAsync("/api/delivery-orders",
+            DtmsWebApplicationFactory.BuildOrderRequest(pickupId, dropId, profileCode, sla));
 }

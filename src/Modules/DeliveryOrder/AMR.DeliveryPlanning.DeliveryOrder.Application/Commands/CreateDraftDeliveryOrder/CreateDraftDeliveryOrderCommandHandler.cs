@@ -3,6 +3,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.Facility.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.SharedKernel.Tenancy;
+using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 
@@ -11,15 +12,18 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
     private readonly IDeliveryOrderRepository _repository;
     private readonly ILoadUnitProfileRepository _loadUnitProfileRepository;
     private readonly ITenantContext _tenantContext;
+    private readonly ILogger<CreateDraftDeliveryOrderCommandHandler> _logger;
 
     public CreateDraftDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
         ILoadUnitProfileRepository loadUnitProfileRepository,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        ILogger<CreateDraftDeliveryOrderCommandHandler> logger)
     {
         _repository = repository;
         _loadUnitProfileRepository = loadUnitProfileRepository;
         _tenantContext = tenantContext;
+        _logger = logger;
     }
 
     public async Task<Result<Guid>> Handle(CreateDraftDeliveryOrderCommand request, CancellationToken cancellationToken)
@@ -71,6 +75,9 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
 
         await _repository.AddAsync(order, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("[CreateDraft] Order {OrderId} '{OrderName}' created as Draft for tenant {TenantId}.",
+            order.Id, order.OrderName, _tenantContext.TenantId);
 
         return Result<Guid>.Success(order.Id);
     }

@@ -190,7 +190,7 @@ public class DeliveryOrder : AggregateRoot<Guid>
             throw new InvalidOperationException($"Cannot hold an order in {Status} status.");
 
         Status = OrderStatus.Held;
-        AddDomainEvent(new DeliveryOrderHeldDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+        AddDomainEvent(new DeliveryOrderHeldDomainEvent(Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, reason));
     }
 
     public void Release()
@@ -199,7 +199,7 @@ public class DeliveryOrder : AggregateRoot<Guid>
             throw new InvalidOperationException("Only held orders can be released.");
 
         Status = OrderStatus.ReadyToPlan;
-        AddDomainEvent(new DeliveryOrderReleasedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+        AddDomainEvent(new DeliveryOrderReleasedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, TenantId, Id));
     }
 
     public void MarkFailed(string reason)
@@ -213,7 +213,8 @@ public class DeliveryOrder : AggregateRoot<Guid>
 
     public void Cancel(string reason)
     {
-        if (Status == OrderStatus.Completed || Status == OrderStatus.InProgress)
+        if (Status == OrderStatus.Cancelled) return;
+        if (Status is OrderStatus.Completed or OrderStatus.InProgress)
             throw new InvalidOperationException("Cannot cancel an order that is in progress or completed.");
 
         Status = OrderStatus.Cancelled;
@@ -236,6 +237,6 @@ public class DeliveryOrder : AggregateRoot<Guid>
 
         ServiceWindow = newServiceWindow;
         Status = OrderStatus.Amended;
-        AddDomainEvent(new DeliveryOrderAmendedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+        AddDomainEvent(new DeliveryOrderAmendedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, reason));
     }
 }

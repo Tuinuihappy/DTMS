@@ -76,7 +76,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
             if (cmd.Schedule != null)
                 order.SetRecurringSchedule(cmd.Schedule.CronExpression, cmd.Schedule.ValidFrom, cmd.Schedule.ValidUntil);
 
-            var stationMap = await BuildStationMapAsync(order.Legs, cancellationToken);
+            var stationMap = await _stationValidation.BuildStationMapAsync(order.Legs, cancellationToken);
             if (stationMap.IsFailure) return Result<List<Guid>>.Failure(stationMap.Error);
 
             order.Submit();
@@ -90,31 +90,5 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         await _repo.SaveChangesAsync(cancellationToken);
 
         return Result<List<Guid>>.Success(orders.Select(o => o.Id).ToList());
-    }
-
-    private async Task<Result<IReadOnlyDictionary<(string pickup, string drop), (Guid pickupStationId, Guid dropStationId)>>>
-        BuildStationMapAsync(IEnumerable<Domain.Entities.DeliveryLeg> legs, CancellationToken cancellationToken)
-    {
-        var uniquePairs = legs
-            .Select(l => (l.PickupLocationCode, l.DropLocationCode))
-            .Distinct()
-            .ToList();
-
-        var map = new Dictionary<(string, string), (Guid, Guid)>();
-
-        foreach (var (pickup, drop) in uniquePairs)
-        {
-            var (pickupOk, pickupStationId, pickupErr) = await _stationValidation.ResolveAndValidateAsync(
-                pickup, "PickupLocationCode", cancellationToken);
-            if (!pickupOk) return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Failure(pickupErr!);
-
-            var (dropOk, dropStationId, dropErr) = await _stationValidation.ResolveAndValidateAsync(
-                drop, "DropLocationCode", cancellationToken);
-            if (!dropOk) return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Failure(dropErr!);
-
-            map[(pickup, drop)] = (pickupStationId, dropStationId);
-        }
-
-        return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Success(map);
     }
 }

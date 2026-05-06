@@ -41,7 +41,7 @@ public class PodScannedConsumer : IConsumer<PodCapturedIntegrationEvent>
         _logger.LogInformation("[PodScan] Trip {TripId}: matching {Count} scanned barcode(s) to OrderItems.",
             evt.TripId, evt.ScannedIds.Count);
 
-        var orders = await _repository.GetOrdersByPackageBarcodesAsync(evt.ScannedIds, context.CancellationToken);
+        var orders = await _repository.GetOrdersByPackageBarcodesAsync(evt.ScannedIds, evt.TenantId, context.CancellationToken);
 
         if (orders.Count == 0)
         {

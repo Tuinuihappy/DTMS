@@ -29,6 +29,8 @@ builder.Host.UseSerilog((context, configuration) =>
 // Add services to the container.
 builder.Services.AddOpenApi();
 builder.Services.AddAuthorization();
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 
 // Tenant context — scoped per request; populated by TenantContextMiddleware from JWT tenant_id claim
 builder.Services.AddScoped<TenantContext>();

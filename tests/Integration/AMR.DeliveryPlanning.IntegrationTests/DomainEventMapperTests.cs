@@ -30,7 +30,7 @@ public class DomainEventMapperTests
         var dropStationId = Guid.NewGuid();
         var legs = new List<DeliveryLegEventDto>
         {
-            new(legId, 1, pickupStationId, dropStationId, "FEEDER", 1, 5.5)
+            new(legId, 1, pickupStationId, dropStationId, "FEEDER", 1, 5.5, [])
         };
 
         var integrationEvent = new DeliveryOrderDomainEventMapper()
@@ -54,7 +54,7 @@ public class DomainEventMapperTests
         integrationEvent.DeliveryOrderId.Should().Be(orderId);
         integrationEvent.SlaTier.Should().Be("High");
         integrationEvent.Legs.Should().ContainSingle()
-            .Which.Should().BeEquivalentTo(new DeliveryLegDto(legId, 1, pickupStationId, dropStationId, "FEEDER", 1, 5.5));
+            .Which.Should().BeEquivalentTo(new DeliveryLegDto(legId, 1, pickupStationId, dropStationId, "FEEDER", 1, 5.5, []));
     }
 
     [Fact]
@@ -166,12 +166,62 @@ public class DomainEventMapperTests
             .BeOfType<ExceptionRaisedIntegrationEvent>()
             .Which.Detail.Should().Be("blocked");
 
-        mapper.Map(new PodCapturedDomainEvent(eventId, occurredOn, tripId, stopId))
+        mapper.Map(new PodCapturedDomainEvent(eventId, occurredOn, tenantId, tripId, stopId, []))
             .Should()
             .ContainSingle()
             .Which.Should()
             .BeOfType<PodCapturedIntegrationEvent>()
             .Which.StopId.Should().Be(stopId);
+    }
+
+    [Fact]
+    public void DeliveryOrderMapper_MapsAmendedEvent()
+    {
+        var eventId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+
+        var result = new DeliveryOrderDomainEventMapper()
+            .Map(new DeliveryOrderAmendedDomainEvent(eventId, DateTime.UtcNow, tenantId, orderId, "Adjusted window"))
+            .Should().ContainSingle().Subject
+            .Should().BeOfType<DeliveryOrderAmendedIntegrationEvent>().Subject;
+
+        result.TenantId.Should().Be(tenantId);
+        result.DeliveryOrderId.Should().Be(orderId);
+        result.Reason.Should().Be("Adjusted window");
+    }
+
+    [Fact]
+    public void DeliveryOrderMapper_MapsHeldEvent()
+    {
+        var eventId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+
+        var result = new DeliveryOrderDomainEventMapper()
+            .Map(new DeliveryOrderHeldDomainEvent(eventId, DateTime.UtcNow, tenantId, orderId, "Awaiting confirmation"))
+            .Should().ContainSingle().Subject
+            .Should().BeOfType<DeliveryOrderHeldIntegrationEvent>().Subject;
+
+        result.TenantId.Should().Be(tenantId);
+        result.DeliveryOrderId.Should().Be(orderId);
+        result.Reason.Should().Be("Awaiting confirmation");
+    }
+
+    [Fact]
+    public void DeliveryOrderMapper_MapsReleasedEvent()
+    {
+        var eventId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+
+        var result = new DeliveryOrderDomainEventMapper()
+            .Map(new DeliveryOrderReleasedDomainEvent(eventId, DateTime.UtcNow, tenantId, orderId))
+            .Should().ContainSingle().Subject
+            .Should().BeOfType<DeliveryOrderReleasedIntegrationEvent>().Subject;
+
+        result.TenantId.Should().Be(tenantId);
+        result.DeliveryOrderId.Should().Be(orderId);
     }
 
     [Fact]

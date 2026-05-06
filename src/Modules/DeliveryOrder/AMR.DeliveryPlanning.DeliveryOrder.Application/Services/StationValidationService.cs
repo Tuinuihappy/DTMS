@@ -1,3 +1,6 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
+using AMR.DeliveryPlanning.SharedKernel.Messaging;
+
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 
 public class StationValidationService
@@ -21,5 +24,29 @@ public class StationValidationService
             return (false, Guid.Empty, $"{fieldName} '{locationCode}' is not a valid station ID or code.");
 
         return (true, resolvedId.Value, null);
+    }
+
+    public async Task<Result<IReadOnlyDictionary<(string pickup, string drop), (Guid pickupStationId, Guid dropStationId)>>>
+        BuildStationMapAsync(IEnumerable<DeliveryLeg> legs, CancellationToken ct = default)
+    {
+        var uniquePairs = legs
+            .Select(l => (l.PickupLocationCode, l.DropLocationCode))
+            .Distinct()
+            .ToList();
+
+        var map = new Dictionary<(string, string), (Guid, Guid)>();
+
+        foreach (var (pickup, drop) in uniquePairs)
+        {
+            var (pickupOk, pickupStationId, pickupErr) = await ResolveAndValidateAsync(pickup, "PickupLocationCode", ct);
+            if (!pickupOk) return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Failure(pickupErr!);
+
+            var (dropOk, dropStationId, dropErr) = await ResolveAndValidateAsync(drop, "DropLocationCode", ct);
+            if (!dropOk) return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Failure(dropErr!);
+
+            map[(pickup, drop)] = (pickupStationId, dropStationId);
+        }
+
+        return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Success(map);
     }
 }

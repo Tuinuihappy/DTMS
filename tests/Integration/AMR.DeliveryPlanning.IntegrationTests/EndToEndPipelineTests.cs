@@ -27,9 +27,10 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
         var vehicleTypeId = await _factory.CreateVehicleTypeAsync();
         var vehicleId = await RegisterAndSetIdleAsync(client, vehicleTypeId);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
 
         // 1. Submit order
-        var orderId = await SubmitOrderAsync(client, pickupId, dropId);
+        var orderId = await SubmitOrderAsync(client, pickupId, dropId, profileCode);
 
         // 2. Create planning job for that order
         var jobResp = await client.PostAsJsonAsync("/api/planning/jobs", new
@@ -76,7 +77,7 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
 
         // 8. Verify trip status = Completed (enum value 3)
         var finalBody = await (await client.GetAsync($"/api/dispatch/trips/{tripId}")).Content.ReadAsStringAsync();
-        finalBody.Should().Contain("\"status\":3", "trip must reach Completed status after all tasks done");
+        finalBody.Should().Contain("\"status\":\"Completed\"", "trip must reach Completed status after all tasks done");
     }
 
     [Fact]
@@ -87,8 +88,9 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
         var vehicleTypeId = await _factory.CreateVehicleTypeAsync();
         var vehicleId = await RegisterAndSetIdleAsync(client, vehicleTypeId);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
 
-        var orderId = await SubmitOrderAsync(client, pickupId, dropId);
+        var orderId = await SubmitOrderAsync(client, pickupId, dropId, profileCode);
 
         var jobResp = await client.PostAsJsonAsync("/api/planning/jobs", new
         {
@@ -129,22 +131,9 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
 
     // ── helpers ─────────────────────────────────────────────────────────────────
 
-    private async Task<Guid> SubmitOrderAsync(HttpClient client, Guid pickupId, Guid dropId)
-    {
-        var resp = await client.PostAsJsonAsync("/api/delivery-orders", new
-        {
-            OrderId = 2001,
-            OrderNo = $"E2E-{Guid.NewGuid():N}",
-            CreateBy = "test-user",
-            PickupLocationCode = pickupId.ToString(),
-            DropLocationCode = dropId.ToString(),
-            Priority = 0,
-            SLA = DateTime.UtcNow.AddHours(4),
-            OrderItems = new[] { new { ItemCode = "ITEM-A", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
-        });
-        resp.IsSuccessStatusCode.Should().BeTrue($"Submit order failed: {await resp.Content.ReadAsStringAsync()}");
-        return await resp.Content.ReadFromJsonAsync<Guid>();
-    }
+    private Task<Guid> SubmitOrderAsync(HttpClient client, Guid pickupId, Guid dropId, string profileCode)
+        => _factory.CreateAndSubmitOrderAsync(client, pickupId, dropId, profileCode,
+            sla: DateTime.UtcNow.AddHours(4));
 
     private async Task<Guid> RegisterAndSetIdleAsync(HttpClient client, Guid vehicleTypeId)
     {

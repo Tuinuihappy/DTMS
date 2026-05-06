@@ -16,10 +16,18 @@ public class RecurringSchedule : Entity<Guid>
         if (string.IsNullOrWhiteSpace(cronExpression))
             throw new ArgumentException("Cron expression cannot be empty.", nameof(cronExpression));
 
-        var parts = cronExpression.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length is < 5 or > 6)
-            throw new ArgumentException(
-                $"Invalid cron expression '{cronExpression}': expected 5 or 6 space-separated fields.", nameof(cronExpression));
+        try
+        {
+            Cronos.CronExpression.Parse(cronExpression, Cronos.CronFormat.IncludeSeconds);
+        }
+        catch
+        {
+            try { Cronos.CronExpression.Parse(cronExpression); }
+            catch (Cronos.CronFormatException ex)
+            {
+                throw new ArgumentException($"Invalid cron expression '{cronExpression}': {ex.Message}", nameof(cronExpression));
+            }
+        }
 
         Id = Guid.NewGuid();
         DeliveryOrderId = deliveryOrderId;

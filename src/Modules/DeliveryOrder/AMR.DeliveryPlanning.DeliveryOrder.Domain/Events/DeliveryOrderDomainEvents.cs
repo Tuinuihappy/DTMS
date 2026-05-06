@@ -29,8 +29,8 @@ public record DeliveryOrderPlanningStartedDomainEvent(Guid EventId, DateTime Occ
 public record DeliveryOrderPlannedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
 public record DeliveryOrderDispatchedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
 public record DeliveryOrderInProgressDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
-public record DeliveryOrderHeldDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string Reason) : IDomainEvent;
-public record DeliveryOrderReleasedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
+public record DeliveryOrderHeldDomainEvent(Guid EventId, DateTime OccurredOn, Guid TenantId, Guid OrderId, string Reason) : IDomainEvent;
+public record DeliveryOrderReleasedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TenantId, Guid OrderId) : IDomainEvent;
 public record DeliveryOrderFailedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TenantId, Guid OrderId, string Reason) : IDomainEvent;
-public record DeliveryOrderAmendedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string Reason) : IDomainEvent;
+public record DeliveryOrderAmendedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TenantId, Guid OrderId, string Reason) : IDomainEvent;
 public record DeliveryOrderCompletedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TenantId, Guid OrderId) : IDomainEvent;

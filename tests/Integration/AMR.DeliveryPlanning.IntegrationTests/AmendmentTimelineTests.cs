@@ -15,59 +15,57 @@ public class AmendmentTimelineTests : IClassFixture<DtmsWebApplicationFactory>
     public AmendmentTimelineTests(DtmsWebApplicationFactory factory) => _factory = factory;
 
     [Fact]
-    public async Task PatchOrder_ChangePriority_TimelineIncludesAmendmentEntry()
+    public async Task PatchOrder_ChangeServiceWindow_TimelineIncludesAmendmentEntry()
     {
         var client = await _factory.GetAuthenticatedClient();
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
 
-        var orderId = await SubmitOrderAsync(client, pickupId, dropId, priority: 0); // Low
+        var orderId = await SubmitOrderAsync(client, pickupId, dropId, profileCode);
 
-        // PATCH: change priority to High (2)
         var patchResp = await client.PatchAsJsonAsync($"/api/delivery-orders/{orderId}", new
         {
             Reason = "Customer escalation",
-            NewPriority = 2,   // High
+            NewServiceWindow = new { Earliest = (DateTime?)null, Latest = DateTime.UtcNow.AddHours(6) },
             AmendedBy = "ops-user-1"
         });
         patchResp.IsSuccessStatusCode.Should().BeTrue(
             $"PATCH order failed: {await patchResp.Content.ReadAsStringAsync()}");
 
-        // GET timeline
         var timelineResp = await client.GetAsync($"/api/delivery-orders/{orderId}/timeline");
         timelineResp.StatusCode.Should().Be(HttpStatusCode.OK);
         var timelineBody = await timelineResp.Content.ReadAsStringAsync();
 
-        // Timeline must include an Amendment entry
-        timelineBody.Should().Contain("Amendment:PriorityChange",
-            "changing priority must create an Amendment:PriorityChange timeline entry");
+        timelineBody.Should().Contain("Amendment:ServiceWindowChange",
+            "changing service window must create an Amendment:ServiceWindowChange timeline entry");
         timelineBody.Should().Contain("Customer escalation",
             "amendment reason must appear in timeline");
     }
 
     [Fact]
-    public async Task PatchOrder_ChangeSla_TimelineIncludesSlaAmendment()
+    public async Task PatchOrder_ChangeServiceWindow_TimelineIncludesAmendment()
     {
         var client = await _factory.GetAuthenticatedClient();
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
 
-        var orderId = await SubmitOrderAsync(client, pickupId, dropId);
-        var newSla = DateTime.UtcNow.AddHours(8);
+        var orderId = await SubmitOrderAsync(client, pickupId, dropId, profileCode);
 
         var patchResp = await client.PatchAsJsonAsync($"/api/delivery-orders/{orderId}", new
         {
-            Reason = "Production delay — extended SLA",
-            NewSla = newSla,
+            Reason = "Production delay — extended window",
+            NewServiceWindow = new { Earliest = (DateTime?)null, Latest = DateTime.UtcNow.AddHours(8) },
             AmendedBy = "planner-1"
         });
         patchResp.IsSuccessStatusCode.Should().BeTrue(
-            $"PATCH SLA failed: {await patchResp.Content.ReadAsStringAsync()}");
+            $"PATCH service window failed: {await patchResp.Content.ReadAsStringAsync()}");
 
         var timelineResp = await client.GetAsync($"/api/delivery-orders/{orderId}/timeline");
         timelineResp.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await timelineResp.Content.ReadAsStringAsync();
 
-        body.Should().Contain("Amendment:SlaChange",
-            "changing SLA must create an Amendment:SlaChange timeline entry");
+        body.Should().Contain("Amendment:ServiceWindowChange",
+            "changing service window must create an Amendment:ServiceWindowChange timeline entry");
     }
 
     [Fact]
@@ -75,24 +73,23 @@ public class AmendmentTimelineTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
 
-        var orderId = await SubmitOrderAsync(client, pickupId, dropId, priority: 0);
+        var orderId = await SubmitOrderAsync(client, pickupId, dropId, profileCode);
 
-        // First amendment: change priority
         await client.PatchAsJsonAsync($"/api/delivery-orders/{orderId}", new
         {
             Reason = "First change",
-            NewPriority = 1, // Normal
+            NewServiceWindow = new { Earliest = (DateTime?)null, Latest = DateTime.UtcNow.AddHours(5) },
             AmendedBy = "user-A"
         });
 
-        await Task.Delay(50); // ensure distinct timestamps
+        await Task.Delay(50);
 
-        // Second amendment: change SLA
         await client.PatchAsJsonAsync($"/api/delivery-orders/{orderId}", new
         {
             Reason = "Second change",
-            NewSla = DateTime.UtcNow.AddHours(6),
+            NewServiceWindow = new { Earliest = (DateTime?)null, Latest = DateTime.UtcNow.AddHours(6) },
             AmendedBy = "user-B"
         });
 
@@ -100,11 +97,9 @@ public class AmendmentTimelineTests : IClassFixture<DtmsWebApplicationFactory>
         timelineResp.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await timelineResp.Content.ReadAsStringAsync();
 
-        // Both amendments must appear
         body.Should().Contain("First change");
         body.Should().Contain("Second change");
 
-        // Verify chronological order: "First change" must appear before "Second change"
         var firstIdx = body.IndexOf("First change", StringComparison.Ordinal);
         var secondIdx = body.IndexOf("Second change", StringComparison.Ordinal);
         firstIdx.Should().BeLessThan(secondIdx,
@@ -116,8 +111,9 @@ public class AmendmentTimelineTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
 
-        var orderId = await SubmitOrderAsync(client, pickupId, dropId);
+        var orderId = await SubmitOrderAsync(client, pickupId, dropId, profileCode);
 
         var timelineResp = await client.GetAsync($"/api/delivery-orders/{orderId}/timeline");
         timelineResp.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -136,7 +132,6 @@ public class AmendmentTimelineTests : IClassFixture<DtmsWebApplicationFactory>
 
         var resp = await client.GetAsync($"/api/delivery-orders/{Guid.NewGuid()}/timeline");
 
-        // Timeline query always succeeds — returns empty array for unknown orderId
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await resp.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(body);
@@ -145,21 +140,7 @@ public class AmendmentTimelineTests : IClassFixture<DtmsWebApplicationFactory>
 
     // ── helper ──────────────────────────────────────────────────────────────────
 
-    private static async Task<Guid> SubmitOrderAsync(
-        HttpClient client, Guid pickupId, Guid dropId, int priority = 1)
-    {
-        var resp = await client.PostAsJsonAsync("/api/delivery-orders", new
-        {
-            OrderId = 6001,
-            OrderNo = $"AMD-{Guid.NewGuid():N}",
-            CreateBy = "test-user",
-            PickupLocationCode = pickupId.ToString(),
-            DropLocationCode = dropId.ToString(),
-            Priority = priority,
-            SLA = DateTime.UtcNow.AddHours(4),
-            OrderItems = new[] { new { ItemCode = "ITEM", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
-        });
-        resp.IsSuccessStatusCode.Should().BeTrue($"Submit order failed: {await resp.Content.ReadAsStringAsync()}");
-        return await resp.Content.ReadFromJsonAsync<Guid>();
-    }
+    private Task<Guid> SubmitOrderAsync(HttpClient client, Guid pickupId, Guid dropId, string profileCode)
+        => _factory.CreateAndSubmitOrderAsync(client, pickupId, dropId, profileCode,
+            sla: DateTime.UtcNow.AddHours(4));
 }

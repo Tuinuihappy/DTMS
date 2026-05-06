@@ -10,3 +10,12 @@ public record DeliveryOrderFailedIntegrationEvent(
 
 public record DeliveryOrderCompletedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TenantId, Guid DeliveryOrderId) : IIntegrationEvent;
+
+public record DeliveryOrderAmendedIntegrationEvent(
+    Guid EventId, DateTime OccurredOn, Guid TenantId, Guid DeliveryOrderId, string Reason) : IIntegrationEvent;
+
+public record DeliveryOrderHeldIntegrationEvent(
+    Guid EventId, DateTime OccurredOn, Guid TenantId, Guid DeliveryOrderId, string Reason) : IIntegrationEvent;
+
+public record DeliveryOrderReleasedIntegrationEvent(
+    Guid EventId, DateTime OccurredOn, Guid TenantId, Guid DeliveryOrderId) : IIntegrationEvent;

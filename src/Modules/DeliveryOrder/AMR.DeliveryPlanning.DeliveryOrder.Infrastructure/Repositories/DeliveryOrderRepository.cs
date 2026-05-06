@@ -19,6 +19,8 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
 
     public async Task<List<Domain.Entities.DeliveryOrder>> GetByStatusAsync(OrderStatus status, int page, int pageSize, CancellationToken cancellationToken = default)
         => await _context.DeliveryOrders
+            .Include(o => o.Legs).ThenInclude(l => l.Packages).ThenInclude(p => p.Contents)
+            .Include(o => o.Schedule)
             .Where(o => o.Status == status)
             .OrderByDescending(o => o.Id)
             .Skip((page - 1) * pageSize)
@@ -27,18 +29,20 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
 
     public async Task<List<Domain.Entities.DeliveryOrder>> GetAllAsync(int page, int pageSize, CancellationToken cancellationToken = default)
         => await _context.DeliveryOrders
+            .Include(o => o.Legs).ThenInclude(l => l.Packages).ThenInclude(p => p.Contents)
+            .Include(o => o.Schedule)
             .OrderByDescending(o => o.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
     public async Task<List<Domain.Entities.DeliveryOrder>> GetOrdersByPackageBarcodesAsync(
-        IEnumerable<string> barcodes, CancellationToken cancellationToken = default)
+        IEnumerable<string> barcodes, Guid tenantId, CancellationToken cancellationToken = default)
     {
         var barcodeList = barcodes.ToList();
         return await _context.DeliveryOrders
             .Include(o => o.Legs).ThenInclude(l => l.Packages).ThenInclude(p => p.Contents)
-            .Where(o => o.Legs.Any(l => l.Packages.Any(p => barcodeList.Contains(p.Barcode))))
+            .Where(o => o.TenantId == tenantId && o.Legs.Any(l => l.Packages.Any(p => barcodeList.Contains(p.Barcode))))
             .ToListAsync(cancellationToken);
     }
 

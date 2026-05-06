@@ -68,6 +68,19 @@ public class DeliveryOrderTests
     }
 
     [Fact]
+    public void Cancel_WhenAlreadyCancelled_IsIdempotent()
+    {
+        var order = CreateOrder();
+        order.Cancel("First cancel");
+
+        order.Cancel("Second cancel");
+
+        order.Status.Should().Be(OrderStatus.Cancelled);
+        order.DomainEvents.OfType<DeliveryOrderCancelledDomainEvent>().Should().HaveCount(1,
+            "re-cancelling must not emit a second domain event");
+    }
+
+    [Fact]
     public void MarkAsValidated_SetsStationIdsOnLegs()
     {
         var order = CreateOrder();
@@ -225,5 +238,72 @@ public class DeliveryOrderTests
         order.MarkPackagesDelivered(["box-001"]);
 
         order.AllPackages.Single().Status.Should().Be(PackageStatus.Delivered);
+    }
+
+    // ── Cron validation ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void SetRecurringSchedule_WithInvalidCron_Throws()
+    {
+        var order = CreateOrder();
+
+        var act = () => order.SetRecurringSchedule("99 99 99 99 99", null, null);
+
+        act.Should().Throw<ArgumentException>().WithMessage("*cron*");
+    }
+
+    [Fact]
+    public void SetRecurringSchedule_WithValidCron_DoesNotThrow()
+    {
+        var order = CreateOrder();
+
+        var act = () => order.SetRecurringSchedule("0 8 * * 1-5", null, null);
+
+        act.Should().NotThrow();
+    }
+
+    // ── TenantId in Hold / Release / Amend events ─────────────────────────────
+
+    [Fact]
+    public void Hold_EmitsDomainEventWithTenantId()
+    {
+        var tenantId = Guid.NewGuid();
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            tenantId, "Test", SlaTier.Normal, new ServiceWindow(null, null));
+
+        order.Hold("waiting");
+
+        order.DomainEvents
+            .OfType<DeliveryOrderHeldDomainEvent>()
+            .Single().TenantId.Should().Be(tenantId);
+    }
+
+    [Fact]
+    public void Release_EmitsDomainEventWithTenantId()
+    {
+        var tenantId = Guid.NewGuid();
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            tenantId, "Test", SlaTier.Normal, new ServiceWindow(null, null));
+        order.Hold("waiting");
+
+        order.Release();
+
+        order.DomainEvents
+            .OfType<DeliveryOrderReleasedDomainEvent>()
+            .Single().TenantId.Should().Be(tenantId);
+    }
+
+    [Fact]
+    public void AmendServiceWindow_EmitsDomainEventWithTenantId()
+    {
+        var tenantId = Guid.NewGuid();
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            tenantId, "Test", SlaTier.Normal, new ServiceWindow(null, null));
+
+        order.AmendServiceWindow(new ServiceWindow(null, DateTime.UtcNow.AddHours(8)), "rescheduled");
+
+        order.DomainEvents
+            .OfType<DeliveryOrderAmendedDomainEvent>()
+            .Single().TenantId.Should().Be(tenantId);
     }
 }

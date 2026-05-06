@@ -109,6 +109,82 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
             new { FromStationId = pickupStationId, ToStationId = dropStationId, SequenceOrder = 1 }
         };
 
+    /// <summary>
+    /// Creates a CarrierTypeProfile + LoadUnitProfile pair and returns the profile code.
+    /// Uses unique codes per call so parallel tests don't collide.
+    /// </summary>
+    public async Task<string> CreateLoadUnitProfileAsync(HttpClient client)
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var carrierCode = $"FEEDER-{suffix}";
+        var profileCode = $"TRAY-{suffix}";
+
+        var carrierResp = await client.PostAsJsonAsync("/api/facility/carrier-type-profiles", new
+        {
+            Code = carrierCode,
+            DisplayName = "Test Feeder",
+            AMRCapability = "MOVE"
+        });
+        await EnsureSuccessAsync(carrierResp, "Create carrier type failed");
+
+        var profileResp = await client.PostAsJsonAsync("/api/facility/load-unit-profiles", new
+        {
+            Code = profileCode,
+            DisplayName = "Test Tray",
+            LengthMm = 400.0,
+            WidthMm = 300.0,
+            HeightMm = 200.0,
+            MaxGrossWeightKg = 50.0,
+            CarrierTypeCode = carrierCode
+        });
+        await EnsureSuccessAsync(profileResp, "Create load unit profile failed");
+
+        return profileCode;
+    }
+
+    /// <summary>Builds a CreateDraftDeliveryOrder request body using the current API format.</summary>
+    public static object BuildOrderRequest(
+        Guid pickupId, Guid dropId, string loadUnitProfileCode,
+        DateTime? sla = null, string? orderName = null) => new
+    {
+        OrderName = orderName ?? $"Test-{Guid.NewGuid():N}"[..20],
+        SlaTier = "Normal",
+        ServiceWindow = sla.HasValue ? new { Earliest = (DateTime?)null, Latest = sla } : (object?)null,
+        StructureType = "Sequence",
+        Tags = (string[]?)null,
+        OrderItems = new[]
+        {
+            new
+            {
+                PickupLocationCode = pickupId.ToString(),
+                DropLocationCode = dropId.ToString(),
+                Barcode = $"BCR-{Guid.NewGuid():N}"[..15],
+                LoadUnitProfileCode = loadUnitProfileCode,
+                GrossWeightKg = 5.0,
+                Contents = (object[]?)null
+            }
+        },
+        Schedule = (object?)null
+    };
+
+    /// <summary>
+    /// Creates a draft order then submits it (Draft → ReadyToPlan).
+    /// Returns the order ID or throws if either step fails.
+    /// </summary>
+    public async Task<Guid> CreateAndSubmitOrderAsync(HttpClient client, Guid pickupId, Guid dropId,
+        string loadUnitProfileCode, DateTime? sla = null, string? orderName = null)
+    {
+        var createResp = await client.PostAsJsonAsync("/api/delivery-orders",
+            BuildOrderRequest(pickupId, dropId, loadUnitProfileCode, sla, orderName));
+        await EnsureSuccessAsync(createResp, "Create order failed");
+        var orderId = await createResp.Content.ReadFromJsonAsync<Guid>();
+
+        var submitResp = await client.PostAsync($"/api/delivery-orders/{orderId}/submit", null);
+        await EnsureSuccessAsync(submitResp, $"Submit order {orderId} failed");
+
+        return orderId;
+    }
+
     async Task IAsyncLifetime.DisposeAsync() => await _postgres.DisposeAsync();
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, string message)

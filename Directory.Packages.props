@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- API -->
+    <PackageVersion Include="Cronos" Version="0.13.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.6" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.6" />

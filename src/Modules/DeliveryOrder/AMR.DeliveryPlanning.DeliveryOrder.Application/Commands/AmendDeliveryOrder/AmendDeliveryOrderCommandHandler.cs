@@ -4,6 +4,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AmendDeliveryOrder;
 
@@ -11,13 +12,16 @@ public class AmendDeliveryOrderCommandHandler : ICommandHandler<AmendDeliveryOrd
 {
     private readonly IDeliveryOrderRepository _orderRepo;
     private readonly IOrderAmendmentRepository _amendmentRepo;
+    private readonly ILogger<AmendDeliveryOrderCommandHandler> _logger;
 
     public AmendDeliveryOrderCommandHandler(
         IDeliveryOrderRepository orderRepo,
-        IOrderAmendmentRepository amendmentRepo)
+        IOrderAmendmentRepository amendmentRepo,
+        ILogger<AmendDeliveryOrderCommandHandler> logger)
     {
         _orderRepo = orderRepo;
         _amendmentRepo = amendmentRepo;
+        _logger = logger;
     }
 
     public async Task<Result<Guid>> Handle(AmendDeliveryOrderCommand request, CancellationToken cancellationToken)
@@ -50,20 +54,25 @@ public class AmendDeliveryOrderCommandHandler : ICommandHandler<AmendDeliveryOrd
             });
 
             var amendment = new OrderAmendment(
-                order.Id, AmendmentType.SlaChange, request.Reason,
+                order.Id, AmendmentType.ServiceWindowChange, request.Reason,
                 originalSnapshot, newSnapshot, request.AmendedBy);
 
             await _amendmentRepo.AddAsync(amendment, cancellationToken);
             await _orderRepo.SaveChangesAsync(cancellationToken);
 
+            _logger.LogInformation("[Amend] Order {OrderId} amended ({AmendmentType}) by {AmendedBy}.",
+                request.OrderId, amendment.Type, request.AmendedBy ?? "system");
+
             return Result<Guid>.Success(amendment.Id);
         }
         catch (InvalidOperationException ex)
         {
+            _logger.LogWarning("[Amend] Order {OrderId} amendment failed: {Error}.", request.OrderId, ex.Message);
             return Result<Guid>.Failure(ex.Message);
         }
         catch (DbUpdateConcurrencyException)
         {
+            _logger.LogWarning("[Amend] Concurrency conflict on Order {OrderId}.", request.OrderId);
             return Result<Guid>.Failure("The order was modified by another process. Please retry.");
         }
     }

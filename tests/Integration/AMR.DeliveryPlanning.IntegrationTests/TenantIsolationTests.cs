@@ -29,25 +29,16 @@ public class TenantIsolationTests : IClassFixture<DtmsWebApplicationFactory>
         var clientA = await _factory.GetClientForTenantAsync(TenantA);
         var clientB = await _factory.GetClientForTenantAsync(TenantB);
 
-        // Tenant B creates an order — stations are shared (facility is not tenant-scoped)
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(clientA);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(clientA);
 
-        var orderResp = await clientB.PostAsJsonAsync("/api/delivery-orders", new
-        {
-            OrderId = 3001,
-            OrderNo = $"ISO-B-{Guid.NewGuid():N}",
-            CreateBy = "test-user",
-            PickupLocationCode = pickupId.ToString(),
-            DropLocationCode = dropId.ToString(),
-            Priority = 0,
-            SLA = DateTime.UtcNow.AddHours(4),
-            OrderItems = new[] { new { ItemCode = "X", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
-        });
+        var orderResp = await clientB.PostAsJsonAsync("/api/delivery-orders",
+            DtmsWebApplicationFactory.BuildOrderRequest(pickupId, dropId, profileCode,
+                sla: DateTime.UtcNow.AddHours(4)));
         orderResp.IsSuccessStatusCode.Should().BeTrue(
             $"Tenant B should be able to submit an order: {await orderResp.Content.ReadAsStringAsync()}");
         var orderId = await orderResp.Content.ReadFromJsonAsync<Guid>();
 
-        // Tenant A tries to access the order created by Tenant B — query filter returns 404
         var getResp = await clientA.GetAsync($"/api/delivery-orders/{orderId}");
         getResp.StatusCode.Should().Be(HttpStatusCode.NotFound,
             "EF global query filter must prevent Tenant A from reading Tenant B's order");
@@ -60,45 +51,22 @@ public class TenantIsolationTests : IClassFixture<DtmsWebApplicationFactory>
         var clientB = await _factory.GetClientForTenantAsync(TenantB);
 
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(clientA);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(clientA);
 
-        // Each tenant creates one order
-        var keyA = $"ISO-LIST-A-{Guid.NewGuid():N}";
-        var keyB = $"ISO-LIST-B-{Guid.NewGuid():N}";
+        var nameA = $"ISO-A-{Guid.NewGuid():N}"[..20];
+        var nameB = $"ISO-B-{Guid.NewGuid():N}"[..20];
 
-        var orderAResp = await clientA.PostAsJsonAsync("/api/delivery-orders", new
-        {
-            OrderId = 3002,
-            OrderNo = keyA,
-            CreateBy = "test-user",
-            PickupLocationCode = pickupId.ToString(),
-            DropLocationCode = dropId.ToString(),
-            Priority = 0,
-            SLA = DateTime.UtcNow.AddHours(4),
-            OrderItems = new[] { new { ItemCode = "A", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
-        });
-        orderAResp.IsSuccessStatusCode.Should().BeTrue(
-            $"Tenant A order creation failed: {await orderAResp.Content.ReadAsStringAsync()}");
+        await _factory.CreateAndSubmitOrderAsync(clientA, pickupId, dropId, profileCode,
+            sla: DateTime.UtcNow.AddHours(4), orderName: nameA);
 
-        var orderBResp = await clientB.PostAsJsonAsync("/api/delivery-orders", new
-        {
-            OrderId = 3003,
-            OrderNo = keyB,
-            CreateBy = "test-user",
-            PickupLocationCode = pickupId.ToString(),
-            DropLocationCode = dropId.ToString(),
-            Priority = 0,
-            SLA = DateTime.UtcNow.AddHours(4),
-            OrderItems = new[] { new { ItemCode = "B", Quantity = 1, Weight = 1.0, Remarks = (string?)null } }
-        });
-        orderBResp.IsSuccessStatusCode.Should().BeTrue(
-            $"Tenant B order creation failed: {await orderBResp.Content.ReadAsStringAsync()}");
+        await _factory.CreateAndSubmitOrderAsync(clientB, pickupId, dropId, profileCode,
+            sla: DateTime.UtcNow.AddHours(4), orderName: nameB);
 
-        // Tenant B lists orders (SubmitDeliveryOrder advances to ReadyToPlan, so query that status)
         var listResp = await clientB.GetAsync("/api/delivery-orders?page=1&pageSize=50&status=ReadyToPlan");
         listResp.IsSuccessStatusCode.Should().BeTrue($"List orders failed: {await listResp.Content.ReadAsStringAsync()}");
         var body = await listResp.Content.ReadAsStringAsync();
-        body.Should().Contain(keyB, "Tenant B should see its own order");
-        body.Should().NotContain(keyA, "Tenant B must not see Tenant A's order");
+        body.Should().Contain(nameB, "Tenant B should see its own order");
+        body.Should().NotContain(nameA, "Tenant B must not see Tenant A's order");
     }
 
     // ── Trip isolation ────────────────────────────────────────────────────────

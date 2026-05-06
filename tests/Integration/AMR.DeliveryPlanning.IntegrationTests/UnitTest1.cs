@@ -89,23 +89,12 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
 
-        // Must create real stations first — C5 validates station existence in Facility DB
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
 
-        var response = await client.PostAsJsonAsync("/api/delivery-orders", new
-        {
-            OrderId = 1001,
-            OrderNo = $"TEST-{Guid.NewGuid():N}",
-            CreateBy = "test-user",
-            PickupLocationCode = pickupId.ToString(),
-            DropLocationCode = dropId.ToString(),
-            Priority = 0,
-            SLA = DateTime.UtcNow.AddHours(4),
-            OrderItems = new[]
-            {
-                new { ItemCode = "ITEM-A", Quantity = 10, Weight = 5.0, Remarks = "Test item" }
-            }
-        });
+        var response = await client.PostAsJsonAsync("/api/delivery-orders",
+            DtmsWebApplicationFactory.BuildOrderRequest(pickupId, dropId, profileCode,
+                sla: DateTime.UtcNow.AddHours(4)));
 
         response.IsSuccessStatusCode.Should().BeTrue($"Expected 2xx but got {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
     }
@@ -383,7 +372,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         var getResponse = await client.GetAsync($"/api/dispatch/trips/{tripId}");
         getResponse.IsSuccessStatusCode.Should().BeTrue();
         var body = await getResponse.Content.ReadAsStringAsync();
-        body.Should().Contain("\"status\":1");
+        body.Should().Contain("\"status\":\"InProgress\"");
     }
 
     // ── Hardening: Auth Register ─────────────────────────────────

@@ -32,6 +32,18 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             [
                 new DeliveryOrderCompletedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId)
             ],
+            DeliveryOrderAmendedDomainEvent evt =>
+            [
+                new DeliveryOrderAmendedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId, evt.Reason)
+            ],
+            DeliveryOrderHeldDomainEvent evt =>
+            [
+                new DeliveryOrderHeldIntegrationEvent(evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId, evt.Reason)
+            ],
+            DeliveryOrderReleasedDomainEvent evt =>
+            [
+                new DeliveryOrderReleasedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId)
+            ],
             _ => []
         };
     }
