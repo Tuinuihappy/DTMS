@@ -20,4 +20,6 @@ public record DeliveryOrderReadyForPlanningIntegrationEvent(
     Guid TenantId,
     Guid DeliveryOrderId,
     string SlaTier,
+    DateTime? ServiceWindowEarliest,
+    DateTime? ServiceWindowLatest,
     IReadOnlyList<DeliveryLegDto> Legs) : IIntegrationEvent;

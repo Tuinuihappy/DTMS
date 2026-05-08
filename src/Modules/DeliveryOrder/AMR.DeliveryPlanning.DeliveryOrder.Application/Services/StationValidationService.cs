@@ -34,18 +34,30 @@ public class StationValidationService
             .Distinct()
             .ToList();
 
-        var map = new Dictionary<(string, string), (Guid, Guid)>();
+        // Deduplicate all location codes and resolve them in parallel
+        var allCodes = uniquePairs
+            .SelectMany(p => new[]
+            {
+                (Code: p.PickupLocationCode, Field: "PickupLocationCode"),
+                (Code: p.DropLocationCode,   Field: "DropLocationCode")
+            })
+            .GroupBy(x => x.Code, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
 
-        foreach (var (pickup, drop) in uniquePairs)
-        {
-            var (pickupOk, pickupStationId, pickupErr) = await ResolveAndValidateAsync(pickup, "PickupLocationCode", ct);
-            if (!pickupOk) return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Failure(pickupErr!);
+        var results = await Task.WhenAll(
+            allCodes.Select(x => ResolveAndValidateAsync(x.Code, x.Field, ct)));
 
-            var (dropOk, dropStationId, dropErr) = await ResolveAndValidateAsync(drop, "DropLocationCode", ct);
-            if (!dropOk) return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Failure(dropErr!);
+        var codeToStation = new Dictionary<string, (bool Ok, Guid Id, string? Err)>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < allCodes.Count; i++)
+            codeToStation[allCodes[i].Code] = results[i];
 
-            map[(pickup, drop)] = (pickupStationId, dropStationId);
-        }
+        foreach (var (_, (ok, _, err)) in codeToStation)
+            if (!ok) return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Failure(err!);
+
+        var map = uniquePairs.ToDictionary(
+            p => (p.PickupLocationCode, p.DropLocationCode),
+            p => (codeToStation[p.PickupLocationCode].Id, codeToStation[p.DropLocationCode].Id));
 
         return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Success(map);
     }

@@ -15,6 +15,7 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             [
                 new DeliveryOrderReadyForPlanningIntegrationEvent(
                     evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId, evt.SlaTier,
+                    evt.ServiceWindowEarliest, evt.ServiceWindowLatest,
                     evt.Legs.Select(l => new DeliveryLegDto(
                         l.LegId, l.Sequence, l.PickupStationId, l.DropStationId,
                         l.CarrierTypeCode, l.TotalPackageCount, l.TotalWeight,

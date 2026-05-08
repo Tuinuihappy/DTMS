@@ -28,6 +28,8 @@ public class DomainEventMapperTests
         var legId = Guid.NewGuid();
         var pickupStationId = Guid.NewGuid();
         var dropStationId = Guid.NewGuid();
+        var earliest = new DateTime(2026, 5, 8, 8, 0, 0, DateTimeKind.Utc);
+        var latest = new DateTime(2026, 5, 8, 18, 0, 0, DateTimeKind.Utc);
         var legs = new List<DeliveryLegEventDto>
         {
             new(legId, 1, pickupStationId, dropStationId, "FEEDER", 1, 5.5, [])
@@ -40,6 +42,8 @@ public class DomainEventMapperTests
                 tenantId,
                 orderId,
                 "High",
+                earliest,
+                latest,
                 legs))
             .Should()
             .ContainSingle()
@@ -53,6 +57,8 @@ public class DomainEventMapperTests
         integrationEvent.TenantId.Should().Be(tenantId);
         integrationEvent.DeliveryOrderId.Should().Be(orderId);
         integrationEvent.SlaTier.Should().Be("High");
+        integrationEvent.ServiceWindowEarliest.Should().Be(earliest);
+        integrationEvent.ServiceWindowLatest.Should().Be(latest);
         integrationEvent.Legs.Should().ContainSingle()
             .Which.Should().BeEquivalentTo(new DeliveryLegDto(legId, 1, pickupStationId, dropStationId, "FEEDER", 1, 5.5, []));
     }

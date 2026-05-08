@@ -24,6 +24,8 @@ public record DeliveryOrderReadyToPlanDomainEvent(
     Guid TenantId,
     Guid OrderId,
     string SlaTier,
+    DateTime? ServiceWindowEarliest,
+    DateTime? ServiceWindowLatest,
     IReadOnlyList<DeliveryLegEventDto> Legs) : IDomainEvent;
 public record DeliveryOrderPlanningStartedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
 public record DeliveryOrderPlannedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;

@@ -62,6 +62,9 @@ public class DeliveryOrder : AggregateRoot<Guid>
         double grossWeightKg,
         IEnumerable<(string itemNumber, double quantity)>? contents = null)
     {
+        if (_legs.Any(l => l.Packages.Any(p => p.Barcode.Equals(barcode, StringComparison.OrdinalIgnoreCase))))
+            throw new InvalidOperationException($"A package with barcode '{barcode}' already exists in this order.");
+
         var leg = _legs.FirstOrDefault(l =>
             l.PickupLocationCode == pickupLocationCode &&
             l.DropLocationCode == dropLocationCode &&
@@ -145,7 +148,8 @@ public class DeliveryOrder : AggregateRoot<Guid>
             .ToList();
 
         AddDomainEvent(new DeliveryOrderReadyToPlanDomainEvent(
-            Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, SlaTier.ToString(), legDtos));
+            Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, SlaTier.ToString(),
+            ServiceWindow.Earliest, ServiceWindow.Latest, legDtos));
     }
 
     public void MarkPlanning()
