@@ -16,9 +16,9 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                 new TripCompletedIntegrationEvent(
                     evt.EventId,
                     evt.OccurredOn,
-                    evt.TenantId,
                     evt.TripId,
-                    evt.JobId)
+                    evt.JobId,
+                    evt.DeliveryOrderId)
             ],
             TripCancelledDomainEvent evt =>
             [
@@ -46,7 +46,6 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                 new PodCapturedIntegrationEvent(
                     evt.EventId,
                     evt.OccurredOn,
-                    evt.TenantId,
                     evt.TripId,
                     evt.StopId,
                     evt.ScannedIds)

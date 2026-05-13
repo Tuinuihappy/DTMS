@@ -53,6 +53,40 @@ public sealed class FacilityReadService : IFacilityReadService
             target.StationVendorRef.Trim());
     }
 
+    public async Task<IReadOnlyDictionary<string, Guid>> ResolveStationsBatchAsync(
+        IReadOnlyList<string> locationCodes,
+        CancellationToken cancellationToken = default)
+    {
+        var result = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+
+        var guidInputs = locationCodes.Where(c => Guid.TryParse(c, out _)).ToList();
+        var codeInputs = locationCodes.Where(c => !Guid.TryParse(c, out _)).ToList();
+
+        if (guidInputs.Count > 0)
+        {
+            var guids = guidInputs.ConvertAll(Guid.Parse);
+            var foundIds = await _db.Stations.AsNoTracking()
+                .Where(s => guids.Contains(s.Id))
+                .Select(s => s.Id)
+                .ToListAsync(cancellationToken);
+            foreach (var id in foundIds)
+                result[id.ToString()] = id;
+        }
+
+        if (codeInputs.Count > 0)
+        {
+            var upperCodes = codeInputs.ConvertAll(c => c.ToUpperInvariant());
+            var stations = await _db.Stations.AsNoTracking()
+                .Where(s => s.Code != null && upperCodes.Contains(s.Code))
+                .Select(s => new { s.Code, s.Id })
+                .ToListAsync(cancellationToken);
+            foreach (var s in stations)
+                result[s.Code!] = s.Id;
+        }
+
+        return result;
+    }
+
     public async Task<double?> GetRouteCostAsync(
         Guid fromStationId,
         Guid toStationId,

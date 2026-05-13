@@ -15,4 +15,7 @@ public class FacilityStationLookup : IStationLookup
 
     public Task<Guid?> ResolveByCodeAsync(string code, CancellationToken ct = default)
         => _facilityReadService.ResolveStationByCodeAsync(code, ct);
+
+    public Task<IReadOnlyDictionary<string, Guid>> ResolveBatchAsync(IReadOnlyList<string> locationCodes, CancellationToken ct = default)
+        => _facilityReadService.ResolveStationsBatchAsync(locationCodes, ct);
 }

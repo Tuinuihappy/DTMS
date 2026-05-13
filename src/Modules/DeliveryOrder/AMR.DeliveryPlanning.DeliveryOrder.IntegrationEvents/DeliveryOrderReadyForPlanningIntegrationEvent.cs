@@ -2,24 +2,16 @@ using AMR.DeliveryPlanning.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
 
-public record PackageSummaryDto(string Barcode, string LoadUnitProfileCode, double GrossWeightKg);
-
-public record DeliveryLegDto(
-    Guid LegId,
-    int Sequence,
+public record ItemSummaryDto(
+    string Sku,
+    double WeightKg,
     Guid PickupStationId,
-    Guid DropStationId,
-    string CarrierTypeCode,
-    int TotalPackageCount,
-    double TotalWeight,
-    IReadOnlyList<PackageSummaryDto> Packages);
+    Guid DropStationId);
 
 public record DeliveryOrderReadyForPlanningIntegrationEvent(
     Guid EventId,
     DateTime OccurredOn,
-    Guid TenantId,
     Guid DeliveryOrderId,
-    string SlaTier,
-    DateTime? ServiceWindowEarliest,
-    DateTime? ServiceWindowLatest,
-    IReadOnlyList<DeliveryLegDto> Legs) : IIntegrationEvent;
+    string Priority,
+    DateTime? Deadline,
+    IReadOnlyList<ItemSummaryDto> Items) : IIntegrationEvent;

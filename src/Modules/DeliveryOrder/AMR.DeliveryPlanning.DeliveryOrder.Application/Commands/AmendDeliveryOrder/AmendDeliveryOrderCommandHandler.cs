@@ -1,7 +1,6 @@
 using System.Text.Json;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -29,39 +28,38 @@ public class AmendDeliveryOrderCommandHandler : ICommandHandler<AmendDeliveryOrd
         var order = await _orderRepo.GetByIdAsync(request.OrderId, cancellationToken);
         if (order == null) return Result<Guid>.Failure($"Order {request.OrderId} not found.");
 
-        if (request.NewServiceWindow is null)
-            return Result<Guid>.Failure("At least one amendment field (NewServiceWindow) must be provided.");
+        var amendedBy = string.IsNullOrWhiteSpace(request.AmendedBy) ? null : request.AmendedBy.Trim();
+
+        if (request.NewRequestedTime is null)
+            return Result<Guid>.Failure("At least one amendment field (NewRequestedTime) must be provided.");
 
         var originalSnapshot = JsonSerializer.Serialize(new
         {
-            ServiceWindowEarliest = order.ServiceWindow.Earliest,
-            ServiceWindowLatest = order.ServiceWindow.Latest,
+            RequestedTime = order.RequestedTime,
             order.Status
         });
 
         try
         {
-            var newWindow = new ServiceWindow(request.NewServiceWindow.Earliest, request.NewServiceWindow.Latest);
-            order.AmendServiceWindow(newWindow, request.Reason);
+            order.AmendRequestedTime(request.NewRequestedTime, request.Reason);
 
             await _orderRepo.UpdateAsync(order, cancellationToken);
 
             var newSnapshot = JsonSerializer.Serialize(new
             {
-                ServiceWindowEarliest = order.ServiceWindow.Earliest,
-                ServiceWindowLatest = order.ServiceWindow.Latest,
+                RequestedTime = order.RequestedTime,
                 order.Status
             });
 
             var amendment = new OrderAmendment(
-                order.Id, AmendmentType.ServiceWindowChange, request.Reason,
-                originalSnapshot, newSnapshot, request.AmendedBy);
+                order.Id, AmendmentType.RequestedTimeChange, request.Reason,
+                originalSnapshot, newSnapshot, amendedBy);
 
             await _amendmentRepo.AddAsync(amendment, cancellationToken);
             await _orderRepo.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("[Amend] Order {OrderId} amended ({AmendmentType}) by {AmendedBy}.",
-                request.OrderId, amendment.Type, request.AmendedBy ?? "system");
+                request.OrderId, amendment.Type, amendedBy ?? "system");
 
             return Result<Guid>.Success(amendment.Id);
         }

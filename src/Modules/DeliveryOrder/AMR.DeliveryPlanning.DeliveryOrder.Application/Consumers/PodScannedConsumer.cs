@@ -1,6 +1,5 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
-using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -14,16 +13,11 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Consumers;
 public class PodScannedConsumer : IConsumer<PodCapturedIntegrationEvent>
 {
     private readonly IDeliveryOrderRepository _repository;
-    private readonly TenantContext _tenantContext;
     private readonly ILogger<PodScannedConsumer> _logger;
 
-    public PodScannedConsumer(
-        IDeliveryOrderRepository repository,
-        TenantContext tenantContext,
-        ILogger<PodScannedConsumer> logger)
+    public PodScannedConsumer(IDeliveryOrderRepository repository, ILogger<PodScannedConsumer> logger)
     {
         _repository = repository;
-        _tenantContext = tenantContext;
         _logger = logger;
     }
 
@@ -37,11 +31,10 @@ public class PodScannedConsumer : IConsumer<PodCapturedIntegrationEvent>
             return;
         }
 
-        _tenantContext.Set(evt.TenantId);
         _logger.LogInformation("[PodScan] Trip {TripId}: matching {Count} scanned barcode(s) to OrderItems.",
             evt.TripId, evt.ScannedIds.Count);
 
-        var orders = await _repository.GetOrdersByPackageBarcodesAsync(evt.ScannedIds, evt.TenantId, context.CancellationToken);
+        var orders = await _repository.GetOrdersByItemSkusAsync(evt.ScannedIds, context.CancellationToken);
 
         if (orders.Count == 0)
         {
@@ -54,7 +47,7 @@ public class PodScannedConsumer : IConsumer<PodCapturedIntegrationEvent>
         {
             try
             {
-                order.MarkPackagesDelivered(evt.ScannedIds);
+                order.MarkItemsDelivered(evt.ScannedIds);
                 await _repository.UpdateAsync(order, context.CancellationToken);
                 _logger.LogInformation("[PodScan] Updated item statuses on Order {OrderId}.", order.Id);
             }

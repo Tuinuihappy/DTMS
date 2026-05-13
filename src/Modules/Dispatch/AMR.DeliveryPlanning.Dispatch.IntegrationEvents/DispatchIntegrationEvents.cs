@@ -6,7 +6,7 @@ public record TripStartedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid VehicleId) : IIntegrationEvent;
 
 public record TripCompletedIntegrationEvent(
-    Guid EventId, DateTime OccurredOn, Guid TenantId, Guid TripId, Guid JobId) : IIntegrationEvent;
+    Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId) : IIntegrationEvent;
 
 public record TripCancelledIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, string Reason) : IIntegrationEvent;
@@ -18,7 +18,6 @@ public record ExceptionRaisedIntegrationEvent(
 public record PodCapturedIntegrationEvent(
     Guid EventId,
     DateTime OccurredOn,
-    Guid TenantId,
     Guid TripId,
     Guid StopId,
     IReadOnlyList<string> ScannedIds) : IIntegrationEvent;

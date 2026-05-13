@@ -1,7 +1,6 @@
 using System.Text;
 using System.Threading.RateLimiting;
 using FluentValidation;
-using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using AMR.DeliveryPlanning.Api.Auth;
 using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
 using AMR.DeliveryPlanning.Api.Middlewares;
@@ -31,11 +30,6 @@ builder.Services.AddOpenApi();
 builder.Services.AddAuthorization();
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
-
-// Tenant context — scoped per request; populated by TenantContextMiddleware from JWT tenant_id claim
-builder.Services.AddScoped<TenantContext>();
-builder.Services.AddScoped<AMR.DeliveryPlanning.SharedKernel.Tenancy.ITenantContext>(
-    sp => sp.GetRequiredService<TenantContext>());
 
 // Configure authentication. Auth:Disable is honored only in Development and
 // supplies a tenant claim so tenant-scoped APIs still behave realistically.
@@ -304,7 +298,6 @@ app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseMiddleware<TenantContextMiddleware>();
 
 // Liveness probe (always 200 if process is up)
 app.MapHealthChecks("/health").AllowAnonymous();

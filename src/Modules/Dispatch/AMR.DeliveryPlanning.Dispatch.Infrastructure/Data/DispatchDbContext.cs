@@ -1,6 +1,5 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
-using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
@@ -8,8 +7,6 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
 public class DispatchDbContext : DbContext
 {
     public const string Schema = "dispatch";
-
-    private readonly ITenantContext _tenantContext;
 
     public DbSet<Trip> Trips { get; set; } = null!;
     public DbSet<RobotTask> RobotTasks { get; set; } = null!;
@@ -19,11 +16,7 @@ public class DispatchDbContext : DbContext
     public DbSet<ShelfManifest> ShelfManifests { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
-    public DispatchDbContext(DbContextOptions<DispatchDbContext> options, ITenantContext tenantContext)
-        : base(options)
-    {
-        _tenantContext = tenantContext;
-    }
+    public DispatchDbContext(DbContextOptions<DispatchDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -32,8 +25,6 @@ public class DispatchDbContext : DbContext
         modelBuilder.Entity<Trip>(builder =>
         {
             builder.HasKey(t => t.Id);
-            builder.Property(t => t.TenantId).IsRequired();
-            builder.HasQueryFilter(t => t.TenantId == _tenantContext.TenantId);
             builder.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);
             builder.Ignore(t => t.DomainEvents);
 

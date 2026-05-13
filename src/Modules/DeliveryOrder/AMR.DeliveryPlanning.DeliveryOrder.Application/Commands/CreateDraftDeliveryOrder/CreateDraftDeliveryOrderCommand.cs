@@ -3,26 +3,32 @@ using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 
-public record PackageContentDto(string ItemNumber, double Quantity);
+public record DimensionsDto(double LengthCm, double WidthCm, double HeightCm);
 
-public record PackageDto(
+public record QuantityDto(double Value, string Uom);
+
+public record CargoSpecificDto(
+    string? PartNo,
+    string? Vendor,
+    string? DateCode,
+    string? TradingCode,
+    string? InventoryNo,
+    string? Po,
+    string? TraceId);
+
+public record ItemDto(
+    string Sku,
     string PickupLocationCode,
     string DropLocationCode,
-    string Barcode,
-    string LoadUnitProfileCode,
-    double GrossWeightKg,
-    List<PackageContentDto>? Contents = null);
-
-public record ServiceWindowDto(DateTime? Earliest, DateTime? Latest);
-
-public record RecurringScheduleDto(string CronExpression, DateTime? ValidFrom, DateTime? ValidUntil);
+    DimensionsDto? Dimensions,
+    double WeightKg,
+    QuantityDto Quantity,
+    CargoSpecificDto? CargoSpecific);
 
 public record CreateDraftDeliveryOrderCommand(
-    string OrderName,
-    SlaTier SlaTier,
-    ServiceWindowDto? ServiceWindow,
-    StructureType StructureType,
-    List<string>? Tags,
-    List<PackageDto> OrderItems,
-    RecurringScheduleDto? Schedule
+    string OrderRef,
+    Priority Priority,
+    CargoType CargoType,
+    DateTime? RequestedTime,
+    List<ItemDto> Items
 ) : ICommand<Guid>;

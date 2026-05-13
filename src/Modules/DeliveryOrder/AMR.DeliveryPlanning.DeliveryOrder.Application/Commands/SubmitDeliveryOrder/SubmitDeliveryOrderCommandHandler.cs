@@ -2,7 +2,6 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -13,20 +12,17 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
     private readonly IDeliveryOrderRepository _repository;
     private readonly IOrderAuditEventRepository _auditRepo;
     private readonly StationValidationService _stationValidation;
-    private readonly ITenantContext _tenantContext;
     private readonly ILogger<SubmitDeliveryOrderCommandHandler> _logger;
 
     public SubmitDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
         IOrderAuditEventRepository auditRepo,
         StationValidationService stationValidation,
-        ITenantContext tenantContext,
         ILogger<SubmitDeliveryOrderCommandHandler> logger)
     {
         _repository = repository;
         _auditRepo = auditRepo;
         _stationValidation = stationValidation;
-        _tenantContext = tenantContext;
         _logger = logger;
     }
 
@@ -36,7 +32,7 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
         if (order is null)
             return Result<Guid>.Failure($"Order {request.OrderId} not found.");
 
-        var stationMap = await _stationValidation.BuildStationMapAsync(order.Legs, cancellationToken);
+        var stationMap = await _stationValidation.BuildStationMapAsync(order.Items, cancellationToken);
         if (stationMap.IsFailure) return Result<Guid>.Failure(stationMap.Error);
 
         try
@@ -49,13 +45,12 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
 
             await _auditRepo.AddAsync(new OrderAuditEvent(
                 order.Id, "OrderSubmitted",
-                $"Order '{order.OrderName}' submitted with SLA tier {order.SlaTier}",
-                _tenantContext.UserId ?? _tenantContext.TenantId.ToString()), cancellationToken);
+                $"Order '{order.OrderRef}' submitted with priority {order.Priority}"), cancellationToken);
 
             await _repository.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("[Submit] Order {OrderId} '{OrderName}' submitted and ready to plan.",
-                order.Id, order.OrderName);
+            _logger.LogInformation("[Submit] Order {OrderId} '{OrderRef}' submitted and ready to plan.",
+                order.Id, order.OrderRef);
 
             return Result<Guid>.Success(order.Id);
         }

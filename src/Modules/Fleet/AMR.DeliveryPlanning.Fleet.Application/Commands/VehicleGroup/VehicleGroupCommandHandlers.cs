@@ -1,22 +1,20 @@
 using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 
 namespace AMR.DeliveryPlanning.Fleet.Application.Commands.VehicleGroup;
 
 public class CreateVehicleGroupCommandHandler : ICommandHandler<CreateVehicleGroupCommand, Guid>
 {
     private readonly IVehicleGroupRepository _repo;
-    private readonly ITenantContext _tenantContext;
-    public CreateVehicleGroupCommandHandler(IVehicleGroupRepository repo, ITenantContext tenantContext)
+
+    public CreateVehicleGroupCommandHandler(IVehicleGroupRepository repo)
     {
         _repo = repo;
-        _tenantContext = tenantContext;
     }
 
     public async Task<Result<Guid>> Handle(CreateVehicleGroupCommand request, CancellationToken cancellationToken)
     {
-        var group = new Domain.Entities.VehicleGroup(_tenantContext.TenantId, request.Name, request.Description, request.Tags);
+        var group = new Domain.Entities.VehicleGroup(request.Name, request.Description, request.Tags);
         await _repo.AddAsync(group, cancellationToken);
         await _repo.SaveChangesAsync(cancellationToken);
         return Result<Guid>.Success(group.Id);
@@ -39,8 +37,6 @@ public class AddVehicleToGroupCommandHandler : ICommandHandler<AddVehicleToGroup
         var group = await _groupRepo.GetByIdAsync(request.GroupId, cancellationToken);
         if (group == null) return Result.Failure($"Group {request.GroupId} not found.");
 
-        // Validate vehicle exists — FK on VehicleGroupMembers will also enforce this,
-        // but a pre-check gives a clearer error message to the caller.
         var vehicleExists = await _vehicleRepo.GetByIdAsync(request.VehicleId, cancellationToken) != null;
         if (!vehicleExists) return Result.Failure($"Vehicle {request.VehicleId} not found.");
 

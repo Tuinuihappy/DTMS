@@ -16,8 +16,8 @@ public class PlanningDomainEventMapper : IDomainEventToIntegrationEventMapper
                 new PlanCommittedIntegrationEvent(
                     evt.EventId,
                     evt.OccurredOn,
-                    evt.TenantId,
                     evt.JobId,
+                    evt.DeliveryOrderId,
                     evt.VehicleId,
                     evt.Legs
                         .Select(l => new PlannedLegDto(l.FromStationId, l.ToStationId, l.SequenceOrder))

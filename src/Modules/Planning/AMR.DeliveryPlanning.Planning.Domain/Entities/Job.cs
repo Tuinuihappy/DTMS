@@ -6,7 +6,6 @@ namespace AMR.DeliveryPlanning.Planning.Domain.Entities;
 
 public class Job : AggregateRoot<Guid>
 {
-    public Guid TenantId { get; private set; }
     public Guid DeliveryOrderId { get; private set; }
     public JobStatus Status { get; private set; }
     public Guid? AssignedVehicleId { get; private set; }
@@ -36,10 +35,9 @@ public class Job : AggregateRoot<Guid>
 
     private Job() { } // EF Core
 
-    public Job(Guid tenantId, Guid deliveryOrderId, string priority)
+    public Job(Guid deliveryOrderId, string priority)
     {
         Id = Guid.NewGuid();
-        TenantId = tenantId;
         DeliveryOrderId = deliveryOrderId;
         Priority = priority;
         Status = JobStatus.Created;
@@ -52,10 +50,9 @@ public class Job : AggregateRoot<Guid>
     /// <summary>
     /// Create a Job from multiple consolidated orders.
     /// </summary>
-    public Job(Guid tenantId, List<Guid> orderIds, string priority, PatternType pattern)
+    public Job(List<Guid> orderIds, string priority, PatternType pattern)
     {
         Id = Guid.NewGuid();
-        TenantId = tenantId;
         DeliveryOrderId = orderIds.First();
         Priority = priority;
         Pattern = pattern;
@@ -115,8 +112,8 @@ public class Job : AggregateRoot<Guid>
         AddDomainEvent(new JobCommittedDomainEvent(
             Guid.NewGuid(),
             DateTime.UtcNow,
-            TenantId,
             Id,
+            DeliveryOrderId,
             AssignedVehicleId,
             legs));
     }

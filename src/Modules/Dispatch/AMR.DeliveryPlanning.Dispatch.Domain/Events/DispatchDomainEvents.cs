@@ -3,7 +3,7 @@ using AMR.DeliveryPlanning.SharedKernel.Domain;
 namespace AMR.DeliveryPlanning.Dispatch.Domain.Events;
 
 public record TripStartedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid? VehicleId) : IDomainEvent;
-public record TripCompletedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TenantId, Guid TripId, Guid JobId) : IDomainEvent;
+public record TripCompletedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId) : IDomainEvent;
 public record TripPausedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId) : IDomainEvent;
 public record TripResumedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId) : IDomainEvent;
 public record TripCancelledDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, string Reason) : IDomainEvent;
@@ -24,7 +24,6 @@ public record ExceptionResolvedDomainEvent(Guid EventId, DateTime OccurredOn, Gu
 public record PodCapturedDomainEvent(
     Guid EventId,
     DateTime OccurredOn,
-    Guid TenantId,
     Guid TripId,
     Guid StopId,
     IReadOnlyList<string> ScannedIds) : IDomainEvent;

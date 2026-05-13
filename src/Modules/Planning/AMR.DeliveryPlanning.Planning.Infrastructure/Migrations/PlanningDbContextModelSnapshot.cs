@@ -77,9 +77,6 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
                     b.Property<double>("TotalWeight")
                         .HasColumnType("double precision");
 

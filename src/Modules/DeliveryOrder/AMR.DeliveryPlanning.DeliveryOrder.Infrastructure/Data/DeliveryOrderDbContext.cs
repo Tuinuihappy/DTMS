@@ -2,7 +2,6 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
-using AMR.DeliveryPlanning.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
@@ -11,22 +10,13 @@ public class DeliveryOrderDbContext : DbContext
 {
     public const string Schema = "deliveryorder";
 
-    private readonly ITenantContext _tenantContext;
-
     public DbSet<Domain.Entities.DeliveryOrder> DeliveryOrders { get; set; } = null!;
-    public DbSet<DeliveryLeg> DeliveryLegs { get; set; } = null!;
-    public DbSet<PackageUnit> PackageUnits { get; set; } = null!;
-    public DbSet<PackageContent> PackageContents { get; set; } = null!;
-    public DbSet<RecurringSchedule> RecurringSchedules { get; set; } = null!;
+    public DbSet<Item> Items { get; set; } = null!;
     public DbSet<OrderAmendment> OrderAmendments { get; set; } = null!;
     public DbSet<OrderAuditEvent> OrderAuditEvents { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
-    public DeliveryOrderDbContext(DbContextOptions<DeliveryOrderDbContext> options, ITenantContext tenantContext)
-        : base(options)
-    {
-        _tenantContext = tenantContext;
-    }
+    public DeliveryOrderDbContext(DbContextOptions<DeliveryOrderDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -35,84 +25,60 @@ public class DeliveryOrderDbContext : DbContext
         modelBuilder.Entity<Domain.Entities.DeliveryOrder>(b =>
         {
             b.HasKey(o => o.Id);
-            b.Property(o => o.TenantId).IsRequired();
-            b.Property(o => o.OrderName).HasMaxLength(200).IsRequired();
-            b.Property(o => o.SlaTier).HasConversion<string>().HasMaxLength(20).IsRequired();
-            b.Property(o => o.StructureType).HasConversion<string>().HasMaxLength(20).IsRequired();
-            b.Property(o => o.Tags).HasColumnType("text[]");
+            b.Property(o => o.OrderRef).HasMaxLength(200).IsRequired();
+            b.Property(o => o.CreatedAt).IsRequired();
+            b.Property(o => o.UpdatedAt);
+            b.Property(o => o.TotalWeightKg).IsRequired();
+            b.Property(o => o.TotalQuantity).IsRequired();
+            b.Property(o => o.TotalItems).IsRequired();
+            b.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20).IsRequired();
+            b.Property(o => o.CargoType).HasConversion<string>().HasMaxLength(30).IsRequired();
             b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
-            b.HasQueryFilter(o => o.TenantId == _tenantContext.TenantId);
             b.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion().IsConcurrencyToken();
             b.Ignore(o => o.DomainEvents);
-            b.Ignore(o => o.AllPackages);
+            b.Property(o => o.RequestedTime);
 
-            b.OwnsOne(o => o.ServiceWindow, sw =>
-            {
-                sw.Property(s => s.Earliest).HasColumnName("ServiceWindowEarliest");
-                sw.Property(s => s.Latest).HasColumnName("ServiceWindowLatest");
-            });
-
-            b.HasMany(o => o.Legs)
+            b.HasMany(o => o.Items)
              .WithOne()
-             .HasForeignKey(l => l.DeliveryOrderId)
+             .HasForeignKey(p => p.DeliveryOrderId)
              .OnDelete(DeleteBehavior.Cascade);
 
-            b.HasOne(o => o.Schedule)
-             .WithOne()
-             .HasForeignKey<RecurringSchedule>(s => s.DeliveryOrderId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<DeliveryLeg>(b =>
-        {
-            b.HasKey(l => l.Id);
-            b.Property(l => l.PickupLocationCode).HasMaxLength(50).IsRequired();
-            b.Property(l => l.DropLocationCode).HasMaxLength(50).IsRequired();
-            b.Property(l => l.CarrierTypeCode).HasMaxLength(50).IsRequired();
-            b.HasIndex(l => l.DeliveryOrderId);
-
-            b.HasMany(l => l.Packages)
-             .WithOne()
-             .HasForeignKey(p => p.DeliveryLegId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.Navigation(l => l.Packages)
-             .HasField("_packages")
+            b.Navigation(o => o.Items)
+             .HasField("_items")
              .UsePropertyAccessMode(PropertyAccessMode.Field);
+
         });
 
-        modelBuilder.Entity<PackageUnit>(b =>
+        modelBuilder.Entity<Item>(b =>
         {
+            b.ToTable("Items", Schema);
             b.HasKey(p => p.Id);
-            b.Property(p => p.Barcode).HasMaxLength(100).IsRequired();
-            b.HasIndex(p => p.Barcode).IsUnique();
-            b.HasIndex(p => p.DeliveryLegId);
-            b.Property(p => p.LoadUnitProfileCode).HasMaxLength(50).IsRequired();
-            b.Property(p => p.GrossWeightKg).IsRequired();
+            b.Property(p => p.PickupLocationCode).HasMaxLength(50).IsRequired();
+            b.Property(p => p.DropLocationCode).HasMaxLength(50).IsRequired();
+            b.Property(p => p.PickupStationId);
+            b.Property(p => p.DropStationId);
+            b.Property(p => p.Sku).HasMaxLength(100).IsRequired();
+            b.OwnsOne(p => p.Dimensions, d =>
+            {
+                d.Property(x => x.LengthCm).HasColumnName("LengthCm");
+                d.Property(x => x.WidthCm).HasColumnName("WidthCm");
+                d.Property(x => x.HeightCm).HasColumnName("HeightCm");
+            });
+            b.HasIndex(p => new { p.DeliveryOrderId, p.Sku }).IsUnique();
+            b.Property(p => p.WeightKg).IsRequired();
+            b.Property(p => p.Quantity).IsRequired();
+            b.Property(p => p.Uom).HasMaxLength(20).IsRequired();
             b.Property(p => p.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
-
-            b.HasMany(p => p.Contents)
-             .WithOne()
-             .HasForeignKey(c => c.PackageUnitId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.Navigation(p => p.Contents)
-             .HasField("_contents")
-             .UsePropertyAccessMode(PropertyAccessMode.Field);
-        });
-
-        modelBuilder.Entity<PackageContent>(b =>
-        {
-            b.HasKey(c => c.Id);
-            b.Property(c => c.ItemNumber).HasMaxLength(100).IsRequired();
-            b.Property(c => c.Quantity).IsRequired();
-            b.HasIndex(c => c.PackageUnitId);
-        });
-
-        modelBuilder.Entity<RecurringSchedule>(b =>
-        {
-            b.HasKey(s => s.Id);
-            b.Property(s => s.CronExpression).HasMaxLength(50).IsRequired();
+            b.OwnsOne(p => p.CargoSpecific, cs =>
+            {
+                cs.Property(x => x.PartNo).HasColumnName("PartNo").HasMaxLength(100);
+                cs.Property(x => x.Vendor).HasColumnName("Vendor").HasMaxLength(200);
+                cs.Property(x => x.DateCode).HasColumnName("DateCode").HasMaxLength(50);
+                cs.Property(x => x.TradingCode).HasColumnName("TradingCode").HasMaxLength(100);
+                cs.Property(x => x.InventoryNo).HasColumnName("InventoryNo").HasMaxLength(100);
+                cs.Property(x => x.Po).HasColumnName("Po").HasMaxLength(100);
+                cs.Property(x => x.TraceId).HasColumnName("TraceId").HasMaxLength(100);
+            });
         });
 
         modelBuilder.Entity<OrderAmendment>(b =>

@@ -25,7 +25,6 @@ public static class AuthEndpoints
                 new Claim(ClaimTypes.Name, user.Username),
                 new Claim(ClaimTypes.Role, user.Role),
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim("tenant_id", user.TenantId.ToString()),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
@@ -45,20 +44,14 @@ public static class AuthEndpoints
         .WithTags("Auth")
         .AllowAnonymous();
 
-        // POST /api/auth/register — Register a new user (admin only)
-        app.MapPost("/api/auth/register", async (RegisterRequest request, AuthDbContext authDb, HttpContext httpContext) =>
+        app.MapPost("/api/auth/register", async (RegisterRequest request, AuthDbContext authDb) =>
         {
             if (await authDb.Users.AnyAsync(u => u.Username == request.Username))
                 return Results.BadRequest("Username already exists.");
 
-            // Tenant is supplied via X-Tenant-Id header; defaults to system tenant if absent.
-            if (!Guid.TryParse(httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault(), out var regTenantId))
-                regTenantId = AppUser.SystemTenantId;
-
             var user = new AppUser
             {
                 Id = Guid.NewGuid(),
-                TenantId = regTenantId,
                 Username = request.Username,
                 PasswordHash = AppUser.HashPassword(request.Password),
                 Role = request.Role ?? "Operator",
@@ -75,9 +68,6 @@ public static class AuthEndpoints
         .RequireAuthorization();
     }
 
-    /// <summary>
-    /// Seeds the default admin user if no users exist.
-    /// </summary>
     public static async Task SeedDefaultUserAsync(IServiceProvider services)
     {
         using var scope = services.CreateScope();
@@ -88,7 +78,6 @@ public static class AuthEndpoints
             db.Users.Add(new AppUser
             {
                 Id = Guid.NewGuid(),
-                TenantId = AppUser.SystemTenantId,
                 Username = "admin",
                 PasswordHash = AppUser.HashPassword("admin123"),
                 Role = "Admin",

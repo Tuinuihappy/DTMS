@@ -106,8 +106,10 @@ public static class ModuleServiceRegistration
         services.AddScoped<DeliveryOrderDomainEventMapper>();
         services.AddDbContext<DeliveryOrderDbContext>((sp, o) => o
             .UseNpgsql(connectionString)
-            .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
-                sp.GetRequiredService<DeliveryOrderDomainEventMapper>())));
+            .AddInterceptors(
+                new AuditSaveChangesInterceptor(),
+                new DomainEventOutboxSaveChangesInterceptor(
+                    sp.GetRequiredService<DeliveryOrderDomainEventMapper>())));
         services.AddScoped<IDeliveryOrderRepository, DeliveryOrderRepository>();
         services.AddScoped<IStationLookup, FacilityStationLookup>();
         services.AddScoped<StationValidationService>();

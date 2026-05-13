@@ -8,7 +8,7 @@ public record CommittedLegSnapshot(Guid FromStationId, Guid ToStationId, int Seq
 public record JobCommittedDomainEvent(
     Guid EventId,
     DateTime OccurredOn,
-    Guid TenantId,
     Guid JobId,
+    Guid DeliveryOrderId,
     Guid? VehicleId,
     IReadOnlyCollection<CommittedLegSnapshot> Legs) : IDomainEvent;

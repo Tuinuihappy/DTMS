@@ -19,17 +19,11 @@ public sealed class DevAuthenticationHandler : AuthenticationHandler<Authenticat
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        var tenantId = Context.RequestServices
-            .GetRequiredService<IConfiguration>()
-            .GetValue<Guid?>("Auth:DevTenantId")
-            ?? AppUser.SystemTenantId;
-
         var claims = new[]
         {
             new Claim(ClaimTypes.Name, "dev"),
             new Claim(ClaimTypes.Role, "Admin"),
-            new Claim(ClaimTypes.NameIdentifier, "dev-auth-bypass"),
-            new Claim("tenant_id", tenantId.ToString())
+            new Claim(ClaimTypes.NameIdentifier, "dev-auth-bypass")
         };
 
         var identity = new ClaimsIdentity(claims, SchemeName);

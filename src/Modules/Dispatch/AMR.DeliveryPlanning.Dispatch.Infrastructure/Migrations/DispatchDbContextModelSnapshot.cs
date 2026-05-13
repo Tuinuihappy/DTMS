@@ -183,6 +183,9 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("DeliveryOrderId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("JobId")
                         .HasColumnType("uuid");
 
@@ -193,9 +196,6 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("VehicleId")
                         .HasColumnType("uuid");

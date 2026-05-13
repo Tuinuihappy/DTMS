@@ -113,9 +113,6 @@ namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("VehicleName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -130,7 +127,7 @@ namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TenantId", "AdapterKey", "VendorVehicleKey")
+                    b.HasIndex("AdapterKey", "VendorVehicleKey")
                         .IsUnique()
                         .HasFilter("\"VendorVehicleKey\" IS NOT NULL");
 
@@ -157,9 +154,6 @@ namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("Tags");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
 
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()

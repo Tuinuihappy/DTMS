@@ -3,6 +3,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkSubmitDelivery
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CancelDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.UpdateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderTimeline;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
@@ -42,7 +43,8 @@ public static class DeliveryOrderEndpoints
                 await cache.SetStringAsync($"idempotency:{idempotencyKey}", result.Value.ToString(),
                     new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24) });
 
-            return Results.Created($"/api/delivery-orders/{result.Value}", result.Value);
+            var dto = await sender.Send(new GetDeliveryOrderQuery(result.Value));
+            return Results.Created($"/api/delivery-orders/{result.Value}", dto.Value);
         });
 
         // POST /api/delivery-orders/{id}/submit — submit draft (validate + ready to plan)
@@ -79,6 +81,15 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new CancelDeliveryOrderCommand(id, body.Reason));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+        });
+
+        // PUT /api/delivery-orders/{id} — replace draft (only allowed when status=Draft)
+        group.MapPut("/{id:guid}", async (Guid id, UpdateDraftDeliveryOrderCommand command, ISender sender) =>
+        {
+            var result = await sender.Send(command with { OrderId = id });
+            if (!result.IsSuccess) return Results.BadRequest(result.Error);
+            var dto = await sender.Send(new GetDeliveryOrderQuery(result.Value));
+            return Results.Ok(dto.Value);
         });
 
         // PATCH /api/delivery-orders/{id} — amendment

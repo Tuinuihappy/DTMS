@@ -1,28 +1,15 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using FluentAssertions;
 
 namespace DeliveryOrder.UnitTests;
 
 public class DeliveryOrderTests
 {
-    private static AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder CreateOrder() =>
+    private static AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder CreateOrder(
+        string orderRef = "Test Order") =>
         AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
-            Guid.NewGuid(), "Test Order", SlaTier.Normal,
-            new ServiceWindow(null, null));
-
-    private static void AddPackage(
-        AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder order,
-        string pickup = "LOC-A",
-        string drop = "LOC-B",
-        string carrierTypeCode = "FEEDER",
-        string barcode = "BOX-001",
-        string profileCode = "TRAY-SMALL",
-        double grossWeightKg = 2.5,
-        IEnumerable<(string itemNumber, double quantity)>? contents = null)
-        => order.AddPackage(pickup, drop, carrierTypeCode, barcode, profileCode, grossWeightKg, contents);
+            orderRef, Priority.Normal, CargoType.FinishedGood, null);
 
     private static IReadOnlyDictionary<(string, string), (Guid, Guid)> StationMap(
         params (string pickup, string drop)[] routes)
@@ -33,28 +20,35 @@ public class DeliveryOrderTests
         return dict;
     }
 
-    // ── Core behaviour ────────────────────────────────────────────────────────
-
     [Fact]
     public void NewOrder_StartsAsDraft()
     {
         var order = CreateOrder();
 
         order.Status.Should().Be(OrderStatus.Draft);
-        order.Legs.Should().BeEmpty();
+        order.Items.Should().BeEmpty();
     }
 
     [Fact]
-    public void AddPackage_CreatesLeg()
+    public void AddItem_AddsItemToOrder()
     {
         var order = CreateOrder();
-        AddPackage(order);
+        order.AddItem("WH-01", "STORE-05", "SKU-001", null, 10.0, 5, "EA");
 
-        order.Legs.Should().HaveCount(1);
-        order.Legs.First().PickupLocationCode.Should().Be("LOC-A");
-        order.Legs.First().DropLocationCode.Should().Be("LOC-B");
-        order.Legs.First().CarrierTypeCode.Should().Be("FEEDER");
-        order.AllPackages.Should().HaveCount(1);
+        order.Items.Should().HaveCount(1);
+        order.Items.First().Sku.Should().Be("SKU-001");
+        order.Items.First().PickupLocationCode.Should().Be("WH-01");
+    }
+
+    [Fact]
+    public void AddItem_DuplicateSku_Throws()
+    {
+        var order = CreateOrder();
+        order.AddItem("WH-01", "STORE-05", "SKU-001", null, 10.0, 5, "EA");
+
+        var act = () => order.AddItem("WH-01", "STORE-05", "SKU-001", null, 5.0, 2, "EA");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*SKU-001*");
     }
 
     [Fact]
@@ -76,234 +70,175 @@ public class DeliveryOrderTests
         order.Cancel("Second cancel");
 
         order.Status.Should().Be(OrderStatus.Cancelled);
-        order.DomainEvents.OfType<DeliveryOrderCancelledDomainEvent>().Should().HaveCount(1,
-            "re-cancelling must not emit a second domain event");
+        order.DomainEvents.OfType<DeliveryOrderCancelledDomainEvent>().Should().HaveCount(1);
     }
 
     [Fact]
-    public void MarkAsValidated_SetsStationIdsOnLegs()
+    public void Submit_WhenDraft_SetsStatusToSubmitted()
     {
         var order = CreateOrder();
-        AddPackage(order);
+        order.AddItem("WH-01", "STORE-05", "SKU-001", null, 10.0, 5, "EA");
+
+        order.Submit();
+
+        order.Status.Should().Be(OrderStatus.Submitted);
+    }
+
+    [Fact]
+    public void MarkAsValidated_SetsStationIdsOnItems()
+    {
+        var order = CreateOrder();
+        order.AddItem("WH-01", "STORE-05", "SKU-001", null, 10.0, 5, "EA");
+        order.Submit();
+
         var pickupId = Guid.NewGuid();
         var dropId = Guid.NewGuid();
-        order.Submit();
         order.MarkAsValidated(new Dictionary<(string, string), (Guid, Guid)>
         {
-            [("LOC-A", "LOC-B")] = (pickupId, dropId)
+            [("WH-01", "STORE-05")] = (pickupId, dropId)
         });
 
         order.Status.Should().Be(OrderStatus.Validated);
-        order.Legs.First().PickupStationId.Should().Be(pickupId);
-        order.Legs.First().DropStationId.Should().Be(dropId);
+        order.Items.First().PickupStationId.Should().Be(pickupId);
+        order.Items.First().DropStationId.Should().Be(dropId);
     }
 
     [Fact]
     public void MarkAsValidated_WhenNotSubmitted_Throws()
     {
         var order = CreateOrder();
-        AddPackage(order);
+        order.AddItem("WH-01", "STORE-05", "SKU-001", null, 10.0, 5, "EA");
 
-        var act = () => order.MarkAsValidated(StationMap(("LOC-A", "LOC-B")));
+        var act = () => order.MarkAsValidated(StationMap(("WH-01", "STORE-05")));
 
         act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
-    public void SetRecurringSchedule_SetsSchedule()
+    public void Hold_SetsStatusToHeld()
     {
         var order = CreateOrder();
 
-        order.SetRecurringSchedule("0 */2 * * *", DateTime.UtcNow, DateTime.UtcNow.AddDays(30));
+        order.Hold("waiting for space");
 
-        order.Schedule.Should().NotBeNull();
-        order.Schedule!.CronExpression.Should().Be("0 */2 * * *");
+        order.Status.Should().Be(OrderStatus.Held);
+        order.DomainEvents.OfType<DeliveryOrderHeldDomainEvent>().Should().HaveCount(1);
     }
 
-    // ── CarrierTypeCode leg grouping ──────────────────────────────────────────
-
     [Fact]
-    public void AddPackage_SameRouteAndCarrier_MergesIntoOneLeg()
+    public void Release_FromHeld_SetsStatusToReadyToPlan()
     {
         var order = CreateOrder();
-
-        AddPackage(order, "LOC-A", "LOC-B", "FEEDER", "TRAY-001");
-        AddPackage(order, "LOC-A", "LOC-B", "FEEDER", "TRAY-002");
-
-        order.Legs.Should().HaveCount(1);
-        order.Legs.First().Packages.Should().HaveCount(2);
-    }
-
-    [Fact]
-    public void AddPackage_SameRouteButDifferentCarrier_CreatesTwoLegs()
-    {
-        var order = CreateOrder();
-
-        AddPackage(order, "LOC-A", "LOC-B", "FEEDER", "TRAY-001");
-        AddPackage(order, "LOC-A", "LOC-B", "SHELF",  "BOX-001");
-
-        order.Legs.Should().HaveCount(2);
-        order.Legs.Select(l => l.CarrierTypeCode).Should()
-            .BeEquivalentTo(new[] { "FEEDER", "SHELF" });
-    }
-
-    [Fact]
-    public void AddPackage_DifferentRoutes_CreatesTwoLegs()
-    {
-        var order = CreateOrder();
-
-        AddPackage(order, "LOC-A", "LOC-B", "FEEDER", "TRAY-001");
-        AddPackage(order, "LOC-C", "LOC-D", "FEEDER", "TRAY-002");
-
-        order.Legs.Should().HaveCount(2);
-    }
-
-    [Fact]
-    public void AddPackage_SequenceIsUniquePerNewLeg()
-    {
-        var order = CreateOrder();
-
-        AddPackage(order, "LOC-A", "LOC-B", "FEEDER", "TRAY-001");
-        AddPackage(order, "LOC-A", "LOC-B", "SHELF",  "BOX-001");
-        AddPackage(order, "LOC-C", "LOC-D", "FEEDER", "TRAY-002");
-
-        order.Legs.Select(l => l.Sequence).Should().OnlyHaveUniqueItems();
-        order.Legs.Select(l => l.Sequence).Should().BeEquivalentTo(new[] { 1, 2, 3 });
-    }
-
-    // ── MarkReadyToPlan domain event ──────────────────────────────────────────
-
-    [Fact]
-    public void MarkReadyToPlan_LegEventHasCorrectCarrierTypeAndPackageCount()
-    {
-        var order = CreateOrder();
-        AddPackage(order, "LOC-A", "LOC-B", "FEEDER", "TRAY-001", grossWeightKg: 3.0);
-        AddPackage(order, "LOC-A", "LOC-B", "FEEDER", "TRAY-002", grossWeightKg: 4.0);
-        AddPackage(order, "LOC-A", "LOC-B", "SHELF",  "BOX-001",  grossWeightKg: 20.0);
-        order.Submit();
-        order.MarkAsValidated(StationMap(("LOC-A", "LOC-B")));
-        order.MarkReadyToPlan();
-
-        var evt = order.DomainEvents
-            .OfType<DeliveryOrderReadyToPlanDomainEvent>()
-            .Single();
-
-        evt.Legs.Should().HaveCount(2);
-
-        var feederLeg = evt.Legs.Single(l => l.CarrierTypeCode == "FEEDER");
-        feederLeg.TotalPackageCount.Should().Be(2);
-        feederLeg.TotalWeight.Should().Be(7.0);
-
-        var shelfLeg = evt.Legs.Single(l => l.CarrierTypeCode == "SHELF");
-        shelfLeg.TotalPackageCount.Should().Be(1);
-        shelfLeg.TotalWeight.Should().Be(20.0);
-    }
-
-    // ── PackageUnit contents ───────────────────────────────────────────────────
-
-    [Fact]
-    public void AddPackage_WithContents_StoresContentItems()
-    {
-        var order = CreateOrder();
-        order.AddPackage("LOC-A", "LOC-B", "FEEDER", "BOX-001", "CARTON-A3", 5.0,
-            contents: [("MOTOR-A", 5), ("PCB-B", 3)]);
-
-        var pkg = order.AllPackages.Single();
-        pkg.Contents.Should().HaveCount(2);
-        pkg.Contents.Should().Contain(c => c.ItemNumber == "MOTOR-A" && c.Quantity == 5);
-        pkg.Contents.Should().Contain(c => c.ItemNumber == "PCB-B"   && c.Quantity == 3);
-    }
-
-    // ── MarkPackagesDelivered ─────────────────────────────────────────────────
-
-    [Fact]
-    public void MarkPackagesDelivered_UpdatesMatchingBarcodes()
-    {
-        var order = CreateOrder();
-        AddPackage(order, barcode: "BOX-001");
-        AddPackage(order, barcode: "BOX-002");
-
-        order.MarkPackagesDelivered(["BOX-001"]);
-
-        order.AllPackages.Single(p => p.Barcode == "BOX-001").Status.Should().Be(PackageStatus.Delivered);
-        order.AllPackages.Single(p => p.Barcode == "BOX-002").Status.Should().Be(PackageStatus.Pending);
-    }
-
-    [Fact]
-    public void MarkPackagesDelivered_IsCaseInsensitive()
-    {
-        var order = CreateOrder();
-        AddPackage(order, barcode: "BOX-001");
-
-        order.MarkPackagesDelivered(["box-001"]);
-
-        order.AllPackages.Single().Status.Should().Be(PackageStatus.Delivered);
-    }
-
-    // ── Cron validation ───────────────────────────────────────────────────────
-
-    [Fact]
-    public void SetRecurringSchedule_WithInvalidCron_Throws()
-    {
-        var order = CreateOrder();
-
-        var act = () => order.SetRecurringSchedule("99 99 99 99 99", null, null);
-
-        act.Should().Throw<ArgumentException>().WithMessage("*cron*");
-    }
-
-    [Fact]
-    public void SetRecurringSchedule_WithValidCron_DoesNotThrow()
-    {
-        var order = CreateOrder();
-
-        var act = () => order.SetRecurringSchedule("0 8 * * 1-5", null, null);
-
-        act.Should().NotThrow();
-    }
-
-    // ── TenantId in Hold / Release / Amend events ─────────────────────────────
-
-    [Fact]
-    public void Hold_EmitsDomainEventWithTenantId()
-    {
-        var tenantId = Guid.NewGuid();
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
-            tenantId, "Test", SlaTier.Normal, new ServiceWindow(null, null));
-
-        order.Hold("waiting");
-
-        order.DomainEvents
-            .OfType<DeliveryOrderHeldDomainEvent>()
-            .Single().TenantId.Should().Be(tenantId);
-    }
-
-    [Fact]
-    public void Release_EmitsDomainEventWithTenantId()
-    {
-        var tenantId = Guid.NewGuid();
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
-            tenantId, "Test", SlaTier.Normal, new ServiceWindow(null, null));
         order.Hold("waiting");
 
         order.Release();
 
-        order.DomainEvents
-            .OfType<DeliveryOrderReleasedDomainEvent>()
-            .Single().TenantId.Should().Be(tenantId);
+        order.Status.Should().Be(OrderStatus.ReadyToPlan);
+        order.DomainEvents.OfType<DeliveryOrderReleasedDomainEvent>().Should().HaveCount(1);
     }
 
     [Fact]
-    public void AmendServiceWindow_EmitsDomainEventWithTenantId()
+    public void MarkItemsDelivered_UpdatesMatchingItems()
     {
-        var tenantId = Guid.NewGuid();
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
-            tenantId, "Test", SlaTier.Normal, new ServiceWindow(null, null));
+        var order = CreateOrder();
+        order.AddItem("WH-01", "STORE-05", "SKU-001", null, 10.0, 5, "EA");
+        order.AddItem("WH-01", "STORE-05", "SKU-002", null, 5.0, 2, "EA");
 
-        order.AmendServiceWindow(new ServiceWindow(null, DateTime.UtcNow.AddHours(8)), "rescheduled");
+        order.MarkItemsDelivered(["SKU-001"]);
 
-        order.DomainEvents
-            .OfType<DeliveryOrderAmendedDomainEvent>()
-            .Single().TenantId.Should().Be(tenantId);
+        order.Items.Single(i => i.Sku == "SKU-001").Status.Should().Be(ItemStatus.Delivered);
+        order.Items.Single(i => i.Sku == "SKU-002").Status.Should().Be(ItemStatus.Pending);
+    }
+
+    [Fact]
+    public void MarkItemsDelivered_IsCaseInsensitive()
+    {
+        var order = CreateOrder();
+        order.AddItem("WH-01", "STORE-05", "SKU-001", null, 10.0, 5, "EA");
+
+        order.MarkItemsDelivered(["sku-001"]);
+
+        order.Items.Single().Status.Should().Be(ItemStatus.Delivered);
+    }
+
+    [Fact]
+    public void UpdateDraft_ReplacesCoreFieldsAndItems()
+    {
+        var order = CreateOrder("Original Ref");
+        order.AddItem("WH-01", "LINE-01", "SKU-OLD", null, 5.0, 10, "PCS");
+
+        order.UpdateDraft("New Ref", Priority.High, CargoType.PackingMaterial, null);
+        order.AddItem("WH-02", "LINE-02", "SKU-NEW", null, 3.0, 5, "BOX");
+
+        order.OrderRef.Should().Be("New Ref");
+        order.Priority.Should().Be(Priority.High);
+        order.CargoType.Should().Be(CargoType.PackingMaterial);
+        order.Items.Should().HaveCount(1);
+        order.Items.Single().Sku.Should().Be("SKU-NEW");
+        order.TotalWeightKg.Should().Be(3.0);
+        order.TotalQuantity.Should().Be(5);
+        order.TotalItems.Should().Be(1);
+    }
+
+    [Fact]
+    public void UpdateDraft_RaisesDeliveryOrderDraftUpdatedDomainEvent()
+    {
+        var order = CreateOrder();
+
+        order.UpdateDraft(order.OrderRef, order.Priority, order.CargoType, null);
+
+        order.DomainEvents.OfType<DeliveryOrderDraftUpdatedDomainEvent>().Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void UpdateDraft_WhenNotDraft_Throws()
+    {
+        var order = CreateOrder();
+        order.AddItem("WH-01", "LINE-01", "SKU-001", null, 5.0, 10, "PCS");
+        order.Submit();
+
+        var act = () => order.UpdateDraft("New Ref", Priority.Low, CargoType.FinishedGood, null);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Draft*");
+    }
+
+    [Fact]
+    public void UpdateDraft_ClearsTotals()
+    {
+        var order = CreateOrder();
+        order.AddItem("WH-01", "LINE-01", "SKU-A", null, 10.0, 20, "PCS");
+        order.AddItem("WH-01", "LINE-02", "SKU-B", null, 5.0, 10, "PCS");
+
+        order.UpdateDraft(order.OrderRef, order.Priority, order.CargoType, null);
+
+        order.Items.Should().BeEmpty();
+        order.TotalWeightKg.Should().Be(0);
+        order.TotalQuantity.Should().Be(0);
+        order.TotalItems.Should().Be(0);
+    }
+
+    [Fact]
+    public void UpdateDraft_AllowsReusingSku_ThatWasPreviouslyInOrder()
+    {
+        var order = CreateOrder();
+        order.AddItem("WH-01", "LINE-01", "SKU-REUSE", null, 5.0, 10, "PCS");
+
+        order.UpdateDraft(order.OrderRef, order.Priority, order.CargoType, null);
+        var act = () => order.AddItem("WH-02", "LINE-02", "SKU-REUSE", null, 3.0, 5, "BOX");
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void AmendRequestedTime_UpdatesFieldAndPreservesStatus()
+    {
+        var order = CreateOrder();
+        var newTime = DateTime.UtcNow.AddHours(4);
+
+        order.AmendRequestedTime(newTime, "rescheduled");
+
+        order.RequestedTime.Should().Be(newTime);
+        order.Status.Should().Be(OrderStatus.Draft);
+        order.DomainEvents.OfType<DeliveryOrderAmendedDomainEvent>().Should().HaveCount(1);
     }
 }

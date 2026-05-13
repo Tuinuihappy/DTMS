@@ -14,36 +14,33 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             DeliveryOrderReadyToPlanDomainEvent evt =>
             [
                 new DeliveryOrderReadyForPlanningIntegrationEvent(
-                    evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId, evt.SlaTier,
-                    evt.ServiceWindowEarliest, evt.ServiceWindowLatest,
-                    evt.Legs.Select(l => new DeliveryLegDto(
-                        l.LegId, l.Sequence, l.PickupStationId, l.DropStationId,
-                        l.CarrierTypeCode, l.TotalPackageCount, l.TotalWeight,
-                        l.Packages.Select(p => new PackageSummaryDto(p.Barcode, p.LoadUnitProfileCode, p.GrossWeightKg)).ToList())).ToList())
+                    evt.EventId, evt.OccurredOn, evt.OrderId, evt.Priority,
+                    evt.Deadline,
+                    evt.Items.Select(i => new ItemSummaryDto(i.Sku, i.WeightKg, i.PickupStationId, i.DropStationId)).ToList())
             ],
             DeliveryOrderCancelledDomainEvent evt =>
             [
-                new DeliveryOrderCancelledIntegrationEvent(evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId, evt.Reason)
+                new DeliveryOrderCancelledIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason)
             ],
             DeliveryOrderFailedDomainEvent evt =>
             [
-                new DeliveryOrderFailedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId, evt.Reason)
+                new DeliveryOrderFailedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason)
             ],
             DeliveryOrderCompletedDomainEvent evt =>
             [
-                new DeliveryOrderCompletedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId)
+                new DeliveryOrderCompletedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId)
             ],
             DeliveryOrderAmendedDomainEvent evt =>
             [
-                new DeliveryOrderAmendedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId, evt.Reason)
+                new DeliveryOrderAmendedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason)
             ],
             DeliveryOrderHeldDomainEvent evt =>
             [
-                new DeliveryOrderHeldIntegrationEvent(evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId, evt.Reason)
+                new DeliveryOrderHeldIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason)
             ],
             DeliveryOrderReleasedDomainEvent evt =>
             [
-                new DeliveryOrderReleasedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.TenantId, evt.OrderId)
+                new DeliveryOrderReleasedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId)
             ],
             _ => []
         };

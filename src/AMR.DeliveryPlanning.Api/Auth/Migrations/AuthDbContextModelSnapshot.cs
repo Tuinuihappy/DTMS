@@ -45,9 +45,6 @@ namespace AMR.DeliveryPlanning.Api.Auth.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -55,7 +52,7 @@ namespace AMR.DeliveryPlanning.Api.Auth.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TenantId", "Username")
+                    b.HasIndex("Username")
                         .IsUnique();
 
                     b.ToTable("Users", "auth");

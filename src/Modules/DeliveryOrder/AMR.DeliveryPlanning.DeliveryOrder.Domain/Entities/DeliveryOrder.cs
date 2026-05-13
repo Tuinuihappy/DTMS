@@ -5,44 +5,60 @@ using AMR.DeliveryPlanning.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 
-public class DeliveryOrder : AggregateRoot<Guid>
+public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 {
-    public Guid TenantId { get; private set; }
-    public string OrderName { get; private set; } = string.Empty;
-    public SlaTier SlaTier { get; private set; }
-    public StructureType StructureType { get; private set; }
+    public string OrderRef { get; private set; } = string.Empty;
+    public Priority Priority { get; private set; }
+    public CargoType CargoType { get; private set; }
     public OrderStatus Status { get; private set; }
-    public ServiceWindow ServiceWindow { get; private set; } = null!;
-    public List<string> Tags { get; private set; } = [];
+    public DateTime? RequestedTime { get; private set; }
+    public DateTime CreatedAt { get; private set; }
+    public DateTime? UpdatedAt { get; private set; }
+    public double TotalWeightKg { get; private set; }
+    public double TotalQuantity { get; private set; }
+    public int TotalItems { get; private set; }
 
-    private readonly List<DeliveryLeg> _legs = new();
-    public IReadOnlyCollection<DeliveryLeg> Legs => _legs.AsReadOnly();
-
-    public IReadOnlyCollection<PackageUnit> AllPackages =>
-        _legs.SelectMany(l => l.Packages).ToList().AsReadOnly();
-
-    public RecurringSchedule? Schedule { get; private set; }
+    private readonly List<Item> _items = new();
+    public IReadOnlyCollection<Item> Items => _items.AsReadOnly();
 
     private DeliveryOrder() { }
 
-    public static DeliveryOrder Create(Guid tenantId, string orderName, SlaTier slaTier,
-        ServiceWindow serviceWindow, StructureType structureType = StructureType.Sequence,
-        IEnumerable<string>? tags = null)
+    void IAuditable.SetCreatedAt(DateTime createdAt) => CreatedAt = createdAt;
+    void IAuditable.SetUpdatedAt(DateTime updatedAt) => UpdatedAt = updatedAt;
+
+    public static DeliveryOrder Create(string orderRef, Priority priority,
+        CargoType cargoType, DateTime? requestedTime)
     {
         var order = new DeliveryOrder
         {
             Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            OrderName = orderName,
-            SlaTier = slaTier,
-            ServiceWindow = serviceWindow,
-            StructureType = structureType,
-            Tags = tags?.ToList() ?? [],
+            OrderRef = orderRef,
+            Priority = priority,
+            CargoType = cargoType,
+            RequestedTime = requestedTime,
             Status = OrderStatus.Draft
         };
 
         order.AddDomainEvent(new DeliveryOrderDraftedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, order.Id));
         return order;
+    }
+
+    public void UpdateDraft(string orderRef, Priority priority, CargoType cargoType, DateTime? requestedTime)
+    {
+        if (Status != OrderStatus.Draft)
+            throw new InvalidOperationException($"Only Draft orders can be edited. Current status: {Status}.");
+
+        OrderRef = orderRef;
+        Priority = priority;
+        CargoType = cargoType;
+        RequestedTime = requestedTime;
+
+        _items.Clear();
+        TotalWeightKg = 0;
+        TotalQuantity = 0;
+        TotalItems = 0;
+
+        AddDomainEvent(new DeliveryOrderDraftUpdatedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
     public void Submit()
@@ -54,60 +70,32 @@ public class DeliveryOrder : AggregateRoot<Guid>
         AddDomainEvent(new DeliveryOrderSubmittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
-    public void AddPackage(
+    public void AddItem(
         string pickupLocationCode, string dropLocationCode,
-        string carrierTypeCode,
-        string barcode,
-        string loadUnitProfileCode,
-        double grossWeightKg,
-        IEnumerable<(string itemNumber, double quantity)>? contents = null)
+        string sku, Dimensions? dimensions, double weightKg, double quantity, string uom,
+        CargoSpecific? cargoSpecific = null)
     {
-        if (_legs.Any(l => l.Packages.Any(p => p.Barcode.Equals(barcode, StringComparison.OrdinalIgnoreCase))))
-            throw new InvalidOperationException($"A package with barcode '{barcode}' already exists in this order.");
+        if (_items.Any(p => p.Sku.Equals(sku, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException($"A package with sku '{sku}' already exists in this order.");
 
-        var leg = _legs.FirstOrDefault(l =>
-            l.PickupLocationCode == pickupLocationCode &&
-            l.DropLocationCode == dropLocationCode &&
-            l.CarrierTypeCode == carrierTypeCode);
-
-        if (leg is null)
-        {
-            leg = new DeliveryLeg(Id, _legs.Count + 1, pickupLocationCode, dropLocationCode, carrierTypeCode);
-            _legs.Add(leg);
-        }
-
-        leg.AddPackage(barcode, loadUnitProfileCode, grossWeightKg, contents);
+        _items.Add(new Item(Id, pickupLocationCode, dropLocationCode, sku, dimensions, weightKg, quantity, uom, cargoSpecific));
+        TotalWeightKg += weightKg;
+        TotalQuantity += quantity;
+        TotalItems++;
     }
 
-    public void UpdateAllPackageStatuses(PackageStatus status)
+    public void UpdateAllItemStatuses(ItemStatus status)
     {
-        foreach (var leg in _legs)
-            leg.UpdateAllPackageStatuses(status);
+        foreach (var item in _items)
+            item.UpdateStatus(status);
     }
 
-    public void MarkPackagesDelivered(IEnumerable<string> barcodes)
+    public void MarkItemsDelivered(IEnumerable<string> skus)
     {
-        var barcodeSet = new HashSet<string>(barcodes, StringComparer.OrdinalIgnoreCase);
-        foreach (var leg in _legs)
-            foreach (var pkg in leg.Packages)
-                if (barcodeSet.Contains(pkg.Barcode))
-                    pkg.UpdateStatus(PackageStatus.Delivered);
-    }
-
-    public void SetRecurringSchedule(string cronExpression, DateTime? validFrom, DateTime? validUntil)
-    {
-        Schedule = new RecurringSchedule(Id, cronExpression, validFrom, validUntil);
-    }
-
-    public void AddTag(string tag)
-    {
-        if (!Tags.Contains(tag, StringComparer.OrdinalIgnoreCase))
-            Tags.Add(tag);
-    }
-
-    public void RemoveTag(string tag)
-    {
-        Tags.RemoveAll(t => t.Equals(tag, StringComparison.OrdinalIgnoreCase));
+        var skuSet = new HashSet<string>(skus, StringComparer.OrdinalIgnoreCase);
+        foreach (var item in _items)
+            if (skuSet.Contains(item.Sku))
+                item.UpdateStatus(ItemStatus.Delivered);
     }
 
     public void MarkAsValidated(IReadOnlyDictionary<(string pickup, string drop), (Guid pickupStationId, Guid dropStationId)> stationMap)
@@ -115,11 +103,11 @@ public class DeliveryOrder : AggregateRoot<Guid>
         if (Status != OrderStatus.Submitted)
             throw new InvalidOperationException("Only submitted orders can be validated.");
 
-        foreach (var leg in _legs)
+        foreach (var item in _items)
         {
-            if (!stationMap.TryGetValue((leg.PickupLocationCode, leg.DropLocationCode), out var stations))
-                throw new InvalidOperationException($"Missing station mapping for leg {leg.PickupLocationCode} → {leg.DropLocationCode}.");
-            leg.SetStationIds(stations.pickupStationId, stations.dropStationId);
+            if (!stationMap.TryGetValue((item.PickupLocationCode, item.DropLocationCode), out var stations))
+                throw new InvalidOperationException($"Missing station mapping for {item.PickupLocationCode} → {item.DropLocationCode}.");
+            item.SetStationIds(stations.pickupStationId, stations.dropStationId);
         }
 
         Status = OrderStatus.Validated;
@@ -133,23 +121,15 @@ public class DeliveryOrder : AggregateRoot<Guid>
 
         Status = OrderStatus.ReadyToPlan;
 
-        var legDtos = _legs
-            .OrderBy(l => l.Sequence)
-            .Select(l => new DeliveryLegEventDto(
-                l.Id,
-                l.Sequence,
-                l.PickupStationId!.Value,
-                l.DropStationId!.Value,
-                l.CarrierTypeCode,
-                l.Packages.Count,
-                l.Packages.Sum(p => p.GrossWeightKg),
-                l.Packages.Select(p => new PackageSummaryEventDto(
-                    p.Barcode, p.LoadUnitProfileCode, p.GrossWeightKg)).ToList()))
+        var itemDtos = _items
+            .Select(p => new ItemEventDto(
+                p.Sku, p.WeightKg,
+                p.PickupStationId!.Value, p.DropStationId!.Value))
             .ToList();
 
         AddDomainEvent(new DeliveryOrderReadyToPlanDomainEvent(
-            Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, SlaTier.ToString(),
-            ServiceWindow.Earliest, ServiceWindow.Latest, legDtos));
+            Guid.NewGuid(), DateTime.UtcNow, Id, Priority.ToString(),
+            RequestedTime, itemDtos));
     }
 
     public void MarkPlanning()
@@ -194,7 +174,7 @@ public class DeliveryOrder : AggregateRoot<Guid>
             throw new InvalidOperationException($"Cannot hold an order in {Status} status.");
 
         Status = OrderStatus.Held;
-        AddDomainEvent(new DeliveryOrderHeldDomainEvent(Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, reason));
+        AddDomainEvent(new DeliveryOrderHeldDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
     }
 
     public void Release()
@@ -203,7 +183,7 @@ public class DeliveryOrder : AggregateRoot<Guid>
             throw new InvalidOperationException("Only held orders can be released.");
 
         Status = OrderStatus.ReadyToPlan;
-        AddDomainEvent(new DeliveryOrderReleasedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, TenantId, Id));
+        AddDomainEvent(new DeliveryOrderReleasedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
     public void MarkFailed(string reason)
@@ -212,7 +192,7 @@ public class DeliveryOrder : AggregateRoot<Guid>
             throw new InvalidOperationException($"Cannot fail an order in {Status} status.");
 
         Status = OrderStatus.Failed;
-        AddDomainEvent(new DeliveryOrderFailedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, reason));
+        AddDomainEvent(new DeliveryOrderFailedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
     }
 
     public void Cancel(string reason)
@@ -222,7 +202,7 @@ public class DeliveryOrder : AggregateRoot<Guid>
             throw new InvalidOperationException("Cannot cancel an order that is in progress or completed.");
 
         Status = OrderStatus.Cancelled;
-        AddDomainEvent(new DeliveryOrderCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, reason));
+        AddDomainEvent(new DeliveryOrderCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
     }
 
     public void MarkAsCompleted()
@@ -231,16 +211,15 @@ public class DeliveryOrder : AggregateRoot<Guid>
             throw new InvalidOperationException($"Cannot complete an order in {Status} status.");
 
         Status = OrderStatus.Completed;
-        AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, TenantId, Id));
+        AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
-    public void AmendServiceWindow(ServiceWindow newServiceWindow, string reason)
+    public void AmendRequestedTime(DateTime? newRequestedTime, string reason)
     {
         if (Status == OrderStatus.Completed || Status == OrderStatus.Cancelled)
             throw new InvalidOperationException($"Cannot amend a {Status} order.");
 
-        ServiceWindow = newServiceWindow;
-        Status = OrderStatus.Amended;
-        AddDomainEvent(new DeliveryOrderAmendedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, reason));
+        RequestedTime = newRequestedTime;
+        AddDomainEvent(new DeliveryOrderAmendedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
     }
 }

@@ -6,7 +6,6 @@ namespace AMR.DeliveryPlanning.Fleet.Domain.Entities;
 
 public class Vehicle : AggregateRoot<Guid>
 {
-    public Guid TenantId { get; private set; }
     public string VehicleName { get; private set; } = string.Empty;
     public Guid VehicleTypeId { get; private set; }
     public VehicleState State { get; private set; }
@@ -20,9 +19,8 @@ public class Vehicle : AggregateRoot<Guid>
 
     private Vehicle() { }
 
-    public Vehicle(Guid id, Guid tenantId, string vehicleName, Guid vehicleTypeId, string adapterKey = "riot3", string? vendorVehicleKey = null) : base(id)
+    public Vehicle(Guid id, string vehicleName, Guid vehicleTypeId, string adapterKey = "riot3", string? vendorVehicleKey = null) : base(id)
     {
-        TenantId = tenantId;
         VehicleName = vehicleName;
         VehicleTypeId = vehicleTypeId;
         AdapterKey = NormalizeAdapterKey(adapterKey);

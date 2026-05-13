@@ -14,6 +14,6 @@ public class FleetDbContextFactory : IDesignTimeDbContextFactory<FleetDbContext>
             .UseNpgsql(connStr)
             .Options;
 
-        return new FleetDbContext(options, new AMR.DeliveryPlanning.SharedKernel.Tenancy.TenantContext());
+        return new FleetDbContext(options);
     }
 }

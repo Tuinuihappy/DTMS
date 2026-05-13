@@ -6,8 +6,8 @@ namespace AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 
 public class Trip : AggregateRoot<Guid>
 {
-    public Guid TenantId { get; private set; }
     public Guid JobId { get; private set; }
+    public Guid DeliveryOrderId { get; private set; }
     public Guid? VehicleId { get; private set; }
     public TripStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -28,11 +28,11 @@ public class Trip : AggregateRoot<Guid>
 
     private Trip() { }
 
-    public Trip(Guid tenantId, Guid jobId, Guid? vehicleId)
+    public Trip(Guid jobId, Guid deliveryOrderId, Guid? vehicleId)
     {
         Id = Guid.NewGuid();
-        TenantId = tenantId;
         JobId = jobId;
+        DeliveryOrderId = deliveryOrderId;
         VehicleId = vehicleId;
         Status = TripStatus.Created;
         CreatedAt = DateTime.UtcNow;
@@ -85,7 +85,7 @@ public class Trip : AggregateRoot<Guid>
             // All tasks done → complete the trip
             Status = TripStatus.Completed;
             CompletedAt = DateTime.UtcNow;
-            AddDomainEvent(new TripCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, JobId));
+            AddDomainEvent(new TripCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, JobId, DeliveryOrderId));
             RecordEvent(null, "TripCompleted", null);
         }
     }
@@ -172,7 +172,7 @@ public class Trip : AggregateRoot<Guid>
         var pod = new ProofOfDelivery(Id, stopId, photoUrl, signatureData, scannedIds, notes);
         _proofs.Add(pod);
         AddDomainEvent(new PodCapturedDomainEvent(
-            Guid.NewGuid(), DateTime.UtcNow, TenantId, Id, stopId,
+            Guid.NewGuid(), DateTime.UtcNow, Id, stopId,
             (scannedIds ?? []).AsReadOnly()));
         RecordEvent(null, "PodCaptured", $"Stop {stopId}, {scannedIds?.Count ?? 0} item(s) scanned");
         return pod;
