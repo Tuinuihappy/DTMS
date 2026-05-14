@@ -29,7 +29,8 @@ builder.Host.UseSerilog((context, configuration) =>
 builder.Services.AddOpenApi();
 builder.Services.AddAuthorization();
 builder.Services.ConfigureHttpJsonOptions(options =>
-    options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
+    options.SerializerOptions.Converters.Add(
+        new System.Text.Json.Serialization.JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.SnakeCaseUpper)));
 
 // Configure authentication. Auth:Disable is honored only in Development and
 // supplies a tenant claim so tenant-scoped APIs still behave realistically.
