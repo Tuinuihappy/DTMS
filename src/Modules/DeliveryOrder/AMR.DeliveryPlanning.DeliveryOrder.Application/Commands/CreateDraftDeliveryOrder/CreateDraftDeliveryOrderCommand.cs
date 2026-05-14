@@ -1,6 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
+
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 
 public record DimensionsDto(double LengthCm, double WidthCm, double HeightCm);
@@ -29,6 +30,7 @@ public record CreateDraftDeliveryOrderCommand(
     string OrderRef,
     Priority Priority,
     CargoType CargoType,
-    DateTime? RequestedTime,
-    List<ItemDto> Items
+    DateTime? RequestedDeliveryDate,
+    List<ItemDto> Items,
+    SourceSystem SourceSystem = SourceSystem.Manual
 ) : ICommand<Guid>;

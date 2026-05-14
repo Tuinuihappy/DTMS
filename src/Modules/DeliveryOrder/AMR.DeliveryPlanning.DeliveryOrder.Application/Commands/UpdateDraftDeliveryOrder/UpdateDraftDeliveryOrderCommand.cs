@@ -9,6 +9,6 @@ public record UpdateDraftDeliveryOrderCommand(
     string OrderRef,
     Priority Priority,
     CargoType CargoType,
-    DateTime? RequestedTime,
+    DateTime? RequestedDeliveryDate,
     List<ItemDto> Items
 ) : ICommand<Guid>;

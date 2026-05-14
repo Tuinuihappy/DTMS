@@ -5,5 +5,5 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AmendDeliveryO
 public record AmendDeliveryOrderCommand(
     Guid OrderId,
     string Reason,
-    DateTime? NewRequestedTime,
+    DateTime? NewRequestedDeliveryDate,
     string? AmendedBy) : ICommand<Guid>;

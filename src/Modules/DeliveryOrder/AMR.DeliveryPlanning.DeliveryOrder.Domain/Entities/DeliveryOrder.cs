@@ -8,12 +8,13 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 {
     public string OrderRef { get; private set; } = string.Empty;
+    public SourceSystem SourceSystem { get; private set; }
     public Priority Priority { get; private set; }
     public CargoType CargoType { get; private set; }
     public OrderStatus Status { get; private set; }
-    public DateTime? RequestedTime { get; private set; }
-    public DateTime CreatedAt { get; private set; }
-    public DateTime? UpdatedAt { get; private set; }
+    public DateTime? RequestedDeliveryDate { get; private set; }
+    public DateTime CreatedDate { get; private set; }
+    public DateTime? UpdatedDate { get; private set; }
     public double TotalWeightKg { get; private set; }
     public double TotalQuantity { get; private set; }
     public int TotalItems { get; private set; }
@@ -23,11 +24,11 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     private DeliveryOrder() { }
 
-    void IAuditable.SetCreatedAt(DateTime createdAt) => CreatedAt = createdAt;
-    void IAuditable.SetUpdatedAt(DateTime updatedAt) => UpdatedAt = updatedAt;
+    void IAuditable.SetCreatedAt(DateTime createdAt) => CreatedDate = createdAt;
+    void IAuditable.SetUpdatedAt(DateTime updatedAt) => UpdatedDate = updatedAt;
 
     public static DeliveryOrder Create(string orderRef, Priority priority,
-        CargoType cargoType, DateTime? requestedTime)
+        CargoType cargoType, DateTime? requestedDeliveryDate, SourceSystem sourceSystem = SourceSystem.Manual)
     {
         var order = new DeliveryOrder
         {
@@ -35,15 +36,16 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             OrderRef = orderRef,
             Priority = priority,
             CargoType = cargoType,
-            RequestedTime = requestedTime,
-            Status = OrderStatus.Draft
+            RequestedDeliveryDate = requestedDeliveryDate,
+            Status = OrderStatus.Draft,
+            SourceSystem = sourceSystem
         };
 
         order.AddDomainEvent(new DeliveryOrderDraftedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, order.Id));
         return order;
     }
 
-    public void UpdateDraft(string orderRef, Priority priority, CargoType cargoType, DateTime? requestedTime)
+    public void UpdateDraft(string orderRef, Priority priority, CargoType cargoType, DateTime? requestedDeliveryDate)
     {
         if (Status != OrderStatus.Draft)
             throw new InvalidOperationException($"Only Draft orders can be edited. Current status: {Status}.");
@@ -51,7 +53,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         OrderRef = orderRef;
         Priority = priority;
         CargoType = cargoType;
-        RequestedTime = requestedTime;
+        RequestedDeliveryDate = requestedDeliveryDate;
 
         _items.Clear();
         TotalWeightKg = 0;
@@ -129,7 +131,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
         AddDomainEvent(new DeliveryOrderReadyToPlanDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, Priority.ToString(),
-            RequestedTime, itemDtos));
+            RequestedDeliveryDate, itemDtos));
     }
 
     public void MarkPlanning()
@@ -214,12 +216,12 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
-    public void AmendRequestedTime(DateTime? newRequestedTime, string reason)
+    public void AmendRequestedDeliveryDate(DateTime? newRequestedDeliveryDate, string reason)
     {
         if (Status == OrderStatus.Completed || Status == OrderStatus.Cancelled)
             throw new InvalidOperationException($"Cannot amend a {Status} order.");
 
-        RequestedTime = newRequestedTime;
+        RequestedDeliveryDate = newRequestedDeliveryDate;
         AddDomainEvent(new DeliveryOrderAmendedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
     }
 }

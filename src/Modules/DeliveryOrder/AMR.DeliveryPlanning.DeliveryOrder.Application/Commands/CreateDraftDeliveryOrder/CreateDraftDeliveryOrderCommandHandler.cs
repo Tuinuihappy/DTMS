@@ -24,7 +24,8 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
             request.OrderRef,
             request.Priority,
             request.CargoType,
-            request.RequestedTime);
+            request.RequestedDeliveryDate,
+            request.SourceSystem);
 
         foreach (var pkg in request.Items)
         {

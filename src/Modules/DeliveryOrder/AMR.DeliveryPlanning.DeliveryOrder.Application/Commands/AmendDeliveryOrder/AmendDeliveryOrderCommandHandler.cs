@@ -30,25 +30,25 @@ public class AmendDeliveryOrderCommandHandler : ICommandHandler<AmendDeliveryOrd
 
         var amendedBy = string.IsNullOrWhiteSpace(request.AmendedBy) ? null : request.AmendedBy.Trim();
 
-        if (request.NewRequestedTime is null)
-            return Result<Guid>.Failure("At least one amendment field (NewRequestedTime) must be provided.");
+        if (request.NewRequestedDeliveryDate is null)
+            return Result<Guid>.Failure("At least one amendment field (NewRequestedDeliveryDate) must be provided.");
 
         var originalSnapshot = JsonSerializer.Serialize(new
         {
-            RequestedTime = order.RequestedTime,
-            order.Status
+            RequestedDeliveryDate = order.RequestedDeliveryDate,
+            OrderStatus = order.Status
         });
 
         try
         {
-            order.AmendRequestedTime(request.NewRequestedTime, request.Reason);
+            order.AmendRequestedDeliveryDate(request.NewRequestedDeliveryDate, request.Reason);
 
             await _orderRepo.UpdateAsync(order, cancellationToken);
 
             var newSnapshot = JsonSerializer.Serialize(new
             {
-                RequestedTime = order.RequestedTime,
-                order.Status
+                RequestedDeliveryDate = order.RequestedDeliveryDate,
+                OrderStatus = order.Status
             });
 
             var amendment = new OrderAmendment(

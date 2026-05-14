@@ -26,17 +26,18 @@ public class DeliveryOrderDbContext : DbContext
         {
             b.HasKey(o => o.Id);
             b.Property(o => o.OrderRef).HasMaxLength(200).IsRequired();
-            b.Property(o => o.CreatedAt).IsRequired();
-            b.Property(o => o.UpdatedAt);
+            b.Property(o => o.CreatedDate).IsRequired();
+            b.Property(o => o.UpdatedDate);
             b.Property(o => o.TotalWeightKg).IsRequired();
             b.Property(o => o.TotalQuantity).IsRequired();
             b.Property(o => o.TotalItems).IsRequired();
+            b.Property(o => o.SourceSystem).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.Property(o => o.CargoType).HasConversion<string>().HasMaxLength(30).IsRequired();
             b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
             b.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion().IsConcurrencyToken();
             b.Ignore(o => o.DomainEvents);
-            b.Property(o => o.RequestedTime);
+            b.Property(o => o.RequestedDeliveryDate);
 
             b.HasMany(o => o.Items)
              .WithOne()

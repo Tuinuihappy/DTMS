@@ -29,7 +29,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         foreach (var cmd in request.Orders)
         {
             var order = Domain.Entities.DeliveryOrder.Create(
-                cmd.OrderRef, cmd.Priority, cmd.CargoType, cmd.RequestedTime);
+                cmd.OrderRef, cmd.Priority, cmd.CargoType, cmd.RequestedDeliveryDate);
 
             foreach (var pkg in cmd.Items)
             {
