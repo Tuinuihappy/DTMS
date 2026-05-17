@@ -5,6 +5,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliver
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.UpdateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderItems;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderTimeline;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using MediatR;
@@ -33,18 +34,22 @@ public static class DeliveryOrderEndpoints
             {
                 var existing = await cache.GetStringAsync($"idempotency:{idempotencyKey}");
                 if (existing != null && Guid.TryParse(existing, out var existingId))
-                    return Results.Ok(existingId);
+                {
+                    var cached = await sender.Send(new GetDeliveryOrderQuery(existingId));
+                    return cached.IsSuccess
+                        ? Results.Ok(cached.Value)
+                        : Results.Created($"/api/delivery-orders/{existingId}", existingId);
+                }
             }
 
             var result = await sender.Send(command);
             if (!result.IsSuccess) return Results.BadRequest(result.Error);
 
             if (idempotencyKey != null)
-                await cache.SetStringAsync($"idempotency:{idempotencyKey}", result.Value.ToString(),
+                await cache.SetStringAsync($"idempotency:{idempotencyKey}", result.Value.Id.ToString(),
                     new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24) });
 
-            var dto = await sender.Send(new GetDeliveryOrderQuery(result.Value));
-            return Results.Created($"/api/delivery-orders/{result.Value}", dto.Value);
+            return Results.Created($"/api/delivery-orders/{result.Value.Id}", result.Value);
         });
 
         // POST /api/delivery-orders/{id}/submit — submit draft (validate + ready to plan)
@@ -58,7 +63,15 @@ public static class DeliveryOrderEndpoints
         group.MapPost("/bulk", async (BulkSubmitDeliveryOrdersCommand command, ISender sender) =>
         {
             var result = await sender.Send(command);
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+            if (result.IsFailure) return Results.BadRequest(result.Error);
+
+            var bulk = result.Value;
+            if (bulk.SucceededIds.Count == 0)
+                return Results.BadRequest(bulk.Failures);
+
+            return bulk.Failures.Count > 0
+                ? Results.Json(bulk, statusCode: 207)
+                : Results.Ok(bulk);
         });
 
         // GET /api/delivery-orders/{id}
@@ -87,9 +100,7 @@ public static class DeliveryOrderEndpoints
         group.MapPut("/{id:guid}", async (Guid id, UpdateDraftDeliveryOrderCommand command, ISender sender) =>
         {
             var result = await sender.Send(command with { OrderId = id });
-            if (!result.IsSuccess) return Results.BadRequest(result.Error);
-            var dto = await sender.Send(new GetDeliveryOrderQuery(result.Value));
-            return Results.Ok(dto.Value);
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
         // PATCH /api/delivery-orders/{id} — amendment
@@ -104,6 +115,24 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new GetOrderTimelineQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
+        });
+
+        // GET /api/delivery-orders/{id}/items?status=
+        group.MapGet("/{id:guid}/items", async (Guid id, string? status, ISender sender) =>
+        {
+            ItemStatus? itemStatus = status != null && Enum.TryParse<ItemStatus>(status, true, out var s) ? s : null;
+            var result = await sender.Send(new GetOrderItemsQuery(id, itemStatus));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
+        });
+
+        // GET /api/delivery-orders/{id}/items/{itemId}
+        group.MapGet("/{id:guid}/items/{itemId:guid}", async (Guid id, Guid itemId, ISender sender) =>
+        {
+            var result = await sender.Send(new GetOrderItemsQuery(id));
+            if (!result.IsSuccess) return Results.NotFound(result.Error);
+
+            var item = result.Value.FirstOrDefault(i => i.Id == itemId);
+            return item is not null ? Results.Ok(item) : Results.NotFound($"Item {itemId} not found in order {id}.");
         });
     }
 }

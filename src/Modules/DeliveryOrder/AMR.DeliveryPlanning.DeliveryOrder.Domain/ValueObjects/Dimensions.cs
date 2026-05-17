@@ -4,24 +4,26 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 
 public class Dimensions : ValueObject
 {
-    public double LengthCm { get; private set; }
-    public double WidthCm { get; private set; }
-    public double HeightCm { get; private set; }
+    public double LengthMm { get; private set; }
+    public double WidthMm { get; private set; }
+    public double HeightMm { get; private set; }
+
+    public double VolumeM3 => LengthMm * WidthMm * HeightMm / 1_000_000_000.0;
 
     private Dimensions() { }
 
-    public static Dimensions Create(double lengthCm, double widthCm, double heightCm)
+    public static Dimensions Create(double lengthMm, double widthMm, double heightMm)
     {
-        if (lengthCm <= 0 || widthCm <= 0 || heightCm <= 0)
+        if (lengthMm <= 0 || widthMm <= 0 || heightMm <= 0)
             throw new ArgumentException("All dimensions must be greater than zero.");
 
-        return new Dimensions { LengthCm = lengthCm, WidthCm = widthCm, HeightCm = heightCm };
+        return new Dimensions { LengthMm = lengthMm, WidthMm = widthMm, HeightMm = heightMm };
     }
 
     protected override IEnumerable<object> GetEqualityComponents()
     {
-        yield return LengthCm;
-        yield return WidthCm;
-        yield return HeightCm;
+        yield return LengthMm;
+        yield return WidthMm;
+        yield return HeightMm;
     }
 }

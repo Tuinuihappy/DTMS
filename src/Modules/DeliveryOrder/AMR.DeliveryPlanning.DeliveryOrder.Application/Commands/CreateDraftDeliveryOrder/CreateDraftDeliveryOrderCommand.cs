@@ -1,10 +1,10 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
-
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 
-public record DimensionsDto(double LengthCm, double WidthCm, double HeightCm);
+public record DimensionsDto(double LengthMm, double WidthMm, double HeightMm);
 
 public record QuantityDto(double Value, string Uom);
 
@@ -15,12 +15,15 @@ public record CargoSpecificDto(
     string? TradingCode,
     string? InventoryNo,
     string? Po,
-    string? TraceId);
+    string? TraceId,
+    string? LotNo);
 
 public record ItemDto(
+    int ItemSeq,
     string Sku,
     string PickupLocationCode,
     string DropLocationCode,
+    CargoType CargoType,
     DimensionsDto? Dimensions,
     double WeightKg,
     QuantityDto Quantity,
@@ -29,8 +32,7 @@ public record ItemDto(
 public record CreateDraftDeliveryOrderCommand(
     string OrderRef,
     Priority Priority,
-    CargoType CargoType,
     DateTime? RequestedDeliveryDate,
     List<ItemDto> Items,
     SourceSystem SourceSystem = SourceSystem.Manual
-) : ICommand<Guid>;
+) : ICommand<DeliveryOrderDetailDto>;

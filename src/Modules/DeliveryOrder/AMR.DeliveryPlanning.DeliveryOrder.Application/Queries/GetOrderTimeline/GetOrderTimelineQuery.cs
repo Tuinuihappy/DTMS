@@ -20,8 +20,11 @@ public class GetOrderTimelineQueryHandler : IQueryHandler<GetOrderTimelineQuery,
 
     public async Task<Result<List<TimelineEntryDto>>> Handle(GetOrderTimelineQuery request, CancellationToken cancellationToken)
     {
-        var auditEvents = await _auditRepo.GetByOrderAsync(request.OrderId, cancellationToken);
-        var amendments = await _amendmentRepo.GetByOrderAsync(request.OrderId, cancellationToken);
+        var auditTask   = _auditRepo.GetByOrderAsync(request.OrderId, cancellationToken);
+        var amendTask   = _amendmentRepo.GetByOrderAsync(request.OrderId, cancellationToken);
+        await Task.WhenAll(auditTask, amendTask);
+        var auditEvents = auditTask.Result;
+        var amendments  = amendTask.Result;
 
         var timeline = auditEvents
             .Select(e => new TimelineEntryDto(e.Id, e.EventType, e.Details, e.ActorId, e.OccurredAt))

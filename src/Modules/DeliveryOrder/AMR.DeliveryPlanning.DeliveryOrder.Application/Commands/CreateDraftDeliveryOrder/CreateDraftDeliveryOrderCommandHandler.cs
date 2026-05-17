@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
@@ -5,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 
-public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraftDeliveryOrderCommand, Guid>
+public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraftDeliveryOrderCommand, DeliveryOrderDetailDto>
 {
     private readonly IDeliveryOrderRepository _repository;
     private readonly ILogger<CreateDraftDeliveryOrderCommandHandler> _logger;
@@ -18,12 +19,11 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
         _logger = logger;
     }
 
-    public async Task<Result<Guid>> Handle(CreateDraftDeliveryOrderCommand request, CancellationToken cancellationToken)
+    public async Task<Result<DeliveryOrderDetailDto>> Handle(CreateDraftDeliveryOrderCommand request, CancellationToken cancellationToken)
     {
         var order = Domain.Entities.DeliveryOrder.Create(
             request.OrderRef,
             request.Priority,
-            request.CargoType,
             request.RequestedDeliveryDate,
             request.SourceSystem);
 
@@ -31,13 +31,14 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
         {
             order.AddItem(
                 pkg.PickupLocationCode, pkg.DropLocationCode,
-                pkg.Sku,
-                pkg.Dimensions is { } d ? Dimensions.Create(d.LengthCm, d.WidthCm, d.HeightCm) : null,
+                pkg.ItemSeq, pkg.Sku,
+                pkg.CargoType,
+                pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                 pkg.WeightKg,
                 pkg.Quantity.Value,
                 pkg.Quantity.Uom,
                 pkg.CargoSpecific is { } cs
-                    ? CargoSpecific.Create(cs.PartNo, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId)
+                    ? CargoSpecific.Create(cs.PartNo, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                     : null);
         }
 
@@ -46,6 +47,6 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
 
         _logger.LogInformation("[CreateDraft] Order {OrderId} '{OrderRef}' created as Draft.", order.Id, order.OrderRef);
 
-        return Result<Guid>.Success(order.Id);
+        return Result<DeliveryOrderDetailDto>.Success(DeliveryOrderMapper.MapToDetailDto(order));
     }
 }

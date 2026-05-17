@@ -111,8 +111,9 @@ public static class ModuleServiceRegistration
                 new DomainEventOutboxSaveChangesInterceptor(
                     sp.GetRequiredService<DeliveryOrderDomainEventMapper>())));
         services.AddScoped<IDeliveryOrderRepository, DeliveryOrderRepository>();
-        services.AddScoped<IStationLookup, FacilityStationLookup>();
-        services.AddScoped<StationValidationService>();
+        services.AddScoped<FacilityStationLookup>();
+        services.AddScoped<IStationLookup, CachedStationLookup>();
+        services.AddScoped<IStationValidationService, StationValidationService>();
         services.AddScoped<IOrderAmendmentRepository, OrderAmendmentRepository>();
         services.AddScoped<IOrderAuditEventRepository, OrderAuditEventRepository>();
         services.Configure<DeliveryOrderOptions>(

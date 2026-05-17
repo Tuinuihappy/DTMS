@@ -3,8 +3,8 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 public enum OrderStatus
 {
     Draft,
-    Submitted,
-    Validated,
+    Submitted,  // reserved for async human-approval step between submit and validation
+    Validated,  // reserved for async external-validation step before planning
     ReadyToPlan,
     Planning,
     Planned,
@@ -13,6 +13,7 @@ public enum OrderStatus
     Completed,
     Held,
     Failed,
-    Amended,
+    Amended,   // reserved: set when order is amended after entering planning pipeline (ReadyToPlan→Dispatched)
+               // requires Planning module consumer for DeliveryOrderAmendedIntegrationEvent + re-plan mechanism
     Cancelled
 }

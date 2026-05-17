@@ -3,7 +3,7 @@ using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 
-public class StationValidationService
+public class StationValidationService : IStationValidationService
 {
     private readonly IStationLookup _stationLookup;
 

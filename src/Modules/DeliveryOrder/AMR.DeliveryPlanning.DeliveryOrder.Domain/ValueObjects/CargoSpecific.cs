@@ -9,12 +9,13 @@ public class CargoSpecific
     public string? InventoryNo { get; private set; }
     public string? Po { get; private set; }
     public string? TraceId { get; private set; }
+    public string? LotNo { get; private set; }
 
     private CargoSpecific() { }
 
     public static CargoSpecific Create(
         string? partNo, string? vendor, string? dateCode,
-        string? tradingCode, string? inventoryNo, string? po, string? traceId)
+        string? tradingCode, string? inventoryNo, string? po, string? traceId, string? lotNo = null)
     {
         return new CargoSpecific
         {
@@ -24,7 +25,8 @@ public class CargoSpecific
             TradingCode = tradingCode,
             InventoryNo = inventoryNo,
             Po = po,
-            TraceId = traceId
+            TraceId = traceId,
+            LotNo = lotNo
         };
     }
 }

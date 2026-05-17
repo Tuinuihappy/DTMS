@@ -27,7 +27,6 @@ public class CancelDeliveryOrderCommandHandler : ICommandHandler<CancelDeliveryO
         try
         {
             order.Cancel(request.Reason);
-            await _repository.UpdateAsync(order, cancellationToken);
             await _repository.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("[Cancel] Order {OrderId} cancelled. Reason: {Reason}.", request.OrderId, request.Reason);

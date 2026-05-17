@@ -230,15 +230,27 @@ public class DeliveryOrderTests
     }
 
     [Fact]
-    public void AmendRequestedTime_UpdatesFieldAndPreservesStatus()
+    public void AmendRequestedDeliveryDate_UpdatesFieldAndPreservesStatus()
     {
         var order = CreateOrder();
+        order.Submit();
         var newTime = DateTime.UtcNow.AddHours(4);
 
-        order.AmendRequestedTime(newTime, "rescheduled");
+        order.AmendRequestedDeliveryDate(newTime, "rescheduled");
 
-        order.RequestedTime.Should().Be(newTime);
-        order.Status.Should().Be(OrderStatus.Draft);
+        order.RequestedDeliveryDate.Should().Be(newTime);
+        order.Status.Should().Be(OrderStatus.Submitted);
         order.DomainEvents.OfType<DeliveryOrderAmendedDomainEvent>().Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void AmendRequestedDeliveryDate_WhenDraft_Throws()
+    {
+        var order = CreateOrder();
+
+        var act = () => order.AmendRequestedDeliveryDate(DateTime.UtcNow.AddHours(1), "reason");
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Draft*");
     }
 }

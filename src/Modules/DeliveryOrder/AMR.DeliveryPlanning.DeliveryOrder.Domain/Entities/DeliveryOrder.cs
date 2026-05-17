@@ -10,7 +10,6 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     public string OrderRef { get; private set; } = string.Empty;
     public SourceSystem SourceSystem { get; private set; }
     public Priority Priority { get; private set; }
-    public CargoType CargoType { get; private set; }
     public OrderStatus Status { get; private set; }
     public DateTime? RequestedDeliveryDate { get; private set; }
     public DateTime CreatedDate { get; private set; }
@@ -28,14 +27,13 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     void IAuditable.SetUpdatedAt(DateTime updatedAt) => UpdatedDate = updatedAt;
 
     public static DeliveryOrder Create(string orderRef, Priority priority,
-        CargoType cargoType, DateTime? requestedDeliveryDate, SourceSystem sourceSystem = SourceSystem.Manual)
+        DateTime? requestedDeliveryDate, SourceSystem sourceSystem = SourceSystem.Manual)
     {
         var order = new DeliveryOrder
         {
             Id = Guid.NewGuid(),
             OrderRef = orderRef,
             Priority = priority,
-            CargoType = cargoType,
             RequestedDeliveryDate = requestedDeliveryDate,
             Status = OrderStatus.Draft,
             SourceSystem = sourceSystem
@@ -45,14 +43,13 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         return order;
     }
 
-    public void UpdateDraft(string orderRef, Priority priority, CargoType cargoType, DateTime? requestedDeliveryDate)
+    public void UpdateDraft(string orderRef, Priority priority, DateTime? requestedDeliveryDate)
     {
         if (Status != OrderStatus.Draft)
             throw new InvalidOperationException($"Only Draft orders can be edited. Current status: {Status}.");
 
         OrderRef = orderRef;
         Priority = priority;
-        CargoType = cargoType;
         RequestedDeliveryDate = requestedDeliveryDate;
 
         _items.Clear();
@@ -74,13 +71,13 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     public void AddItem(
         string pickupLocationCode, string dropLocationCode,
-        string sku, Dimensions? dimensions, double weightKg, double quantity, string uom,
+        int itemSeq, string sku, CargoType cargoType, Dimensions? dimensions, double weightKg, double quantity, string uom,
         CargoSpecific? cargoSpecific = null)
     {
-        if (_items.Any(p => p.Sku.Equals(sku, StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidOperationException($"A package with sku '{sku}' already exists in this order.");
+        if (_items.Any(p => p.ItemSeq == itemSeq))
+            throw new InvalidOperationException($"An item with seq '{itemSeq}' already exists in this order.");
 
-        _items.Add(new Item(Id, pickupLocationCode, dropLocationCode, sku, dimensions, weightKg, quantity, uom, cargoSpecific));
+        _items.Add(new Item(Id, pickupLocationCode, dropLocationCode, itemSeq, sku, cargoType, dimensions, weightKg, quantity, uom, cargoSpecific));
         TotalWeightKg += weightKg;
         TotalQuantity += quantity;
         TotalItems++;
@@ -218,7 +215,10 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     public void AmendRequestedDeliveryDate(DateTime? newRequestedDeliveryDate, string reason)
     {
-        if (Status == OrderStatus.Completed || Status == OrderStatus.Cancelled)
+        if (Status is OrderStatus.Draft)
+            throw new InvalidOperationException("Cannot amend a Draft order — use UpdateDraft instead.");
+
+        if (Status is OrderStatus.Completed or OrderStatus.Cancelled)
             throw new InvalidOperationException($"Cannot amend a {Status} order.");
 
         RequestedDeliveryDate = newRequestedDeliveryDate;

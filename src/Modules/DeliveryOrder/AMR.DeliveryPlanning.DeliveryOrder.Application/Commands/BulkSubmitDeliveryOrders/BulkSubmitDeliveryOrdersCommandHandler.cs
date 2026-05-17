@@ -3,61 +3,104 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using FluentValidation;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkSubmitDeliveryOrders;
 
-public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmitDeliveryOrdersCommand, List<Guid>>
+public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmitDeliveryOrdersCommand, BulkSubmitResult>
 {
     private readonly IDeliveryOrderRepository _repo;
-    private readonly StationValidationService _stationValidation;
+    private readonly IStationValidationService _stationValidation;
+    private readonly IValidator<CreateDraftDeliveryOrderCommand> _orderValidator;
 
     public BulkSubmitDeliveryOrdersCommandHandler(
         IDeliveryOrderRepository repo,
-        StationValidationService stationValidation)
+        IStationValidationService stationValidation,
+        IValidator<CreateDraftDeliveryOrderCommand> orderValidator)
     {
         _repo = repo;
         _stationValidation = stationValidation;
+        _orderValidator = orderValidator;
     }
 
-    public async Task<Result<List<Guid>>> Handle(BulkSubmitDeliveryOrdersCommand request, CancellationToken cancellationToken)
+    public async Task<Result<BulkSubmitResult>> Handle(BulkSubmitDeliveryOrdersCommand request, CancellationToken cancellationToken)
     {
         if (request.Orders.Count == 0)
-            return Result<List<Guid>>.Failure("No orders provided.");
+            return Result<BulkSubmitResult>.Failure("No orders provided.");
 
-        var orders = new List<Domain.Entities.DeliveryOrder>();
+        var succeeded = new List<Domain.Entities.DeliveryOrder>();
+        var failures = new List<BulkSubmitFailure>();
 
+        // validate and build orders first (sequential — shares DbContext safely)
+        var pendingOrders = new List<Domain.Entities.DeliveryOrder>();
         foreach (var cmd in request.Orders)
         {
-            var order = Domain.Entities.DeliveryOrder.Create(
-                cmd.OrderRef, cmd.Priority, cmd.CargoType, cmd.RequestedDeliveryDate);
-
-            foreach (var pkg in cmd.Items)
+            var validation = await _orderValidator.ValidateAsync(cmd, cancellationToken);
+            if (!validation.IsValid)
             {
-                order.AddItem(
-                    pkg.PickupLocationCode, pkg.DropLocationCode,
-                    pkg.Sku,
-                    pkg.Dimensions is { } d ? Dimensions.Create(d.LengthCm, d.WidthCm, d.HeightCm) : null,
-                    pkg.WeightKg,
-                    pkg.Quantity.Value,
-                    pkg.Quantity.Uom,
-                    pkg.CargoSpecific is { } cs
-                        ? CargoSpecific.Create(cs.PartNo, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId)
-                        : null);
+                var errors = string.Join("; ", validation.Errors.Select(e => e.ErrorMessage));
+                failures.Add(new BulkSubmitFailure(cmd.OrderRef, errors));
+                continue;
             }
 
+            Domain.Entities.DeliveryOrder order;
+            try
+            {
+                order = Domain.Entities.DeliveryOrder.Create(
+                    cmd.OrderRef, cmd.Priority, cmd.RequestedDeliveryDate);
+
+                foreach (var pkg in cmd.Items)
+                {
+                    order.AddItem(
+                        pkg.PickupLocationCode, pkg.DropLocationCode,
+                        pkg.ItemSeq, pkg.Sku,
+                        pkg.CargoType,
+                        pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
+                        pkg.WeightKg,
+                        pkg.Quantity.Value,
+                        pkg.Quantity.Uom,
+                        pkg.CargoSpecific is { } cs
+                            ? CargoSpecific.Create(cs.PartNo, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
+                            : null);
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                failures.Add(new BulkSubmitFailure(cmd.OrderRef, ex.Message));
+                continue;
+            }
+
+            pendingOrders.Add(order);
+        }
+
+        // validate stations in parallel — IStationLookup (cached) is read-only, safe to fan out
+        var validationTasks = pendingOrders.Select(async order =>
+        {
             var stationMap = await _stationValidation.BuildStationMapAsync(order.Items, cancellationToken);
-            if (stationMap.IsFailure) return Result<List<Guid>>.Failure(stationMap.Error);
+            return (order, stationMap);
+        });
+
+        foreach (var (order, stationMap) in await Task.WhenAll(validationTasks))
+        {
+            if (stationMap.IsFailure)
+            {
+                failures.Add(new BulkSubmitFailure(order.OrderRef, stationMap.Error));
+                continue;
+            }
 
             order.Submit();
             order.MarkAsValidated(stationMap.Value);
             order.MarkReadyToPlan();
-
-            orders.Add(order);
+            succeeded.Add(order);
         }
 
-        await _repo.AddRangeAsync(orders, cancellationToken);
-        await _repo.SaveChangesAsync(cancellationToken);
+        if (succeeded.Count > 0)
+        {
+            await _repo.AddRangeAsync(succeeded, cancellationToken);
+            await _repo.SaveChangesAsync(cancellationToken);
+        }
 
-        return Result<List<Guid>>.Success(orders.Select(o => o.Id).ToList());
+        return Result<BulkSubmitResult>.Success(
+            new BulkSubmitResult(succeeded.Select(o => o.Id).ToList(), failures));
     }
 }

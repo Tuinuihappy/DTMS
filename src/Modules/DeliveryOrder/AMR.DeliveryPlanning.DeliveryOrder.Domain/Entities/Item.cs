@@ -11,7 +11,9 @@ public class Item : Entity<Guid>
     public string DropLocationCode { get; private set; } = string.Empty;
     public Guid? PickupStationId { get; private set; }
     public Guid? DropStationId { get; private set; }
+    public int ItemSeq { get; private set; }
     public string Sku { get; private set; } = string.Empty;
+    public CargoType CargoType { get; private set; }
     public Dimensions? Dimensions { get; private set; }
     public double WeightKg { get; private set; }
     public double Quantity { get; private set; }
@@ -22,14 +24,16 @@ public class Item : Entity<Guid>
     private Item() { }
 
     internal Item(Guid deliveryOrderId, string pickupLocationCode, string dropLocationCode,
-        string sku, Dimensions? dimensions, double weightKg, double quantity, string uom,
+        int itemSeq, string sku, CargoType cargoType, Dimensions? dimensions, double weightKg, double quantity, string uom,
         CargoSpecific? cargoSpecific = null)
     {
         Id = Guid.NewGuid();
         DeliveryOrderId = deliveryOrderId;
         PickupLocationCode = pickupLocationCode;
         DropLocationCode = dropLocationCode;
+        ItemSeq = itemSeq;
         Sku = sku;
+        CargoType = cargoType;
         Dimensions = dimensions;
         WeightKg = weightKg;
         Quantity = quantity;

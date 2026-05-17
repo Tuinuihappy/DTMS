@@ -3,6 +3,7 @@ using System;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 {
     [DbContext(typeof(DeliveryOrderDbContext))]
-    partial class DeliveryOrderDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260517085404_RenameDimensionsCmToMm")]
+    partial class RenameDimensionsCmToMm
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -28,6 +31,11 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("CargoType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("timestamp with time zone");
@@ -88,11 +96,6 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("CargoType")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
                     b.Property<Guid>("DeliveryOrderId")
                         .HasColumnType("uuid");
 
@@ -103,9 +106,6 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 
                     b.Property<Guid?>("DropStationId")
                         .HasColumnType("uuid");
-
-                    b.Property<int>("ItemSeq")
-                        .HasColumnType("integer");
 
                     b.Property<string>("PickupLocationCode")
                         .IsRequired()
@@ -140,7 +140,7 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 
                     b.HasIndex("Sku");
 
-                    b.HasIndex("DeliveryOrderId", "ItemSeq")
+                    b.HasIndex("DeliveryOrderId", "Sku")
                         .IsUnique();
 
                     b.ToTable("Items", "deliveryorder");
@@ -270,11 +270,6 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                                 .HasMaxLength(100)
                                 .HasColumnType("character varying(100)")
                                 .HasColumnName("InventoryNo");
-
-                            b1.Property<string>("LotNo")
-                                .HasMaxLength(100)
-                                .HasColumnType("character varying(100)")
-                                .HasColumnName("LotNo");
 
                             b1.Property<string>("PartNo")
                                 .HasMaxLength(100)

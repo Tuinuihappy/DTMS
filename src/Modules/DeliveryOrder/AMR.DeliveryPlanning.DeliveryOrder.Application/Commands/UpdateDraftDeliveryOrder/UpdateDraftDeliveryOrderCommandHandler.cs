@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
@@ -6,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.UpdateDraftDeliveryOrder;
 
-public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraftDeliveryOrderCommand, Guid>
+public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraftDeliveryOrderCommand, DeliveryOrderDetailDto>
 {
     private readonly IDeliveryOrderRepository _repository;
     private readonly ILogger<UpdateDraftDeliveryOrderCommandHandler> _logger;
@@ -19,11 +20,11 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
         _logger = logger;
     }
 
-    public async Task<Result<Guid>> Handle(UpdateDraftDeliveryOrderCommand request, CancellationToken cancellationToken)
+    public async Task<Result<DeliveryOrderDetailDto>> Handle(UpdateDraftDeliveryOrderCommand request, CancellationToken cancellationToken)
     {
         var order = await _repository.GetByIdAsync(request.OrderId, cancellationToken);
         if (order is null)
-            return Result<Guid>.Failure($"Order {request.OrderId} not found.");
+            return Result<DeliveryOrderDetailDto>.Failure($"Order {request.OrderId} not found.");
 
         try
         {
@@ -32,19 +33,20 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
             var oldItems = order.Items.ToList();
             await _repository.RemoveItemsAsync(oldItems, cancellationToken);
 
-            order.UpdateDraft(request.OrderRef, request.Priority, request.CargoType, request.RequestedDeliveryDate);
+            order.UpdateDraft(request.OrderRef, request.Priority, request.RequestedDeliveryDate);
 
             foreach (var item in request.Items)
             {
                 order.AddItem(
                     item.PickupLocationCode, item.DropLocationCode,
-                    item.Sku,
-                    item.Dimensions is { } d ? Dimensions.Create(d.LengthCm, d.WidthCm, d.HeightCm) : null,
+                    item.ItemSeq, item.Sku,
+                    item.CargoType,
+                    item.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                     item.WeightKg,
                     item.Quantity.Value,
                     item.Quantity.Uom,
                     item.CargoSpecific is { } cs
-                        ? CargoSpecific.Create(cs.PartNo, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId)
+                        ? CargoSpecific.Create(cs.PartNo, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                         : null);
             }
 
@@ -56,17 +58,17 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
             _logger.LogInformation("[UpdateDraft] Order {OrderId} '{OrderRef}' draft updated with {ItemCount} item(s).",
                 order.Id, order.OrderRef, order.Items.Count);
 
-            return Result<Guid>.Success(order.Id);
+            return Result<DeliveryOrderDetailDto>.Success(DeliveryOrderMapper.MapToDetailDto(order));
         }
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning("[UpdateDraft] Order {OrderId} update failed: {Error}.", request.OrderId, ex.Message);
-            return Result<Guid>.Failure(ex.Message);
+            return Result<DeliveryOrderDetailDto>.Failure(ex.Message);
         }
         catch (DbUpdateConcurrencyException)
         {
             _logger.LogWarning("[UpdateDraft] Concurrency conflict on Order {OrderId}.", request.OrderId);
-            return Result<Guid>.Failure("The order was modified by another process. Please retry.");
+            return Result<DeliveryOrderDetailDto>.Failure("The order was modified by another process. Please retry.");
         }
     }
 }

@@ -11,13 +11,13 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
 {
     private readonly IDeliveryOrderRepository _repository;
     private readonly IOrderAuditEventRepository _auditRepo;
-    private readonly StationValidationService _stationValidation;
+    private readonly IStationValidationService _stationValidation;
     private readonly ILogger<SubmitDeliveryOrderCommandHandler> _logger;
 
     public SubmitDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
         IOrderAuditEventRepository auditRepo,
-        StationValidationService stationValidation,
+        IStationValidationService stationValidation,
         ILogger<SubmitDeliveryOrderCommandHandler> logger)
     {
         _repository = repository;
@@ -40,8 +40,6 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
             order.Submit();
             order.MarkAsValidated(stationMap.Value);
             order.MarkReadyToPlan();
-
-            await _repository.UpdateAsync(order, cancellationToken);
 
             await _auditRepo.AddAsync(new OrderAuditEvent(
                 order.Id, "OrderSubmitted",

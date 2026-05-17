@@ -1,32 +1,31 @@
-﻿using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddTags : Migration
+    public partial class AddLotNoToCargoSpecific : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<List<string>>(
-                name: "Tags",
+            migrationBuilder.AddColumn<string>(
+                name: "LotNo",
                 schema: "deliveryorder",
-                table: "DeliveryOrders",
-                type: "text[]",
-                nullable: false,
-                defaultValueSql: "'{}'");
+                table: "Items",
+                type: "character varying(100)",
+                maxLength: 100,
+                nullable: true);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "Tags",
+                name: "LotNo",
                 schema: "deliveryorder",
-                table: "DeliveryOrders");
+                table: "Items");
         }
     }
 }

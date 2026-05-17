@@ -42,7 +42,20 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             [
                 new DeliveryOrderReleasedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId)
             ],
-            _ => []
+
+            // internal-only — no cross-module publishing needed
+            DeliveryOrderDraftedDomainEvent         => [],
+            DeliveryOrderDraftUpdatedDomainEvent     => [],
+            DeliveryOrderSubmittedDomainEvent        => [],
+            DeliveryOrderValidatedDomainEvent        => [],
+            DeliveryOrderPlanningStartedDomainEvent  => [],
+            DeliveryOrderPlannedDomainEvent          => [],
+            DeliveryOrderDispatchedDomainEvent       => [],
+            DeliveryOrderInProgressDomainEvent       => [],
+
+            _ => throw new InvalidOperationException(
+                $"Unhandled domain event '{domainEvent.GetType().Name}'. " +
+                "Add a mapping or explicitly return [] if internal-only.")
         };
     }
 }

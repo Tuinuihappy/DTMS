@@ -33,11 +33,13 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(o => o.TotalItems).IsRequired();
             b.Property(o => o.SourceSystem).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20).IsRequired();
-            b.Property(o => o.CargoType).HasConversion<string>().HasMaxLength(30).IsRequired();
             b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
             b.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion().IsConcurrencyToken();
             b.Ignore(o => o.DomainEvents);
             b.Property(o => o.RequestedDeliveryDate);
+
+            b.HasIndex(o => o.Status);
+            b.HasIndex(o => o.CreatedDate);
 
             b.HasMany(o => o.Items)
              .WithOne()
@@ -58,14 +60,18 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(p => p.DropLocationCode).HasMaxLength(50).IsRequired();
             b.Property(p => p.PickupStationId);
             b.Property(p => p.DropStationId);
+            b.Property(p => p.ItemSeq).IsRequired();
             b.Property(p => p.Sku).HasMaxLength(100).IsRequired();
+            b.Property(p => p.CargoType).HasConversion<string>().HasMaxLength(30).IsRequired();
             b.OwnsOne(p => p.Dimensions, d =>
             {
-                d.Property(x => x.LengthCm).HasColumnName("LengthCm");
-                d.Property(x => x.WidthCm).HasColumnName("WidthCm");
-                d.Property(x => x.HeightCm).HasColumnName("HeightCm");
+                d.Property(x => x.LengthMm).HasColumnName("LengthMm");
+                d.Property(x => x.WidthMm).HasColumnName("WidthMm");
+                d.Property(x => x.HeightMm).HasColumnName("HeightMm");
+                d.Ignore(x => x.VolumeM3);
             });
-            b.HasIndex(p => new { p.DeliveryOrderId, p.Sku }).IsUnique();
+            b.HasIndex(p => new { p.DeliveryOrderId, p.ItemSeq }).IsUnique();
+            b.HasIndex(p => p.Sku);
             b.Property(p => p.WeightKg).IsRequired();
             b.Property(p => p.Quantity).IsRequired();
             b.Property(p => p.Uom).HasMaxLength(20).IsRequired();
@@ -79,6 +85,7 @@ public class DeliveryOrderDbContext : DbContext
                 cs.Property(x => x.InventoryNo).HasColumnName("InventoryNo").HasMaxLength(100);
                 cs.Property(x => x.Po).HasColumnName("Po").HasMaxLength(100);
                 cs.Property(x => x.TraceId).HasColumnName("TraceId").HasMaxLength(100);
+                cs.Property(x => x.LotNo).HasColumnName("LotNo").HasMaxLength(100);
             });
         });
 

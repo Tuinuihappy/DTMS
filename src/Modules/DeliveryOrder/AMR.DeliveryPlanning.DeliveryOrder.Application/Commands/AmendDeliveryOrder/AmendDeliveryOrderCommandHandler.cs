@@ -30,9 +30,6 @@ public class AmendDeliveryOrderCommandHandler : ICommandHandler<AmendDeliveryOrd
 
         var amendedBy = string.IsNullOrWhiteSpace(request.AmendedBy) ? null : request.AmendedBy.Trim();
 
-        if (request.NewRequestedDeliveryDate is null)
-            return Result<Guid>.Failure("At least one amendment field (NewRequestedDeliveryDate) must be provided.");
-
         var originalSnapshot = JsonSerializer.Serialize(new
         {
             RequestedDeliveryDate = order.RequestedDeliveryDate,
@@ -42,8 +39,6 @@ public class AmendDeliveryOrderCommandHandler : ICommandHandler<AmendDeliveryOrd
         try
         {
             order.AmendRequestedDeliveryDate(request.NewRequestedDeliveryDate, request.Reason);
-
-            await _orderRepo.UpdateAsync(order, cancellationToken);
 
             var newSnapshot = JsonSerializer.Serialize(new
             {

@@ -9,8 +9,13 @@ public class CreateDraftDeliveryOrderCommandValidator : AbstractValidator<Create
         RuleFor(x => x.OrderRef).NotEmpty().MaximumLength(200);
 
         RuleFor(x => x.Items).NotEmpty().WithMessage("At least one package is required.");
+        RuleFor(x => x.Items)
+            .Must(items => items.Select(i => i.ItemSeq).Distinct().Count() == items.Count)
+            .WithMessage("ItemSeq must be unique within the order.");
         RuleForEach(x => x.Items).ChildRules(pkg =>
         {
+            pkg.RuleFor(p => p.ItemSeq).GreaterThan(0);
+            pkg.RuleFor(p => p.CargoType).IsInEnum();
             pkg.RuleFor(p => p.PickupLocationCode).NotEmpty();
             pkg.RuleFor(p => p.DropLocationCode).NotEmpty();
             pkg.RuleFor(p => p.DropLocationCode)
@@ -19,9 +24,9 @@ public class CreateDraftDeliveryOrderCommandValidator : AbstractValidator<Create
             pkg.RuleFor(p => p.Sku).NotEmpty().MaximumLength(100);
             pkg.When(p => p.Dimensions != null, () =>
             {
-                pkg.RuleFor(p => p.Dimensions!.LengthCm).GreaterThan(0);
-                pkg.RuleFor(p => p.Dimensions!.WidthCm).GreaterThan(0);
-                pkg.RuleFor(p => p.Dimensions!.HeightCm).GreaterThan(0);
+                pkg.RuleFor(p => p.Dimensions!.LengthMm).GreaterThan(0);
+                pkg.RuleFor(p => p.Dimensions!.WidthMm).GreaterThan(0);
+                pkg.RuleFor(p => p.Dimensions!.HeightMm).GreaterThan(0);
             });
             pkg.RuleFor(p => p.WeightKg).GreaterThan(0);
             pkg.RuleFor(p => p.Quantity).NotNull();

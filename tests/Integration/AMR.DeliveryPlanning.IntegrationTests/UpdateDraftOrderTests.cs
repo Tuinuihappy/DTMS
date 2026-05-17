@@ -17,7 +17,7 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
         orderRef,
         priority = "Normal",
         cargoType = "FinishedGood",
-        requestedTime = (DateTime?)null,
+        requestedDeliveryDate = (DateTime?)null,
         items = new[]
         {
             new
@@ -38,7 +38,7 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
         orderRef,
         priority = "High",
         cargoType = "RawMaterial",
-        requestedTime = (DateTime?)null,
+        requestedDeliveryDate = (DateTime?)null,
         items = new[]
         {
             new
@@ -104,7 +104,7 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
             orderRef = "ORD-REUSE",
             priority = "Normal",
             cargoType = "FinishedGood",
-            requestedTime = (DateTime?)null,
+            requestedDeliveryDate = (DateTime?)null,
             items = new[]
             {
                 new
@@ -148,7 +148,7 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
             orderRef = "ORD-EMPTY",
             priority = "Normal",
             cargoType = "FinishedGood",
-            requestedTime = (DateTime?)null,
+            requestedDeliveryDate = (DateTime?)null,
             items = Array.Empty<object>()
         };
 
@@ -167,7 +167,7 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
             orderRef = "ORD-SUBMIT-THEN-UPDATE",
             priority = "Normal",
             cargoType = "FinishedGood",
-            requestedTime = (DateTime?)null,
+            requestedDeliveryDate = (DateTime?)null,
             items = new[]
             {
                 new

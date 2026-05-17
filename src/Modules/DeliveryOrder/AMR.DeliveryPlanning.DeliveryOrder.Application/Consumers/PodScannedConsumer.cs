@@ -43,22 +43,25 @@ public class PodScannedConsumer : IConsumer<PodCapturedIntegrationEvent>
             return;
         }
 
-        foreach (var order in orders)
+        foreach (var chunk in orders.Chunk(50))
         {
-            try
+            foreach (var order in chunk)
             {
                 order.MarkItemsDelivered(evt.ScannedIds);
-                await _repository.UpdateAsync(order, context.CancellationToken);
                 _logger.LogInformation("[PodScan] Updated item statuses on Order {OrderId}.", order.Id);
+            }
+
+            try
+            {
+                await _repository.SaveChangesAsync(context.CancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
-                _logger.LogWarning("[PodScan] Concurrency conflict on Order {OrderId}. MassTransit will retry.", order.Id);
+                _logger.LogWarning("[PodScan] Concurrency conflict in batch for Trip {TripId}. MassTransit will retry.", evt.TripId);
                 throw;
             }
         }
 
-        await _repository.SaveChangesAsync(context.CancellationToken);
         _logger.LogInformation("[PodScan] ✓ Barcode matching complete for Trip {TripId} — {OrderCount} order(s) updated.",
             evt.TripId, orders.Count);
     }
