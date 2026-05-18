@@ -57,6 +57,8 @@ public class FacilityDbContext : DbContext
             b.HasIndex(s => new { s.MapId, s.VendorRef }).IsUnique().HasFilter("\"VendorRef\" IS NOT NULL");
             b.Property(s => s.Code).HasMaxLength(50);
             b.HasIndex(s => new { s.MapId, s.Code }).IsUnique().HasFilter("\"Code\" IS NOT NULL");
+            b.Property(s => s.IsActive).HasDefaultValue(true).IsRequired();
+            b.HasIndex(s => new { s.MapId, s.IsActive });
         });
 
         modelBuilder.Entity<Zone>(b =>

@@ -80,6 +80,19 @@ public static class ModuleServiceRegistration
             if (!string.IsNullOrWhiteSpace(riot3ApiKey))
                 client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
         });
+        services.AddHttpClient<AMR.DeliveryPlanning.Facility.Application.Services.IRiot3FacilityClient, Riot3FacilityClient>(client =>
+        {
+            client.BaseAddress = new Uri(riot3BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(15);
+            if (!string.IsNullOrWhiteSpace(riot3ApiKey))
+                client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
+        });
+        // MapStationSync runs at 15s delay; RouteEdgeSync runs at 2min delay to ensure stations are synced first
+        services.AddHostedService(sp => new MapStationSyncService(
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            sp.GetRequiredService<AMR.DeliveryPlanning.Facility.Application.Services.IRiot3FacilityClient>(),
+            sp.GetRequiredService<ILogger<MapStationSyncService>>(),
+            TimeSpan.FromMinutes(syncIntervalMinutes)));
         services.AddHostedService(sp => new RouteEdgeSyncService(
             sp.GetRequiredService<IServiceScopeFactory>(),
             sp.GetRequiredService<IRiot3RouteClient>(),

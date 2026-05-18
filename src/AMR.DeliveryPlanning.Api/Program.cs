@@ -96,9 +96,15 @@ builder.Services.AddOpenTelemetry()
         .AddHttpClientInstrumentation()
         .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)));
 
-// Health checks — /health (liveness) and /health/ready (readiness with dependency probes)
+// Health checks — /health (liveness), /health/ready (readiness), /health/vendors (external vendors)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
 var redisConn = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+var rabbitConfig = builder.Configuration.GetSection("RabbitMq");
+var rabbitHost = rabbitConfig["Host"] ?? "localhost";
+var rabbitUser = rabbitConfig["Username"] ?? "guest";
+var rabbitPass = rabbitConfig["Password"] ?? "guest";
+var riot3BaseUrl = builder.Configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:12000";
+var riot3ApiKey  = builder.Configuration.GetValue<string>("VendorAdapter:Riot3:ApiKey") ?? string.Empty;
 
 builder.Services.AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy("Service is running"))
@@ -132,7 +138,53 @@ builder.Services.AddHealthChecks()
         {
             return HealthCheckResult.Degraded(ex.Message);
         }
-    }, tags: ["ready"]);
+    }, tags: ["ready"])
+    .AddCheck("rabbitmq", () =>
+    {
+        try
+        {
+            var factory = new RabbitMQ.Client.ConnectionFactory
+            {
+                HostName = rabbitHost,
+                UserName = rabbitUser,
+                Password = rabbitPass,
+                RequestedConnectionTimeout = TimeSpan.FromSeconds(3)
+            };
+            using var conn = factory.CreateConnection();
+            return HealthCheckResult.Healthy();
+        }
+        catch (Exception ex)
+        {
+            return HealthCheckResult.Unhealthy(ex.Message);
+        }
+    }, tags: ["ready"])
+    .AddCheck("riot3", (CancellationToken ct) =>
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            if (!string.IsNullOrWhiteSpace(riot3ApiKey))
+                http.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var response = http.GetAsync($"{riot3BaseUrl}/api/v4/maps?pageSize=1", ct).GetAwaiter().GetResult();
+            sw.Stop();
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                return HealthCheckResult.Degraded("RIOT3 reachable but ApiKey is invalid (401)");
+
+            response.EnsureSuccessStatusCode();
+            return HealthCheckResult.Healthy($"RIOT3 responded in {sw.ElapsedMilliseconds}ms");
+        }
+        catch (TaskCanceledException)
+        {
+            return HealthCheckResult.Unhealthy("RIOT3 connection timed out (>5s)");
+        }
+        catch (Exception ex)
+        {
+            return HealthCheckResult.Unhealthy($"RIOT3 unreachable: {ex.Message}");
+        }
+    }, tags: ["vendors"]);
 
 // Rate limiting — fixed window, 100 req/min, applied globally
 builder.Services.AddRateLimiter(options =>
@@ -301,12 +353,53 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Liveness probe (always 200 if process is up)
-app.MapHealthChecks("/health").AllowAnonymous();
+app.MapHealthChecks("/health").AllowAnonymous()
+    .WithTags("Health").WithSummary("Liveness").WithDescription("Returns 200 if the process is running.");
 // Readiness probe (checks postgres, rabbitmq, redis)
 app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
-    Predicate = check => check.Tags.Contains("ready")
-}).AllowAnonymous();
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = WriteJsonResponse
+}).AllowAnonymous()
+    .WithTags("Health").WithSummary("Readiness").WithDescription("Checks core dependencies: PostgreSQL, Redis, RabbitMQ.");
+// Vendor probe (checks external systems: RIOT3)
+app.MapHealthChecks("/health/vendors", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("vendors"),
+    ResponseWriter = WriteJsonResponse
+}).AllowAnonymous()
+    .WithTags("Health").WithSummary("Vendors").WithDescription("Checks external vendor connectivity: RIOT3.");
+
+// OpenAPI-visible wrappers — Swagger shows these under the Health tag
+app.MapGet("/health/status/liveness", async (HealthCheckService svc) =>
+{
+    var report = await svc.CheckHealthAsync(check => check.Name == "self");
+    return WriteHealthResult(report);
+})
+.AllowAnonymous()
+.WithTags("Health")
+.WithSummary("Liveness")
+.WithDescription("Returns Healthy if the process is running.");
+
+app.MapGet("/health/status/ready", async (HealthCheckService svc) =>
+{
+    var report = await svc.CheckHealthAsync(check => check.Tags.Contains("ready"));
+    return WriteHealthResult(report);
+})
+.AllowAnonymous()
+.WithTags("Health")
+.WithSummary("Readiness")
+.WithDescription("Checks core dependencies: PostgreSQL, Redis, RabbitMQ.");
+
+app.MapGet("/health/status/vendors", async (HealthCheckService svc) =>
+{
+    var report = await svc.CheckHealthAsync(check => check.Tags.Contains("vendors"));
+    return WriteHealthResult(report);
+})
+.AllowAnonymous()
+.WithTags("Health")
+.WithSummary("Vendors")
+.WithDescription("Checks external vendor connectivity: RIOT3.");
 
 // Map auth endpoint (anonymous)
 app.MapAuthEndpoints();
@@ -315,3 +408,38 @@ app.MapAuthEndpoints();
 app.MapAllModuleEndpoints();
 
 app.Run();
+
+static IResult WriteHealthResult(HealthReport report)
+{
+    var status = report.Status == HealthStatus.Healthy ? 200 : 503;
+    var body = new
+    {
+        status = report.Status.ToString(),
+        checks = report.Entries.Select(e => new
+        {
+            name        = e.Key,
+            status      = e.Value.Status.ToString(),
+            description = e.Value.Description,
+            error       = e.Value.Exception?.Message
+        })
+    };
+    return status == 200 ? Results.Ok(body) : Results.Json(body, statusCode: 503);
+}
+
+static Task WriteJsonResponse(HttpContext ctx, HealthReport report)
+{
+    ctx.Response.ContentType = "application/json";
+    ctx.Response.StatusCode = report.Status == HealthStatus.Healthy ? 200 : 503;
+    var result = System.Text.Json.JsonSerializer.Serialize(new
+    {
+        status = report.Status.ToString(),
+        checks = report.Entries.Select(e => new
+        {
+            name   = e.Key,
+            status = e.Value.Status.ToString(),
+            description = e.Value.Description,
+            error  = e.Value.Exception?.Message
+        })
+    });
+    return ctx.Response.WriteAsync(result);
+}

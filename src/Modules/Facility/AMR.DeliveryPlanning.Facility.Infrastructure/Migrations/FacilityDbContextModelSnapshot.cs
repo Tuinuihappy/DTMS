@@ -258,6 +258,11 @@ namespace AMR.DeliveryPlanning.Facility.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("CompatibleVehicleTypes");
 
+                    b.Property<bool>("IsActive")
+                        .IsRequired()
+                        .HasDefaultValue(true)
+                        .HasColumnType("boolean");
+
                     b.Property<Guid>("MapId")
                         .HasColumnType("uuid");
 
@@ -283,6 +288,8 @@ namespace AMR.DeliveryPlanning.Facility.Infrastructure.Migrations
                     b.HasIndex("MapId", "Code")
                         .IsUnique()
                         .HasFilter("\"Code\" IS NOT NULL");
+
+                    b.HasIndex("MapId", "IsActive");
 
                     b.HasIndex("MapId", "VendorRef")
                         .IsUnique()

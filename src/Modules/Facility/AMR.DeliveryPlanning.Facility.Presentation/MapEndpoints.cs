@@ -1,5 +1,7 @@
 using AMR.DeliveryPlanning.Facility.Application.Commands.AddStation;
 using AMR.DeliveryPlanning.Facility.Application.Commands.CreateMap;
+using AMR.DeliveryPlanning.Facility.Application.Commands.ImportMapFromRiot3;
+using AMR.DeliveryPlanning.Facility.Application.Commands.UpdateStation;
 using AMR.DeliveryPlanning.Facility.Application.Commands.FacilityResource;
 using AMR.DeliveryPlanning.Facility.Application.Commands.RegisterCarrierTypeProfile;
 using AMR.DeliveryPlanning.Facility.Application.Commands.ReleaseShelf;
@@ -37,6 +39,12 @@ public static class MapEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         });
 
+        group.MapPost("/maps/import-from-riot3", async (ImportMapFromRiot3Request req, ISender sender) =>
+        {
+            var result = await sender.Send(new ImportMapFromRiot3Command(req.Riot3MapId));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
         // ── Stations ───────────────────────────────────────────────────────
         // POST /api/facility/maps/{mapId}/stations
         group.MapPost("/maps/{mapId:guid}/stations", async (Guid mapId, AddStationRequest req, ISender sender) =>
@@ -48,13 +56,21 @@ public static class MapEndpoints
                 : Results.BadRequest(result.Error);
         });
 
-        // GET /api/facility/stations?mapId=&type=&zoneId=&compatibleWith=
-        group.MapGet("/stations", async (Guid? mapId, string? type, Guid? zoneId, string? compatibleWith, ISender sender) =>
+        // GET /api/facility/stations?mapId=&type=&zoneId=&compatibleWith=&includeInactive=
+        group.MapGet("/stations", async (Guid? mapId, string? type, Guid? zoneId, string? compatibleWith, bool includeInactive, ISender sender) =>
         {
             StationType? stationType = type != null && Enum.TryParse<StationType>(type, true, out var t) ? t : null;
-            var result = await sender.Send(new GetStationsQuery(mapId, stationType, zoneId, compatibleWith));
+            var result = await sender.Send(new GetStationsQuery(mapId, stationType, zoneId, compatibleWith, includeInactive));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
+
+        // PATCH /api/facility/stations/{stationId}
+        group.MapMethods("/stations/{stationId:guid}", ["PATCH"],
+            async (Guid stationId, UpdateStationRequest req, ISender sender) =>
+            {
+                var result = await sender.Send(new UpdateStationCommand(stationId, req.Type, req.Code));
+                return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+            });
 
         // ── Route Costs ────────────────────────────────────────────────────
         // GET /api/facility/route-cost?from=&to=
@@ -134,5 +150,7 @@ public static class MapEndpoints
 }
 
 public record ResourceCommandRequest(string Command);
+public record ImportMapFromRiot3Request(int Riot3MapId);
+public record UpdateStationRequest(StationType? Type, string? Code);
 public record AddStationRequest(string Name, double X, double Y, double? Theta, StationType Type = StationType.Normal,
     string? VendorRef = null, string? Code = null);

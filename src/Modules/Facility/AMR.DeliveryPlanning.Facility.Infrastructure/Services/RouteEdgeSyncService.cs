@@ -22,22 +22,26 @@ public sealed class RouteEdgeSyncService : BackgroundService
     // Limit concurrent RIOT3 HTTP calls to avoid overwhelming the vendor API
     private static readonly SemaphoreSlim _concurrencyGate = new(5, 5);
 
+    private readonly TimeSpan _startupDelay;
+
     public RouteEdgeSyncService(
         IServiceScopeFactory scopeFactory,
         IRiot3RouteClient riot3Client,
         ILogger<RouteEdgeSyncService> logger,
-        TimeSpan? interval = null)
+        TimeSpan? interval = null,
+        TimeSpan? startupDelay = null)
     {
         _scopeFactory = scopeFactory;
         _riot3Client = riot3Client;
         _logger = logger;
         _interval = interval ?? TimeSpan.FromMinutes(30);
+        _startupDelay = startupDelay ?? TimeSpan.FromMinutes(2);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Short startup delay — wait for DB to be ready
-        await Task.Delay(TimeSpan.FromSeconds(15), stoppingToken);
+        // Wait for MapStationSyncService to complete first run before syncing edges
+        await Task.Delay(_startupDelay, stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -73,7 +77,7 @@ public sealed class RouteEdgeSyncService : BackgroundService
     private async Task SyncMapAsync(FacilityDbContext db, Map map, CancellationToken ct)
     {
         var stations = await db.Stations
-            .Where(s => s.MapId == map.Id && s.VendorRef != null)
+            .Where(s => s.MapId == map.Id && s.VendorRef != null && s.IsActive)
             .ToListAsync(ct);
 
         if (stations.Count == 0)

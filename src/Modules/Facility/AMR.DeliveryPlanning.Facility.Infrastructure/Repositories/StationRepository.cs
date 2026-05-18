@@ -14,12 +14,17 @@ public class StationRepository : IStationRepository
         => _db.Stations.FindAsync(new object[] { id }, ct).AsTask();
 
     public Task<List<Station>> GetByMapAsync(Guid mapId, CancellationToken ct = default)
+        => _db.Stations.Where(s => s.MapId == mapId && s.IsActive).ToListAsync(ct);
+
+    public Task<List<Station>> GetAllByMapAsync(Guid mapId, CancellationToken ct = default)
         => _db.Stations.Where(s => s.MapId == mapId).ToListAsync(ct);
 
     public async Task<List<Station>> QueryAsync(Guid? mapId, StationType? type, Guid? zoneId,
-        string? compatibleVehicleType, CancellationToken ct = default)
+        string? compatibleVehicleType, bool includeInactive = false, CancellationToken ct = default)
     {
-        var query = _db.Stations.AsQueryable();
+        var query = includeInactive
+            ? _db.Stations.AsQueryable()
+            : _db.Stations.Where(s => s.IsActive).AsQueryable();
         if (mapId.HasValue) query = query.Where(s => s.MapId == mapId);
         if (type.HasValue) query = query.Where(s => s.Type == type);
         if (zoneId.HasValue) query = query.Where(s => s.ZoneId == zoneId);
