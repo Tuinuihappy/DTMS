@@ -10,6 +10,8 @@ public record QuantityDto(double Value, string Uom);
 
 public record CargoSpecificDto(
     string? PartNo,
+    string? Wo,
+    string? Line,
     string? Vendor,
     string? DateCode,
     string? TradingCode,
@@ -19,13 +21,13 @@ public record CargoSpecificDto(
     string? LotNo);
 
 public record ItemDto(
-    int ItemSeq,
     string Sku,
+    string? Description,
     string PickupLocationCode,
     string DropLocationCode,
     CargoType CargoType,
     DimensionsDto? Dimensions,
-    double WeightKg,
+    double? WeightKg,
     QuantityDto Quantity,
     CargoSpecificDto? CargoSpecific);
 
@@ -34,5 +36,6 @@ public record CreateDraftDeliveryOrderCommand(
     Priority Priority,
     DateTime? RequestedDeliveryDate,
     List<ItemDto> Items,
-    SourceSystem SourceSystem = SourceSystem.Manual
+    SourceSystem SourceSystem = SourceSystem.Manual,
+    string? CreatedBy = null
 ) : ICommand<DeliveryOrderDetailDto>;

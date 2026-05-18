@@ -25,20 +25,21 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
             request.OrderRef,
             request.Priority,
             request.RequestedDeliveryDate,
-            request.SourceSystem);
+            request.SourceSystem,
+            request.CreatedBy);
 
-        foreach (var pkg in request.Items)
+        foreach (var (pkg, idx) in request.Items.Select((p, i) => (p, i + 1)))
         {
             order.AddItem(
                 pkg.PickupLocationCode, pkg.DropLocationCode,
-                pkg.ItemSeq, pkg.Sku,
+                idx, pkg.Sku, pkg.Description,
                 pkg.CargoType,
                 pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                 pkg.WeightKg,
                 pkg.Quantity.Value,
                 pkg.Quantity.Uom,
                 pkg.CargoSpecific is { } cs
-                    ? CargoSpecific.Create(cs.PartNo, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
+                    ? CargoSpecific.Create(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                     : null);
         }
 

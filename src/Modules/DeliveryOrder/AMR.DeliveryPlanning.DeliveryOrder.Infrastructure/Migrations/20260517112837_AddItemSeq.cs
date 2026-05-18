@@ -23,6 +23,16 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                 nullable: false,
                 defaultValue: 0);
 
+            migrationBuilder.Sql("""
+                UPDATE deliveryorder."Items" i
+                SET "ItemSeq" = sub.rn - 1
+                FROM (
+                    SELECT "Id", ROW_NUMBER() OVER (PARTITION BY "DeliveryOrderId" ORDER BY "Id") AS rn
+                    FROM deliveryorder."Items"
+                ) sub
+                WHERE i."Id" = sub."Id";
+                """);
+
             migrationBuilder.CreateIndex(
                 name: "IX_Items_DeliveryOrderId_ItemSeq",
                 schema: "deliveryorder",

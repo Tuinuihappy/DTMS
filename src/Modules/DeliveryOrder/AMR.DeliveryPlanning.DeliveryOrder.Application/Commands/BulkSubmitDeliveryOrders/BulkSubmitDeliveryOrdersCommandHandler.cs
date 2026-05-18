@@ -47,20 +47,21 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
             try
             {
                 order = Domain.Entities.DeliveryOrder.Create(
-                    cmd.OrderRef, cmd.Priority, cmd.RequestedDeliveryDate);
+                    cmd.OrderRef, cmd.Priority, cmd.RequestedDeliveryDate,
+                    cmd.SourceSystem, cmd.CreatedBy);
 
-                foreach (var pkg in cmd.Items)
+                foreach (var (pkg, idx) in cmd.Items.Select((p, i) => (p, i + 1)))
                 {
                     order.AddItem(
                         pkg.PickupLocationCode, pkg.DropLocationCode,
-                        pkg.ItemSeq, pkg.Sku,
+                        idx, pkg.Sku, pkg.Description,
                         pkg.CargoType,
                         pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                         pkg.WeightKg,
                         pkg.Quantity.Value,
                         pkg.Quantity.Uom,
                         pkg.CargoSpecific is { } cs
-                            ? CargoSpecific.Create(cs.PartNo, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
+                            ? CargoSpecific.Create(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                             : null);
                 }
             }

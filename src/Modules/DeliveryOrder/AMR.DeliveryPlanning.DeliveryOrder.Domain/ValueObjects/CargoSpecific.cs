@@ -3,6 +3,8 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 public class CargoSpecific
 {
     public string? PartNo { get; private set; }
+    public string? Wo { get; private set; }
+    public string? Line { get; private set; }
     public string? Vendor { get; private set; }
     public string? DateCode { get; private set; }
     public string? TradingCode { get; private set; }
@@ -14,12 +16,15 @@ public class CargoSpecific
     private CargoSpecific() { }
 
     public static CargoSpecific Create(
-        string? partNo, string? vendor, string? dateCode,
+        string? partNo, string? wo, string? line,
+        string? vendor, string? dateCode,
         string? tradingCode, string? inventoryNo, string? po, string? traceId, string? lotNo = null)
     {
         return new CargoSpecific
         {
             PartNo = partNo,
+            Wo = wo,
+            Line = line,
             Vendor = vendor,
             DateCode = dateCode,
             TradingCode = tradingCode,

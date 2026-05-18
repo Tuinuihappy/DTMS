@@ -29,6 +29,10 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -118,6 +122,14 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.Property<double>("Quantity")
                         .HasColumnType("double precision");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Line")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("Sku")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -133,7 +145,7 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<double>("WeightKg")
+                    b.Property<double?>("WeightKg")
                         .HasColumnType("double precision");
 
                     b.HasKey("Id");
@@ -276,10 +288,20 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                                 .HasColumnType("character varying(100)")
                                 .HasColumnName("LotNo");
 
+                            b1.Property<string>("Line")
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("Line");
+
                             b1.Property<string>("PartNo")
                                 .HasMaxLength(100)
                                 .HasColumnType("character varying(100)")
                                 .HasColumnName("PartNo");
+
+                            b1.Property<string>("Wo")
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("Wo");
 
                             b1.Property<string>("Po")
                                 .HasMaxLength(100)

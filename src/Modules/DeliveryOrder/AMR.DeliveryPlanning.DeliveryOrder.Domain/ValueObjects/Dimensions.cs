@@ -8,7 +8,7 @@ public class Dimensions : ValueObject
     public double WidthMm { get; private set; }
     public double HeightMm { get; private set; }
 
-    public double VolumeM3 => LengthMm * WidthMm * HeightMm / 1_000_000_000.0;
+    public double VolumeCBM => LengthMm * WidthMm * HeightMm / 1_000_000_000.0;
 
     private Dimensions() { }
 

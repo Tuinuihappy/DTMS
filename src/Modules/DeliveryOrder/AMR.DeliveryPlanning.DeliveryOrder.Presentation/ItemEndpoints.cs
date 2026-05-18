@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetItem;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.SearchItems;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using MediatR;
@@ -20,6 +21,8 @@ public static class ItemEndpoints
             string? pickupLocationCode,
             string? dropLocationCode,
             string? partNo,
+            string? wo,
+            string? line,
             string? vendor,
             string? dateCode,
             string? tradingCode,
@@ -37,11 +40,18 @@ public static class ItemEndpoints
             var result = await sender.Send(new SearchItemsQuery(
                 sku, cargoTypeEnum, statusEnum,
                 pickupLocationCode, dropLocationCode,
-                partNo, vendor, dateCode, tradingCode,
+                partNo, wo, line, vendor, dateCode, tradingCode,
                 inventoryNo, po, traceId, lotNo,
                 page, pageSize));
 
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
+        // GET /api/items/{itemId}
+        group.MapGet("/{itemId:guid}", async (Guid itemId, ISender sender) =>
+        {
+            var result = await sender.Send(new GetItemQuery(itemId));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         });
     }
 }

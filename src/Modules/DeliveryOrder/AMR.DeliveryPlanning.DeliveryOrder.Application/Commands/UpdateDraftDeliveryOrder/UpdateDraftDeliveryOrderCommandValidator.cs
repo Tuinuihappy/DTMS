@@ -11,8 +11,15 @@ public class UpdateDraftDeliveryOrderCommandValidator : AbstractValidator<Update
 
         RuleFor(x => x.Items).NotEmpty().WithMessage("At least one item is required.");
         RuleFor(x => x.Items)
-            .Must(items => items.Select(i => i.ItemSeq).Distinct().Count() == items.Count)
-            .WithMessage("ItemSeq must be unique within the order.");
+            .Must(items =>
+            {
+                var lotNos = items
+                    .Where(i => i.CargoSpecific?.LotNo != null)
+                    .Select(i => i.CargoSpecific!.LotNo!)
+                    .ToList();
+                return lotNos.Distinct(StringComparer.OrdinalIgnoreCase).Count() == lotNos.Count;
+            })
+            .WithMessage("LotNo must be unique within the order.");
         RuleForEach(x => x.Items).SetValidator(new ItemDtoValidator());
     }
 }
@@ -21,7 +28,6 @@ file class ItemDtoValidator : AbstractValidator<ItemDto>
 {
     public ItemDtoValidator()
     {
-        RuleFor(p => p.ItemSeq).GreaterThan(0);
         RuleFor(p => p.Sku).NotEmpty().MaximumLength(100);
         RuleFor(p => p.CargoType).IsInEnum();
         RuleFor(p => p.PickupLocationCode).NotEmpty();
@@ -35,7 +41,8 @@ file class ItemDtoValidator : AbstractValidator<ItemDto>
             RuleFor(p => p.Dimensions!.WidthMm).GreaterThan(0);
             RuleFor(p => p.Dimensions!.HeightMm).GreaterThan(0);
         });
-        RuleFor(p => p.WeightKg).GreaterThan(0);
+        When(p => p.WeightKg.HasValue, () =>
+            RuleFor(p => p.WeightKg!.Value).GreaterThan(0));
         RuleFor(p => p.Quantity).NotNull();
         When(p => p.Quantity != null, () =>
         {

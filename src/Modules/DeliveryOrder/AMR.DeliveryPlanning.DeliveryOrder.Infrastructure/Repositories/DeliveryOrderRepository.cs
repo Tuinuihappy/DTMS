@@ -69,7 +69,7 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
     public async Task<(List<Domain.Entities.Item> Items, int TotalCount)> SearchItemsAsync(
         string? sku, Domain.Enums.CargoType? cargoType, Domain.Enums.ItemStatus? status,
         string? pickupLocationCode, string? dropLocationCode,
-        string? partNo, string? vendor, string? dateCode, string? tradingCode,
+        string? partNo, string? wo, string? line, string? vendor, string? dateCode, string? tradingCode,
         string? inventoryNo, string? po, string? traceId, string? lotNo,
         int page, int pageSize, CancellationToken cancellationToken = default)
     {
@@ -87,6 +87,10 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
             query = query.Where(i => i.DropLocationCode == dropLocationCode);
         if (!string.IsNullOrEmpty(partNo))
             query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.PartNo != null && i.CargoSpecific.PartNo.Contains(partNo));
+        if (!string.IsNullOrEmpty(wo))
+            query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.Wo == wo);
+        if (!string.IsNullOrEmpty(line))
+            query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.Line == line);
         if (!string.IsNullOrEmpty(vendor))
             query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.Vendor != null && i.CargoSpecific.Vendor.Contains(vendor));
         if (!string.IsNullOrEmpty(dateCode))
@@ -112,6 +116,11 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
 
         return (items, totalCount);
     }
+
+    public Task<Domain.Entities.Item?> GetItemByIdAsync(Guid itemId, CancellationToken cancellationToken = default)
+        => _context.Items
+            .AsNoTracking()
+            .FirstOrDefaultAsync(i => i.Id == itemId, cancellationToken);
 
     public async Task AddAsync(Domain.Entities.DeliveryOrder order, CancellationToken cancellationToken = default)
     {

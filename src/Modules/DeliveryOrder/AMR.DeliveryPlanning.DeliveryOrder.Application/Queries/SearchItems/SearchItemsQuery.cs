@@ -5,20 +5,21 @@ using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.SearchItems;
 
-public record OrderContextDto(Guid Id, string OrderRef, string OrderStatus, string Priority);
+public record OrderContextDto(Guid Id, string OrderRef, OrderStatus OrderStatus, Priority Priority);
 
 public record ItemSearchResultDto(
     Guid Id,
     int ItemSeq,
     string Sku,
+    string? Description,
     string PickupLocationCode,
     string DropLocationCode,
-    string CargoType,
+    CargoType CargoType,
     DimensionsDto? Dimensions,
-    double WeightKg,
+    double? WeightKg,
     QuantityDto Quantity,
     CargoSpecificDto? CargoSpecific,
-    string Status,
+    ItemStatus Status,
     OrderContextDto Order);
 
 public record SearchItemsQuery(
@@ -28,6 +29,8 @@ public record SearchItemsQuery(
     string? PickupLocationCode,
     string? DropLocationCode,
     string? PartNo,
+    string? Wo,
+    string? Line,
     string? Vendor,
     string? DateCode,
     string? TradingCode,
@@ -52,7 +55,7 @@ public class SearchItemsQueryHandler : IQueryHandler<SearchItemsQuery, PagedResu
         var (items, totalCount) = await _repo.SearchItemsAsync(
             request.Sku, request.CargoType, request.Status,
             request.PickupLocationCode, request.DropLocationCode,
-            request.PartNo, request.Vendor, request.DateCode, request.TradingCode,
+            request.PartNo, request.Wo, request.Line, request.Vendor, request.DateCode, request.TradingCode,
             request.InventoryNo, request.Po, request.TraceId, request.LotNo,
             page, pageSize, cancellationToken);
 
@@ -69,17 +72,18 @@ public class SearchItemsQueryHandler : IQueryHandler<SearchItemsQuery, PagedResu
                     i.Id,
                     i.ItemSeq,
                     i.Sku,
+                    i.Description,
                     i.PickupLocationCode,
                     i.DropLocationCode,
-                    i.CargoType.ToString(),
-                    i.Dimensions is { } d ? new DimensionsDto(d.LengthMm, d.WidthMm, d.HeightMm, d.VolumeM3) : null,
+                    i.CargoType,
+                    i.Dimensions is { } d ? new DimensionsDto(d.LengthMm, d.WidthMm, d.HeightMm, d.VolumeCBM) : null,
                     i.WeightKg,
                     new QuantityDto(i.Quantity, i.Uom),
                     i.CargoSpecific is { } cs
-                        ? new CargoSpecificDto(cs.PartNo, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
+                        ? new CargoSpecificDto(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                         : null,
-                    i.Status.ToString(),
-                    new OrderContextDto(o.Id, o.OrderRef, o.Status.ToString(), o.Priority.ToString())
+                    i.Status,
+                    new OrderContextDto(o.Id, o.OrderRef, o.Status, o.Priority)
                 );
             })
             .ToList();

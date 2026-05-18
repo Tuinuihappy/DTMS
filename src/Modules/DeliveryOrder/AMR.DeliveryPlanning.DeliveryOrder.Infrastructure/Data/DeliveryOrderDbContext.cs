@@ -68,17 +68,19 @@ public class DeliveryOrderDbContext : DbContext
                 d.Property(x => x.LengthMm).HasColumnName("LengthMm");
                 d.Property(x => x.WidthMm).HasColumnName("WidthMm");
                 d.Property(x => x.HeightMm).HasColumnName("HeightMm");
-                d.Ignore(x => x.VolumeM3);
+                d.Ignore(x => x.VolumeCBM);
             });
             b.HasIndex(p => new { p.DeliveryOrderId, p.ItemSeq }).IsUnique();
             b.HasIndex(p => p.Sku);
-            b.Property(p => p.WeightKg).IsRequired();
+            b.Property(p => p.WeightKg);
             b.Property(p => p.Quantity).IsRequired();
             b.Property(p => p.Uom).HasMaxLength(20).IsRequired();
             b.Property(p => p.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.OwnsOne(p => p.CargoSpecific, cs =>
             {
                 cs.Property(x => x.PartNo).HasColumnName("PartNo").HasMaxLength(100);
+                cs.Property(x => x.Wo).HasColumnName("Wo").HasMaxLength(100);
+                cs.Property(x => x.Line).HasColumnName("Line").HasMaxLength(100);
                 cs.Property(x => x.Vendor).HasColumnName("Vendor").HasMaxLength(200);
                 cs.Property(x => x.DateCode).HasColumnName("DateCode").HasMaxLength(50);
                 cs.Property(x => x.TradingCode).HasColumnName("TradingCode").HasMaxLength(100);

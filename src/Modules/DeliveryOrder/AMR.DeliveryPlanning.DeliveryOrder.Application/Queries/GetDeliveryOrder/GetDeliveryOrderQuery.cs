@@ -4,12 +4,14 @@ using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 
-public record DimensionsDto(double LengthMm, double WidthMm, double HeightMm, double VolumeM3);
+public record DimensionsDto(double LengthMm, double WidthMm, double HeightMm, double VolumeCBM);
 
 public record QuantityDto(double Value, string Uom);
 
 public record CargoSpecificDto(
     string? PartNo,
+    string? Wo,
+    string? Line,
     string? Vendor,
     string? DateCode,
     string? TradingCode,
@@ -22,22 +24,24 @@ public record ItemDto(
     Guid Id,
     int ItemSeq,
     string Sku,
+    string? Description,
     string PickupLocationCode,
     string DropLocationCode,
     CargoType CargoType,
     DimensionsDto? Dimensions,
-    double WeightKg,
+    double? WeightKg,
     QuantityDto Quantity,
     CargoSpecificDto? CargoSpecific,
-    string Status);
+    ItemStatus Status);
 
 public record DeliveryOrderListDto(
     Guid Id,
     string OrderRef,
-    string SourceSystem,
-    string Priority,
-    string OrderStatus,
+    SourceSystem SourceSystem,
+    Priority Priority,
+    OrderStatus OrderStatus,
     DateTime? RequestedDeliveryDate,
+    string? CreatedBy,
     DateTime CreatedDate,
     DateTime? UpdatedDate,
     double TotalWeightKg,
@@ -47,10 +51,11 @@ public record DeliveryOrderListDto(
 public record DeliveryOrderDetailDto(
     Guid Id,
     string OrderRef,
-    string SourceSystem,
-    string Priority,
-    string OrderStatus,
+    SourceSystem SourceSystem,
+    Priority Priority,
+    OrderStatus OrderStatus,
     DateTime? RequestedDeliveryDate,
+    string? CreatedBy,
     DateTime CreatedDate,
     DateTime? UpdatedDate,
     double TotalWeightKg,
@@ -84,17 +89,15 @@ public class GetDeliveryOrdersQueryHandler : IQueryHandler<GetDeliveryOrdersQuer
 
     public async Task<Result<PagedResult<DeliveryOrderListDto>>> Handle(GetDeliveryOrdersQuery request, CancellationToken cancellationToken)
     {
-        var dataTask  = request.Status.HasValue
-            ? _repo.GetByStatusAsync(request.Status.Value, request.Page, request.PageSize, cancellationToken)
-            : _repo.GetAllAsync(request.Page, request.PageSize, cancellationToken);
+        var data = request.Status.HasValue
+            ? await _repo.GetByStatusAsync(request.Status.Value, request.Page, request.PageSize, cancellationToken)
+            : await _repo.GetAllAsync(request.Page, request.PageSize, cancellationToken);
 
-        var countTask = _repo.CountAsync(request.Status, cancellationToken);
-
-        await Task.WhenAll(dataTask, countTask);
+        var count = await _repo.CountAsync(request.Status, cancellationToken);
 
         var paged = new PagedResult<DeliveryOrderListDto>(
-            dataTask.Result.Select(DeliveryOrderMapper.MapToListDto).ToList(),
-            countTask.Result,
+            data.Select(DeliveryOrderMapper.MapToListDto).ToList(),
+            count,
             request.Page,
             request.PageSize);
 
@@ -108,10 +111,11 @@ internal static class DeliveryOrderMapper
         new(
             order.Id,
             order.OrderRef,
-            order.SourceSystem.ToString(),
-            order.Priority.ToString(),
-            order.Status.ToString(),
+            order.SourceSystem,
+            order.Priority,
+            order.Status,
             order.RequestedDeliveryDate,
+            order.CreatedBy,
             order.CreatedDate,
             order.UpdatedDate,
             order.TotalWeightKg,
@@ -122,10 +126,11 @@ internal static class DeliveryOrderMapper
         new(
             order.Id,
             order.OrderRef,
-            order.SourceSystem.ToString(),
-            order.Priority.ToString(),
-            order.Status.ToString(),
+            order.SourceSystem,
+            order.Priority,
+            order.Status,
             order.RequestedDeliveryDate,
+            order.CreatedBy,
             order.CreatedDate,
             order.UpdatedDate,
             order.TotalWeightKg,
@@ -135,15 +140,16 @@ internal static class DeliveryOrderMapper
                 p.Id,
                 p.ItemSeq,
                 p.Sku,
+                p.Description,
                 p.PickupLocationCode,
                 p.DropLocationCode,
                 p.CargoType,
-                p.Dimensions is { } d ? new DimensionsDto(d.LengthMm, d.WidthMm, d.HeightMm, d.VolumeM3) : null,
+                p.Dimensions is { } d ? new DimensionsDto(d.LengthMm, d.WidthMm, d.HeightMm, d.VolumeCBM) : null,
                 p.WeightKg,
                 new QuantityDto(p.Quantity, p.Uom),
                 p.CargoSpecific is { } cs
-                    ? new CargoSpecificDto(cs.PartNo, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
+                    ? new CargoSpecificDto(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                     : null,
-                p.Status.ToString()
+                p.Status
             )).ToList());
 }

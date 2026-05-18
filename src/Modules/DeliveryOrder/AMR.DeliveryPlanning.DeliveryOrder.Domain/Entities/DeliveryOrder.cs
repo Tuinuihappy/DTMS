@@ -12,6 +12,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     public Priority Priority { get; private set; }
     public OrderStatus Status { get; private set; }
     public DateTime? RequestedDeliveryDate { get; private set; }
+    public string? CreatedBy { get; private set; }
     public DateTime CreatedDate { get; private set; }
     public DateTime? UpdatedDate { get; private set; }
     public double TotalWeightKg { get; private set; }
@@ -27,7 +28,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     void IAuditable.SetUpdatedAt(DateTime updatedAt) => UpdatedDate = updatedAt;
 
     public static DeliveryOrder Create(string orderRef, Priority priority,
-        DateTime? requestedDeliveryDate, SourceSystem sourceSystem = SourceSystem.Manual)
+        DateTime? requestedDeliveryDate, SourceSystem sourceSystem = SourceSystem.Manual,
+        string? createdBy = null)
     {
         var order = new DeliveryOrder
         {
@@ -36,7 +38,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             Priority = priority,
             RequestedDeliveryDate = requestedDeliveryDate,
             Status = OrderStatus.Draft,
-            SourceSystem = sourceSystem
+            SourceSystem = sourceSystem,
+            CreatedBy = createdBy
         };
 
         order.AddDomainEvent(new DeliveryOrderDraftedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, order.Id));
@@ -71,14 +74,14 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     public void AddItem(
         string pickupLocationCode, string dropLocationCode,
-        int itemSeq, string sku, CargoType cargoType, Dimensions? dimensions, double weightKg, double quantity, string uom,
+        int itemSeq, string sku, string? description, CargoType cargoType, Dimensions? dimensions, double? weightKg, double quantity, string uom,
         CargoSpecific? cargoSpecific = null)
     {
         if (_items.Any(p => p.ItemSeq == itemSeq))
             throw new InvalidOperationException($"An item with seq '{itemSeq}' already exists in this order.");
 
-        _items.Add(new Item(Id, pickupLocationCode, dropLocationCode, itemSeq, sku, cargoType, dimensions, weightKg, quantity, uom, cargoSpecific));
-        TotalWeightKg += weightKg;
+        _items.Add(new Item(Id, pickupLocationCode, dropLocationCode, itemSeq, sku, description, cargoType, dimensions, weightKg, quantity, uom, cargoSpecific));
+        TotalWeightKg += weightKg ?? 0;
         TotalQuantity += quantity;
         TotalItems++;
     }
@@ -122,7 +125,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
         var itemDtos = _items
             .Select(p => new ItemEventDto(
-                p.Sku, p.WeightKg,
+                p.Sku, p.WeightKg ?? 0,
                 p.PickupStationId!.Value, p.DropStationId!.Value))
             .ToList();
 

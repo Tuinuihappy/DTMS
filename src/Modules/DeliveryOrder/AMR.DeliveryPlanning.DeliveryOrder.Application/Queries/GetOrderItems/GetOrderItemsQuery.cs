@@ -26,16 +26,17 @@ public class GetOrderItemsQueryHandler : IQueryHandler<GetOrderItemsQuery, IRead
                 p.Id,
                 p.ItemSeq,
                 p.Sku,
+                p.Description,
                 p.PickupLocationCode,
                 p.DropLocationCode,
                 p.CargoType,
-                p.Dimensions is { } d ? new DimensionsDto(d.LengthMm, d.WidthMm, d.HeightMm, d.VolumeM3) : null,
+                p.Dimensions is { } d ? new DimensionsDto(d.LengthMm, d.WidthMm, d.HeightMm, d.VolumeCBM) : null,
                 p.WeightKg,
                 new QuantityDto(p.Quantity, p.Uom),
                 p.CargoSpecific is { } cs
-                    ? new CargoSpecificDto(cs.PartNo, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
+                    ? new CargoSpecificDto(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                     : null,
-                p.Status.ToString()
+                p.Status
             ))
             .ToList();
 
