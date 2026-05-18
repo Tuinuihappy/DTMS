@@ -56,11 +56,11 @@ public static class MapEndpoints
                 : Results.BadRequest(result.Error);
         });
 
-        // GET /api/facility/stations?mapId=&type=&zoneId=&compatibleWith=&includeInactive=
-        group.MapGet("/stations", async (Guid? mapId, string? type, Guid? zoneId, string? compatibleWith, bool includeInactive, ISender sender) =>
+        // GET /api/facility/stations?mapId=&type=&zoneId=&compatibleWith=&includeInactive=&search=
+        group.MapGet("/stations", async (Guid? mapId, string? type, Guid? zoneId, string? compatibleWith, bool includeInactive, string? search, ISender sender) =>
         {
             StationType? stationType = type != null && Enum.TryParse<StationType>(type, true, out var t) ? t : null;
-            var result = await sender.Send(new GetStationsQuery(mapId, stationType, zoneId, compatibleWith, includeInactive));
+            var result = await sender.Send(new GetStationsQuery(mapId, stationType, zoneId, compatibleWith, includeInactive, search));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
