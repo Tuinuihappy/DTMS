@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.Fleet.Application.Commands.ChargingPolicy;
+using AMR.DeliveryPlanning.Fleet.Application.Commands.ImportVehiclesFromRiot3;
 using AMR.DeliveryPlanning.Fleet.Application.Commands.Maintenance;
 using AMR.DeliveryPlanning.Fleet.Application.Commands.RegisterVehicle;
 using AMR.DeliveryPlanning.Fleet.Application.Commands.UpdateVehicleState;
@@ -45,6 +46,12 @@ public static class VehicleEndpoints
         group.MapGet("/vehicles/available", async (ISender sender) =>
         {
             var result = await sender.Send(new GetAvailableVehiclesQuery());
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
+        group.MapPost("/vehicles/import-from-riot3", async (ImportVehiclesFromRiot3Command command, ISender sender) =>
+        {
+            var result = await sender.Send(command);
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 

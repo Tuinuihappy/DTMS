@@ -20,7 +20,7 @@ public class StationRepository : IStationRepository
         => _db.Stations.Where(s => s.MapId == mapId).ToListAsync(ct);
 
     public async Task<List<Station>> QueryAsync(Guid? mapId, StationType? type, Guid? zoneId,
-        string? compatibleVehicleType, bool includeInactive = false, string? search = null, CancellationToken ct = default)
+        string? compatibleVehicleType, bool includeInactive = false, string? code = null, CancellationToken ct = default)
     {
         var query = includeInactive
             ? _db.Stations.AsQueryable()
@@ -30,8 +30,8 @@ public class StationRepository : IStationRepository
         if (zoneId.HasValue) query = query.Where(s => s.ZoneId == zoneId);
         if (compatibleVehicleType != null)
             query = query.Where(s => EF.Property<string>(s, "CompatibleVehicleTypes").Contains(compatibleVehicleType));
-        if (search != null)
-            query = query.Where(s => s.Name.Contains(search) || (s.Code != null && s.Code.Contains(search)));
+        if (code != null)
+            query = query.Where(s => s.Code != null && s.Code.Contains(code));
         return await query.ToListAsync(ct);
     }
 

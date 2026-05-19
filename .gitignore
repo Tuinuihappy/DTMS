@@ -64,3 +64,6 @@ publish/
 
 ## IDE Cache
 *.lscache
+
+## Claude Code
+.claude/settings.local.json

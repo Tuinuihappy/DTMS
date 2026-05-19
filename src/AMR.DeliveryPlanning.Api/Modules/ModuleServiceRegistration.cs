@@ -24,6 +24,7 @@ using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Repositories;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Services;
+using FleetServices = AMR.DeliveryPlanning.Fleet.Infrastructure.Services;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.Planning.Domain.Services;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
@@ -114,6 +115,13 @@ public static class ModuleServiceRegistration
         services.AddScoped<IVehicleGroupRepository, VehicleGroupRepository>();
         services.AddScoped<IFleetReadService, FleetReadService>();
         services.AddScoped<IFleetOutbox, FleetOutbox>();
+        services.AddHttpClient<IRiot3FleetClient, FleetServices.Riot3FleetClient>(client =>
+        {
+            client.BaseAddress = new Uri(riot3BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(15);
+            if (!string.IsNullOrWhiteSpace(riot3ApiKey))
+                client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
+        });
 
         // ── DeliveryOrder Module ──────────────────────────────────────
         services.AddScoped<DeliveryOrderDomainEventMapper>();

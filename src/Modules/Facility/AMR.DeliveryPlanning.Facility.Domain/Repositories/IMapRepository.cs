@@ -16,7 +16,7 @@ public interface IStationRepository
     Task<Station?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<List<Station>> GetByMapAsync(Guid mapId, CancellationToken cancellationToken = default);
     Task<List<Station>> GetAllByMapAsync(Guid mapId, CancellationToken cancellationToken = default);
-    Task<List<Station>> QueryAsync(Guid? mapId, StationType? type, Guid? zoneId, string? compatibleVehicleType, bool includeInactive = false, string? search = null, CancellationToken cancellationToken = default);
+    Task<List<Station>> QueryAsync(Guid? mapId, StationType? type, Guid? zoneId, string? compatibleVehicleType, bool includeInactive = false, string? code = null, CancellationToken cancellationToken = default);
     Task AddAsync(Station station, CancellationToken cancellationToken = default);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
