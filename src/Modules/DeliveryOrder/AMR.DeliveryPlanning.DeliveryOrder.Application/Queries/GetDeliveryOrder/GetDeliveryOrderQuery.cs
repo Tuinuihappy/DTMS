@@ -27,7 +27,7 @@ public record ItemDto(
     string? Description,
     string PickupLocationCode,
     string DropLocationCode,
-    CargoType CargoType,
+    CargoType? CargoType,
     string? LoadUnitProfileCode,
     DimensionsDto? Dimensions,
     double? WeightKg,

@@ -62,7 +62,7 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(p => p.DropStationId);
             b.Property(p => p.ItemSeq).IsRequired();
             b.Property(p => p.Sku).HasMaxLength(100).IsRequired();
-            b.Property(p => p.CargoType).HasConversion<string>().HasMaxLength(30).IsRequired();
+            b.Property(p => p.CargoType).HasConversion<string>().HasMaxLength(30);
             b.OwnsOne(p => p.Dimensions, d =>
             {
                 d.Property(x => x.LengthMm).HasColumnName("LengthMm");

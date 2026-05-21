@@ -93,7 +93,6 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("CargoType")
-                        .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 

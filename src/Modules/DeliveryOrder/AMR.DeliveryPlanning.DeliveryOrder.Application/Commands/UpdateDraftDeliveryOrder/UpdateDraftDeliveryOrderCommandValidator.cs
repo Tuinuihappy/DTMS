@@ -29,7 +29,17 @@ file class ItemDtoValidator : AbstractValidator<ItemDto>
     public ItemDtoValidator()
     {
         RuleFor(p => p.Sku).NotEmpty().MaximumLength(100);
-        RuleFor(p => p.CargoType).IsInEnum();
+        RuleFor(p => p.CargoType!.Value)
+            .IsInEnum()
+            .When(p => p.CargoType != null);
+        RuleFor(p => p.CargoSpecific)
+            .Null()
+            .When(p => p.CargoType == null)
+            .WithMessage("CargoSpecific must not be provided when CargoType is empty.");
+        RuleFor(p => p.LoadUnitProfileCode!)
+            .NotEmpty()
+            .MaximumLength(50)
+            .When(p => p.LoadUnitProfileCode != null);
         RuleFor(p => p.PickupLocationCode).NotEmpty();
         RuleFor(p => p.DropLocationCode).NotEmpty();
         RuleFor(p => p.DropLocationCode)

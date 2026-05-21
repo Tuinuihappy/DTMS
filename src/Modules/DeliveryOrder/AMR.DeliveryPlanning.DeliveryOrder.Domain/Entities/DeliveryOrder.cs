@@ -74,7 +74,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     public void AddItem(
         string pickupLocationCode, string dropLocationCode,
-        int itemSeq, string sku, string? description, CargoType cargoType,
+        int itemSeq, string sku, string? description, CargoType? cargoType,
         string? loadUnitProfileCode,
         Dimensions? dimensions, double? weightKg, double quantity, string uom,
         CargoSpecific? cargoSpecific = null)

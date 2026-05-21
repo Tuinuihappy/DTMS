@@ -21,7 +21,13 @@ public class CreateDraftDeliveryOrderCommandValidator : AbstractValidator<Create
             .WithMessage("LotNo must be unique within the order.");
         RuleForEach(x => x.Items).ChildRules(pkg =>
         {
-            pkg.RuleFor(p => p.CargoType).IsInEnum();
+            pkg.RuleFor(p => p.CargoType!.Value)
+                .IsInEnum()
+                .When(p => p.CargoType != null);
+            pkg.RuleFor(p => p.CargoSpecific)
+                .Null()
+                .When(p => p.CargoType == null)
+                .WithMessage("CargoSpecific must not be provided when CargoType is empty.");
             pkg.RuleFor(p => p.PickupLocationCode).NotEmpty();
             pkg.RuleFor(p => p.DropLocationCode).NotEmpty();
             pkg.RuleFor(p => p.DropLocationCode)

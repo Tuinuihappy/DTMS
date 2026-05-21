@@ -14,7 +14,7 @@ public class Item : Entity<Guid>
     public int ItemSeq { get; private set; }
     public string Sku { get; private set; } = string.Empty;
     public string? Description { get; private set; }
-    public CargoType CargoType { get; private set; }
+    public CargoType? CargoType { get; private set; }
     public string? LoadUnitProfileCode { get; private set; }
     public Dimensions? Dimensions { get; private set; }
     public double? WeightKg { get; private set; }
@@ -26,11 +26,15 @@ public class Item : Entity<Guid>
     private Item() { }
 
     internal Item(Guid deliveryOrderId, string pickupLocationCode, string dropLocationCode,
-        int itemSeq, string sku, string? description, CargoType cargoType,
+        int itemSeq, string sku, string? description, CargoType? cargoType,
         string? loadUnitProfileCode,
         Dimensions? dimensions, double? weightKg, double quantity, string uom,
         CargoSpecific? cargoSpecific = null)
     {
+        if (cargoType is null && cargoSpecific is not null)
+            throw new InvalidOperationException(
+                "CargoSpecific must be null when CargoType is not specified.");
+
         Id = Guid.NewGuid();
         DeliveryOrderId = deliveryOrderId;
         PickupLocationCode = pickupLocationCode;
