@@ -26,6 +26,7 @@ public record ItemDto(
     string PickupLocationCode,
     string DropLocationCode,
     CargoType CargoType,
+    string? LoadUnitProfileCode,
     DimensionsDto? Dimensions,
     double? WeightKg,
     QuantityDto Quantity,
@@ -33,9 +34,9 @@ public record ItemDto(
 
 public record CreateDraftDeliveryOrderCommand(
     string OrderRef,
-    Priority Priority,
     DateTime? RequestedDeliveryDate,
     List<ItemDto> Items,
+    Priority Priority = Priority.Normal,
     SourceSystem SourceSystem = SourceSystem.Manual,
     string? CreatedBy = null
 ) : ICommand<DeliveryOrderDetailDto>;

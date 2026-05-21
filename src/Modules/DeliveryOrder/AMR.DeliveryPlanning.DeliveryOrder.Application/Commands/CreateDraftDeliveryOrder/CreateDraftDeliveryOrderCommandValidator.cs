@@ -28,6 +28,10 @@ public class CreateDraftDeliveryOrderCommandValidator : AbstractValidator<Create
                 .NotEqual(p => p.PickupLocationCode)
                 .WithMessage("Pickup and Drop locations must be different.");
             pkg.RuleFor(p => p.Sku).NotEmpty().MaximumLength(100);
+            pkg.RuleFor(p => p.LoadUnitProfileCode!)
+                .NotEmpty()
+                .MaximumLength(50)
+                .When(p => p.LoadUnitProfileCode != null);
             pkg.When(p => p.Dimensions != null, () =>
             {
                 pkg.RuleFor(p => p.Dimensions!.LengthMm).GreaterThan(0);

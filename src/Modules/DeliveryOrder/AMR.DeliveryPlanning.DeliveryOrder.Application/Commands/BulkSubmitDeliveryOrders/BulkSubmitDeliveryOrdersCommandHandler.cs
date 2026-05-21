@@ -56,6 +56,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                         pkg.PickupLocationCode, pkg.DropLocationCode,
                         idx, pkg.Sku, pkg.Description,
                         pkg.CargoType,
+                        pkg.LoadUnitProfileCode,
                         pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                         pkg.WeightKg,
                         pkg.Quantity.Value,

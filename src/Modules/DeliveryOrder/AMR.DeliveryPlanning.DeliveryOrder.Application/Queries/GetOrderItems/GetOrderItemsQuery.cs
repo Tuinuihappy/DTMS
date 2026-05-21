@@ -30,6 +30,7 @@ public class GetOrderItemsQueryHandler : IQueryHandler<GetOrderItemsQuery, IRead
                 p.PickupLocationCode,
                 p.DropLocationCode,
                 p.CargoType,
+                p.LoadUnitProfileCode,
                 p.Dimensions is { } d ? new DimensionsDto(d.LengthMm, d.WidthMm, d.HeightMm, d.VolumeCBM) : null,
                 p.WeightKg,
                 new QuantityDto(p.Quantity, p.Uom),

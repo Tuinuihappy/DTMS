@@ -41,6 +41,7 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
                     item.PickupLocationCode, item.DropLocationCode,
                     idx, item.Sku, item.Description,
                     item.CargoType,
+                    item.LoadUnitProfileCode,
                     item.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                     item.WeightKg,
                     item.Quantity.Value,

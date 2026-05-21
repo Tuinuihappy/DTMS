@@ -75,6 +75,7 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(p => p.WeightKg);
             b.Property(p => p.Quantity).IsRequired();
             b.Property(p => p.Uom).HasMaxLength(20).IsRequired();
+            b.Property(p => p.LoadUnitProfileCode).HasMaxLength(50);
             b.Property(p => p.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.OwnsOne(p => p.CargoSpecific, cs =>
             {
