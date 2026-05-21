@@ -25,11 +25,11 @@ public record ItemDto(
     string? Description,
     string PickupLocationCode,
     string DropLocationCode,
-    CargoType? CargoType,
     string? LoadUnitProfileCode,
     DimensionsDto? Dimensions,
     double? WeightKg,
     QuantityDto Quantity,
+    CargoType? CargoType,
     CargoSpecificDto? CargoSpecific);
 
 public record CreateDraftDeliveryOrderCommand(

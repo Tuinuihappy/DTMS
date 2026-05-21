@@ -14,11 +14,11 @@ public record ItemSearchResultDto(
     string? Description,
     string PickupLocationCode,
     string DropLocationCode,
-    CargoType? CargoType,
     string? LoadUnitProfileCode,
     DimensionsDto? Dimensions,
     double? WeightKg,
     QuantityDto Quantity,
+    CargoType? CargoType,
     CargoSpecificDto? CargoSpecific,
     ItemStatus Status,
     OrderContextDto Order);
@@ -76,11 +76,11 @@ public class SearchItemsQueryHandler : IQueryHandler<SearchItemsQuery, PagedResu
                     i.Description,
                     i.PickupLocationCode,
                     i.DropLocationCode,
-                    i.CargoType,
                     i.LoadUnitProfileCode,
                     i.Dimensions is { } d ? new DimensionsDto(d.LengthMm, d.WidthMm, d.HeightMm, d.VolumeCBM) : null,
                     i.WeightKg,
                     new QuantityDto(i.Quantity, i.Uom),
+                    i.CargoType,
                     i.CargoSpecific is { } cs
                         ? new CargoSpecificDto(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                         : null,

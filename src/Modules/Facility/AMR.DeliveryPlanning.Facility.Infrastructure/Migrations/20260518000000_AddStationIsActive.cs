@@ -1,3 +1,6 @@
+using AMR.DeliveryPlanning.Facility.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -5,6 +8,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace AMR.DeliveryPlanning.Facility.Infrastructure.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(FacilityDbContext))]
+    [Migration("20260518000000_AddStationIsActive")]
     public partial class AddStationIsActive : Migration
     {
         /// <inheritdoc />

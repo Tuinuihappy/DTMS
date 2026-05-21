@@ -127,6 +127,7 @@ public static class ModuleServiceRegistration
         services.AddScoped<DeliveryOrderDomainEventMapper>();
         services.AddDbContext<DeliveryOrderDbContext>((sp, o) => o
             .UseNpgsql(connectionString)
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .AddInterceptors(
                 new AuditSaveChangesInterceptor(),
                 new DomainEventOutboxSaveChangesInterceptor(

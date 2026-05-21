@@ -74,15 +74,16 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     public void AddItem(
         string pickupLocationCode, string dropLocationCode,
-        int itemSeq, string sku, string? description, CargoType? cargoType,
+        int itemSeq, string sku, string? description,
         string? loadUnitProfileCode,
         Dimensions? dimensions, double? weightKg, double quantity, string uom,
+        CargoType? cargoType,
         CargoSpecific? cargoSpecific = null)
     {
         if (_items.Any(p => p.ItemSeq == itemSeq))
             throw new InvalidOperationException($"An item with seq '{itemSeq}' already exists in this order.");
 
-        _items.Add(new Item(Id, pickupLocationCode, dropLocationCode, itemSeq, sku, description, cargoType, loadUnitProfileCode, dimensions, weightKg, quantity, uom, cargoSpecific));
+        _items.Add(new Item(Id, pickupLocationCode, dropLocationCode, itemSeq, sku, description, loadUnitProfileCode, dimensions, weightKg, quantity, uom, cargoType, cargoSpecific));
         TotalWeightKg += weightKg ?? 0;
         TotalQuantity += quantity;
         TotalItems++;

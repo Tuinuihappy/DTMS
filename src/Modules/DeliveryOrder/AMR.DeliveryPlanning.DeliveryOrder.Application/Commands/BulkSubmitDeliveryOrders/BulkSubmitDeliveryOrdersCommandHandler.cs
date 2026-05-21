@@ -55,12 +55,12 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                     order.AddItem(
                         pkg.PickupLocationCode, pkg.DropLocationCode,
                         idx, pkg.Sku, pkg.Description,
-                        pkg.CargoType,
                         pkg.LoadUnitProfileCode,
                         pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                         pkg.WeightKg,
                         pkg.Quantity.Value,
                         pkg.Quantity.Uom,
+                        pkg.CargoType,
                         pkg.CargoSpecific is { } cs
                             ? CargoSpecific.Create(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                             : null);
@@ -75,15 +75,11 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
             pendingOrders.Add(order);
         }
 
-        // validate stations in parallel — IStationLookup (cached) is read-only, safe to fan out
-        var validationTasks = pendingOrders.Select(async order =>
+        // Validate stations sequentially — IStationLookup is backed by a Facility DbContext
+        // which is not safe to use concurrently across orders.
+        foreach (var order in pendingOrders)
         {
             var stationMap = await _stationValidation.BuildStationMapAsync(order.Items, cancellationToken);
-            return (order, stationMap);
-        });
-
-        foreach (var (order, stationMap) in await Task.WhenAll(validationTasks))
-        {
             if (stationMap.IsFailure)
             {
                 failures.Add(new BulkSubmitFailure(order.OrderRef, stationMap.Error));

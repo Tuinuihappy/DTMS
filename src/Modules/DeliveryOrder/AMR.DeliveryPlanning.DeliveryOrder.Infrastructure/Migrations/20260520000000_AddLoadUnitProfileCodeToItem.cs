@@ -1,3 +1,6 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -5,6 +8,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(DeliveryOrderDbContext))]
+    [Migration("20260520000000_AddLoadUnitProfileCodeToItem")]
     public partial class AddLoadUnitProfileCodeToItem : Migration
     {
         /// <inheritdoc />

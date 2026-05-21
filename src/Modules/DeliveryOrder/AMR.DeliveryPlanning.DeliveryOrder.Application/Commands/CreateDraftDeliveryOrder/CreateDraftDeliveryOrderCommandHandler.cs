@@ -33,12 +33,12 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
             order.AddItem(
                 pkg.PickupLocationCode, pkg.DropLocationCode,
                 idx, pkg.Sku, pkg.Description,
-                pkg.CargoType,
                 pkg.LoadUnitProfileCode,
                 pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                 pkg.WeightKg,
                 pkg.Quantity.Value,
                 pkg.Quantity.Uom,
+                pkg.CargoType,
                 pkg.CargoSpecific is { } cs
                     ? CargoSpecific.Create(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                     : null);

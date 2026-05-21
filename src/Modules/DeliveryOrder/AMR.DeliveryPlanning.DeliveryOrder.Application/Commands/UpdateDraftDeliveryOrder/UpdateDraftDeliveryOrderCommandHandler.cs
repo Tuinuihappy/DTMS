@@ -40,12 +40,12 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
                 order.AddItem(
                     item.PickupLocationCode, item.DropLocationCode,
                     idx, item.Sku, item.Description,
-                    item.CargoType,
                     item.LoadUnitProfileCode,
                     item.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                     item.WeightKg,
                     item.Quantity.Value,
                     item.Quantity.Uom,
+                    item.CargoType,
                     item.CargoSpecific is { } cs
                         ? CargoSpecific.Create(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                         : null);
