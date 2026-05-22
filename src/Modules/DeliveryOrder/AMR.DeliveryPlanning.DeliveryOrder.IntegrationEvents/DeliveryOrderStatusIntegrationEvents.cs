@@ -19,3 +19,6 @@ public record DeliveryOrderHeldIntegrationEvent(
 
 public record DeliveryOrderReleasedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId) : IIntegrationEvent;
+
+public record DeliveryOrderRejectedIntegrationEvent(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason) : IIntegrationEvent;

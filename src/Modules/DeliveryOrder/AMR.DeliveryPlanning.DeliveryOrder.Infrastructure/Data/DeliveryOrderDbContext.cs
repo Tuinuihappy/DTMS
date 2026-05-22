@@ -40,6 +40,7 @@ public class DeliveryOrderDbContext : DbContext
 
             b.HasIndex(o => o.Status);
             b.HasIndex(o => o.CreatedDate);
+            b.HasIndex(o => new { o.SourceSystem, o.OrderRef }).IsUnique();
 
             b.HasMany(o => o.Items)
              .WithOne()

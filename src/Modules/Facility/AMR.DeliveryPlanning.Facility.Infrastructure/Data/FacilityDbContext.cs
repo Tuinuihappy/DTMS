@@ -59,6 +59,12 @@ public class FacilityDbContext : DbContext
             b.HasIndex(s => new { s.MapId, s.Code }).IsUnique().HasFilter("\"Code\" IS NOT NULL");
             b.Property(s => s.IsActive).HasDefaultValue(true).IsRequired();
             b.HasIndex(s => new { s.MapId, s.IsActive });
+            b.Property(s => s.ManualOverrideOffline).HasDefaultValue(false).IsRequired();
+            b.Property(s => s.ManualOverrideReason).HasMaxLength(500);
+            b.Property(s => s.ManualOverrideBy).HasMaxLength(200);
+            b.Property(s => s.ManualOverrideAt);
+            b.Property(s => s.ManualOverrideExpiresAt);
+            b.HasIndex(s => s.ManualOverrideExpiresAt).HasFilter("\"ManualOverrideOffline\" = true");
         });
 
         modelBuilder.Entity<Zone>(b =>

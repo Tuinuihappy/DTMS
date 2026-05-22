@@ -6,6 +6,16 @@ public sealed record StationVendorTarget(
     string MapVendorRef,
     string StationVendorRef);
 
+/// <summary>
+/// Station lookup outcome. ManualOverrideActive=true means an operator has forced this station offline.
+/// </summary>
+public sealed record StationLookupResult(
+    Guid Id,
+    string? Code,
+    bool IsActive,
+    bool ManualOverrideActive,
+    string? ManualOverrideReason);
+
 public interface IFacilityReadService
 {
     Task<bool> StationExistsAsync(Guid stationId, CancellationToken cancellationToken = default);
@@ -14,10 +24,11 @@ public interface IFacilityReadService
 
     /// <summary>
     /// Resolves a mixed list of station GUIDs and codes in at most 2 queries.
-    /// Returns a case-insensitive dictionary mapping each input value to its StationId.
-    /// Inputs that do not match any station are omitted from the result.
+    /// Returns a case-insensitive dictionary mapping each input value to its lookup result
+    /// (including IsActive + manual override state). Inputs that do not match any station
+    /// are omitted from the result.
     /// </summary>
-    Task<IReadOnlyDictionary<string, Guid>> ResolveStationsBatchAsync(
+    Task<IReadOnlyDictionary<string, StationLookupResult>> ResolveStationsBatchAsync(
         IReadOnlyList<string> locationCodes,
         CancellationToken cancellationToken = default);
 

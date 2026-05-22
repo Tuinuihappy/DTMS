@@ -20,6 +20,13 @@ public class Station : Entity<Guid>
     // False when RIOT3 has removed this station — kept for referential integrity, excluded from new orders
     public bool IsActive { get; private set; } = true;
 
+    // Manual override by operator (independent of RIOT3 sync). Survives vendor sync until cleared or expired.
+    public bool ManualOverrideOffline { get; private set; }
+    public string? ManualOverrideReason { get; private set; }
+    public DateTime? ManualOverrideAt { get; private set; }
+    public string? ManualOverrideBy { get; private set; }
+    public DateTime? ManualOverrideExpiresAt { get; private set; }
+
     private Station() { }
 
     public void SetVendorRef(string vendorRef) => VendorRef = vendorRef;
@@ -31,8 +38,39 @@ public class Station : Entity<Guid>
     {
         Name = name;
         Coordinate = new Coordinate(x, y, yaw);
-        IsActive = true;
+        // RIOT3 reactivation does NOT override an operator's manual force-offline.
+        if (!ManualOverrideOffline || IsManualOverrideExpired(DateTime.UtcNow))
+            IsActive = true;
     }
+
+    public void ForceOffline(string reason, string by, TimeSpan duration, DateTime nowUtc)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("Reason is required.", nameof(reason));
+        if (duration <= TimeSpan.Zero || duration > TimeSpan.FromHours(24))
+            throw new ArgumentOutOfRangeException(nameof(duration), "Duration must be between 0 and 24 hours.");
+
+        ManualOverrideOffline = true;
+        ManualOverrideReason = reason.Trim();
+        ManualOverrideBy = string.IsNullOrWhiteSpace(by) ? null : by.Trim();
+        ManualOverrideAt = nowUtc;
+        ManualOverrideExpiresAt = nowUtc.Add(duration);
+    }
+
+    public void ClearManualOverride()
+    {
+        ManualOverrideOffline = false;
+        ManualOverrideReason = null;
+        ManualOverrideBy = null;
+        ManualOverrideAt = null;
+        ManualOverrideExpiresAt = null;
+    }
+
+    public bool IsManualOverrideExpired(DateTime nowUtc) =>
+        ManualOverrideExpiresAt.HasValue && nowUtc >= ManualOverrideExpiresAt.Value;
+
+    public bool IsCurrentlyManualOffline(DateTime nowUtc) =>
+        ManualOverrideOffline && !IsManualOverrideExpired(nowUtc);
 
     public Station(Guid id, Guid mapId, string name, Coordinate coordinate, StationType type,
         Guid? zoneId = null, IEnumerable<string>? compatibleVehicleTypes = null) : base(id)

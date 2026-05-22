@@ -26,14 +26,24 @@ public class StationValidationService : IStationValidationService
 
         foreach (var code in allCodes)
         {
-            if (!resolved.ContainsKey(code))
+            if (!resolved.TryGetValue(code, out var station))
                 return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Failure(
                     $"'{code}' is not a valid station ID or code.");
+
+            if (!station.IsActive)
+                return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Failure(
+                    $"'{code}' is deactivated and cannot be used for new orders.");
+
+            if (station.ManualOverrideActive)
+                return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Failure(
+                    string.IsNullOrWhiteSpace(station.ManualOverrideReason)
+                        ? $"'{code}' is currently offline (manual override)."
+                        : $"'{code}' is currently offline (manual override): {station.ManualOverrideReason}");
         }
 
         var map = uniquePairs.ToDictionary(
             p => (p.PickupLocationCode, p.DropLocationCode),
-            p => (resolved[p.PickupLocationCode], resolved[p.DropLocationCode]));
+            p => (resolved[p.PickupLocationCode].Id, resolved[p.DropLocationCode].Id));
 
         return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Success(map);
     }

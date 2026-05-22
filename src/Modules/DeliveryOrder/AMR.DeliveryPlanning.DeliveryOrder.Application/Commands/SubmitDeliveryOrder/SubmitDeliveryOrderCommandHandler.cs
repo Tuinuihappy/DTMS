@@ -32,6 +32,13 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
         if (order is null)
             return Result<Guid>.Failure($"Order {request.OrderId} not found.");
 
+        var readiness = SubmitReadinessCheck.Check(order);
+        if (!readiness.IsValid)
+        {
+            _logger.LogWarning("[Submit] Order {OrderId} not ready to submit: {Error}.", request.OrderId, readiness.Error);
+            return Result<Guid>.Failure(readiness.Error);
+        }
+
         var stationMap = await _stationValidation.BuildStationMapAsync(order.Items, cancellationToken);
         if (stationMap.IsFailure) return Result<Guid>.Failure(stationMap.Error);
 
@@ -39,15 +46,14 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
         {
             order.Submit();
             order.MarkAsValidated(stationMap.Value);
-            order.MarkReadyToPlan();
 
             await _auditRepo.AddAsync(new OrderAuditEvent(
                 order.Id, "OrderSubmitted",
-                $"Order '{order.OrderRef}' submitted with priority {order.Priority}"), cancellationToken);
+                $"Order '{order.OrderRef}' submitted and validated with priority {order.Priority}"), cancellationToken);
 
             await _repository.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("[Submit] Order {OrderId} '{OrderRef}' submitted and ready to plan.",
+            _logger.LogInformation("[Submit] Order {OrderId} '{OrderRef}' submitted and validated — awaiting confirmation.",
                 order.Id, order.OrderRef);
 
             return Result<Guid>.Success(order.Id);

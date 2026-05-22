@@ -83,6 +83,9 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 
                     b.HasIndex("Status");
 
+                    b.HasIndex("SourceSystem", "OrderRef")
+                        .IsUnique();
+
                     b.ToTable("DeliveryOrders", "deliveryorder");
                 });
 

@@ -8,7 +8,7 @@ public record ItemSummaryDto(
     Guid PickupStationId,
     Guid DropStationId);
 
-public record DeliveryOrderReadyForPlanningIntegrationEvent(
+public record DeliveryOrderConfirmedIntegrationEvent(
     Guid EventId,
     DateTime OccurredOn,
     Guid DeliveryOrderId,

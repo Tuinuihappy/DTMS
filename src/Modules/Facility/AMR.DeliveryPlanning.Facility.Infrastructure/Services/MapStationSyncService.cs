@@ -33,7 +33,7 @@ public sealed class MapStationSyncService : BackgroundService
         _scopeFactory = scopeFactory;
         _riot3 = riot3;
         _logger = logger;
-        _interval = interval ?? TimeSpan.FromMinutes(30);
+        _interval = interval ?? TimeSpan.FromMinutes(5);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

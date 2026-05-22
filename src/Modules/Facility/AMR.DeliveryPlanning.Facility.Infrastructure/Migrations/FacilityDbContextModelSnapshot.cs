@@ -263,6 +263,25 @@ namespace AMR.DeliveryPlanning.Facility.Infrastructure.Migrations
                         .HasDefaultValue(true)
                         .HasColumnType("boolean");
 
+                    b.Property<DateTime?>("ManualOverrideAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ManualOverrideBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("ManualOverrideExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("ManualOverrideOffline")
+                        .IsRequired()
+                        .HasDefaultValue(false)
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ManualOverrideReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<Guid>("MapId")
                         .HasColumnType("uuid");
 
@@ -284,6 +303,9 @@ namespace AMR.DeliveryPlanning.Facility.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ManualOverrideExpiresAt")
+                        .HasFilter("\"ManualOverrideOffline\" = true");
 
                     b.HasIndex("MapId", "Code")
                         .IsUnique()

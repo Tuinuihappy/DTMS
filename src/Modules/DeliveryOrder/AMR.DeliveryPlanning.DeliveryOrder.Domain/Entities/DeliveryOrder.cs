@@ -46,6 +46,27 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         return order;
     }
 
+    public static DeliveryOrder CreateFromUpstream(string orderRef, Priority priority,
+        DateTime? requestedDeliveryDate, SourceSystem sourceSystem, string? createdBy = null)
+    {
+        if (sourceSystem == SourceSystem.Manual)
+            throw new InvalidOperationException("Upstream orders cannot have Manual source system.");
+
+        var order = new DeliveryOrder
+        {
+            Id = Guid.NewGuid(),
+            OrderRef = orderRef,
+            Priority = priority,
+            RequestedDeliveryDate = requestedDeliveryDate,
+            Status = OrderStatus.Submitted,
+            SourceSystem = sourceSystem,
+            CreatedBy = createdBy
+        };
+
+        order.AddDomainEvent(new DeliveryOrderSubmittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, order.Id));
+        return order;
+    }
+
     public void UpdateDraft(string orderRef, Priority priority, DateTime? requestedDeliveryDate)
     {
         if (Status != OrderStatus.Draft)
@@ -119,31 +140,44 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         AddDomainEvent(new DeliveryOrderValidatedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
-    public void MarkReadyToPlan()
+    public void Confirm()
     {
         if (Status != OrderStatus.Validated)
-            throw new InvalidOperationException("Only validated orders can be marked ready to plan.");
+            throw new InvalidOperationException($"Only Validated orders can be confirmed. Current status: {Status}.");
 
-        Status = OrderStatus.ReadyToPlan;
+        Status = OrderStatus.Confirmed;
+        AddDomainEvent(BuildConfirmedEvent());
+    }
 
+    public void Reject(string reason)
+    {
+        if (Status is not (OrderStatus.Submitted or OrderStatus.Validated or OrderStatus.Confirmed))
+            throw new InvalidOperationException($"Cannot reject an order in {Status} status.");
+
+        Status = OrderStatus.Rejected;
+        AddDomainEvent(new DeliveryOrderRejectedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+    }
+
+    public void MarkPlanning()
+    {
+        if (Status != OrderStatus.Confirmed)
+            throw new InvalidOperationException("Only Confirmed orders can enter Planning.");
+
+        Status = OrderStatus.Planning;
+        AddDomainEvent(new DeliveryOrderPlanningStartedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+    }
+
+    private DeliveryOrderConfirmedDomainEvent BuildConfirmedEvent()
+    {
         var itemDtos = _items
             .Select(p => new ItemEventDto(
                 p.Sku, p.WeightKg ?? 0,
                 p.PickupStationId!.Value, p.DropStationId!.Value))
             .ToList();
 
-        AddDomainEvent(new DeliveryOrderReadyToPlanDomainEvent(
+        return new DeliveryOrderConfirmedDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, Priority.ToString(),
-            RequestedDeliveryDate, itemDtos));
-    }
-
-    public void MarkPlanning()
-    {
-        if (Status != OrderStatus.ReadyToPlan)
-            throw new InvalidOperationException("Only ReadyToPlan orders can enter Planning.");
-
-        Status = OrderStatus.Planning;
-        AddDomainEvent(new DeliveryOrderPlanningStartedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+            RequestedDeliveryDate, itemDtos);
     }
 
     public void MarkPlanned()
@@ -187,8 +221,9 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         if (Status != OrderStatus.Held)
             throw new InvalidOperationException("Only held orders can be released.");
 
-        Status = OrderStatus.ReadyToPlan;
+        Status = OrderStatus.Confirmed;
         AddDomainEvent(new DeliveryOrderReleasedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+        AddDomainEvent(BuildConfirmedEvent());
     }
 
     public void MarkFailed(string reason)

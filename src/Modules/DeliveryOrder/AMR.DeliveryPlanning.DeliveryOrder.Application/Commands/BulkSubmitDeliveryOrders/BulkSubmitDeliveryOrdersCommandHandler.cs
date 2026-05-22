@@ -3,7 +3,6 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
-using FluentValidation;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkSubmitDeliveryOrders;
 
@@ -11,16 +10,16 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
 {
     private readonly IDeliveryOrderRepository _repo;
     private readonly IStationValidationService _stationValidation;
-    private readonly IValidator<CreateDraftDeliveryOrderCommand> _orderValidator;
+    private readonly IStationLookup _stationLookup;
 
     public BulkSubmitDeliveryOrdersCommandHandler(
         IDeliveryOrderRepository repo,
         IStationValidationService stationValidation,
-        IValidator<CreateDraftDeliveryOrderCommand> orderValidator)
+        IStationLookup stationLookup)
     {
         _repo = repo;
         _stationValidation = stationValidation;
-        _orderValidator = orderValidator;
+        _stationLookup = stationLookup;
     }
 
     public async Task<Result<BulkSubmitResult>> Handle(BulkSubmitDeliveryOrdersCommand request, CancellationToken cancellationToken)
@@ -31,11 +30,18 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         var succeeded = new List<Domain.Entities.DeliveryOrder>();
         var failures = new List<BulkSubmitFailure>();
 
+        // Resolve all location inputs across all orders in one batched lookup so each draft
+        // stores the canonical Code form regardless of whether the caller sent a Guid or a Code.
+        var normalize = await LocationCodeNormalizer.BuildAsync(
+            request.Orders.SelectMany(o => o.Items).SelectMany(i => new[] { i.PickupLocationCode, i.DropLocationCode }),
+            _stationLookup, cancellationToken);
+
         // validate and build orders first (sequential — shares DbContext safely)
         var pendingOrders = new List<Domain.Entities.DeliveryOrder>();
         foreach (var cmd in request.Orders)
         {
-            var validation = await _orderValidator.ValidateAsync(cmd, cancellationToken);
+            // Bulk always submits, so apply the strict SubmitReadiness rules upfront.
+            var validation = SubmitReadiness.Validate(cmd);
             if (!validation.IsValid)
             {
                 var errors = string.Join("; ", validation.Errors.Select(e => e.ErrorMessage));
@@ -53,7 +59,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                 foreach (var (pkg, idx) in cmd.Items.Select((p, i) => (p, i + 1)))
                 {
                     order.AddItem(
-                        pkg.PickupLocationCode, pkg.DropLocationCode,
+                        normalize(pkg.PickupLocationCode), normalize(pkg.DropLocationCode),
                         idx, pkg.Sku, pkg.Description,
                         pkg.LoadUnitProfileCode,
                         pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
@@ -88,7 +94,6 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
 
             order.Submit();
             order.MarkAsValidated(stationMap.Value);
-            order.MarkReadyToPlan();
             succeeded.Add(order);
         }
 

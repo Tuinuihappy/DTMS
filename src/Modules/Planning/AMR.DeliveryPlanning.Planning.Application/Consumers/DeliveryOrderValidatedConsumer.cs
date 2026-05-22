@@ -13,9 +13,9 @@ namespace AMR.DeliveryPlanning.Planning.Application.Consumers;
 
 /// <summary>
 /// Auto Planning Pipeline:
-///   DeliveryOrder (ReadyToPlan) → Group items by station pair → Create Job per group → Commit Plan
+///   DeliveryOrder (Confirmed) → Group items by station pair → Create Job per group → Commit Plan
 /// </summary>
-public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderReadyForPlanningIntegrationEvent>
+public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIntegrationEvent>
 {
     private readonly ISender _sender;
     private readonly ICarrierTypeProfileRepository _carrierTypeRepo;
@@ -37,7 +37,7 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderReadyForPla
         _logger = logger;
     }
 
-    public async Task Consume(ConsumeContext<DeliveryOrderReadyForPlanningIntegrationEvent> context)
+    public async Task Consume(ConsumeContext<DeliveryOrderConfirmedIntegrationEvent> context)
     {
         var evt = context.Message;
 

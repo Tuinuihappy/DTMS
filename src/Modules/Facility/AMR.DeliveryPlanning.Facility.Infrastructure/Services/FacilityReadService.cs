@@ -53,11 +53,12 @@ public sealed class FacilityReadService : IFacilityReadService
             target.StationVendorRef.Trim());
     }
 
-    public async Task<IReadOnlyDictionary<string, Guid>> ResolveStationsBatchAsync(
+    public async Task<IReadOnlyDictionary<string, StationLookupResult>> ResolveStationsBatchAsync(
         IReadOnlyList<string> locationCodes,
         CancellationToken cancellationToken = default)
     {
-        var result = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, StationLookupResult>(StringComparer.OrdinalIgnoreCase);
+        var now = DateTime.UtcNow;
 
         var guidInputs = locationCodes.Where(c => Guid.TryParse(c, out _)).ToList();
         var codeInputs = locationCodes.Where(c => !Guid.TryParse(c, out _)).ToList();
@@ -65,12 +66,25 @@ public sealed class FacilityReadService : IFacilityReadService
         if (guidInputs.Count > 0)
         {
             var guids = guidInputs.ConvertAll(Guid.Parse);
-            var foundIds = await _db.Stations.AsNoTracking()
+            var found = await _db.Stations.AsNoTracking()
                 .Where(s => guids.Contains(s.Id))
-                .Select(s => s.Id)
+                .Select(s => new
+                {
+                    s.Id,
+                    s.Code,
+                    s.IsActive,
+                    s.ManualOverrideOffline,
+                    s.ManualOverrideExpiresAt,
+                    s.ManualOverrideReason
+                })
                 .ToListAsync(cancellationToken);
-            foreach (var id in foundIds)
-                result[id.ToString()] = id;
+            foreach (var s in found)
+            {
+                var overrideActive = s.ManualOverrideOffline
+                    && (!s.ManualOverrideExpiresAt.HasValue || now < s.ManualOverrideExpiresAt.Value);
+                result[s.Id.ToString()] = new StationLookupResult(
+                    s.Id, s.Code, s.IsActive, overrideActive, overrideActive ? s.ManualOverrideReason : null);
+            }
         }
 
         if (codeInputs.Count > 0)
@@ -78,10 +92,23 @@ public sealed class FacilityReadService : IFacilityReadService
             var upperCodes = codeInputs.ConvertAll(c => c.ToUpperInvariant());
             var stations = await _db.Stations.AsNoTracking()
                 .Where(s => s.Code != null && upperCodes.Contains(s.Code))
-                .Select(s => new { s.Code, s.Id })
+                .Select(s => new
+                {
+                    s.Code,
+                    s.Id,
+                    s.IsActive,
+                    s.ManualOverrideOffline,
+                    s.ManualOverrideExpiresAt,
+                    s.ManualOverrideReason
+                })
                 .ToListAsync(cancellationToken);
             foreach (var s in stations)
-                result[s.Code!] = s.Id;
+            {
+                var overrideActive = s.ManualOverrideOffline
+                    && (!s.ManualOverrideExpiresAt.HasValue || now < s.ManualOverrideExpiresAt.Value);
+                result[s.Code!] = new StationLookupResult(
+                    s.Id, s.Code, s.IsActive, overrideActive, overrideActive ? s.ManualOverrideReason : null);
+            }
         }
 
         return result;

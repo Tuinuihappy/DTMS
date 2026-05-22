@@ -19,7 +19,7 @@ namespace AMR.DeliveryPlanning.IntegrationTests;
 public class DomainEventMapperTests
 {
     [Fact]
-    public void DeliveryOrderMapper_MapsReadyToPlanEvent()
+    public void DeliveryOrderMapper_MapsConfirmedEvent()
     {
         var eventId = Guid.NewGuid();
         var occurredOn = DateTime.UtcNow;
@@ -33,10 +33,10 @@ public class DomainEventMapperTests
         };
 
         var result = new DeliveryOrderDomainEventMapper()
-            .Map(new DeliveryOrderReadyToPlanDomainEvent(
+            .Map(new DeliveryOrderConfirmedDomainEvent(
                 eventId, occurredOn, orderId, "High", deadline, items))
             .Should().ContainSingle().Subject
-            .Should().BeOfType<DeliveryOrderReadyForPlanningIntegrationEvent>().Subject;
+            .Should().BeOfType<DeliveryOrderConfirmedIntegrationEvent>().Subject;
 
         result.EventId.Should().Be(eventId);
         result.OccurredOn.Should().Be(occurredOn);

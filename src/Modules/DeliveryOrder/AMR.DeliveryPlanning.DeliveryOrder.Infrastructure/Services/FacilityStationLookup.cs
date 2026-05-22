@@ -1,5 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.Facility.Application.Services;
+using DoStationLookupResult = AMR.DeliveryPlanning.DeliveryOrder.Application.Services.StationLookupResult;
+using FacilityStationLookupResult = AMR.DeliveryPlanning.Facility.Application.Services.StationLookupResult;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
 
@@ -16,6 +18,15 @@ public class FacilityStationLookup : IStationLookup
     public Task<Guid?> ResolveByCodeAsync(string code, CancellationToken ct = default)
         => _facilityReadService.ResolveStationByCodeAsync(code, ct);
 
-    public Task<IReadOnlyDictionary<string, Guid>> ResolveBatchAsync(IReadOnlyList<string> locationCodes, CancellationToken ct = default)
-        => _facilityReadService.ResolveStationsBatchAsync(locationCodes, ct);
+    public async Task<IReadOnlyDictionary<string, DoStationLookupResult>> ResolveBatchAsync(
+        IReadOnlyList<string> locationCodes, CancellationToken ct = default)
+    {
+        IReadOnlyDictionary<string, FacilityStationLookupResult> facilityResult =
+            await _facilityReadService.ResolveStationsBatchAsync(locationCodes, ct);
+
+        var translated = new Dictionary<string, DoStationLookupResult>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (code, r) in facilityResult)
+            translated[code] = new DoStationLookupResult(r.Id, r.Code, r.IsActive, r.ManualOverrideActive, r.ManualOverrideReason);
+        return translated;
+    }
 }

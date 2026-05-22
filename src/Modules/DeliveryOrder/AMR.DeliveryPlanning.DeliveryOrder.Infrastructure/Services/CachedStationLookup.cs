@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
@@ -10,9 +11,10 @@ public class CachedStationLookup : IStationLookup
     private readonly IDistributedCache _cache;
     private readonly ILogger<CachedStationLookup> _logger;
 
+    // Short TTL so deactivation / manual override propagates within ~1 min.
     private static readonly DistributedCacheEntryOptions CacheOptions = new()
     {
-        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1)
     };
 
     public CachedStationLookup(
@@ -31,24 +33,33 @@ public class CachedStationLookup : IStationLookup
     public Task<Guid?> ResolveByCodeAsync(string code, CancellationToken ct = default)
         => _inner.ResolveByCodeAsync(code, ct);
 
-    public async Task<IReadOnlyDictionary<string, Guid>> ResolveBatchAsync(
+    public async Task<IReadOnlyDictionary<string, StationLookupResult>> ResolveBatchAsync(
         IReadOnlyList<string> locationCodes, CancellationToken ct = default)
     {
-        var result = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, StationLookupResult>(StringComparer.OrdinalIgnoreCase);
         var uncached = new List<string>();
 
         foreach (var code in locationCodes)
         {
-            var cached = await _cache.GetStringAsync($"station:code:{code}", ct);
-            if (cached != null && Guid.TryParse(cached, out var stationId))
+            var cached = await _cache.GetStringAsync($"station:lookup:{code}", ct);
+            if (cached != null)
             {
-                result[code] = stationId;
-                _logger.LogDebug("Cache hit for station code {Code}", code);
+                try
+                {
+                    var entry = JsonSerializer.Deserialize<StationLookupResult>(cached);
+                    if (entry != null)
+                    {
+                        result[code] = entry;
+                        _logger.LogDebug("Cache hit for station {Code}", code);
+                        continue;
+                    }
+                }
+                catch (JsonException)
+                {
+                    // stale cache shape from a previous deploy — fall through and re-resolve
+                }
             }
-            else
-            {
-                uncached.Add(code);
-            }
+            uncached.Add(code);
         }
 
         if (uncached.Count == 0)
@@ -56,10 +67,13 @@ public class CachedStationLookup : IStationLookup
 
         var resolved = await _inner.ResolveBatchAsync(uncached, ct);
 
-        foreach (var (code, id) in resolved)
+        foreach (var (code, entry) in resolved)
         {
-            result[code] = id;
-            await _cache.SetStringAsync($"station:code:{code}", id.ToString(), CacheOptions, ct);
+            result[code] = entry;
+            await _cache.SetStringAsync(
+                $"station:lookup:{code}",
+                JsonSerializer.Serialize(entry),
+                CacheOptions, ct);
         }
 
         return result;

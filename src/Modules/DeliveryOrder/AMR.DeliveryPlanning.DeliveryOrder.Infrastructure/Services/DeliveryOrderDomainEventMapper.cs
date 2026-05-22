@@ -11,9 +11,9 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
     {
         return domainEvent switch
         {
-            DeliveryOrderReadyToPlanDomainEvent evt =>
+            DeliveryOrderConfirmedDomainEvent evt =>
             [
-                new DeliveryOrderReadyForPlanningIntegrationEvent(
+                new DeliveryOrderConfirmedIntegrationEvent(
                     evt.EventId, evt.OccurredOn, evt.OrderId, evt.Priority,
                     evt.Deadline,
                     evt.Items.Select(i => new ItemSummaryDto(i.Sku, i.WeightKg, i.PickupStationId, i.DropStationId)).ToList())
@@ -41,6 +41,10 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             DeliveryOrderReleasedDomainEvent evt =>
             [
                 new DeliveryOrderReleasedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId)
+            ],
+            DeliveryOrderRejectedDomainEvent evt =>
+            [
+                new DeliveryOrderRejectedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason)
             ],
 
             // internal-only — no cross-module publishing needed
