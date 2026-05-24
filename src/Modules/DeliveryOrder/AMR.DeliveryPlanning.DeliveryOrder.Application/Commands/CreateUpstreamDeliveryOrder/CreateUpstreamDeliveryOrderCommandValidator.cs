@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using FluentValidation;
 
@@ -18,10 +19,11 @@ public class CreateUpstreamDeliveryOrderCommandValidator : AbstractValidator<Cre
 
         RuleForEach(x => x.Items).ChildRules(item =>
         {
-            item.RuleFor(p => p.PickupLocationCode).NotEmpty();
-            item.RuleFor(p => p.DropLocationCode).NotEmpty();
-            item.RuleFor(p => p.DropLocationCode)
-                .NotEqual(p => p.PickupLocationCode)
+            item.RuleFor(p => p.PickupLocation).NotNull().SetValidator(new LocationRefDtoValidator());
+            item.RuleFor(p => p.DropLocation).NotNull().SetValidator(new LocationRefDtoValidator());
+            item.RuleFor(p => p.DropLocation)
+                .NotEqual(p => p.PickupLocation)
+                .When(p => p.PickupLocation is not null && p.DropLocation is not null)
                 .WithMessage("Pickup and Drop locations must be different.");
             item.RuleFor(p => p.Sku).NotEmpty().MaximumLength(100);
             item.RuleFor(p => p.WeightKg)

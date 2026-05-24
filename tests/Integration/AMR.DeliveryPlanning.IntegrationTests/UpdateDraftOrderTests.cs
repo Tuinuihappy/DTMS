@@ -23,8 +23,8 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
             new
             {
                 sku = "SKU-ORIG-001",
-                pickupLocationCode = "WH-01",
-                dropLocationCode = "LINE-01",
+                pickupLocation = new { code = "WH-01" },
+                dropLocation = new { code = "LINE-01" },
                 dimensions = (object?)null,
                 weightKg = 5.0,
                 quantity = new { value = 10, uom = "PCS" },
@@ -44,8 +44,8 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
             new
             {
                 sku = "SKU-NEW-001",
-                pickupLocationCode = "WH-02",
-                dropLocationCode = "LINE-05",
+                pickupLocation = new { code = "WH-02" },
+                dropLocation = new { code = "LINE-05" },
                 dimensions = new { lengthCm = 30.0, widthCm = 20.0, heightCm = 10.0 },
                 weightKg = 8.0,
                 quantity = new { value = 3, uom = "BOX" },
@@ -54,8 +54,8 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
             new
             {
                 sku = "SKU-NEW-002",
-                pickupLocationCode = "WH-02",
-                dropLocationCode = "LINE-06",
+                pickupLocation = new { code = "WH-02" },
+                dropLocation = new { code = "LINE-06" },
                 dimensions = (object?)null,
                 weightKg = 2.0,
                 quantity = new { value = 50, uom = "PCS" },
@@ -110,8 +110,8 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
                 new
                 {
                     sku = "SKU-ORIG-001",  // same SKU as original — must be allowed
-                    pickupLocationCode = "WH-03",
-                    dropLocationCode = "LINE-07",
+                    pickupLocation = new { code = "WH-03" },
+                    dropLocation = new { code = "LINE-07" },
                     dimensions = (object?)null,
                     weightKg = 1.0,
                     quantity = new { value = 1, uom = "PCS" },
@@ -173,8 +173,8 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
                 new
                 {
                     sku = "SKU-001",
-                    pickupLocationCode = pickupId.ToString(),
-                    dropLocationCode = dropId.ToString(),
+                    pickupLocation = new { stationId = pickupId },
+                    dropLocation = new { stationId = dropId },
                     dimensions = (object?)null,
                     weightKg = 1.0,
                     quantity = new { value = 1, uom = "PCS" },
@@ -199,5 +199,5 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
     private record OrderDetailResponse(Guid Id, string OrderRef, string Priority, string CargoType,
         string OrderStatus, List<ItemResponse> Items);
 
-    private record ItemResponse(Guid Id, string Sku, string PickupLocationCode, string DropLocationCode);
+    private record ItemResponse(Guid Id, string Sku);
 }

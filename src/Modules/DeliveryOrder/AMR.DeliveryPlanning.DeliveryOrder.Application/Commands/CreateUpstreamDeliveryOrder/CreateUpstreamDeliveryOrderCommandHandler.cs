@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
@@ -13,20 +14,17 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
     private readonly IDeliveryOrderRepository _repository;
     private readonly IOrderAuditEventRepository _auditRepo;
     private readonly IStationValidationService _stationValidation;
-    private readonly IStationLookup _stationLookup;
     private readonly ILogger<CreateUpstreamDeliveryOrderCommandHandler> _logger;
 
     public CreateUpstreamDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
         IOrderAuditEventRepository auditRepo,
         IStationValidationService stationValidation,
-        IStationLookup stationLookup,
         ILogger<CreateUpstreamDeliveryOrderCommandHandler> logger)
     {
         _repository = repository;
         _auditRepo = auditRepo;
         _stationValidation = stationValidation;
-        _stationLookup = stationLookup;
         _logger = logger;
     }
 
@@ -49,14 +47,10 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
                 request.OrderRef, request.Priority, request.RequestedDeliveryDate,
                 request.SourceSystem, request.CreatedBy);
 
-            var normalize = await LocationCodeNormalizer.BuildAsync(
-                request.Items.SelectMany(i => new[] { i.PickupLocationCode, i.DropLocationCode }),
-                _stationLookup, cancellationToken);
-
             foreach (var (item, idx) in request.Items.Select((p, i) => (p, i + 1)))
             {
                 order.AddItem(
-                    normalize(item.PickupLocationCode), normalize(item.DropLocationCode),
+                    item.PickupLocation.ToDomain(), item.DropLocation.ToDomain(),
                     idx, item.Sku, item.Description,
                     item.LoadUnitProfileCode,
                     item.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,

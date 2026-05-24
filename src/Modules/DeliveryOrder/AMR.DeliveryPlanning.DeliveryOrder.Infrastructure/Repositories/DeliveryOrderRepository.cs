@@ -73,7 +73,8 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
 
     public async Task<(List<Domain.Entities.Item> Items, int TotalCount)> SearchItemsAsync(
         string? sku, Domain.Enums.CargoType? cargoType, Domain.Enums.ItemStatus? status,
-        string? pickupLocationCode, string? dropLocationCode,
+        string? pickupCode, Guid? pickupStationId,
+        string? dropCode, Guid? dropStationId,
         string? partNo, string? wo, string? line, string? vendor, string? dateCode, string? tradingCode,
         string? inventoryNo, string? po, string? traceId, string? lotNo,
         int page, int pageSize, CancellationToken cancellationToken = default)
@@ -86,10 +87,14 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
             query = query.Where(i => i.CargoType == cargoType.Value);
         if (status.HasValue)
             query = query.Where(i => i.Status == status.Value);
-        if (!string.IsNullOrEmpty(pickupLocationCode))
-            query = query.Where(i => i.PickupLocationCode == pickupLocationCode);
-        if (!string.IsNullOrEmpty(dropLocationCode))
-            query = query.Where(i => i.DropLocationCode == dropLocationCode);
+        if (!string.IsNullOrEmpty(pickupCode))
+            query = query.Where(i => i.PickupLocation.Code == pickupCode);
+        if (pickupStationId.HasValue)
+            query = query.Where(i => i.PickupLocation.StationId == pickupStationId.Value);
+        if (!string.IsNullOrEmpty(dropCode))
+            query = query.Where(i => i.DropLocation.Code == dropCode);
+        if (dropStationId.HasValue)
+            query = query.Where(i => i.DropLocation.StationId == dropStationId.Value);
         if (!string.IsNullOrEmpty(partNo))
             query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.PartNo != null && i.CargoSpecific.PartNo.Contains(partNo));
         if (!string.IsNullOrEmpty(wo))

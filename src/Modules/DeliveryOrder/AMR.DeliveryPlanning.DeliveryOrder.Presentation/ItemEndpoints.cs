@@ -18,8 +18,10 @@ public static class ItemEndpoints
             string? sku,
             string? cargoType,
             string? status,
-            string? pickupLocationCode,
-            string? dropLocationCode,
+            string? pickupCode,
+            Guid? pickupStationId,
+            string? dropCode,
+            Guid? dropStationId,
             string? partNo,
             string? wo,
             string? line,
@@ -39,7 +41,8 @@ public static class ItemEndpoints
 
             var result = await sender.Send(new SearchItemsQuery(
                 sku, cargoTypeEnum, statusEnum,
-                pickupLocationCode, dropLocationCode,
+                pickupCode, pickupStationId,
+                dropCode, dropStationId,
                 partNo, wo, line, vendor, dateCode, tradingCode,
                 inventoryNo, po, traceId, lotNo,
                 page, pageSize));

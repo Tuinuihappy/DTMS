@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkSubmitDeliveryOrders;
@@ -10,16 +10,13 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
 {
     private readonly IDeliveryOrderRepository _repo;
     private readonly IStationValidationService _stationValidation;
-    private readonly IStationLookup _stationLookup;
 
     public BulkSubmitDeliveryOrdersCommandHandler(
         IDeliveryOrderRepository repo,
-        IStationValidationService stationValidation,
-        IStationLookup stationLookup)
+        IStationValidationService stationValidation)
     {
         _repo = repo;
         _stationValidation = stationValidation;
-        _stationLookup = stationLookup;
     }
 
     public async Task<Result<BulkSubmitResult>> Handle(BulkSubmitDeliveryOrdersCommand request, CancellationToken cancellationToken)
@@ -29,12 +26,6 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
 
         var succeeded = new List<Domain.Entities.DeliveryOrder>();
         var failures = new List<BulkSubmitFailure>();
-
-        // Resolve all location inputs across all orders in one batched lookup so each draft
-        // stores the canonical Code form regardless of whether the caller sent a Guid or a Code.
-        var normalize = await LocationCodeNormalizer.BuildAsync(
-            request.Orders.SelectMany(o => o.Items).SelectMany(i => new[] { i.PickupLocationCode, i.DropLocationCode }),
-            _stationLookup, cancellationToken);
 
         // validate and build orders first (sequential — shares DbContext safely)
         var pendingOrders = new List<Domain.Entities.DeliveryOrder>();
@@ -59,7 +50,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                 foreach (var (pkg, idx) in cmd.Items.Select((p, i) => (p, i + 1)))
                 {
                     order.AddItem(
-                        normalize(pkg.PickupLocationCode), normalize(pkg.DropLocationCode),
+                        pkg.PickupLocation.ToDomain(), pkg.DropLocation.ToDomain(),
                         idx, pkg.Sku, pkg.Description,
                         pkg.LoadUnitProfileCode,
                         pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,

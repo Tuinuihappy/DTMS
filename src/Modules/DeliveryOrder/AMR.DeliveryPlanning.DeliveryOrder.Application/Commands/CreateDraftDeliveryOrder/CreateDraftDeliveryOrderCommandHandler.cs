@@ -1,5 +1,4 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
@@ -10,16 +9,13 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDel
 public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraftDeliveryOrderCommand, DeliveryOrderDetailDto>
 {
     private readonly IDeliveryOrderRepository _repository;
-    private readonly IStationLookup _stationLookup;
     private readonly ILogger<CreateDraftDeliveryOrderCommandHandler> _logger;
 
     public CreateDraftDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
-        IStationLookup stationLookup,
         ILogger<CreateDraftDeliveryOrderCommandHandler> logger)
     {
         _repository = repository;
-        _stationLookup = stationLookup;
         _logger = logger;
     }
 
@@ -32,14 +28,10 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
             request.SourceSystem,
             request.CreatedBy);
 
-        var normalize = await LocationCodeNormalizer.BuildAsync(
-            request.Items.SelectMany(i => new[] { i.PickupLocationCode, i.DropLocationCode }),
-            _stationLookup, cancellationToken);
-
         foreach (var (pkg, idx) in request.Items.Select((p, i) => (p, i + 1)))
         {
             order.AddItem(
-                normalize(pkg.PickupLocationCode), normalize(pkg.DropLocationCode),
+                pkg.PickupLocation.ToDomain(), pkg.DropLocation.ToDomain(),
                 idx, pkg.Sku, pkg.Description,
                 pkg.LoadUnitProfileCode,
                 pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,

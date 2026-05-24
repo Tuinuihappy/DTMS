@@ -20,11 +20,17 @@ public record CargoSpecificDto(
     string? TraceId,
     string? LotNo);
 
+/// <summary>
+/// Discriminated location reference. Provide exactly one of <c>Code</c> or <c>StationId</c>.
+/// The chosen form is preserved end-to-end (response returns the same shape).
+/// </summary>
+public record LocationRefDto(string? Code, Guid? StationId);
+
 public record ItemDto(
     string Sku,
     string? Description,
-    string PickupLocationCode,
-    string DropLocationCode,
+    LocationRefDto PickupLocation,
+    LocationRefDto DropLocation,
     string? LoadUnitProfileCode,
     DimensionsDto? Dimensions,
     double? WeightKg,

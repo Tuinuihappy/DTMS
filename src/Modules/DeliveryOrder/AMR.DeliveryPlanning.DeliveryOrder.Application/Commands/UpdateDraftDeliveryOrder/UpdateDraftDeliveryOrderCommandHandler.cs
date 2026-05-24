@@ -1,5 +1,5 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
@@ -11,16 +11,13 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.UpdateDraftDel
 public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraftDeliveryOrderCommand, DeliveryOrderDetailDto>
 {
     private readonly IDeliveryOrderRepository _repository;
-    private readonly IStationLookup _stationLookup;
     private readonly ILogger<UpdateDraftDeliveryOrderCommandHandler> _logger;
 
     public UpdateDraftDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
-        IStationLookup stationLookup,
         ILogger<UpdateDraftDeliveryOrderCommandHandler> logger)
     {
         _repository = repository;
-        _stationLookup = stationLookup;
         _logger = logger;
     }
 
@@ -39,14 +36,10 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
 
             order.UpdateDraft(request.OrderRef, request.Priority, request.RequestedDeliveryDate);
 
-            var normalize = await LocationCodeNormalizer.BuildAsync(
-                request.Items.SelectMany(i => new[] { i.PickupLocationCode, i.DropLocationCode }),
-                _stationLookup, cancellationToken);
-
             foreach (var (item, idx) in request.Items.Select((p, i) => (p, i + 1)))
             {
                 order.AddItem(
-                    normalize(item.PickupLocationCode), normalize(item.DropLocationCode),
+                    item.PickupLocation.ToDomain(), item.DropLocation.ToDomain(),
                     idx, item.Sku, item.Description,
                     item.LoadUnitProfileCode,
                     item.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,

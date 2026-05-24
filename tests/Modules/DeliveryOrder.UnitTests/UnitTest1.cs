@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using FluentAssertions;
 
 namespace DeliveryOrder.UnitTests;
@@ -15,17 +16,18 @@ public class DeliveryOrderTests
         AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder order,
         int itemSeq, string pickup, string drop, string sku,
         double? weightKg = 10.0, double quantity = 5, string uom = "EA") =>
-        order.AddItem(pickup, drop, itemSeq, sku,
+        order.AddItem(
+            LocationRef.FromCode(pickup), LocationRef.FromCode(drop),
+            itemSeq, sku,
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: weightKg, quantity: quantity, uom: uom,
             cargoType: null, cargoSpecific: null);
 
-    private static IReadOnlyDictionary<(string, string), (Guid, Guid)> StationMap(
-        params (string pickup, string drop)[] routes)
+    private static IReadOnlyDictionary<LocationRef, Guid> StationMap(params string[] codes)
     {
-        var dict = new Dictionary<(string, string), (Guid, Guid)>();
-        foreach (var r in routes)
-            dict[r] = (Guid.NewGuid(), Guid.NewGuid());
+        var dict = new Dictionary<LocationRef, Guid>();
+        foreach (var c in codes)
+            dict[LocationRef.FromCode(c)] = Guid.NewGuid();
         return dict;
     }
 
@@ -46,8 +48,27 @@ public class DeliveryOrderTests
 
         order.Items.Should().HaveCount(1);
         order.Items.First().Sku.Should().Be("SKU-001");
-        order.Items.First().PickupLocationCode.Should().Be("WH-01");
+        order.Items.First().PickupLocation.Code.Should().Be("WH-01");
+        order.Items.First().DropLocation.Code.Should().Be("STORE-05");
         order.Items.First().ItemSeq.Should().Be(1);
+    }
+
+    [Fact]
+    public void AddItem_AcceptsStationIdForm()
+    {
+        var order = CreateOrder();
+        var pickupId = Guid.NewGuid();
+        var dropId = Guid.NewGuid();
+        order.AddItem(
+            LocationRef.FromStationId(pickupId), LocationRef.FromStationId(dropId),
+            itemSeq: 1, "SKU-X",
+            description: null, loadUnitProfileCode: null,
+            dimensions: null, weightKg: 5.0, quantity: 1, uom: "EA",
+            cargoType: null, cargoSpecific: null);
+
+        order.Items.Single().PickupLocation.StationId.Should().Be(pickupId);
+        order.Items.Single().PickupLocation.IsStationId.Should().BeTrue();
+        order.Items.Single().DropLocation.StationId.Should().Be(dropId);
     }
 
     [Fact]
@@ -115,9 +136,10 @@ public class DeliveryOrderTests
 
         var pickupId = Guid.NewGuid();
         var dropId = Guid.NewGuid();
-        order.MarkAsValidated(new Dictionary<(string, string), (Guid, Guid)>
+        order.MarkAsValidated(new Dictionary<LocationRef, Guid>
         {
-            [("WH-01", "STORE-05")] = (pickupId, dropId)
+            [LocationRef.FromCode("WH-01")] = pickupId,
+            [LocationRef.FromCode("STORE-05")] = dropId,
         });
 
         order.Status.Should().Be(OrderStatus.Validated);
@@ -131,7 +153,7 @@ public class DeliveryOrderTests
         var order = CreateOrder();
         AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
 
-        var act = () => order.MarkAsValidated(StationMap(("WH-01", "STORE-05")));
+        var act = () => order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
 
         act.Should().Throw<InvalidOperationException>();
     }
@@ -142,7 +164,7 @@ public class DeliveryOrderTests
         var order = CreateOrder();
         AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
         order.Submit();
-        order.MarkAsValidated(StationMap(("WH-01", "STORE-05")));
+        order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
 
         order.Confirm();
 
@@ -301,5 +323,51 @@ public class DeliveryOrderTests
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*Draft*");
+    }
+}
+
+public class LocationRefTests
+{
+    [Fact]
+    public void FromCode_TrimsInput()
+    {
+        var r = LocationRef.FromCode("  SHELF-05 ");
+        r.Code.Should().Be("SHELF-05");
+        r.StationId.Should().BeNull();
+        r.IsCode.Should().BeTrue();
+    }
+
+    [Fact]
+    public void FromCode_RejectsEmpty()
+    {
+        var act = () => LocationRef.FromCode("   ");
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void FromStationId_RejectsEmptyGuid()
+    {
+        var act = () => LocationRef.FromStationId(Guid.Empty);
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Equality_TwoCodeRefs_SameValue_AreEqual()
+    {
+        LocationRef.FromCode("A").Should().Be(LocationRef.FromCode("A"));
+    }
+
+    [Fact]
+    public void Equality_CodeVsStationId_AreNotEqual()
+    {
+        var g = Guid.NewGuid();
+        LocationRef.FromCode("A").Should().NotBe(LocationRef.FromStationId(g));
+    }
+
+    [Fact]
+    public void Equality_TwoDifferentStationIds_AreNotEqual()
+    {
+        LocationRef.FromStationId(Guid.NewGuid())
+            .Should().NotBe(LocationRef.FromStationId(Guid.NewGuid()));
     }
 }

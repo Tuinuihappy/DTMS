@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
@@ -9,42 +10,49 @@ public class StationValidationService : IStationValidationService
 
     public StationValidationService(IStationLookup stationLookup) => _stationLookup = stationLookup;
 
-    public async Task<Result<IReadOnlyDictionary<(string pickup, string drop), (Guid pickupStationId, Guid dropStationId)>>>
+    public async Task<Result<IReadOnlyDictionary<LocationRef, Guid>>>
         BuildStationMapAsync(IEnumerable<Item> items, CancellationToken ct = default)
     {
-        var uniquePairs = items
-            .Select(i => (i.PickupLocationCode, i.DropLocationCode))
+        var refs = items
+            .SelectMany(i => new[] { i.PickupLocation, i.DropLocation })
             .Distinct()
             .ToList();
 
-        var allCodes = uniquePairs
-            .SelectMany(p => new[] { p.PickupLocationCode, p.DropLocationCode })
+        // Underlying lookup is string-based and handles both Code and Guid forms.
+        // Stringify each ref so we can reuse the existing Facility batch endpoint
+        // and the Redis cache layer in CachedStationLookup.
+        var inputs = refs
+            .Select(StringifyRef)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var resolved = await _stationLookup.ResolveBatchAsync(allCodes, ct);
+        var resolved = await _stationLookup.ResolveBatchAsync(inputs, ct);
 
-        foreach (var code in allCodes)
+        var map = new Dictionary<LocationRef, Guid>();
+        foreach (var r in refs)
         {
-            if (!resolved.TryGetValue(code, out var station))
-                return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Failure(
-                    $"'{code}' is not a valid station ID or code.");
+            var key = StringifyRef(r);
+
+            if (!resolved.TryGetValue(key, out var station))
+                return Result<IReadOnlyDictionary<LocationRef, Guid>>.Failure(
+                    $"'{r}' is not a valid station ID or code.");
 
             if (!station.IsActive)
-                return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Failure(
-                    $"'{code}' is deactivated and cannot be used for new orders.");
+                return Result<IReadOnlyDictionary<LocationRef, Guid>>.Failure(
+                    $"'{r}' is deactivated and cannot be used for new orders.");
 
             if (station.ManualOverrideActive)
-                return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Failure(
+                return Result<IReadOnlyDictionary<LocationRef, Guid>>.Failure(
                     string.IsNullOrWhiteSpace(station.ManualOverrideReason)
-                        ? $"'{code}' is currently offline (manual override)."
-                        : $"'{code}' is currently offline (manual override): {station.ManualOverrideReason}");
+                        ? $"'{r}' is currently offline (manual override)."
+                        : $"'{r}' is currently offline (manual override): {station.ManualOverrideReason}");
+
+            map[r] = station.Id;
         }
 
-        var map = uniquePairs.ToDictionary(
-            p => (p.PickupLocationCode, p.DropLocationCode),
-            p => (resolved[p.PickupLocationCode].Id, resolved[p.DropLocationCode].Id));
-
-        return Result<IReadOnlyDictionary<(string, string), (Guid, Guid)>>.Success(map);
+        return Result<IReadOnlyDictionary<LocationRef, Guid>>.Success(map);
     }
+
+    private static string StringifyRef(LocationRef r) =>
+        r.IsCode ? r.Code! : r.StationId!.Value.ToString();
 }

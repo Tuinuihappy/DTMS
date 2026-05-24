@@ -57,8 +57,18 @@ public class DeliveryOrderDbContext : DbContext
         {
             b.ToTable("Items", Schema);
             b.HasKey(p => p.Id);
-            b.Property(p => p.PickupLocationCode).HasMaxLength(50).IsRequired();
-            b.Property(p => p.DropLocationCode).HasMaxLength(50).IsRequired();
+            b.OwnsOne(p => p.PickupLocation, loc =>
+            {
+                loc.Property(x => x.Code).HasColumnName("PickupLocationCode").HasMaxLength(50);
+                loc.Property(x => x.StationId).HasColumnName("PickupLocationStationId");
+            });
+            b.OwnsOne(p => p.DropLocation, loc =>
+            {
+                loc.Property(x => x.Code).HasColumnName("DropLocationCode").HasMaxLength(50);
+                loc.Property(x => x.StationId).HasColumnName("DropLocationStationId");
+            });
+            b.Navigation(p => p.PickupLocation).IsRequired();
+            b.Navigation(p => p.DropLocation).IsRequired();
             b.Property(p => p.PickupStationId);
             b.Property(p => p.DropStationId);
             b.Property(p => p.ItemSeq).IsRequired();

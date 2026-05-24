@@ -156,8 +156,8 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         {
             new
             {
-                PickupLocationCode = pickupId.ToString(),
-                DropLocationCode = dropId.ToString(),
+                PickupLocation = new { StationId = pickupId },
+                DropLocation = new { StationId = dropId },
                 Barcode = $"BCR-{Guid.NewGuid():N}"[..15],
                 LoadUnitProfileCode = loadUnitProfileCode,
                 GrossWeightKg = 5.0,

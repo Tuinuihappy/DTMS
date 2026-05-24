@@ -2,6 +2,24 @@ using FluentValidation;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 
+public class LocationRefDtoValidator : AbstractValidator<LocationRefDto>
+{
+    public LocationRefDtoValidator()
+    {
+        RuleFor(x => x)
+            .Must(r => (r.Code is not null) ^ r.StationId.HasValue)
+            .WithMessage("LocationRef must specify exactly one of Code or StationId.");
+
+        RuleFor(x => x.Code!)
+            .NotEmpty().MaximumLength(50)
+            .When(x => x.Code is not null);
+
+        RuleFor(x => x.StationId!.Value)
+            .NotEqual(Guid.Empty)
+            .When(x => x.StationId.HasValue);
+    }
+}
+
 public class DraftItemDtoValidator : AbstractValidator<ItemDto>
 {
     public DraftItemDtoValidator()
@@ -37,9 +55,12 @@ public class DraftItemDtoValidator : AbstractValidator<ItemDto>
             RuleFor(p => p.Quantity.Uom).MaximumLength(20);
         });
 
-        RuleFor(p => p.DropLocationCode)
-            .NotEqual(p => p.PickupLocationCode)
-            .When(p => !string.IsNullOrEmpty(p.PickupLocationCode) && !string.IsNullOrEmpty(p.DropLocationCode))
+        RuleFor(p => p.PickupLocation).NotNull().SetValidator(new LocationRefDtoValidator());
+        RuleFor(p => p.DropLocation).NotNull().SetValidator(new LocationRefDtoValidator());
+
+        RuleFor(p => p.DropLocation)
+            .NotEqual(p => p.PickupLocation)
+            .When(p => p.PickupLocation is not null && p.DropLocation is not null)
             .WithMessage("Pickup and Drop locations must be different.");
     }
 }
@@ -51,8 +72,6 @@ public class SubmitItemDtoValidator : AbstractValidator<ItemDto>
         Include(new DraftItemDtoValidator());
 
         RuleFor(p => p.Sku).NotEmpty();
-        RuleFor(p => p.PickupLocationCode).NotEmpty();
-        RuleFor(p => p.DropLocationCode).NotEmpty();
         RuleFor(p => p.Quantity).NotNull();
         RuleFor(p => p.Quantity.Uom).NotEmpty().When(p => p.Quantity != null);
     }
