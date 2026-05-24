@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Domain\AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Presentation\AMR.DeliveryPlanning.DeliveryOrder.Presentation.csproj" />
   </ItemGroup>
 
 </Project>

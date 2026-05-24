@@ -11,12 +11,12 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderItems;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderTimeline;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using AMR.DeliveryPlanning.DeliveryOrder.Presentation.Idempotency;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.Caching.Distributed;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Presentation;
 
@@ -30,65 +30,48 @@ public static class DeliveryOrderEndpoints
     {
         var group = app.MapGroup("/api/delivery-orders").WithTags("DeliveryOrders").RequireAuthorization();
 
-        // POST /api/delivery-orders — create draft (supports Idempotency-Key header).
+        // POST /api/delivery-orders — create draft. Requires Idempotency-Key.
         // To submit, call POST /{id}/submit after creating.
-        group.MapPost("/", async (CreateDraftDeliveryOrderCommand command, HttpContext ctx, ISender sender, IDistributedCache cache) =>
+        group.MapPost("/", async (CreateDraftDeliveryOrderCommand command, ISender sender) =>
         {
-            var idempotencyKey = ctx.Request.Headers["Idempotency-Key"].FirstOrDefault();
-
-            if (idempotencyKey != null)
-            {
-                var existing = await cache.GetStringAsync($"idempotency:{idempotencyKey}");
-                if (existing != null && Guid.TryParse(existing, out var existingId))
-                {
-                    var cached = await sender.Send(new GetDeliveryOrderQuery(existingId));
-                    return cached.IsSuccess
-                        ? Results.Ok(cached.Value)
-                        : Results.Created($"/api/delivery-orders/{existingId}", existingId);
-                }
-            }
-
             var result = await sender.Send(command);
-            if (!result.IsSuccess) return Results.BadRequest(result.Error);
-
-            if (idempotencyKey != null)
-                await cache.SetStringAsync($"idempotency:{idempotencyKey}", result.Value.Id.ToString(),
-                    new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24) });
-
-            return Results.Created($"/api/delivery-orders/{result.Value.Id}", result.Value);
-        });
+            return result.IsSuccess
+                ? Results.Created($"/api/delivery-orders/{result.Value.Id}", result.Value)
+                : Results.BadRequest(result.Error);
+        }).RequireIdempotencyKey();
 
         // POST /api/delivery-orders/{id}/submit — submit draft (Draft → Validated)
         group.MapPost("/{id:guid}/submit", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new SubmitDeliveryOrderCommand(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequireIdempotencyKey();
 
         // POST /api/delivery-orders/{id}/confirm — manual confirm (Validated → Confirmed)
         group.MapPost("/{id:guid}/confirm", async (Guid id, [FromBody] ConfirmOrderRequest? body, ISender sender) =>
         {
             var result = await sender.Send(new ConfirmDeliveryOrderCommand(id, body?.ConfirmedBy));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequireIdempotencyKey();
 
         // POST /api/delivery-orders/{id}/reject — reject (Submitted|Validated|Confirmed → Rejected)
         group.MapPost("/{id:guid}/reject", async (Guid id, [FromBody] RejectOrderRequest body, ISender sender) =>
         {
             var result = await sender.Send(new RejectDeliveryOrderCommand(id, body.Reason, body.RejectedBy));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
-        });
+        }).RequireIdempotencyKey();
 
         // POST /api/delivery-orders/upstream — auto pipeline for upstream sources (SAP/ERP/OMS)
         // Submitted → Validated → Confirmed in one transaction.
-        // Idempotent on (SourceSystem, OrderRef): retries return the existing order id.
+        // Idempotent on (SourceSystem, OrderRef) at DB-level; Idempotency-Key is the
+        // transport-level guard for client retries.
         group.MapPost("/upstream", async (CreateUpstreamDeliveryOrderCommand command, ISender sender) =>
         {
             var result = await sender.Send(command);
             return result.IsSuccess
                 ? Results.Created($"/api/delivery-orders/{result.Value.Id}", result.Value)
                 : Results.BadRequest(result.Error);
-        });
+        }).RequireIdempotencyKey();
 
         // POST /api/delivery-orders/bulk
         group.MapPost("/bulk", async (BulkSubmitDeliveryOrdersCommand command, ISender sender) =>
@@ -103,7 +86,7 @@ public static class DeliveryOrderEndpoints
             return bulk.Failures.Count > 0
                 ? Results.Json(bulk, statusCode: 207)
                 : Results.Ok(bulk);
-        });
+        }).RequireIdempotencyKey();
 
         // GET /api/delivery-orders/{id}
         group.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
@@ -125,21 +108,21 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new CancelDeliveryOrderCommand(id, body.Reason));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
-        });
+        }).RequireIdempotencyKey();
 
         // PUT /api/delivery-orders/{id} — replace draft (only allowed when status=Draft)
         group.MapPut("/{id:guid}", async (Guid id, UpdateDraftDeliveryOrderCommand command, ISender sender) =>
         {
             var result = await sender.Send(command with { OrderId = id });
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequireIdempotencyKey();
 
         // PATCH /api/delivery-orders/{id} — amendment
         group.MapPatch("/{id:guid}", async (Guid id, AmendDeliveryOrderCommand command, ISender sender) =>
         {
             var result = await sender.Send(command with { OrderId = id });
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequireIdempotencyKey();
 
         // GET /api/delivery-orders/{id}/timeline
         group.MapGet("/{id:guid}/timeline", async (Guid id, ISender sender) =>

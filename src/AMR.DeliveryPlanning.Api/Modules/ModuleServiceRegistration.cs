@@ -6,6 +6,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
+using AMR.DeliveryPlanning.DeliveryOrder.Presentation.Idempotency;
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
@@ -205,6 +206,9 @@ public static class ModuleServiceRegistration
         // Redis distributed cache
         var redisConnection = configuration.GetConnectionString("Redis") ?? "localhost:6379";
         services.AddStackExchangeRedisCache(o => o.Configuration = redisConnection);
+
+        // Idempotency-Key filter — singleton (stateless, depends on IDistributedCache only)
+        services.AddSingleton<IdempotencyKeyFilter>();
 
         return services;
     }
