@@ -142,13 +142,13 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         AddDomainEvent(new DeliveryOrderValidatedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
-    public void Confirm()
+    public void Confirm(double weightFallbackKg)
     {
         if (Status != OrderStatus.Validated)
             throw new InvalidOperationException($"Only Validated orders can be confirmed. Current status: {Status}.");
 
         Status = OrderStatus.Confirmed;
-        AddDomainEvent(BuildConfirmedEvent());
+        AddDomainEvent(BuildConfirmedEvent(weightFallbackKg));
     }
 
     public void Reject(string reason)
@@ -169,11 +169,11 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         AddDomainEvent(new DeliveryOrderPlanningStartedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
-    private DeliveryOrderConfirmedDomainEvent BuildConfirmedEvent()
+    private DeliveryOrderConfirmedDomainEvent BuildConfirmedEvent(double weightFallbackKg)
     {
         var itemDtos = _items
             .Select(p => new ItemEventDto(
-                p.Sku, p.WeightKg ?? 0,
+                p.Sku, p.WeightKg ?? weightFallbackKg,
                 p.PickupStationId!.Value, p.DropStationId!.Value))
             .ToList();
 
@@ -218,14 +218,14 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         AddDomainEvent(new DeliveryOrderHeldDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
     }
 
-    public void Release()
+    public void Release(double weightFallbackKg)
     {
         if (Status != OrderStatus.Held)
             throw new InvalidOperationException("Only held orders can be released.");
 
         Status = OrderStatus.Confirmed;
         AddDomainEvent(new DeliveryOrderReleasedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
-        AddDomainEvent(BuildConfirmedEvent());
+        AddDomainEvent(BuildConfirmedEvent(weightFallbackKg));
     }
 
     public void MarkFailed(string reason)

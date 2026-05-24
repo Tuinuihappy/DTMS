@@ -26,8 +26,10 @@ public class CreateUpstreamDeliveryOrderCommandValidator : AbstractValidator<Cre
                 .When(p => p.PickupLocation is not null && p.DropLocation is not null)
                 .WithMessage("Pickup and Drop locations must be different.");
             item.RuleFor(p => p.Sku).NotEmpty().MaximumLength(100);
-            item.RuleFor(p => p.WeightKg)
-                .NotNull().WithMessage("WeightKg is required for upstream orders.")
+            // WeightKg is optional everywhere (P0-5 / Option C). When omitted, the order
+            // is still accepted, a warning is returned to the caller, and the configured
+            // WeightFallbackKg is used in the planning event so capacity stays safe.
+            item.RuleFor(p => p.WeightKg!.Value)
                 .GreaterThan(0).When(p => p.WeightKg.HasValue);
             item.RuleFor(p => p.Quantity).NotNull();
             item.When(p => p.Quantity != null, () =>

@@ -166,7 +166,7 @@ public class DeliveryOrderTests
         order.Submit();
         order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
 
-        order.Confirm();
+        order.Confirm(weightFallbackKg: 500);
 
         order.Status.Should().Be(OrderStatus.Confirmed);
         order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Should().HaveCount(1);
@@ -189,7 +189,7 @@ public class DeliveryOrderTests
         var order = CreateOrder();
         order.Hold("waiting");
 
-        order.Release();
+        order.Release(weightFallbackKg: 500);
 
         order.Status.Should().Be(OrderStatus.Confirmed);
         order.DomainEvents.OfType<DeliveryOrderReleasedDomainEvent>().Should().HaveCount(1);

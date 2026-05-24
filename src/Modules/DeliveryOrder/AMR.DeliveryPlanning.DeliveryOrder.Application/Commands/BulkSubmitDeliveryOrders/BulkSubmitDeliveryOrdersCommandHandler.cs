@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
@@ -24,7 +25,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         if (request.Orders.Count == 0)
             return Result<BulkSubmitResult>.Failure("No orders provided.");
 
-        var succeeded = new List<Domain.Entities.DeliveryOrder>();
+        var succeeded = new List<BulkSubmitSuccess>();
         var failures = new List<BulkSubmitFailure>();
 
         // validate and build orders first (sequential — shares DbContext safely)
@@ -85,16 +86,17 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
 
             order.Submit();
             order.MarkAsValidated(stationMap.Value);
-            succeeded.Add(order);
+            var warnings = WeightWarningEvaluator.Evaluate(order.Items);
+            succeeded.Add(new BulkSubmitSuccess(order.Id, warnings));
         }
 
         if (succeeded.Count > 0)
         {
-            await _repo.AddRangeAsync(succeeded, cancellationToken);
+            var orders = pendingOrders.Where(o => succeeded.Any(s => s.OrderId == o.Id));
+            await _repo.AddRangeAsync(orders, cancellationToken);
             await _repo.SaveChangesAsync(cancellationToken);
         }
 
-        return Result<BulkSubmitResult>.Success(
-            new BulkSubmitResult(succeeded.Select(o => o.Id).ToList(), failures));
+        return Result<BulkSubmitResult>.Success(new BulkSubmitResult(succeeded, failures));
     }
 }

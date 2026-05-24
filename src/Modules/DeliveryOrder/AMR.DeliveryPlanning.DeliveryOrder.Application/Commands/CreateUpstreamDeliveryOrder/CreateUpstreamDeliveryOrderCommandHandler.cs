@@ -1,4 +1,6 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Options;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
@@ -6,6 +8,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
 
@@ -14,17 +17,20 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
     private readonly IDeliveryOrderRepository _repository;
     private readonly IOrderAuditEventRepository _auditRepo;
     private readonly IStationValidationService _stationValidation;
+    private readonly DeliveryOrderOptions _options;
     private readonly ILogger<CreateUpstreamDeliveryOrderCommandHandler> _logger;
 
     public CreateUpstreamDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
         IOrderAuditEventRepository auditRepo,
         IStationValidationService stationValidation,
+        IOptions<DeliveryOrderOptions> options,
         ILogger<CreateUpstreamDeliveryOrderCommandHandler> logger)
     {
         _repository = repository;
         _auditRepo = auditRepo;
         _stationValidation = stationValidation;
+        _options = options.Value;
         _logger = logger;
     }
 
@@ -37,7 +43,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
             _logger.LogInformation("[Upstream] Order '{OrderRef}' from {SourceSystem} already exists with id {OrderId} — returning existing.",
                 request.OrderRef, request.SourceSystem, existing.Id);
             return Result<UpstreamOrderAckDto>.Success(
-                new UpstreamOrderAckDto(existing.Id, existing.OrderRef, existing.Status, existing.CreatedDate));
+                new UpstreamOrderAckDto(existing.Id, existing.OrderRef, existing.Status, existing.CreatedDate, Array.Empty<OrderQualityIssue>()));
         }
 
         Domain.Entities.DeliveryOrder order;
@@ -78,20 +84,24 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         try
         {
             order.MarkAsValidated(stationMap.Value);
-            order.Confirm();
+            order.Confirm(_options.WeightFallbackKg);
 
             await _repository.AddAsync(order, cancellationToken);
             await _auditRepo.AddAsync(new OrderAuditEvent(
                 order.Id, "OrderUpstreamIngested",
                 $"Order '{order.OrderRef}' ingested from {order.SourceSystem} by {request.CreatedBy} — auto-confirmed and queued for planning"), cancellationToken);
 
+            var warnings = WeightWarningEvaluator.Evaluate(order.Items);
+            foreach (var w in warnings)
+                await _auditRepo.AddAsync(new OrderAuditEvent(order.Id, "QualityWarning", $"{w.Code}: {w.Message}"), cancellationToken);
+
             await _repository.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("[Upstream] Order {OrderId} '{OrderRef}' from {SourceSystem} auto-pipelined to Confirmed.",
-                order.Id, order.OrderRef, order.SourceSystem);
+            _logger.LogInformation("[Upstream] Order {OrderId} '{OrderRef}' from {SourceSystem} auto-pipelined to Confirmed ({WarningCount} warning(s)).",
+                order.Id, order.OrderRef, order.SourceSystem, warnings.Count);
 
             return Result<UpstreamOrderAckDto>.Success(
-                new UpstreamOrderAckDto(order.Id, order.OrderRef, order.Status, order.CreatedDate));
+                new UpstreamOrderAckDto(order.Id, order.OrderRef, order.Status, order.CreatedDate, warnings));
         }
         catch (InvalidOperationException ex)
         {
@@ -113,7 +123,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
             _logger.LogInformation("[Upstream] Order '{OrderRef}' raced with concurrent insert — returning existing id {OrderId}.",
                 request.OrderRef, raced.Id);
             return Result<UpstreamOrderAckDto>.Success(
-                new UpstreamOrderAckDto(raced.Id, raced.OrderRef, raced.Status, raced.CreatedDate));
+                new UpstreamOrderAckDto(raced.Id, raced.OrderRef, raced.Status, raced.CreatedDate, Array.Empty<OrderQualityIssue>()));
         }
     }
 }
