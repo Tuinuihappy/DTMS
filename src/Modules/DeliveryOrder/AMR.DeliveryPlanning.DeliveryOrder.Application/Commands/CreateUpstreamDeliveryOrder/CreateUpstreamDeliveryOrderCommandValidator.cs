@@ -15,16 +15,6 @@ public class CreateUpstreamDeliveryOrderCommandValidator : AbstractValidator<Cre
         RuleFor(x => x.CreatedBy).NotEmpty().MaximumLength(200);
 
         RuleFor(x => x.Items).NotEmpty().WithMessage("At least one item is required.");
-        RuleFor(x => x.Items)
-            .Must(items =>
-            {
-                var lotNos = items
-                    .Where(i => i.CargoSpecific?.LotNo != null)
-                    .Select(i => i.CargoSpecific!.LotNo!)
-                    .ToList();
-                return lotNos.Distinct(StringComparer.OrdinalIgnoreCase).Count() == lotNos.Count;
-            })
-            .WithMessage("LotNo must be unique within the order.");
 
         RuleForEach(x => x.Items).ChildRules(item =>
         {
