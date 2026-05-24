@@ -13,7 +13,7 @@ public enum OrderStatus
     Completed,
     Held,
     Failed,
-    Amended,     // reserved: set when order is amended after entering planning pipeline (ReadyToPlan→Dispatched)
+    Amended,     // reserved: set when order is amended after entering planning pipeline (Confirmed→Dispatched)
                  // requires Planning module consumer for DeliveryOrderAmendedIntegrationEvent + re-plan mechanism
     Cancelled,
     Rejected     // terminal: reject after Submitted/Validated/Confirmed (distinct from user-driven Cancelled)

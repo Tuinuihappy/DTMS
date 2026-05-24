@@ -65,7 +65,7 @@ public static class DeliveryOrderEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
-        // POST /api/delivery-orders/{id}/confirm — manual confirm (Validated → Confirmed → ReadyToPlan)
+        // POST /api/delivery-orders/{id}/confirm — manual confirm (Validated → Confirmed)
         group.MapPost("/{id:guid}/confirm", async (Guid id, [FromBody] ConfirmOrderRequest? body, ISender sender) =>
         {
             var result = await sender.Send(new ConfirmDeliveryOrderCommand(id, body?.ConfirmedBy));
@@ -80,7 +80,7 @@ public static class DeliveryOrderEndpoints
         });
 
         // POST /api/delivery-orders/upstream — auto pipeline for upstream sources (SAP/ERP/OMS)
-        // Submitted → Validated → Confirmed → ReadyToPlan in one transaction.
+        // Submitted → Validated → Confirmed in one transaction.
         // Idempotent on (SourceSystem, OrderRef): retries return the existing order id.
         group.MapPost("/upstream", async (CreateUpstreamDeliveryOrderCommand command, ISender sender) =>
         {

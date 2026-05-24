@@ -93,7 +93,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
 
             await _repository.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("[Upstream] Order {OrderId} '{OrderRef}' from {SourceSystem} auto-pipelined to ReadyToPlan.",
+            _logger.LogInformation("[Upstream] Order {OrderId} '{OrderRef}' from {SourceSystem} auto-pipelined to Confirmed.",
                 order.Id, order.OrderRef, order.SourceSystem);
 
             return Result<UpstreamOrderAckDto>.Success(

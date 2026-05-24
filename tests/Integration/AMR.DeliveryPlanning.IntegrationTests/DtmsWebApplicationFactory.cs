@@ -168,7 +168,7 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
     };
 
     /// <summary>
-    /// Creates a draft order then submits it (Draft → ReadyToPlan).
+    /// Creates a draft order then submits it (Draft → Validated).
     /// Returns the order ID or throws if either step fails.
     /// </summary>
     public async Task<Guid> CreateAndSubmitOrderAsync(HttpClient client, Guid pickupId, Guid dropId,
