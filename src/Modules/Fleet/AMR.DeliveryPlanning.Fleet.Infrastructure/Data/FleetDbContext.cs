@@ -108,7 +108,9 @@ public class FleetDbContext : DbContext
             b.HasKey(e => e.Id);
             b.Property(e => e.Type).HasMaxLength(500).IsRequired();
             b.Property(e => e.Content).HasColumnType("text").IsRequired();
+            b.Property(e => e.RetryCount).HasDefaultValue(0);
             b.HasIndex(e => e.ProcessedOnUtc);
+            b.HasIndex(e => e.NextRetryAtUtc);
         });
 
         base.OnModelCreating(modelBuilder);

@@ -20,7 +20,9 @@ public class OutboxDbContext : DbContext
             e.Property(m => m.Type).HasMaxLength(500).IsRequired();
             e.Property(m => m.Content).IsRequired();
             e.Property(m => m.OccurredOnUtc).IsRequired();
+            e.Property(m => m.RetryCount).HasDefaultValue(0);
             e.HasIndex(m => m.ProcessedOnUtc);
+            e.HasIndex(m => m.NextRetryAtUtc);
         });
     }
 }

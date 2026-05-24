@@ -63,9 +63,11 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
         where TDbContext : DbContext
     {
         var db = scope.ServiceProvider.GetRequiredService<TDbContext>();
+        var now = DateTime.UtcNow;
 
         var messages = await db.Set<OutboxMessage>()
-            .Where(m => m.ProcessedOnUtc == null)
+            .Where(m => m.ProcessedOnUtc == null
+                        && (m.NextRetryAtUtc == null || m.NextRetryAtUtc <= now))
             .OrderBy(m => m.OccurredOnUtc)
             .Take(50)
             .ToListAsync(cancellationToken);
@@ -81,8 +83,7 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
                 var type = Type.GetType(message.Type);
                 if (type == null)
                 {
-                    _logger.LogWarning("Cannot resolve type {Type} for outbox message {Id} from {Source}", message.Type, message.Id, source);
-                    message.MarkAsFailed(DateTime.UtcNow, $"Type not found: {message.Type}");
+                    HandleFailure(message, source, $"Type not found: {message.Type}", exception: null);
                     continue;
                 }
 
@@ -100,11 +101,26 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to publish outbox message {Id} from {Source}", message.Id, source);
-                message.MarkAsFailed(DateTime.UtcNow, ex.Message);
+                HandleFailure(message, source, ex.Message, ex);
             }
         }
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private void HandleFailure(OutboxMessage message, string source, string error, Exception? exception)
+    {
+        message.MarkAsFailed(DateTime.UtcNow, error);
+
+        if (message.HasReachedMaxRetries)
+        {
+            _logger.LogError(exception, "Outbox message {Id} from {Source} permanently failed after {Max} attempts: {Error}",
+                message.Id, source, OutboxRetryPolicy.MaxRetries, error);
+        }
+        else
+        {
+            _logger.LogWarning(exception, "Outbox message {Id} from {Source} failed (attempt {Count}/{Max}); next retry at {NextRetry:o}: {Error}",
+                message.Id, source, message.RetryCount, OutboxRetryPolicy.MaxRetries, message.NextRetryAtUtc, error);
+        }
     }
 }

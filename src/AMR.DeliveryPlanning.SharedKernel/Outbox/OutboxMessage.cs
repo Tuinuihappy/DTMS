@@ -8,6 +8,10 @@ public class OutboxMessage
     public DateTime OccurredOnUtc { get; private set; }
     public DateTime? ProcessedOnUtc { get; private set; }
     public string? Error { get; private set; }
+    public int RetryCount { get; private set; }
+    public DateTime? NextRetryAtUtc { get; private set; }
+
+    public bool HasReachedMaxRetries => RetryCount >= OutboxRetryPolicy.MaxRetries;
 
     private OutboxMessage() { } // For EF Core
 
@@ -22,11 +26,25 @@ public class OutboxMessage
     public void MarkAsProcessed(DateTime processedOnUtc)
     {
         ProcessedOnUtc = processedOnUtc;
+        Error = null;
+        NextRetryAtUtc = null;
     }
 
-    public void MarkAsFailed(DateTime processedOnUtc, string error)
+    public void MarkAsFailed(DateTime attemptedAtUtc, string error)
     {
-        ProcessedOnUtc = processedOnUtc;
+        RetryCount++;
         Error = error;
+
+        var nextDelay = OutboxRetryPolicy.GetNextRetryDelay(RetryCount);
+        if (nextDelay.HasValue)
+        {
+            NextRetryAtUtc = attemptedAtUtc.Add(nextDelay.Value);
+        }
+        else
+        {
+            // Max retries reached — terminal failure; stop polling this row.
+            ProcessedOnUtc = attemptedAtUtc;
+            NextRetryAtUtc = null;
+        }
     }
 }

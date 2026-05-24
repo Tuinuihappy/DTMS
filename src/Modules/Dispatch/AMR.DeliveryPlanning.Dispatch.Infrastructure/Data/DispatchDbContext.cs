@@ -116,7 +116,9 @@ public class DispatchDbContext : DbContext
             builder.HasKey(e => e.Id);
             builder.Property(e => e.Type).HasMaxLength(500).IsRequired();
             builder.Property(e => e.Content).HasColumnType("text").IsRequired();
+            builder.Property(e => e.RetryCount).HasDefaultValue(0);
             builder.HasIndex(e => e.ProcessedOnUtc);
+            builder.HasIndex(e => e.NextRetryAtUtc);
         });
     }
 }

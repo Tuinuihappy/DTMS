@@ -36,11 +36,19 @@ namespace AMR.DeliveryPlanning.Api.Infrastructure.Outbox.Migrations
                     b.Property<string>("Error")
                         .HasColumnType("text");
 
+                    b.Property<DateTime?>("NextRetryAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("OccurredOnUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("ProcessedOnUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RetryCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -48,6 +56,8 @@ namespace AMR.DeliveryPlanning.Api.Infrastructure.Outbox.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("NextRetryAtUtc");
 
                     b.HasIndex("ProcessedOnUtc");
 
