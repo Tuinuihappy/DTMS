@@ -19,6 +19,10 @@ public record DeliveryOrderConfirmedDomainEvent(
     string SlaTier,
     DateTime? Earliest,
     DateTime? Latest,
+    // Deadline is a backward-compat alias for Latest, kept so existing consumers that
+    // read `evt.Deadline` keep working until P1-8 introduces explicit event versioning.
+    // New consumers should prefer Earliest+Latest.
+    DateTime? Deadline,
     DateTime? SubmittedAt,
     IReadOnlyList<ItemEventDto> Items) : IDomainEvent;
 public record DeliveryOrderRejectedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string Reason) : IDomainEvent;

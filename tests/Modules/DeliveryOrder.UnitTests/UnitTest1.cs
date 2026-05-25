@@ -493,4 +493,41 @@ public class DeliveryOrderTests
         confirmed.Earliest.Should().Be(earliest);
         confirmed.Latest.Should().Be(latest);
     }
+
+    [Fact]
+    public void Confirm_DomainEvent_DeadlineMirrorsLatest_ForBackwardCompat()
+    {
+        var earliest = DateTime.UtcNow.AddHours(2);
+        var latest = DateTime.UtcNow.AddHours(8);
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "DEADLINE-COMPAT", Priority.Normal,
+            serviceWindow: ServiceWindow.Create(earliest, latest),
+            sourceSystem: SourceSystem.Manual, createdBy: null);
+        AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
+
+        order.Confirm(weightFallbackKg: 500);
+
+        var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
+        confirmed.Deadline.Should().Be(latest, "Deadline is a v1-compat alias for Latest");
+    }
+
+    [Fact]
+    public void Confirm_DomainEvent_DeadlineIsNull_WhenNoServiceWindow()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "NO-WINDOW", Priority.Normal, serviceWindow: null,
+            sourceSystem: SourceSystem.Manual, createdBy: null);
+        AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
+
+        order.Confirm(weightFallbackKg: 500);
+
+        var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
+        confirmed.Earliest.Should().BeNull();
+        confirmed.Latest.Should().BeNull();
+        confirmed.Deadline.Should().BeNull();
+    }
 }
