@@ -4,7 +4,9 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CancelDeliveryOrde
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ConfirmDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.HoldDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.RejectDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReleaseDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.UpdateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
@@ -23,6 +25,8 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Presentation;
 public record CancelOrderRequest(string Reason);
 public record ConfirmOrderRequest(string? ConfirmedBy = null);
 public record RejectOrderRequest(string Reason, string? RejectedBy = null);
+public record HoldOrderRequest(string Reason, string? HeldBy = null);
+public record ReleaseOrderRequest(string? ReleasedBy = null);
 
 public static class DeliveryOrderEndpoints
 {
@@ -59,6 +63,21 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new RejectDeliveryOrderCommand(id, body.Reason, body.RejectedBy));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+        }).RequireIdempotencyKey();
+
+        // POST /api/v1/delivery-orders/{id}/hold — hold an order (any live state → Held)
+        group.MapPost("/{id:guid}/hold", async (Guid id, [FromBody] HoldOrderRequest body, ISender sender) =>
+        {
+            var result = await sender.Send(new HoldDeliveryOrderCommand(id, body.Reason, body.HeldBy));
+            return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+        }).RequireIdempotencyKey();
+
+        // POST /api/v1/delivery-orders/{id}/release — release a held order back to Confirmed
+        // (re-fires DeliveryOrderConfirmedIntegrationEvent so Planning re-plans).
+        group.MapPost("/{id:guid}/release", async (Guid id, [FromBody] ReleaseOrderRequest? body, ISender sender) =>
+        {
+            var result = await sender.Send(new ReleaseDeliveryOrderCommand(id, body?.ReleasedBy));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequireIdempotencyKey();
 
         // POST /api/v1/delivery-orders/upstream — auto pipeline for upstream sources (SAP/ERP/OMS)
