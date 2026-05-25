@@ -88,13 +88,13 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
         if (status.HasValue)
             query = query.Where(i => i.Status == status.Value);
         if (!string.IsNullOrEmpty(pickupCode))
-            query = query.Where(i => i.PickupLocation.Code == pickupCode);
+            query = query.Where(i => i.PickupLocationCode == pickupCode);
         if (pickupStationId.HasValue)
-            query = query.Where(i => i.PickupLocation.StationId == pickupStationId.Value);
+            query = query.Where(i => i.PickupStationId == pickupStationId.Value);
         if (!string.IsNullOrEmpty(dropCode))
-            query = query.Where(i => i.DropLocation.Code == dropCode);
+            query = query.Where(i => i.DropLocationCode == dropCode);
         if (dropStationId.HasValue)
-            query = query.Where(i => i.DropLocation.StationId == dropStationId.Value);
+            query = query.Where(i => i.DropStationId == dropStationId.Value);
         if (!string.IsNullOrEmpty(partNo))
             query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.PartNo != null && i.CargoSpecific.PartNo.Contains(partNo));
         if (!string.IsNullOrEmpty(wo))

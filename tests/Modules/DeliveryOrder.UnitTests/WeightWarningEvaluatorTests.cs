@@ -1,6 +1,5 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using FluentAssertions;
 using DomainEntities = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 
@@ -13,7 +12,7 @@ public class WeightWarningEvaluatorTests
         var order = DomainEntities.DeliveryOrder.Create("ORD-X", Priority.Normal, requestedDeliveryDate: null);
         foreach (var (seq, sku, weight) in items)
             order.AddItem(
-                LocationRef.FromCode("WH-01"), LocationRef.FromCode("LINE-01"),
+                "WH-01", "LINE-01",
                 seq, sku,
                 description: null, loadUnitProfileCode: null,
                 dimensions: null, weightKg: weight, quantity: 1, uom: "EA",
@@ -83,16 +82,16 @@ public class DeliveryOrderFallbackWeightTests
     {
         var order = DomainEntities.DeliveryOrder.Create("ORD-1", Priority.Normal, requestedDeliveryDate: null);
         order.AddItem(
-            LocationRef.FromCode("WH-01"), LocationRef.FromCode("LINE-01"),
+            "WH-01", "LINE-01",
             itemSeq: 1, sku: "SKU-A",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: null, quantity: 1, uom: "EA",
             cargoType: null, cargoSpecific: null);
         order.Submit();
-        order.MarkAsValidated(new Dictionary<LocationRef, Guid>
+        order.MarkAsValidated(new Dictionary<string, Guid>
         {
-            [LocationRef.FromCode("WH-01")] = Guid.NewGuid(),
-            [LocationRef.FromCode("LINE-01")] = Guid.NewGuid(),
+            ["WH-01"] = Guid.NewGuid(),
+            ["LINE-01"] = Guid.NewGuid(),
         });
 
         order.Confirm(weightFallbackKg: 250.0);
@@ -108,16 +107,16 @@ public class DeliveryOrderFallbackWeightTests
     {
         var order = DomainEntities.DeliveryOrder.Create("ORD-2", Priority.Normal, requestedDeliveryDate: null);
         order.AddItem(
-            LocationRef.FromCode("WH-01"), LocationRef.FromCode("LINE-01"),
+            "WH-01", "LINE-01",
             itemSeq: 1, sku: "SKU-B",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 42.0, quantity: 1, uom: "EA",
             cargoType: null, cargoSpecific: null);
         order.Submit();
-        order.MarkAsValidated(new Dictionary<LocationRef, Guid>
+        order.MarkAsValidated(new Dictionary<string, Guid>
         {
-            [LocationRef.FromCode("WH-01")] = Guid.NewGuid(),
-            [LocationRef.FromCode("LINE-01")] = Guid.NewGuid(),
+            ["WH-01"] = Guid.NewGuid(),
+            ["LINE-01"] = Guid.NewGuid(),
         });
 
         order.Confirm(weightFallbackKg: 250.0);

@@ -19,13 +19,13 @@ public static class VehicleEndpoints
 {
     public static void MapFleetEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/fleet").WithTags("Fleet").RequireAuthorization();
+        var group = app.MapGroup("/api/v1/fleet").WithTags("Fleet").RequireAuthorization();
 
         group.MapPost("/vehicle-types", async (CreateVehicleTypeCommand command, ISender sender) =>
         {
             var result = await sender.Send(command);
             return result.IsSuccess
-                ? Results.Created($"/api/fleet/vehicle-types/{result.Value}", result.Value)
+                ? Results.Created($"/api/v1/fleet/vehicle-types/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
         });
 
@@ -76,7 +76,7 @@ public static class VehicleEndpoints
                 var result = await sender.Send(new CreateMaintenanceRecordCommand(
                     vehicleId, req.Type, req.Reason, req.Technician, req.ScheduledAt));
                 return result.IsSuccess
-                    ? Results.Created($"/api/fleet/vehicles/{vehicleId}/maintenance/{result.Value}", result.Value)
+                    ? Results.Created($"/api/v1/fleet/vehicles/{vehicleId}/maintenance/{result.Value}", result.Value)
                     : Results.BadRequest(result.Error);
             });
 
@@ -92,7 +92,7 @@ public static class VehicleEndpoints
         {
             var result = await sender.Send(command);
             return result.IsSuccess
-                ? Results.Created($"/api/fleet/groups/{result.Value}", result.Value)
+                ? Results.Created($"/api/v1/fleet/groups/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
         });
 

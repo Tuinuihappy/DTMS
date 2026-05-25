@@ -180,7 +180,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
         var vehicleTypeId = await _factory.CreateVehicleTypeAsync();
 
         // Register vehicle with riot3 adapter (real RIOT3 call will be made on dispatch)
-        var regResp = await client.PostAsJsonAsync("/api/fleet/vehicles", new
+        var regResp = await client.PostAsJsonAsync("/api/v1/fleet/vehicles", new
         {
             VehicleName = $"RIOT3T-{Guid.NewGuid():N}"[..20],
             VehicleTypeId = vehicleTypeId,
@@ -191,7 +191,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
             $"Vehicle registration failed: {await regResp.Content.ReadAsStringAsync()}");
         var vehicleId = await regResp.Content.ReadFromJsonAsync<Guid>();
 
-        await client.PutAsJsonAsync($"/api/fleet/vehicles/{vehicleId}/state", new
+        await client.PutAsJsonAsync($"/api/v1/fleet/vehicles/{vehicleId}/state", new
         {
             VehicleId = vehicleId,
             NewState = 1, // Idle
@@ -200,7 +200,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
         });
 
         // Create job → assign → commit
-        var jobResp = await client.PostAsJsonAsync("/api/planning/jobs", new
+        var jobResp = await client.PostAsJsonAsync("/api/v1/planning/jobs", new
         {
             DeliveryOrderId = Guid.NewGuid(),
             PickupStationId = pickupId,
@@ -210,13 +210,13 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
         jobResp.IsSuccessStatusCode.Should().BeTrue();
         var jobId = await jobResp.Content.ReadFromJsonAsync<Guid>();
 
-        var assignResp = await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/assign", new { JobId = jobId });
+        var assignResp = await client.PostAsJsonAsync($"/api/v1/planning/jobs/{jobId}/assign", new { JobId = jobId });
         assignResp.IsSuccessStatusCode.Should().BeTrue(
             $"Assign failed: {await assignResp.Content.ReadAsStringAsync()}");
-        await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/commit", new { JobId = jobId });
+        await client.PostAsJsonAsync($"/api/v1/planning/jobs/{jobId}/commit", new { JobId = jobId });
 
         // Dispatch trip — this CALLS RIOT3 for real via Riot3CommandService
-        var tripResp = await client.PostAsJsonAsync("/api/dispatch/trips", new
+        var tripResp = await client.PostAsJsonAsync("/api/v1/dispatch/trips", new
         {
             JobId = jobId,
             VehicleId = vehicleId,
@@ -228,7 +228,7 @@ public class Riot3RealIntegrationTests : IClassFixture<DtmsWebApplicationFactory
 
         // Trip must be InProgress regardless of whether RIOT3 accepted the task
         // (VendorAdapterTaskDispatcher catches RIOT3 errors gracefully)
-        var tripBody = await (await client.GetAsync($"/api/dispatch/trips/{tripId}")).Content.ReadAsStringAsync();
+        var tripBody = await (await client.GetAsync($"/api/v1/dispatch/trips/{tripId}")).Content.ReadAsStringAsync();
         tripBody.Should().Contain("\"status\":1",
             "Trip must be InProgress even if RIOT3 rejects unknown vehicle — app must handle RIOT3 errors gracefully");
     }

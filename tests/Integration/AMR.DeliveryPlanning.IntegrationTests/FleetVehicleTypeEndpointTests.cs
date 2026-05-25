@@ -16,7 +16,7 @@ public class FleetVehicleTypeEndpointTests : IClassFixture<DtmsWebApplicationFac
         var client = await _factory.GetAuthenticatedClient();
         var deviceKey = $"SEER-{Guid.NewGuid():N}"[..20];
 
-        var typeResp = await client.PostAsJsonAsync("/api/fleet/vehicle-types", new
+        var typeResp = await client.PostAsJsonAsync("/api/v1/fleet/vehicle-types", new
         {
             TypeName = "RIOT3 Feeder",
             MaxPayload = 100.0,
@@ -27,7 +27,7 @@ public class FleetVehicleTypeEndpointTests : IClassFixture<DtmsWebApplicationFac
             $"VehicleType creation failed: {await typeResp.Content.ReadAsStringAsync()}");
         var vehicleTypeId = await typeResp.Content.ReadFromJsonAsync<Guid>();
 
-        var regResp = await client.PostAsJsonAsync("/api/fleet/vehicles", new
+        var regResp = await client.PostAsJsonAsync("/api/v1/fleet/vehicles", new
         {
             VehicleName = "FAN1_FEEDER_NO6",
             VehicleTypeId = vehicleTypeId,

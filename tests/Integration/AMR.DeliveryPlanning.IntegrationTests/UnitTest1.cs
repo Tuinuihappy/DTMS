@@ -53,7 +53,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/api/planning/jobs/pending");
+        var response = await client.GetAsync("/api/v1/planning/jobs/pending");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -65,7 +65,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
 
-        var createResponse = await client.PostAsJsonAsync("/api/facility/maps", new
+        var createResponse = await client.PostAsJsonAsync("/api/v1/facility/maps", new
         {
             Name = "TestMap",
             Version = "1.0",
@@ -78,7 +78,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         var mapId = await createResponse.Content.ReadFromJsonAsync<Guid>();
         mapId.Should().NotBe(Guid.Empty);
 
-        var getResponse = await client.GetAsync($"/api/facility/maps/{mapId}");
+        var getResponse = await client.GetAsync($"/api/v1/facility/maps/{mapId}");
         getResponse.IsSuccessStatusCode.Should().BeTrue();
     }
 
@@ -92,7 +92,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
         var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
 
-        var response = await client.PostAsJsonAsync("/api/delivery-orders",
+        var response = await client.PostAsJsonAsync("/api/v1/delivery-orders",
             DtmsWebApplicationFactory.BuildOrderRequest(pickupId, dropId, profileCode,
                 sla: DateTime.UtcNow.AddHours(4)));
 
@@ -108,7 +108,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
 
         // 0. Register an idle vehicle so GreedyVehicleSelector can find it via DB
         var vehicleTypeId = await _factory.CreateVehicleTypeAsync();
-        var regResponse = await client.PostAsJsonAsync("/api/fleet/vehicles", new
+        var regResponse = await client.PostAsJsonAsync("/api/v1/fleet/vehicles", new
         {
             VehicleName = "TestVehicle-Assign",
             VehicleTypeId = vehicleTypeId
@@ -116,7 +116,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         regResponse.IsSuccessStatusCode.Should().BeTrue($"Register vehicle failed: {await regResponse.Content.ReadAsStringAsync()}");
         var vehicleId = await regResponse.Content.ReadFromJsonAsync<Guid>();
 
-        var stateResponse = await client.PutAsJsonAsync($"/api/fleet/vehicles/{vehicleId}/state", new
+        var stateResponse = await client.PutAsJsonAsync($"/api/v1/fleet/vehicles/{vehicleId}/state", new
         {
             VehicleId = vehicleId,
             NewState = 1, // VehicleState.Idle
@@ -126,7 +126,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         stateResponse.IsSuccessStatusCode.Should().BeTrue($"Set vehicle state failed: {await stateResponse.Content.ReadAsStringAsync()}");
 
         // 1. Create Job
-        var createResponse = await client.PostAsJsonAsync("/api/planning/jobs", new
+        var createResponse = await client.PostAsJsonAsync("/api/v1/planning/jobs", new
         {
             DeliveryOrderId = Guid.NewGuid(),
             PickupStationId = Guid.NewGuid(),
@@ -139,18 +139,18 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         jobId.Should().NotBe(Guid.Empty);
 
         // 2. Get Job
-        var getResponse = await client.GetAsync($"/api/planning/jobs/{jobId}");
+        var getResponse = await client.GetAsync($"/api/v1/planning/jobs/{jobId}");
         getResponse.IsSuccessStatusCode.Should().BeTrue();
 
         // 3. Assign Vehicle (GreedyVehicleSelector will find the registered vehicle)
-        var assignResponse = await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/assign", new
+        var assignResponse = await client.PostAsJsonAsync($"/api/v1/planning/jobs/{jobId}/assign", new
         {
             JobId = jobId
         });
         assignResponse.IsSuccessStatusCode.Should().BeTrue($"Assign failed: {await assignResponse.Content.ReadAsStringAsync()}");
 
         // 4. Commit Plan
-        var commitResponse = await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/commit", new
+        var commitResponse = await client.PostAsJsonAsync($"/api/v1/planning/jobs/{jobId}/commit", new
         {
             JobId = jobId
         });
@@ -166,7 +166,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         var pickupId = Guid.NewGuid();
         var dropId = Guid.NewGuid();
 
-        var tripResponse = await client.PostAsJsonAsync("/api/dispatch/trips", new
+        var tripResponse = await client.PostAsJsonAsync("/api/v1/dispatch/trips", new
         {
             JobId = Guid.NewGuid(),
             VehicleId = Guid.NewGuid(),
@@ -177,7 +177,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         var tripId = await tripResponse.Content.ReadFromJsonAsync<Guid>();
         tripId.Should().NotBe(Guid.Empty);
 
-        var getResponse = await client.GetAsync($"/api/dispatch/trips/{tripId}");
+        var getResponse = await client.GetAsync($"/api/v1/dispatch/trips/{tripId}");
         getResponse.IsSuccessStatusCode.Should().BeTrue();
     }
 
@@ -188,7 +188,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
 
-        var createResponse = await client.PostAsJsonAsync("/api/planning/jobs", new
+        var createResponse = await client.PostAsJsonAsync("/api/v1/planning/jobs", new
         {
             DeliveryOrderId = Guid.NewGuid(),
             PickupStationId = Guid.NewGuid(),
@@ -202,7 +202,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         jobId.Should().NotBe(Guid.Empty);
 
         // Verify job has multiple legs
-        var getResponse = await client.GetAsync($"/api/planning/jobs/{jobId}");
+        var getResponse = await client.GetAsync($"/api/v1/planning/jobs/{jobId}");
         getResponse.IsSuccessStatusCode.Should().BeTrue();
     }
 
@@ -235,7 +235,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
 
         // Register an idle vehicle so GreedyVehicleSelector can find it via DB
         var replanVehicleTypeId = await _factory.CreateVehicleTypeAsync();
-        var regResponse = await client.PostAsJsonAsync("/api/fleet/vehicles", new
+        var regResponse = await client.PostAsJsonAsync("/api/v1/fleet/vehicles", new
         {
             VehicleName = "TestVehicle-Replan",
             VehicleTypeId = replanVehicleTypeId
@@ -243,7 +243,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         regResponse.IsSuccessStatusCode.Should().BeTrue($"Register vehicle failed: {await regResponse.Content.ReadAsStringAsync()}");
         var vehicleId = await regResponse.Content.ReadFromJsonAsync<Guid>();
 
-        var stateResponse = await client.PutAsJsonAsync($"/api/fleet/vehicles/{vehicleId}/state", new
+        var stateResponse = await client.PutAsJsonAsync($"/api/v1/fleet/vehicles/{vehicleId}/state", new
         {
             VehicleId = vehicleId,
             NewState = 1, // VehicleState.Idle
@@ -253,7 +253,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         stateResponse.IsSuccessStatusCode.Should().BeTrue($"Set vehicle state failed: {await stateResponse.Content.ReadAsStringAsync()}");
 
         // Create + Assign + Commit
-        var createResponse = await client.PostAsJsonAsync("/api/planning/jobs", new
+        var createResponse = await client.PostAsJsonAsync("/api/v1/planning/jobs", new
         {
             DeliveryOrderId = Guid.NewGuid(),
             PickupStationId = Guid.NewGuid(),
@@ -262,11 +262,11 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         });
         var jobId = await createResponse.Content.ReadFromJsonAsync<Guid>();
 
-        await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/assign", new { JobId = jobId });
-        await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/commit", new { JobId = jobId });
+        await client.PostAsJsonAsync($"/api/v1/planning/jobs/{jobId}/assign", new { JobId = jobId });
+        await client.PostAsJsonAsync($"/api/v1/planning/jobs/{jobId}/commit", new { JobId = jobId });
 
         // Replan
-        var replanResponse = await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/replan", new
+        var replanResponse = await client.PostAsJsonAsync($"/api/v1/planning/jobs/{jobId}/replan", new
         {
             JobId = jobId,
             Reason = "DISRUPTION"
@@ -359,7 +359,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
 
         // Create trip (auto-starts on dispatch)
         var p = Guid.NewGuid(); var d = Guid.NewGuid();
-        var createResponse = await client.PostAsJsonAsync("/api/dispatch/trips", new
+        var createResponse = await client.PostAsJsonAsync("/api/v1/dispatch/trips", new
         {
             JobId = Guid.NewGuid(),
             VehicleId = Guid.NewGuid(),
@@ -369,7 +369,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         var tripId = await createResponse.Content.ReadFromJsonAsync<Guid>();
 
         // Verify trip is auto-started (status=1 = InProgress)
-        var getResponse = await client.GetAsync($"/api/dispatch/trips/{tripId}");
+        var getResponse = await client.GetAsync($"/api/v1/dispatch/trips/{tripId}");
         getResponse.IsSuccessStatusCode.Should().BeTrue();
         var body = await getResponse.Content.ReadAsStringAsync();
         body.Should().Contain("\"status\":\"InProgress\"");

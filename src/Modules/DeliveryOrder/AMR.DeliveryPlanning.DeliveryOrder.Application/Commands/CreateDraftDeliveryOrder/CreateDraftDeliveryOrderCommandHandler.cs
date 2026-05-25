@@ -31,7 +31,7 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
         foreach (var (pkg, idx) in request.Items.Select((p, i) => (p, i + 1)))
         {
             order.AddItem(
-                pkg.PickupLocation.ToDomain(), pkg.DropLocation.ToDomain(),
+                pkg.PickupLocationCode, pkg.DropLocationCode,
                 idx, pkg.Sku, pkg.Description,
                 pkg.LoadUnitProfileCode,
                 pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,

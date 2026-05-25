@@ -94,7 +94,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     }
 
     public void AddItem(
-        LocationRef pickupLocation, LocationRef dropLocation,
+        string pickupLocationCode, string dropLocationCode,
         int itemSeq, string sku, string? description,
         string? loadUnitProfileCode,
         Dimensions? dimensions, double? weightKg, double quantity, string uom,
@@ -104,7 +104,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         if (_items.Any(p => p.ItemSeq == itemSeq))
             throw new InvalidOperationException($"An item with seq '{itemSeq}' already exists in this order.");
 
-        _items.Add(new Item(Id, pickupLocation, dropLocation, itemSeq, sku, description, loadUnitProfileCode, dimensions, weightKg, quantity, uom, cargoType, cargoSpecific));
+        _items.Add(new Item(Id, pickupLocationCode, dropLocationCode, itemSeq, sku, description, loadUnitProfileCode, dimensions, weightKg, quantity, uom, cargoType, cargoSpecific));
         TotalWeightKg += weightKg ?? 0;
         TotalQuantity += quantity;
         TotalItems++;
@@ -124,17 +124,17 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
                 item.UpdateStatus(ItemStatus.Delivered);
     }
 
-    public void MarkAsValidated(IReadOnlyDictionary<LocationRef, Guid> stationMap)
+    public void MarkAsValidated(IReadOnlyDictionary<string, Guid> stationMap)
     {
         if (Status != OrderStatus.Submitted)
             throw new InvalidOperationException("Only submitted orders can be validated.");
 
         foreach (var item in _items)
         {
-            if (!stationMap.TryGetValue(item.PickupLocation, out var pickupId))
-                throw new InvalidOperationException($"Missing station mapping for pickup {item.PickupLocation}.");
-            if (!stationMap.TryGetValue(item.DropLocation, out var dropId))
-                throw new InvalidOperationException($"Missing station mapping for drop {item.DropLocation}.");
+            if (!stationMap.TryGetValue(item.PickupLocationCode, out var pickupId))
+                throw new InvalidOperationException($"Missing station mapping for pickup {item.PickupLocationCode}.");
+            if (!stationMap.TryGetValue(item.DropLocationCode, out var dropId))
+                throw new InvalidOperationException($"Missing station mapping for drop {item.DropLocationCode}.");
             item.SetStationIds(pickupId, dropId);
         }
 

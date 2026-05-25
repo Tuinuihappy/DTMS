@@ -20,19 +20,13 @@ public record CargoSpecificDto(
     string? TraceId,
     string? LotNo);
 
-/// <summary>
-/// Discriminated location reference echoed back in the same shape the caller sent on POST.
-/// Exactly one of <c>Code</c> or <c>StationId</c> is non-null.
-/// </summary>
-public record LocationRefDto(string? Code, Guid? StationId);
-
 public record ItemDto(
     Guid Id,
     int ItemSeq,
     string Sku,
     string? Description,
-    LocationRefDto PickupLocation,
-    LocationRefDto DropLocation,
+    string PickupLocationCode,
+    string DropLocationCode,
     Guid? PickupStationId,
     Guid? DropStationId,
     string? LoadUnitProfileCode,
@@ -150,8 +144,8 @@ internal static class DeliveryOrderMapper
                 p.ItemSeq,
                 p.Sku,
                 p.Description,
-                new LocationRefDto(p.PickupLocation.Code, p.PickupLocation.StationId),
-                new LocationRefDto(p.DropLocation.Code, p.DropLocation.StationId),
+                p.PickupLocationCode,
+                p.DropLocationCode,
                 p.PickupStationId,
                 p.DropStationId,
                 p.LoadUnitProfileCode,

@@ -19,11 +19,11 @@ public class CreateUpstreamDeliveryOrderCommandValidator : AbstractValidator<Cre
 
         RuleForEach(x => x.Items).ChildRules(item =>
         {
-            item.RuleFor(p => p.PickupLocation).NotNull().SetValidator(new LocationRefDtoValidator());
-            item.RuleFor(p => p.DropLocation).NotNull().SetValidator(new LocationRefDtoValidator());
-            item.RuleFor(p => p.DropLocation)
-                .NotEqual(p => p.PickupLocation)
-                .When(p => p.PickupLocation is not null && p.DropLocation is not null)
+            item.RuleFor(p => p.PickupLocationCode).NotEmpty().MaximumLength(50);
+            item.RuleFor(p => p.DropLocationCode).NotEmpty().MaximumLength(50);
+            item.RuleFor(p => p.DropLocationCode)
+                .NotEqual(p => p.PickupLocationCode)
+                .When(p => !string.IsNullOrWhiteSpace(p.PickupLocationCode) && !string.IsNullOrWhiteSpace(p.DropLocationCode))
                 .WithMessage("Pickup and Drop locations must be different.");
             item.RuleFor(p => p.Sku).NotEmpty().MaximumLength(100);
             // WeightKg is optional everywhere (P0-5 / Option C). When omitted, the order

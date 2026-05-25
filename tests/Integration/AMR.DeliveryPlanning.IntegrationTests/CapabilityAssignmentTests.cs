@@ -34,14 +34,14 @@ public class CapabilityAssignmentTests : IClassFixture<DtmsWebApplicationFactory
         var jobId = await CreateJobWithCapabilityAsync(client, "LIFT");
 
         // Assign — GreedyVehicleSelector must find the LIFT vehicle
-        var assignResp = await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/assign",
+        var assignResp = await client.PostAsJsonAsync($"/api/v1/planning/jobs/{jobId}/assign",
             new { JobId = jobId });
 
         assignResp.IsSuccessStatusCode.Should().BeTrue(
             $"Assign must succeed when a LIFT vehicle is available: {await assignResp.Content.ReadAsStringAsync()}");
 
         // Verify job is now in Assigned status by reading it
-        var getResp = await client.GetAsync($"/api/planning/jobs/{jobId}");
+        var getResp = await client.GetAsync($"/api/v1/planning/jobs/{jobId}");
         getResp.IsSuccessStatusCode.Should().BeTrue();
         var body = await getResp.Content.ReadAsStringAsync();
         body.Should().Contain(vehicleId.ToString(), "assigned vehicle must be the LIFT-capable one");
@@ -60,7 +60,7 @@ public class CapabilityAssignmentTests : IClassFixture<DtmsWebApplicationFactory
         var jobId = await CreateJobWithCapabilityAsync(client, "LIFT");
 
         // Assign — no LIFT vehicle available for this tenant → must fail
-        var assignResp = await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/assign",
+        var assignResp = await client.PostAsJsonAsync($"/api/v1/planning/jobs/{jobId}/assign",
             new { JobId = jobId });
 
         assignResp.IsSuccessStatusCode.Should().BeFalse(
@@ -75,7 +75,7 @@ public class CapabilityAssignmentTests : IClassFixture<DtmsWebApplicationFactory
         await RegisterAndSetIdleAsync(client, moveTypeId);
 
         // Job with no RequiredCapability — any idle vehicle is eligible
-        var jobResp = await client.PostAsJsonAsync("/api/planning/jobs", new
+        var jobResp = await client.PostAsJsonAsync("/api/v1/planning/jobs", new
         {
             DeliveryOrderId = Guid.NewGuid(),
             PickupStationId = Guid.NewGuid(),
@@ -86,7 +86,7 @@ public class CapabilityAssignmentTests : IClassFixture<DtmsWebApplicationFactory
         jobResp.IsSuccessStatusCode.Should().BeTrue();
         var jobId = await jobResp.Content.ReadFromJsonAsync<Guid>();
 
-        var assignResp = await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/assign",
+        var assignResp = await client.PostAsJsonAsync($"/api/v1/planning/jobs/{jobId}/assign",
             new { JobId = jobId });
 
         assignResp.IsSuccessStatusCode.Should().BeTrue(
@@ -111,7 +111,7 @@ public class CapabilityAssignmentTests : IClassFixture<DtmsWebApplicationFactory
 
     private static async Task<Guid> RegisterAndSetIdleAsync(HttpClient client, Guid vehicleTypeId)
     {
-        var regResp = await client.PostAsJsonAsync("/api/fleet/vehicles", new
+        var regResp = await client.PostAsJsonAsync("/api/v1/fleet/vehicles", new
         {
             VehicleName = $"CAP-{Guid.NewGuid():N}"[..20],
             VehicleTypeId = vehicleTypeId
@@ -120,7 +120,7 @@ public class CapabilityAssignmentTests : IClassFixture<DtmsWebApplicationFactory
             $"Vehicle registration failed: {await regResp.Content.ReadAsStringAsync()}");
         var vehicleId = await regResp.Content.ReadFromJsonAsync<Guid>();
 
-        var stateResp = await client.PutAsJsonAsync($"/api/fleet/vehicles/{vehicleId}/state", new
+        var stateResp = await client.PutAsJsonAsync($"/api/v1/fleet/vehicles/{vehicleId}/state", new
         {
             VehicleId = vehicleId,
             NewState = 1,   // Idle
@@ -135,7 +135,7 @@ public class CapabilityAssignmentTests : IClassFixture<DtmsWebApplicationFactory
 
     private static async Task<Guid> CreateJobWithCapabilityAsync(HttpClient client, string capability)
     {
-        var resp = await client.PostAsJsonAsync("/api/planning/jobs", new
+        var resp = await client.PostAsJsonAsync("/api/v1/planning/jobs", new
         {
             DeliveryOrderId = Guid.NewGuid(),
             PickupStationId = Guid.NewGuid(),

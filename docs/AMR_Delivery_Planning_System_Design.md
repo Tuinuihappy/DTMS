@@ -94,7 +94,7 @@ Before diving into contexts, the core glossary to anchor naming:
 
 **State machine**
 ```
-DRAFT → SUBMITTED → VALIDATED → READY_TO_PLAN → PLANNING → PLANNED
+DRAFT → SUBMITTED → VALIDATED → CONFIRMED → PLANNING → PLANNED
      → DISPATCHED → IN_PROGRESS → COMPLETED
 (at any live state): HELD, CANCELLED, FAILED, AMENDED
 ```
@@ -539,7 +539,7 @@ Predictive replanning, battery-aware dispatch, cost-model tuning per tenant, pla
 
 - Expected peak throughput (orders/hour/facility)? Drives solver mode choice.
 - Preferred UI framework & whether the operator console is part of this scope or separate.
-- Multi-tenant vs single-tenant deployment target? Drives isolation strategy.
+- ~~Multi-tenant vs single-tenant deployment target? Drives isolation strategy.~~ **Resolved 2026-05-25**: Single-tenant deployment is the target for Phase 1–4. Multi-tenancy is descoped pending business validation (no confirmed multi-subsidiary customer). `facilityId` provides the physical scope for plant-level isolation. References to `tenantId` throughout this document are retained as forward-looking placeholders — see [`payload-delivery-refactored-tiger.md`](payload-delivery-refactored-tiger.md) P2-7 for the reintroduction trigger.
 - Mix of vendors expected at go-live and over 2 years? Drives how much to invest in ACL abstractions upfront.
 - Is there an existing identity provider (SSO)? Drives auth integration.
 - Real-time streaming of telemetry to BI/monitoring required, or periodic export acceptable?
@@ -573,9 +573,9 @@ Predictive replanning, battery-aware dispatch, cost-model tuning per tenant, pla
 | `DeliveryOrder` aggregate | ✅ Done | `DeliveryOrder.cs` — OrderKey, Priority, Status, SLA, PickupStationId, DropStationId |
 | `OrderLine` entity | ✅ Done | `OrderLine.cs` — ItemCode, Quantity, Weight, Remarks |
 | `RecurringSchedule` entity | ✅ Done | `RecurringSchedule.cs` — CronExpression, ValidFrom, ValidUntil |
-| State machine | ⚡ Partial | Submitted → Validated → Cancelled (missing: DRAFT, READY_TO_PLAN, PLANNING, PLANNED, DISPATCHED, IN_PROGRESS, COMPLETED, HELD, FAILED, AMENDED) |
-| `POST /api/delivery-orders` | ✅ Done | SubmitDeliveryOrderCommand + Handler |
-| `DEL /api/delivery-orders/{id}` | ✅ Done | CancelDeliveryOrderCommand + Handler |
+| State machine | ⚡ Partial | Submitted → Validated → Cancelled (missing: DRAFT, CONFIRMED, PLANNING, PLANNED, DISPATCHED, IN_PROGRESS, COMPLETED, HELD, FAILED, AMENDED) |
+| `POST /api/v1/delivery-orders` | ✅ Done | SubmitDeliveryOrderCommand + Handler |
+| `DEL /api/v1/delivery-orders/{id}` | ✅ Done | CancelDeliveryOrderCommand + Handler |
 | Domain events | ✅ Done | DeliveryOrderSubmittedDomainEvent, ValidatedDomainEvent, CancelledDomainEvent |
 | Integration events | ✅ Done | DeliveryOrderSubmittedIntegrationEvent |
 | DbContext + Schema | ✅ Done | `deliveryorder` schema — 3 tables (DeliveryOrders, OrderLines, RecurringSchedules) |
@@ -595,11 +595,11 @@ Predictive replanning, battery-aware dispatch, cost-model tuning per tenant, pla
 | `Stop` entity | ✅ Done | `Stop.cs` — StationType (Pick/Drop/Charge/Park/Wait) |
 | Vehicle Assignment | ✅ Done | `GreedyVehicleSelector` — nearest-compatible heuristic |
 | Route Cost Calculator | ✅ Done | `SimpleRouteCostCalculator` — Euclidean distance (placeholder) |
-| `POST /api/planning/jobs` | ✅ Done | CreateJobFromOrderCommand + Handler |
-| `POST /api/planning/jobs/{id}/assign` | ✅ Done | AssignVehicleCommand + Handler |
-| `POST /api/planning/jobs/{id}/commit` | ✅ Done | CommitJobCommand + Handler |
-| `GET /api/planning/jobs/{id}` | ✅ Done | GetJobByIdQuery + Handler |
-| `GET /api/planning/jobs/pending` | ✅ Done | GetPendingJobsQuery + Handler |
+| `POST /api/v1/planning/jobs` | ✅ Done | CreateJobFromOrderCommand + Handler |
+| `POST /api/v1/planning/jobs/{id}/assign` | ✅ Done | AssignVehicleCommand + Handler |
+| `POST /api/v1/planning/jobs/{id}/commit` | ✅ Done | CommitJobCommand + Handler |
+| `GET /api/v1/planning/jobs/{id}` | ✅ Done | GetJobByIdQuery + Handler |
+| `GET /api/v1/planning/jobs/pending` | ✅ Done | GetPendingJobsQuery + Handler |
 | Domain events | ✅ Done | JobCreated, JobAssigned, JobCommitted |
 | Integration events | ✅ Done | JobAssignedIntegrationEvent |
 | DbContext + Schema | ✅ Done | `planning` schema — 3 tables (Jobs, Legs, Stops) |
@@ -619,11 +619,11 @@ Predictive replanning, battery-aware dispatch, cost-model tuning per tenant, pla
 | `RobotTask` entity | ✅ Done | `RobotTask.cs` — TaskType (Move/Lift/Drop/Act/Charge/Park), SequenceOrder, Status |
 | `ExecutionEvent` entity | ✅ Done | `ExecutionEvent.cs` — EventType, Details, OccurredAt |
 | Auto-dispatch chain | ✅ Done | Trip.Start() dispatches first task; CompleteTask() auto-dispatches next |
-| `POST /api/dispatch/trips` | ✅ Done | DispatchTripCommand + Handler |
-| `POST /api/dispatch/trips/{tripId}/tasks/{taskId}/complete` | ✅ Done | ReportTaskCompletedCommand |
-| `POST /api/dispatch/trips/{tripId}/tasks/{taskId}/fail` | ✅ Done | ReportTaskFailedCommand |
-| `GET /api/dispatch/trips/{id}` | ✅ Done | GetTripByIdQuery |
-| `GET /api/dispatch/vehicles/{vehicleId}/trips` | ✅ Done | GetTripsByVehicleQuery |
+| `POST /api/v1/dispatch/trips` | ✅ Done | DispatchTripCommand + Handler |
+| `POST /api/v1/dispatch/trips/{tripId}/tasks/{taskId}/complete` | ✅ Done | ReportTaskCompletedCommand |
+| `POST /api/v1/dispatch/trips/{tripId}/tasks/{taskId}/fail` | ✅ Done | ReportTaskFailedCommand |
+| `GET /api/v1/dispatch/trips/{id}` | ✅ Done | GetTripByIdQuery |
+| `GET /api/v1/dispatch/vehicles/{vehicleId}/trips` | ✅ Done | GetTripsByVehicleQuery |
 | Domain events | ✅ Done | TripStarted, TripCompleted, TaskDispatched, TaskCompleted, TaskFailed |
 | Integration events | ✅ Done | TripStartedIntegrationEvent |
 | DbContext + Schema | ✅ Done | `dispatch` schema — 3 tables (Trips, RobotTasks, ExecutionEvents) |
@@ -639,9 +639,9 @@ Predictive replanning, battery-aware dispatch, cost-model tuning per tenant, pla
 |---|---|---|
 | `Vehicle` entity | ✅ Done | `Vehicle.cs` — VehicleName, VehicleTypeId, State (Idle/Moving/Charging/Error/Offline) |
 | `VehicleType` entity | ✅ Done | `VehicleType.cs` — TypeName, MaxPayloadKg, Capabilities |
-| `POST /api/fleet/vehicles/register-state` | ✅ Done | RegisterVehicleStateCommand |
-| `GET /api/fleet/vehicles/available` | ✅ Done | GetAvailableVehiclesQuery |
-| `GET /api/fleet/vehicle-types` | ✅ Done | GetVehicleTypesQuery |
+| `POST /api/v1/fleet/vehicles/register-state` | ✅ Done | RegisterVehicleStateCommand |
+| `GET /api/v1/fleet/vehicles/available` | ✅ Done | GetAvailableVehiclesQuery |
+| `GET /api/v1/fleet/vehicle-types` | ✅ Done | GetVehicleTypesQuery |
 | Integration events | ✅ Done | VehicleStateChangedIntegrationEvent |
 | DbContext + Schema | ✅ Done | `fleet` schema — 2 tables (Vehicles, VehicleTypes) |
 | Charging strategy | ❌ Not started | ChargingPolicy entity |
@@ -657,8 +657,8 @@ Predictive replanning, battery-aware dispatch, cost-model tuning per tenant, pla
 | `Station` entity | ✅ Done | `Station.cs` — Name, StationType, Coordinate (X, Y, Theta) |
 | `Zone` entity | ✅ Done | `Zone.cs` — Name, ZoneType, Polygon |
 | `RouteEdge` entity | ✅ Done | `RouteEdge.cs` — FromStationId, ToStationId, DistanceMm |
-| `POST /api/facility/maps` | ✅ Done | CreateMapCommand + Handler |
-| `GET /api/facility/maps/{id}` | ✅ Done | GetMapByIdQuery + Handler |
+| `POST /api/v1/facility/maps` | ✅ Done | CreateMapCommand + Handler |
+| `GET /api/v1/facility/maps/{id}` | ✅ Done | GetMapByIdQuery + Handler |
 | DbContext + Schema | ✅ Done | `facility` schema — 4 tables (Maps, Stations, Zones, RouteEdges) |
 | Route cost proxy | ❌ Not started | Cache + proxy to vendor `/api/v4/route/costs` |
 | Topology overlays | ❌ Not started | Temporary blockage |
@@ -719,23 +719,23 @@ Predictive replanning, battery-aware dispatch, cost-model tuning per tenant, pla
 
 | # | Method | Path | Module |
 |---|---|---|---|
-| 0 | POST | `/api/auth/token` | Auth (anonymous) || 1 | POST | `/api/facility/maps` | Facility |
-| 2 | GET | `/api/facility/maps/{id}` | Facility |
-| 3 | POST | `/api/fleet/vehicles/register-state` | Fleet |
-| 4 | GET | `/api/fleet/vehicles/available` | Fleet |
-| 5 | GET | `/api/fleet/vehicle-types` | Fleet |
-| 6 | POST | `/api/delivery-orders` | DeliveryOrder |
-| 7 | DEL | `/api/delivery-orders/{id}` | DeliveryOrder |
-| 8 | POST | `/api/planning/jobs` | Planning |
-| 9 | POST | `/api/planning/jobs/{id}/assign` | Planning |
-| 10 | POST | `/api/planning/jobs/{id}/commit` | Planning |
-| 11 | GET | `/api/planning/jobs/{id}` | Planning |
-| 12 | GET | `/api/planning/jobs/pending` | Planning |
-| 13 | POST | `/api/dispatch/trips` | Dispatch |
-| 14 | POST | `/api/dispatch/trips/{tripId}/tasks/{taskId}/complete` | Dispatch |
-| 15 | POST | `/api/dispatch/trips/{tripId}/tasks/{taskId}/fail` | Dispatch |
-| 16 | GET | `/api/dispatch/trips/{id}` | Dispatch |
-| 17 | GET | `/api/dispatch/vehicles/{vehicleId}/trips` | Dispatch |
+| 0 | POST | `/api/auth/token` | Auth (anonymous) || 1 | POST | `/api/v1/facility/maps` | Facility |
+| 2 | GET | `/api/v1/facility/maps/{id}` | Facility |
+| 3 | POST | `/api/v1/fleet/vehicles/register-state` | Fleet |
+| 4 | GET | `/api/v1/fleet/vehicles/available` | Fleet |
+| 5 | GET | `/api/v1/fleet/vehicle-types` | Fleet |
+| 6 | POST | `/api/v1/delivery-orders` | DeliveryOrder |
+| 7 | DEL | `/api/v1/delivery-orders/{id}` | DeliveryOrder |
+| 8 | POST | `/api/v1/planning/jobs` | Planning |
+| 9 | POST | `/api/v1/planning/jobs/{id}/assign` | Planning |
+| 10 | POST | `/api/v1/planning/jobs/{id}/commit` | Planning |
+| 11 | GET | `/api/v1/planning/jobs/{id}` | Planning |
+| 12 | GET | `/api/v1/planning/jobs/pending` | Planning |
+| 13 | POST | `/api/v1/dispatch/trips` | Dispatch |
+| 14 | POST | `/api/v1/dispatch/trips/{tripId}/tasks/{taskId}/complete` | Dispatch |
+| 15 | POST | `/api/v1/dispatch/trips/{tripId}/tasks/{taskId}/fail` | Dispatch |
+| 16 | GET | `/api/v1/dispatch/trips/{id}` | Dispatch |
+| 17 | GET | `/api/v1/dispatch/vehicles/{vehicleId}/trips` | Dispatch |
 | 18 | POST | `/api/webhooks/riot3/status` | VendorAdapter |
 
 ### 8.6 Database Schema (15 tables)

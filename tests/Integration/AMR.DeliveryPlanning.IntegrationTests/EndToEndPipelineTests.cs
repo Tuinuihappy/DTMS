@@ -33,7 +33,7 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
         var orderId = await SubmitOrderAsync(client, pickupId, dropId, profileCode);
 
         // 2. Create planning job for that order
-        var jobResp = await client.PostAsJsonAsync("/api/planning/jobs", new
+        var jobResp = await client.PostAsJsonAsync("/api/v1/planning/jobs", new
         {
             DeliveryOrderId = orderId,
             PickupStationId = pickupId,
@@ -44,15 +44,15 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
         var jobId = await jobResp.Content.ReadFromJsonAsync<Guid>();
 
         // 3. Assign vehicle
-        var assignResp = await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/assign", new { JobId = jobId });
+        var assignResp = await client.PostAsJsonAsync($"/api/v1/planning/jobs/{jobId}/assign", new { JobId = jobId });
         assignResp.IsSuccessStatusCode.Should().BeTrue($"Assign failed: {await assignResp.Content.ReadAsStringAsync()}");
 
         // 4. Commit plan
-        var commitResp = await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/commit", new { JobId = jobId });
+        var commitResp = await client.PostAsJsonAsync($"/api/v1/planning/jobs/{jobId}/commit", new { JobId = jobId });
         commitResp.IsSuccessStatusCode.Should().BeTrue($"Commit failed: {await commitResp.Content.ReadAsStringAsync()}");
 
         // 5. Dispatch trip
-        var tripResp = await client.PostAsJsonAsync("/api/dispatch/trips", new
+        var tripResp = await client.PostAsJsonAsync("/api/v1/dispatch/trips", new
         {
             JobId = jobId,
             VehicleId = vehicleId,
@@ -62,7 +62,7 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
         var tripId = await tripResp.Content.ReadFromJsonAsync<Guid>();
 
         // 6. Get trip → collect all task IDs in sequence order
-        var tripBody = await (await client.GetAsync($"/api/dispatch/trips/{tripId}")).Content.ReadAsStringAsync();
+        var tripBody = await (await client.GetAsync($"/api/v1/dispatch/trips/{tripId}")).Content.ReadAsStringAsync();
         var taskIds = ParseTaskIds(tripBody);
         taskIds.Should().NotBeEmpty("trip must have at least one task");
 
@@ -70,13 +70,13 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
         foreach (var taskId in taskIds)
         {
             var completeResp = await client.PostAsync(
-                $"/api/dispatch/trips/{tripId}/tasks/{taskId}/complete", null);
+                $"/api/v1/dispatch/trips/{tripId}/tasks/{taskId}/complete", null);
             completeResp.IsSuccessStatusCode.Should().BeTrue(
                 $"Complete task {taskId} failed: {await completeResp.Content.ReadAsStringAsync()}");
         }
 
         // 8. Verify trip status = Completed (enum value 3)
-        var finalBody = await (await client.GetAsync($"/api/dispatch/trips/{tripId}")).Content.ReadAsStringAsync();
+        var finalBody = await (await client.GetAsync($"/api/v1/dispatch/trips/{tripId}")).Content.ReadAsStringAsync();
         finalBody.Should().Contain("\"status\":\"Completed\"", "trip must reach Completed status after all tasks done");
     }
 
@@ -92,7 +92,7 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
 
         var orderId = await SubmitOrderAsync(client, pickupId, dropId, profileCode);
 
-        var jobResp = await client.PostAsJsonAsync("/api/planning/jobs", new
+        var jobResp = await client.PostAsJsonAsync("/api/v1/planning/jobs", new
         {
             DeliveryOrderId = orderId,
             PickupStationId = pickupId,
@@ -100,10 +100,10 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
             Priority = "Normal"
         });
         var jobId = await jobResp.Content.ReadFromJsonAsync<Guid>();
-        await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/assign", new { JobId = jobId });
-        await client.PostAsJsonAsync($"/api/planning/jobs/{jobId}/commit", new { JobId = jobId });
+        await client.PostAsJsonAsync($"/api/v1/planning/jobs/{jobId}/assign", new { JobId = jobId });
+        await client.PostAsJsonAsync($"/api/v1/planning/jobs/{jobId}/commit", new { JobId = jobId });
 
-        var tripResp = await client.PostAsJsonAsync("/api/dispatch/trips", new
+        var tripResp = await client.PostAsJsonAsync("/api/v1/dispatch/trips", new
         {
             JobId = jobId,
             VehicleId = vehicleId,
@@ -111,11 +111,11 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
         });
         var tripId = await tripResp.Content.ReadFromJsonAsync<Guid>();
 
-        var tripBody = await (await client.GetAsync($"/api/dispatch/trips/{tripId}")).Content.ReadAsStringAsync();
+        var tripBody = await (await client.GetAsync($"/api/v1/dispatch/trips/{tripId}")).Content.ReadAsStringAsync();
         var taskIds = ParseTaskIds(tripBody);
 
         foreach (var taskId in taskIds)
-            await client.PostAsync($"/api/dispatch/trips/{tripId}/tasks/{taskId}/complete", null);
+            await client.PostAsync($"/api/v1/dispatch/trips/{tripId}/tasks/{taskId}/complete", null);
 
         // Verify TripCompletedIntegrationEvent written to outbox
         using var scope = _factory.Services.CreateScope();
@@ -137,7 +137,7 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
 
     private async Task<Guid> RegisterAndSetIdleAsync(HttpClient client, Guid vehicleTypeId)
     {
-        var regResp = await client.PostAsJsonAsync("/api/fleet/vehicles", new
+        var regResp = await client.PostAsJsonAsync("/api/v1/fleet/vehicles", new
         {
             VehicleName = $"E2E-{Guid.NewGuid():N}"[..20],
             VehicleTypeId = vehicleTypeId,
@@ -146,7 +146,7 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
         regResp.IsSuccessStatusCode.Should().BeTrue();
         var vehicleId = await regResp.Content.ReadFromJsonAsync<Guid>();
 
-        var stateResp = await client.PutAsJsonAsync($"/api/fleet/vehicles/{vehicleId}/state", new
+        var stateResp = await client.PutAsJsonAsync($"/api/v1/fleet/vehicles/{vehicleId}/state", new
         {
             VehicleId = vehicleId,
             NewState = 1,

@@ -51,7 +51,7 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
 
     public async Task<(Guid PickupId, Guid DropId)> CreateStationPairAsync(HttpClient client)
     {
-        var mapResponse = await client.PostAsJsonAsync("/api/facility/maps", new
+        var mapResponse = await client.PostAsJsonAsync("/api/v1/facility/maps", new
         {
             Name = $"TestMap-{Guid.NewGuid():N}",
             Version = "1.0",
@@ -63,7 +63,7 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
 
         var mapId = await mapResponse.Content.ReadFromJsonAsync<Guid>();
 
-        var pickupResponse = await client.PostAsJsonAsync($"/api/facility/maps/{mapId}/stations", new
+        var pickupResponse = await client.PostAsJsonAsync($"/api/v1/facility/maps/{mapId}/stations", new
         {
             Name = $"Pickup-{Guid.NewGuid():N}",
             X = 10.0,
@@ -74,7 +74,7 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         await EnsureSuccessAsync(pickupResponse, "Create pickup station failed");
         var pickupId = await pickupResponse.Content.ReadFromJsonAsync<Guid>();
 
-        var dropResponse = await client.PostAsJsonAsync($"/api/facility/maps/{mapId}/stations", new
+        var dropResponse = await client.PostAsJsonAsync($"/api/v1/facility/maps/{mapId}/stations", new
         {
             Name = $"Drop-{Guid.NewGuid():N}",
             X = 80.0,
@@ -119,7 +119,7 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         var carrierCode = $"FEEDER-{suffix}";
         var profileCode = $"TRAY-{suffix}";
 
-        var carrierResp = await client.PostAsJsonAsync("/api/facility/carrier-type-profiles", new
+        var carrierResp = await client.PostAsJsonAsync("/api/v1/facility/carrier-type-profiles", new
         {
             Code = carrierCode,
             DisplayName = "Test Feeder",
@@ -127,7 +127,7 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         });
         await EnsureSuccessAsync(carrierResp, "Create carrier type failed");
 
-        var profileResp = await client.PostAsJsonAsync("/api/facility/load-unit-profiles", new
+        var profileResp = await client.PostAsJsonAsync("/api/v1/facility/load-unit-profiles", new
         {
             Code = profileCode,
             DisplayName = "Test Tray",
@@ -156,8 +156,8 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         {
             new
             {
-                PickupLocation = new { StationId = pickupId },
-                DropLocation = new { StationId = dropId },
+                PickupLocationCode = pickupId.ToString(),
+                DropLocationCode = dropId.ToString(),
                 Barcode = $"BCR-{Guid.NewGuid():N}"[..15],
                 LoadUnitProfileCode = loadUnitProfileCode,
                 GrossWeightKg = 5.0,
@@ -174,12 +174,12 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
     public async Task<Guid> CreateAndSubmitOrderAsync(HttpClient client, Guid pickupId, Guid dropId,
         string loadUnitProfileCode, DateTime? sla = null, string? orderName = null)
     {
-        var createResp = await client.PostAsJsonAsync("/api/delivery-orders",
+        var createResp = await client.PostAsJsonAsync("/api/v1/delivery-orders",
             BuildOrderRequest(pickupId, dropId, loadUnitProfileCode, sla, orderName));
         await EnsureSuccessAsync(createResp, "Create order failed");
         var orderId = await createResp.Content.ReadFromJsonAsync<Guid>();
 
-        var submitResp = await client.PostAsync($"/api/delivery-orders/{orderId}/submit", null);
+        var submitResp = await client.PostAsync($"/api/v1/delivery-orders/{orderId}/submit", null);
         await EnsureSuccessAsync(submitResp, $"Submit order {orderId} failed");
 
         return orderId;

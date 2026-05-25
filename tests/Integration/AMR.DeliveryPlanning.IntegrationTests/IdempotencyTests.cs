@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace AMR.DeliveryPlanning.IntegrationTests;
 
 /// <summary>
-/// Phase 3 — Test #3: Idempotency on POST /api/delivery-orders.
+/// Phase 3 — Test #3: Idempotency on POST /api/v1/delivery-orders.
 /// Same Idempotency-Key → same orderId (cached 24h). Different key → new orderId.
 /// </summary>
 public class IdempotencyTests : IClassFixture<DtmsWebApplicationFactory>
@@ -78,7 +78,7 @@ public class IdempotencyTests : IClassFixture<DtmsWebApplicationFactory>
     private static async Task<HttpResponseMessage> SubmitWithKeyAsync(
         HttpClient client, Guid pickupId, Guid dropId, string profileCode, string? idempotencyKey)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, "/api/delivery-orders")
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/delivery-orders")
         {
             Content = JsonContent.Create(
                 DtmsWebApplicationFactory.BuildOrderRequest(pickupId, dropId, profileCode,

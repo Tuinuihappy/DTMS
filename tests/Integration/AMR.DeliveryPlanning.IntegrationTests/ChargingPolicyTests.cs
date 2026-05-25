@@ -25,7 +25,7 @@ public class ChargingPolicyTests : IClassFixture<DtmsWebApplicationFactory>
         var vehicleTypeId = await _factory.CreateVehicleTypeAsync();
 
         // Create charging policy (low threshold 20 %)
-        var policyResp = await client.PostAsJsonAsync("/api/fleet/charging-policies", new
+        var policyResp = await client.PostAsJsonAsync("/api/v1/fleet/charging-policies", new
         {
             VehicleTypeId = vehicleTypeId,
             LowThresholdPct = 0.20,

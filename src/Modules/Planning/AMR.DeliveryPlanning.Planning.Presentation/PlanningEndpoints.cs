@@ -21,32 +21,32 @@ public static class PlanningEndpoints
 {
     public static void MapPlanningEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/planning/jobs").WithTags("Planning").RequireAuthorization();
+        var group = app.MapGroup("/api/v1/planning/jobs").WithTags("Planning").RequireAuthorization();
 
-        // POST /api/planning/jobs — Create a Job from a DeliveryOrder
+        // POST /api/v1/planning/jobs — Create a Job from a DeliveryOrder
         group.MapPost("/", async (CreateJobFromOrderCommand command, ISender sender) =>
         {
             var result = await sender.Send(command);
             return result.IsSuccess
-                ? Results.Created($"/api/planning/jobs/{result.Value}", result.Value)
+                ? Results.Created($"/api/v1/planning/jobs/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
         });
 
-        // POST /api/planning/jobs/{id}/assign — Assign a vehicle (Greedy)
+        // POST /api/v1/planning/jobs/{id}/assign — Assign a vehicle (Greedy)
         group.MapPost("/{id:guid}/assign", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new AssignVehicleToJobCommand(id));
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         });
 
-        // POST /api/planning/jobs/{id}/commit — Commit the plan
+        // POST /api/v1/planning/jobs/{id}/commit — Commit the plan
         group.MapPost("/{id:guid}/commit", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new CommitPlanCommand(id));
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         });
 
-        // POST /api/planning/jobs/{id}/replan — Replan a committed job
+        // POST /api/v1/planning/jobs/{id}/replan — Replan a committed job
         group.MapPost("/{id:guid}/replan", async (Guid id, ReplanJobCommand command, ISender sender) =>
         {
             if (id != command.JobId) return Results.BadRequest("ID mismatch");
@@ -54,14 +54,14 @@ public static class PlanningEndpoints
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         });
 
-        // GET /api/planning/jobs/{id} — Get job details
+        // GET /api/v1/planning/jobs/{id} — Get job details
         group.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new GetJobByIdQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         });
 
-        // GET /api/planning/jobs/pending — Get all pending jobs
+        // GET /api/v1/planning/jobs/pending — Get all pending jobs
         group.MapGet("/pending", async (ISender sender) =>
         {
             var result = await sender.Send(new GetPendingJobsQuery());
@@ -76,7 +76,7 @@ public static class PlanningEndpoints
         {
             var result = await sender.Send(command);
             return result.IsSuccess
-                ? Results.Created($"/api/planning/jobs/{result.Value}", result.Value)
+                ? Results.Created($"/api/v1/planning/jobs/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
         });
 
@@ -85,7 +85,7 @@ public static class PlanningEndpoints
         {
             var result = await sender.Send(command);
             return result.IsSuccess
-                ? Results.Created($"/api/planning/jobs/{result.Value.InboundJobId}", result.Value)
+                ? Results.Created($"/api/v1/planning/jobs/{result.Value.InboundJobId}", result.Value)
                 : Results.BadRequest(result.Error);
         });
 
@@ -103,7 +103,7 @@ public static class PlanningEndpoints
         {
             var result = await sender.Send(command);
             return result.IsSuccess
-                ? Results.Created($"/api/planning/jobs/{result.Value}", result.Value)
+                ? Results.Created($"/api/v1/planning/jobs/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
         });
 

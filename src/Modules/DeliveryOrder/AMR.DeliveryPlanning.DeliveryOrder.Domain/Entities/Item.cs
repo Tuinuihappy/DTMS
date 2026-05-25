@@ -7,8 +7,8 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 public class Item : Entity<Guid>
 {
     public Guid DeliveryOrderId { get; private set; }
-    public LocationRef PickupLocation { get; private set; } = null!;
-    public LocationRef DropLocation { get; private set; } = null!;
+    public string PickupLocationCode { get; private set; } = string.Empty;
+    public string DropLocationCode { get; private set; } = string.Empty;
     public Guid? PickupStationId { get; private set; }
     public Guid? DropStationId { get; private set; }
     public int ItemSeq { get; private set; }
@@ -25,7 +25,7 @@ public class Item : Entity<Guid>
 
     private Item() { }
 
-    internal Item(Guid deliveryOrderId, LocationRef pickupLocation, LocationRef dropLocation,
+    internal Item(Guid deliveryOrderId, string pickupLocationCode, string dropLocationCode,
         int itemSeq, string sku, string? description,
         string? loadUnitProfileCode,
         Dimensions? dimensions, double? weightKg, double quantity, string uom,
@@ -36,10 +36,15 @@ public class Item : Entity<Guid>
             throw new InvalidOperationException(
                 "CargoSpecific must be null when CargoType is not specified.");
 
+        if (string.IsNullOrWhiteSpace(pickupLocationCode))
+            throw new ArgumentException("PickupLocationCode must not be empty.", nameof(pickupLocationCode));
+        if (string.IsNullOrWhiteSpace(dropLocationCode))
+            throw new ArgumentException("DropLocationCode must not be empty.", nameof(dropLocationCode));
+
         Id = Guid.NewGuid();
         DeliveryOrderId = deliveryOrderId;
-        PickupLocation = pickupLocation ?? throw new ArgumentNullException(nameof(pickupLocation));
-        DropLocation = dropLocation ?? throw new ArgumentNullException(nameof(dropLocation));
+        PickupLocationCode = pickupLocationCode.Trim();
+        DropLocationCode = dropLocationCode.Trim();
         ItemSeq = itemSeq;
         Sku = sku;
         Description = description;

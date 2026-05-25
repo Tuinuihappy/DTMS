@@ -23,8 +23,8 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
             new
             {
                 sku = "SKU-ORIG-001",
-                pickupLocation = new { code = "WH-01" },
-                dropLocation = new { code = "LINE-01" },
+                pickupLocationCode = "WH-01",
+                dropLocationCode = "LINE-01",
                 dimensions = (object?)null,
                 weightKg = 5.0,
                 quantity = new { value = 10, uom = "PCS" },
@@ -44,9 +44,9 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
             new
             {
                 sku = "SKU-NEW-001",
-                pickupLocation = new { code = "WH-02" },
-                dropLocation = new { code = "LINE-05" },
-                dimensions = new { lengthCm = 30.0, widthCm = 20.0, heightCm = 10.0 },
+                pickupLocationCode = "WH-02",
+                dropLocationCode = "LINE-05",
+                dimensions = (object?)new { lengthMm = 300.0, widthMm = 200.0, heightMm = 100.0 },
                 weightKg = 8.0,
                 quantity = new { value = 3, uom = "BOX" },
                 cargoSpecific = (object?)null
@@ -54,8 +54,8 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
             new
             {
                 sku = "SKU-NEW-002",
-                pickupLocation = new { code = "WH-02" },
-                dropLocation = new { code = "LINE-06" },
+                pickupLocationCode = "WH-02",
+                dropLocationCode = "LINE-06",
                 dimensions = (object?)null,
                 weightKg = 2.0,
                 quantity = new { value = 50, uom = "PCS" },
@@ -71,13 +71,13 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
 
-        var createResp = await client.PostAsJsonAsync("/api/delivery-orders", CreateOrderBody());
+        var createResp = await client.PostAsJsonAsync("/api/v1/delivery-orders", CreateOrderBody());
         createResp.StatusCode.Should().Be(HttpStatusCode.Created);
         var created = await createResp.Content.ReadFromJsonAsync<OrderDetailResponse>();
         created.Should().NotBeNull();
         created!.Items.Should().HaveCount(1);
 
-        var updateResp = await client.PutAsJsonAsync($"/api/delivery-orders/{created.Id}", UpdateOrderBody());
+        var updateResp = await client.PutAsJsonAsync($"/api/v1/delivery-orders/{created.Id}", UpdateOrderBody());
         updateResp.StatusCode.Should().Be(HttpStatusCode.OK, await updateResp.Content.ReadAsStringAsync());
 
         var updated = await updateResp.Content.ReadFromJsonAsync<OrderDetailResponse>();
@@ -95,7 +95,7 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
 
-        var createResp = await client.PostAsJsonAsync("/api/delivery-orders", CreateOrderBody());
+        var createResp = await client.PostAsJsonAsync("/api/v1/delivery-orders", CreateOrderBody());
         createResp.StatusCode.Should().Be(HttpStatusCode.Created);
         var created = await createResp.Content.ReadFromJsonAsync<OrderDetailResponse>();
 
@@ -110,8 +110,8 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
                 new
                 {
                     sku = "SKU-ORIG-001",  // same SKU as original — must be allowed
-                    pickupLocation = new { code = "WH-03" },
-                    dropLocation = new { code = "LINE-07" },
+                    pickupLocationCode = "WH-03",
+                    dropLocationCode = "LINE-07",
                     dimensions = (object?)null,
                     weightKg = 1.0,
                     quantity = new { value = 1, uom = "PCS" },
@@ -120,7 +120,7 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
             }
         };
 
-        var updateResp = await client.PutAsJsonAsync($"/api/delivery-orders/{created!.Id}", reuseBody);
+        var updateResp = await client.PutAsJsonAsync($"/api/v1/delivery-orders/{created!.Id}", reuseBody);
         updateResp.StatusCode.Should().Be(HttpStatusCode.OK, await updateResp.Content.ReadAsStringAsync());
     }
 
@@ -129,7 +129,7 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
 
-        var updateResp = await client.PutAsJsonAsync($"/api/delivery-orders/{Guid.NewGuid()}", UpdateOrderBody());
+        var updateResp = await client.PutAsJsonAsync($"/api/v1/delivery-orders/{Guid.NewGuid()}", UpdateOrderBody());
 
         updateResp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -139,7 +139,7 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
 
-        var createResp = await client.PostAsJsonAsync("/api/delivery-orders", CreateOrderBody());
+        var createResp = await client.PostAsJsonAsync("/api/v1/delivery-orders", CreateOrderBody());
         createResp.StatusCode.Should().Be(HttpStatusCode.Created);
         var created = await createResp.Content.ReadFromJsonAsync<OrderDetailResponse>();
 
@@ -152,7 +152,7 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
             items = Array.Empty<object>()
         };
 
-        var updateResp = await client.PutAsJsonAsync($"/api/delivery-orders/{created!.Id}", invalidBody);
+        var updateResp = await client.PutAsJsonAsync($"/api/v1/delivery-orders/{created!.Id}", invalidBody);
         updateResp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -173,8 +173,8 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
                 new
                 {
                     sku = "SKU-001",
-                    pickupLocation = new { stationId = pickupId },
-                    dropLocation = new { stationId = dropId },
+                    pickupLocationCode = pickupId.ToString(),
+                    dropLocationCode = dropId.ToString(),
                     dimensions = (object?)null,
                     weightKg = 1.0,
                     quantity = new { value = 1, uom = "PCS" },
@@ -183,14 +183,14 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
             }
         };
 
-        var createResp = await client.PostAsJsonAsync("/api/delivery-orders", createBody);
+        var createResp = await client.PostAsJsonAsync("/api/v1/delivery-orders", createBody);
         createResp.StatusCode.Should().Be(HttpStatusCode.Created);
         var created = await createResp.Content.ReadFromJsonAsync<OrderDetailResponse>();
 
-        var submitResp = await client.PostAsync($"/api/delivery-orders/{created!.Id}/submit", null);
+        var submitResp = await client.PostAsync($"/api/v1/delivery-orders/{created!.Id}/submit", null);
         submitResp.IsSuccessStatusCode.Should().BeTrue();
 
-        var updateResp = await client.PutAsJsonAsync($"/api/delivery-orders/{created.Id}", UpdateOrderBody());
+        var updateResp = await client.PutAsJsonAsync($"/api/v1/delivery-orders/{created.Id}", UpdateOrderBody());
         updateResp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 

@@ -26,7 +26,10 @@ builder.Host.UseSerilog((context, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration));
 
 // Add services to the container.
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddOperationTransformer<AMR.DeliveryPlanning.Api.OpenApi.IdempotencyKeyOperationTransformer>();
+});
 builder.Services.AddAuthorization();
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(

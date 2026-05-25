@@ -23,7 +23,7 @@ public class AmendmentTimelineTests : IClassFixture<DtmsWebApplicationFactory>
 
         var orderId = await SubmitOrderAsync(client, pickupId, dropId, profileCode);
 
-        var patchResp = await client.PatchAsJsonAsync($"/api/delivery-orders/{orderId}", new
+        var patchResp = await client.PatchAsJsonAsync($"/api/v1/delivery-orders/{orderId}", new
         {
             Reason = "Customer escalation",
             NewServiceWindow = new { Earliest = (DateTime?)null, Latest = DateTime.UtcNow.AddHours(6) },
@@ -32,7 +32,7 @@ public class AmendmentTimelineTests : IClassFixture<DtmsWebApplicationFactory>
         patchResp.IsSuccessStatusCode.Should().BeTrue(
             $"PATCH order failed: {await patchResp.Content.ReadAsStringAsync()}");
 
-        var timelineResp = await client.GetAsync($"/api/delivery-orders/{orderId}/timeline");
+        var timelineResp = await client.GetAsync($"/api/v1/delivery-orders/{orderId}/timeline");
         timelineResp.StatusCode.Should().Be(HttpStatusCode.OK);
         var timelineBody = await timelineResp.Content.ReadAsStringAsync();
 
@@ -51,7 +51,7 @@ public class AmendmentTimelineTests : IClassFixture<DtmsWebApplicationFactory>
 
         var orderId = await SubmitOrderAsync(client, pickupId, dropId, profileCode);
 
-        var patchResp = await client.PatchAsJsonAsync($"/api/delivery-orders/{orderId}", new
+        var patchResp = await client.PatchAsJsonAsync($"/api/v1/delivery-orders/{orderId}", new
         {
             Reason = "Production delay — extended window",
             NewServiceWindow = new { Earliest = (DateTime?)null, Latest = DateTime.UtcNow.AddHours(8) },
@@ -60,7 +60,7 @@ public class AmendmentTimelineTests : IClassFixture<DtmsWebApplicationFactory>
         patchResp.IsSuccessStatusCode.Should().BeTrue(
             $"PATCH service window failed: {await patchResp.Content.ReadAsStringAsync()}");
 
-        var timelineResp = await client.GetAsync($"/api/delivery-orders/{orderId}/timeline");
+        var timelineResp = await client.GetAsync($"/api/v1/delivery-orders/{orderId}/timeline");
         timelineResp.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await timelineResp.Content.ReadAsStringAsync();
 
@@ -77,7 +77,7 @@ public class AmendmentTimelineTests : IClassFixture<DtmsWebApplicationFactory>
 
         var orderId = await SubmitOrderAsync(client, pickupId, dropId, profileCode);
 
-        await client.PatchAsJsonAsync($"/api/delivery-orders/{orderId}", new
+        await client.PatchAsJsonAsync($"/api/v1/delivery-orders/{orderId}", new
         {
             Reason = "First change",
             NewServiceWindow = new { Earliest = (DateTime?)null, Latest = DateTime.UtcNow.AddHours(5) },
@@ -86,14 +86,14 @@ public class AmendmentTimelineTests : IClassFixture<DtmsWebApplicationFactory>
 
         await Task.Delay(50);
 
-        await client.PatchAsJsonAsync($"/api/delivery-orders/{orderId}", new
+        await client.PatchAsJsonAsync($"/api/v1/delivery-orders/{orderId}", new
         {
             Reason = "Second change",
             NewServiceWindow = new { Earliest = (DateTime?)null, Latest = DateTime.UtcNow.AddHours(6) },
             AmendedBy = "user-B"
         });
 
-        var timelineResp = await client.GetAsync($"/api/delivery-orders/{orderId}/timeline");
+        var timelineResp = await client.GetAsync($"/api/v1/delivery-orders/{orderId}/timeline");
         timelineResp.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await timelineResp.Content.ReadAsStringAsync();
 
@@ -115,7 +115,7 @@ public class AmendmentTimelineTests : IClassFixture<DtmsWebApplicationFactory>
 
         var orderId = await SubmitOrderAsync(client, pickupId, dropId, profileCode);
 
-        var timelineResp = await client.GetAsync($"/api/delivery-orders/{orderId}/timeline");
+        var timelineResp = await client.GetAsync($"/api/v1/delivery-orders/{orderId}/timeline");
         timelineResp.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var body = await timelineResp.Content.ReadAsStringAsync();
@@ -130,7 +130,7 @@ public class AmendmentTimelineTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = await _factory.GetAuthenticatedClient();
 
-        var resp = await client.GetAsync($"/api/delivery-orders/{Guid.NewGuid()}/timeline");
+        var resp = await client.GetAsync($"/api/v1/delivery-orders/{Guid.NewGuid()}/timeline");
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await resp.Content.ReadAsStringAsync();

@@ -39,7 +39,7 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
             foreach (var (item, idx) in request.Items.Select((p, i) => (p, i + 1)))
             {
                 order.AddItem(
-                    item.PickupLocation.ToDomain(), item.DropLocation.ToDomain(),
+                    item.PickupLocationCode, item.DropLocationCode,
                     idx, item.Sku, item.Description,
                     item.LoadUnitProfileCode,
                     item.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,

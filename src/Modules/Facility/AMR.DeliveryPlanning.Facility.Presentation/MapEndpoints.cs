@@ -26,7 +26,7 @@ public static class MapEndpoints
 {
     public static void MapFacilityEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/facility").WithTags("Facility").RequireAuthorization();
+        var group = app.MapGroup("/api/v1/facility").WithTags("Facility").RequireAuthorization();
 
         // ── Maps ───────────────────────────────────────────────────────────
         group.MapPost("/maps", async (CreateMapCommand command, ISender sender) =>
@@ -48,17 +48,17 @@ public static class MapEndpoints
         });
 
         // ── Stations ───────────────────────────────────────────────────────
-        // POST /api/facility/maps/{mapId}/stations
+        // POST /api/v1/facility/maps/{mapId}/stations
         group.MapPost("/maps/{mapId:guid}/stations", async (Guid mapId, AddStationRequest req, ISender sender) =>
         {
             var result = await sender.Send(new AddStationCommand(
                 mapId, req.Name, req.X, req.Y, req.Theta, req.Type, req.VendorRef, req.Code));
             return result.IsSuccess
-                ? Results.Created($"/api/facility/stations/{result.Value}", result.Value)
+                ? Results.Created($"/api/v1/facility/stations/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
         });
 
-        // GET /api/facility/stations?mapId=&type=&zoneId=&compatibleWith=&includeInactive=&code=
+        // GET /api/v1/facility/stations?mapId=&type=&zoneId=&compatibleWith=&includeInactive=&code=
         group.MapGet("/stations", async (Guid? mapId, string? type, Guid? zoneId, string? compatibleWith, bool includeInactive, string? code, ISender sender) =>
         {
             StationType? stationType = type != null && Enum.TryParse<StationType>(type, true, out var t) ? t : null;
@@ -66,7 +66,7 @@ public static class MapEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
-        // PATCH /api/facility/stations/{stationId}
+        // PATCH /api/v1/facility/stations/{stationId}
         group.MapMethods("/stations/{stationId:guid}", ["PATCH"],
             async (Guid stationId, UpdateStationRequest req, ISender sender) =>
             {
@@ -74,7 +74,7 @@ public static class MapEndpoints
                 return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
             });
 
-        // POST /api/facility/stations/{stationId}/force-offline
+        // POST /api/v1/facility/stations/{stationId}/force-offline
         // Manual operator override — TTL-bounded (5..1440 minutes). Survives RIOT3 sync until cleared or expired.
         group.MapPost("/stations/{stationId:guid}/force-offline",
             async (Guid stationId, ForceOfflineRequest req, ISender sender) =>
@@ -84,7 +84,7 @@ public static class MapEndpoints
                 return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
             });
 
-        // DELETE /api/facility/stations/{stationId}/force-offline
+        // DELETE /api/v1/facility/stations/{stationId}/force-offline
         group.MapDelete("/stations/{stationId:guid}/force-offline",
             async (Guid stationId, ISender sender) =>
             {
@@ -93,7 +93,7 @@ public static class MapEndpoints
             });
 
         // ── Route Costs ────────────────────────────────────────────────────
-        // GET /api/facility/route-cost?from=&to=
+        // GET /api/v1/facility/route-cost?from=&to=
         group.MapGet("/route-cost", async (Guid from, Guid to, ISender sender) =>
         {
             var result = await sender.Send(new GetRouteCostQuery(from, to));
@@ -105,7 +105,7 @@ public static class MapEndpoints
         {
             var result = await sender.Send(command);
             return result.IsSuccess
-                ? Results.Created($"/api/facility/topology-overlays/{result.Value}", result.Value)
+                ? Results.Created($"/api/v1/facility/topology-overlays/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
         });
 
@@ -127,7 +127,7 @@ public static class MapEndpoints
         {
             var result = await sender.Send(command);
             return result.IsSuccess
-                ? Results.Created($"/api/facility/carrier-type-profiles/{result.Value}", result.Value)
+                ? Results.Created($"/api/v1/facility/carrier-type-profiles/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
         });
 
@@ -142,7 +142,7 @@ public static class MapEndpoints
         {
             var result = await sender.Send(command);
             return result.IsSuccess
-                ? Results.Created($"/api/facility/load-unit-profiles/{result.Value}", result.Value)
+                ? Results.Created($"/api/v1/facility/load-unit-profiles/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
         });
 
@@ -157,7 +157,7 @@ public static class MapEndpoints
         {
             var result = await sender.Send(command);
             return result.IsSuccess
-                ? Results.Created($"/api/facility/resources/{result.Value}", result.Value)
+                ? Results.Created($"/api/v1/facility/resources/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
         });
 

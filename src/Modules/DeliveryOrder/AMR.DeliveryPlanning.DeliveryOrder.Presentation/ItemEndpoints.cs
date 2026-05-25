@@ -12,7 +12,7 @@ public static class ItemEndpoints
 {
     public static void MapItemEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/items").WithTags("Items").RequireAuthorization();
+        var group = app.MapGroup("/api/v1/items").WithTags("Items").RequireAuthorization();
 
         group.MapGet("/", async (
             string? sku,
@@ -50,7 +50,7 @@ public static class ItemEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
-        // GET /api/items/{itemId}
+        // GET /api/v1/items/{itemId}
         group.MapGet("/{itemId:guid}", async (Guid itemId, ISender sender) =>
         {
             var result = await sender.Send(new GetItemQuery(itemId));

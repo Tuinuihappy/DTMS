@@ -89,6 +89,6 @@ public class SlaValidationTests : IClassFixture<DtmsWebApplicationFactory>
 
     private static Task<HttpResponseMessage> SubmitOrderAsync(
         HttpClient client, Guid pickupId, Guid dropId, string profileCode, DateTime? sla)
-        => client.PostAsJsonAsync("/api/delivery-orders",
+        => client.PostAsJsonAsync("/api/v1/delivery-orders",
             DtmsWebApplicationFactory.BuildOrderRequest(pickupId, dropId, profileCode, sla));
 }

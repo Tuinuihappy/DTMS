@@ -22,12 +22,12 @@ internal static class SubmitReadinessCheck
 
             if (string.IsNullOrWhiteSpace(item.Sku))
                 errors.Add($"{prefix}: Sku is required.");
-            if (item.PickupLocation is null)
-                errors.Add($"{prefix}: PickupLocation is required.");
-            if (item.DropLocation is null)
-                errors.Add($"{prefix}: DropLocation is required.");
-            if (item.PickupLocation is not null && item.DropLocation is not null
-                && item.PickupLocation == item.DropLocation)
+            if (string.IsNullOrWhiteSpace(item.PickupLocationCode))
+                errors.Add($"{prefix}: PickupLocationCode is required.");
+            if (string.IsNullOrWhiteSpace(item.DropLocationCode))
+                errors.Add($"{prefix}: DropLocationCode is required.");
+            if (!string.IsNullOrWhiteSpace(item.PickupLocationCode)
+                && string.Equals(item.PickupLocationCode, item.DropLocationCode, StringComparison.OrdinalIgnoreCase))
                 errors.Add($"{prefix}: Pickup and Drop locations must be different.");
             if (item.Quantity <= 0)
                 errors.Add($"{prefix}: Quantity must be > 0.");

@@ -6,9 +6,10 @@ using Microsoft.Extensions.Logging;
 namespace AMR.DeliveryPlanning.DeliveryOrder.Presentation.Idempotency;
 
 /// <summary>
-/// Endpoint filter that enforces <c>Idempotency-Key</c> on mutation endpoints.
+/// Best-effort endpoint filter for <c>Idempotency-Key</c> on mutation endpoints.
 /// <list type="bullet">
-///   <item>Missing header → 400 Bad Request.</item>
+///   <item>Missing header → pass through (no caching, no enforcement) — clients
+///         that opt out accept the risk of duplicate writes on network retries.</item>
 ///   <item>Same key + same request body → replay cached response, set
 ///         <c>Idempotency-Replayed: true</c>.</item>
 ///   <item>Same key + different body → 422 Unprocessable Entity.</item>
@@ -36,10 +37,9 @@ public sealed class IdempotencyKeyFilter : IEndpointFilter
 
         if (string.IsNullOrWhiteSpace(key))
         {
-            return Results.Problem(
-                title: "Idempotency-Key required",
-                detail: $"The '{HeaderName}' header is required for mutation requests. Send a unique value (UUID recommended) per logical operation; retries with the same key replay the original response.",
-                statusCode: StatusCodes.Status400BadRequest);
+            // Best-effort mode: client opted out of idempotency. Execute normally
+            // with no replay protection — duplicates on retry are the caller's risk.
+            return await next(context);
         }
 
         if (key.Length > 200)

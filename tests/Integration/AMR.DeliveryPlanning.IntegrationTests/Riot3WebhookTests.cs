@@ -165,7 +165,7 @@ public class Riot3WebhookTests : IClassFixture<DtmsWebApplicationFactory>
         var vehicleTypeId = await _factory.CreateVehicleTypeAsync();
         var deviceKey = $"SEER-{Guid.NewGuid():N}"[..20];
 
-        var regResp = await client.PostAsJsonAsync("/api/fleet/vehicles", new
+        var regResp = await client.PostAsJsonAsync("/api/v1/fleet/vehicles", new
         {
             VehicleName = $"RIOT3-{Guid.NewGuid():N}"[..20],
             VehicleTypeId = vehicleTypeId,
@@ -208,7 +208,7 @@ public class Riot3WebhookTests : IClassFixture<DtmsWebApplicationFactory>
         var vehicleTypeId = await _factory.CreateVehicleTypeAsync();
         var deviceKey = $"SEER-{Guid.NewGuid():N}"[..20];
 
-        var regResp = await client.PostAsJsonAsync("/api/fleet/vehicles", new
+        var regResp = await client.PostAsJsonAsync("/api/v1/fleet/vehicles", new
         {
             VehicleName = $"RIOT3-{Guid.NewGuid():N}"[..20],
             VehicleTypeId = vehicleTypeId,
