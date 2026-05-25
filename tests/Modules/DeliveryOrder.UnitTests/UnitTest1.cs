@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using FluentAssertions;
 
 namespace DeliveryOrder.UnitTests;
@@ -9,7 +10,7 @@ public class DeliveryOrderTests
     private static AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder CreateOrder(
         string orderRef = "Test Order") =>
         AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
-            orderRef, Priority.Normal, requestedDeliveryDate: null);
+            orderRef, Priority.Normal, serviceWindow: null);
 
     private static void AddTestItem(
         AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder order,
@@ -238,7 +239,7 @@ public class DeliveryOrderTests
         var order = CreateOrder("Original Ref");
         AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-OLD", weightKg: 5.0, quantity: 10, uom: "PCS");
 
-        order.UpdateDraft("New Ref", Priority.High, requestedDeliveryDate: null);
+        order.UpdateDraft("New Ref", Priority.High, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-02", "LINE-02", "SKU-NEW", weightKg: 3.0, quantity: 5, uom: "BOX");
 
         order.OrderRef.Should().Be("New Ref");
@@ -255,7 +256,7 @@ public class DeliveryOrderTests
     {
         var order = CreateOrder();
 
-        order.UpdateDraft(order.OrderRef, order.Priority, requestedDeliveryDate: null);
+        order.UpdateDraft(order.OrderRef, order.Priority, serviceWindow: null);
 
         order.DomainEvents.OfType<DeliveryOrderDraftUpdatedDomainEvent>().Should().HaveCount(1);
     }
@@ -267,7 +268,7 @@ public class DeliveryOrderTests
         AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-001", weightKg: 5.0, quantity: 10, uom: "PCS");
         order.Submit();
 
-        var act = () => order.UpdateDraft("New Ref", Priority.Low, requestedDeliveryDate: null);
+        var act = () => order.UpdateDraft("New Ref", Priority.Low, serviceWindow: null);
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*Draft*");
     }
@@ -279,7 +280,7 @@ public class DeliveryOrderTests
         AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-A", weightKg: 10.0, quantity: 20, uom: "PCS");
         AddTestItem(order, itemSeq: 2, "WH-01", "LINE-02", "SKU-B", weightKg: 5.0, quantity: 10, uom: "PCS");
 
-        order.UpdateDraft(order.OrderRef, order.Priority, requestedDeliveryDate: null);
+        order.UpdateDraft(order.OrderRef, order.Priority, serviceWindow: null);
 
         order.Items.Should().BeEmpty();
         order.TotalWeightKg.Should().Be(0);
@@ -293,33 +294,35 @@ public class DeliveryOrderTests
         var order = CreateOrder();
         AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-REUSE", weightKg: 5.0, quantity: 10, uom: "PCS");
 
-        order.UpdateDraft(order.OrderRef, order.Priority, requestedDeliveryDate: null);
+        order.UpdateDraft(order.OrderRef, order.Priority, serviceWindow: null);
         var act = () => AddTestItem(order, itemSeq: 1, "WH-02", "LINE-02", "SKU-REUSE", weightKg: 3.0, quantity: 5, uom: "BOX");
 
         act.Should().NotThrow();
     }
 
     [Fact]
-    public void AmendRequestedDeliveryDate_UpdatesFieldAndPreservesStatus()
+    public void AmendServiceWindow_UpdatesFieldAndPreservesStatus()
     {
         var order = CreateOrder();
         AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
         order.Submit();
         var newTime = DateTime.UtcNow.AddHours(4);
 
-        order.AmendRequestedDeliveryDate(newTime, "rescheduled");
+        order.AmendServiceWindow(ServiceWindow.Create(earliest: null, latest: newTime), "rescheduled");
 
-        order.RequestedDeliveryDate.Should().Be(newTime);
+        order.ServiceWindow.Should().NotBeNull();
+        order.ServiceWindow!.Latest.Should().Be(newTime);
         order.Status.Should().Be(OrderStatus.Submitted);
         order.DomainEvents.OfType<DeliveryOrderAmendedDomainEvent>().Should().HaveCount(1);
     }
 
     [Fact]
-    public void AmendRequestedDeliveryDate_WhenDraft_Throws()
+    public void AmendServiceWindow_WhenDraft_Throws()
     {
         var order = CreateOrder();
 
-        var act = () => order.AmendRequestedDeliveryDate(DateTime.UtcNow.AddHours(1), "reason");
+        var act = () => order.AmendServiceWindow(
+            ServiceWindow.Create(earliest: null, latest: DateTime.UtcNow.AddHours(1)), "reason");
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*Draft*");
@@ -340,7 +343,7 @@ public class DeliveryOrderTests
     public void Create_WithExplicitSlaTier_PreservesIt()
     {
         var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
-            "TIER-TEST", Priority.Normal, requestedDeliveryDate: null,
+            "TIER-TEST", Priority.Normal, serviceWindow: null,
             sourceSystem: SourceSystem.Manual, createdBy: null, slaTier: SlaTier.Gold);
 
         order.SlaTier.Should().Be(SlaTier.Gold);
@@ -365,7 +368,7 @@ public class DeliveryOrderTests
         var before = DateTime.UtcNow;
 
         var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.CreateFromUpstream(
-            "UPS-001", Priority.High, DateTime.UtcNow.AddHours(2),
+            "UPS-001", Priority.High, ServiceWindow.Create(earliest: null, latest: DateTime.UtcNow.AddHours(2)),
             SourceSystem.Sap, createdBy: "sap-user", slaTier: SlaTier.Silver);
 
         order.SlaTier.Should().Be(SlaTier.Silver);
@@ -394,10 +397,10 @@ public class DeliveryOrderTests
     public void UpdateDraft_CanChangeSlaTier()
     {
         var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
-            "UPD-001", Priority.Normal, requestedDeliveryDate: null,
+            "UPD-001", Priority.Normal, serviceWindow: null,
             sourceSystem: SourceSystem.Manual, createdBy: null, slaTier: SlaTier.Bronze);
 
-        order.UpdateDraft("UPD-001", Priority.High, requestedDeliveryDate: null, slaTier: SlaTier.Gold);
+        order.UpdateDraft("UPD-001", Priority.High, serviceWindow: null, slaTier: SlaTier.Gold);
 
         order.SlaTier.Should().Be(SlaTier.Gold);
         order.Priority.Should().Be(Priority.High);
@@ -407,7 +410,7 @@ public class DeliveryOrderTests
     public void Confirm_DomainEventCarriesSlaTierAndSubmittedAt()
     {
         var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
-            "EVT-001", Priority.High, requestedDeliveryDate: DateTime.UtcNow.AddHours(4),
+            "EVT-001", Priority.High, serviceWindow: ServiceWindow.Create(earliest: null, latest: DateTime.UtcNow.AddHours(4)),
             sourceSystem: SourceSystem.Manual, createdBy: null, slaTier: SlaTier.Gold);
         AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
         order.Submit();
@@ -418,5 +421,76 @@ public class DeliveryOrderTests
         var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
         confirmed.SlaTier.Should().Be("Gold");
         confirmed.SubmittedAt.Should().Be(order.SubmittedAt);
+    }
+
+    // ── P1-1: ServiceWindow VO + window-aware Confirm event ─────────────
+
+    [Fact]
+    public void ServiceWindow_Create_RejectsBothBoundsNull()
+    {
+        var act = () => ServiceWindow.Create(earliest: null, latest: null);
+
+        act.Should().Throw<ArgumentException>().WithMessage("*at least one bound*");
+    }
+
+    [Fact]
+    public void ServiceWindow_Create_RejectsEarliestAfterLatest()
+    {
+        var now = DateTime.UtcNow;
+        var act = () => ServiceWindow.Create(earliest: now.AddHours(2), latest: now.AddHours(1));
+
+        act.Should().Throw<ArgumentException>().WithMessage("*Earliest*on or before*Latest*");
+    }
+
+    [Fact]
+    public void ServiceWindow_Create_AllowsEarliestOnly()
+    {
+        var earliest = DateTime.UtcNow.AddHours(1);
+
+        var window = ServiceWindow.Create(earliest: earliest, latest: null);
+
+        window.Earliest.Should().Be(earliest);
+        window.Latest.Should().BeNull();
+    }
+
+    [Fact]
+    public void ServiceWindow_Create_AllowsLatestOnly()
+    {
+        var latest = DateTime.UtcNow.AddHours(3);
+
+        var window = ServiceWindow.Create(earliest: null, latest: latest);
+
+        window.Earliest.Should().BeNull();
+        window.Latest.Should().Be(latest);
+    }
+
+    [Fact]
+    public void ServiceWindow_Equality_BasedOnBothBounds()
+    {
+        var early = DateTime.UtcNow.AddHours(1);
+        var late = DateTime.UtcNow.AddHours(5);
+
+        ServiceWindow.Create(early, late).Should().Be(ServiceWindow.Create(early, late));
+        ServiceWindow.Create(null, late).Should().NotBe(ServiceWindow.Create(early, late));
+    }
+
+    [Fact]
+    public void Confirm_DomainEvent_CarriesBothServiceWindowBounds()
+    {
+        var earliest = DateTime.UtcNow.AddHours(2);
+        var latest = DateTime.UtcNow.AddHours(8);
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "WIN-001", Priority.Normal,
+            serviceWindow: ServiceWindow.Create(earliest, latest),
+            sourceSystem: SourceSystem.Manual, createdBy: null);
+        AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
+
+        order.Confirm(weightFallbackKg: 500);
+
+        var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
+        confirmed.Earliest.Should().Be(earliest);
+        confirmed.Latest.Should().Be(latest);
     }
 }

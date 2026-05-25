@@ -14,6 +14,7 @@ public record DeliveryOrderConfirmedIntegrationEvent(
     Guid DeliveryOrderId,
     string Priority,
     string SlaTier,
-    DateTime? Deadline,
+    DateTime? Earliest,
+    DateTime? Latest,
     DateTime? SubmittedAt,
     IReadOnlyList<ItemSummaryDto> Items) : IIntegrationEvent;

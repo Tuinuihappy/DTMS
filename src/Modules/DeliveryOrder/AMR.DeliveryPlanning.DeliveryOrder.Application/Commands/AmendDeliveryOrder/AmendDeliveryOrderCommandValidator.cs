@@ -8,8 +8,8 @@ public class AmendDeliveryOrderCommandValidator : AbstractValidator<AmendDeliver
     {
         RuleFor(x => x.OrderId).NotEmpty();
         RuleFor(x => x.Reason).NotEmpty().MaximumLength(500);
-        RuleFor(x => x.NewRequestedDeliveryDate).NotNull()
-            .WithMessage("At least one amendment field (NewRequestedDeliveryDate) must be provided.");
+        RuleFor(x => x.NewServiceWindow).NotNull()
+            .WithMessage("At least one amendment field (NewServiceWindow) must be provided.");
         RuleFor(x => x.AmendedBy).MaximumLength(200).When(x => x.AmendedBy != null);
     }
 }

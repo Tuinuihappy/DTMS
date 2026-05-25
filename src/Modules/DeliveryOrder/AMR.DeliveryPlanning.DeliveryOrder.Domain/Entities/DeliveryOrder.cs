@@ -12,7 +12,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     public Priority Priority { get; private set; }
     public SlaTier SlaTier { get; private set; } = SlaTier.Bronze;
     public OrderStatus Status { get; private set; }
-    public DateTime? RequestedDeliveryDate { get; private set; }
+    public ServiceWindow? ServiceWindow { get; private set; }
     public DateTime? SubmittedAt { get; private set; }
     public string? CreatedBy { get; private set; }
     public DateTime CreatedDate { get; private set; }
@@ -30,7 +30,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     void IAuditable.SetUpdatedAt(DateTime updatedAt) => UpdatedDate = updatedAt;
 
     public static DeliveryOrder Create(string orderRef, Priority priority,
-        DateTime? requestedDeliveryDate, SourceSystem sourceSystem = SourceSystem.Manual,
+        ServiceWindow? serviceWindow, SourceSystem sourceSystem = SourceSystem.Manual,
         string? createdBy = null, SlaTier slaTier = SlaTier.Bronze)
     {
         var order = new DeliveryOrder
@@ -39,7 +39,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             OrderRef = orderRef,
             Priority = priority,
             SlaTier = slaTier,
-            RequestedDeliveryDate = requestedDeliveryDate,
+            ServiceWindow = serviceWindow,
             Status = OrderStatus.Draft,
             SourceSystem = sourceSystem,
             CreatedBy = createdBy
@@ -50,7 +50,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     }
 
     public static DeliveryOrder CreateFromUpstream(string orderRef, Priority priority,
-        DateTime? requestedDeliveryDate, SourceSystem sourceSystem, string? createdBy = null,
+        ServiceWindow? serviceWindow, SourceSystem sourceSystem, string? createdBy = null,
         SlaTier slaTier = SlaTier.Bronze)
     {
         if (sourceSystem == SourceSystem.Manual)
@@ -62,7 +62,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             OrderRef = orderRef,
             Priority = priority,
             SlaTier = slaTier,
-            RequestedDeliveryDate = requestedDeliveryDate,
+            ServiceWindow = serviceWindow,
             Status = OrderStatus.Submitted,
             SubmittedAt = DateTime.UtcNow,
             SourceSystem = sourceSystem,
@@ -73,7 +73,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         return order;
     }
 
-    public void UpdateDraft(string orderRef, Priority priority, DateTime? requestedDeliveryDate,
+    public void UpdateDraft(string orderRef, Priority priority, ServiceWindow? serviceWindow,
         SlaTier slaTier = SlaTier.Bronze)
     {
         if (Status != OrderStatus.Draft)
@@ -82,7 +82,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         OrderRef = orderRef;
         Priority = priority;
         SlaTier = slaTier;
-        RequestedDeliveryDate = requestedDeliveryDate;
+        ServiceWindow = serviceWindow;
 
         _items.Clear();
         TotalWeightKg = 0;
@@ -190,7 +190,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
         return new DeliveryOrderConfirmedDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, Priority.ToString(), SlaTier.ToString(),
-            RequestedDeliveryDate, SubmittedAt, itemDtos);
+            ServiceWindow?.Earliest, ServiceWindow?.Latest, SubmittedAt, itemDtos);
     }
 
     public void MarkPlanned()
@@ -267,7 +267,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
-    public void AmendRequestedDeliveryDate(DateTime? newRequestedDeliveryDate, string reason)
+    public void AmendServiceWindow(ServiceWindow? newServiceWindow, string reason)
     {
         if (Status is OrderStatus.Draft)
             throw new InvalidOperationException("Cannot amend a Draft order — use UpdateDraft instead.");
@@ -275,7 +275,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         if (Status is OrderStatus.Completed or OrderStatus.Cancelled)
             throw new InvalidOperationException($"Cannot amend a {Status} order.");
 
-        RequestedDeliveryDate = newRequestedDeliveryDate;
+        ServiceWindow = newServiceWindow;
         AddDomainEvent(new DeliveryOrderAmendedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
     }
 }

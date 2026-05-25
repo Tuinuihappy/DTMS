@@ -21,10 +21,14 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
 
     public async Task<Result<DeliveryOrderDetailDto>> Handle(CreateDraftDeliveryOrderCommand request, CancellationToken cancellationToken)
     {
+        var serviceWindow = request.ServiceWindow is { } sw
+            ? Domain.ValueObjects.ServiceWindow.Create(sw.Earliest, sw.Latest)
+            : null;
+
         var order = Domain.Entities.DeliveryOrder.Create(
             request.OrderRef,
             request.Priority,
-            request.RequestedDeliveryDate,
+            serviceWindow,
             request.SourceSystem,
             request.CreatedBy,
             request.SlaTier);

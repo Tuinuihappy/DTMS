@@ -37,7 +37,11 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
             b.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion().IsConcurrencyToken();
             b.Ignore(o => o.DomainEvents);
-            b.Property(o => o.RequestedDeliveryDate);
+            b.OwnsOne(o => o.ServiceWindow, sw =>
+            {
+                sw.Property(x => x.Earliest).HasColumnName("ServiceWindow_Earliest");
+                sw.Property(x => x.Latest).HasColumnName("ServiceWindow_Latest");
+            });
             b.Property(o => o.SubmittedAt);
 
             b.HasIndex(o => o.Status);

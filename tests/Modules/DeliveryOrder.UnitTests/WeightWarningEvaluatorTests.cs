@@ -9,7 +9,7 @@ public class WeightWarningEvaluatorTests
 {
     private static DomainEntities.DeliveryOrder OrderWithItems(params (int Seq, string Sku, double? Weight)[] items)
     {
-        var order = DomainEntities.DeliveryOrder.Create("ORD-X", Priority.Normal, requestedDeliveryDate: null);
+        var order = DomainEntities.DeliveryOrder.Create("ORD-X", Priority.Normal, serviceWindow: null);
         foreach (var (seq, sku, weight) in items)
             order.AddItem(
                 "WH-01", "LINE-01",
@@ -80,7 +80,7 @@ public class DeliveryOrderFallbackWeightTests
     [Fact]
     public void ConfirmWithFallback_PublishesEventUsingFallbackForNullWeights()
     {
-        var order = DomainEntities.DeliveryOrder.Create("ORD-1", Priority.Normal, requestedDeliveryDate: null);
+        var order = DomainEntities.DeliveryOrder.Create("ORD-1", Priority.Normal, serviceWindow: null);
         order.AddItem(
             "WH-01", "LINE-01",
             itemSeq: 1, sku: "SKU-A",
@@ -105,7 +105,7 @@ public class DeliveryOrderFallbackWeightTests
     [Fact]
     public void ConfirmWithFallback_KeepsRealWeightWhenPresent()
     {
-        var order = DomainEntities.DeliveryOrder.Create("ORD-2", Priority.Normal, requestedDeliveryDate: null);
+        var order = DomainEntities.DeliveryOrder.Create("ORD-2", Priority.Normal, serviceWindow: null);
         order.AddItem(
             "WH-01", "LINE-01",
             itemSeq: 1, sku: "SKU-B",

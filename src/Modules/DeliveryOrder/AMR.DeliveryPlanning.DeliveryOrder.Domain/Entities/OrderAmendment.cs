@@ -2,10 +2,10 @@ using AMR.DeliveryPlanning.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 
-// RequestedTimeChange is the only type in active use.
+// ServiceWindowChange is the only type in active use.
 // PriorityChange, LocationChange, CombinedChange, Cancel, Hold, Release, StatusTransition
 // are reserved for future amendment types when the full re-plan flow is implemented.
-public enum AmendmentType { PriorityChange, LocationChange, RequestedTimeChange, CombinedChange, Cancel, Hold, Release, StatusTransition }
+public enum AmendmentType { PriorityChange, LocationChange, ServiceWindowChange, CombinedChange, Cancel, Hold, Release, StatusTransition }
 
 public class OrderAmendment : Entity<Guid>
 {

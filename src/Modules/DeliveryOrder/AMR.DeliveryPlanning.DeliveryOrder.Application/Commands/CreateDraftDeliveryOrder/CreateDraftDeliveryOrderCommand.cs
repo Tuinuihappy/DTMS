@@ -8,6 +8,8 @@ public record DimensionsDto(double LengthMm, double WidthMm, double HeightMm);
 
 public record QuantityDto(double Value, string Uom);
 
+public record ServiceWindowDto(DateTime? Earliest, DateTime? Latest);
+
 public record CargoSpecificDto(
     string? PartNo,
     string? Wo,
@@ -34,7 +36,7 @@ public record ItemDto(
 
 public record CreateDraftDeliveryOrderCommand(
     string OrderRef,
-    DateTime? RequestedDeliveryDate,
+    ServiceWindowDto? ServiceWindow,
     List<ItemDto> Items,
     Priority Priority = Priority.Normal,
     SourceSystem SourceSystem = SourceSystem.Manual,

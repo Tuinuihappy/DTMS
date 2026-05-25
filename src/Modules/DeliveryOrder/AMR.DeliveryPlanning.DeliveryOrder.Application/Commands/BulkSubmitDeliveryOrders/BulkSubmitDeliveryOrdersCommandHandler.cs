@@ -44,8 +44,12 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
             Domain.Entities.DeliveryOrder order;
             try
             {
+                var serviceWindow = cmd.ServiceWindow is { } sw
+                    ? Domain.ValueObjects.ServiceWindow.Create(sw.Earliest, sw.Latest)
+                    : null;
+
                 order = Domain.Entities.DeliveryOrder.Create(
-                    cmd.OrderRef, cmd.Priority, cmd.RequestedDeliveryDate,
+                    cmd.OrderRef, cmd.Priority, serviceWindow,
                     cmd.SourceSystem, cmd.CreatedBy, cmd.SlaTier);
 
                 foreach (var (pkg, idx) in cmd.Items.Select((p, i) => (p, i + 1)))

@@ -7,7 +7,7 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateUpstream
 
 public record CreateUpstreamDeliveryOrderCommand(
     string OrderRef,
-    DateTime RequestedDeliveryDate,
+    ServiceWindowDto ServiceWindow,
     List<ItemDto> Items,
     Priority Priority,
     SourceSystem SourceSystem,

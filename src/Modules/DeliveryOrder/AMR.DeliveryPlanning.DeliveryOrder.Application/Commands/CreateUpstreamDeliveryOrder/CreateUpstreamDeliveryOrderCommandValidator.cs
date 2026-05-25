@@ -12,7 +12,12 @@ public class CreateUpstreamDeliveryOrderCommandValidator : AbstractValidator<Cre
         RuleFor(x => x.SourceSystem)
             .NotEqual(SourceSystem.Manual)
             .WithMessage("Upstream orders cannot have Manual source system.");
-        RuleFor(x => x.RequestedDeliveryDate).NotEmpty();
+        RuleFor(x => x.ServiceWindow).NotNull()
+            .WithMessage("Upstream orders must include a ServiceWindow.");
+        RuleFor(x => x.ServiceWindow)
+            .Must(sw => sw.Earliest.HasValue || sw.Latest.HasValue)
+            .When(x => x.ServiceWindow is not null)
+            .WithMessage("ServiceWindow must have at least one bound (Earliest or Latest).");
         RuleFor(x => x.CreatedBy).NotEmpty().MaximumLength(200);
 
         RuleFor(x => x.Items).NotEmpty().WithMessage("At least one item is required.");

@@ -32,22 +32,30 @@ public class AmendDeliveryOrderCommandHandler : ICommandHandler<AmendDeliveryOrd
 
         var originalSnapshot = JsonSerializer.Serialize(new
         {
-            RequestedDeliveryDate = order.RequestedDeliveryDate,
+            ServiceWindow = order.ServiceWindow is null
+                ? null
+                : new { order.ServiceWindow.Earliest, order.ServiceWindow.Latest },
             OrderStatus = order.Status
         });
 
         try
         {
-            order.AmendRequestedDeliveryDate(request.NewRequestedDeliveryDate, request.Reason);
+            var newServiceWindow = request.NewServiceWindow is { } sw
+                ? Domain.ValueObjects.ServiceWindow.Create(sw.Earliest, sw.Latest)
+                : null;
+
+            order.AmendServiceWindow(newServiceWindow, request.Reason);
 
             var newSnapshot = JsonSerializer.Serialize(new
             {
-                RequestedDeliveryDate = order.RequestedDeliveryDate,
+                ServiceWindow = order.ServiceWindow is null
+                    ? null
+                    : new { order.ServiceWindow.Earliest, order.ServiceWindow.Latest },
                 OrderStatus = order.Status
             });
 
             var amendment = new OrderAmendment(
-                order.Id, AmendmentType.RequestedTimeChange, request.Reason,
+                order.Id, AmendmentType.ServiceWindowChange, request.Reason,
                 originalSnapshot, newSnapshot, amendedBy);
 
             await _amendmentRepo.AddAsync(amendment, cancellationToken);

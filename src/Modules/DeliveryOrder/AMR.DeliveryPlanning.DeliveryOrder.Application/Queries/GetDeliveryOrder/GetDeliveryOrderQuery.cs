@@ -8,6 +8,8 @@ public record DimensionsDto(double LengthMm, double WidthMm, double HeightMm, do
 
 public record QuantityDto(double Value, string Uom);
 
+public record ServiceWindowDto(DateTime? Earliest, DateTime? Latest);
+
 public record CargoSpecificDto(
     string? PartNo,
     string? Wo,
@@ -44,7 +46,7 @@ public record DeliveryOrderListDto(
     Priority Priority,
     SlaTier SlaTier,
     OrderStatus OrderStatus,
-    DateTime? RequestedDeliveryDate,
+    ServiceWindowDto? ServiceWindow,
     DateTime? SubmittedAt,
     string? CreatedBy,
     DateTime CreatedDate,
@@ -60,7 +62,7 @@ public record DeliveryOrderDetailDto(
     Priority Priority,
     SlaTier SlaTier,
     OrderStatus OrderStatus,
-    DateTime? RequestedDeliveryDate,
+    ServiceWindowDto? ServiceWindow,
     DateTime? SubmittedAt,
     string? CreatedBy,
     DateTime CreatedDate,
@@ -122,7 +124,7 @@ internal static class DeliveryOrderMapper
             order.Priority,
             order.SlaTier,
             order.Status,
-            order.RequestedDeliveryDate,
+            order.ServiceWindow is { } sw ? new ServiceWindowDto(sw.Earliest, sw.Latest) : null,
             order.SubmittedAt,
             order.CreatedBy,
             order.CreatedDate,
@@ -139,7 +141,7 @@ internal static class DeliveryOrderMapper
             order.Priority,
             order.SlaTier,
             order.Status,
-            order.RequestedDeliveryDate,
+            order.ServiceWindow is { } sw ? new ServiceWindowDto(sw.Earliest, sw.Latest) : null,
             order.SubmittedAt,
             order.CreatedBy,
             order.CreatedDate,

@@ -17,7 +17,8 @@ public record DeliveryOrderConfirmedDomainEvent(
     Guid OrderId,
     string Priority,
     string SlaTier,
-    DateTime? Deadline,
+    DateTime? Earliest,
+    DateTime? Latest,
     DateTime? SubmittedAt,
     IReadOnlyList<ItemEventDto> Items) : IDomainEvent;
 public record DeliveryOrderRejectedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string Reason) : IDomainEvent;
