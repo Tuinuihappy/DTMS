@@ -34,7 +34,7 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
             var oldItems = order.Items.ToList();
             await _repository.RemoveItemsAsync(oldItems, cancellationToken);
 
-            order.UpdateDraft(request.OrderRef, request.Priority, request.RequestedDeliveryDate);
+            order.UpdateDraft(request.OrderRef, request.Priority, request.RequestedDeliveryDate, request.SlaTier);
 
             foreach (var (item, idx) in request.Items.Select((p, i) => (p, i + 1)))
             {

@@ -46,7 +46,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
             {
                 order = Domain.Entities.DeliveryOrder.Create(
                     cmd.OrderRef, cmd.Priority, cmd.RequestedDeliveryDate,
-                    cmd.SourceSystem, cmd.CreatedBy);
+                    cmd.SourceSystem, cmd.CreatedBy, cmd.SlaTier);
 
                 foreach (var (pkg, idx) in cmd.Items.Select((p, i) => (p, i + 1)))
                 {

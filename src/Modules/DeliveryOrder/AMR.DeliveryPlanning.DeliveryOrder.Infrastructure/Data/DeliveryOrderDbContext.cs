@@ -33,10 +33,12 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(o => o.TotalItems).IsRequired();
             b.Property(o => o.SourceSystem).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20).IsRequired();
+            b.Property(o => o.SlaTier).HasConversion<string>().HasMaxLength(10).IsRequired();
             b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
             b.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion().IsConcurrencyToken();
             b.Ignore(o => o.DomainEvents);
             b.Property(o => o.RequestedDeliveryDate);
+            b.Property(o => o.SubmittedAt);
 
             b.HasIndex(o => o.Status);
             b.HasIndex(o => o.CreatedDate);

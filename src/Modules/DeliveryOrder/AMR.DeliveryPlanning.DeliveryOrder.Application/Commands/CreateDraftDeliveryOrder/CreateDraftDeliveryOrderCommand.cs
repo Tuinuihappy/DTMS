@@ -38,5 +38,6 @@ public record CreateDraftDeliveryOrderCommand(
     List<ItemDto> Items,
     Priority Priority = Priority.Normal,
     SourceSystem SourceSystem = SourceSystem.Manual,
-    string? CreatedBy = null
+    string? CreatedBy = null,
+    SlaTier SlaTier = SlaTier.Bronze
 ) : ICommand<DeliveryOrderDetailDto>;

@@ -26,7 +26,8 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
             request.Priority,
             request.RequestedDeliveryDate,
             request.SourceSystem,
-            request.CreatedBy);
+            request.CreatedBy,
+            request.SlaTier);
 
         foreach (var (pkg, idx) in request.Items.Select((p, i) => (p, i + 1)))
         {

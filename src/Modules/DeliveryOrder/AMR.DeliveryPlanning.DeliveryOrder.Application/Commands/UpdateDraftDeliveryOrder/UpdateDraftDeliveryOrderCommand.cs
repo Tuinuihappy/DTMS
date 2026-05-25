@@ -10,5 +10,6 @@ public record UpdateDraftDeliveryOrderCommand(
     string OrderRef,
     Priority Priority,
     DateTime? RequestedDeliveryDate,
-    List<CommandItemDto> Items
+    List<CommandItemDto> Items,
+    SlaTier SlaTier = SlaTier.Bronze
 ) : ICommand<DeliveryOrderDetailDto>;

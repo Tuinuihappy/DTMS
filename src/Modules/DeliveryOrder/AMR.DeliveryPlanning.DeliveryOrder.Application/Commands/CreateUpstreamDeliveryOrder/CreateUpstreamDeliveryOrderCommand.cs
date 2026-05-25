@@ -11,7 +11,8 @@ public record CreateUpstreamDeliveryOrderCommand(
     List<ItemDto> Items,
     Priority Priority,
     SourceSystem SourceSystem,
-    string CreatedBy
+    string CreatedBy,
+    SlaTier SlaTier = SlaTier.Bronze
 ) : ICommand<UpstreamOrderAckDto>;
 
 public record UpstreamOrderAckDto(

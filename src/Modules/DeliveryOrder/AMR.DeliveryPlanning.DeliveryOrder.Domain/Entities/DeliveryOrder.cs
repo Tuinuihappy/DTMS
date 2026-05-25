@@ -10,8 +10,10 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     public string OrderRef { get; private set; } = string.Empty;
     public SourceSystem SourceSystem { get; private set; }
     public Priority Priority { get; private set; }
+    public SlaTier SlaTier { get; private set; } = SlaTier.Bronze;
     public OrderStatus Status { get; private set; }
     public DateTime? RequestedDeliveryDate { get; private set; }
+    public DateTime? SubmittedAt { get; private set; }
     public string? CreatedBy { get; private set; }
     public DateTime CreatedDate { get; private set; }
     public DateTime? UpdatedDate { get; private set; }
@@ -29,13 +31,14 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     public static DeliveryOrder Create(string orderRef, Priority priority,
         DateTime? requestedDeliveryDate, SourceSystem sourceSystem = SourceSystem.Manual,
-        string? createdBy = null)
+        string? createdBy = null, SlaTier slaTier = SlaTier.Bronze)
     {
         var order = new DeliveryOrder
         {
             Id = Guid.NewGuid(),
             OrderRef = orderRef,
             Priority = priority,
+            SlaTier = slaTier,
             RequestedDeliveryDate = requestedDeliveryDate,
             Status = OrderStatus.Draft,
             SourceSystem = sourceSystem,
@@ -47,7 +50,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     }
 
     public static DeliveryOrder CreateFromUpstream(string orderRef, Priority priority,
-        DateTime? requestedDeliveryDate, SourceSystem sourceSystem, string? createdBy = null)
+        DateTime? requestedDeliveryDate, SourceSystem sourceSystem, string? createdBy = null,
+        SlaTier slaTier = SlaTier.Bronze)
     {
         if (sourceSystem == SourceSystem.Manual)
             throw new InvalidOperationException("Upstream orders cannot have Manual source system.");
@@ -57,8 +61,10 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             Id = Guid.NewGuid(),
             OrderRef = orderRef,
             Priority = priority,
+            SlaTier = slaTier,
             RequestedDeliveryDate = requestedDeliveryDate,
             Status = OrderStatus.Submitted,
+            SubmittedAt = DateTime.UtcNow,
             SourceSystem = sourceSystem,
             CreatedBy = createdBy
         };
@@ -67,13 +73,15 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         return order;
     }
 
-    public void UpdateDraft(string orderRef, Priority priority, DateTime? requestedDeliveryDate)
+    public void UpdateDraft(string orderRef, Priority priority, DateTime? requestedDeliveryDate,
+        SlaTier slaTier = SlaTier.Bronze)
     {
         if (Status != OrderStatus.Draft)
             throw new InvalidOperationException($"Only Draft orders can be edited. Current status: {Status}.");
 
         OrderRef = orderRef;
         Priority = priority;
+        SlaTier = slaTier;
         RequestedDeliveryDate = requestedDeliveryDate;
 
         _items.Clear();
@@ -90,6 +98,9 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             throw new InvalidOperationException("Only Draft orders can be submitted.");
 
         Status = OrderStatus.Submitted;
+        // SLA clock starts at first submit. Subsequent transitions (e.g., release back to Confirmed
+        // after a Hold) do not re-route through Submit(), so this assignment runs exactly once.
+        SubmittedAt ??= DateTime.UtcNow;
         AddDomainEvent(new DeliveryOrderSubmittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
@@ -178,8 +189,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             .ToList();
 
         return new DeliveryOrderConfirmedDomainEvent(
-            Guid.NewGuid(), DateTime.UtcNow, Id, Priority.ToString(),
-            RequestedDeliveryDate, itemDtos);
+            Guid.NewGuid(), DateTime.UtcNow, Id, Priority.ToString(), SlaTier.ToString(),
+            RequestedDeliveryDate, SubmittedAt, itemDtos);
     }
 
     public void MarkPlanned()

@@ -51,7 +51,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         {
             order = Domain.Entities.DeliveryOrder.CreateFromUpstream(
                 request.OrderRef, request.Priority, request.RequestedDeliveryDate,
-                request.SourceSystem, request.CreatedBy);
+                request.SourceSystem, request.CreatedBy, request.SlaTier);
 
             foreach (var (item, idx) in request.Items.Select((p, i) => (p, i + 1)))
             {

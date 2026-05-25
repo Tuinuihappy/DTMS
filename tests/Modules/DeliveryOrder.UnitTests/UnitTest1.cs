@@ -324,4 +324,99 @@ public class DeliveryOrderTests
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*Draft*");
     }
+
+    // ── P1-2: SlaTier + SubmittedAt (SLA clock) ─────────────────────────
+
+    [Fact]
+    public void NewOrder_DefaultsToBronzeTier_AndHasNoSubmittedAt()
+    {
+        var order = CreateOrder();
+
+        order.SlaTier.Should().Be(SlaTier.Bronze);
+        order.SubmittedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void Create_WithExplicitSlaTier_PreservesIt()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "TIER-TEST", Priority.Normal, requestedDeliveryDate: null,
+            sourceSystem: SourceSystem.Manual, createdBy: null, slaTier: SlaTier.Gold);
+
+        order.SlaTier.Should().Be(SlaTier.Gold);
+    }
+
+    [Fact]
+    public void Submit_StartsSlaClock()
+    {
+        var order = CreateOrder();
+        AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
+        var before = DateTime.UtcNow;
+
+        order.Submit();
+
+        order.SubmittedAt.Should().NotBeNull();
+        order.SubmittedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(DateTime.UtcNow);
+    }
+
+    [Fact]
+    public void CreateFromUpstream_StartsSlaClockImmediately()
+    {
+        var before = DateTime.UtcNow;
+
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.CreateFromUpstream(
+            "UPS-001", Priority.High, DateTime.UtcNow.AddHours(2),
+            SourceSystem.Sap, createdBy: "sap-user", slaTier: SlaTier.Silver);
+
+        order.SlaTier.Should().Be(SlaTier.Silver);
+        order.Status.Should().Be(OrderStatus.Submitted);
+        order.SubmittedAt.Should().NotBeNull();
+        order.SubmittedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(DateTime.UtcNow);
+    }
+
+    [Fact]
+    public void SubmittedAt_PersistsThroughValidatedAndConfirmedTransitions()
+    {
+        var order = CreateOrder();
+        AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
+        order.Submit();
+        var clockStart = order.SubmittedAt;
+        clockStart.Should().NotBeNull();
+
+        order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
+        order.SubmittedAt.Should().Be(clockStart);
+
+        order.Confirm(weightFallbackKg: 500);
+        order.SubmittedAt.Should().Be(clockStart);
+    }
+
+    [Fact]
+    public void UpdateDraft_CanChangeSlaTier()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "UPD-001", Priority.Normal, requestedDeliveryDate: null,
+            sourceSystem: SourceSystem.Manual, createdBy: null, slaTier: SlaTier.Bronze);
+
+        order.UpdateDraft("UPD-001", Priority.High, requestedDeliveryDate: null, slaTier: SlaTier.Gold);
+
+        order.SlaTier.Should().Be(SlaTier.Gold);
+        order.Priority.Should().Be(Priority.High);
+    }
+
+    [Fact]
+    public void Confirm_DomainEventCarriesSlaTierAndSubmittedAt()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "EVT-001", Priority.High, requestedDeliveryDate: DateTime.UtcNow.AddHours(4),
+            sourceSystem: SourceSystem.Manual, createdBy: null, slaTier: SlaTier.Gold);
+        AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
+
+        order.Confirm(weightFallbackKg: 500);
+
+        var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
+        confirmed.SlaTier.Should().Be("Gold");
+        confirmed.SubmittedAt.Should().Be(order.SubmittedAt);
+    }
 }
