@@ -573,18 +573,35 @@ Predictive replanning, battery-aware dispatch, cost-model tuning per tenant, pla
 | `DeliveryOrder` aggregate | ✅ Done | `DeliveryOrder.cs` — OrderKey, Priority, Status, SLA, PickupStationId, DropStationId |
 | `OrderLine` entity | ✅ Done | `OrderLine.cs` — ItemCode, Quantity, Weight, Remarks |
 | `RecurringSchedule` entity | ✅ Done | `RecurringSchedule.cs` — CronExpression, ValidFrom, ValidUntil |
-| State machine | ⚡ Partial | Submitted → Validated → Cancelled (missing: DRAFT, CONFIRMED, PLANNING, PLANNED, DISPATCHED, IN_PROGRESS, COMPLETED, HELD, FAILED, AMENDED) |
-| `POST /api/v1/delivery-orders` | ✅ Done | SubmitDeliveryOrderCommand + Handler |
+| State machine | ✅ Done | Full lifecycle: DRAFT → SUBMITTED → VALIDATED → CONFIRMED → PLANNING → PLANNED → DISPATCHED → IN_PROGRESS → COMPLETED; plus HELD/RELEASED/CANCELLED/REJECTED/FAILED/AMENDED branches |
+| `POST /api/v1/delivery-orders` (Draft) | ✅ Done | CreateDraftDeliveryOrderCommand + Handler |
+| `POST /api/v1/delivery-orders/{id}/submit` | ✅ Done | SubmitDeliveryOrderCommand (auto-validates internally) |
+| `POST /api/v1/delivery-orders/{id}/confirm` | ✅ Done | ConfirmDeliveryOrderCommand + Handler |
+| `POST /api/v1/delivery-orders/{id}/reject` | ✅ Done | RejectDeliveryOrderCommand + Handler |
+| `POST /api/v1/delivery-orders/{id}/hold` | ✅ Done (P1-6, `826c4ea`) | HoldDeliveryOrderCommand + Handler |
+| `POST /api/v1/delivery-orders/{id}/release` | ✅ Done (P1-6, `826c4ea`) | ReleaseDeliveryOrderCommand (re-fires Confirmed event) |
+| `POST /api/v1/delivery-orders/upstream` | ✅ Done | CreateUpstreamDeliveryOrderCommand — Submitted→Validated→Confirmed in one tx |
+| `POST /api/v1/delivery-orders/bulk` | ✅ Done | BulkSubmitDeliveryOrdersCommand — best-effort, HTTP 207 partial |
+| `PUT /api/v1/delivery-orders/{id}` | ✅ Done | UpdateDraftDeliveryOrderCommand (Draft-only replace) |
+| `PATCH /api/v1/delivery-orders/{id}` | ✅ Done | AmendDeliveryOrderCommand (ServiceWindow change) |
 | `DEL /api/v1/delivery-orders/{id}` | ✅ Done | CancelDeliveryOrderCommand + Handler |
-| Domain events | ✅ Done | DeliveryOrderSubmittedDomainEvent, ValidatedDomainEvent, CancelledDomainEvent |
-| Integration events | ✅ Done | DeliveryOrderSubmittedIntegrationEvent |
-| DbContext + Schema | ✅ Done | `deliveryorder` schema — 3 tables (DeliveryOrders, OrderLines, RecurringSchedules) |
-| Unit Tests | ✅ Done | 7 tests — create, validate, cancel, schedule |
-| Bulk import | ❌ Not started | `POST /api/v1/orders:bulk` |
-| Amendment history | ❌ Not started | OrderAmendment entity + append-only |
-| Idempotency key | ❌ Not started | Header-based dedup |
-| SLA validation | ❌ Not started | Service window feasibility check |
-| Order Templates | ❌ Not started | Recurring order generation |
+| `GET /api/v1/delivery-orders/{id}/timeline` | ✅ Done | Audit events + amendments merged chronologically |
+| Domain events | ✅ Done | Drafted, Submitted, Validated, Confirmed, Rejected, Held, Released, Planning/Planned/Dispatched/InProgress/Completed/Failed/Cancelled, Amended, DraftUpdated |
+| Integration events | ✅ Done | Confirmed (incl. SlaTier + ServiceWindow + Deadline alias), Cancelled, Failed, Completed, Amended, Held, Released, Rejected — published via outbox pattern |
+| ServiceWindow VO `{earliest, latest}` | ✅ Done (P1-1, `d9c4e93`) | Replaces single `RequestedDeliveryDate`; invariant Earliest ≤ Latest |
+| SlaTier (Bronze/Silver/Gold) + SubmittedAt | ✅ Done (P1-2, `8982a1e`) | SLA clock starts at first Submit (frozen via `??=`); upstream sets immediately |
+| Path versioning `/api/v1/...` | ✅ Done (P1-7, `cea473e`) | All 6 business modules; Auth/Webhook/Health unchanged |
+| DbContext + Schema | ✅ Done | `deliveryorder` schema — `DeliveryOrders`, `Items`, `OrderAmendments`, `OrderAuditEvents`, `OutboxMessages` |
+| Outbox pattern + retry | ✅ Done (P0-3, `552c13be`) | DbContext interceptor + BackgroundService + MassTransit; exponential backoff (30s/2m/10m/30m/2h, max 5) |
+| Idempotency-Key header | ⚡ Optional (P0-4, `2ce55796` + `cea473e`) | Filter on 8 mutation endpoints; missing→pass-through (best-effort), present→replay/conflict via Redis 24h |
+| SLA validation (window feasibility) | ❌ Not started | Solver-side check, not at payload tier |
+| Order Templates | ❌ Not started | Recurring order generation (Phase 5 / P2-4) |
+| HazmatInfo VO (class + packing group) | ⏳ planned (P1-3) | Option C per Decision #5 |
+| Quantity VO + UOM whitelist | ⏳ planned (P1-9) | Option C hybrid per Decision #4 |
+| TemperatureRange VO | ⏳ planned (P1-4) | minC/maxC nullable bounds |
+| handlingInstructions | ⏳ planned (P1-5) | enum flags or string list |
+| Event schema versioning | ⏳ planned (P1-8) | `schemaVersion` field + drop `Deadline` alias |
+| Unit Tests | ✅ 51 passing | Entity invariants, VO factories, SLA clock, hold/release transitions, event payload |
 
 #### Context 2 — Planning & Optimization ✅ Core Implemented
 
