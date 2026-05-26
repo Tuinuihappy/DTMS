@@ -19,14 +19,16 @@ namespace AMR.DeliveryPlanning.IntegrationTests;
 public class DomainEventMapperTests
 {
     [Fact]
-    public void DeliveryOrderMapper_MapsConfirmedEvent()
+    public void DeliveryOrderMapper_MapsConfirmedEvent_ToV1()
     {
         var eventId = Guid.NewGuid();
         var occurredOn = DateTime.UtcNow;
         var orderId = Guid.NewGuid();
         var pickupStationId = Guid.NewGuid();
         var dropStationId = Guid.NewGuid();
-        var deadline = new DateTime(2026, 5, 8, 18, 0, 0, DateTimeKind.Utc);
+        var earliest = new DateTime(2026, 5, 8, 8, 0, 0, DateTimeKind.Utc);
+        var latest = new DateTime(2026, 5, 8, 18, 0, 0, DateTimeKind.Utc);
+        var submittedAt = new DateTime(2026, 5, 7, 23, 0, 0, DateTimeKind.Utc);
         var items = new List<ItemEventDto>
         {
             new("SKU-001", 5.5, pickupStationId, dropStationId)
@@ -34,21 +36,26 @@ public class DomainEventMapperTests
 
         var result = new DeliveryOrderDomainEventMapper()
             .Map(new DeliveryOrderConfirmedDomainEvent(
-                eventId, occurredOn, orderId, "High", deadline, items))
+                eventId, occurredOn, orderId, "High", "Gold",
+                earliest, latest, submittedAt, items))
             .Should().ContainSingle().Subject
-            .Should().BeOfType<DeliveryOrderConfirmedIntegrationEvent>().Subject;
+            .Should().BeOfType<DeliveryOrderConfirmedIntegrationEventV1>().Subject;
 
         result.EventId.Should().Be(eventId);
         result.OccurredOn.Should().Be(occurredOn);
         result.DeliveryOrderId.Should().Be(orderId);
         result.Priority.Should().Be("High");
-        result.Deadline.Should().Be(deadline);
+        result.SlaTier.Should().Be("Gold");
+        result.Earliest.Should().Be(earliest);
+        result.Latest.Should().Be(latest);
+        result.SubmittedAt.Should().Be(submittedAt);
+        result.SchemaVersion.Should().Be("1.0");
         result.Items.Should().ContainSingle()
             .Which.Should().BeEquivalentTo(new ItemSummaryDto("SKU-001", 5.5, pickupStationId, dropStationId));
     }
 
     [Fact]
-    public void DeliveryOrderMapper_MapsCancelledEvent()
+    public void DeliveryOrderMapper_MapsCancelledEvent_ToV1()
     {
         var eventId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
@@ -56,14 +63,15 @@ public class DomainEventMapperTests
         var result = new DeliveryOrderDomainEventMapper()
             .Map(new DeliveryOrderCancelledDomainEvent(eventId, DateTime.UtcNow, orderId, "Not needed"))
             .Should().ContainSingle().Subject
-            .Should().BeOfType<DeliveryOrderCancelledIntegrationEvent>().Subject;
+            .Should().BeOfType<DeliveryOrderCancelledIntegrationEventV1>().Subject;
 
         result.DeliveryOrderId.Should().Be(orderId);
         result.Reason.Should().Be("Not needed");
+        result.SchemaVersion.Should().Be("1.0");
     }
 
     [Fact]
-    public void DeliveryOrderMapper_MapsHeldEvent()
+    public void DeliveryOrderMapper_MapsHeldEvent_ToV1()
     {
         var eventId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
@@ -71,14 +79,15 @@ public class DomainEventMapperTests
         var result = new DeliveryOrderDomainEventMapper()
             .Map(new DeliveryOrderHeldDomainEvent(eventId, DateTime.UtcNow, orderId, "Awaiting confirmation"))
             .Should().ContainSingle().Subject
-            .Should().BeOfType<DeliveryOrderHeldIntegrationEvent>().Subject;
+            .Should().BeOfType<DeliveryOrderHeldIntegrationEventV1>().Subject;
 
         result.DeliveryOrderId.Should().Be(orderId);
         result.Reason.Should().Be("Awaiting confirmation");
+        result.SchemaVersion.Should().Be("1.0");
     }
 
     [Fact]
-    public void DeliveryOrderMapper_MapsReleasedEvent()
+    public void DeliveryOrderMapper_MapsReleasedEvent_ToV1()
     {
         var eventId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
@@ -86,13 +95,14 @@ public class DomainEventMapperTests
         var result = new DeliveryOrderDomainEventMapper()
             .Map(new DeliveryOrderReleasedDomainEvent(eventId, DateTime.UtcNow, orderId))
             .Should().ContainSingle().Subject
-            .Should().BeOfType<DeliveryOrderReleasedIntegrationEvent>().Subject;
+            .Should().BeOfType<DeliveryOrderReleasedIntegrationEventV1>().Subject;
 
         result.DeliveryOrderId.Should().Be(orderId);
+        result.SchemaVersion.Should().Be("1.0");
     }
 
     [Fact]
-    public void DeliveryOrderMapper_MapsAmendedEvent()
+    public void DeliveryOrderMapper_MapsAmendedEvent_ToV1()
     {
         var eventId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
@@ -100,10 +110,11 @@ public class DomainEventMapperTests
         var result = new DeliveryOrderDomainEventMapper()
             .Map(new DeliveryOrderAmendedDomainEvent(eventId, DateTime.UtcNow, orderId, "Adjusted window"))
             .Should().ContainSingle().Subject
-            .Should().BeOfType<DeliveryOrderAmendedIntegrationEvent>().Subject;
+            .Should().BeOfType<DeliveryOrderAmendedIntegrationEventV1>().Subject;
 
         result.DeliveryOrderId.Should().Be(orderId);
         result.Reason.Should().Be("Adjusted window");
+        result.SchemaVersion.Should().Be("1.0");
     }
 
     [Fact]
@@ -192,14 +203,31 @@ public class DomainEventMapperTests
     }
 
     [Fact]
-    public void Mappers_ReturnEmpty_ForUnmappedDomainEvents()
+    public void PlanningFleetDispatchMappers_ReturnEmpty_ForUnmappedDomainEvents()
     {
+        // Planning, Fleet, and Dispatch mappers fall through to [] for any
+        // domain event they don't have a handler for — the integration-event
+        // surface stays opt-in.
         var domainEvent = new UnmappedDomainEvent(Guid.NewGuid(), DateTime.UtcNow);
 
-        new DeliveryOrderDomainEventMapper().Map(domainEvent).Should().BeEmpty();
         new PlanningDomainEventMapper().Map(domainEvent).Should().BeEmpty();
         new FleetDomainEventMapper().Map(domainEvent).Should().BeEmpty();
         new DispatchDomainEventMapper().Map(domainEvent).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void DeliveryOrderMapper_Throws_ForUnmappedDomainEvent()
+    {
+        // DeliveryOrder mapper is intentionally strict — every concrete
+        // DeliveryOrder*DomainEvent must be either mapped to an integration
+        // event or explicitly listed as internal-only `=> []`. A truly
+        // unrecognized type signals a missing entry, so the mapper throws.
+        var domainEvent = new UnmappedDomainEvent(Guid.NewGuid(), DateTime.UtcNow);
+
+        var act = () => new DeliveryOrderDomainEventMapper().Map(domainEvent);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Unhandled domain event 'UnmappedDomainEvent'*");
     }
 
     private sealed record UnmappedDomainEvent(Guid EventId, DateTime OccurredOn) : IDomainEvent;

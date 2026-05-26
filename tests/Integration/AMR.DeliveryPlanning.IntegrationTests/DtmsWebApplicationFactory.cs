@@ -147,24 +147,21 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         Guid pickupId, Guid dropId, string loadUnitProfileCode,
         DateTime? sla = null, string? orderName = null) => new
     {
-        OrderName = orderName ?? $"Test-{Guid.NewGuid():N}"[..20],
-        SlaTier = "Normal",
+        OrderRef = orderName ?? $"Test-{Guid.NewGuid():N}"[..20],
+        SlaTier = "Bronze",
         ServiceWindow = sla.HasValue ? new { Earliest = (DateTime?)null, Latest = sla } : (object?)null,
-        StructureType = "Sequence",
-        Tags = (string[]?)null,
-        OrderItems = new[]
+        Items = new[]
         {
             new
             {
+                Sku = $"SKU-{Guid.NewGuid():N}"[..15],
                 PickupLocationCode = pickupId.ToString(),
                 DropLocationCode = dropId.ToString(),
-                Barcode = $"BCR-{Guid.NewGuid():N}"[..15],
                 LoadUnitProfileCode = loadUnitProfileCode,
-                GrossWeightKg = 5.0,
-                Contents = (object[]?)null
+                WeightKg = 5.0,
+                Quantity = new { Value = 1.0, Uom = "BOX" }
             }
-        },
-        Schedule = (object?)null
+        }
     };
 
     /// <summary>
