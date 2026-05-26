@@ -22,6 +22,7 @@ public record ItemSearchResultDto(
     QuantityDto Quantity,
     CargoType? CargoType,
     CargoSpecificDto? CargoSpecific,
+    HazmatDto? Hazmat,
     ItemStatus Status,
     OrderContextDto Order);
 
@@ -91,6 +92,7 @@ public class SearchItemsQueryHandler : IQueryHandler<SearchItemsQuery, PagedResu
                     i.CargoSpecific is { } cs
                         ? new CargoSpecificDto(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                         : null,
+                    i.Hazmat is { } hz ? new HazmatDto(hz.ClassCode, hz.PackingGroup) : null,
                     i.Status,
                     new OrderContextDto(o.Id, o.OrderRef, o.Status, o.Priority)
                 );

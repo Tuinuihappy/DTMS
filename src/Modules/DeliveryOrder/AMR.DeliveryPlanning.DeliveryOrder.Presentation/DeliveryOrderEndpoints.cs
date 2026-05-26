@@ -10,6 +10,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReleaseDeliveryOrd
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.UpdateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetItem;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderItems;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderTimeline;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
@@ -161,11 +162,12 @@ public static class DeliveryOrderEndpoints
         // GET /api/v1/delivery-orders/{id}/items/{itemId}
         group.MapGet("/{id:guid}/items/{itemId:guid}", async (Guid id, Guid itemId, ISender sender) =>
         {
-            var result = await sender.Send(new GetOrderItemsQuery(id));
-            if (!result.IsSuccess) return Results.NotFound(result.Error);
+            var result = await sender.Send(new GetItemQuery(itemId));
+            if (result.IsFailure) return Results.NotFound(result.Error);
+            if (result.Value.DeliveryOrderId != id)
+                return Results.NotFound($"Item {itemId} not found in order {id}.");
 
-            var item = result.Value.FirstOrDefault(i => i.Id == itemId);
-            return item is not null ? Results.Ok(item) : Results.NotFound($"Item {itemId} not found in order {id}.");
+            return Results.Ok(result.Value);
         });
     }
 }

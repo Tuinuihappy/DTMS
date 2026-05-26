@@ -22,6 +22,8 @@ public record CargoSpecificDto(
     string? TraceId,
     string? LotNo);
 
+public record HazmatDto(string ClassCode, PackingGroup? PackingGroup);
+
 public record ItemDto(
     Guid Id,
     int ItemSeq,
@@ -37,6 +39,7 @@ public record ItemDto(
     QuantityDto Quantity,
     CargoType? CargoType,
     CargoSpecificDto? CargoSpecific,
+    HazmatDto? Hazmat,
     ItemStatus Status);
 
 public record DeliveryOrderListDto(
@@ -166,6 +169,7 @@ internal static class DeliveryOrderMapper
                 p.CargoSpecific is { } cs
                     ? new CargoSpecificDto(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                     : null,
+                p.Hazmat is { } hz ? new HazmatDto(hz.ClassCode, hz.PackingGroup) : null,
                 p.Status
             )).ToList());
 }

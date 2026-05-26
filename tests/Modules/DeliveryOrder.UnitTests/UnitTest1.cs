@@ -556,6 +556,117 @@ public class DeliveryOrderTests
         a.Should().NotBe(d);
     }
 
+    // ── P1-3: HazmatInfo VO ────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("3")]
+    [InlineData("2.1")]
+    [InlineData("5.1")]
+    [InlineData("6.1")]
+    [InlineData("9")]
+    public void HazmatInfo_Create_AcceptsValidClassCodes(string classCode)
+    {
+        var act = () => HazmatInfo.Create(classCode, PackingGroup.II);
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("0")]
+    [InlineData("10")]
+    [InlineData("3.0")]
+    [InlineData("2.7")]
+    [InlineData("X")]
+    [InlineData("3a")]
+    public void HazmatInfo_Create_RejectsInvalidClassCodes(string classCode)
+    {
+        var act = () => HazmatInfo.Create(classCode, null);
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void HazmatInfo_PackingGroup_IsOptional_AndPreserved()
+    {
+        var withPg = HazmatInfo.Create("3", PackingGroup.II);
+        var withoutPg = HazmatInfo.Create("7", null);
+
+        withPg.PackingGroup.Should().Be(PackingGroup.II);
+        withoutPg.PackingGroup.Should().BeNull();
+    }
+
+    [Fact]
+    public void HazmatInfo_TrimsWhitespaceInClassCode()
+    {
+        var hz = HazmatInfo.Create("  3  ", PackingGroup.I);
+
+        hz.ClassCode.Should().Be("3");
+    }
+
+    [Fact]
+    public void Item_DefaultsToNonHazardous_AndHazmatCanBeAttached()
+    {
+        var order = CreateOrder();
+
+        order.AddItem(
+            "WH-01", "LINE-01",
+            itemSeq: 1, sku: "PAPER",
+            description: null, loadUnitProfileCode: null,
+            dimensions: null, weightKg: 5.0,
+            quantity: Quantity.Create(10, UnitOfMeasure.BOX),
+            cargoType: null, cargoSpecific: null);
+
+        order.AddItem(
+            "WH-FLAM-01", "LINE-02",
+            itemSeq: 2, sku: "THINNER",
+            description: null, loadUnitProfileCode: null,
+            dimensions: null, weightKg: 25.0,
+            quantity: Quantity.Create(2, UnitOfMeasure.BOX),
+            cargoType: null, cargoSpecific: null,
+            hazmat: HazmatInfo.Create("3", PackingGroup.II));
+
+        var paper = order.Items.Single(i => i.Sku == "PAPER");
+        var thinner = order.Items.Single(i => i.Sku == "THINNER");
+
+        paper.Hazmat.Should().BeNull();
+        thinner.Hazmat.Should().NotBeNull();
+        thinner.Hazmat!.ClassCode.Should().Be("3");
+        thinner.Hazmat.PackingGroup.Should().Be(PackingGroup.II);
+    }
+
+    [Fact]
+    public void Confirm_DomainEvent_CarriesHazmatPerItem()
+    {
+        var order = CreateOrder();
+        order.AddItem(
+            "WH-01", "STORE-05",
+            itemSeq: 1, sku: "SKU-CLEAN",
+            description: null, loadUnitProfileCode: null,
+            dimensions: null, weightKg: 5.0,
+            quantity: Quantity.Create(1, UnitOfMeasure.BOX),
+            cargoType: null, cargoSpecific: null);
+        order.AddItem(
+            "WH-FLAM-01", "STORE-05",
+            itemSeq: 2, sku: "SKU-ACID",
+            description: null, loadUnitProfileCode: null,
+            dimensions: null, weightKg: 10.0,
+            quantity: Quantity.Create(1, UnitOfMeasure.BOX),
+            cargoType: null, cargoSpecific: null,
+            hazmat: HazmatInfo.Create("8", PackingGroup.II));
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-01", "WH-FLAM-01", "STORE-05"));
+        order.Confirm(weightFallbackKg: 500);
+
+        var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
+        var clean = confirmed.Items.Single(i => i.Sku == "SKU-CLEAN");
+        var acid = confirmed.Items.Single(i => i.Sku == "SKU-ACID");
+
+        clean.Hazmat.Should().BeNull();
+        acid.Hazmat.Should().NotBeNull();
+        acid.Hazmat!.ClassCode.Should().Be("8");
+        acid.Hazmat.PackingGroup.Should().Be("II");
+    }
+
     [Fact]
     public void AddItem_StoresQuantityVO_WithCanonicalUom()
     {

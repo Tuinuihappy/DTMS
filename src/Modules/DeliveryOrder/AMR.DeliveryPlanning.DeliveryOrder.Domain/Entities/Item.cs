@@ -20,6 +20,7 @@ public class Item : Entity<Guid>
     public Quantity Quantity { get; private set; } = null!;
     public CargoType? CargoType { get; private set; }
     public CargoSpecific? CargoSpecific { get; private set; }
+    public HazmatInfo? Hazmat { get; private set; }
     public ItemStatus Status { get; private set; }
 
     private Item() { }
@@ -29,7 +30,8 @@ public class Item : Entity<Guid>
         string? loadUnitProfileCode,
         Dimensions? dimensions, double? weightKg, Quantity quantity,
         CargoType? cargoType,
-        CargoSpecific? cargoSpecific = null)
+        CargoSpecific? cargoSpecific = null,
+        HazmatInfo? hazmat = null)
     {
         if (cargoType is null && cargoSpecific is not null)
             throw new InvalidOperationException(
@@ -54,6 +56,7 @@ public class Item : Entity<Guid>
         Quantity = quantity;
         CargoType = cargoType;
         CargoSpecific = cargoSpecific;
+        Hazmat = hazmat;
         Status = ItemStatus.Pending;
     }
 

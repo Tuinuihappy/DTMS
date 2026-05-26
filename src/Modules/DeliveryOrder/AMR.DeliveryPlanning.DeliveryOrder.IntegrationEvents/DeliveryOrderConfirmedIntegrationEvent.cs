@@ -2,11 +2,14 @@ using AMR.DeliveryPlanning.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
 
+public record ItemHazmatSummaryDto(string ClassCode, string? PackingGroup);
+
 public record ItemSummaryDto(
     string Sku,
     double WeightKg,
     Guid PickupStationId,
-    Guid DropStationId);
+    Guid DropStationId,
+    ItemHazmatSummaryDto? Hazmat = null);
 
 public record DeliveryOrderConfirmedIntegrationEvent(
     Guid EventId,

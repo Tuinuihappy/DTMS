@@ -77,6 +77,9 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                         pkg.CargoType,
                         pkg.CargoSpecific is { } cs
                             ? CargoSpecific.Create(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
+                            : null,
+                        pkg.Hazmat is { } hz
+                            ? HazmatInfo.Create(hz.ClassCode, hz.PackingGroup)
                             : null);
                 }
 

@@ -1,9 +1,16 @@
+using System.Text.RegularExpressions;
 using FluentValidation;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 
 public class DraftItemDtoValidator : AbstractValidator<ItemDto>
 {
+    // Mirror of the domain regex on HazmatInfo.ClassCode — kept here too so
+    // ModelValidation rejects bad input with a clear 400 before the handler
+    // throws (which would still work, but as a generic Result.Failure).
+    private static readonly Regex HazmatClassPattern =
+        new(@"^[1-9](\.[1-6])?$", RegexOptions.Compiled);
+
     public DraftItemDtoValidator()
     {
         RuleFor(p => p.Sku).MaximumLength(100);
@@ -44,6 +51,18 @@ public class DraftItemDtoValidator : AbstractValidator<ItemDto>
             .NotEqual(p => p.PickupLocationCode)
             .When(p => !string.IsNullOrWhiteSpace(p.PickupLocationCode) && !string.IsNullOrWhiteSpace(p.DropLocationCode))
             .WithMessage("Pickup and Drop locations must be different.");
+
+        When(p => p.Hazmat is not null, () =>
+        {
+            RuleFor(p => p.Hazmat!.ClassCode)
+                .NotEmpty()
+                .Must(c => !string.IsNullOrWhiteSpace(c) && HazmatClassPattern.IsMatch(c.Trim()))
+                .WithMessage("Hazmat.ClassCode must be a UN hazard class 1-9 with optional subdivision (e.g. '3', '2.1', '5.1').");
+
+            RuleFor(p => p.Hazmat!.PackingGroup!.Value)
+                .IsInEnum()
+                .When(p => p.Hazmat!.PackingGroup.HasValue);
+        });
     }
 }
 

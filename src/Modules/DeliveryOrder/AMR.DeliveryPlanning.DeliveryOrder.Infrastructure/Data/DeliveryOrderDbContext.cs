@@ -104,6 +104,11 @@ public class DeliveryOrderDbContext : DbContext
                 cs.Property(x => x.TraceId).HasColumnName("TraceId").HasMaxLength(100);
                 cs.Property(x => x.LotNo).HasColumnName("LotNo").HasMaxLength(100);
             });
+            b.OwnsOne(p => p.Hazmat, hz =>
+            {
+                hz.Property(x => x.ClassCode).HasColumnName("Hazmat_ClassCode").HasMaxLength(10);
+                hz.Property(x => x.PackingGroup).HasConversion<string>().HasColumnName("Hazmat_PackingGroup").HasMaxLength(5);
+            });
         });
 
         modelBuilder.Entity<OrderAmendment>(b =>

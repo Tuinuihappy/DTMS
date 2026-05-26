@@ -21,6 +21,7 @@ public record ItemDetailDto(
     QuantityDto Quantity,
     CargoType? CargoType,
     CargoSpecificDto? CargoSpecific,
+    HazmatDto? Hazmat,
     ItemStatus Status);
 
 public record GetItemQuery(Guid ItemId) : IQuery<ItemDetailDto>;
@@ -54,6 +55,7 @@ public class GetItemQueryHandler : IQueryHandler<GetItemQuery, ItemDetailDto>
             item.CargoSpecific is { } cs
                 ? new CargoSpecificDto(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                 : null,
+            item.Hazmat is { } hz ? new HazmatDto(hz.ClassCode, hz.PackingGroup) : null,
             item.Status
         );
 

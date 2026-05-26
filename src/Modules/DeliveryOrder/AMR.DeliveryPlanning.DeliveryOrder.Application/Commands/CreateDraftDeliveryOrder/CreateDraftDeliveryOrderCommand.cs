@@ -22,6 +22,8 @@ public record CargoSpecificDto(
     string? TraceId,
     string? LotNo);
 
+public record HazmatDto(string ClassCode, PackingGroup? PackingGroup);
+
 public record ItemDto(
     string Sku,
     string? Description,
@@ -32,7 +34,8 @@ public record ItemDto(
     double? WeightKg,
     QuantityDto Quantity,
     CargoType? CargoType,
-    CargoSpecificDto? CargoSpecific);
+    CargoSpecificDto? CargoSpecific,
+    HazmatDto? Hazmat = null);
 
 public record CreateDraftDeliveryOrderCommand(
     string OrderRef,
