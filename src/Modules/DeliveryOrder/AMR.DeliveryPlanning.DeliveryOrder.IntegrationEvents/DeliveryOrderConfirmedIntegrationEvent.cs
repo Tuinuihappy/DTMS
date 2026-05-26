@@ -4,12 +4,15 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
 
 public record ItemHazmatSummaryDto(string ClassCode, string? PackingGroup);
 
+public record ItemTemperatureSummaryDto(double? MinC, double? MaxC);
+
 public record ItemSummaryDto(
     string Sku,
     double WeightKg,
     Guid PickupStationId,
     Guid DropStationId,
-    ItemHazmatSummaryDto? Hazmat = null);
+    ItemHazmatSummaryDto? Hazmat = null,
+    ItemTemperatureSummaryDto? Temperature = null);
 
 public record DeliveryOrderConfirmedIntegrationEvent(
     Guid EventId,

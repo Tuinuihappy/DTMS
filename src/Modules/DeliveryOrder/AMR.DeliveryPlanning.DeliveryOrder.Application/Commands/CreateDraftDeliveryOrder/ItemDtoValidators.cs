@@ -63,6 +63,16 @@ public class DraftItemDtoValidator : AbstractValidator<ItemDto>
                 .IsInEnum()
                 .When(p => p.Hazmat!.PackingGroup.HasValue);
         });
+
+        When(p => p.Temperature is not null, () =>
+        {
+            RuleFor(p => p.Temperature!)
+                .Must(t => t.MinC.HasValue || t.MaxC.HasValue)
+                .WithMessage("Temperature must have at least one bound (MinC or MaxC).");
+            RuleFor(p => p.Temperature!)
+                .Must(t => !(t.MinC.HasValue && t.MaxC.HasValue) || t.MinC!.Value <= t.MaxC!.Value)
+                .WithMessage("Temperature.MinC must be on or below MaxC.");
+        });
     }
 }
 

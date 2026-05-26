@@ -23,6 +23,7 @@ public record ItemSearchResultDto(
     CargoType? CargoType,
     CargoSpecificDto? CargoSpecific,
     HazmatDto? Hazmat,
+    TemperatureRangeDto? Temperature,
     ItemStatus Status,
     OrderContextDto Order);
 
@@ -93,6 +94,7 @@ public class SearchItemsQueryHandler : IQueryHandler<SearchItemsQuery, PagedResu
                         ? new CargoSpecificDto(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                         : null,
                     i.Hazmat is { } hz ? new HazmatDto(hz.ClassCode, hz.PackingGroup) : null,
+                    i.Temperature is { } tr ? new TemperatureRangeDto(tr.MinC, tr.MaxC) : null,
                     i.Status,
                     new OrderContextDto(o.Id, o.OrderRef, o.Status, o.Priority)
                 );

@@ -40,6 +40,7 @@ public class GetOrderItemsQueryHandler : IQueryHandler<GetOrderItemsQuery, IRead
                     ? new CargoSpecificDto(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                     : null,
                 p.Hazmat is { } hz ? new HazmatDto(hz.ClassCode, hz.PackingGroup) : null,
+                p.Temperature is { } tr ? new TemperatureRangeDto(tr.MinC, tr.MaxC) : null,
                 p.Status
             ))
             .ToList();

@@ -64,6 +64,9 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
                         : null,
                     item.Hazmat is { } hz
                         ? HazmatInfo.Create(hz.ClassCode, hz.PackingGroup)
+                        : null,
+                    item.Temperature is { } tr
+                        ? TemperatureRange.Create(tr.MinC, tr.MaxC)
                         : null);
             }
 

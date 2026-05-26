@@ -80,6 +80,9 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                             : null,
                         pkg.Hazmat is { } hz
                             ? HazmatInfo.Create(hz.ClassCode, hz.PackingGroup)
+                            : null,
+                        pkg.Temperature is { } tr
+                            ? TemperatureRange.Create(tr.MinC, tr.MaxC)
                             : null);
                 }
 

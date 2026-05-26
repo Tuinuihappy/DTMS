@@ -79,6 +79,9 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
                         : null,
                     item.Hazmat is { } hz
                         ? HazmatInfo.Create(hz.ClassCode, hz.PackingGroup)
+                        : null,
+                    item.Temperature is { } tr
+                        ? TemperatureRange.Create(tr.MinC, tr.MaxC)
                         : null);
             }
         }

@@ -667,6 +667,108 @@ public class DeliveryOrderTests
         acid.Hazmat.PackingGroup.Should().Be("II");
     }
 
+    // ── P1-4: TemperatureRange VO ─────────────────────────────────────
+
+    [Fact]
+    public void TemperatureRange_Create_RejectsBothBoundsNull()
+    {
+        var act = () => TemperatureRange.Create(null, null);
+        act.Should().Throw<ArgumentException>().WithMessage("*at least one bound*");
+    }
+
+    [Fact]
+    public void TemperatureRange_Create_RejectsMinAboveMax()
+    {
+        var act = () => TemperatureRange.Create(minC: 10, maxC: 5);
+        act.Should().Throw<ArgumentException>().WithMessage("*MinC must be on or below MaxC*");
+    }
+
+    [Theory]
+    [InlineData(2.0, 8.0)]      // refrigerated pharma
+    [InlineData(-20.0, -18.0)]  // frozen
+    [InlineData(-196.0, null)]  // cryogenic, no upper bound
+    [InlineData(null, 25.0)]    // ambient ceiling (e.g. chocolate)
+    [InlineData(60.0, 60.0)]    // single-temp clamp (e.g. exact storage)
+    public void TemperatureRange_Create_AcceptsValidBounds(double? minC, double? maxC)
+    {
+        var act = () => TemperatureRange.Create(minC, maxC);
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void TemperatureRange_Equality_BasedOnBothBounds()
+    {
+        TemperatureRange.Create(2, 8).Should().Be(TemperatureRange.Create(2, 8));
+        TemperatureRange.Create(2, 8).Should().NotBe(TemperatureRange.Create(2, 10));
+        TemperatureRange.Create(null, 8).Should().NotBe(TemperatureRange.Create(2, 8));
+    }
+
+    [Fact]
+    public void Item_DefaultsToAmbient_AndTemperatureCanBeAttached()
+    {
+        var order = CreateOrder();
+
+        order.AddItem(
+            "WH-01", "LINE-01",
+            itemSeq: 1, sku: "PAPER",
+            description: null, loadUnitProfileCode: null,
+            dimensions: null, weightKg: 5.0,
+            quantity: Quantity.Create(10, UnitOfMeasure.BOX),
+            cargoType: null, cargoSpecific: null);
+
+        order.AddItem(
+            "WH-COLD-01", "LAB-FREEZER",
+            itemSeq: 2, sku: "VACCINE",
+            description: null, loadUnitProfileCode: null,
+            dimensions: null, weightKg: 2.0,
+            quantity: Quantity.Create(1, UnitOfMeasure.BOX),
+            cargoType: null, cargoSpecific: null,
+            hazmat: null,
+            temperature: TemperatureRange.Create(2.0, 8.0));
+
+        var paper = order.Items.Single(i => i.Sku == "PAPER");
+        var vaccine = order.Items.Single(i => i.Sku == "VACCINE");
+
+        paper.Temperature.Should().BeNull();
+        vaccine.Temperature.Should().NotBeNull();
+        vaccine.Temperature!.MinC.Should().Be(2.0);
+        vaccine.Temperature.MaxC.Should().Be(8.0);
+    }
+
+    [Fact]
+    public void Confirm_DomainEvent_CarriesTemperaturePerItem()
+    {
+        var order = CreateOrder();
+        order.AddItem(
+            "WH-01", "STORE-05",
+            itemSeq: 1, sku: "SKU-AMBIENT",
+            description: null, loadUnitProfileCode: null,
+            dimensions: null, weightKg: 5.0,
+            quantity: Quantity.Create(1, UnitOfMeasure.BOX),
+            cargoType: null, cargoSpecific: null);
+        order.AddItem(
+            "WH-COLD-01", "STORE-05",
+            itemSeq: 2, sku: "SKU-COLD",
+            description: null, loadUnitProfileCode: null,
+            dimensions: null, weightKg: 3.0,
+            quantity: Quantity.Create(1, UnitOfMeasure.BOX),
+            cargoType: null, cargoSpecific: null,
+            hazmat: null,
+            temperature: TemperatureRange.Create(minC: null, maxC: 8.0));
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-01", "WH-COLD-01", "STORE-05"));
+        order.Confirm(weightFallbackKg: 500);
+
+        var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
+        var ambient = confirmed.Items.Single(i => i.Sku == "SKU-AMBIENT");
+        var cold = confirmed.Items.Single(i => i.Sku == "SKU-COLD");
+
+        ambient.Temperature.Should().BeNull();
+        cold.Temperature.Should().NotBeNull();
+        cold.Temperature!.MinC.Should().BeNull();
+        cold.Temperature.MaxC.Should().Be(8.0);
+    }
+
     [Fact]
     public void AddItem_StoresQuantityVO_WithCanonicalUom()
     {

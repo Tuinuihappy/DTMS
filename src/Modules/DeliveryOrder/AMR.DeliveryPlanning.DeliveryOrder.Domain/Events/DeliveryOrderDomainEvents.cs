@@ -4,12 +4,15 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
 
 public record ItemHazmatDto(string ClassCode, string? PackingGroup);
 
+public record ItemTemperatureDto(double? MinC, double? MaxC);
+
 public record ItemEventDto(
     string Sku,
     double WeightKg,
     Guid PickupStationId,
     Guid DropStationId,
-    ItemHazmatDto? Hazmat = null);
+    ItemHazmatDto? Hazmat = null,
+    ItemTemperatureDto? Temperature = null);
 
 public record DeliveryOrderDraftedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
 public record DeliveryOrderSubmittedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;

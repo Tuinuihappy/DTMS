@@ -24,6 +24,8 @@ public record CargoSpecificDto(
 
 public record HazmatDto(string ClassCode, PackingGroup? PackingGroup);
 
+public record TemperatureRangeDto(double? MinC, double? MaxC);
+
 public record ItemDto(
     string Sku,
     string? Description,
@@ -35,7 +37,8 @@ public record ItemDto(
     QuantityDto Quantity,
     CargoType? CargoType,
     CargoSpecificDto? CargoSpecific,
-    HazmatDto? Hazmat = null);
+    HazmatDto? Hazmat = null,
+    TemperatureRangeDto? Temperature = null);
 
 public record CreateDraftDeliveryOrderCommand(
     string OrderRef,

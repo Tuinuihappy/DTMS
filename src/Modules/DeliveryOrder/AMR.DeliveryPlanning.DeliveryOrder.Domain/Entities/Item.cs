@@ -21,6 +21,7 @@ public class Item : Entity<Guid>
     public CargoType? CargoType { get; private set; }
     public CargoSpecific? CargoSpecific { get; private set; }
     public HazmatInfo? Hazmat { get; private set; }
+    public TemperatureRange? Temperature { get; private set; }
     public ItemStatus Status { get; private set; }
 
     private Item() { }
@@ -31,7 +32,8 @@ public class Item : Entity<Guid>
         Dimensions? dimensions, double? weightKg, Quantity quantity,
         CargoType? cargoType,
         CargoSpecific? cargoSpecific = null,
-        HazmatInfo? hazmat = null)
+        HazmatInfo? hazmat = null,
+        TemperatureRange? temperature = null)
     {
         if (cargoType is null && cargoSpecific is not null)
             throw new InvalidOperationException(
@@ -57,6 +59,7 @@ public class Item : Entity<Guid>
         CargoType = cargoType;
         CargoSpecific = cargoSpecific;
         Hazmat = hazmat;
+        Temperature = temperature;
         Status = ItemStatus.Pending;
     }
 
