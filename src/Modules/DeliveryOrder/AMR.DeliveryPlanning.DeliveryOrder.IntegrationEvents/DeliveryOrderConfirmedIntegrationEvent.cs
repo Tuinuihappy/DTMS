@@ -15,7 +15,13 @@ public record ItemSummaryDto(
     ItemTemperatureSummaryDto? Temperature = null,
     IReadOnlyList<string>? HandlingInstructions = null);
 
-public record DeliveryOrderConfirmedIntegrationEvent(
+/// <summary>
+/// Emitted when a DeliveryOrder enters the Confirmed state — the planning trigger.
+/// V1 is the first explicitly-versioned shape; the un-versioned predecessor's
+/// <c>Deadline</c> alias (formerly equal to Latest) has been dropped here.
+/// Consumers needing the upper window bound should read <see cref="Latest"/>.
+/// </summary>
+public record DeliveryOrderConfirmedIntegrationEventV1(
     Guid EventId,
     DateTime OccurredOn,
     Guid DeliveryOrderId,
@@ -23,8 +29,6 @@ public record DeliveryOrderConfirmedIntegrationEvent(
     string SlaTier,
     DateTime? Earliest,
     DateTime? Latest,
-    // Backward-compat alias for Latest. Existing v1 consumers may read `Deadline`;
-    // new consumers should use Earliest+Latest. Slated for removal in P1-8.
-    DateTime? Deadline,
     DateTime? SubmittedAt,
-    IReadOnlyList<ItemSummaryDto> Items) : IIntegrationEvent;
+    IReadOnlyList<ItemSummaryDto> Items,
+    string SchemaVersion = "1.0") : IIntegrationEvent;

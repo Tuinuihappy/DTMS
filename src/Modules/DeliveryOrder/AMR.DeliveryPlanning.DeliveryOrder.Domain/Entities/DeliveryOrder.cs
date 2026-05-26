@@ -199,7 +199,6 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         return new DeliveryOrderConfirmedDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, Priority.ToString(), SlaTier.ToString(),
             ServiceWindow?.Earliest, ServiceWindow?.Latest,
-            Deadline: ServiceWindow?.Latest,
             SubmittedAt, itemDtos);
     }
 

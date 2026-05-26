@@ -495,27 +495,25 @@ public class DeliveryOrderTests
     }
 
     [Fact]
-    public void Confirm_DomainEvent_DeadlineMirrorsLatest_ForBackwardCompat()
+    public void DeliveryOrderConfirmedIntegrationEventV1_DefaultSchemaVersion_Is_1_0()
     {
-        var earliest = DateTime.UtcNow.AddHours(2);
-        var latest = DateTime.UtcNow.AddHours(8);
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
-            "DEADLINE-COMPAT", Priority.Normal,
-            serviceWindow: ServiceWindow.Create(earliest, latest),
-            sourceSystem: SourceSystem.Manual, createdBy: null);
-        AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
-        order.Submit();
-        order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
+        // P1-8 sealed the V1 wire shape. The schemaVersion default is a class-
+        // level constant; if a future field reshuffle ever changes it without a
+        // class-name bump (V1 → V2), this test fails loudly.
+        var evt = new AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.DeliveryOrderConfirmedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(),
+            Priority: "Normal", SlaTier: "Bronze",
+            Earliest: null, Latest: null, SubmittedAt: null,
+            Items: Array.Empty<AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.ItemSummaryDto>());
 
-        order.Confirm(weightFallbackKg: 500);
-
-        var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
-        confirmed.Deadline.Should().Be(latest, "Deadline is a v1-compat alias for Latest");
+        evt.SchemaVersion.Should().Be("1.0");
     }
 
     [Fact]
-    public void Confirm_DomainEvent_DeadlineIsNull_WhenNoServiceWindow()
+    public void Confirm_DomainEvent_OmitsTimingFields_WhenNoServiceWindow()
     {
+        // P1-8 dropped the Deadline backward-compat alias. With no ServiceWindow
+        // at all, both Earliest and Latest must be null in the emitted event.
         var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "NO-WINDOW", Priority.Normal, serviceWindow: null,
             sourceSystem: SourceSystem.Manual, createdBy: null);
@@ -528,7 +526,6 @@ public class DeliveryOrderTests
         var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
         confirmed.Earliest.Should().BeNull();
         confirmed.Latest.Should().BeNull();
-        confirmed.Deadline.Should().BeNull();
     }
 
     // ── P1-9: Quantity VO + UnitOfMeasure enum ──────────────────────────

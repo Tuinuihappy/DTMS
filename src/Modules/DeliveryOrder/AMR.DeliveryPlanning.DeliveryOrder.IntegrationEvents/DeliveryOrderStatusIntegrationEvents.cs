@@ -2,23 +2,37 @@ using AMR.DeliveryPlanning.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
 
-public record DeliveryOrderCancelledIntegrationEvent(
-    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason) : IIntegrationEvent;
+// All DeliveryOrder integration events carry an explicit SchemaVersion field
+// (semver string). The class name encodes the major version; the field encodes
+// minor (additive) revisions. Convention:
+//   - Add nullable field → bump minor (V1, "1.0" → "1.1"), consumer keeps working.
+//   - Remove field / rename / change type → bump major (V1 → V2 class), with
+//     V1 retained until all consumers migrate.
 
-public record DeliveryOrderFailedIntegrationEvent(
-    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason) : IIntegrationEvent;
+public record DeliveryOrderCancelledIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
 
-public record DeliveryOrderCompletedIntegrationEvent(
-    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId) : IIntegrationEvent;
+public record DeliveryOrderFailedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
 
-public record DeliveryOrderAmendedIntegrationEvent(
-    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason) : IIntegrationEvent;
+public record DeliveryOrderCompletedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
 
-public record DeliveryOrderHeldIntegrationEvent(
-    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason) : IIntegrationEvent;
+public record DeliveryOrderAmendedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
 
-public record DeliveryOrderReleasedIntegrationEvent(
-    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId) : IIntegrationEvent;
+public record DeliveryOrderHeldIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
 
-public record DeliveryOrderRejectedIntegrationEvent(
-    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason) : IIntegrationEvent;
+public record DeliveryOrderReleasedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
+
+public record DeliveryOrderRejectedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
+    string SchemaVersion = "1.0") : IIntegrationEvent;

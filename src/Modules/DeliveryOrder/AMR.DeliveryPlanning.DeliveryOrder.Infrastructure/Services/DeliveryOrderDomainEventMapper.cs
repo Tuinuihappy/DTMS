@@ -13,9 +13,9 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
         {
             DeliveryOrderConfirmedDomainEvent evt =>
             [
-                new DeliveryOrderConfirmedIntegrationEvent(
+                new DeliveryOrderConfirmedIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId, evt.Priority, evt.SlaTier,
-                    evt.Earliest, evt.Latest, evt.Deadline, evt.SubmittedAt,
+                    evt.Earliest, evt.Latest, evt.SubmittedAt,
                     evt.Items.Select(i => new ItemSummaryDto(
                         i.Sku, i.WeightKg, i.PickupStationId, i.DropStationId,
                         i.Hazmat is { } hz ? new ItemHazmatSummaryDto(hz.ClassCode, hz.PackingGroup) : null,
@@ -24,31 +24,31 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             ],
             DeliveryOrderCancelledDomainEvent evt =>
             [
-                new DeliveryOrderCancelledIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason)
+                new DeliveryOrderCancelledIntegrationEventV1(evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason)
             ],
             DeliveryOrderFailedDomainEvent evt =>
             [
-                new DeliveryOrderFailedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason)
+                new DeliveryOrderFailedIntegrationEventV1(evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason)
             ],
             DeliveryOrderCompletedDomainEvent evt =>
             [
-                new DeliveryOrderCompletedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId)
+                new DeliveryOrderCompletedIntegrationEventV1(evt.EventId, evt.OccurredOn, evt.OrderId)
             ],
             DeliveryOrderAmendedDomainEvent evt =>
             [
-                new DeliveryOrderAmendedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason)
+                new DeliveryOrderAmendedIntegrationEventV1(evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason)
             ],
             DeliveryOrderHeldDomainEvent evt =>
             [
-                new DeliveryOrderHeldIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason)
+                new DeliveryOrderHeldIntegrationEventV1(evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason)
             ],
             DeliveryOrderReleasedDomainEvent evt =>
             [
-                new DeliveryOrderReleasedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId)
+                new DeliveryOrderReleasedIntegrationEventV1(evt.EventId, evt.OccurredOn, evt.OrderId)
             ],
             DeliveryOrderRejectedDomainEvent evt =>
             [
-                new DeliveryOrderRejectedIntegrationEvent(evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason)
+                new DeliveryOrderRejectedIntegrationEventV1(evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason)
             ],
 
             // internal-only — no cross-module publishing needed
