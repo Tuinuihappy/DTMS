@@ -141,6 +141,8 @@ public static class ModuleServiceRegistration
         services.AddScoped<IOrderAuditEventRepository, OrderAuditEventRepository>();
         services.Configure<DeliveryOrderOptions>(
             configuration.GetSection(DeliveryOrderOptions.SectionName));
+        services.Configure<UomOptions>(configuration.GetSection(UomOptions.SectionName));
+        services.AddSingleton<IUomNormalizer, UomNormalizer>();
 
         // ── Planning Module ───────────────────────────────────────────
         services.AddScoped<PlanningDomainEventMapper>();

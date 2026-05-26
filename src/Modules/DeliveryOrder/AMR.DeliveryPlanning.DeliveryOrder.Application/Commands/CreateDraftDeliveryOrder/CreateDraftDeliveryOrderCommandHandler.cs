@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
@@ -9,13 +10,16 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDel
 public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraftDeliveryOrderCommand, DeliveryOrderDetailDto>
 {
     private readonly IDeliveryOrderRepository _repository;
+    private readonly IUomNormalizer _uomNormalizer;
     private readonly ILogger<CreateDraftDeliveryOrderCommandHandler> _logger;
 
     public CreateDraftDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
+        IUomNormalizer uomNormalizer,
         ILogger<CreateDraftDeliveryOrderCommandHandler> logger)
     {
         _repository = repository;
+        _uomNormalizer = uomNormalizer;
         _logger = logger;
     }
 
@@ -35,14 +39,18 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
 
         foreach (var (pkg, idx) in request.Items.Select((p, i) => (p, i + 1)))
         {
+            var uom = _uomNormalizer.Normalize(pkg.Quantity.Uom);
+            if (uom is null)
+                return Result<DeliveryOrderDetailDto>.Failure(
+                    $"Unknown UOM '{pkg.Quantity.Uom}' on item {idx} — accepted: KG, G, LB, EA, BOX, PALLET, CASE (or configured aliases).");
+
             order.AddItem(
                 pkg.PickupLocationCode, pkg.DropLocationCode,
                 idx, pkg.Sku, pkg.Description,
                 pkg.LoadUnitProfileCode,
                 pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                 pkg.WeightKg,
-                pkg.Quantity.Value,
-                pkg.Quantity.Uom,
+                Quantity.Create(pkg.Quantity.Value, uom.Value),
                 pkg.CargoType,
                 pkg.CargoSpecific is { } cs
                     ? CargoSpecific.Create(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)

@@ -11,13 +11,16 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
 {
     private readonly IDeliveryOrderRepository _repo;
     private readonly IStationValidationService _stationValidation;
+    private readonly IUomNormalizer _uomNormalizer;
 
     public BulkSubmitDeliveryOrdersCommandHandler(
         IDeliveryOrderRepository repo,
-        IStationValidationService stationValidation)
+        IStationValidationService stationValidation,
+        IUomNormalizer uomNormalizer)
     {
         _repo = repo;
         _stationValidation = stationValidation;
+        _uomNormalizer = uomNormalizer;
     }
 
     public async Task<Result<BulkSubmitResult>> Handle(BulkSubmitDeliveryOrdersCommand request, CancellationToken cancellationToken)
@@ -52,21 +55,32 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                     cmd.OrderRef, cmd.Priority, serviceWindow,
                     cmd.SourceSystem, cmd.CreatedBy, cmd.SlaTier);
 
+                var uomFailureForOrder = false;
                 foreach (var (pkg, idx) in cmd.Items.Select((p, i) => (p, i + 1)))
                 {
+                    var uom = _uomNormalizer.Normalize(pkg.Quantity.Uom);
+                    if (uom is null)
+                    {
+                        failures.Add(new BulkSubmitFailure(cmd.OrderRef,
+                            $"Unknown UOM '{pkg.Quantity.Uom}' on item {idx}."));
+                        uomFailureForOrder = true;
+                        break;
+                    }
+
                     order.AddItem(
                         pkg.PickupLocationCode, pkg.DropLocationCode,
                         idx, pkg.Sku, pkg.Description,
                         pkg.LoadUnitProfileCode,
                         pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                         pkg.WeightKg,
-                        pkg.Quantity.Value,
-                        pkg.Quantity.Uom,
+                        Quantity.Create(pkg.Quantity.Value, uom.Value),
                         pkg.CargoType,
                         pkg.CargoSpecific is { } cs
                             ? CargoSpecific.Create(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
                             : null);
                 }
+
+                if (uomFailureForOrder) continue;
             }
             catch (InvalidOperationException ex)
             {

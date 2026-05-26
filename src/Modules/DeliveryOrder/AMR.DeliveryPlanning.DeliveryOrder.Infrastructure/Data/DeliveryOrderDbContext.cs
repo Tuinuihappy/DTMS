@@ -80,8 +80,15 @@ public class DeliveryOrderDbContext : DbContext
             b.HasIndex(p => new { p.DeliveryOrderId, p.ItemSeq }).IsUnique();
             b.HasIndex(p => p.Sku);
             b.Property(p => p.WeightKg);
-            b.Property(p => p.Quantity).IsRequired();
-            b.Property(p => p.Uom).HasMaxLength(20).IsRequired();
+            // Quantity is mapped as an owned value object. Column names are kept
+            // as "Quantity" and "Uom" via HasColumnName so the existing schema
+            // doesn't need a rename — only the values inside Uom get backfilled
+            // to the canonical enum names by the migration.
+            b.OwnsOne(p => p.Quantity, q =>
+            {
+                q.Property(x => x.Value).HasColumnName("Quantity").IsRequired();
+                q.Property(x => x.Uom).HasConversion<string>().HasColumnName("Uom").HasMaxLength(20).IsRequired();
+            });
             b.Property(p => p.LoadUnitProfileCode).HasMaxLength(50);
             b.Property(p => p.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.OwnsOne(p => p.CargoSpecific, cs =>

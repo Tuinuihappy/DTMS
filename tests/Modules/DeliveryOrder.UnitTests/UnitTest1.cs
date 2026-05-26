@@ -15,12 +15,12 @@ public class DeliveryOrderTests
     private static void AddTestItem(
         AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder order,
         int itemSeq, string pickup, string drop, string sku,
-        double? weightKg = 10.0, double quantity = 5, string uom = "EA") =>
+        double? weightKg = 10.0, double quantity = 5, UnitOfMeasure uom = UnitOfMeasure.EA) =>
         order.AddItem(
             pickup, drop,
             itemSeq, sku,
             description: null, loadUnitProfileCode: null,
-            dimensions: null, weightKg: weightKg, quantity: quantity, uom: uom,
+            dimensions: null, weightKg: weightKg, quantity: Quantity.Create(quantity, uom),
             cargoType: null, cargoSpecific: null);
 
     private static IReadOnlyDictionary<string, Guid> StationMap(params string[] codes)
@@ -237,10 +237,10 @@ public class DeliveryOrderTests
     public void UpdateDraft_ReplacesCoreFieldsAndItems()
     {
         var order = CreateOrder("Original Ref");
-        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-OLD", weightKg: 5.0, quantity: 10, uom: "PCS");
+        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-OLD", weightKg: 5.0, quantity: 10, uom: UnitOfMeasure.EA);
 
         order.UpdateDraft("New Ref", Priority.High, serviceWindow: null);
-        AddTestItem(order, itemSeq: 1, "WH-02", "LINE-02", "SKU-NEW", weightKg: 3.0, quantity: 5, uom: "BOX");
+        AddTestItem(order, itemSeq: 1, "WH-02", "LINE-02", "SKU-NEW", weightKg: 3.0, quantity: 5, uom: UnitOfMeasure.BOX);
 
         order.OrderRef.Should().Be("New Ref");
         order.Priority.Should().Be(Priority.High);
@@ -265,7 +265,7 @@ public class DeliveryOrderTests
     public void UpdateDraft_WhenNotDraft_Throws()
     {
         var order = CreateOrder();
-        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-001", weightKg: 5.0, quantity: 10, uom: "PCS");
+        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-001", weightKg: 5.0, quantity: 10, uom: UnitOfMeasure.EA);
         order.Submit();
 
         var act = () => order.UpdateDraft("New Ref", Priority.Low, serviceWindow: null);
@@ -277,8 +277,8 @@ public class DeliveryOrderTests
     public void UpdateDraft_ClearsTotals()
     {
         var order = CreateOrder();
-        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-A", weightKg: 10.0, quantity: 20, uom: "PCS");
-        AddTestItem(order, itemSeq: 2, "WH-01", "LINE-02", "SKU-B", weightKg: 5.0, quantity: 10, uom: "PCS");
+        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-A", weightKg: 10.0, quantity: 20, uom: UnitOfMeasure.EA);
+        AddTestItem(order, itemSeq: 2, "WH-01", "LINE-02", "SKU-B", weightKg: 5.0, quantity: 10, uom: UnitOfMeasure.EA);
 
         order.UpdateDraft(order.OrderRef, order.Priority, serviceWindow: null);
 
@@ -292,10 +292,10 @@ public class DeliveryOrderTests
     public void UpdateDraft_AllowsReAddingItemWithSameSeq()
     {
         var order = CreateOrder();
-        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-REUSE", weightKg: 5.0, quantity: 10, uom: "PCS");
+        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-REUSE", weightKg: 5.0, quantity: 10, uom: UnitOfMeasure.EA);
 
         order.UpdateDraft(order.OrderRef, order.Priority, serviceWindow: null);
-        var act = () => AddTestItem(order, itemSeq: 1, "WH-02", "LINE-02", "SKU-REUSE", weightKg: 3.0, quantity: 5, uom: "BOX");
+        var act = () => AddTestItem(order, itemSeq: 1, "WH-02", "LINE-02", "SKU-REUSE", weightKg: 3.0, quantity: 5, uom: UnitOfMeasure.BOX);
 
         act.Should().NotThrow();
     }
@@ -529,5 +529,51 @@ public class DeliveryOrderTests
         confirmed.Earliest.Should().BeNull();
         confirmed.Latest.Should().BeNull();
         confirmed.Deadline.Should().BeNull();
+    }
+
+    // ── P1-9: Quantity VO + UnitOfMeasure enum ──────────────────────────
+
+    [Fact]
+    public void Quantity_Create_RejectsZeroOrNegativeValue()
+    {
+        var actZero = () => Quantity.Create(0, UnitOfMeasure.EA);
+        var actNeg  = () => Quantity.Create(-5, UnitOfMeasure.KG);
+
+        actZero.Should().Throw<ArgumentException>().WithMessage("*greater than zero*");
+        actNeg.Should().Throw<ArgumentException>().WithMessage("*greater than zero*");
+    }
+
+    [Fact]
+    public void Quantity_Equality_IsStructural()
+    {
+        var a = Quantity.Create(10, UnitOfMeasure.EA);
+        var b = Quantity.Create(10, UnitOfMeasure.EA);
+        var c = Quantity.Create(10, UnitOfMeasure.BOX);
+        var d = Quantity.Create(5, UnitOfMeasure.EA);
+
+        a.Should().Be(b);
+        a.Should().NotBe(c);
+        a.Should().NotBe(d);
+    }
+
+    [Fact]
+    public void AddItem_StoresQuantityVO_WithCanonicalUom()
+    {
+        var order = CreateOrder();
+
+        order.AddItem(
+            "WH-01", "LINE-01",
+            itemSeq: 1, sku: "SKU-Q",
+            description: null, loadUnitProfileCode: null,
+            dimensions: null, weightKg: 5.0,
+            quantity: Quantity.Create(12, UnitOfMeasure.BOX),
+            cargoType: null, cargoSpecific: null);
+
+        var item = order.Items.Single();
+        item.Quantity.Value.Should().Be(12);
+        item.Quantity.Uom.Should().Be(UnitOfMeasure.BOX);
+        // TotalQuantity continues to aggregate by raw value (Uom-mixed for now;
+        // capacity-aware aggregation by Uom is Planning-solver territory).
+        order.TotalQuantity.Should().Be(12);
     }
 }

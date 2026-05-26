@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
@@ -11,13 +12,16 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.UpdateDraftDel
 public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraftDeliveryOrderCommand, DeliveryOrderDetailDto>
 {
     private readonly IDeliveryOrderRepository _repository;
+    private readonly IUomNormalizer _uomNormalizer;
     private readonly ILogger<UpdateDraftDeliveryOrderCommandHandler> _logger;
 
     public UpdateDraftDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
+        IUomNormalizer uomNormalizer,
         ILogger<UpdateDraftDeliveryOrderCommandHandler> logger)
     {
         _repository = repository;
+        _uomNormalizer = uomNormalizer;
         _logger = logger;
     }
 
@@ -42,14 +46,18 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
 
             foreach (var (item, idx) in request.Items.Select((p, i) => (p, i + 1)))
             {
+                var uom = _uomNormalizer.Normalize(item.Quantity.Uom);
+                if (uom is null)
+                    return Result<DeliveryOrderDetailDto>.Failure(
+                        $"Unknown UOM '{item.Quantity.Uom}' on item {idx} — accepted: KG, G, LB, EA, BOX, PALLET, CASE (or configured aliases).");
+
                 order.AddItem(
                     item.PickupLocationCode, item.DropLocationCode,
                     idx, item.Sku, item.Description,
                     item.LoadUnitProfileCode,
                     item.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                     item.WeightKg,
-                    item.Quantity.Value,
-                    item.Quantity.Uom,
+                    Quantity.Create(item.Quantity.Value, uom.Value),
                     item.CargoType,
                     item.CargoSpecific is { } cs
                         ? CargoSpecific.Create(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)

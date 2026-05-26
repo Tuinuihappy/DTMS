@@ -29,10 +29,8 @@ internal static class SubmitReadinessCheck
             if (!string.IsNullOrWhiteSpace(item.PickupLocationCode)
                 && string.Equals(item.PickupLocationCode, item.DropLocationCode, StringComparison.OrdinalIgnoreCase))
                 errors.Add($"{prefix}: Pickup and Drop locations must be different.");
-            if (item.Quantity <= 0)
+            if (item.Quantity is null || item.Quantity.Value <= 0)
                 errors.Add($"{prefix}: Quantity must be > 0.");
-            if (string.IsNullOrWhiteSpace(item.Uom))
-                errors.Add($"{prefix}: Uom is required.");
         }
 
         return (errors.Count == 0, string.Join("; ", errors));

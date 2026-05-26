@@ -17,8 +17,7 @@ public class Item : Entity<Guid>
     public string? LoadUnitProfileCode { get; private set; }
     public Dimensions? Dimensions { get; private set; }
     public double? WeightKg { get; private set; }
-    public double Quantity { get; private set; }
-    public string Uom { get; private set; } = string.Empty;
+    public Quantity Quantity { get; private set; } = null!;
     public CargoType? CargoType { get; private set; }
     public CargoSpecific? CargoSpecific { get; private set; }
     public ItemStatus Status { get; private set; }
@@ -28,7 +27,7 @@ public class Item : Entity<Guid>
     internal Item(Guid deliveryOrderId, string pickupLocationCode, string dropLocationCode,
         int itemSeq, string sku, string? description,
         string? loadUnitProfileCode,
-        Dimensions? dimensions, double? weightKg, double quantity, string uom,
+        Dimensions? dimensions, double? weightKg, Quantity quantity,
         CargoType? cargoType,
         CargoSpecific? cargoSpecific = null)
     {
@@ -40,6 +39,7 @@ public class Item : Entity<Guid>
             throw new ArgumentException("PickupLocationCode must not be empty.", nameof(pickupLocationCode));
         if (string.IsNullOrWhiteSpace(dropLocationCode))
             throw new ArgumentException("DropLocationCode must not be empty.", nameof(dropLocationCode));
+        ArgumentNullException.ThrowIfNull(quantity);
 
         Id = Guid.NewGuid();
         DeliveryOrderId = deliveryOrderId;
@@ -52,7 +52,6 @@ public class Item : Entity<Guid>
         Dimensions = dimensions;
         WeightKg = weightKg;
         Quantity = quantity;
-        Uom = uom;
         CargoType = cargoType;
         CargoSpecific = cargoSpecific;
         Status = ItemStatus.Pending;

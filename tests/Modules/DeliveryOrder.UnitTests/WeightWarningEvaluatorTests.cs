@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using FluentAssertions;
 using DomainEntities = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 
@@ -15,7 +16,7 @@ public class WeightWarningEvaluatorTests
                 "WH-01", "LINE-01",
                 seq, sku,
                 description: null, loadUnitProfileCode: null,
-                dimensions: null, weightKg: weight, quantity: 1, uom: "EA",
+                dimensions: null, weightKg: weight, quantity: Quantity.Create(1, UnitOfMeasure.EA),
                 cargoType: null, cargoSpecific: null);
         return order;
     }
@@ -85,7 +86,7 @@ public class DeliveryOrderFallbackWeightTests
             "WH-01", "LINE-01",
             itemSeq: 1, sku: "SKU-A",
             description: null, loadUnitProfileCode: null,
-            dimensions: null, weightKg: null, quantity: 1, uom: "EA",
+            dimensions: null, weightKg: null, quantity: Quantity.Create(1, UnitOfMeasure.EA),
             cargoType: null, cargoSpecific: null);
         order.Submit();
         order.MarkAsValidated(new Dictionary<string, Guid>
@@ -110,7 +111,7 @@ public class DeliveryOrderFallbackWeightTests
             "WH-01", "LINE-01",
             itemSeq: 1, sku: "SKU-B",
             description: null, loadUnitProfileCode: null,
-            dimensions: null, weightKg: 42.0, quantity: 1, uom: "EA",
+            dimensions: null, weightKg: 42.0, quantity: Quantity.Create(1, UnitOfMeasure.EA),
             cargoType: null, cargoSpecific: null);
         order.Submit();
         order.MarkAsValidated(new Dictionary<string, Guid>

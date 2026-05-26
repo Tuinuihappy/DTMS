@@ -49,7 +49,7 @@ public class GetItemQueryHandler : IQueryHandler<GetItemQuery, ItemDetailDto>
             item.LoadUnitProfileCode,
             item.Dimensions is { } d ? new DimensionsDto(d.LengthMm, d.WidthMm, d.HeightMm, d.VolumeCBM) : null,
             item.WeightKg,
-            new QuantityDto(item.Quantity, item.Uom),
+            new QuantityDto(item.Quantity.Value, item.Quantity.Uom.ToString()),
             item.CargoType,
             item.CargoSpecific is { } cs
                 ? new CargoSpecificDto(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
