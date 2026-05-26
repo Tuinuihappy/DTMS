@@ -30,13 +30,7 @@ public class AmendDeliveryOrderCommandHandler : ICommandHandler<AmendDeliveryOrd
 
         var amendedBy = string.IsNullOrWhiteSpace(request.AmendedBy) ? null : request.AmendedBy.Trim();
 
-        var originalSnapshot = JsonSerializer.Serialize(new
-        {
-            ServiceWindow = order.ServiceWindow is null
-                ? null
-                : new { order.ServiceWindow.Earliest, order.ServiceWindow.Latest },
-            OrderStatus = order.Status
-        });
+        var originalSnapshot = JsonSerializer.Serialize(OrderSnapshotV1.From(order));
 
         try
         {
@@ -46,17 +40,12 @@ public class AmendDeliveryOrderCommandHandler : ICommandHandler<AmendDeliveryOrd
 
             order.AmendServiceWindow(newServiceWindow, request.Reason);
 
-            var newSnapshot = JsonSerializer.Serialize(new
-            {
-                ServiceWindow = order.ServiceWindow is null
-                    ? null
-                    : new { order.ServiceWindow.Earliest, order.ServiceWindow.Latest },
-                OrderStatus = order.Status
-            });
+            var newSnapshot = JsonSerializer.Serialize(OrderSnapshotV1.From(order));
 
             var amendment = new OrderAmendment(
                 order.Id, AmendmentType.ServiceWindowChange, request.Reason,
-                originalSnapshot, newSnapshot, amendedBy);
+                originalSnapshot, newSnapshot, amendedBy,
+                amendmentVersion: 1);
 
             await _amendmentRepo.AddAsync(amendment, cancellationToken);
             await _orderRepo.SaveChangesAsync(cancellationToken);

@@ -138,6 +138,7 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(a => a.OriginalSnapshot).HasColumnType("jsonb");
             b.Property(a => a.NewSnapshot).HasColumnType("jsonb");
             b.Property(a => a.AmendedBy).HasMaxLength(200);
+            b.Property(a => a.AmendmentVersion).IsRequired();
             b.HasIndex(a => a.DeliveryOrderId);
         });
 
