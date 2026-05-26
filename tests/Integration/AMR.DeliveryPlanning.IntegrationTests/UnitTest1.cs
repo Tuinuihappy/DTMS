@@ -372,7 +372,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
         var getResponse = await client.GetAsync($"/api/v1/dispatch/trips/{tripId}");
         getResponse.IsSuccessStatusCode.Should().BeTrue();
         var body = await getResponse.Content.ReadAsStringAsync();
-        body.Should().Contain("\"status\":\"InProgress\"");
+        body.Should().Contain("\"status\":\"IN_PROGRESS\"");
     }
 
     // ── Hardening: Auth Register ─────────────────────────────────

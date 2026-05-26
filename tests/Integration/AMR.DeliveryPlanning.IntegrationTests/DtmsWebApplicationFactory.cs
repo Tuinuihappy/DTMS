@@ -174,13 +174,28 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         var createResp = await client.PostAsJsonAsync("/api/v1/delivery-orders",
             BuildOrderRequest(pickupId, dropId, loadUnitProfileCode, sla, orderName));
         await EnsureSuccessAsync(createResp, "Create order failed");
-        var orderId = await createResp.Content.ReadFromJsonAsync<Guid>();
+        var orderId = await ReadOrderIdAsync(createResp);
 
         var submitResp = await client.PostAsync($"/api/v1/delivery-orders/{orderId}/submit", null);
         await EnsureSuccessAsync(submitResp, $"Submit order {orderId} failed");
 
         return orderId;
     }
+
+    /// <summary>
+    /// Reads an order Id from a create/submit response. The endpoint returns the full
+    /// DeliveryOrderDetailDto, so we deserialize the {"id":...} envelope and project Id.
+    /// </summary>
+    public static async Task<Guid> ReadOrderIdAsync(HttpResponseMessage response)
+    {
+        var envelope = await response.Content.ReadFromJsonAsync<OrderIdEnvelope>();
+        if (envelope is null || envelope.Id == Guid.Empty)
+            throw new InvalidOperationException(
+                $"Order response did not contain an Id: {await response.Content.ReadAsStringAsync()}");
+        return envelope.Id;
+    }
+
+    private sealed record OrderIdEnvelope(Guid Id);
 
     async Task IAsyncLifetime.DisposeAsync() => await _postgres.DisposeAsync();
 

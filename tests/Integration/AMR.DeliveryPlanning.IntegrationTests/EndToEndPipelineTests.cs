@@ -77,7 +77,7 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
 
         // 8. Verify trip status = Completed (enum value 3)
         var finalBody = await (await client.GetAsync($"/api/v1/dispatch/trips/{tripId}")).Content.ReadAsStringAsync();
-        finalBody.Should().Contain("\"status\":\"Completed\"", "trip must reach Completed status after all tasks done");
+        finalBody.Should().Contain("\"status\":\"COMPLETED\"", "trip must reach Completed status after all tasks done");
     }
 
     [Fact]
