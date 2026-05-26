@@ -112,12 +112,13 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         CargoType? cargoType,
         CargoSpecific? cargoSpecific = null,
         HazmatInfo? hazmat = null,
-        TemperatureRange? temperature = null)
+        TemperatureRange? temperature = null,
+        IReadOnlyList<HandlingInstruction>? handlingInstructions = null)
     {
         if (_items.Any(p => p.ItemSeq == itemSeq))
             throw new InvalidOperationException($"An item with seq '{itemSeq}' already exists in this order.");
 
-        _items.Add(new Item(Id, pickupLocationCode, dropLocationCode, itemSeq, sku, description, loadUnitProfileCode, dimensions, weightKg, quantity, cargoType, cargoSpecific, hazmat, temperature));
+        _items.Add(new Item(Id, pickupLocationCode, dropLocationCode, itemSeq, sku, description, loadUnitProfileCode, dimensions, weightKg, quantity, cargoType, cargoSpecific, hazmat, temperature, handlingInstructions));
         TotalWeightKg += weightKg ?? 0;
         TotalQuantity += quantity.Value;
         TotalItems++;
@@ -189,7 +190,10 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
                 p.Sku, p.WeightKg ?? weightFallbackKg,
                 p.PickupStationId!.Value, p.DropStationId!.Value,
                 p.Hazmat is { } hz ? new ItemHazmatDto(hz.ClassCode, hz.PackingGroup?.ToString()) : null,
-                p.Temperature is { } tr ? new ItemTemperatureDto(tr.MinC, tr.MaxC) : null))
+                p.Temperature is { } tr ? new ItemTemperatureDto(tr.MinC, tr.MaxC) : null,
+                p.HandlingInstructions.Count > 0
+                    ? p.HandlingInstructions.Select(h => h.ToString()).ToList()
+                    : null))
             .ToList();
 
         return new DeliveryOrderConfirmedDomainEvent(

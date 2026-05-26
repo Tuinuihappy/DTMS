@@ -73,6 +73,13 @@ public class DraftItemDtoValidator : AbstractValidator<ItemDto>
                 .Must(t => !(t.MinC.HasValue && t.MaxC.HasValue) || t.MinC!.Value <= t.MaxC!.Value)
                 .WithMessage("Temperature.MinC must be on or below MaxC.");
         });
+
+        When(p => p.HandlingInstructions is not null, () =>
+        {
+            RuleForEach(p => p.HandlingInstructions!)
+                .IsInEnum()
+                .WithMessage("HandlingInstructions must contain valid values: Fragile, ThisSideUp, DoNotStack, HeavyLift, Sharp, KeepDry, KeepDark, PinchHazard.");
+        });
     }
 }
 

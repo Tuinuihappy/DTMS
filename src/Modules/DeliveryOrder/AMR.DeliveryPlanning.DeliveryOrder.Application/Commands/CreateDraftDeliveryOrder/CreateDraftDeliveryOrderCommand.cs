@@ -38,7 +38,8 @@ public record ItemDto(
     CargoType? CargoType,
     CargoSpecificDto? CargoSpecific,
     HazmatDto? Hazmat = null,
-    TemperatureRangeDto? Temperature = null);
+    TemperatureRangeDto? Temperature = null,
+    IReadOnlyList<HandlingInstruction>? HandlingInstructions = null);
 
 public record CreateDraftDeliveryOrderCommand(
     string OrderRef,

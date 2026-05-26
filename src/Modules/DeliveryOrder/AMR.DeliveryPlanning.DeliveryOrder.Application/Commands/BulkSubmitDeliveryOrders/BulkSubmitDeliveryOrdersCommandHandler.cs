@@ -83,7 +83,8 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                             : null,
                         pkg.Temperature is { } tr
                             ? TemperatureRange.Create(tr.MinC, tr.MaxC)
-                            : null);
+                            : null,
+                        pkg.HandlingInstructions);
                 }
 
                 if (uomFailureForOrder) continue;

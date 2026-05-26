@@ -114,6 +114,20 @@ public class DeliveryOrderDbContext : DbContext
                 tr.Property(x => x.MinC).HasColumnName("Temperature_MinC");
                 tr.Property(x => x.MaxC).HasColumnName("Temperature_MaxC");
             });
+            // HandlingInstructions stored as Postgres text[] of enum names.
+            // Empty list is the default ("no special handling") and a value
+            // comparer keeps EF change-tracking honest after rehydration.
+            b.Property(p => p.HandlingInstructions)
+                .HasConversion(
+                    v => v.Select(x => x.ToString()).ToArray(),
+                    v => v.Select(s => Enum.Parse<HandlingInstruction>(s)).ToArray() as IReadOnlyList<HandlingInstruction>,
+                    new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<IReadOnlyList<HandlingInstruction>>(
+                        (a, c) => (a == null && c == null) || (a != null && c != null && a.SequenceEqual(c)),
+                        v => v.Aggregate(0, (h, x) => HashCode.Combine(h, x.GetHashCode())),
+                        v => v.ToArray()))
+                .HasColumnType("text[]")
+                .HasColumnName("HandlingInstructions")
+                .IsRequired();
         });
 
         modelBuilder.Entity<OrderAmendment>(b =>

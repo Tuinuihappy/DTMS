@@ -82,7 +82,8 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
                         : null,
                     item.Temperature is { } tr
                         ? TemperatureRange.Create(tr.MinC, tr.MaxC)
-                        : null);
+                        : null,
+                    item.HandlingInstructions);
             }
         }
         catch (InvalidOperationException ex)

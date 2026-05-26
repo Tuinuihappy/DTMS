@@ -19,7 +19,8 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
                     evt.Items.Select(i => new ItemSummaryDto(
                         i.Sku, i.WeightKg, i.PickupStationId, i.DropStationId,
                         i.Hazmat is { } hz ? new ItemHazmatSummaryDto(hz.ClassCode, hz.PackingGroup) : null,
-                        i.Temperature is { } tr ? new ItemTemperatureSummaryDto(tr.MinC, tr.MaxC) : null)).ToList())
+                        i.Temperature is { } tr ? new ItemTemperatureSummaryDto(tr.MinC, tr.MaxC) : null,
+                        i.HandlingInstructions)).ToList())
             ],
             DeliveryOrderCancelledDomainEvent evt =>
             [

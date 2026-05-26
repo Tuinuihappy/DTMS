@@ -22,6 +22,8 @@ public class Item : Entity<Guid>
     public CargoSpecific? CargoSpecific { get; private set; }
     public HazmatInfo? Hazmat { get; private set; }
     public TemperatureRange? Temperature { get; private set; }
+    public IReadOnlyList<HandlingInstruction> HandlingInstructions { get; private set; }
+        = Array.Empty<HandlingInstruction>();
     public ItemStatus Status { get; private set; }
 
     private Item() { }
@@ -33,7 +35,8 @@ public class Item : Entity<Guid>
         CargoType? cargoType,
         CargoSpecific? cargoSpecific = null,
         HazmatInfo? hazmat = null,
-        TemperatureRange? temperature = null)
+        TemperatureRange? temperature = null,
+        IReadOnlyList<HandlingInstruction>? handlingInstructions = null)
     {
         if (cargoType is null && cargoSpecific is not null)
             throw new InvalidOperationException(
@@ -60,6 +63,11 @@ public class Item : Entity<Guid>
         CargoSpecific = cargoSpecific;
         Hazmat = hazmat;
         Temperature = temperature;
+        // Dedupe while preserving order: ["Fragile","Fragile","ThisSideUp"] → ["Fragile","ThisSideUp"].
+        // Caller intent is "this item has these handling traits", not a sequence.
+        HandlingInstructions = handlingInstructions is null
+            ? Array.Empty<HandlingInstruction>()
+            : handlingInstructions.Distinct().ToArray();
         Status = ItemStatus.Pending;
     }
 

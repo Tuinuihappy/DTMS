@@ -769,6 +769,113 @@ public class DeliveryOrderTests
         cold.Temperature.MaxC.Should().Be(8.0);
     }
 
+    // ── P1-5: HandlingInstructions ────────────────────────────────────
+
+    [Fact]
+    public void Item_HandlingInstructions_DefaultsToEmpty()
+    {
+        var order = CreateOrder();
+        AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
+
+        order.Items.Single().HandlingInstructions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AddItem_AttachesMultipleHandlingInstructions()
+    {
+        var order = CreateOrder();
+        var instructions = new[] { HandlingInstruction.Fragile, HandlingInstruction.ThisSideUp };
+
+        order.AddItem(
+            "WH-01", "LINE-01",
+            itemSeq: 1, sku: "GLASS",
+            description: null, loadUnitProfileCode: null,
+            dimensions: null, weightKg: 5.0,
+            quantity: Quantity.Create(10, UnitOfMeasure.BOX),
+            cargoType: null, cargoSpecific: null,
+            hazmat: null, temperature: null,
+            handlingInstructions: instructions);
+
+        var item = order.Items.Single();
+        item.HandlingInstructions.Should().BeEquivalentTo(instructions);
+    }
+
+    [Fact]
+    public void AddItem_DedupesDuplicateHandlingInstructions()
+    {
+        var order = CreateOrder();
+        var withDupes = new[]
+        {
+            HandlingInstruction.Fragile,
+            HandlingInstruction.Fragile,
+            HandlingInstruction.ThisSideUp
+        };
+
+        order.AddItem(
+            "WH-01", "LINE-01",
+            itemSeq: 1, sku: "GLASS",
+            description: null, loadUnitProfileCode: null,
+            dimensions: null, weightKg: 5.0,
+            quantity: Quantity.Create(10, UnitOfMeasure.BOX),
+            cargoType: null, cargoSpecific: null,
+            hazmat: null, temperature: null,
+            handlingInstructions: withDupes);
+
+        var item = order.Items.Single();
+        item.HandlingInstructions.Should().HaveCount(2);
+        item.HandlingInstructions.Should().BeEquivalentTo(
+            new[] { HandlingInstruction.Fragile, HandlingInstruction.ThisSideUp });
+    }
+
+    [Fact]
+    public void AddItem_NullHandlingInstructions_StoredAsEmpty()
+    {
+        var order = CreateOrder();
+
+        order.AddItem(
+            "WH-01", "LINE-01",
+            itemSeq: 1, sku: "PLAIN",
+            description: null, loadUnitProfileCode: null,
+            dimensions: null, weightKg: 5.0,
+            quantity: Quantity.Create(10, UnitOfMeasure.BOX),
+            cargoType: null, cargoSpecific: null,
+            hazmat: null, temperature: null,
+            handlingInstructions: null);
+
+        order.Items.Single().HandlingInstructions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Confirm_DomainEvent_CarriesHandlingInstructionsPerItem()
+    {
+        var order = CreateOrder();
+        AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-PLAIN");
+        order.AddItem(
+            "WH-01", "STORE-05",
+            itemSeq: 2, sku: "SKU-GLASS",
+            description: null, loadUnitProfileCode: null,
+            dimensions: null, weightKg: 5.0,
+            quantity: Quantity.Create(10, UnitOfMeasure.BOX),
+            cargoType: null, cargoSpecific: null,
+            hazmat: null, temperature: null,
+            handlingInstructions: new[]
+            {
+                HandlingInstruction.Fragile,
+                HandlingInstruction.ThisSideUp
+            });
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
+        order.Confirm(weightFallbackKg: 500);
+
+        var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
+        var plain = confirmed.Items.Single(i => i.Sku == "SKU-PLAIN");
+        var glass = confirmed.Items.Single(i => i.Sku == "SKU-GLASS");
+
+        plain.HandlingInstructions.Should().BeNull();   // empty list serialized as null on the event
+        glass.HandlingInstructions.Should().NotBeNull();
+        glass.HandlingInstructions!.Should().BeEquivalentTo(new[] { "Fragile", "ThisSideUp" });
+    }
+
     [Fact]
     public void AddItem_StoresQuantityVO_WithCanonicalUom()
     {

@@ -67,7 +67,8 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
                         : null,
                     item.Temperature is { } tr
                         ? TemperatureRange.Create(tr.MinC, tr.MaxC)
-                        : null);
+                        : null,
+                    item.HandlingInstructions);
             }
 
             // Explicitly mark new items as Added — EF Core's DetectChanges would otherwise

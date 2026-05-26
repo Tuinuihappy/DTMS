@@ -43,6 +43,7 @@ public record ItemDto(
     CargoSpecificDto? CargoSpecific,
     HazmatDto? Hazmat,
     TemperatureRangeDto? Temperature,
+    IReadOnlyList<HandlingInstruction> HandlingInstructions,
     ItemStatus Status);
 
 public record DeliveryOrderListDto(
@@ -174,6 +175,7 @@ internal static class DeliveryOrderMapper
                     : null,
                 p.Hazmat is { } hz ? new HazmatDto(hz.ClassCode, hz.PackingGroup) : null,
                 p.Temperature is { } tr ? new TemperatureRangeDto(tr.MinC, tr.MaxC) : null,
+                p.HandlingInstructions,
                 p.Status
             )).ToList());
 }

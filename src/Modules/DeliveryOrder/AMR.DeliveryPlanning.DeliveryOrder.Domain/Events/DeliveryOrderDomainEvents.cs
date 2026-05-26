@@ -12,7 +12,8 @@ public record ItemEventDto(
     Guid PickupStationId,
     Guid DropStationId,
     ItemHazmatDto? Hazmat = null,
-    ItemTemperatureDto? Temperature = null);
+    ItemTemperatureDto? Temperature = null,
+    IReadOnlyList<string>? HandlingInstructions = null);
 
 public record DeliveryOrderDraftedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
 public record DeliveryOrderSubmittedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;

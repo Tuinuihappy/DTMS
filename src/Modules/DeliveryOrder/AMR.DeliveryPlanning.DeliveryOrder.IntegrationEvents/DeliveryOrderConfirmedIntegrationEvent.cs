@@ -12,7 +12,8 @@ public record ItemSummaryDto(
     Guid PickupStationId,
     Guid DropStationId,
     ItemHazmatSummaryDto? Hazmat = null,
-    ItemTemperatureSummaryDto? Temperature = null);
+    ItemTemperatureSummaryDto? Temperature = null,
+    IReadOnlyList<string>? HandlingInstructions = null);
 
 public record DeliveryOrderConfirmedIntegrationEvent(
     Guid EventId,

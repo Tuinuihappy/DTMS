@@ -60,7 +60,8 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
                     : null,
                 pkg.Temperature is { } tr
                     ? TemperatureRange.Create(tr.MinC, tr.MaxC)
-                    : null);
+                    : null,
+                pkg.HandlingInstructions);
         }
 
         await _repository.AddAsync(order, cancellationToken);
