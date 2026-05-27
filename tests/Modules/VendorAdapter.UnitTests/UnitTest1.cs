@@ -17,13 +17,16 @@ public class UnitTest1
         var appVehicleId = Guid.NewGuid();
         var deviceKey = "SEER-001";
 
+        // RIOT3 spec v4 requires mapId/stationId to be integers; the
+        // adapter parses RobotTaskCommand.MapId/TargetNodeId strings into
+        // ints before serializing, so the test must pass numeric refs.
         var result = await service.SendTaskAsync(appVehicleId, new RobotTaskCommand
         {
             TaskId = Guid.NewGuid(),
             VendorVehicleKey = deviceKey,
             Action = RobotActionType.MOVE,
-            MapId = "MAP-001",
-            TargetNodeId = "ST-001"
+            MapId = "27",
+            TargetNodeId = "5"
         });
 
         Assert.True(result.IsSuccess);
@@ -34,6 +37,14 @@ public class UnitTest1
 
         Assert.Equal(deviceKey, appointVehicleKey);
         Assert.NotEqual(appVehicleId.ToString(), appointVehicleKey);
+
+        // Verify the mission carries the v4-required fields (category, int mapId/stationId).
+        var mission = doc.RootElement.GetProperty("missions")[0];
+        Assert.Equal("MOVE", mission.GetProperty("type").GetString());
+        Assert.Equal("agv", mission.GetProperty("category").GetString());
+        Assert.Equal(27, mission.GetProperty("mapId").GetInt32());
+        Assert.Equal(5, mission.GetProperty("stationId").GetInt32());
+        Assert.Equal("sequence", doc.RootElement.GetProperty("structureType").GetString());
     }
 
     [Fact]

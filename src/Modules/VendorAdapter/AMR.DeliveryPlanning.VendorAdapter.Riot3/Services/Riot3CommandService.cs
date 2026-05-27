@@ -39,6 +39,11 @@ public class Riot3CommandService : IVehicleCommandService
         }
 
         var mission = BuildMission(command);
+        if (mission is null)
+        {
+            return Result.Failure($"RIOT3 task {command.TaskId}: failed to build mission for action {command.Action}.");
+        }
+
         var request = new Riot3OrderRequest
         {
             UpperKey = command.TaskId.ToString(),
@@ -64,74 +69,16 @@ public class Riot3CommandService : IVehicleCommandService
         }
     }
 
-    public async Task<Result> CancelTaskAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation("Cancelling task {TaskId} via RIOT3 order cancel", taskId);
+    public Task<Result> CancelTaskAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
+        => SendOrderOperationAsync(taskId, Riot3OrderCommandType.Cancel, "cancel", cancellationToken);
 
-        var operationRequest = new Riot3OrderOperationRequest { OrderCommandType = Riot3OrderCommandType.Cancel };
+    public Task<Result> PauseTaskAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
+        => SendOrderOperationAsync(taskId, Riot3OrderCommandType.Hold, "pause", cancellationToken);
 
-        try
-        {
-            var upperKey = taskId.ToString();
-            var response = await _httpClient.PutAsJsonAsync(
-                $"/api/v4/orders/{upperKey}/operation?isUpper=true",
-                operationRequest,
-                cancellationToken);
-            response.EnsureSuccessStatusCode();
-            return Result.Success();
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogError(ex, "Failed to cancel RIOT3 order for task {TaskId}", taskId);
-            return Result.Failure($"RIOT3 cancel error: {ex.Message}");
-        }
-    }
-
-    public async Task<Result> PauseTaskAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation("Pausing task {TaskId} via RIOT3 order hold", taskId);
-
-        var operationRequest = new Riot3OrderOperationRequest { OrderCommandType = Riot3OrderCommandType.Hold };
-
-        try
-        {
-            var upperKey = taskId.ToString();
-            var response = await _httpClient.PutAsJsonAsync(
-                $"/api/v4/orders/{upperKey}/operation?isUpper=true",
-                operationRequest,
-                cancellationToken);
-            response.EnsureSuccessStatusCode();
-            return Result.Success();
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogError(ex, "Failed to pause RIOT3 order for task {TaskId}", taskId);
-            return Result.Failure($"RIOT3 pause error: {ex.Message}");
-        }
-    }
-
-    public async Task<Result> ResumeTaskAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation("Resuming task {TaskId} via RIOT3 order resume", taskId);
-
-        var operationRequest = new Riot3OrderOperationRequest { OrderCommandType = Riot3OrderCommandType.Resume };
-
-        try
-        {
-            var upperKey = taskId.ToString();
-            var response = await _httpClient.PutAsJsonAsync(
-                $"/api/v4/orders/{upperKey}/operation?isUpper=true",
-                operationRequest,
-                cancellationToken);
-            response.EnsureSuccessStatusCode();
-            return Result.Success();
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogError(ex, "Failed to resume RIOT3 order for task {TaskId}", taskId);
-            return Result.Failure($"RIOT3 resume error: {ex.Message}");
-        }
-    }
+    public Task<Result> ResumeTaskAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
+        // We pause via CMD_ORDER_HELD, so the inverse is CMD_ORDER_CONTINUE_FROM_HELD.
+        // CMD_ORDER_CONTINUE_FROM_HANG is for system-initiated hangs (e.g. traffic stops).
+        => SendOrderOperationAsync(taskId, Riot3OrderCommandType.ContinueFromHeld, "resume", cancellationToken);
 
     public async Task<StandardRobotState?> GetVehicleStateAsync(Guid vehicleId, CancellationToken cancellationToken = default)
     {
@@ -160,75 +107,138 @@ public class Riot3CommandService : IVehicleCommandService
         }
     }
 
+    // ── helpers ─────────────────────────────────────────────────────────────
+
+    private async Task<Result> SendOrderOperationAsync(
+        Guid taskId,
+        string orderCommandType,
+        string operationLabel,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("RIOT3 order operation {Operation} ({Command}) for task {TaskId}",
+            operationLabel, orderCommandType, taskId);
+
+        var envelope = new Riot3OrderOperationEnvelope
+        {
+            OrderCommand = new Riot3OrderOperationRequest
+            {
+                OrderCommandType = orderCommandType,
+                DisableVehicle = false
+            }
+        };
+
+        try
+        {
+            var upperKey = taskId.ToString();
+            var response = await _httpClient.PutAsJsonAsync(
+                $"/api/v4/orders/{upperKey}/operation?isUpper=true",
+                envelope,
+                cancellationToken);
+            response.EnsureSuccessStatusCode();
+            return Result.Success();
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Failed to {Operation} RIOT3 order for task {TaskId}", operationLabel, taskId);
+            return Result.Failure($"RIOT3 {operationLabel} error: {ex.Message}");
+        }
+    }
+
     private static bool RequiresStationTarget(RobotTaskCommand command)
         => command.Action is RobotActionType.MOVE or RobotActionType.CHARGE;
 
-    private static Riot3Mission BuildMission(RobotTaskCommand command)
+    // RIOT3 standardRobotsCustom action — the lift/drop encoding the codebase
+    // has been using since this adapter was first wired. Verified against
+    // RIOT3 spec example (page 6): actionParameters carry id + param0/1.
+    private const string StandardRobotsCustomAction = "standardRobotsCustom";
+    private const string StandardRobotsCustomActionId = "4";
+
+    private Riot3Mission? BuildMission(RobotTaskCommand command)
     {
         var mission = new Riot3Mission
         {
-            MissionId = command.TaskId.ToString(),
-            MissionName = $"{command.Action}-{command.TaskId}",
-            BlockingType = "HARD"
+            MissionKey = command.TaskId.ToString(),
+            ActionName = $"{command.Action}-{command.TaskId}",
+            Category = "agv",
+            BlockingType = "NONE"
         };
 
         switch (command.Action)
         {
             case RobotActionType.MOVE:
+            case RobotActionType.CHARGE:
                 mission.Type = "MOVE";
-                mission.MapId = command.MapId;
-                mission.StationId = command.TargetNodeId;
+                if (!TryAssignMoveTarget(mission, command))
+                    return null;
                 break;
 
             case RobotActionType.LIFT:
                 mission.Type = "ACT";
-                mission.ActionType = 4;
-                mission.Parameters = new List<Riot3ActionParam>
+                mission.ActionType = StandardRobotsCustomAction;
+                mission.ActionParameters = new List<Riot3ActionParam>
                 {
-                    new() { Key = "0", Value = "1" },
-                    new() { Key = "1", Value = "0" }
+                    new() { Key = "id", Value = StandardRobotsCustomActionId },
+                    new() { Key = "param0", Value = "1" },
+                    new() { Key = "param1", Value = "0" }
                 };
                 break;
 
             case RobotActionType.DROP:
                 mission.Type = "ACT";
-                mission.ActionType = 4;
-                mission.Parameters = new List<Riot3ActionParam>
+                mission.ActionType = StandardRobotsCustomAction;
+                mission.ActionParameters = new List<Riot3ActionParam>
                 {
-                    new() { Key = "0", Value = "2" },
-                    new() { Key = "1", Value = "0" }
+                    new() { Key = "id", Value = StandardRobotsCustomActionId },
+                    new() { Key = "param0", Value = "2" },
+                    new() { Key = "param1", Value = "0" }
                 };
-                break;
-
-            case RobotActionType.CHARGE:
-                mission.Type = "MOVE";
-                mission.MapId = command.MapId;
-                mission.StationId = command.TargetNodeId;
                 break;
 
             case RobotActionType.ACT:
                 mission.Type = "ACT";
                 if (command.AdditionalParameters != null)
                 {
-                    if (command.AdditionalParameters.TryGetValue("actionType", out var actionTypeStr)
-                        && int.TryParse(actionTypeStr, out var actionType))
-                        mission.ActionType = actionType;
+                    if (command.AdditionalParameters.TryGetValue("actionType", out var actionTypeStr))
+                        mission.ActionType = actionTypeStr;
 
-                    mission.Parameters = command.AdditionalParameters
+                    mission.ActionParameters = command.AdditionalParameters
                         .Where(kv => kv.Key != "actionType")
                         .Select(kv => new Riot3ActionParam { Key = kv.Key, Value = kv.Value })
                         .ToList();
                 }
                 break;
 
+            case RobotActionType.PARK:
+            case RobotActionType.WAIT:
             default:
                 mission.Type = "MOVE";
-                mission.MapId = command.MapId;
-                mission.StationId = command.TargetNodeId;
+                if (!TryAssignMoveTarget(mission, command))
+                    return null;
                 break;
         }
 
         return mission;
+    }
+
+    private bool TryAssignMoveTarget(Riot3Mission mission, RobotTaskCommand command)
+    {
+        if (!int.TryParse(command.MapId, out var mapId))
+        {
+            _logger.LogError("RIOT3 task {TaskId}: MapId '{MapId}' is not a valid integer",
+                command.TaskId, command.MapId);
+            return false;
+        }
+
+        if (!int.TryParse(command.TargetNodeId, out var stationId))
+        {
+            _logger.LogError("RIOT3 task {TaskId}: TargetNodeId '{NodeId}' is not a valid integer",
+                command.TaskId, command.TargetNodeId);
+            return false;
+        }
+
+        mission.MapId = mapId;
+        mission.StationId = stationId;
+        return true;
     }
 
     private static StandardState MapSystemState(string systemState) => systemState?.ToUpperInvariant() switch

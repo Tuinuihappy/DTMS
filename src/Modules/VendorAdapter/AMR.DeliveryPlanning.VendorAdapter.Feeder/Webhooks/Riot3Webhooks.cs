@@ -15,7 +15,7 @@ public static class Riot3Webhooks
     {
         var group = app.MapGroup("/api/webhooks/riot3").WithTags("Webhooks");
 
-        // Full RIOT3.0 /api/v4/notify endpoint
+        // RIOT3.0 v4 /api/v4/notify callback — task / subTask / vehicle events
         group.MapPost("/notify", async (
             Riot3NotifyPayload payload,
             IVendorAdapterOutbox outbox,
@@ -94,30 +94,51 @@ public static class Riot3Webhooks
         CancellationToken cancellationToken)
     {
         // upperKey = our TaskId (used as idempotency key when submitting)
-        if (!Guid.TryParse(payload.UpperKey, out var taskId)) return;
-
-        switch (payload.TaskEventType?.ToLower())
+        var upperKey = payload.Task?.UpperKey;
+        if (!Guid.TryParse(upperKey, out var taskId))
         {
-            case "finished":
+            logger.LogWarning("RIOT3 task event missing/invalid upperKey: {UpperKey}", upperKey);
+            return;
+        }
+
+        var orderKey = payload.Task?.Key ?? string.Empty;
+
+        switch (payload.TaskEventType?.ToUpperInvariant())
+        {
+            case "TASK_FINISHED":
                 logger.LogInformation("RIOT3 task finished: {TaskId}", taskId);
                 await outbox.AddAsync(new Riot3TaskCompletedIntegrationEvent(
-                    Guid.NewGuid(), DateTime.UtcNow, taskId, payload.OrderKey ?? string.Empty), cancellationToken);
+                    Guid.NewGuid(), DateTime.UtcNow, taskId, orderKey), cancellationToken);
                 break;
 
-            case "failed":
-                var errorCode = payload.FailResult?.ErrorCode ?? "UNKNOWN";
-                var errorMsg = payload.FailResult?.ErrorMsg ?? "Task failed";
+            case "TASK_FAILED":
+                var failResult = payload.Task?.FailReason;
+                var errorCode = failResult?.ErrorCode ?? "UNKNOWN";
+                var errorMsg = failResult?.ErrorDescription ?? "Task failed";
                 logger.LogWarning("RIOT3 task failed: {TaskId} [{Code}] {Msg}", taskId, errorCode, errorMsg);
                 await outbox.AddAsync(new Riot3TaskFailedIntegrationEvent(
-                    Guid.NewGuid(), DateTime.UtcNow, taskId, payload.OrderKey ?? string.Empty, errorCode, errorMsg), cancellationToken);
+                    Guid.NewGuid(), DateTime.UtcNow, taskId, orderKey, errorCode, errorMsg), cancellationToken);
                 break;
 
-            case "started":
+            case "TASK_CANCELED":
+                logger.LogInformation("RIOT3 task canceled: {TaskId} reason={Reason}",
+                    taskId, payload.Task?.CancelReason);
+                break;
+
+            case "TASK_PROCESSING":
                 logger.LogDebug("RIOT3 task started: {TaskId}", taskId);
                 break;
 
-            case "progress":
-                logger.LogDebug("RIOT3 task progress: {TaskId} {Pct}%", taskId, payload.Progress);
+            case "TASK_HANG":
+            case "TASK_HELD":
+                logger.LogInformation("RIOT3 task paused: {TaskId} event={Event} reason={Reason}",
+                    taskId, payload.TaskEventType, payload.Task?.HangReason);
+                break;
+
+            case "TASK_HANG_TO_CONTINUE":
+            case "TASK_HELD_TO_CONTINUE":
+                logger.LogDebug("RIOT3 task resumed: {TaskId} event={Event}",
+                    taskId, payload.TaskEventType);
                 break;
         }
     }
@@ -128,20 +149,38 @@ public static class Riot3Webhooks
         ILogger logger,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(payload.TaskId, out var subTaskId)) return;
-
-        switch (payload.TaskEventType?.ToLower())
+        // Sub-tasks carry their own RIOT-side key; the parent order's
+        // upperKey lives on the task object alongside.
+        var subTaskKey = payload.SubTask?.Key;
+        if (!Guid.TryParse(subTaskKey, out var subTaskId))
         {
-            case "finished":
+            logger.LogDebug("RIOT3 sub-task event missing/invalid key: {Key}", subTaskKey);
+            return;
+        }
+
+        var orderKey = payload.Task?.Key ?? payload.SubTask?.TaskKey ?? string.Empty;
+
+        switch (payload.TaskEventType?.ToUpperInvariant())
+        {
+            case "SUB_TASK_FINISHED":
                 await outbox.AddAsync(new Riot3TaskCompletedIntegrationEvent(
-                    Guid.NewGuid(), DateTime.UtcNow, subTaskId, payload.OrderKey ?? string.Empty), cancellationToken);
+                    Guid.NewGuid(), DateTime.UtcNow, subTaskId, orderKey), cancellationToken);
                 break;
 
-            case "failed":
-                var code = payload.FailResult?.ErrorCode ?? "UNKNOWN";
-                var msg = payload.FailResult?.ErrorMsg ?? "SubTask failed";
+            case "SUB_TASK_FAILED":
+                var failResult = payload.SubTask?.FailResult;
+                var code = failResult?.ErrorCode ?? "UNKNOWN";
+                var msg = failResult?.ErrorDescription ?? "SubTask failed";
                 await outbox.AddAsync(new Riot3TaskFailedIntegrationEvent(
-                    Guid.NewGuid(), DateTime.UtcNow, subTaskId, payload.OrderKey ?? string.Empty, code, msg), cancellationToken);
+                    Guid.NewGuid(), DateTime.UtcNow, subTaskId, orderKey, code, msg), cancellationToken);
+                break;
+
+            case "SUB_TASK_CANCELED":
+                logger.LogInformation("RIOT3 sub-task canceled: {SubTaskId}", subTaskId);
+                break;
+
+            case "SUB_TASK_PROCESSING":
+                logger.LogDebug("RIOT3 sub-task started: {SubTaskId}", subTaskId);
                 break;
         }
     }
@@ -153,26 +192,32 @@ public static class Riot3Webhooks
         ILogger logger,
         CancellationToken cancellationToken)
     {
-        var vehicle = payload.Vehicle;
-        if (vehicle == null || string.IsNullOrWhiteSpace(vehicle.DeviceKey)) return;
+        var vehicle = payload.VehicleInfo;
+        if (vehicle == null || string.IsNullOrWhiteSpace(vehicle.Key))
+        {
+            logger.LogDebug("RIOT3 vehicle event ignored — missing vehicleInfo.key");
+            return;
+        }
 
-        var vehicleId = await vehicleIdentityResolver.ResolveVehicleIdAsync("riot3", vehicle.DeviceKey, cancellationToken);
+        var vehicleId = await vehicleIdentityResolver.ResolveVehicleIdAsync("riot3", vehicle.Key, cancellationToken);
         if (!vehicleId.HasValue)
         {
-            logger.LogWarning("RIOT3 vehicle event ignored because deviceKey {DeviceKey} is not mapped", vehicle.DeviceKey);
+            logger.LogWarning("RIOT3 vehicle event ignored because deviceKey {DeviceKey} is not mapped", vehicle.Key);
             return;
         }
 
         var canonicalState = MapRiotSystemState(vehicle.SystemState);
-        var batteryPct = vehicle.BatteryLevel / 100.0;
+        var batteryPct = (vehicle.BatteryState?.BatteryCharge ?? 0) / 100.0;
 
         await outbox.AddAsync(new VehicleStateChangedIntegrationEvent(
             Guid.NewGuid(), DateTime.UtcNow, vehicleId.Value, canonicalState, batteryPct, null), cancellationToken);
 
-        if (payload.VehicleEventType?.ToLower() == "emergency_triggered" ||
-            vehicle.SafetyState?.Contains("EMERGENCY") == true)
+        // Emergency = eStop is anything other than NONE (AUTOACK/MANUAL/REMOTE)
+        var eStop = vehicle.SafetyState?.EStop;
+        if (!string.IsNullOrEmpty(eStop) && !eStop.Equals("NONE", StringComparison.OrdinalIgnoreCase))
         {
-            logger.LogWarning("RIOT3 emergency triggered for vehicle {VehicleId}", vehicleId.Value);
+            logger.LogWarning("RIOT3 emergency triggered for vehicle {VehicleId}: eStop={EStop} event={Event}",
+                vehicleId.Value, eStop, payload.VehicleEventType);
         }
 
         if (batteryPct < 0.20)

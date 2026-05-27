@@ -2,13 +2,14 @@ using System.Text.Json.Serialization;
 
 namespace AMR.DeliveryPlanning.VendorAdapter.Riot3.Models;
 
+// Matches RIOT3.0 API v4 "Create Order" — POST /api/v4/orders
 public class Riot3OrderRequest
 {
     [JsonPropertyName("upperKey")]
     public string UpperKey { get; set; } = string.Empty;
 
     [JsonPropertyName("orderName")]
-    public string OrderName { get; set; } = string.Empty;
+    public string? OrderName { get; set; }
 
     [JsonPropertyName("orderType")]
     public string OrderType { get; set; } = "WORK";
@@ -19,50 +20,75 @@ public class Riot3OrderRequest
     [JsonPropertyName("structureType")]
     public string StructureType { get; set; } = "sequence";
 
+    [JsonPropertyName("missions")]
+    public List<Riot3Mission> Missions { get; set; } = new();
+
     [JsonPropertyName("appointVehicleKey")]
     public string? AppointVehicleKey { get; set; }
 
-    [JsonPropertyName("missions")]
-    public List<Riot3Mission> Missions { get; set; } = new();
+    [JsonPropertyName("appointVehicleName")]
+    public string? AppointVehicleName { get; set; }
+
+    // Comma-separated group keys when multiple groups are acceptable
+    [JsonPropertyName("appointVehicleGroupKey")]
+    public string? AppointVehicleGroupKey { get; set; }
+
+    [JsonPropertyName("appointVehicleGroupName")]
+    public string? AppointVehicleGroupName { get; set; }
+
+    [JsonPropertyName("orderState")]
+    public string? OrderState { get; set; }
+
+    [JsonPropertyName("tags")]
+    public List<string>? Tags { get; set; }
 }
 
 public class Riot3Mission
 {
-    [JsonPropertyName("missionId")]
-    public string MissionId { get; set; } = string.Empty;
+    [JsonPropertyName("missionIndex")]
+    public int? MissionIndex { get; set; }
 
-    [JsonPropertyName("missionName")]
-    public string MissionName { get; set; } = string.Empty;
-
+    // "MOVE" or "ACT"
     [JsonPropertyName("type")]
     public string Type { get; set; } = string.Empty;
 
-    [JsonPropertyName("mapId")]
-    public string? MapId { get; set; }
+    // "agv" | "seer_agv" | "rest_20" — required per spec
+    [JsonPropertyName("category")]
+    public string Category { get; set; } = "agv";
 
-    [JsonPropertyName("stationId")]
-    public string? StationId { get; set; }
+    // String per spec (e.g. "standardRobotsCustom"), not an integer
+    [JsonPropertyName("actionType")]
+    public string? ActionType { get; set; }
 
     [JsonPropertyName("blockingType")]
-    public string BlockingType { get; set; } = "HARD";
+    public string BlockingType { get; set; } = "NONE";
 
-    [JsonPropertyName("actionType")]
-    public int? ActionType { get; set; }
+    [JsonPropertyName("missionKey")]
+    public string? MissionKey { get; set; }
 
-    [JsonPropertyName("parameters")]
-    public List<Riot3ActionParam>? Parameters { get; set; }
+    [JsonPropertyName("actionName")]
+    public string? ActionName { get; set; }
 
-    [JsonPropertyName("url")]
-    public string? CallbackUrl { get; set; }
+    [JsonPropertyName("actionDescription")]
+    public string? ActionDescription { get; set; }
 
-    [JsonPropertyName("retryCount")]
-    public int? RetryCount { get; set; }
+    [JsonPropertyName("actionParameters")]
+    public List<Riot3ActionParam>? ActionParameters { get; set; }
 
-    [JsonPropertyName("backoffDelay")]
-    public int? BackoffDelay { get; set; }
+    [JsonPropertyName("extendedParameters")]
+    public List<Riot3ActionParam>? ExtendedParameters { get; set; }
 
-    [JsonPropertyName("readTimeOutMillis")]
-    public int? ReadTimeOutMillis { get; set; }
+    [JsonPropertyName("mapId")]
+    public int? MapId { get; set; }
+
+    [JsonPropertyName("mapName")]
+    public string? MapName { get; set; }
+
+    [JsonPropertyName("stationId")]
+    public int? StationId { get; set; }
+
+    [JsonPropertyName("stationName")]
+    public string? StationName { get; set; }
 }
 
 public class Riot3ActionParam
@@ -70,6 +96,8 @@ public class Riot3ActionParam
     [JsonPropertyName("key")]
     public string Key { get; set; } = string.Empty;
 
+    // Spec example shows mixed types (int, string); keep as string for
+    // serialization simplicity — callers stringify before passing in.
     [JsonPropertyName("value")]
     public string Value { get; set; } = string.Empty;
 }
