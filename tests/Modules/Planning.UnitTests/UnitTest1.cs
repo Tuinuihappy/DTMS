@@ -68,9 +68,28 @@ public class JobTests
     }
 
     [Fact]
-    public void Commit_WhenNotAssigned_ShouldThrow()
+    public void Commit_WhenNotAssigned_ShouldSucceed()
     {
+        // Phase 1 flow: planners can commit without pre-assigning a vehicle.
+        // RIOT3 auto-selects the robot when the order has no
+        // appointVehicleKey, and the assigned vehicle is reported back via
+        // the task callback (processingVehicle.key).
         var job = new Job(Guid.NewGuid(), "Normal");
+
+        var act = () => job.Commit();
+
+        act.Should().NotThrow();
+        job.Status.Should().Be(JobStatus.Committed);
+        job.AssignedVehicleId.Should().BeNull();
+    }
+
+    [Fact]
+    public void Commit_WhenAlreadyCommitted_ShouldThrow()
+    {
+        // Guard the other side of the transition: Committed is a terminal
+        // status from Planning's perspective; re-committing is an error.
+        var job = new Job(Guid.NewGuid(), "Normal");
+        job.Commit();
 
         var act = () => job.Commit();
 

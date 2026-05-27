@@ -148,6 +148,31 @@ public class Trip : AggregateRoot<Guid>
         RecordEvent(null, "TripReassigned", $"From {oldVehicleId} to {newVehicleId}");
     }
 
+    // Bind the trip to a vehicle the vendor (RIOT3) auto-selected after
+    // dispatch. Idempotent: a no-op if the same vehicle is reported again,
+    // throws if a *different* vehicle tries to take over (that's a
+    // reassignment and must go through Reassign so tasks are re-dispatched).
+    // Does NOT reset task state — the vendor is already executing.
+    public void SetAssignedVehicle(Guid vehicleId)
+    {
+        if (vehicleId == Guid.Empty)
+            throw new ArgumentException("VehicleId must not be empty.", nameof(vehicleId));
+
+        if (Status == TripStatus.Completed || Status == TripStatus.Cancelled)
+            throw new InvalidOperationException($"Cannot assign a vehicle to a trip in {Status} status.");
+
+        if (VehicleId == vehicleId)
+            return;
+
+        if (VehicleId.HasValue)
+            throw new InvalidOperationException(
+                $"Trip already has VehicleId {VehicleId}; use Reassign to switch vehicles.");
+
+        VehicleId = vehicleId;
+        AddDomainEvent(new TripVehicleAssignedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, vehicleId));
+        RecordEvent(null, "TripVehicleAssigned", vehicleId.ToString());
+    }
+
     public TripException RaiseException(string code, string severity, string detail)
     {
         var exception = new TripException(Id, code, severity, detail);
