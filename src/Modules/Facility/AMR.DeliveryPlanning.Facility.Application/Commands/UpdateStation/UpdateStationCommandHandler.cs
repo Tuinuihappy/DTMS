@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Facility.Application.Commands;
 using AMR.DeliveryPlanning.Facility.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Exceptions;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
@@ -25,8 +26,8 @@ internal sealed class UpdateStationCommandHandler : ICommandHandler<UpdateStatio
         if (request.Code is not null)
             station.SetCode(request.Code);
 
-        if (request.UpdateAction)
-            station.SetActionConfig(request.ActionType, request.ActionCategory, request.ActionParameters);
+        if (request.UpdateActions)
+            station.SetActions(StationActionInputMapper.ToDomain(request.Actions));
 
         await _stationRepository.SaveChangesAsync(cancellationToken);
 

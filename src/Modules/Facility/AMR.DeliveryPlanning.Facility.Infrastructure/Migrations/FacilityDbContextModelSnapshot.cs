@@ -249,16 +249,8 @@ namespace AMR.DeliveryPlanning.Facility.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ActionCategory")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<string>("ActionParameters")
+                    b.Property<string>("Actions")
                         .HasColumnType("jsonb");
-
-                    b.Property<string>("ActionType")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Code")
                         .HasMaxLength(50)

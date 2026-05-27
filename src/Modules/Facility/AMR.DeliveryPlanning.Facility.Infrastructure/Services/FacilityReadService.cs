@@ -36,9 +36,7 @@ public sealed class FacilityReadService : IFacilityReadService
                 station.MapId,
                 MapVendorRef = map.VendorRef,
                 StationVendorRef = station.VendorRef,
-                station.ActionType,
-                station.ActionCategory,
-                station.ActionParameters
+                station.Actions
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -49,14 +47,28 @@ public sealed class FacilityReadService : IFacilityReadService
             return null;
         }
 
+        // Project the domain value-object map into the plain Application DTO
+        // so callers (Dispatch) don't import Facility.Domain.
+        IReadOnlyDictionary<string, StationActionConfig>? actions = null;
+        if (target.Actions is { Count: > 0 })
+        {
+            var projected = new Dictionary<string, StationActionConfig>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in target.Actions)
+            {
+                projected[kv.Key] = new StationActionConfig(
+                    kv.Value.ActionType,
+                    kv.Value.Category,
+                    kv.Value.Parameters);
+            }
+            actions = projected;
+        }
+
         return new StationVendorTarget(
             target.StationId,
             target.MapId,
             target.MapVendorRef.Trim(),
             target.StationVendorRef.Trim(),
-            string.IsNullOrWhiteSpace(target.ActionType) ? null : target.ActionType,
-            string.IsNullOrWhiteSpace(target.ActionCategory) ? null : target.ActionCategory,
-            target.ActionParameters);
+            actions);
     }
 
     public async Task<IReadOnlyDictionary<string, StationLookupResult>> ResolveStationsBatchAsync(

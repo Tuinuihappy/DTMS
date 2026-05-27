@@ -1,17 +1,23 @@
 namespace AMR.DeliveryPlanning.Facility.Application.Services;
 
+// Vendor action config keyed by intent in StationVendorTarget.Actions
+// (e.g. "lift", "drop"). Plain data DTO so the Application layer does
+// not need to import the Domain value object.
+public sealed record StationActionConfig(
+    string ActionType,
+    string Category,
+    IReadOnlyDictionary<string, string>? Parameters);
+
 // Carries everything Dispatch needs to translate a station into RIOT3 mission(s):
-// the vendor-side refs for the MOVE leg, plus the optional ACT configuration
-// (action type/category/params) when the station is more than a pure waypoint.
-// ActionType=null means "MOVE only" — do not append an ACT mission.
+// the vendor-side refs for the MOVE leg, plus an optional action map keyed by
+// intent. Dispatch picks the right entry from Actions based on the task type
+// (TaskType.Lift → Actions["lift"], etc.). Null/empty Actions = pure MOVE.
 public sealed record StationVendorTarget(
     Guid StationId,
     Guid MapId,
     string MapVendorRef,
     string StationVendorRef,
-    string? ActionType = null,
-    string? ActionCategory = null,
-    IReadOnlyDictionary<string, string>? ActionParameters = null);
+    IReadOnlyDictionary<string, StationActionConfig>? Actions = null);
 
 /// <summary>
 /// Station lookup outcome. ManualOverrideActive=true means an operator has forced this station offline.

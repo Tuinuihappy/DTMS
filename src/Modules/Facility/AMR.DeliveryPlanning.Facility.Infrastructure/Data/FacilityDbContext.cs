@@ -66,17 +66,23 @@ public class FacilityDbContext : DbContext
             b.Property(s => s.ManualOverrideExpiresAt);
             b.HasIndex(s => s.ManualOverrideExpiresAt).HasFilter("\"ManualOverrideOffline\" = true");
 
-            // Vendor action configuration (RIOT3 ACT mission). ActionParameters
-            // serialized to JSON so we can grow the per-action shape without
-            // schema migrations; column is jsonb on Postgres.
-            b.Property(s => s.ActionType).HasMaxLength(50);
-            b.Property(s => s.ActionCategory).HasMaxLength(30);
-            b.Property(s => s.ActionParameters)
+            // Vendor action map (intent → StationAction). Stored as a single
+            // jsonb document — keeps RIOT3 ACT-mission config close to the
+            // station record without a separate child table. The value
+            // converter serializes the whole IReadOnlyDictionary at once.
+            b.Property(s => s.Actions)
                 .HasConversion(
-                    v => v == null ? null : System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                    v => v == null
+                        ? null
+                        : System.Text.Json.JsonSerializer.Serialize(
+                            v,
+                            (System.Text.Json.JsonSerializerOptions?)null),
                     v => string.IsNullOrEmpty(v)
                         ? null
-                        : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(v, (System.Text.Json.JsonSerializerOptions?)null))
+                        : (IReadOnlyDictionary<string, AMR.DeliveryPlanning.Facility.Domain.ValueObjects.StationAction>?)
+                          System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, AMR.DeliveryPlanning.Facility.Domain.ValueObjects.StationAction>>(
+                              v,
+                              (System.Text.Json.JsonSerializerOptions?)null))
                 .HasColumnType("jsonb");
         });
 

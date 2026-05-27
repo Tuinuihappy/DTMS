@@ -3,6 +3,14 @@ using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Facility.Application.Commands.AddStation;
 
+// Caller-facing shape for an action entry inside AddStationCommand.Actions.
+// Plain DTO mirroring StationAction value object so the Application layer
+// can be called without importing Domain types.
+public sealed record StationActionInput(
+    string ActionType,
+    string? Category = null,
+    IDictionary<string, string>? Parameters = null);
+
 public record AddStationCommand(
     Guid MapId,
     string Name,
@@ -12,10 +20,7 @@ public record AddStationCommand(
     StationType Type,
     string? VendorRef = null,
     string? Code = null,
-    // Optional ACT mission configuration for stations where the robot
-    // does more than just stop (e.g. lift/drop). When null, the station
-    // is a pure MOVE waypoint. Category defaults to "agv" on the entity
-    // side when actionType is set.
-    string? ActionType = null,
-    string? ActionCategory = null,
-    IDictionary<string, string>? ActionParameters = null) : ICommand<Guid>;
+    // Optional action map keyed by intent ("lift", "drop", "charge", ...).
+    // Null/empty = pure MOVE waypoint. A station can carry multiple intents
+    // (e.g. a DOCK that serves both pickup and dropoff).
+    IDictionary<string, StationActionInput>? Actions = null) : ICommand<Guid>;

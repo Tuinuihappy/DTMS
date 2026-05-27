@@ -53,7 +53,7 @@ public static class MapEndpoints
         {
             var result = await sender.Send(new AddStationCommand(
                 mapId, req.Name, req.X, req.Y, req.Theta, req.Type, req.VendorRef, req.Code,
-                req.ActionType, req.ActionCategory, req.ActionParameters));
+                req.Actions));
             return result.IsSuccess
                 ? Results.Created($"/api/v1/facility/stations/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
@@ -73,7 +73,7 @@ public static class MapEndpoints
             {
                 var result = await sender.Send(new UpdateStationCommand(
                     stationId, req.Type, req.Code,
-                    req.UpdateAction, req.ActionType, req.ActionCategory, req.ActionParameters));
+                    req.UpdateActions, req.Actions));
                 return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
             });
 
@@ -174,15 +174,14 @@ public static class MapEndpoints
 
 public record ResourceCommandRequest(string Command);
 public record ImportMapFromRiot3Request(int Riot3MapId);
-// UpdateAction=false (default) leaves the existing action config untouched;
-// set UpdateAction=true and pass null for ActionType to explicitly clear it.
+// UpdateActions=false (default) leaves the existing action map untouched;
+// set UpdateActions=true and pass null/empty Actions to explicitly clear it,
+// or a non-empty map to replace it wholesale.
 public record UpdateStationRequest(
     StationType? Type,
     string? Code,
-    bool UpdateAction = false,
-    string? ActionType = null,
-    string? ActionCategory = null,
-    IDictionary<string, string>? ActionParameters = null);
+    bool UpdateActions = false,
+    IDictionary<string, StationActionInput>? Actions = null);
 
 public record ForceOfflineRequest(string Reason, int DurationMinutes, string? By = null);
 
@@ -194,6 +193,5 @@ public record AddStationRequest(
     StationType Type = StationType.Normal,
     string? VendorRef = null,
     string? Code = null,
-    string? ActionType = null,
-    string? ActionCategory = null,
-    IDictionary<string, string>? ActionParameters = null);
+    // Optional action map keyed by intent ("lift", "drop", "charge", ...).
+    IDictionary<string, StationActionInput>? Actions = null);

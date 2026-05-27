@@ -4,6 +4,12 @@ using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Facility.Application.Queries.GetStations;
 
+// Read-side projection of Station.Actions[intent] — flat data carrier.
+public sealed record StationActionDto(
+    string ActionType,
+    string Category,
+    IReadOnlyDictionary<string, string>? Parameters);
+
 public record StationDto(
     Guid Id, Guid MapId, string Name, StationType Type, double X, double Y, double? Theta,
     string? VendorRef, string? Code, bool IsActive,
@@ -15,12 +21,9 @@ public record StationDto(
     DateTime? ManualOverrideAt,
     string? ManualOverrideBy,
     DateTime? ManualOverrideExpiresAt,
-    // Vendor action config. ActionType=null means the station is a pure MOVE
-    // waypoint; otherwise Dispatch appends a RIOT3 ACT mission with the
-    // category + parameters when building a trip's missions.
-    string? ActionType,
-    string? ActionCategory,
-    IReadOnlyDictionary<string, string>? ActionParameters);
+    // Vendor action map keyed by intent (e.g. "lift", "drop", "charge").
+    // Null/empty = pure MOVE waypoint.
+    IReadOnlyDictionary<string, StationActionDto>? Actions);
 
 public record GetStationsQuery(Guid? MapId, StationType? Type, Guid? ZoneId, string? CompatibleVehicleType, bool IncludeInactive = false, string? Code = null) : IQuery<List<StationDto>>;
 
@@ -44,9 +47,19 @@ public class GetStationsQueryHandler : IQueryHandler<GetStationsQuery, List<Stat
             s.ManualOverrideAt,
             s.ManualOverrideBy,
             s.ManualOverrideExpiresAt,
-            s.ActionType,
-            s.ActionCategory,
-            s.ActionParameters)).ToList();
+            ProjectActions(s.Actions))).ToList();
         return Result<List<StationDto>>.Success(dtos);
+    }
+
+    private static IReadOnlyDictionary<string, StationActionDto>? ProjectActions(
+        IReadOnlyDictionary<string, AMR.DeliveryPlanning.Facility.Domain.ValueObjects.StationAction>? actions)
+    {
+        if (actions is null || actions.Count == 0)
+            return null;
+
+        var result = new Dictionary<string, StationActionDto>(StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in actions)
+            result[kv.Key] = new StationActionDto(kv.Value.ActionType, kv.Value.Category, kv.Value.Parameters);
+        return result;
     }
 }

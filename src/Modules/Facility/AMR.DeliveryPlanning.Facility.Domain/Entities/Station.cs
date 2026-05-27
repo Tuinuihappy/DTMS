@@ -27,14 +27,13 @@ public class Station : Entity<Guid>
     public string? ManualOverrideBy { get; private set; }
     public DateTime? ManualOverrideExpiresAt { get; private set; }
 
-    // Vendor action configuration — what the robot should DO at this station
-    // (vs. just MOVE there). When ActionType is set, the Dispatch module appends
-    // an ACT mission to RIOT3 orders after the MOVE; when null, the station is
-    // a pure waypoint. Kept vendor-agnostic at this layer: the dispatcher maps
-    // these strings into RIOT3's actionType/category/actionParameters.
-    public string? ActionType { get; private set; }
-    public string? ActionCategory { get; private set; }
-    public Dictionary<string, string>? ActionParameters { get; private set; }
+    // Vendor action map keyed by "intent" (e.g. "lift", "drop", "charge",
+    // "scan"). The Dispatch module reads the intent from the trip's task
+    // type (TaskType.Lift → key "lift", etc.) and appends the matching
+    // RIOT3 ACT mission after the MOVE. A station can carry several intents
+    // — e.g. a DOCK that serves as both pickup and dropoff would have
+    // both "lift" and "drop" entries. Null/empty = pure MOVE waypoint.
+    public IReadOnlyDictionary<string, StationAction>? Actions { get; private set; }
 
     private Station() { }
 
@@ -43,26 +42,20 @@ public class Station : Entity<Guid>
     public void SetType(StationType type) => Type = type;
 
     /// <summary>
-    /// Configure the action a robot performs when reaching this station.
-    /// Pass actionType=null to clear the configuration (station becomes a pure
-    /// MOVE waypoint). When actionType is set, category defaults to "agv".
-    /// Parameters is copied defensively so the caller can keep mutating its dictionary.
+    /// Bulk-replace the action map. Pass null or an empty map to make this
+    /// station a pure MOVE waypoint. Keys are matched case-insensitively
+    /// (so "Lift" / "LIFT" / "lift" all collide). The supplied dictionary
+    /// is copied defensively.
     /// </summary>
-    public void SetActionConfig(string? actionType, string? category = null, IDictionary<string, string>? parameters = null)
+    public void SetActions(IDictionary<string, StationAction>? actions)
     {
-        if (string.IsNullOrWhiteSpace(actionType))
+        if (actions is null || actions.Count == 0)
         {
-            ActionType = null;
-            ActionCategory = null;
-            ActionParameters = null;
+            Actions = null;
             return;
         }
 
-        ActionType = actionType.Trim();
-        ActionCategory = string.IsNullOrWhiteSpace(category) ? "agv" : category.Trim();
-        ActionParameters = parameters is null || parameters.Count == 0
-            ? null
-            : new Dictionary<string, string>(parameters, StringComparer.Ordinal);
+        Actions = new Dictionary<string, StationAction>(actions, StringComparer.OrdinalIgnoreCase);
     }
     public void Deactivate() => IsActive = false;
     public void Reactivate() => IsActive = true;

@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Facility.Application.Commands;
 using AMR.DeliveryPlanning.Facility.Domain.Entities;
 using AMR.DeliveryPlanning.Facility.Domain.Repositories;
 using AMR.DeliveryPlanning.Facility.Domain.ValueObjects;
@@ -31,8 +32,9 @@ internal sealed class AddStationCommandHandler : ICommandHandler<AddStationComma
         if (!string.IsNullOrWhiteSpace(request.Code))
             station.SetCode(request.Code);
 
-        if (!string.IsNullOrWhiteSpace(request.ActionType))
-            station.SetActionConfig(request.ActionType, request.ActionCategory, request.ActionParameters);
+        var actions = StationActionInputMapper.ToDomain(request.Actions);
+        if (actions is not null)
+            station.SetActions(actions);
 
         map.AddStation(station);
 
