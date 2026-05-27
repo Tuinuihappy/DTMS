@@ -1,10 +1,17 @@
 namespace AMR.DeliveryPlanning.Facility.Application.Services;
 
+// Carries everything Dispatch needs to translate a station into RIOT3 mission(s):
+// the vendor-side refs for the MOVE leg, plus the optional ACT configuration
+// (action type/category/params) when the station is more than a pure waypoint.
+// ActionType=null means "MOVE only" — do not append an ACT mission.
 public sealed record StationVendorTarget(
     Guid StationId,
     Guid MapId,
     string MapVendorRef,
-    string StationVendorRef);
+    string StationVendorRef,
+    string? ActionType = null,
+    string? ActionCategory = null,
+    IReadOnlyDictionary<string, string>? ActionParameters = null);
 
 /// <summary>
 /// Station lookup outcome. ManualOverrideActive=true means an operator has forced this station offline.

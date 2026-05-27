@@ -31,6 +31,9 @@ internal sealed class AddStationCommandHandler : ICommandHandler<AddStationComma
         if (!string.IsNullOrWhiteSpace(request.Code))
             station.SetCode(request.Code);
 
+        if (!string.IsNullOrWhiteSpace(request.ActionType))
+            station.SetActionConfig(request.ActionType, request.ActionCategory, request.ActionParameters);
+
         map.AddStation(station);
 
         _mapRepository.Update(map);

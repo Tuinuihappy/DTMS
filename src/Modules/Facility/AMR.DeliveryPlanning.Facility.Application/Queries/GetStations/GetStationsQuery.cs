@@ -14,7 +14,13 @@ public record StationDto(
     string? ManualOverrideReason,
     DateTime? ManualOverrideAt,
     string? ManualOverrideBy,
-    DateTime? ManualOverrideExpiresAt);
+    DateTime? ManualOverrideExpiresAt,
+    // Vendor action config. ActionType=null means the station is a pure MOVE
+    // waypoint; otherwise Dispatch appends a RIOT3 ACT mission with the
+    // category + parameters when building a trip's missions.
+    string? ActionType,
+    string? ActionCategory,
+    IReadOnlyDictionary<string, string>? ActionParameters);
 
 public record GetStationsQuery(Guid? MapId, StationType? Type, Guid? ZoneId, string? CompatibleVehicleType, bool IncludeInactive = false, string? Code = null) : IQuery<List<StationDto>>;
 
@@ -37,7 +43,10 @@ public class GetStationsQueryHandler : IQueryHandler<GetStationsQuery, List<Stat
             s.ManualOverrideReason,
             s.ManualOverrideAt,
             s.ManualOverrideBy,
-            s.ManualOverrideExpiresAt)).ToList();
+            s.ManualOverrideExpiresAt,
+            s.ActionType,
+            s.ActionCategory,
+            s.ActionParameters)).ToList();
         return Result<List<StationDto>>.Success(dtos);
     }
 }

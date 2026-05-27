@@ -65,6 +65,19 @@ public class FacilityDbContext : DbContext
             b.Property(s => s.ManualOverrideAt);
             b.Property(s => s.ManualOverrideExpiresAt);
             b.HasIndex(s => s.ManualOverrideExpiresAt).HasFilter("\"ManualOverrideOffline\" = true");
+
+            // Vendor action configuration (RIOT3 ACT mission). ActionParameters
+            // serialized to JSON so we can grow the per-action shape without
+            // schema migrations; column is jsonb on Postgres.
+            b.Property(s => s.ActionType).HasMaxLength(50);
+            b.Property(s => s.ActionCategory).HasMaxLength(30);
+            b.Property(s => s.ActionParameters)
+                .HasConversion(
+                    v => v == null ? null : System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                    v => string.IsNullOrEmpty(v)
+                        ? null
+                        : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(v, (System.Text.Json.JsonSerializerOptions?)null))
+                .HasColumnType("jsonb");
         });
 
         modelBuilder.Entity<Zone>(b =>

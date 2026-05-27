@@ -25,6 +25,9 @@ internal sealed class UpdateStationCommandHandler : ICommandHandler<UpdateStatio
         if (request.Code is not null)
             station.SetCode(request.Code);
 
+        if (request.UpdateAction)
+            station.SetActionConfig(request.ActionType, request.ActionCategory, request.ActionParameters);
+
         await _stationRepository.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

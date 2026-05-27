@@ -52,7 +52,8 @@ public static class MapEndpoints
         group.MapPost("/maps/{mapId:guid}/stations", async (Guid mapId, AddStationRequest req, ISender sender) =>
         {
             var result = await sender.Send(new AddStationCommand(
-                mapId, req.Name, req.X, req.Y, req.Theta, req.Type, req.VendorRef, req.Code));
+                mapId, req.Name, req.X, req.Y, req.Theta, req.Type, req.VendorRef, req.Code,
+                req.ActionType, req.ActionCategory, req.ActionParameters));
             return result.IsSuccess
                 ? Results.Created($"/api/v1/facility/stations/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
@@ -70,7 +71,9 @@ public static class MapEndpoints
         group.MapMethods("/stations/{stationId:guid}", ["PATCH"],
             async (Guid stationId, UpdateStationRequest req, ISender sender) =>
             {
-                var result = await sender.Send(new UpdateStationCommand(stationId, req.Type, req.Code));
+                var result = await sender.Send(new UpdateStationCommand(
+                    stationId, req.Type, req.Code,
+                    req.UpdateAction, req.ActionType, req.ActionCategory, req.ActionParameters));
                 return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
             });
 
@@ -171,7 +174,26 @@ public static class MapEndpoints
 
 public record ResourceCommandRequest(string Command);
 public record ImportMapFromRiot3Request(int Riot3MapId);
-public record UpdateStationRequest(StationType? Type, string? Code);
+// UpdateAction=false (default) leaves the existing action config untouched;
+// set UpdateAction=true and pass null for ActionType to explicitly clear it.
+public record UpdateStationRequest(
+    StationType? Type,
+    string? Code,
+    bool UpdateAction = false,
+    string? ActionType = null,
+    string? ActionCategory = null,
+    IDictionary<string, string>? ActionParameters = null);
+
 public record ForceOfflineRequest(string Reason, int DurationMinutes, string? By = null);
-public record AddStationRequest(string Name, double X, double Y, double? Theta, StationType Type = StationType.Normal,
-    string? VendorRef = null, string? Code = null);
+
+public record AddStationRequest(
+    string Name,
+    double X,
+    double Y,
+    double? Theta,
+    StationType Type = StationType.Normal,
+    string? VendorRef = null,
+    string? Code = null,
+    string? ActionType = null,
+    string? ActionCategory = null,
+    IDictionary<string, string>? ActionParameters = null);

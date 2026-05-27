@@ -35,7 +35,10 @@ public sealed class FacilityReadService : IFacilityReadService
                 StationId = station.Id,
                 station.MapId,
                 MapVendorRef = map.VendorRef,
-                StationVendorRef = station.VendorRef
+                StationVendorRef = station.VendorRef,
+                station.ActionType,
+                station.ActionCategory,
+                station.ActionParameters
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -50,7 +53,10 @@ public sealed class FacilityReadService : IFacilityReadService
             target.StationId,
             target.MapId,
             target.MapVendorRef.Trim(),
-            target.StationVendorRef.Trim());
+            target.StationVendorRef.Trim(),
+            string.IsNullOrWhiteSpace(target.ActionType) ? null : target.ActionType,
+            string.IsNullOrWhiteSpace(target.ActionCategory) ? null : target.ActionCategory,
+            target.ActionParameters);
     }
 
     public async Task<IReadOnlyDictionary<string, StationLookupResult>> ResolveStationsBatchAsync(

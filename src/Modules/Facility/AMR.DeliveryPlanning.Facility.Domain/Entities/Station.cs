@@ -27,11 +27,43 @@ public class Station : Entity<Guid>
     public string? ManualOverrideBy { get; private set; }
     public DateTime? ManualOverrideExpiresAt { get; private set; }
 
+    // Vendor action configuration — what the robot should DO at this station
+    // (vs. just MOVE there). When ActionType is set, the Dispatch module appends
+    // an ACT mission to RIOT3 orders after the MOVE; when null, the station is
+    // a pure waypoint. Kept vendor-agnostic at this layer: the dispatcher maps
+    // these strings into RIOT3's actionType/category/actionParameters.
+    public string? ActionType { get; private set; }
+    public string? ActionCategory { get; private set; }
+    public Dictionary<string, string>? ActionParameters { get; private set; }
+
     private Station() { }
 
     public void SetVendorRef(string vendorRef) => VendorRef = vendorRef;
     public void SetCode(string code) => Code = code.Trim().ToUpperInvariant();
     public void SetType(StationType type) => Type = type;
+
+    /// <summary>
+    /// Configure the action a robot performs when reaching this station.
+    /// Pass actionType=null to clear the configuration (station becomes a pure
+    /// MOVE waypoint). When actionType is set, category defaults to "agv".
+    /// Parameters is copied defensively so the caller can keep mutating its dictionary.
+    /// </summary>
+    public void SetActionConfig(string? actionType, string? category = null, IDictionary<string, string>? parameters = null)
+    {
+        if (string.IsNullOrWhiteSpace(actionType))
+        {
+            ActionType = null;
+            ActionCategory = null;
+            ActionParameters = null;
+            return;
+        }
+
+        ActionType = actionType.Trim();
+        ActionCategory = string.IsNullOrWhiteSpace(category) ? "agv" : category.Trim();
+        ActionParameters = parameters is null || parameters.Count == 0
+            ? null
+            : new Dictionary<string, string>(parameters, StringComparer.Ordinal);
+    }
     public void Deactivate() => IsActive = false;
     public void Reactivate() => IsActive = true;
     public void UpdateFromVendor(string name, double x, double y, double yaw)
