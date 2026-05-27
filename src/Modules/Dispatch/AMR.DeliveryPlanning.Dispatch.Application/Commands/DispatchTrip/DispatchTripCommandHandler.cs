@@ -32,6 +32,10 @@ public class DispatchTripCommandHandler : ICommandHandler<DispatchTripCommand, G
         if (legs.Count == 0)
             return Result<Guid>.Failure("No legs provided for trip dispatch.");
 
+        if (legs.Any(l => l.FromStationId == Guid.Empty || l.ToStationId == Guid.Empty))
+            return Result<Guid>.Failure(
+                "DispatchTrip received a leg with Guid.Empty station — Planning must filter synthetic legs before emitting.");
+
         int taskSeq = 1;
         for (int i = 0; i < legs.Count; i++)
         {

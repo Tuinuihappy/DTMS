@@ -20,6 +20,7 @@ public class PlanningDomainEventMapper : IDomainEventToIntegrationEventMapper
                     evt.DeliveryOrderId,
                     evt.VehicleId,
                     evt.Legs
+                        .Where(l => l.FromStationId != Guid.Empty && l.ToStationId != Guid.Empty)
                         .Select(l => new PlannedLegDto(l.FromStationId, l.ToStationId, l.SequenceOrder))
                         .ToList())
             ],

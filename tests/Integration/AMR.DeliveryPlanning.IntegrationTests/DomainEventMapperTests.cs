@@ -203,6 +203,35 @@ public class DomainEventMapperTests
     }
 
     [Fact]
+    public void PlanningMapper_DropsSyntheticEmptyFromLegs()
+    {
+        // Planning command handlers create a synthetic first leg with
+        // FromStationId = Guid.Empty to represent "vehicle's current
+        // position". That sentinel must not leak past the integration
+        // boundary — Dispatch / VendorAdapter cannot resolve it to a
+        // vendor target, so the task would be silently dropped at the
+        // adapter and never reach RIOT3.
+        var eventId = Guid.NewGuid();
+        var jobId = Guid.NewGuid();
+        var deliveryOrderId = Guid.NewGuid();
+        var pickupStationId = Guid.NewGuid();
+        var dropStationId = Guid.NewGuid();
+
+        var result = new PlanningDomainEventMapper()
+            .Map(new JobCommittedDomainEvent(
+                eventId, DateTime.UtcNow, jobId, deliveryOrderId, null,
+                [
+                    new CommittedLegSnapshot(Guid.Empty, pickupStationId, 1),
+                    new CommittedLegSnapshot(pickupStationId, dropStationId, 2)
+                ]))
+            .Should().ContainSingle().Subject
+            .Should().BeOfType<PlanCommittedIntegrationEvent>().Subject;
+
+        result.Legs.Should().ContainSingle()
+            .Which.Should().BeEquivalentTo(new PlannedLegDto(pickupStationId, dropStationId, 2));
+    }
+
+    [Fact]
     public void PlanningFleetDispatchMappers_ReturnEmpty_ForUnmappedDomainEvents()
     {
         // Planning, Fleet, and Dispatch mappers fall through to [] for any

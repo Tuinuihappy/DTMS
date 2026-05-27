@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
+using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -127,6 +128,55 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
         messages.Should().NotBeEmpty("completing all tasks must publish TripCompletedIntegrationEvent");
         messages.Should().Contain(m => m.Content.Contains(tripId.ToString()),
             "event content must reference the completed trip");
+    }
+
+    [Fact]
+    public async Task Pipeline_CommitPlan_OutboxOmitsSyntheticEmptyFromLeg()
+    {
+        // Regression: CreateJobFromOrder seeds a synthetic (Guid.Empty → pickup)
+        // first leg to track "vehicle-to-pickup" cost. That sentinel must be
+        // filtered at the integration boundary — otherwise the downstream
+        // DispatchTripCommandHandler builds a Move task targeting Guid.Empty,
+        // VendorAdapterTaskDispatcher rejects it for missing vendor refs, and
+        // RIOT3 never receives the order.
+        var client = await _factory.GetAuthenticatedClient();
+
+        var (pickupId, dropId) = await _factory.CreateStationPairAsync(client);
+        var profileCode = await _factory.CreateLoadUnitProfileAsync(client);
+        var orderId = await SubmitOrderAsync(client, pickupId, dropId, profileCode);
+
+        var jobResp = await client.PostAsJsonAsync("/api/v1/planning/jobs", new
+        {
+            DeliveryOrderId = orderId,
+            PickupStationId = pickupId,
+            DropStationId = dropId,
+            Priority = "Normal"
+        });
+        jobResp.IsSuccessStatusCode.Should().BeTrue($"Create job failed: {await jobResp.Content.ReadAsStringAsync()}");
+        var jobId = await jobResp.Content.ReadFromJsonAsync<Guid>();
+
+        var commitResp = await client.PostAsJsonAsync($"/api/v1/planning/jobs/{jobId}/commit", new { JobId = jobId });
+        commitResp.IsSuccessStatusCode.Should().BeTrue($"Commit failed: {await commitResp.Content.ReadAsStringAsync()}");
+
+        using var scope = _factory.Services.CreateScope();
+        var planningDb = scope.ServiceProvider.GetRequiredService<PlanningDbContext>();
+        var planCommittedMessage = await planningDb.OutboxMessages
+            .Where(m => m.Type.Contains("PlanCommittedIntegrationEvent") && m.Content.Contains(jobId.ToString()))
+            .OrderByDescending(m => m.OccurredOnUtc)
+            .FirstOrDefaultAsync();
+
+        planCommittedMessage.Should().NotBeNull(
+            "commit must produce a PlanCommittedIntegrationEvent in the planning outbox");
+        planCommittedMessage!.Content.Should().NotContain(
+            Guid.Empty.ToString(),
+            "the integration event must not carry a leg with FromStationId = Guid.Empty " +
+            "(would cause Dispatch to emit a Move-to-Empty task that VendorAdapter rejects).");
+        planCommittedMessage.Content.Should().Contain(
+            pickupId.ToString(),
+            "the surviving first leg must start at the real pickup station");
+        planCommittedMessage.Content.Should().Contain(
+            dropId.ToString(),
+            "the delivery leg's drop station must be present");
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────
