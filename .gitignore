@@ -52,6 +52,11 @@ docker-compose.override.yml
 appsettings.Development.json
 appsettings.Local.json
 **/secrets.json
+# Dev runner script — contains live RIOT3 API token, must never be committed
+verify-run.ps1
+
+## Generated artifacts
+openapi.json
 
 ## Test Results
 TestResults/
