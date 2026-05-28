@@ -147,9 +147,11 @@ public static class PlanningEndpoints
         });
 
         // GET — list templates (filter by ActionType, optionally include inactive)
-        actionTemplates.MapGet("/", async (bool includeInactive, string? actionType, ISender sender) =>
+        // bool query params must be nullable in minimal APIs so the caller
+        // can omit them — otherwise the framework returns 400.
+        actionTemplates.MapGet("/", async (bool? includeInactive, string? actionType, ISender sender) =>
         {
-            var result = await sender.Send(new GetActionTemplatesQuery(includeInactive, actionType));
+            var result = await sender.Send(new GetActionTemplatesQuery(includeInactive ?? false, actionType));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
