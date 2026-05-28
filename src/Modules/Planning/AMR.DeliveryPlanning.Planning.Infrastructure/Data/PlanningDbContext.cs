@@ -16,6 +16,7 @@ public class PlanningDbContext : DbContext
     public DbSet<MilkRunTemplate> MilkRunTemplates { get; set; } = null!;
     public DbSet<MilkRunStop> MilkRunStops { get; set; } = null!;
     public DbSet<ActionTemplate> ActionTemplates { get; set; } = null!;
+    public DbSet<OrderTemplate> OrderTemplates { get; set; } = null!;
     public DbSet<CostModelConfigRecord> CostModelConfigs { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
@@ -110,6 +111,49 @@ public class PlanningDbContext : DbContext
             builder.Property(t => t.Description).HasMaxLength(500);
             builder.Property(t => t.IsActive).HasDefaultValue(true).IsRequired();
             builder.HasIndex(t => t.IsActive);
+            builder.Ignore(t => t.DomainEvents);
+        });
+
+        modelBuilder.Entity<OrderTemplate>(builder =>
+        {
+            builder.HasKey(t => t.Id);
+            builder.Property(t => t.Name).HasMaxLength(100).IsRequired();
+            builder.HasIndex(t => t.Name).IsUnique().HasDatabaseName("IX_OrderTemplates_Name_Unique");
+            builder.Property(t => t.Priority).IsRequired();
+            builder.Property(t => t.StructureType).HasMaxLength(20).IsRequired();
+            builder.Property(t => t.TransportOrderPriority).IsRequired();
+            builder.Property(t => t.AppointVehicleKey).HasMaxLength(200);
+            builder.Property(t => t.AppointVehicleName).HasMaxLength(200);
+            builder.Property(t => t.AppointVehicleGroupKey).HasMaxLength(500);
+            builder.Property(t => t.AppointVehicleGroupName).HasMaxLength(500);
+            builder.Property(t => t.AppointQueueWaitArea).HasMaxLength(200);
+            builder.Property(t => t.Description).HasMaxLength(500);
+            builder.Property(t => t.IsActive).HasDefaultValue(true).IsRequired();
+            builder.HasIndex(t => t.IsActive);
+
+            // Missions are owned solely by the parent template; storing them as
+            // a single jsonb document keeps reads cheap and matches the RIOT3
+            // payload shape we hydrate from / serialize to. The converter
+            // round-trips the entire list at once.
+            var jsonOptions = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                Converters =
+                {
+                    new System.Text.Json.Serialization.JsonStringEnumConverter(
+                        System.Text.Json.JsonNamingPolicy.CamelCase)
+                }
+            };
+            builder.Property(t => t.Missions)
+                .HasConversion(
+                    v => System.Text.Json.JsonSerializer.Serialize(v, jsonOptions),
+                    v => string.IsNullOrEmpty(v)
+                        ? new List<OrderTemplateMission>()
+                        : (IReadOnlyList<OrderTemplateMission>)System.Text.Json.JsonSerializer
+                            .Deserialize<List<OrderTemplateMission>>(v, jsonOptions)!)
+                .HasColumnType("jsonb")
+                .IsRequired();
+
             builder.Ignore(t => t.DomainEvents);
         });
 

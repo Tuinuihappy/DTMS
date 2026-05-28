@@ -152,6 +152,7 @@ public static class ModuleServiceRegistration
                 sp.GetRequiredService<PlanningDomainEventMapper>())));
         services.AddScoped<IJobRepository, JobRepository>();
         services.AddScoped<IActionTemplateRepository, ActionTemplateRepository>();
+        services.AddScoped<IOrderTemplateRepository, OrderTemplateRepository>();
         services.AddScoped<ICostModelService, DbCostModelService>();
         services.AddScoped<IVehicleSelector, GreedyVehicleSelector>();
         services.AddScoped<SimpleRouteCostCalculator>();
