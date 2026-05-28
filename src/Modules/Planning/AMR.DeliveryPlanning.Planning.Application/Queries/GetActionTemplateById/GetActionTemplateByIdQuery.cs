@@ -19,10 +19,6 @@ public class GetActionTemplateByIdQueryHandler : IQueryHandler<GetActionTemplate
         var t = await _repo.GetByIdAsync(request.Id, cancellationToken);
         if (t is null) return Result<ActionTemplateDto>.Failure($"ActionTemplate {request.Id} not found.");
 
-        var dto = new ActionTemplateDto(
-            t.Id, t.Name, t.ActionType,
-            t.VendorActionId, t.Param0, t.Param1, t.ParamStr,
-            t.Description, t.IsActive, t.CreatedAt, t.ModifiedAt);
-        return Result<ActionTemplateDto>.Success(dto);
+        return Result<ActionTemplateDto>.Success(ActionTemplateDtoFactory.From(t));
     }
 }

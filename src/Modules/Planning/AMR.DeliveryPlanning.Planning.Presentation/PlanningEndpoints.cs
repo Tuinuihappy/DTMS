@@ -136,19 +136,31 @@ public static class PlanningEndpoints
             .WithTags("Planning")
             .RequireAuthorization();
 
-        // POST — create a new template
+        // POST — create a new template. Body mirrors the RIOT3
+        // /api/v4/order/action-templates payload shape:
+        //   { actionName, actionType, actionParameters:[{key,value}...] }
+        // so operators can paste a RIOT3 example straight in.
         actionTemplates.MapPost("/", async (CreateActionTemplateRequest req, ISender sender) =>
         {
-            // ActionType defaults to "STD" when the caller omits it, matching
-            // RIOT3's request schema default for /api/v4/order/action-templates.
             var actionType = string.IsNullOrWhiteSpace(req.ActionType) ? "STD" : req.ActionType;
+
+            ActionTemplateParameterSet parsed;
+            try
+            {
+                parsed = ActionParameterParser.Parse(req.ActionParameters);
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(ex.Message);
+            }
+
             var result = await sender.Send(new CreateActionTemplateCommand(
-                Name: req.Name,
-                VendorActionId: req.VendorActionId,
-                Param0: req.Param0,
-                Param1: req.Param1,
+                Name: req.ActionName,
+                VendorActionId: parsed.Id,
+                Param0: parsed.Param0,
+                Param1: parsed.Param1,
                 ActionType: actionType,
-                ParamStr: req.ParamStr,
+                ParamStr: parsed.ParamStr,
                 Description: req.Description));
             return result.IsSuccess
                 ? Results.Created($"/api/v1/planning/action-templates/{result.Value}", result.Value)
@@ -171,12 +183,25 @@ public static class PlanningEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         });
 
-        // PATCH /{id} — update the action params + meta (rename is separate)
+        // PATCH /{id} — update the action params + meta (rename is separate).
+        // Body uses the same RIOT3 shape as POST.
         actionTemplates.MapMethods("/{id:guid}", ["PATCH"],
             async (Guid id, UpdateActionTemplateRequest req, ISender sender) =>
             {
+                var actionType = string.IsNullOrWhiteSpace(req.ActionType) ? "STD" : req.ActionType;
+
+                ActionTemplateParameterSet parsed;
+                try
+                {
+                    parsed = ActionParameterParser.Parse(req.ActionParameters);
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(ex.Message);
+                }
+
                 var result = await sender.Send(new UpdateActionTemplateCommand(
-                    id, req.ActionType, req.VendorActionId, req.Param0, req.Param1, req.ParamStr, req.Description));
+                    id, actionType, parsed.Id, parsed.Param0, parsed.Param1, parsed.ParamStr, req.Description));
                 return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
             });
 
@@ -202,21 +227,95 @@ public static class PlanningEndpoints
     }
 }
 
-// ActionType is optional in the request — handler defaults to "STD" when
-// omitted, matching RIOT3's request schema example.
+// Request body mirrors RIOT3's /api/v4/order/action-templates payload:
+//   { actionName, actionType, actionParameters: [{key,value},...] }
+// The parameters array is parsed into id/param0/param1/param_str by
+// ActionParameterParser.
 public record CreateActionTemplateRequest(
-    string Name,
-    int VendorActionId,
-    int Param0,
-    int Param1,
+    string ActionName,
+    List<ActionParameterDto> ActionParameters,
     string? ActionType = null,
-    string? ParamStr = null,
     string? Description = null);
 
 public record UpdateActionTemplateRequest(
-    string ActionType,
-    int VendorActionId,
-    int Param0,
-    int Param1,
-    string? ParamStr = null,
+    List<ActionParameterDto> ActionParameters,
+    string? ActionType = null,
     string? Description = null);
+
+// One entry in the actionParameters array. RIOT3 sends `value` as JSON
+// (int for id/param0/param1, string for param_str, or omitted entirely
+// when the key is just being declared with no value).
+public record ActionParameterDto
+{
+    public string Key { get; init; } = string.Empty;
+    public System.Text.Json.JsonElement? Value { get; init; }
+}
+
+// Result of pulling the four well-known parameters out of the array.
+internal sealed record ActionTemplateParameterSet(int Id, int Param0, int Param1, string? ParamStr);
+
+internal static class ActionParameterParser
+{
+    private const string KeyId       = "id";
+    private const string KeyParam0   = "param0";
+    private const string KeyParam1   = "param1";
+    private const string KeyParamStr = "param_str";
+
+    public static ActionTemplateParameterSet Parse(IReadOnlyList<ActionParameterDto>? entries)
+    {
+        if (entries is null || entries.Count == 0)
+            throw new ArgumentException(
+                $"actionParameters is required (must include '{KeyId}', '{KeyParam0}', '{KeyParam1}').",
+                nameof(entries));
+
+        var map = new Dictionary<string, ActionParameterDto>(StringComparer.OrdinalIgnoreCase);
+        foreach (var e in entries)
+        {
+            if (string.IsNullOrWhiteSpace(e.Key)) continue;
+            map[e.Key.Trim()] = e;
+        }
+
+        var id       = RequireInt(map, KeyId);
+        var param0   = RequireInt(map, KeyParam0);
+        var param1   = RequireInt(map, KeyParam1);
+        var paramStr = OptionalString(map, KeyParamStr);
+
+        return new ActionTemplateParameterSet(id, param0, param1, paramStr);
+    }
+
+    private static int RequireInt(IReadOnlyDictionary<string, ActionParameterDto> map, string key)
+    {
+        if (!map.TryGetValue(key, out var entry) || !entry.Value.HasValue
+            || entry.Value.Value.ValueKind == System.Text.Json.JsonValueKind.Null
+            || entry.Value.Value.ValueKind == System.Text.Json.JsonValueKind.Undefined)
+        {
+            throw new ArgumentException($"actionParameters: '{key}' is required.");
+        }
+
+        var v = entry.Value.Value;
+        if (v.ValueKind == System.Text.Json.JsonValueKind.Number && v.TryGetInt32(out var i))
+            return i;
+
+        // Allow numeric strings (e.g. "131") so operators can paste UI-edited values.
+        if (v.ValueKind == System.Text.Json.JsonValueKind.String
+            && int.TryParse(v.GetString(), out var parsed))
+            return parsed;
+
+        throw new ArgumentException($"actionParameters: '{key}' must be an integer.");
+    }
+
+    private static string? OptionalString(IReadOnlyDictionary<string, ActionParameterDto> map, string key)
+    {
+        if (!map.TryGetValue(key, out var entry) || !entry.Value.HasValue
+            || entry.Value.Value.ValueKind == System.Text.Json.JsonValueKind.Null
+            || entry.Value.Value.ValueKind == System.Text.Json.JsonValueKind.Undefined)
+        {
+            // Key declared with no value (RIOT3-style `{ "key": "param_str" }`)
+            // is treated the same as "not provided".
+            return null;
+        }
+
+        var v = entry.Value.Value;
+        return v.ValueKind == System.Text.Json.JsonValueKind.String ? v.GetString() : v.ToString();
+    }
+}
