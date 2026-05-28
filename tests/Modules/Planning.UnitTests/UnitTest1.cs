@@ -108,3 +108,114 @@ public class JobTests
         job.EstimatedDistance.Should().Be(30.0);
     }
 }
+
+public class ActionTemplateTests
+{
+    private static ActionTemplate New(string name = "Lift")
+        => new(name, "SR action", vendorActionId: 4, param0: 1, param1: 0);
+
+    [Fact]
+    public void Construct_TrimsNameAndAssignsDefaults()
+    {
+        // RIOT3 form values land verbatim — entity should normalize whitespace,
+        // start active, and stamp CreatedAt at construction time.
+        var t = new ActionTemplate("  Waiting_Confirm  ", "SR action", 131, 0, 0);
+
+        t.Name.Should().Be("Waiting_Confirm");
+        t.ActionType.Should().Be("SR action");
+        t.VendorActionId.Should().Be(131);
+        t.Param0.Should().Be(0);
+        t.Param1.Should().Be(0);
+        t.ParamStr.Should().BeNull();
+        t.IsActive.Should().BeTrue();
+        t.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
+        t.ModifiedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void Construct_RejectsEmptyName()
+    {
+        Action act = () => new ActionTemplate("   ", "SR action", 4, 1, 0);
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Construct_RejectsEmptyActionType()
+    {
+        Action act = () => new ActionTemplate("Lift", " ", 4, 1, 0);
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Construct_RejectsNameOver100Chars()
+    {
+        var longName = new string('x', 101);
+        Action act = () => new ActionTemplate(longName, "SR action", 4, 1, 0);
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Update_OverwritesParamsAndStampsModifiedAt()
+    {
+        var t = New();
+        t.ModifiedAt.Should().BeNull();
+
+        t.Update(actionType: "SR action", vendorActionId: 4, param0: 2, param1: 0,
+                 paramStr: "fragile", description: "Drop variant");
+
+        t.Param0.Should().Be(2);
+        t.ParamStr.Should().Be("fragile");
+        t.Description.Should().Be("Drop variant");
+        t.ModifiedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Update_TreatsBlankParamStrAsNull()
+    {
+        // Operators may type spaces in the UI; entity normalizes to null so
+        // queries like "templates with no param_str" stay consistent.
+        var t = New();
+        t.Update("SR action", 4, 1, 0, paramStr: "   ", description: null);
+        t.ParamStr.Should().BeNull();
+    }
+
+    [Fact]
+    public void Rename_AllowsNewNameAndStampsModifiedAt()
+    {
+        var t = New("Lift");
+        t.Rename("Lift_Heavy");
+
+        t.Name.Should().Be("Lift_Heavy");
+        t.ModifiedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void DeactivateThenActivate_FlipsIsActive()
+    {
+        var t = New();
+        t.IsActive.Should().BeTrue();
+
+        t.Deactivate();
+        t.IsActive.Should().BeFalse();
+        var firstMod = t.ModifiedAt;
+        firstMod.Should().NotBeNull();
+
+        t.Activate();
+        t.IsActive.Should().BeTrue();
+        t.ModifiedAt.Should().BeAfter(firstMod!.Value);
+    }
+
+    [Fact]
+    public void Deactivate_WhenAlreadyInactive_IsNoOp()
+    {
+        // Idempotency keeps the audit trail clean — bulk-deactivate scripts
+        // shouldn't bump ModifiedAt for templates that were already off.
+        var t = New();
+        t.Deactivate();
+        var mod1 = t.ModifiedAt;
+
+        t.Deactivate();
+
+        t.ModifiedAt.Should().Be(mod1);
+    }
+}

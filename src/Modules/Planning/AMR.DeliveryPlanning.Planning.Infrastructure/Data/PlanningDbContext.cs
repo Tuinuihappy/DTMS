@@ -15,6 +15,7 @@ public class PlanningDbContext : DbContext
     public DbSet<JobDependency> JobDependencies { get; set; } = null!;
     public DbSet<MilkRunTemplate> MilkRunTemplates { get; set; } = null!;
     public DbSet<MilkRunStop> MilkRunStops { get; set; } = null!;
+    public DbSet<ActionTemplate> ActionTemplates { get; set; } = null!;
     public DbSet<CostModelConfigRecord> CostModelConfigs { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
@@ -92,6 +93,24 @@ public class PlanningDbContext : DbContext
         modelBuilder.Entity<MilkRunStop>(builder =>
         {
             builder.HasKey(s => s.Id);
+        });
+
+        modelBuilder.Entity<ActionTemplate>(builder =>
+        {
+            builder.HasKey(t => t.Id);
+            builder.Property(t => t.Name).HasMaxLength(100).IsRequired();
+            // Case-insensitive uniqueness via a lower(name) functional index.
+            // Plain unique index would let "Lift" and "lift" coexist.
+            builder.HasIndex(t => t.Name).IsUnique().HasDatabaseName("IX_ActionTemplates_Name_Unique");
+            builder.Property(t => t.ActionType).HasMaxLength(50).IsRequired();
+            builder.Property(t => t.VendorActionId).IsRequired();
+            builder.Property(t => t.Param0).IsRequired();
+            builder.Property(t => t.Param1).IsRequired();
+            builder.Property(t => t.ParamStr).HasMaxLength(500);
+            builder.Property(t => t.Description).HasMaxLength(500);
+            builder.Property(t => t.IsActive).HasDefaultValue(true).IsRequired();
+            builder.HasIndex(t => t.IsActive);
+            builder.Ignore(t => t.DomainEvents);
         });
 
         modelBuilder.Entity<CostModelConfigRecord>(b =>

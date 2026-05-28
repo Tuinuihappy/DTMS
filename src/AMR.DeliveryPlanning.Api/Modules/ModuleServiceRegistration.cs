@@ -151,6 +151,7 @@ public static class ModuleServiceRegistration
             .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
                 sp.GetRequiredService<PlanningDomainEventMapper>())));
         services.AddScoped<IJobRepository, JobRepository>();
+        services.AddScoped<IActionTemplateRepository, ActionTemplateRepository>();
         services.AddScoped<ICostModelService, DbCostModelService>();
         services.AddScoped<IVehicleSelector, GreedyVehicleSelector>();
         services.AddScoped<SimpleRouteCostCalculator>();

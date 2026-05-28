@@ -23,6 +23,61 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("AMR.DeliveryPlanning.Planning.Domain.Entities.ActionTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActionType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsActive")
+                        .IsRequired()
+                        .HasDefaultValue(true)
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Param0")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Param1")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ParamStr")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("VendorActionId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ActionTemplates_Name_Unique");
+
+                    b.ToTable("ActionTemplates", "planning");
+                });
+
             modelBuilder.Entity("AMR.DeliveryPlanning.Planning.Domain.Entities.Job", b =>
                 {
                     b.Property<Guid>("Id")
