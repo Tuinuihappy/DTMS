@@ -9,6 +9,7 @@ using AMR.DeliveryPlanning.Planning.Application.Commands.CreateMultiPickDropJob;
 using AMR.DeliveryPlanning.Planning.Application.Commands.CreateOrderTemplate;
 using AMR.DeliveryPlanning.Planning.Application.Commands.DeleteActionTemplate;
 using AMR.DeliveryPlanning.Planning.Application.Commands.DeleteOrderTemplate;
+using AMR.DeliveryPlanning.Planning.Application.Commands.InstantiateOrderTemplate;
 using AMR.DeliveryPlanning.Planning.Application.Commands.ReplanJob;
 using AMR.DeliveryPlanning.Planning.Application.Commands.SetActionTemplateActive;
 using AMR.DeliveryPlanning.Planning.Application.Commands.SetOrderTemplateActive;
@@ -336,8 +337,41 @@ public static class PlanningEndpoints
             var result = await sender.Send(new DeleteOrderTemplateCommand(id));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
         });
+
+        // POST /{id}/instantiate — resolve ActionTemplate references against
+        // the catalog and POST the full envelope to RIOT3. dryRun=true skips
+        // the vendor call so operators can preview the resolved missions.
+        orderTemplates.MapPost("/{id:guid}/instantiate",
+            async (Guid id, InstantiateOrderTemplateRequest? req, ISender sender) =>
+            {
+                req ??= new InstantiateOrderTemplateRequest();
+                var result = await sender.Send(new InstantiateOrderTemplateCommand(
+                    OrderTemplateId: id,
+                    PriorityOverride: req.Priority,
+                    AppointVehicleKeyOverride: req.AppointVehicleKey,
+                    AppointVehicleNameOverride: req.AppointVehicleName,
+                    AppointVehicleGroupKeyOverride: req.AppointVehicleGroupKey,
+                    AppointVehicleGroupNameOverride: req.AppointVehicleGroupName,
+                    AppointQueueWaitAreaOverride: req.AppointQueueWaitArea,
+                    UpperKey: req.UpperKey,
+                    DryRun: req.DryRun ?? false));
+                return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+            });
     }
 }
+
+// Body is optional — all fields are overrides on top of the stored template.
+// DryRun=true makes the API return the resolved envelope without calling
+// RIOT3; useful for previewing what would be sent.
+public record InstantiateOrderTemplateRequest(
+    int? Priority = null,
+    string? AppointVehicleKey = null,
+    string? AppointVehicleName = null,
+    string? AppointVehicleGroupKey = null,
+    string? AppointVehicleGroupName = null,
+    string? AppointQueueWaitArea = null,
+    string? UpperKey = null,
+    bool? DryRun = null);
 
 // ── OrderTemplate request DTOs (RIOT3 wire shape) ─────────────────────────────
 public record CreateOrderTemplateRequest(

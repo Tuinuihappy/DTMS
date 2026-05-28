@@ -69,6 +69,38 @@ public class Riot3CommandService : IVehicleCommandService
         }
     }
 
+    // Multi-mission send used by the OrderTemplate instantiate flow. Bypasses
+    // the per-task `SendTaskAsync` shape because the caller has already built
+    // the full RIOT3 envelope (multiple missions, vendor-binding hints, etc).
+    // Returns the orderKey RIOT3 minted for the new order on success.
+    public async Task<Result<string>> SendOrderAsync(
+        Riot3OrderRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Sending RIOT3 order upperKey={UpperKey} with {Count} missions (structureType={Structure})",
+            request.UpperKey, request.Missions.Count, request.StructureType);
+
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/v4/orders", request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            // RIOT3 returns the created order; parse out the orderKey so the
+            // caller can correlate later callbacks.
+            var payload = await response.Content.ReadFromJsonAsync<Riot3CreateOrderResponse>(cancellationToken);
+            var orderKey = payload?.Data?.OrderKey ?? string.Empty;
+            _logger.LogInformation("RIOT3 accepted order upperKey={UpperKey} orderKey={OrderKey}",
+                request.UpperKey, orderKey);
+            return Result<string>.Success(orderKey);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Failed to send RIOT3 order upperKey={UpperKey}", request.UpperKey);
+            return Result<string>.Failure($"RIOT3 API error: {ex.Message}");
+        }
+    }
+
     public Task<Result> CancelTaskAsync(Guid vehicleId, Guid taskId, CancellationToken cancellationToken = default)
         => SendOrderOperationAsync(taskId, Riot3OrderCommandType.Cancel, "cancel", cancellationToken);
 

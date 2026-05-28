@@ -361,3 +361,191 @@ public class OrderTemplateTests
         t.IsActive.Should().BeTrue();
     }
 }
+
+public class OrderTemplateResolverTests
+{
+    // In-memory IActionTemplateRepository so tests stay free of EF / Postgres.
+    private sealed class StubActionRepo : AMR.DeliveryPlanning.Planning.Domain.Repositories.IActionTemplateRepository
+    {
+        private readonly Dictionary<string, ActionTemplate> _byName;
+        public StubActionRepo(params ActionTemplate[] templates)
+        {
+            _byName = templates.ToDictionary(t => t.Name, StringComparer.OrdinalIgnoreCase);
+        }
+
+        public Task<ActionTemplate?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+            => Task.FromResult<ActionTemplate?>(_byName.Values.FirstOrDefault(t => t.Id == id));
+
+        public Task<ActionTemplate?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
+        {
+            _byName.TryGetValue(name, out var t);
+            return Task.FromResult<ActionTemplate?>(t);
+        }
+
+        public Task<bool> NameExistsAsync(string name, Guid? excludeId = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(_byName.ContainsKey(name));
+
+        public Task<IReadOnlyList<ActionTemplate>> ListAsync(bool includeInactive = false, string? actionType = null, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ActionTemplate>>(_byName.Values.ToList());
+
+        public Task AddAsync(ActionTemplate template, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public void Update(ActionTemplate template) { }
+        public void Remove(ActionTemplate template) { }
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task Resolve_InlineActMissions_PassThroughUnchanged()
+    {
+        // Templates that ship inline params (paste-from-RIOT3 case) must
+        // round-trip through the resolver without touching the catalog.
+        var template = new OrderTemplate(
+            name: "INLINE", priority: 50,
+            structureType: "sequence", transportOrderPriority: 50,
+            missions: new[]
+            {
+                OrderTemplateMission.CreateMove(1, "agv", 2, 3),
+                OrderTemplateMission.CreateActInline(2, "agv", "standardRobotsCustom", "NONE",
+                    new[] {
+                        new MissionActionParameter("id", "4"),
+                        new MissionActionParameter("param0", "2"),
+                        new MissionActionParameter("param1", "0")
+                    })
+            });
+
+        var resolver = new AMR.DeliveryPlanning.Planning.Application.Services.OrderTemplateResolver(
+            new StubActionRepo());
+        var resolved = await resolver.ResolveAsync(template);
+
+        resolved.Missions.Should().HaveCount(2);
+        resolved.Missions[0].Type.Should().Be("MOVE");
+        resolved.Missions[0].MapId.Should().Be(2);
+        resolved.Missions[0].StationId.Should().Be(3);
+
+        resolved.Missions[1].Type.Should().Be("ACT");
+        resolved.Missions[1].ActionType.Should().Be("standardRobotsCustom");
+        resolved.Missions[1].ActionParameters.Should().HaveCount(3);
+        // Numeric strings re-typed as int so RIOT3 sees JSON numbers
+        resolved.Missions[1].ActionParameters![0].Value.Should().Be(4);
+        resolved.Missions[1].ActionParameters![1].Value.Should().Be(2);
+        resolved.Missions[1].ActionParameters![2].Value.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Resolve_ActByReference_ExpandsFromCatalog()
+    {
+        // The whole point of the catalog: an ACT mission with just
+        // actionTemplateName must come out the other side with the four
+        // RIOT3 parameter slots populated from the named ActionTemplate.
+        var lift = new ActionTemplate("Lift", "SR action",
+            vendorActionId: 4, param0: 1, param1: 0,
+            paramStr: null, description: null);
+
+        var template = new OrderTemplate(
+            name: "REF", priority: 10,
+            structureType: "sequence", transportOrderPriority: 10,
+            missions: new[]
+            {
+                OrderTemplateMission.CreateMove(1, "agv", 2, 5),
+                OrderTemplateMission.CreateActByReference(2, "agv", "Lift")
+            });
+
+        var resolver = new AMR.DeliveryPlanning.Planning.Application.Services.OrderTemplateResolver(
+            new StubActionRepo(lift));
+        var resolved = await resolver.ResolveAsync(template);
+
+        var act = resolved.Missions[1];
+        act.ActionType.Should().Be("SR action");
+        act.BlockingType.Should().Be("NONE");
+        act.ActionParameters.Should().HaveCount(3,
+            "ParamStr was null on the ActionTemplate so the resolver omits the param_str slot");
+        act.ActionParameters![0].Key.Should().Be("id");
+        act.ActionParameters[0].Value.Should().Be(4);
+        act.ActionParameters[1].Key.Should().Be("param0");
+        act.ActionParameters[2].Key.Should().Be("param1");
+    }
+
+    [Fact]
+    public async Task Resolve_ActByReference_IncludesParamStrWhenSet()
+    {
+        var fancy = new ActionTemplate("Fancy", "SR action",
+            vendorActionId: 7, param0: 0, param1: 0,
+            paramStr: "label-A", description: null);
+
+        var template = new OrderTemplate(
+            name: "REF_STR", priority: 1,
+            structureType: "sequence", transportOrderPriority: 1,
+            missions: new[] { OrderTemplateMission.CreateActByReference(1, "agv", "Fancy") });
+
+        var resolver = new AMR.DeliveryPlanning.Planning.Application.Services.OrderTemplateResolver(
+            new StubActionRepo(fancy));
+        var resolved = await resolver.ResolveAsync(template);
+
+        resolved.Missions[0].ActionParameters.Should().HaveCount(4);
+        resolved.Missions[0].ActionParameters![3].Key.Should().Be("param_str");
+        resolved.Missions[0].ActionParameters![3].Value.Should().Be("label-A");
+    }
+
+    [Fact]
+    public async Task Resolve_UnknownActionTemplateName_Throws()
+    {
+        // Phase 1C validation already blocks this on save but the resolver
+        // re-checks at runtime in case the catalog was edited after the
+        // template was stored.
+        var template = new OrderTemplate(
+            name: "BAD", priority: 1,
+            structureType: "sequence", transportOrderPriority: 1,
+            missions: new[] { OrderTemplateMission.CreateActByReference(1, "agv", "Missing") });
+
+        var resolver = new AMR.DeliveryPlanning.Planning.Application.Services.OrderTemplateResolver(
+            new StubActionRepo());
+
+        var act = async () => await resolver.ResolveAsync(template);
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*'Missing' not found*");
+    }
+
+    [Fact]
+    public async Task Resolve_SameRefUsedTwice_LooksUpOnlyOnce()
+    {
+        // Cache check — two references to the same ActionTemplate in one
+        // template must hit the repository only once. Counts the calls to
+        // a tiny counting stub.
+        var lift = new ActionTemplate("Lift", "SR action", 4, 1, 0);
+        var counter = new CountingRepo(lift);
+
+        var template = new OrderTemplate(
+            name: "DOUBLE", priority: 1,
+            structureType: "sequence", transportOrderPriority: 1,
+            missions: new[]
+            {
+                OrderTemplateMission.CreateActByReference(1, "agv", "Lift"),
+                OrderTemplateMission.CreateActByReference(2, "agv", "Lift")
+            });
+
+        var resolver = new AMR.DeliveryPlanning.Planning.Application.Services.OrderTemplateResolver(counter);
+        await resolver.ResolveAsync(template);
+
+        counter.GetByNameCalls.Should().Be(1);
+    }
+
+    private sealed class CountingRepo : AMR.DeliveryPlanning.Planning.Domain.Repositories.IActionTemplateRepository
+    {
+        public int GetByNameCalls { get; private set; }
+        private readonly ActionTemplate _template;
+        public CountingRepo(ActionTemplate t) => _template = t;
+        public Task<ActionTemplate?> GetByIdAsync(Guid id, CancellationToken c = default) => Task.FromResult<ActionTemplate?>(null);
+        public Task<ActionTemplate?> GetByNameAsync(string name, CancellationToken c = default)
+        {
+            GetByNameCalls++;
+            return Task.FromResult<ActionTemplate?>(string.Equals(name, _template.Name, StringComparison.OrdinalIgnoreCase) ? _template : null);
+        }
+        public Task<bool> NameExistsAsync(string name, Guid? excludeId = null, CancellationToken c = default) => Task.FromResult(true);
+        public Task<IReadOnlyList<ActionTemplate>> ListAsync(bool includeInactive = false, string? actionType = null, CancellationToken c = default)
+            => Task.FromResult<IReadOnlyList<ActionTemplate>>(new[] { _template });
+        public Task AddAsync(ActionTemplate t, CancellationToken c = default) => Task.CompletedTask;
+        public void Update(ActionTemplate t) { }
+        public void Remove(ActionTemplate t) { }
+        public Task SaveChangesAsync(CancellationToken c = default) => Task.CompletedTask;
+    }
+}

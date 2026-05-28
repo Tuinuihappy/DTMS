@@ -26,6 +26,7 @@ using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Repositories;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Services;
 using FleetServices = AMR.DeliveryPlanning.Fleet.Infrastructure.Services;
+using AMR.DeliveryPlanning.Planning.Application.Services;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.Planning.Domain.Services;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
@@ -153,6 +154,8 @@ public static class ModuleServiceRegistration
         services.AddScoped<IJobRepository, JobRepository>();
         services.AddScoped<IActionTemplateRepository, ActionTemplateRepository>();
         services.AddScoped<IOrderTemplateRepository, OrderTemplateRepository>();
+        services.AddScoped<IOrderTemplateResolver, OrderTemplateResolver>();
+        services.AddScoped<IRobotOrderDispatcher, AMR.DeliveryPlanning.Api.Adapters.Riot3OrderDispatcherAdapter>();
         services.AddScoped<ICostModelService, DbCostModelService>();
         services.AddScoped<IVehicleSelector, GreedyVehicleSelector>();
         services.AddScoped<SimpleRouteCostCalculator>();
