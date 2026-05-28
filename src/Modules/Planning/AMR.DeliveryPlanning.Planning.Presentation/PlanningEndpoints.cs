@@ -139,8 +139,17 @@ public static class PlanningEndpoints
         // POST — create a new template
         actionTemplates.MapPost("/", async (CreateActionTemplateRequest req, ISender sender) =>
         {
+            // ActionType defaults to "STD" when the caller omits it, matching
+            // RIOT3's request schema default for /api/v4/order/action-templates.
+            var actionType = string.IsNullOrWhiteSpace(req.ActionType) ? "STD" : req.ActionType;
             var result = await sender.Send(new CreateActionTemplateCommand(
-                req.Name, req.ActionType, req.VendorActionId, req.Param0, req.Param1, req.ParamStr, req.Description));
+                Name: req.Name,
+                VendorActionId: req.VendorActionId,
+                Param0: req.Param0,
+                Param1: req.Param1,
+                ActionType: actionType,
+                ParamStr: req.ParamStr,
+                Description: req.Description));
             return result.IsSuccess
                 ? Results.Created($"/api/v1/planning/action-templates/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
@@ -193,12 +202,14 @@ public static class PlanningEndpoints
     }
 }
 
+// ActionType is optional in the request — handler defaults to "STD" when
+// omitted, matching RIOT3's request schema example.
 public record CreateActionTemplateRequest(
     string Name,
-    string ActionType,
     int VendorActionId,
     int Param0,
     int Param1,
+    string? ActionType = null,
     string? ParamStr = null,
     string? Description = null);
 
