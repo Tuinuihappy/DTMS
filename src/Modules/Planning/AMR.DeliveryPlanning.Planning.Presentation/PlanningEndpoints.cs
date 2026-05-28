@@ -229,17 +229,20 @@ public static class PlanningEndpoints
 
 // Request body mirrors RIOT3's /api/v4/order/action-templates payload:
 //   { actionName, actionType, actionParameters: [{key,value},...] }
-// The parameters array is parsed into id/param0/param1/param_str by
-// ActionParameterParser.
+// Property order matters: Swagger renders fields in declaration order, so we
+// keep actionType right after actionName to match the RIOT3 spec example.
+// ActionParameters is declared nullable (with default null) so it can sit
+// after the optional ActionType — the parser rejects null/empty with a
+// clearer 400 message than the framework's missing-property error.
 public record CreateActionTemplateRequest(
     string ActionName,
-    List<ActionParameterDto> ActionParameters,
     string? ActionType = null,
+    List<ActionParameterDto>? ActionParameters = null,
     string? Description = null);
 
 public record UpdateActionTemplateRequest(
-    List<ActionParameterDto> ActionParameters,
     string? ActionType = null,
+    List<ActionParameterDto>? ActionParameters = null,
     string? Description = null);
 
 // One entry in the actionParameters array. RIOT3 sends `value` as JSON
