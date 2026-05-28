@@ -7,6 +7,12 @@ const backendUrl =
   process.env.DTMS_BACKEND_URL ?? "http://localhost:5219";
 
 const nextConfig: NextConfig = {
+  // `standalone` emits .next/standalone/server.js — a minimal runner that
+  // doesn't need node_modules at deploy time. The Dockerfile copies that
+  // folder into a slim runtime image (see ../Dockerfile-style multi-stage
+  // in frontend/Dockerfile). Local `npm run dev` ignores this setting.
+  output: "standalone",
+
   async rewrites() {
     return [
       {

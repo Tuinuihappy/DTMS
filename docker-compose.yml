@@ -80,5 +80,26 @@ services:
       # Dev-only placeholder secret — NOT for production (production uses Vault/KMS)
       - Jwt__Secret=dev-only-secret-min-32-chars-placeholder!
 
+  # Frontend (Next.js standalone). Opted in by the `prod` profile so
+  # day-to-day backend work doesn't pay the build cost — UI devs run
+  # `npm run dev` directly (see frontend/README.md).
+  #   docker compose --profile prod up -d        # full stack incl. UI
+  #   docker compose up -d                       # backend services only
+  frontend:
+    profiles: ["prod"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dtms-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    environment:
+      # Rewrite target — same Docker network, container hostname is
+      # the service name. Internal port 8080 matches the API's listener.
+      - DTMS_BACKEND_URL=http://api:8080
+      - NODE_ENV=production
+
 volumes:
   pgdata:

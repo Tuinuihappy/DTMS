@@ -48,13 +48,20 @@ helpers (`missionFormToRequest`, `missionToForm`, etc.).
 
 ## Running locally
 
-```bash
-# 1. Start the backend (separate terminal, from the DTMS repo root)
-cd ..
-dotnet run --project src/AMR.DeliveryPlanning.Api
-# Make sure Auth:Disable=true is exported so requests don't 401.
+Two recipes — pick one. **Dev** is for iterating on the UI (hot reload,
+fast TS errors). **Prod (Docker)** is for full-stack smoke tests and
+deploy parity.
 
-# 2. Start this frontend
+### Dev — `npm run dev` (recommended for UI work)
+
+```bash
+# 1. Start the backend services (from the DTMS repo root)
+cd ..
+docker compose up -d         # postgres, rabbitmq, redis, jaeger, api
+# Or run the API natively with ./verify-run.ps1 if you already have
+# the supporting services up some other way.
+
+# 2. Start the frontend
 cd frontend
 npm install        # first time only
 npm run dev
@@ -73,6 +80,33 @@ If you prefer to skip the proxy and hit the backend directly from the
 browser, set `NEXT_PUBLIC_API_BASE` and **also** delete the rewrite block
 in `next.config.ts` so both layers don't fight. CORS must be enabled on
 the backend in that case (it isn't today).
+
+### Prod (Docker) — full stack in one command
+
+The compose file at the repo root has a `prod` profile that builds and
+runs the frontend container alongside the existing backend services.
+
+```bash
+# From the DTMS repo root
+cd ..
+docker compose --profile prod up -d --build
+# → backend services on their usual ports
+# → API     on http://localhost:5219
+# → UI      on http://localhost:3000
+```
+
+Inside the compose network the frontend's `/api/*` rewrite points at
+`http://api:8080` (the API's container-local port), so the browser only
+ever talks to `localhost:3000` and CORS stays irrelevant.
+
+You can also build the image standalone for CI / push:
+
+```bash
+docker build -t dtms-frontend -f frontend/Dockerfile frontend/
+docker run --rm -p 3000:3000 \
+  -e DTMS_BACKEND_URL=http://host.docker.internal:5219 \
+  dtms-frontend
+```
 
 ## Manual smoke test
 

@@ -1,0 +1,41 @@
+# Keep the docker build context small. Anything generated locally
+# or unused at build time is excluded. The deps stage installs from
+# package.json/package-lock.json — local node_modules is irrelevant
+# to the build.
+
+# Local dependencies / build artifacts
+node_modules
+.next
+out
+build
+.turbo
+
+# IDE / OS
+.vscode
+.idea
+.DS_Store
+
+# Source control
+.git
+.gitignore
+.gitattributes
+
+# Environment files — values must come from compose / runtime env,
+# never baked into the image.
+.env
+.env.*
+
+# Tests / docs that aren't needed at build time
+README.md
+**/*.md
+!app/**/*.md
+!components/**/*.md
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Misc
+Dockerfile
+.dockerignore
