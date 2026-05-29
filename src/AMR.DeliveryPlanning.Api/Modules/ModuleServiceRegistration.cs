@@ -35,6 +35,7 @@ using AMR.DeliveryPlanning.Planning.Infrastructure.Services;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
 using AMR.DeliveryPlanning.VendorAdapter.Infrastructure;
+using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Extensions;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
@@ -72,7 +73,9 @@ public static class ModuleServiceRegistration
             client.BaseAddress = new Uri(riot3BaseUrl);
             if (!string.IsNullOrWhiteSpace(riot3ApiKey))
                 client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
-        });
+        })
+        .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
+        .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
 
         // Route edge sync — pulls live costs from RIOT3 and upserts into facility.RouteEdges
         var syncIntervalMinutes = configuration.GetValue<int>("VendorAdapter:Riot3:RouteSync:IntervalMinutes", 30);
@@ -82,14 +85,18 @@ public static class ModuleServiceRegistration
             client.Timeout = TimeSpan.FromSeconds(10);
             if (!string.IsNullOrWhiteSpace(riot3ApiKey))
                 client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
-        });
+        })
+        .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
+        .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
         services.AddHttpClient<AMR.DeliveryPlanning.Facility.Application.Services.IRiot3FacilityClient, Riot3FacilityClient>(client =>
         {
             client.BaseAddress = new Uri(riot3BaseUrl);
             client.Timeout = TimeSpan.FromSeconds(15);
             if (!string.IsNullOrWhiteSpace(riot3ApiKey))
                 client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
-        });
+        })
+        .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
+        .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
         // MapStationSync runs at 15s delay; RouteEdgeSync runs at 2min delay to ensure stations are synced first
         services.AddHostedService(sp => new MapStationSyncService(
             sp.GetRequiredService<IServiceScopeFactory>(),
@@ -123,7 +130,9 @@ public static class ModuleServiceRegistration
             client.Timeout = TimeSpan.FromSeconds(15);
             if (!string.IsNullOrWhiteSpace(riot3ApiKey))
                 client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
-        });
+        })
+        .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
+        .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
 
         // ── DeliveryOrder Module ──────────────────────────────────────
         services.AddScoped<DeliveryOrderDomainEventMapper>();
@@ -134,6 +143,8 @@ public static class ModuleServiceRegistration
                 new AuditSaveChangesInterceptor(),
                 new DomainEventOutboxSaveChangesInterceptor(
                     sp.GetRequiredService<DeliveryOrderDomainEventMapper>())));
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUserAccessor, AMR.DeliveryPlanning.Api.Auth.HttpContextCurrentUserAccessor>();
         services.AddScoped<IDeliveryOrderRepository, DeliveryOrderRepository>();
         services.AddScoped<FacilityStationLookup>();
         services.AddScoped<IStationLookup, CachedStationLookup>();

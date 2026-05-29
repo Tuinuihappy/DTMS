@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
@@ -11,31 +12,35 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
 {
     private readonly IDeliveryOrderRepository _repository;
     private readonly IUomNormalizer _uomNormalizer;
+    private readonly ICurrentUserAccessor _currentUser;
     private readonly ILogger<CreateDraftDeliveryOrderCommandHandler> _logger;
 
     public CreateDraftDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
         IUomNormalizer uomNormalizer,
+        ICurrentUserAccessor currentUser,
         ILogger<CreateDraftDeliveryOrderCommandHandler> logger)
     {
         _repository = repository;
         _uomNormalizer = uomNormalizer;
+        _currentUser = currentUser;
         _logger = logger;
     }
 
     public async Task<Result<DeliveryOrderDetailDto>> Handle(CreateDraftDeliveryOrderCommand request, CancellationToken cancellationToken)
     {
         var serviceWindow = request.ServiceWindow is { } sw
-            ? Domain.ValueObjects.ServiceWindow.Create(sw.Earliest, sw.Latest)
+            ? Domain.ValueObjects.ServiceWindow.Create(sw.EarliestUtc, sw.LatestUtc)
             : null;
 
         var order = Domain.Entities.DeliveryOrder.Create(
             request.OrderRef,
             request.Priority,
             serviceWindow,
-            request.SourceSystem,
-            request.CreatedBy,
-            request.SlaTier);
+            SourceSystem.Manual,
+            _currentUser.GetCurrentUserName(),
+            request.RequestedBy,
+            request.Notes);
 
         foreach (var (pkg, idx) in request.Items.Select((p, i) => (p, i + 1)))
         {
@@ -46,15 +51,11 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
 
             order.AddItem(
                 pkg.PickupLocationCode, pkg.DropLocationCode,
-                idx, pkg.Sku, pkg.Description,
+                idx, pkg.ItemId, pkg.Description,
                 pkg.LoadUnitProfileCode,
                 pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                 pkg.WeightKg,
                 Quantity.Create(pkg.Quantity.Value, uom.Value),
-                pkg.CargoType,
-                pkg.CargoSpecific is { } cs
-                    ? CargoSpecific.Create(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
-                    : null,
                 pkg.Hazmat is { } hz
                     ? HazmatInfo.Create(hz.ClassCode, hz.PackingGroup)
                     : null,

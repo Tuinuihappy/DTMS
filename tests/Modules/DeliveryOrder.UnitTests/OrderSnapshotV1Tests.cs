@@ -13,25 +13,21 @@ public class OrderSnapshotV1Tests
         var order = DomainEntities.DeliveryOrder.Create(
             "SNAP-001", Priority.High,
             serviceWindow: ServiceWindow.Create(
-                earliest: new DateTime(2026, 6, 1, 9, 0, 0, DateTimeKind.Utc),
-                latest:   new DateTime(2026, 6, 1, 17, 0, 0, DateTimeKind.Utc)),
+                earliestUtc: new DateTime(2026, 6, 1, 9, 0, 0, DateTimeKind.Utc),
+                latestUtc:   new DateTime(2026, 6, 1, 17, 0, 0, DateTimeKind.Utc)),
             sourceSystem: SourceSystem.Manual,
             createdBy: "ops-user",
-            slaTier: SlaTier.Gold);
+            requestedBy: "production-line-3",
+            notes: "VIP shipment");
 
         order.AddItem(
             "WH-COLD-01", "LAB-FREEZER",
-            itemSeq: 1, sku: "VACCINE",
+            itemSeq: 1, itemId: "VACCINE-LOT-A-001",
             description: "Refrigerated batch",
             loadUnitProfileCode: "TRAY-A",
             dimensions: Dimensions.Create(300, 200, 100),
             weightKg: 2.5,
             quantity: Quantity.Create(1, UnitOfMeasure.BOX),
-            cargoType: CargoType.FinishedGood,
-            cargoSpecific: CargoSpecific.Create(
-                partNo: "VX-001", wo: null, line: null, vendor: "Pfizer",
-                dateCode: "2026-05", tradingCode: null, inventoryNo: null,
-                po: null, traceId: null, lotNo: "LOT-A"),
             hazmat: HazmatInfo.Create("6.2", PackingGroup.II),
             temperature: TemperatureRange.Create(2, 8),
             handlingInstructions: new[]
@@ -61,11 +57,12 @@ public class OrderSnapshotV1Tests
         snap.Version.Should().Be("1.0");
         snap.OrderRef.Should().Be("SNAP-001");
         snap.Priority.Should().Be("High");
-        snap.SlaTier.Should().Be("Gold");
         snap.OrderStatus.Should().Be("Draft");
+        snap.RequestedBy.Should().Be("production-line-3");
+        snap.Notes.Should().Be("VIP shipment");
         snap.ServiceWindow.Should().NotBeNull();
-        snap.ServiceWindow!.Earliest.Should().Be(new DateTime(2026, 6, 1, 9, 0, 0, DateTimeKind.Utc));
-        snap.ServiceWindow.Latest.Should().Be(new DateTime(2026, 6, 1, 17, 0, 0, DateTimeKind.Utc));
+        snap.ServiceWindow!.EarliestUtc.Should().Be(new DateTime(2026, 6, 1, 9, 0, 0, DateTimeKind.Utc));
+        snap.ServiceWindow.LatestUtc.Should().Be(new DateTime(2026, 6, 1, 17, 0, 0, DateTimeKind.Utc));
         snap.Items.Should().HaveCount(1);
     }
 
@@ -77,7 +74,7 @@ public class OrderSnapshotV1Tests
         var snap = OrderSnapshotV1.From(order);
         var item = snap.Items.Single();
 
-        item.Sku.Should().Be("VACCINE");
+        item.ItemId.Should().Be("VACCINE-LOT-A-001");
         item.Quantity.Uom.Should().Be("BOX");
         item.Hazmat.Should().NotBeNull();
         item.Hazmat!.ClassCode.Should().Be("6.2");
@@ -86,9 +83,6 @@ public class OrderSnapshotV1Tests
         item.Temperature!.MinC.Should().Be(2);
         item.Temperature.MaxC.Should().Be(8);
         item.HandlingInstructions.Should().BeEquivalentTo(new[] { "Fragile", "ThisSideUp" });
-        item.CargoSpecific.Should().NotBeNull();
-        item.CargoSpecific!.LotNo.Should().Be("LOT-A");
-        item.CargoType.Should().Be("FinishedGood");
     }
 
     [Fact]
@@ -115,6 +109,7 @@ public class OrderSnapshotV1Tests
         restored.Should().NotBeNull();
         restored!.Version.Should().Be("1.0");
         restored.Items.Should().HaveCount(1);
+        restored.Items[0].ItemId.Should().Be("VACCINE-LOT-A-001");
         restored.Items[0].Hazmat!.ClassCode.Should().Be("6.2");
         restored.Items[0].HandlingInstructions.Should().BeEquivalentTo(new[] { "Fragile", "ThisSideUp" });
     }

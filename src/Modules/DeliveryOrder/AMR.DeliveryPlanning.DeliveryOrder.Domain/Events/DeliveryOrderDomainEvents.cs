@@ -7,7 +7,7 @@ public record ItemHazmatDto(string ClassCode, string? PackingGroup);
 public record ItemTemperatureDto(double? MinC, double? MaxC);
 
 public record ItemEventDto(
-    string Sku,
+    string ItemId,
     double WeightKg,
     Guid PickupStationId,
     Guid DropStationId,
@@ -23,12 +23,8 @@ public record DeliveryOrderConfirmedDomainEvent(
     DateTime OccurredOn,
     Guid OrderId,
     string Priority,
-    string SlaTier,
-    DateTime? Earliest,
-    DateTime? Latest,
-    // Deadline removed in P1-8: external integration event is now V1-versioned
-    // and the un-versioned Deadline alias has been dropped. Consumers should
-    // read Latest (the upper window bound) instead.
+    DateTime? EarliestUtc,
+    DateTime? LatestUtc,
     DateTime? SubmittedAt,
     IReadOnlyList<ItemEventDto> Items) : IDomainEvent;
 public record DeliveryOrderRejectedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string Reason) : IDomainEvent;

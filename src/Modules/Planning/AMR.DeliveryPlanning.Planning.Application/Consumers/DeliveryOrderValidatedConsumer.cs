@@ -52,7 +52,7 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         {
             var items = stationGroup.ToList();
             var groupWeight = items.Sum(i => i.WeightKg);
-            var skus = items.Select(i => i.Sku).ToList();
+            var itemIds = items.Select(i => i.ItemId).ToList();
 
             _logger.LogInformation("[AutoPlan] Group {G}: {Count} item(s), {Weight}kg ({Pickup} → {Drop})",
                 groupIndex + 1, items.Count, groupWeight,
@@ -75,7 +75,7 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
 
             var jobId = createResult.Value;
 
-            await AssignPackagesToJobAsync(jobId, skus, context.CancellationToken);
+            await AssignPackagesToJobAsync(jobId, itemIds, context.CancellationToken);
 
             var commitResult = await _sender.Send(new CommitPlanCommand(jobId), context.CancellationToken);
             if (!commitResult.IsSuccess)
@@ -90,9 +90,9 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         _logger.LogInformation("[AutoPlan] ═══ Pipeline complete for Order {OrderId} ═══", evt.DeliveryOrderId);
     }
 
-    private async Task AssignPackagesToJobAsync(Guid jobId, List<string> skus, CancellationToken ct)
+    private async Task AssignPackagesToJobAsync(Guid jobId, List<string> itemIds, CancellationToken ct)
     {
-        var result = await _sender.Send(new AssignPackagesToJobCommand(jobId, skus), ct);
+        var result = await _sender.Send(new AssignPackagesToJobCommand(jobId, itemIds), ct);
         if (!result.IsSuccess)
             _logger.LogWarning("[AutoPlan] Failed to assign items to Job {JobId}: {Error}", jobId, result.Error);
     }

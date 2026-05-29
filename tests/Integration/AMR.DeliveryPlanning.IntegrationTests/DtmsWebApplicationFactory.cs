@@ -148,13 +148,12 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         DateTime? sla = null, string? orderName = null) => new
     {
         OrderRef = orderName ?? $"Test-{Guid.NewGuid():N}"[..20],
-        SlaTier = "Bronze",
-        ServiceWindow = sla.HasValue ? new { Earliest = (DateTime?)null, Latest = sla } : (object?)null,
+        ServiceWindow = sla.HasValue ? new { EarliestUtc = (DateTime?)null, LatestUtc = sla } : (object?)null,
         Items = new[]
         {
             new
             {
-                Sku = $"SKU-{Guid.NewGuid():N}"[..15],
+                ItemId = $"ITEM-{Guid.NewGuid():N}"[..15],
                 PickupLocationCode = pickupId.ToString(),
                 DropLocationCode = dropId.ToString(),
                 LoadUnitProfileCode = loadUnitProfileCode,

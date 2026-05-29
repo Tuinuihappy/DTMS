@@ -16,19 +16,17 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
     {
         orderRef,
         priority = "Normal",
-        cargoType = "FinishedGood",
         requestedDeliveryDate = (DateTime?)null,
         items = new[]
         {
             new
             {
-                sku = "SKU-ORIG-001",
+                itemId = "ITEM-ORIG-001",
                 pickupLocationCode = "WH-01",
                 dropLocationCode = "LINE-01",
                 dimensions = (object?)null,
                 weightKg = 5.0,
-                quantity = new { value = 10, uom = "PCS" },
-                cargoSpecific = (object?)null
+                quantity = new { value = 10, uom = "PCS" }
             }
         }
     };
@@ -37,29 +35,26 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
     {
         orderRef,
         priority = "High",
-        cargoType = "RawMaterial",
         requestedDeliveryDate = (DateTime?)null,
         items = new[]
         {
             new
             {
-                sku = "SKU-NEW-001",
+                itemId = "ITEM-NEW-001",
                 pickupLocationCode = "WH-02",
                 dropLocationCode = "LINE-05",
                 dimensions = (object?)new { lengthMm = 300.0, widthMm = 200.0, heightMm = 100.0 },
                 weightKg = 8.0,
-                quantity = new { value = 3, uom = "BOX" },
-                cargoSpecific = (object?)null
+                quantity = new { value = 3, uom = "BOX" }
             },
             new
             {
-                sku = "SKU-NEW-002",
+                itemId = "ITEM-NEW-002",
                 pickupLocationCode = "WH-02",
                 dropLocationCode = "LINE-06",
                 dimensions = (object?)null,
                 weightKg = 2.0,
-                quantity = new { value = 50, uom = "PCS" },
-                cargoSpecific = (object?)null
+                quantity = new { value = 50, uom = "PCS" }
             }
         }
     };
@@ -85,13 +80,12 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
         updated!.Id.Should().Be(created.Id);
         updated.OrderRef.Should().Be("ORD-UPDATED");
         updated.Priority.Should().Be("HIGH");
-        // CargoType is per-item now (P1 move); top-level cargoType in request is ignored.
         updated.Items.Should().HaveCount(2);
-        updated.Items.Select(i => i.Sku).Should().BeEquivalentTo(["SKU-NEW-001", "SKU-NEW-002"]);
+        updated.Items.Select(i => i.ItemId).Should().BeEquivalentTo(["ITEM-NEW-001", "ITEM-NEW-002"]);
     }
 
     [Fact]
-    public async Task UpdateDraft_AllowsReusingSku_AfterReplace()
+    public async Task UpdateDraft_AllowsReusingItemId_AfterReplace()
     {
         var client = await _factory.GetAuthenticatedClient();
 
@@ -103,19 +97,17 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
         {
             orderRef = "ORD-REUSE",
             priority = "Normal",
-            cargoType = "FinishedGood",
             requestedDeliveryDate = (DateTime?)null,
             items = new[]
             {
                 new
                 {
-                    sku = "SKU-ORIG-001",  // same SKU as original — must be allowed
+                    itemId = "ITEM-ORIG-001",  // same ItemId as original — must be allowed
                     pickupLocationCode = "WH-03",
                     dropLocationCode = "LINE-07",
                     dimensions = (object?)null,
                     weightKg = 1.0,
-                    quantity = new { value = 1, uom = "PCS" },
-                    cargoSpecific = (object?)null
+                    quantity = new { value = 1, uom = "PCS" }
                 }
             }
         };
@@ -147,7 +139,6 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
         {
             orderRef = "ORD-EMPTY",
             priority = "Normal",
-            cargoType = "FinishedGood",
             requestedDeliveryDate = (DateTime?)null,
             items = Array.Empty<object>()
         };
@@ -166,19 +157,17 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
         {
             orderRef = "ORD-SUBMIT-THEN-UPDATE",
             priority = "Normal",
-            cargoType = "FinishedGood",
             requestedDeliveryDate = (DateTime?)null,
             items = new[]
             {
                 new
                 {
-                    sku = "SKU-001",
+                    itemId = "ITEM-001",
                     pickupLocationCode = pickupId.ToString(),
                     dropLocationCode = dropId.ToString(),
                     dimensions = (object?)null,
                     weightKg = 1.0,
-                    quantity = new { value = 1, uom = "PCS" },
-                    cargoSpecific = (object?)null
+                    quantity = new { value = 1, uom = "PCS" }
                 }
             }
         };
@@ -196,8 +185,8 @@ public class UpdateDraftOrderTests : IClassFixture<DtmsWebApplicationFactory>
 
     // ── response shape ────────────────────────────────────────────────────────
 
-    private record OrderDetailResponse(Guid Id, string OrderRef, string Priority, string CargoType,
+    private record OrderDetailResponse(Guid Id, string OrderRef, string Priority,
         string OrderStatus, List<ItemResponse> Items);
 
-    private record ItemResponse(Guid Id, string Sku);
+    private record ItemResponse(Guid Id, string ItemId);
 }

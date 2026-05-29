@@ -15,10 +15,11 @@ public class CreateUpstreamDeliveryOrderCommandValidator : AbstractValidator<Cre
         RuleFor(x => x.ServiceWindow).NotNull()
             .WithMessage("Upstream orders must include a ServiceWindow.");
         RuleFor(x => x.ServiceWindow)
-            .Must(sw => sw.Earliest.HasValue || sw.Latest.HasValue)
+            .Must(sw => sw.EarliestUtc.HasValue || sw.LatestUtc.HasValue)
             .When(x => x.ServiceWindow is not null)
-            .WithMessage("ServiceWindow must have at least one bound (Earliest or Latest).");
-        RuleFor(x => x.CreatedBy).NotEmpty().MaximumLength(200);
+            .WithMessage("ServiceWindow must have at least one bound (EarliestUtc or LatestUtc).");
+        RuleFor(x => x.RequestedBy!).MaximumLength(200).When(x => x.RequestedBy != null);
+        RuleFor(x => x.Notes!).MaximumLength(1000).When(x => x.Notes != null);
 
         RuleFor(x => x.Items).NotEmpty().WithMessage("At least one item is required.");
 
@@ -30,7 +31,7 @@ public class CreateUpstreamDeliveryOrderCommandValidator : AbstractValidator<Cre
                 .NotEqual(p => p.PickupLocationCode)
                 .When(p => !string.IsNullOrWhiteSpace(p.PickupLocationCode) && !string.IsNullOrWhiteSpace(p.DropLocationCode))
                 .WithMessage("Pickup and Drop locations must be different.");
-            item.RuleFor(p => p.Sku).NotEmpty().MaximumLength(100);
+            item.RuleFor(p => p.ItemId).NotEmpty().MaximumLength(100);
             // WeightKg is optional everywhere (P0-5 / Option C). When omitted, the order
             // is still accepted, a warning is returned to the caller, and the configured
             // WeightFallbackKg is used in the planning event so capacity stays safe.
@@ -48,10 +49,6 @@ public class CreateUpstreamDeliveryOrderCommandValidator : AbstractValidator<Cre
                 item.RuleFor(p => p.Dimensions!.WidthMm).GreaterThan(0);
                 item.RuleFor(p => p.Dimensions!.HeightMm).GreaterThan(0);
             });
-            item.RuleFor(p => p.CargoSpecific)
-                .Null()
-                .When(p => p.CargoType == null)
-                .WithMessage("CargoSpecific must not be provided when CargoType is empty.");
             item.RuleFor(p => p.LoadUnitProfileCode!)
                 .NotEmpty().MaximumLength(50)
                 .When(p => p.LoadUnitProfileCode != null);

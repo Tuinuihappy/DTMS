@@ -25,7 +25,7 @@ public class GetOrderItemsQueryHandler : IQueryHandler<GetOrderItemsQuery, IRead
             .Select(p => new ItemDto(
                 p.Id,
                 p.ItemSeq,
-                p.Sku,
+                p.ItemId,
                 p.Description,
                 p.PickupLocationCode,
                 p.DropLocationCode,
@@ -35,10 +35,6 @@ public class GetOrderItemsQueryHandler : IQueryHandler<GetOrderItemsQuery, IRead
                 p.Dimensions is { } d ? new DimensionsDto(d.LengthMm, d.WidthMm, d.HeightMm, d.VolumeCBM) : null,
                 p.WeightKg,
                 new QuantityDto(p.Quantity.Value, p.Quantity.Uom.ToString()),
-                p.CargoType,
-                p.CargoSpecific is { } cs
-                    ? new CargoSpecificDto(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
-                    : null,
                 p.Hazmat is { } hz ? new HazmatDto(hz.ClassCode, hz.PackingGroup) : null,
                 p.Temperature is { } tr ? new TemperatureRangeDto(tr.MinC, tr.MaxC) : null,
                 p.HandlingInstructions,

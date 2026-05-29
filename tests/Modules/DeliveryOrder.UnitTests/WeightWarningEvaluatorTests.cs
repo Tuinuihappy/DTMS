@@ -8,16 +8,15 @@ namespace DeliveryOrder.UnitTests;
 
 public class WeightWarningEvaluatorTests
 {
-    private static DomainEntities.DeliveryOrder OrderWithItems(params (int Seq, string Sku, double? Weight)[] items)
+    private static DomainEntities.DeliveryOrder OrderWithItems(params (int Seq, string ItemId, double? Weight)[] items)
     {
         var order = DomainEntities.DeliveryOrder.Create("ORD-X", Priority.Normal, serviceWindow: null);
-        foreach (var (seq, sku, weight) in items)
+        foreach (var (seq, itemId, weight) in items)
             order.AddItem(
                 "WH-01", "LINE-01",
-                seq, sku,
+                seq, itemId,
                 description: null, loadUnitProfileCode: null,
-                dimensions: null, weightKg: weight, quantity: Quantity.Create(1, UnitOfMeasure.EA),
-                cargoType: null, cargoSpecific: null);
+                dimensions: null, weightKg: weight, quantity: Quantity.Create(1, UnitOfMeasure.EA));
         return order;
     }
 
@@ -84,10 +83,9 @@ public class DeliveryOrderFallbackWeightTests
         var order = DomainEntities.DeliveryOrder.Create("ORD-1", Priority.Normal, serviceWindow: null);
         order.AddItem(
             "WH-01", "LINE-01",
-            itemSeq: 1, sku: "SKU-A",
+            itemSeq: 1, itemId: "ITEM-A",
             description: null, loadUnitProfileCode: null,
-            dimensions: null, weightKg: null, quantity: Quantity.Create(1, UnitOfMeasure.EA),
-            cargoType: null, cargoSpecific: null);
+            dimensions: null, weightKg: null, quantity: Quantity.Create(1, UnitOfMeasure.EA));
         order.Submit();
         order.MarkAsValidated(new Dictionary<string, Guid>
         {
@@ -109,10 +107,9 @@ public class DeliveryOrderFallbackWeightTests
         var order = DomainEntities.DeliveryOrder.Create("ORD-2", Priority.Normal, serviceWindow: null);
         order.AddItem(
             "WH-01", "LINE-01",
-            itemSeq: 1, sku: "SKU-B",
+            itemSeq: 1, itemId: "ITEM-B",
             description: null, loadUnitProfileCode: null,
-            dimensions: null, weightKg: 42.0, quantity: Quantity.Create(1, UnitOfMeasure.EA),
-            cargoType: null, cargoSpecific: null);
+            dimensions: null, weightKg: 42.0, quantity: Quantity.Create(1, UnitOfMeasure.EA));
         order.Submit();
         order.MarkAsValidated(new Dictionary<string, Guid>
         {

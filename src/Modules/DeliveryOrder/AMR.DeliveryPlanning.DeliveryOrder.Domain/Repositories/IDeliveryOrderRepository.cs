@@ -11,9 +11,9 @@ public interface IDeliveryOrderRepository
     Task<List<Entities.DeliveryOrder>> GetByStatusAsync(OrderStatus status, int page, int pageSize, CancellationToken cancellationToken = default);
     Task<List<Entities.DeliveryOrder>> GetAllAsync(int page, int pageSize, CancellationToken cancellationToken = default);
     Task<int> CountAsync(OrderStatus? status, CancellationToken cancellationToken = default);
-    Task<List<Entities.DeliveryOrder>> GetOrdersByItemSkusAsync(IEnumerable<string> skus, CancellationToken cancellationToken = default);
+    Task<List<Entities.DeliveryOrder>> GetOrdersByItemIdsAsync(IEnumerable<string> itemIds, CancellationToken cancellationToken = default);
     Task<List<Entities.DeliveryOrder>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken = default);
-    Task<(List<Item> Items, int TotalCount)> SearchItemsAsync(string? sku, CargoType? cargoType, ItemStatus? status, string? pickupCode, Guid? pickupStationId, string? dropCode, Guid? dropStationId, string? partNo, string? wo, string? line, string? vendor, string? dateCode, string? tradingCode, string? inventoryNo, string? po, string? traceId, string? lotNo, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<(List<Item> Items, int TotalCount)> SearchItemsAsync(string? itemId, ItemStatus? status, string? pickupCode, Guid? pickupStationId, string? dropCode, Guid? dropStationId, int page, int pageSize, CancellationToken cancellationToken = default);
     Task<Item?> GetItemByIdAsync(Guid itemId, CancellationToken cancellationToken = default);
     Task AddAsync(Entities.DeliveryOrder order, CancellationToken cancellationToken = default);
     Task AddRangeAsync(IEnumerable<Entities.DeliveryOrder> orders, CancellationToken cancellationToken = default);

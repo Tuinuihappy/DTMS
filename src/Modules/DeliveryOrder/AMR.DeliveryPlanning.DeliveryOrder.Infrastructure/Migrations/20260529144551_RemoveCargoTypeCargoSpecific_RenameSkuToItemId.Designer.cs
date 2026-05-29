@@ -3,6 +3,7 @@ using System;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 {
     [DbContext(typeof(DeliveryOrderDbContext))]
-    partial class DeliveryOrderDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260529144551_RemoveCargoTypeCargoSpecific_RenameSkuToItemId")]
+    partial class RemoveCargoTypeCargoSpecific_RenameSkuToItemId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -35,10 +38,6 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
                     b.Property<string>("OrderRef")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -49,9 +48,10 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<string>("RequestedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                    b.Property<string>("SlaTier")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
 
                     b.Property<string>("SourceSystem")
                         .IsRequired()
@@ -284,13 +284,13 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                             b1.Property<Guid>("DeliveryOrderId")
                                 .HasColumnType("uuid");
 
-                            b1.Property<DateTime?>("EarliestUtc")
+                            b1.Property<DateTime?>("Earliest")
                                 .HasColumnType("timestamp with time zone")
-                                .HasColumnName("ServiceWindow_EarliestUtc");
+                                .HasColumnName("ServiceWindow_Earliest");
 
-                            b1.Property<DateTime?>("LatestUtc")
+                            b1.Property<DateTime?>("Latest")
                                 .HasColumnType("timestamp with time zone")
-                                .HasColumnName("ServiceWindow_LatestUtc");
+                                .HasColumnName("ServiceWindow_Latest");
 
                             b1.HasKey("DeliveryOrderId");
 

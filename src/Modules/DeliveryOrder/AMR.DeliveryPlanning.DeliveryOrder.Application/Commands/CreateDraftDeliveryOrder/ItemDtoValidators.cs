@@ -13,16 +13,7 @@ public class DraftItemDtoValidator : AbstractValidator<ItemDto>
 
     public DraftItemDtoValidator()
     {
-        RuleFor(p => p.Sku).MaximumLength(100);
-
-        RuleFor(p => p.CargoType!.Value)
-            .IsInEnum()
-            .When(p => p.CargoType != null);
-
-        RuleFor(p => p.CargoSpecific)
-            .Null()
-            .When(p => p.CargoType == null)
-            .WithMessage("CargoSpecific must not be provided when CargoType is empty.");
+        RuleFor(p => p.ItemId).MaximumLength(100);
 
         RuleFor(p => p.LoadUnitProfileCode!)
             .MaximumLength(50)
@@ -89,7 +80,7 @@ public class SubmitItemDtoValidator : AbstractValidator<ItemDto>
     {
         Include(new DraftItemDtoValidator());
 
-        RuleFor(p => p.Sku).NotEmpty();
+        RuleFor(p => p.ItemId).NotEmpty();
         RuleFor(p => p.Quantity).NotNull();
         RuleFor(p => p.Quantity.Uom).NotEmpty().When(p => p.Quantity != null);
     }

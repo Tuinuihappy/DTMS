@@ -14,10 +14,10 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             DeliveryOrderConfirmedDomainEvent evt =>
             [
                 new DeliveryOrderConfirmedIntegrationEventV1(
-                    evt.EventId, evt.OccurredOn, evt.OrderId, evt.Priority, evt.SlaTier,
-                    evt.Earliest, evt.Latest, evt.SubmittedAt,
+                    evt.EventId, evt.OccurredOn, evt.OrderId, evt.Priority,
+                    evt.EarliestUtc, evt.LatestUtc, evt.SubmittedAt,
                     evt.Items.Select(i => new ItemSummaryDto(
-                        i.Sku, i.WeightKg, i.PickupStationId, i.DropStationId,
+                        i.ItemId, i.WeightKg, i.PickupStationId, i.DropStationId,
                         i.Hazmat is { } hz ? new ItemHazmatSummaryDto(hz.ClassCode, hz.PackingGroup) : null,
                         i.Temperature is { } tr ? new ItemTemperatureSummaryDto(tr.MinC, tr.MaxC) : null,
                         i.HandlingInstructions)).ToList())

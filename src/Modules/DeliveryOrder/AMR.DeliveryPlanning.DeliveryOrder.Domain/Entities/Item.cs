@@ -12,14 +12,14 @@ public class Item : Entity<Guid>
     public Guid? PickupStationId { get; private set; }
     public Guid? DropStationId { get; private set; }
     public int ItemSeq { get; private set; }
-    public string Sku { get; private set; } = string.Empty;
+    // Upstream-supplied identifier for this item instance (e.g. SAP/ERP item id,
+    // scanner barcode). Unique within an order — used by POD scan matching.
+    public string ItemId { get; private set; } = string.Empty;
     public string? Description { get; private set; }
     public string? LoadUnitProfileCode { get; private set; }
     public Dimensions? Dimensions { get; private set; }
     public double? WeightKg { get; private set; }
     public Quantity Quantity { get; private set; } = null!;
-    public CargoType? CargoType { get; private set; }
-    public CargoSpecific? CargoSpecific { get; private set; }
     public HazmatInfo? Hazmat { get; private set; }
     public TemperatureRange? Temperature { get; private set; }
     public IReadOnlyList<HandlingInstruction> HandlingInstructions { get; private set; }
@@ -29,19 +29,13 @@ public class Item : Entity<Guid>
     private Item() { }
 
     internal Item(Guid deliveryOrderId, string pickupLocationCode, string dropLocationCode,
-        int itemSeq, string sku, string? description,
+        int itemSeq, string itemId, string? description,
         string? loadUnitProfileCode,
         Dimensions? dimensions, double? weightKg, Quantity quantity,
-        CargoType? cargoType,
-        CargoSpecific? cargoSpecific = null,
         HazmatInfo? hazmat = null,
         TemperatureRange? temperature = null,
         IReadOnlyList<HandlingInstruction>? handlingInstructions = null)
     {
-        if (cargoType is null && cargoSpecific is not null)
-            throw new InvalidOperationException(
-                "CargoSpecific must be null when CargoType is not specified.");
-
         if (string.IsNullOrWhiteSpace(pickupLocationCode))
             throw new ArgumentException("PickupLocationCode must not be empty.", nameof(pickupLocationCode));
         if (string.IsNullOrWhiteSpace(dropLocationCode))
@@ -53,14 +47,12 @@ public class Item : Entity<Guid>
         PickupLocationCode = pickupLocationCode.Trim();
         DropLocationCode = dropLocationCode.Trim();
         ItemSeq = itemSeq;
-        Sku = sku;
+        ItemId = itemId;
         Description = description;
         LoadUnitProfileCode = loadUnitProfileCode;
         Dimensions = dimensions;
         WeightKg = weightKg;
         Quantity = quantity;
-        CargoType = cargoType;
-        CargoSpecific = cargoSpecific;
         Hazmat = hazmat;
         Temperature = temperature;
         // Dedupe while preserving order: ["Fragile","Fragile","ThisSideUp"] → ["Fragile","ThisSideUp"].

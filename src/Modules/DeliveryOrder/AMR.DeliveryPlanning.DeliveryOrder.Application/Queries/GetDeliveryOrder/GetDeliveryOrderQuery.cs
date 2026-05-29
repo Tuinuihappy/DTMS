@@ -8,19 +8,7 @@ public record DimensionsDto(double LengthMm, double WidthMm, double HeightMm, do
 
 public record QuantityDto(double Value, string Uom);
 
-public record ServiceWindowDto(DateTime? Earliest, DateTime? Latest);
-
-public record CargoSpecificDto(
-    string? PartNo,
-    string? Wo,
-    string? Line,
-    string? Vendor,
-    string? DateCode,
-    string? TradingCode,
-    string? InventoryNo,
-    string? Po,
-    string? TraceId,
-    string? LotNo);
+public record ServiceWindowDto(DateTime? EarliestUtc, DateTime? LatestUtc);
 
 public record HazmatDto(string ClassCode, PackingGroup? PackingGroup);
 
@@ -29,7 +17,7 @@ public record TemperatureRangeDto(double? MinC, double? MaxC);
 public record ItemDto(
     Guid Id,
     int ItemSeq,
-    string Sku,
+    string ItemId,
     string? Description,
     string PickupLocationCode,
     string DropLocationCode,
@@ -39,8 +27,6 @@ public record ItemDto(
     DimensionsDto? Dimensions,
     double? WeightKg,
     QuantityDto Quantity,
-    CargoType? CargoType,
-    CargoSpecificDto? CargoSpecific,
     HazmatDto? Hazmat,
     TemperatureRangeDto? Temperature,
     IReadOnlyList<HandlingInstruction> HandlingInstructions,
@@ -51,11 +37,12 @@ public record DeliveryOrderListDto(
     string OrderRef,
     SourceSystem SourceSystem,
     Priority Priority,
-    SlaTier SlaTier,
     OrderStatus OrderStatus,
     ServiceWindowDto? ServiceWindow,
     DateTime? SubmittedAt,
     string? CreatedBy,
+    string? RequestedBy,
+    string? Notes,
     DateTime CreatedDate,
     DateTime? UpdatedDate,
     double TotalWeightKg,
@@ -67,11 +54,12 @@ public record DeliveryOrderDetailDto(
     string OrderRef,
     SourceSystem SourceSystem,
     Priority Priority,
-    SlaTier SlaTier,
     OrderStatus OrderStatus,
     ServiceWindowDto? ServiceWindow,
     DateTime? SubmittedAt,
     string? CreatedBy,
+    string? RequestedBy,
+    string? Notes,
     DateTime CreatedDate,
     DateTime? UpdatedDate,
     double TotalWeightKg,
@@ -129,11 +117,12 @@ internal static class DeliveryOrderMapper
             order.OrderRef,
             order.SourceSystem,
             order.Priority,
-            order.SlaTier,
             order.Status,
-            order.ServiceWindow is { } sw ? new ServiceWindowDto(sw.Earliest, sw.Latest) : null,
+            order.ServiceWindow is { } sw ? new ServiceWindowDto(sw.EarliestUtc, sw.LatestUtc) : null,
             order.SubmittedAt,
             order.CreatedBy,
+            order.RequestedBy,
+            order.Notes,
             order.CreatedDate,
             order.UpdatedDate,
             order.TotalWeightKg,
@@ -146,11 +135,12 @@ internal static class DeliveryOrderMapper
             order.OrderRef,
             order.SourceSystem,
             order.Priority,
-            order.SlaTier,
             order.Status,
-            order.ServiceWindow is { } sw ? new ServiceWindowDto(sw.Earliest, sw.Latest) : null,
+            order.ServiceWindow is { } sw ? new ServiceWindowDto(sw.EarliestUtc, sw.LatestUtc) : null,
             order.SubmittedAt,
             order.CreatedBy,
+            order.RequestedBy,
+            order.Notes,
             order.CreatedDate,
             order.UpdatedDate,
             order.TotalWeightKg,
@@ -159,7 +149,7 @@ internal static class DeliveryOrderMapper
             order.Items.Select(p => new ItemDto(
                 p.Id,
                 p.ItemSeq,
-                p.Sku,
+                p.ItemId,
                 p.Description,
                 p.PickupLocationCode,
                 p.DropLocationCode,
@@ -169,10 +159,6 @@ internal static class DeliveryOrderMapper
                 p.Dimensions is { } d ? new DimensionsDto(d.LengthMm, d.WidthMm, d.HeightMm, d.VolumeCBM) : null,
                 p.WeightKg,
                 new QuantityDto(p.Quantity.Value, p.Quantity.Uom.ToString()),
-                p.CargoType,
-                p.CargoSpecific is { } cs
-                    ? new CargoSpecificDto(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
-                    : null,
                 p.Hazmat is { } hz ? new HazmatDto(hz.ClassCode, hz.PackingGroup) : null,
                 p.Temperature is { } tr ? new TemperatureRangeDto(tr.MinC, tr.MaxC) : null,
                 p.HandlingInstructions,

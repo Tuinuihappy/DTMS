@@ -35,7 +35,7 @@ public class AmendDeliveryOrderCommandHandler : ICommandHandler<AmendDeliveryOrd
         try
         {
             var newServiceWindow = request.NewServiceWindow is { } sw
-                ? Domain.ValueObjects.ServiceWindow.Create(sw.Earliest, sw.Latest)
+                ? Domain.ValueObjects.ServiceWindow.Create(sw.EarliestUtc, sw.LatestUtc)
                 : null;
 
             order.AmendServiceWindow(newServiceWindow, request.Reason);

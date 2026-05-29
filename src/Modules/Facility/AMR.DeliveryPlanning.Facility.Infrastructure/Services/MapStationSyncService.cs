@@ -38,12 +38,26 @@ public sealed class MapStationSyncService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await Task.Delay(TimeSpan.FromSeconds(15), stoppingToken);
+        try { await Task.Delay(TimeSpan.FromSeconds(15), stoppingToken); }
+        catch (OperationCanceledException) { return; }
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await SyncAllMapsAsync(stoppingToken);
-            await Task.Delay(_interval, stoppingToken);
+            try
+            {
+                await SyncAllMapsAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "MapStationSyncService: sync cycle failed — will retry next interval");
+            }
+
+            try { await Task.Delay(_interval, stoppingToken); }
+            catch (OperationCanceledException) { return; }
         }
     }
 
@@ -67,7 +81,20 @@ public sealed class MapStationSyncService : BackgroundService
         foreach (var map in maps)
         {
             if (ct.IsCancellationRequested) break;
-            await SyncMapAsync(db, map, ct);
+            try
+            {
+                await SyncMapAsync(db, map, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "MapStationSyncService: map {MapId} ({Name}) sync failed — continuing with next map",
+                    map.Id, map.Name);
+            }
         }
     }
 

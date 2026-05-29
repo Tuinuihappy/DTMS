@@ -21,7 +21,7 @@ public static class WeightWarningEvaluator
                     QualityIssueCodes.ItemWeightMissing,
                     QualityIssueSeverity.Warning,
                     $"items[seq={item.ItemSeq}].weightKg",
-                    $"Item seq {item.ItemSeq} (sku={item.Sku}) has no weight; load planning will use the configured fallback."));
+                    $"Item seq {item.ItemSeq} (itemId={item.ItemId}) has no weight; load planning will use the configured fallback."));
             }
         }
         return warnings;

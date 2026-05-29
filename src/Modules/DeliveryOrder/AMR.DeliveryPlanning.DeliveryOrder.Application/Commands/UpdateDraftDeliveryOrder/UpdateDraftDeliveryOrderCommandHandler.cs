@@ -39,10 +39,11 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
             await _repository.RemoveItemsAsync(oldItems, cancellationToken);
 
             var serviceWindow = request.ServiceWindow is { } sw
-                ? Domain.ValueObjects.ServiceWindow.Create(sw.Earliest, sw.Latest)
+                ? Domain.ValueObjects.ServiceWindow.Create(sw.EarliestUtc, sw.LatestUtc)
                 : null;
 
-            order.UpdateDraft(request.OrderRef, request.Priority, serviceWindow, request.SlaTier);
+            order.UpdateDraft(request.OrderRef, request.Priority, serviceWindow,
+                request.RequestedBy, request.Notes);
 
             foreach (var (item, idx) in request.Items.Select((p, i) => (p, i + 1)))
             {
@@ -53,15 +54,11 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
 
                 order.AddItem(
                     item.PickupLocationCode, item.DropLocationCode,
-                    idx, item.Sku, item.Description,
+                    idx, item.ItemId, item.Description,
                     item.LoadUnitProfileCode,
                     item.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                     item.WeightKg,
                     Quantity.Create(item.Quantity.Value, uom.Value),
-                    item.CargoType,
-                    item.CargoSpecific is { } cs
-                        ? CargoSpecific.Create(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
-                        : null,
                     item.Hazmat is { } hz
                         ? HazmatInfo.Create(hz.ClassCode, hz.PackingGroup)
                         : null,

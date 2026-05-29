@@ -20,8 +20,7 @@ public class DeliveryOrderTests
             pickup, drop,
             itemSeq, sku,
             description: null, loadUnitProfileCode: null,
-            dimensions: null, weightKg: weightKg, quantity: Quantity.Create(quantity, uom),
-            cargoType: null, cargoSpecific: null);
+            dimensions: null, weightKg: weightKg, quantity: Quantity.Create(quantity, uom));
 
     private static IReadOnlyDictionary<string, Guid> StationMap(params string[] codes)
     {
@@ -47,7 +46,7 @@ public class DeliveryOrderTests
         AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
 
         order.Items.Should().HaveCount(1);
-        order.Items.First().Sku.Should().Be("SKU-001");
+        order.Items.First().ItemId.Should().Be("SKU-001");
         order.Items.First().PickupLocationCode.Should().Be("WH-01");
         order.Items.First().DropLocationCode.Should().Be("STORE-05");
         order.Items.First().ItemSeq.Should().Be(1);
@@ -218,8 +217,8 @@ public class DeliveryOrderTests
 
         order.MarkItemsDelivered(["SKU-001"]);
 
-        order.Items.Single(i => i.Sku == "SKU-001").Status.Should().Be(ItemStatus.Delivered);
-        order.Items.Single(i => i.Sku == "SKU-002").Status.Should().Be(ItemStatus.Pending);
+        order.Items.Single(i => i.ItemId == "SKU-001").Status.Should().Be(ItemStatus.Delivered);
+        order.Items.Single(i => i.ItemId == "SKU-002").Status.Should().Be(ItemStatus.Pending);
     }
 
     [Fact]
@@ -245,7 +244,7 @@ public class DeliveryOrderTests
         order.OrderRef.Should().Be("New Ref");
         order.Priority.Should().Be(Priority.High);
         order.Items.Should().HaveCount(1);
-        order.Items.Single().Sku.Should().Be("SKU-NEW");
+        order.Items.Single().ItemId.Should().Be("SKU-NEW");
         order.TotalWeightKg.Should().Be(3.0);
         order.TotalQuantity.Should().Be(5);
         order.TotalItems.Should().Be(1);
@@ -308,10 +307,10 @@ public class DeliveryOrderTests
         order.Submit();
         var newTime = DateTime.UtcNow.AddHours(4);
 
-        order.AmendServiceWindow(ServiceWindow.Create(earliest: null, latest: newTime), "rescheduled");
+        order.AmendServiceWindow(ServiceWindow.Create(earliestUtc: null, latestUtc: newTime), "rescheduled");
 
         order.ServiceWindow.Should().NotBeNull();
-        order.ServiceWindow!.Latest.Should().Be(newTime);
+        order.ServiceWindow!.LatestUtc.Should().Be(newTime);
         order.Status.Should().Be(OrderStatus.Submitted);
         order.DomainEvents.OfType<DeliveryOrderAmendedDomainEvent>().Should().HaveCount(1);
     }
@@ -322,31 +321,20 @@ public class DeliveryOrderTests
         var order = CreateOrder();
 
         var act = () => order.AmendServiceWindow(
-            ServiceWindow.Create(earliest: null, latest: DateTime.UtcNow.AddHours(1)), "reason");
+            ServiceWindow.Create(earliestUtc: null, latestUtc: DateTime.UtcNow.AddHours(1)), "reason");
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*Draft*");
     }
 
-    // ── P1-2: SlaTier + SubmittedAt (SLA clock) ─────────────────────────
+    // ── SubmittedAt (SLA clock) ─────────────────────────────────────────
 
     [Fact]
-    public void NewOrder_DefaultsToBronzeTier_AndHasNoSubmittedAt()
+    public void NewOrder_HasNoSubmittedAt()
     {
         var order = CreateOrder();
 
-        order.SlaTier.Should().Be(SlaTier.Bronze);
         order.SubmittedAt.Should().BeNull();
-    }
-
-    [Fact]
-    public void Create_WithExplicitSlaTier_PreservesIt()
-    {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
-            "TIER-TEST", Priority.Normal, serviceWindow: null,
-            sourceSystem: SourceSystem.Manual, createdBy: null, slaTier: SlaTier.Gold);
-
-        order.SlaTier.Should().Be(SlaTier.Gold);
     }
 
     [Fact]
@@ -368,10 +356,9 @@ public class DeliveryOrderTests
         var before = DateTime.UtcNow;
 
         var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.CreateFromUpstream(
-            "UPS-001", Priority.High, ServiceWindow.Create(earliest: null, latest: DateTime.UtcNow.AddHours(2)),
-            SourceSystem.Sap, createdBy: "sap-user", slaTier: SlaTier.Silver);
+            "UPS-001", Priority.High, ServiceWindow.Create(earliestUtc: null, latestUtc: DateTime.UtcNow.AddHours(2)),
+            SourceSystem.Sap, createdBy: "sap-user");
 
-        order.SlaTier.Should().Be(SlaTier.Silver);
         order.Status.Should().Be(OrderStatus.Submitted);
         order.SubmittedAt.Should().NotBeNull();
         order.SubmittedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(DateTime.UtcNow);
@@ -394,24 +381,26 @@ public class DeliveryOrderTests
     }
 
     [Fact]
-    public void UpdateDraft_CanChangeSlaTier()
+    public void UpdateDraft_CanChangeRequestedByAndNotes()
     {
         var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "UPD-001", Priority.Normal, serviceWindow: null,
-            sourceSystem: SourceSystem.Manual, createdBy: null, slaTier: SlaTier.Bronze);
+            sourceSystem: SourceSystem.Manual, createdBy: null);
 
-        order.UpdateDraft("UPD-001", Priority.High, serviceWindow: null, slaTier: SlaTier.Gold);
+        order.UpdateDraft("UPD-001", Priority.High, serviceWindow: null,
+            requestedBy: "qa-batch", notes: "rerun after recall");
 
-        order.SlaTier.Should().Be(SlaTier.Gold);
         order.Priority.Should().Be(Priority.High);
+        order.RequestedBy.Should().Be("qa-batch");
+        order.Notes.Should().Be("rerun after recall");
     }
 
     [Fact]
-    public void Confirm_DomainEventCarriesSlaTierAndSubmittedAt()
+    public void Confirm_DomainEventCarriesSubmittedAt()
     {
         var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
-            "EVT-001", Priority.High, serviceWindow: ServiceWindow.Create(earliest: null, latest: DateTime.UtcNow.AddHours(4)),
-            sourceSystem: SourceSystem.Manual, createdBy: null, slaTier: SlaTier.Gold);
+            "EVT-001", Priority.High, serviceWindow: ServiceWindow.Create(earliestUtc: null, latestUtc: DateTime.UtcNow.AddHours(4)),
+            sourceSystem: SourceSystem.Manual, createdBy: null);
         AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
         order.Submit();
         order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
@@ -419,7 +408,6 @@ public class DeliveryOrderTests
         order.Confirm(weightFallbackKg: 500);
 
         var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
-        confirmed.SlaTier.Should().Be("Gold");
         confirmed.SubmittedAt.Should().Be(order.SubmittedAt);
     }
 
@@ -428,7 +416,7 @@ public class DeliveryOrderTests
     [Fact]
     public void ServiceWindow_Create_RejectsBothBoundsNull()
     {
-        var act = () => ServiceWindow.Create(earliest: null, latest: null);
+        var act = () => ServiceWindow.Create(earliestUtc: null, latestUtc: null);
 
         act.Should().Throw<ArgumentException>().WithMessage("*at least one bound*");
     }
@@ -437,7 +425,7 @@ public class DeliveryOrderTests
     public void ServiceWindow_Create_RejectsEarliestAfterLatest()
     {
         var now = DateTime.UtcNow;
-        var act = () => ServiceWindow.Create(earliest: now.AddHours(2), latest: now.AddHours(1));
+        var act = () => ServiceWindow.Create(earliestUtc: now.AddHours(2), latestUtc: now.AddHours(1));
 
         act.Should().Throw<ArgumentException>().WithMessage("*Earliest*on or before*Latest*");
     }
@@ -447,10 +435,10 @@ public class DeliveryOrderTests
     {
         var earliest = DateTime.UtcNow.AddHours(1);
 
-        var window = ServiceWindow.Create(earliest: earliest, latest: null);
+        var window = ServiceWindow.Create(earliestUtc: earliest, latestUtc: null);
 
-        window.Earliest.Should().Be(earliest);
-        window.Latest.Should().BeNull();
+        window.EarliestUtc.Should().Be(earliest);
+        window.LatestUtc.Should().BeNull();
     }
 
     [Fact]
@@ -458,10 +446,10 @@ public class DeliveryOrderTests
     {
         var latest = DateTime.UtcNow.AddHours(3);
 
-        var window = ServiceWindow.Create(earliest: null, latest: latest);
+        var window = ServiceWindow.Create(earliestUtc: null, latestUtc: latest);
 
-        window.Earliest.Should().BeNull();
-        window.Latest.Should().Be(latest);
+        window.EarliestUtc.Should().BeNull();
+        window.LatestUtc.Should().Be(latest);
     }
 
     [Fact]
@@ -490,8 +478,8 @@ public class DeliveryOrderTests
         order.Confirm(weightFallbackKg: 500);
 
         var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
-        confirmed.Earliest.Should().Be(earliest);
-        confirmed.Latest.Should().Be(latest);
+        confirmed.EarliestUtc.Should().Be(earliest);
+        confirmed.LatestUtc.Should().Be(latest);
     }
 
     [Fact]
@@ -502,8 +490,8 @@ public class DeliveryOrderTests
         // class-name bump (V1 → V2), this test fails loudly.
         var evt = new AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.DeliveryOrderConfirmedIntegrationEventV1(
             Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(),
-            Priority: "Normal", SlaTier: "Bronze",
-            Earliest: null, Latest: null, SubmittedAt: null,
+            Priority: "Normal",
+            EarliestUtc: null, LatestUtc: null, SubmittedAt: null,
             Items: Array.Empty<AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.ItemSummaryDto>());
 
         evt.SchemaVersion.Should().Be("1.0");
@@ -524,8 +512,8 @@ public class DeliveryOrderTests
         order.Confirm(weightFallbackKg: 500);
 
         var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
-        confirmed.Earliest.Should().BeNull();
-        confirmed.Latest.Should().BeNull();
+        confirmed.EarliestUtc.Should().BeNull();
+        confirmed.LatestUtc.Should().BeNull();
     }
 
     // ── P1-9: Quantity VO + UnitOfMeasure enum ──────────────────────────
@@ -607,23 +595,20 @@ public class DeliveryOrderTests
 
         order.AddItem(
             "WH-01", "LINE-01",
-            itemSeq: 1, sku: "PAPER",
+            itemSeq: 1, itemId: "PAPER",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(10, UnitOfMeasure.BOX),
-            cargoType: null, cargoSpecific: null);
+            quantity: Quantity.Create(10, UnitOfMeasure.BOX));
 
         order.AddItem(
             "WH-FLAM-01", "LINE-02",
-            itemSeq: 2, sku: "THINNER",
+            itemSeq: 2, itemId: "THINNER",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 25.0,
-            quantity: Quantity.Create(2, UnitOfMeasure.BOX),
-            cargoType: null, cargoSpecific: null,
-            hazmat: HazmatInfo.Create("3", PackingGroup.II));
+            quantity: Quantity.Create(2, UnitOfMeasure.BOX),            hazmat: HazmatInfo.Create("3", PackingGroup.II));
 
-        var paper = order.Items.Single(i => i.Sku == "PAPER");
-        var thinner = order.Items.Single(i => i.Sku == "THINNER");
+        var paper = order.Items.Single(i => i.ItemId == "PAPER");
+        var thinner = order.Items.Single(i => i.ItemId == "THINNER");
 
         paper.Hazmat.Should().BeNull();
         thinner.Hazmat.Should().NotBeNull();
@@ -637,26 +622,23 @@ public class DeliveryOrderTests
         var order = CreateOrder();
         order.AddItem(
             "WH-01", "STORE-05",
-            itemSeq: 1, sku: "SKU-CLEAN",
+            itemSeq: 1, itemId: "SKU-CLEAN",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(1, UnitOfMeasure.BOX),
-            cargoType: null, cargoSpecific: null);
+            quantity: Quantity.Create(1, UnitOfMeasure.BOX));
         order.AddItem(
             "WH-FLAM-01", "STORE-05",
-            itemSeq: 2, sku: "SKU-ACID",
+            itemSeq: 2, itemId: "SKU-ACID",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 10.0,
-            quantity: Quantity.Create(1, UnitOfMeasure.BOX),
-            cargoType: null, cargoSpecific: null,
-            hazmat: HazmatInfo.Create("8", PackingGroup.II));
+            quantity: Quantity.Create(1, UnitOfMeasure.BOX),            hazmat: HazmatInfo.Create("8", PackingGroup.II));
         order.Submit();
         order.MarkAsValidated(StationMap("WH-01", "WH-FLAM-01", "STORE-05"));
         order.Confirm(weightFallbackKg: 500);
 
         var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
-        var clean = confirmed.Items.Single(i => i.Sku == "SKU-CLEAN");
-        var acid = confirmed.Items.Single(i => i.Sku == "SKU-ACID");
+        var clean = confirmed.Items.Single(i => i.ItemId == "SKU-CLEAN");
+        var acid = confirmed.Items.Single(i => i.ItemId == "SKU-ACID");
 
         clean.Hazmat.Should().BeNull();
         acid.Hazmat.Should().NotBeNull();
@@ -707,24 +689,21 @@ public class DeliveryOrderTests
 
         order.AddItem(
             "WH-01", "LINE-01",
-            itemSeq: 1, sku: "PAPER",
+            itemSeq: 1, itemId: "PAPER",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(10, UnitOfMeasure.BOX),
-            cargoType: null, cargoSpecific: null);
+            quantity: Quantity.Create(10, UnitOfMeasure.BOX));
 
         order.AddItem(
             "WH-COLD-01", "LAB-FREEZER",
-            itemSeq: 2, sku: "VACCINE",
+            itemSeq: 2, itemId: "VACCINE",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 2.0,
-            quantity: Quantity.Create(1, UnitOfMeasure.BOX),
-            cargoType: null, cargoSpecific: null,
-            hazmat: null,
+            quantity: Quantity.Create(1, UnitOfMeasure.BOX),            hazmat: null,
             temperature: TemperatureRange.Create(2.0, 8.0));
 
-        var paper = order.Items.Single(i => i.Sku == "PAPER");
-        var vaccine = order.Items.Single(i => i.Sku == "VACCINE");
+        var paper = order.Items.Single(i => i.ItemId == "PAPER");
+        var vaccine = order.Items.Single(i => i.ItemId == "VACCINE");
 
         paper.Temperature.Should().BeNull();
         vaccine.Temperature.Should().NotBeNull();
@@ -738,27 +717,24 @@ public class DeliveryOrderTests
         var order = CreateOrder();
         order.AddItem(
             "WH-01", "STORE-05",
-            itemSeq: 1, sku: "SKU-AMBIENT",
+            itemSeq: 1, itemId: "SKU-AMBIENT",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(1, UnitOfMeasure.BOX),
-            cargoType: null, cargoSpecific: null);
+            quantity: Quantity.Create(1, UnitOfMeasure.BOX));
         order.AddItem(
             "WH-COLD-01", "STORE-05",
-            itemSeq: 2, sku: "SKU-COLD",
+            itemSeq: 2, itemId: "SKU-COLD",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 3.0,
-            quantity: Quantity.Create(1, UnitOfMeasure.BOX),
-            cargoType: null, cargoSpecific: null,
-            hazmat: null,
+            quantity: Quantity.Create(1, UnitOfMeasure.BOX),            hazmat: null,
             temperature: TemperatureRange.Create(minC: null, maxC: 8.0));
         order.Submit();
         order.MarkAsValidated(StationMap("WH-01", "WH-COLD-01", "STORE-05"));
         order.Confirm(weightFallbackKg: 500);
 
         var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
-        var ambient = confirmed.Items.Single(i => i.Sku == "SKU-AMBIENT");
-        var cold = confirmed.Items.Single(i => i.Sku == "SKU-COLD");
+        var ambient = confirmed.Items.Single(i => i.ItemId == "SKU-AMBIENT");
+        var cold = confirmed.Items.Single(i => i.ItemId == "SKU-COLD");
 
         ambient.Temperature.Should().BeNull();
         cold.Temperature.Should().NotBeNull();
@@ -785,12 +761,10 @@ public class DeliveryOrderTests
 
         order.AddItem(
             "WH-01", "LINE-01",
-            itemSeq: 1, sku: "GLASS",
+            itemSeq: 1, itemId: "GLASS",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(10, UnitOfMeasure.BOX),
-            cargoType: null, cargoSpecific: null,
-            hazmat: null, temperature: null,
+            quantity: Quantity.Create(10, UnitOfMeasure.BOX),            hazmat: null, temperature: null,
             handlingInstructions: instructions);
 
         var item = order.Items.Single();
@@ -810,12 +784,10 @@ public class DeliveryOrderTests
 
         order.AddItem(
             "WH-01", "LINE-01",
-            itemSeq: 1, sku: "GLASS",
+            itemSeq: 1, itemId: "GLASS",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(10, UnitOfMeasure.BOX),
-            cargoType: null, cargoSpecific: null,
-            hazmat: null, temperature: null,
+            quantity: Quantity.Create(10, UnitOfMeasure.BOX),            hazmat: null, temperature: null,
             handlingInstructions: withDupes);
 
         var item = order.Items.Single();
@@ -831,12 +803,10 @@ public class DeliveryOrderTests
 
         order.AddItem(
             "WH-01", "LINE-01",
-            itemSeq: 1, sku: "PLAIN",
+            itemSeq: 1, itemId: "PLAIN",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(10, UnitOfMeasure.BOX),
-            cargoType: null, cargoSpecific: null,
-            hazmat: null, temperature: null,
+            quantity: Quantity.Create(10, UnitOfMeasure.BOX),            hazmat: null, temperature: null,
             handlingInstructions: null);
 
         order.Items.Single().HandlingInstructions.Should().BeEmpty();
@@ -849,12 +819,10 @@ public class DeliveryOrderTests
         AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-PLAIN");
         order.AddItem(
             "WH-01", "STORE-05",
-            itemSeq: 2, sku: "SKU-GLASS",
+            itemSeq: 2, itemId: "SKU-GLASS",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(10, UnitOfMeasure.BOX),
-            cargoType: null, cargoSpecific: null,
-            hazmat: null, temperature: null,
+            quantity: Quantity.Create(10, UnitOfMeasure.BOX),            hazmat: null, temperature: null,
             handlingInstructions: new[]
             {
                 HandlingInstruction.Fragile,
@@ -865,8 +833,8 @@ public class DeliveryOrderTests
         order.Confirm(weightFallbackKg: 500);
 
         var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
-        var plain = confirmed.Items.Single(i => i.Sku == "SKU-PLAIN");
-        var glass = confirmed.Items.Single(i => i.Sku == "SKU-GLASS");
+        var plain = confirmed.Items.Single(i => i.ItemId == "SKU-PLAIN");
+        var glass = confirmed.Items.Single(i => i.ItemId == "SKU-GLASS");
 
         plain.HandlingInstructions.Should().BeNull();   // empty list serialized as null on the event
         glass.HandlingInstructions.Should().NotBeNull();
@@ -880,11 +848,10 @@ public class DeliveryOrderTests
 
         order.AddItem(
             "WH-01", "LINE-01",
-            itemSeq: 1, sku: "SKU-Q",
+            itemSeq: 1, itemId: "SKU-Q",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(12, UnitOfMeasure.BOX),
-            cargoType: null, cargoSpecific: null);
+            quantity: Quantity.Create(12, UnitOfMeasure.BOX));
 
         var item = order.Items.Single();
         item.Quantity.Value.Should().Be(12);

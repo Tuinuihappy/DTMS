@@ -20,8 +20,8 @@ internal static class SubmitReadinessCheck
         {
             var prefix = $"Item seq {item.ItemSeq}";
 
-            if (string.IsNullOrWhiteSpace(item.Sku))
-                errors.Add($"{prefix}: Sku is required.");
+            if (string.IsNullOrWhiteSpace(item.ItemId))
+                errors.Add($"{prefix}: ItemId is required.");
             if (string.IsNullOrWhiteSpace(item.PickupLocationCode))
                 errors.Add($"{prefix}: PickupLocationCode is required.");
             if (string.IsNullOrWhiteSpace(item.DropLocationCode))

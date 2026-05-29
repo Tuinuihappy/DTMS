@@ -10,7 +10,7 @@ public record OrderContextDto(Guid Id, string OrderRef, OrderStatus OrderStatus,
 public record ItemSearchResultDto(
     Guid Id,
     int ItemSeq,
-    string Sku,
+    string ItemId,
     string? Description,
     string PickupLocationCode,
     string DropLocationCode,
@@ -20,8 +20,6 @@ public record ItemSearchResultDto(
     DimensionsDto? Dimensions,
     double? WeightKg,
     QuantityDto Quantity,
-    CargoType? CargoType,
-    CargoSpecificDto? CargoSpecific,
     HazmatDto? Hazmat,
     TemperatureRangeDto? Temperature,
     IReadOnlyList<HandlingInstruction> HandlingInstructions,
@@ -29,23 +27,12 @@ public record ItemSearchResultDto(
     OrderContextDto Order);
 
 public record SearchItemsQuery(
-    string? Sku,
-    CargoType? CargoType,
+    string? ItemId,
     ItemStatus? Status,
     string? PickupCode,
     Guid? PickupStationId,
     string? DropCode,
     Guid? DropStationId,
-    string? PartNo,
-    string? Wo,
-    string? Line,
-    string? Vendor,
-    string? DateCode,
-    string? TradingCode,
-    string? InventoryNo,
-    string? Po,
-    string? TraceId,
-    string? LotNo,
     int Page = 1,
     int PageSize = 20
 ) : IQuery<PagedResult<ItemSearchResultDto>>;
@@ -61,11 +48,9 @@ public class SearchItemsQueryHandler : IQueryHandler<SearchItemsQuery, PagedResu
         var pageSize = request.PageSize <= 0 ? 20 : request.PageSize;
 
         var (items, totalCount) = await _repo.SearchItemsAsync(
-            request.Sku, request.CargoType, request.Status,
+            request.ItemId, request.Status,
             request.PickupCode, request.PickupStationId,
             request.DropCode, request.DropStationId,
-            request.PartNo, request.Wo, request.Line, request.Vendor, request.DateCode, request.TradingCode,
-            request.InventoryNo, request.Po, request.TraceId, request.LotNo,
             page, pageSize, cancellationToken);
 
         var orderIds = items.Select(i => i.DeliveryOrderId).Distinct();
@@ -80,7 +65,7 @@ public class SearchItemsQueryHandler : IQueryHandler<SearchItemsQuery, PagedResu
                 return new ItemSearchResultDto(
                     i.Id,
                     i.ItemSeq,
-                    i.Sku,
+                    i.ItemId,
                     i.Description,
                     i.PickupLocationCode,
                     i.DropLocationCode,
@@ -90,10 +75,6 @@ public class SearchItemsQueryHandler : IQueryHandler<SearchItemsQuery, PagedResu
                     i.Dimensions is { } d ? new DimensionsDto(d.LengthMm, d.WidthMm, d.HeightMm, d.VolumeCBM) : null,
                     i.WeightKg,
                     new QuantityDto(i.Quantity.Value, i.Quantity.Uom.ToString()),
-                    i.CargoType,
-                    i.CargoSpecific is { } cs
-                        ? new CargoSpecificDto(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
-                        : null,
                     i.Hazmat is { } hz ? new HazmatDto(hz.ClassCode, hz.PackingGroup) : null,
                     i.Temperature is { } tr ? new TemperatureRangeDto(tr.MinC, tr.MaxC) : null,
                     i.HandlingInstructions,

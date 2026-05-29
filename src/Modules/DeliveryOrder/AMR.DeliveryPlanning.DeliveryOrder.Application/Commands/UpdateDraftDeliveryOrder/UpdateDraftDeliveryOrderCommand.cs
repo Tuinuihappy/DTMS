@@ -12,5 +12,6 @@ public record UpdateDraftDeliveryOrderCommand(
     Priority Priority,
     ServiceWindowDto? ServiceWindow,
     List<CommandItemDto> Items,
-    SlaTier SlaTier = SlaTier.Bronze
+    string? RequestedBy = null,
+    string? Notes = null
 ) : ICommand<DeliveryOrderDetailDto>;

@@ -8,26 +8,14 @@ public record DimensionsDto(double LengthMm, double WidthMm, double HeightMm);
 
 public record QuantityDto(double Value, string Uom);
 
-public record ServiceWindowDto(DateTime? Earliest, DateTime? Latest);
-
-public record CargoSpecificDto(
-    string? PartNo,
-    string? Wo,
-    string? Line,
-    string? Vendor,
-    string? DateCode,
-    string? TradingCode,
-    string? InventoryNo,
-    string? Po,
-    string? TraceId,
-    string? LotNo);
+public record ServiceWindowDto(DateTime? EarliestUtc, DateTime? LatestUtc);
 
 public record HazmatDto(string ClassCode, PackingGroup? PackingGroup);
 
 public record TemperatureRangeDto(double? MinC, double? MaxC);
 
 public record ItemDto(
-    string Sku,
+    string ItemId,
     string? Description,
     string PickupLocationCode,
     string DropLocationCode,
@@ -35,8 +23,6 @@ public record ItemDto(
     DimensionsDto? Dimensions,
     double? WeightKg,
     QuantityDto Quantity,
-    CargoType? CargoType,
-    CargoSpecificDto? CargoSpecific,
     HazmatDto? Hazmat = null,
     TemperatureRangeDto? Temperature = null,
     IReadOnlyList<HandlingInstruction>? HandlingInstructions = null);
@@ -46,7 +32,6 @@ public record CreateDraftDeliveryOrderCommand(
     ServiceWindowDto? ServiceWindow,
     List<ItemDto> Items,
     Priority Priority = Priority.Normal,
-    SourceSystem SourceSystem = SourceSystem.Manual,
-    string? CreatedBy = null,
-    SlaTier SlaTier = SlaTier.Bronze
+    string? RequestedBy = null,
+    string? Notes = null
 ) : ICommand<DeliveryOrderDetailDto>;

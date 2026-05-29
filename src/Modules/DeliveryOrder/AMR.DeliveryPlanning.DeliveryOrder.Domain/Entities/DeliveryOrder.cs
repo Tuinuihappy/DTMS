@@ -10,11 +10,12 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     public string OrderRef { get; private set; } = string.Empty;
     public SourceSystem SourceSystem { get; private set; }
     public Priority Priority { get; private set; }
-    public SlaTier SlaTier { get; private set; } = SlaTier.Bronze;
     public OrderStatus Status { get; private set; }
     public ServiceWindow? ServiceWindow { get; private set; }
     public DateTime? SubmittedAt { get; private set; }
     public string? CreatedBy { get; private set; }
+    public string? RequestedBy { get; private set; }
+    public string? Notes { get; private set; }
     public DateTime CreatedDate { get; private set; }
     public DateTime? UpdatedDate { get; private set; }
     public double TotalWeightKg { get; private set; }
@@ -31,18 +32,19 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     public static DeliveryOrder Create(string orderRef, Priority priority,
         ServiceWindow? serviceWindow, SourceSystem sourceSystem = SourceSystem.Manual,
-        string? createdBy = null, SlaTier slaTier = SlaTier.Bronze)
+        string? createdBy = null, string? requestedBy = null, string? notes = null)
     {
         var order = new DeliveryOrder
         {
             Id = Guid.NewGuid(),
             OrderRef = orderRef,
             Priority = priority,
-            SlaTier = slaTier,
             ServiceWindow = serviceWindow,
             Status = OrderStatus.Draft,
             SourceSystem = sourceSystem,
-            CreatedBy = createdBy
+            CreatedBy = createdBy,
+            RequestedBy = requestedBy,
+            Notes = notes
         };
 
         order.AddDomainEvent(new DeliveryOrderDraftedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, order.Id));
@@ -51,7 +53,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     public static DeliveryOrder CreateFromUpstream(string orderRef, Priority priority,
         ServiceWindow? serviceWindow, SourceSystem sourceSystem, string? createdBy = null,
-        SlaTier slaTier = SlaTier.Bronze)
+        string? requestedBy = null, string? notes = null)
     {
         if (sourceSystem == SourceSystem.Manual)
             throw new InvalidOperationException("Upstream orders cannot have Manual source system.");
@@ -61,12 +63,13 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             Id = Guid.NewGuid(),
             OrderRef = orderRef,
             Priority = priority,
-            SlaTier = slaTier,
             ServiceWindow = serviceWindow,
             Status = OrderStatus.Submitted,
             SubmittedAt = DateTime.UtcNow,
             SourceSystem = sourceSystem,
-            CreatedBy = createdBy
+            CreatedBy = createdBy,
+            RequestedBy = requestedBy,
+            Notes = notes
         };
 
         order.AddDomainEvent(new DeliveryOrderSubmittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, order.Id));
@@ -74,15 +77,16 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     }
 
     public void UpdateDraft(string orderRef, Priority priority, ServiceWindow? serviceWindow,
-        SlaTier slaTier = SlaTier.Bronze)
+        string? requestedBy = null, string? notes = null)
     {
         if (Status != OrderStatus.Draft)
             throw new InvalidOperationException($"Only Draft orders can be edited. Current status: {Status}.");
 
         OrderRef = orderRef;
         Priority = priority;
-        SlaTier = slaTier;
         ServiceWindow = serviceWindow;
+        RequestedBy = requestedBy;
+        Notes = notes;
 
         _items.Clear();
         TotalWeightKg = 0;
@@ -106,11 +110,9 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     public void AddItem(
         string pickupLocationCode, string dropLocationCode,
-        int itemSeq, string sku, string? description,
+        int itemSeq, string itemId, string? description,
         string? loadUnitProfileCode,
         Dimensions? dimensions, double? weightKg, Quantity quantity,
-        CargoType? cargoType,
-        CargoSpecific? cargoSpecific = null,
         HazmatInfo? hazmat = null,
         TemperatureRange? temperature = null,
         IReadOnlyList<HandlingInstruction>? handlingInstructions = null)
@@ -118,7 +120,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         if (_items.Any(p => p.ItemSeq == itemSeq))
             throw new InvalidOperationException($"An item with seq '{itemSeq}' already exists in this order.");
 
-        _items.Add(new Item(Id, pickupLocationCode, dropLocationCode, itemSeq, sku, description, loadUnitProfileCode, dimensions, weightKg, quantity, cargoType, cargoSpecific, hazmat, temperature, handlingInstructions));
+        _items.Add(new Item(Id, pickupLocationCode, dropLocationCode, itemSeq, itemId, description, loadUnitProfileCode, dimensions, weightKg, quantity, hazmat, temperature, handlingInstructions));
         TotalWeightKg += weightKg ?? 0;
         TotalQuantity += quantity.Value;
         TotalItems++;
@@ -130,11 +132,11 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             item.UpdateStatus(status);
     }
 
-    public void MarkItemsDelivered(IEnumerable<string> skus)
+    public void MarkItemsDelivered(IEnumerable<string> itemIds)
     {
-        var skuSet = new HashSet<string>(skus, StringComparer.OrdinalIgnoreCase);
+        var idSet = new HashSet<string>(itemIds, StringComparer.OrdinalIgnoreCase);
         foreach (var item in _items)
-            if (skuSet.Contains(item.Sku))
+            if (idSet.Contains(item.ItemId))
                 item.UpdateStatus(ItemStatus.Delivered);
     }
 
@@ -187,7 +189,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     {
         var itemDtos = _items
             .Select(p => new ItemEventDto(
-                p.Sku, p.WeightKg ?? weightFallbackKg,
+                p.ItemId, p.WeightKg ?? weightFallbackKg,
                 p.PickupStationId!.Value, p.DropStationId!.Value,
                 p.Hazmat is { } hz ? new ItemHazmatDto(hz.ClassCode, hz.PackingGroup?.ToString()) : null,
                 p.Temperature is { } tr ? new ItemTemperatureDto(tr.MinC, tr.MaxC) : null,
@@ -197,8 +199,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             .ToList();
 
         return new DeliveryOrderConfirmedDomainEvent(
-            Guid.NewGuid(), DateTime.UtcNow, Id, Priority.ToString(), SlaTier.ToString(),
-            ServiceWindow?.Earliest, ServiceWindow?.Latest,
+            Guid.NewGuid(), DateTime.UtcNow, Id, Priority.ToString(),
+            ServiceWindow?.EarliestUtc, ServiceWindow?.LatestUtc,
             SubmittedAt, itemDtos);
     }
 

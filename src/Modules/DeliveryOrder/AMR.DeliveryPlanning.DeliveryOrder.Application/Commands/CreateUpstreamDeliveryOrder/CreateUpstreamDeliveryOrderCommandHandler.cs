@@ -18,6 +18,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
     private readonly IOrderAuditEventRepository _auditRepo;
     private readonly IStationValidationService _stationValidation;
     private readonly IUomNormalizer _uomNormalizer;
+    private readonly ICurrentUserAccessor _currentUser;
     private readonly DeliveryOrderOptions _options;
     private readonly ILogger<CreateUpstreamDeliveryOrderCommandHandler> _logger;
 
@@ -26,6 +27,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         IOrderAuditEventRepository auditRepo,
         IStationValidationService stationValidation,
         IUomNormalizer uomNormalizer,
+        ICurrentUserAccessor currentUser,
         IOptions<DeliveryOrderOptions> options,
         ILogger<CreateUpstreamDeliveryOrderCommandHandler> logger)
     {
@@ -33,6 +35,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         _auditRepo = auditRepo;
         _stationValidation = stationValidation;
         _uomNormalizer = uomNormalizer;
+        _currentUser = currentUser;
         _options = options.Value;
         _logger = logger;
     }
@@ -53,11 +56,12 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         try
         {
             var serviceWindow = Domain.ValueObjects.ServiceWindow.Create(
-                request.ServiceWindow.Earliest, request.ServiceWindow.Latest);
+                request.ServiceWindow.EarliestUtc, request.ServiceWindow.LatestUtc);
 
             order = Domain.Entities.DeliveryOrder.CreateFromUpstream(
                 request.OrderRef, request.Priority, serviceWindow,
-                request.SourceSystem, request.CreatedBy, request.SlaTier);
+                request.SourceSystem, _currentUser.GetCurrentUserName(),
+                request.RequestedBy, request.Notes);
 
             foreach (var (item, idx) in request.Items.Select((p, i) => (p, i + 1)))
             {
@@ -68,15 +72,11 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
 
                 order.AddItem(
                     item.PickupLocationCode, item.DropLocationCode,
-                    idx, item.Sku, item.Description,
+                    idx, item.ItemId, item.Description,
                     item.LoadUnitProfileCode,
                     item.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                     item.WeightKg,
                     Quantity.Create(item.Quantity.Value, uom.Value),
-                    item.CargoType,
-                    item.CargoSpecific is { } cs
-                        ? CargoSpecific.Create(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
-                        : null,
                     item.Hazmat is { } hz
                         ? HazmatInfo.Create(hz.ClassCode, hz.PackingGroup)
                         : null,
@@ -107,7 +107,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
             await _repository.AddAsync(order, cancellationToken);
             await _auditRepo.AddAsync(new OrderAuditEvent(
                 order.Id, "OrderUpstreamIngested",
-                $"Order '{order.OrderRef}' ingested from {order.SourceSystem} by {request.CreatedBy} — auto-confirmed and queued for planning"), cancellationToken);
+                $"Order '{order.OrderRef}' ingested from {order.SourceSystem} by {order.CreatedBy ?? "system"} — auto-confirmed and queued for planning"), cancellationToken);
 
             var warnings = WeightWarningEvaluator.Evaluate(order.Items);
             foreach (var w in warnings)

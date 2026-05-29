@@ -1,4 +1,3 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
@@ -51,13 +50,13 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
             ? _context.DeliveryOrders.CountAsync(o => o.Status == status.Value, cancellationToken)
             : _context.DeliveryOrders.CountAsync(cancellationToken);
 
-    public async Task<List<Domain.Entities.DeliveryOrder>> GetOrdersByItemSkusAsync(
-        IEnumerable<string> skus, CancellationToken cancellationToken = default)
+    public async Task<List<Domain.Entities.DeliveryOrder>> GetOrdersByItemIdsAsync(
+        IEnumerable<string> itemIds, CancellationToken cancellationToken = default)
     {
-        var skuList = skus.ToList();
+        var idList = itemIds.ToList();
         return await _context.DeliveryOrders
             .Include(o => o.Items)
-            .Where(o => o.Items.Any(p => skuList.Contains(p.Sku)))
+            .Where(o => o.Items.Any(p => idList.Contains(p.ItemId)))
             .ToListAsync(cancellationToken);
     }
 
@@ -72,19 +71,15 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
     }
 
     public async Task<(List<Domain.Entities.Item> Items, int TotalCount)> SearchItemsAsync(
-        string? sku, Domain.Enums.CargoType? cargoType, Domain.Enums.ItemStatus? status,
+        string? itemId, Domain.Enums.ItemStatus? status,
         string? pickupCode, Guid? pickupStationId,
         string? dropCode, Guid? dropStationId,
-        string? partNo, string? wo, string? line, string? vendor, string? dateCode, string? tradingCode,
-        string? inventoryNo, string? po, string? traceId, string? lotNo,
         int page, int pageSize, CancellationToken cancellationToken = default)
     {
         var query = _context.Items.AsNoTracking().AsQueryable();
 
-        if (!string.IsNullOrEmpty(sku))
-            query = query.Where(i => i.Sku.Contains(sku));
-        if (cargoType.HasValue)
-            query = query.Where(i => i.CargoType == cargoType.Value);
+        if (!string.IsNullOrEmpty(itemId))
+            query = query.Where(i => i.ItemId.Contains(itemId));
         if (status.HasValue)
             query = query.Where(i => i.Status == status.Value);
         if (!string.IsNullOrEmpty(pickupCode))
@@ -95,26 +90,6 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
             query = query.Where(i => i.DropLocationCode == dropCode);
         if (dropStationId.HasValue)
             query = query.Where(i => i.DropStationId == dropStationId.Value);
-        if (!string.IsNullOrEmpty(partNo))
-            query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.PartNo != null && i.CargoSpecific.PartNo.Contains(partNo));
-        if (!string.IsNullOrEmpty(wo))
-            query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.Wo == wo);
-        if (!string.IsNullOrEmpty(line))
-            query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.Line == line);
-        if (!string.IsNullOrEmpty(vendor))
-            query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.Vendor != null && i.CargoSpecific.Vendor.Contains(vendor));
-        if (!string.IsNullOrEmpty(dateCode))
-            query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.DateCode == dateCode);
-        if (!string.IsNullOrEmpty(tradingCode))
-            query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.TradingCode == tradingCode);
-        if (!string.IsNullOrEmpty(inventoryNo))
-            query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.InventoryNo != null && i.CargoSpecific.InventoryNo.Contains(inventoryNo));
-        if (!string.IsNullOrEmpty(po))
-            query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.Po == po);
-        if (!string.IsNullOrEmpty(traceId))
-            query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.TraceId == traceId);
-        if (!string.IsNullOrEmpty(lotNo))
-            query = query.Where(i => i.CargoSpecific != null && i.CargoSpecific.LotNo != null && i.CargoSpecific.LotNo.Contains(lotNo));
 
         var totalCount = await query.CountAsync(cancellationToken);
         var items = await query

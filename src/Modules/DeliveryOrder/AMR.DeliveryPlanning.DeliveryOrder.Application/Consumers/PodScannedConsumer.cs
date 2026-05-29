@@ -7,8 +7,11 @@ using Microsoft.Extensions.Logging;
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Consumers;
 
 /// <summary>
-/// Listens for PodCapturedIntegrationEvent and matches scanned barcodes to OrderItems.
-/// Flow: Dispatch (POD scanned) → DeliveryOrder (OrderItem statuses updated to Delivered)
+/// Listens for PodCapturedIntegrationEvent and matches scanned upstream ItemIds
+/// to OrderItems. ScannedIds carries the same identifier the upstream system
+/// used when creating the order (e.g. SAP item id, barcode), which is stored
+/// on Item.ItemId — a one-to-one match by design.
+/// Flow: Dispatch (POD scanned) → DeliveryOrder (OrderItem statuses → Delivered)
 /// </summary>
 public class PodScannedConsumer : IConsumer<PodCapturedIntegrationEvent>
 {
@@ -27,18 +30,18 @@ public class PodScannedConsumer : IConsumer<PodCapturedIntegrationEvent>
 
         if (evt.ScannedIds is null || evt.ScannedIds.Count == 0)
         {
-            _logger.LogInformation("[PodScan] Trip {TripId} POD captured with no scanned IDs — skipping barcode match.", evt.TripId);
+            _logger.LogInformation("[PodScan] Trip {TripId} POD captured with no scanned IDs — skipping match.", evt.TripId);
             return;
         }
 
-        _logger.LogInformation("[PodScan] Trip {TripId}: matching {Count} scanned barcode(s) to OrderItems.",
+        _logger.LogInformation("[PodScan] Trip {TripId}: matching {Count} scanned ItemId(s) to OrderItems.",
             evt.TripId, evt.ScannedIds.Count);
 
-        var orders = await _repository.GetOrdersByItemSkusAsync(evt.ScannedIds, context.CancellationToken);
+        var orders = await _repository.GetOrdersByItemIdsAsync(evt.ScannedIds, context.CancellationToken);
 
         if (orders.Count == 0)
         {
-            _logger.LogWarning("[PodScan] Trip {TripId}: no OrderItems matched scanned barcodes {Barcodes}.",
+            _logger.LogWarning("[PodScan] Trip {TripId}: no OrderItems matched scanned ItemIds {ItemIds}.",
                 evt.TripId, string.Join(", ", evt.ScannedIds));
             return;
         }
@@ -62,7 +65,7 @@ public class PodScannedConsumer : IConsumer<PodCapturedIntegrationEvent>
             }
         }
 
-        _logger.LogInformation("[PodScan] ✓ Barcode matching complete for Trip {TripId} — {OrderCount} order(s) updated.",
+        _logger.LogInformation("[PodScan] ✓ ItemId matching complete for Trip {TripId} — {OrderCount} order(s) updated.",
             evt.TripId, orders.Count);
     }
 }

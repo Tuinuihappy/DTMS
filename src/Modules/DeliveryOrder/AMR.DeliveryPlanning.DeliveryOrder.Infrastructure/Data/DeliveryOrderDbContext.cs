@@ -33,14 +33,15 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(o => o.TotalItems).IsRequired();
             b.Property(o => o.SourceSystem).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20).IsRequired();
-            b.Property(o => o.SlaTier).HasConversion<string>().HasMaxLength(10).IsRequired();
             b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
+            b.Property(o => o.RequestedBy).HasMaxLength(200);
+            b.Property(o => o.Notes).HasMaxLength(1000);
             b.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion().IsConcurrencyToken();
             b.Ignore(o => o.DomainEvents);
             b.OwnsOne(o => o.ServiceWindow, sw =>
             {
-                sw.Property(x => x.Earliest).HasColumnName("ServiceWindow_Earliest");
-                sw.Property(x => x.Latest).HasColumnName("ServiceWindow_Latest");
+                sw.Property(x => x.EarliestUtc).HasColumnName("ServiceWindow_EarliestUtc");
+                sw.Property(x => x.LatestUtc).HasColumnName("ServiceWindow_LatestUtc");
             });
             b.Property(o => o.SubmittedAt);
 
@@ -68,8 +69,7 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(p => p.PickupStationId);
             b.Property(p => p.DropStationId);
             b.Property(p => p.ItemSeq).IsRequired();
-            b.Property(p => p.Sku).HasMaxLength(100).IsRequired();
-            b.Property(p => p.CargoType).HasConversion<string>().HasMaxLength(30);
+            b.Property(p => p.ItemId).HasMaxLength(100).IsRequired();
             b.OwnsOne(p => p.Dimensions, d =>
             {
                 d.Property(x => x.LengthMm).HasColumnName("LengthMm");
@@ -78,7 +78,7 @@ public class DeliveryOrderDbContext : DbContext
                 d.Ignore(x => x.VolumeCBM);
             });
             b.HasIndex(p => new { p.DeliveryOrderId, p.ItemSeq }).IsUnique();
-            b.HasIndex(p => p.Sku);
+            b.HasIndex(p => new { p.DeliveryOrderId, p.ItemId }).IsUnique();
             b.Property(p => p.WeightKg);
             // Quantity is mapped as an owned value object. Column names are kept
             // as "Quantity" and "Uom" via HasColumnName so the existing schema
@@ -91,19 +91,6 @@ public class DeliveryOrderDbContext : DbContext
             });
             b.Property(p => p.LoadUnitProfileCode).HasMaxLength(50);
             b.Property(p => p.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
-            b.OwnsOne(p => p.CargoSpecific, cs =>
-            {
-                cs.Property(x => x.PartNo).HasColumnName("PartNo").HasMaxLength(100);
-                cs.Property(x => x.Wo).HasColumnName("Wo").HasMaxLength(100);
-                cs.Property(x => x.Line).HasColumnName("Line").HasMaxLength(100);
-                cs.Property(x => x.Vendor).HasColumnName("Vendor").HasMaxLength(200);
-                cs.Property(x => x.DateCode).HasColumnName("DateCode").HasMaxLength(50);
-                cs.Property(x => x.TradingCode).HasColumnName("TradingCode").HasMaxLength(100);
-                cs.Property(x => x.InventoryNo).HasColumnName("InventoryNo").HasMaxLength(100);
-                cs.Property(x => x.Po).HasColumnName("Po").HasMaxLength(100);
-                cs.Property(x => x.TraceId).HasColumnName("TraceId").HasMaxLength(100);
-                cs.Property(x => x.LotNo).HasColumnName("LotNo").HasMaxLength(100);
-            });
             b.OwnsOne(p => p.Hazmat, hz =>
             {
                 hz.Property(x => x.ClassCode).HasColumnName("Hazmat_ClassCode").HasMaxLength(10);

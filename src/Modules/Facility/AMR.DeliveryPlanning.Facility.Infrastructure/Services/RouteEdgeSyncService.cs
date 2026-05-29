@@ -41,12 +41,30 @@ public sealed class RouteEdgeSyncService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         // Wait for MapStationSyncService to complete first run before syncing edges
-        await Task.Delay(_startupDelay, stoppingToken);
+        try { await Task.Delay(_startupDelay, stoppingToken); }
+        catch (OperationCanceledException) { return; }
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await SyncAllMapsAsync(stoppingToken);
-            await Task.Delay(_interval, stoppingToken);
+            try
+            {
+                await SyncAllMapsAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                // Host shutting down — exit cleanly
+                return;
+            }
+            catch (Exception ex)
+            {
+                // Outer safety net: a transient infra failure must not tear down the host.
+                // Polly handles HTTP-layer retries; this catches anything that escapes
+                // (DB errors, vendor outage past circuit-breaker, etc.) so we retry next interval.
+                _logger.LogError(ex, "RouteEdgeSyncService: sync cycle failed — will retry next interval");
+            }
+
+            try { await Task.Delay(_interval, stoppingToken); }
+            catch (OperationCanceledException) { return; }
         }
     }
 
@@ -70,7 +88,21 @@ public sealed class RouteEdgeSyncService : BackgroundService
         foreach (var map in maps)
         {
             if (ct.IsCancellationRequested) break;
-            await SyncMapAsync(db, map, ct);
+            try
+            {
+                await SyncMapAsync(db, map, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Per-map isolation: failure on map A must not block map B
+                _logger.LogWarning(ex,
+                    "RouteEdgeSyncService: map {MapId} ({Name}) sync failed — continuing with next map",
+                    map.Id, map.Name);
+            }
         }
     }
 

@@ -36,7 +36,7 @@ public class DomainEventMapperTests
 
         var result = new DeliveryOrderDomainEventMapper()
             .Map(new DeliveryOrderConfirmedDomainEvent(
-                eventId, occurredOn, orderId, "High", "Gold",
+                eventId, occurredOn, orderId, "High",
                 earliest, latest, submittedAt, items))
             .Should().ContainSingle().Subject
             .Should().BeOfType<DeliveryOrderConfirmedIntegrationEventV1>().Subject;
@@ -45,9 +45,8 @@ public class DomainEventMapperTests
         result.OccurredOn.Should().Be(occurredOn);
         result.DeliveryOrderId.Should().Be(orderId);
         result.Priority.Should().Be("High");
-        result.SlaTier.Should().Be("Gold");
-        result.Earliest.Should().Be(earliest);
-        result.Latest.Should().Be(latest);
+        result.EarliestUtc.Should().Be(earliest);
+        result.LatestUtc.Should().Be(latest);
         result.SubmittedAt.Should().Be(submittedAt);
         result.SchemaVersion.Should().Be("1.0");
         result.Items.Should().ContainSingle()

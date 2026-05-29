@@ -12,15 +12,18 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
     private readonly IDeliveryOrderRepository _repo;
     private readonly IStationValidationService _stationValidation;
     private readonly IUomNormalizer _uomNormalizer;
+    private readonly ICurrentUserAccessor _currentUser;
 
     public BulkSubmitDeliveryOrdersCommandHandler(
         IDeliveryOrderRepository repo,
         IStationValidationService stationValidation,
-        IUomNormalizer uomNormalizer)
+        IUomNormalizer uomNormalizer,
+        ICurrentUserAccessor currentUser)
     {
         _repo = repo;
         _stationValidation = stationValidation;
         _uomNormalizer = uomNormalizer;
+        _currentUser = currentUser;
     }
 
     public async Task<Result<BulkSubmitResult>> Handle(BulkSubmitDeliveryOrdersCommand request, CancellationToken cancellationToken)
@@ -48,12 +51,13 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
             try
             {
                 var serviceWindow = cmd.ServiceWindow is { } sw
-                    ? Domain.ValueObjects.ServiceWindow.Create(sw.Earliest, sw.Latest)
+                    ? Domain.ValueObjects.ServiceWindow.Create(sw.EarliestUtc, sw.LatestUtc)
                     : null;
 
                 order = Domain.Entities.DeliveryOrder.Create(
                     cmd.OrderRef, cmd.Priority, serviceWindow,
-                    cmd.SourceSystem, cmd.CreatedBy, cmd.SlaTier);
+                    Domain.Enums.SourceSystem.Manual, _currentUser.GetCurrentUserName(),
+                    cmd.RequestedBy, cmd.Notes);
 
                 var uomFailureForOrder = false;
                 foreach (var (pkg, idx) in cmd.Items.Select((p, i) => (p, i + 1)))
@@ -69,15 +73,11 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
 
                     order.AddItem(
                         pkg.PickupLocationCode, pkg.DropLocationCode,
-                        idx, pkg.Sku, pkg.Description,
+                        idx, pkg.ItemId, pkg.Description,
                         pkg.LoadUnitProfileCode,
                         pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                         pkg.WeightKg,
                         Quantity.Create(pkg.Quantity.Value, uom.Value),
-                        pkg.CargoType,
-                        pkg.CargoSpecific is { } cs
-                            ? CargoSpecific.Create(cs.PartNo, cs.Wo, cs.Line, cs.Vendor, cs.DateCode, cs.TradingCode, cs.InventoryNo, cs.Po, cs.TraceId, cs.LotNo)
-                            : null,
                         pkg.Hazmat is { } hz
                             ? HazmatInfo.Create(hz.ClassCode, hz.PackingGroup)
                             : null,
