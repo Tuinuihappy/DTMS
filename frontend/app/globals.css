@@ -139,9 +139,10 @@
   }
   html {
     @apply font-sans antialiased;
-    /* Use SF Pro-style stylistic alternates when the font supports them.
-       Geist (default) implements a few that nudge it closer to SF. */
-    font-feature-settings: "ss01", "cv11";
+    /* Google Sans is well-balanced by default — no stylistic alternates
+       needed. Enable contextual alternates + kerning for clean ligature
+       handling (e.g. `fi`, `fl`). */
+    font-feature-settings: "calt", "kern";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
