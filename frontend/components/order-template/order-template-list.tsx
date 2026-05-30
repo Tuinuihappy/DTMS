@@ -90,7 +90,7 @@ export function OrderTemplateList({
         </label>
       </div>
 
-      <ScrollArea className="h-44 rounded-md border">
+      <ScrollArea className="glass-subtle h-48 rounded-2xl">
         <div className="space-y-1 p-2">
           {query.isLoading ? (
             <p className="p-3 text-xs text-muted-foreground">Loading…</p>
@@ -111,9 +111,11 @@ export function OrderTemplateList({
                 type="button"
                 onClick={() => onSelect(t.id)}
                 className={cn(
-                  "group flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-left transition hover:bg-accent",
-                  selectedId === t.id && "border-border bg-accent",
-                  !t.isActive && "opacity-60"
+                  "group flex w-full items-center gap-2 rounded-xl border border-transparent px-2.5 py-2 text-left transition-all duration-150",
+                  "hover:bg-white/50 hover:ring-1 hover:ring-indigo-400/20 dark:hover:bg-white/[0.04]",
+                  selectedId === t.id &&
+                    "border-indigo-300/40 bg-white/65 shadow-sm shadow-indigo-500/10 dark:border-indigo-400/30 dark:bg-white/[0.06]",
+                  !t.isActive && "opacity-55"
                 )}
               >
                 <ChevronRight

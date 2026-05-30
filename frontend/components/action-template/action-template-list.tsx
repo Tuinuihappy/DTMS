@@ -46,32 +46,36 @@ export function ActionTemplateList() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+      <div className="flex items-center justify-between gap-2 border-b border-white/40 px-5 py-4 dark:border-white/10">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold leading-none">
+          <h2 className="text-sm font-semibold tracking-tight">
             ActionTemplate catalog
           </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             Reusable RIOT3 ACT recipes.
           </p>
         </div>
-        <Button size="sm" onClick={openCreate}>
+        <Button
+          size="sm"
+          onClick={openCreate}
+          className="rounded-full bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 text-white shadow-md shadow-indigo-500/25 hover:shadow-lg hover:shadow-indigo-500/30 hover:brightness-110"
+        >
           <Plus className="h-3.5 w-3.5" />
           New
         </Button>
       </div>
 
-      <div className="flex items-center gap-2 border-b px-4 py-2">
+      <div className="flex items-center gap-2 border-b border-white/40 px-5 py-3 dark:border-white/10">
         <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Filter by name or type…"
-            className="h-8 pl-7 text-sm"
+            className="h-9 rounded-full border-white/40 bg-white/55 pl-8 text-sm shadow-inner shadow-white/40 placeholder:text-muted-foreground/70 focus-visible:border-indigo-300/50 focus-visible:ring-indigo-200/40 dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none"
           />
         </div>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
           <Checkbox
             checked={includeInactive}
             onCheckedChange={(v) => setIncludeInactive(v === true)}
@@ -81,7 +85,7 @@ export function ActionTemplateList() {
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="space-y-2 p-3">
+        <div className="space-y-2 p-4">
           {query.isLoading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />

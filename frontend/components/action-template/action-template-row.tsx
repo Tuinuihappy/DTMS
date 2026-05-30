@@ -76,31 +76,35 @@ export function ActionTemplateRow({ template, onEdit }: ActionTemplateRowProps) 
   return (
     <div
       className={cn(
-        "group flex items-start justify-between gap-2 rounded-md border p-3 transition hover:bg-accent/40",
-        !template.isActive && "opacity-60"
+        "group glass-subtle relative flex items-start justify-between gap-2 rounded-2xl p-3.5 transition-all duration-200",
+        "hover:-translate-y-0.5 hover:shadow-md hover:shadow-indigo-500/5 hover:ring-1 hover:ring-indigo-400/30",
+        !template.isActive && "opacity-55"
       )}
     >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate text-sm font-medium font-mono">
+          <span className="truncate font-mono text-sm font-medium tracking-tight">
             {template.name}
           </span>
           {!template.isActive ? (
-            <Badge variant="outline" className="text-[10px] uppercase">
+            <Badge
+              variant="outline"
+              className="border-white/40 bg-white/40 text-[10px] uppercase backdrop-blur-sm dark:border-white/10 dark:bg-white/5"
+            >
               inactive
             </Badge>
           ) : null}
         </div>
         <div className="mt-1 text-xs text-muted-foreground">
           <span className="font-mono">{template.actionType}</span>
-          <span className="mx-1.5">·</span>
+          <span className="mx-1.5 text-muted-foreground/50">·</span>
           <span className="font-mono">
             id={template.vendorActionId} p0={template.param0} p1={template.param1}
             {template.paramStr ? ` str=${template.paramStr}` : ""}
           </span>
         </div>
         {template.description ? (
-          <p className="mt-1 text-xs text-muted-foreground/80 line-clamp-2">
+          <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground/80">
             {template.description}
           </p>
         ) : null}

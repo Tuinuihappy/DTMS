@@ -30,7 +30,9 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      {/* body's background gradient lives in globals.css so it composes
+          with the foreground tokens; we just stretch and stack here. */}
+      <body className="min-h-full flex flex-col text-foreground">
         <Providers>{children}</Providers>
         <Toaster richColors position="bottom-right" />
       </body>
