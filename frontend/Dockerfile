@@ -17,6 +17,13 @@
 
 ARG NODE_VERSION=24-alpine
 
+# DTMS_BACKEND_URL must be set at BUILD time, not runtime: Next.js
+# standalone serializes the result of `rewrites()` into the build output,
+# so the env value seen during `next build` is the one baked in. Passing
+# it as a build ARG (and re-exporting as ENV in the builder stage) keeps
+# the value flexible per environment without forcing a Dockerfile edit.
+ARG DTMS_BACKEND_URL=http://api:8080
+
 # ── deps stage ────────────────────────────────────────────────────────
 # Installs production + dev deps. Cached layer — only re-runs when
 # package.json or package-lock.json change.
@@ -36,6 +43,11 @@ FROM node:${NODE_VERSION} AS builder
 WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Re-import the ARG so it's visible inside this stage, then publish it
+# as an ENV so next.config.ts picks it up during `next build`.
+ARG DTMS_BACKEND_URL
+ENV DTMS_BACKEND_URL=${DTMS_BACKEND_URL}
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

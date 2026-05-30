@@ -90,14 +90,19 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Next.js standalone bakes the rewrite target during `next build`,
+        # so we have to pass DTMS_BACKEND_URL at build time. Inside the
+        # compose network the API service is reachable as `api:8080`.
+        DTMS_BACKEND_URL: http://api:8080
     container_name: dtms-frontend
     ports:
       - "3000:3000"
     depends_on:
       - api
     environment:
-      # Rewrite target — same Docker network, container hostname is
-      # the service name. Internal port 8080 matches the API's listener.
+      # Same value at runtime, just in case any non-rewrite code reads
+      # it (e.g. server-side fetch outside `rewrites()`).
       - DTMS_BACKEND_URL=http://api:8080
       - NODE_ENV=production
 
