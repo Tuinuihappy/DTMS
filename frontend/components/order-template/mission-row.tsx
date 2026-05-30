@@ -49,7 +49,7 @@ export function MissionRow({
   const total = fieldArray.fields.length;
 
   return (
-    <div className="space-y-3 rounded-md border p-3">
+    <div className="glass-subtle space-y-4 rounded-2xl p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium text-muted-foreground">
           Mission #{index + 1}
@@ -217,7 +217,7 @@ function ActFields({
       />
 
       {useInline ? (
-        <div className="space-y-3 rounded border-l-2 border-muted pl-3">
+        <div className="space-y-3 rounded-r-md border-l-2 border-primary/30 pl-4">
           <FormField
             control={control}
             name={`missions.${index}.actionType`}

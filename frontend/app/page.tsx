@@ -24,8 +24,6 @@ export default function Home() {
     null
   );
 
-  // Pull the full list once and pluck out the selected one. The form
-  // resets itself when the `template` prop changes (see useEffect there).
   const orderQuery = useQuery({
     queryKey: queryKeys.orderTemplates.list({ includeInactive }),
     queryFn: () => orderTemplatesApi.list({ includeInactive }),
@@ -38,55 +36,52 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Sticky translucent header — floats over the aurora background.
-          We keep it inside the flex column so it scrolls into view on
-          short viewports but stays put on tall ones. */}
-      <header className="sticky top-0 z-40 border-b border-white/40 bg-white/55 backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-white/[0.04]">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-6 py-4">
+      {/* Translucent sticky header. The hairline border is the only
+          chrome — Apple keeps top bars almost invisible so content
+          gets the visual budget. */}
+      <header className="sticky top-0 z-40 border-b border-black/[0.06] bg-white/72 backdrop-blur-xl backdrop-saturate-180 dark:border-white/10 dark:bg-[#1C1C1E]/72">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-6 py-4 md:px-8 md:py-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/90 via-violet-500/90 to-fuchsia-500/90 text-white shadow-lg shadow-indigo-500/20">
-              <Sparkles className="h-4 w-4" />
+            {/* Flat color chip — solid iOS blue, no gradient. */}
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm shadow-primary/20">
+              <Sparkles className="h-4 w-4" strokeWidth={2.25} />
             </div>
             <div>
-              <h1 className="text-base font-semibold tracking-tight">
+              <h1 className="text-[17px] font-semibold tracking-tight leading-tight">
                 DTMS Templates
               </h1>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[13px] text-muted-foreground">
                 Compose RIOT3 action recipes and order plans.
               </p>
             </div>
           </div>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => setSelectedId(null)}
             disabled={selectedId === null}
-            className="rounded-full border-white/40 bg-white/60 backdrop-blur-sm hover:bg-white/80 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+            className="rounded-full px-4 text-[13px] font-medium text-primary hover:bg-primary/10 disabled:opacity-40"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
             New OrderTemplate
           </Button>
         </div>
       </header>
 
-      <main className="mx-auto grid w-full max-w-[1600px] flex-1 grid-cols-1 gap-6 p-6 lg:grid-cols-[minmax(360px,28rem)_1fr]">
-        {/* Left pane — ActionTemplate catalog. Glass card with its own
-            scroll. min-h-0 lets the inner flex child's overflow work
-            even when this grid cell wants to grow with content. */}
-        <aside className="glass flex min-h-0 flex-col overflow-hidden rounded-3xl lg:max-h-[calc(100vh-7rem)]">
+      {/* Tablet ≤1024px: stack panels vertically.
+          Desktop ≥1024px: split panel, sized cards. */}
+      <main className="mx-auto grid w-full max-w-[1600px] flex-1 grid-cols-1 gap-6 p-6 md:p-8 lg:grid-cols-[minmax(380px,28rem)_1fr] lg:gap-8">
+        <aside className="glass flex min-h-0 flex-col overflow-hidden rounded-[24px] lg:max-h-[calc(100vh-7rem)]">
           <ActionTemplateList />
         </aside>
 
-        {/* Right pane — saved templates strip + composer form. The
-            composer scrolls inside the card; the saved list stays
-            pinned to the top. */}
-        <section className="glass flex min-h-0 flex-col overflow-hidden rounded-3xl lg:max-h-[calc(100vh-7rem)]">
-          <div className="flex items-center justify-between border-b border-white/40 px-5 py-4 dark:border-white/10">
+        <section className="glass flex min-h-0 flex-col overflow-hidden rounded-[24px] lg:max-h-[calc(100vh-7rem)]">
+          <div className="flex items-center justify-between border-b border-black/[0.06] px-6 py-5 dark:border-white/10">
             <div className="min-w-0">
-              <h2 className="text-sm font-semibold tracking-tight">
+              <h2 className="text-[15px] font-semibold tracking-tight leading-tight">
                 OrderTemplate composer
               </h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <p className="mt-1 text-[13px] text-muted-foreground">
                 {selected
                   ? `Editing ${selected.name}`
                   : "Building a new template"}
@@ -94,7 +89,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex-1 space-y-6 overflow-auto p-5">
+          <div className="flex-1 space-y-6 overflow-auto p-6">
             <OrderTemplateList
               selectedId={selectedId}
               onSelect={setSelectedId}
@@ -103,7 +98,7 @@ export default function Home() {
               onIncludeInactiveChange={setIncludeInactive}
             />
 
-            <Separator className="bg-white/40 dark:bg-white/10" />
+            <Separator className="bg-black/[0.06] dark:bg-white/10" />
 
             <OrderTemplateForm
               template={selected}

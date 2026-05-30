@@ -192,23 +192,24 @@ export function OrderTemplateForm({
 
         <Separator />
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">Missions</p>
+            <p className="text-[13px] font-semibold tracking-tight">Missions</p>
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={() =>
                 missions.append({ type: "MOVE", mapId: "", stationId: "" })
               }
+              className="press-feedback rounded-full text-primary hover:bg-primary/10"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
               Add mission
             </Button>
           </div>
           {missions.fields.length === 0 ? (
-            <p className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
+            <p className="rounded-xl border border-dashed border-black/[0.10] p-5 text-center text-[12px] text-muted-foreground dark:border-white/10">
               No missions yet. Add at least one MOVE or ACT mission.
             </p>
           ) : (
@@ -319,14 +320,19 @@ export function OrderTemplateForm({
           {onCancel ? (
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={onCancel}
               disabled={mutation.isPending}
+              className="press-feedback rounded-full px-5 font-medium"
             >
               Cancel
             </Button>
           ) : null}
-          <Button type="submit" disabled={mutation.isPending}>
+          <Button
+            type="submit"
+            disabled={mutation.isPending}
+            className="press-feedback rounded-full bg-primary px-5 font-medium text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary/90"
+          >
             {mutation.isPending
               ? "Saving…"
               : isEdit

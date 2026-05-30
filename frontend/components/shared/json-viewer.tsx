@@ -23,7 +23,7 @@ export function JsonViewer({
   return (
     <pre
       className={cn(
-        "overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-xs leading-5",
+        "overflow-auto rounded-2xl border border-black/[0.06] bg-black/[0.03] p-4 font-mono text-[12px] leading-relaxed dark:border-white/10 dark:bg-white/[0.03]",
         maxHeightClassName,
         className
       )}

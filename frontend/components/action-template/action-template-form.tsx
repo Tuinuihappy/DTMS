@@ -137,7 +137,7 @@ export function ActionTemplateForm({
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
-            className="space-y-4"
+            className="space-y-5"
           >
             <FormField
               control={form.control}
@@ -257,13 +257,18 @@ export function ActionTemplateForm({
             <DialogFooter>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={() => onOpenChange(false)}
                 disabled={mutation.isPending}
+                className="press-feedback rounded-full px-5 font-medium"
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={mutation.isPending}>
+              <Button
+                type="submit"
+                disabled={mutation.isPending}
+                className="press-feedback rounded-full bg-primary px-5 font-medium text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary/90"
+              >
                 {mutation.isPending
                   ? "Saving…"
                   : isEdit

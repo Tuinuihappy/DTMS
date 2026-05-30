@@ -76,12 +76,12 @@ export function OrderTemplateList({
   const templates = query.data ?? [];
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
           Saved templates
         </p>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
           <Checkbox
             checked={includeInactive}
             onCheckedChange={(v) => onIncludeInactiveChange(v === true)}
@@ -90,8 +90,8 @@ export function OrderTemplateList({
         </label>
       </div>
 
-      <ScrollArea className="glass-subtle h-48 rounded-2xl">
-        <div className="space-y-1 p-2">
+      <ScrollArea className="glass-subtle h-52 rounded-2xl">
+        <div className="space-y-1 p-2.5">
           {query.isLoading ? (
             <p className="p-3 text-xs text-muted-foreground">Loading…</p>
           ) : query.isError ? (
@@ -111,26 +111,37 @@ export function OrderTemplateList({
                 type="button"
                 onClick={() => onSelect(t.id)}
                 className={cn(
-                  "group flex w-full items-center gap-2 rounded-xl border border-transparent px-2.5 py-2 text-left transition-all duration-150",
-                  "hover:bg-white/50 hover:ring-1 hover:ring-indigo-400/20 dark:hover:bg-white/[0.04]",
+                  "press-feedback group flex w-full items-center gap-2 rounded-xl border border-transparent px-3 py-2.5 text-left",
+                  "hover:bg-card dark:hover:bg-white/[0.05]",
                   selectedId === t.id &&
-                    "border-indigo-300/40 bg-white/65 shadow-sm shadow-indigo-500/10 dark:border-indigo-400/30 dark:bg-white/[0.06]",
+                    "bg-primary/10 ring-1 ring-primary/30 hover:bg-primary/10 dark:bg-primary/15 dark:ring-primary/40",
                   !t.isActive && "opacity-55"
                 )}
               >
                 <ChevronRight
                   className={cn(
-                    "h-3.5 w-3.5 text-muted-foreground transition-transform",
-                    selectedId === t.id && "rotate-90"
+                    "h-3.5 w-3.5 transition-transform",
+                    selectedId === t.id
+                      ? "rotate-90 text-primary"
+                      : "text-muted-foreground"
                   )}
+                  strokeWidth={2.25}
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="truncate font-mono text-xs font-medium">
+                    <span
+                      className={cn(
+                        "truncate font-mono text-[12px] font-medium tracking-tight",
+                        selectedId === t.id && "text-primary"
+                      )}
+                    >
                       {t.name}
                     </span>
                     {!t.isActive ? (
-                      <Badge variant="outline" className="text-[10px] uppercase">
+                      <Badge
+                        variant="outline"
+                        className="border-black/[0.08] bg-black/[0.03] text-[10px] uppercase font-medium tracking-wide text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
+                      >
                         inactive
                       </Badge>
                     ) : null}

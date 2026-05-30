@@ -76,26 +76,28 @@ export function ActionTemplateRow({ template, onEdit }: ActionTemplateRowProps) 
   return (
     <div
       className={cn(
-        "group glass-subtle relative flex items-start justify-between gap-2 rounded-2xl p-3.5 transition-all duration-200",
-        "hover:-translate-y-0.5 hover:shadow-md hover:shadow-indigo-500/5 hover:ring-1 hover:ring-indigo-400/30",
+        // Apple-style row: subtle hover via shadow + bg, no lift.
+        // Less motion = more "settled" / less playful.
+        "group glass-subtle relative flex items-start justify-between gap-2 rounded-2xl p-4 transition-all duration-200",
+        "hover:bg-card hover:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.08)] dark:hover:bg-white/[0.06]",
         !template.isActive && "opacity-55"
       )}
     >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate font-mono text-sm font-medium tracking-tight">
+          <span className="truncate font-mono text-[13px] font-medium tracking-tight">
             {template.name}
           </span>
           {!template.isActive ? (
             <Badge
               variant="outline"
-              className="border-white/40 bg-white/40 text-[10px] uppercase backdrop-blur-sm dark:border-white/10 dark:bg-white/5"
+              className="border-black/[0.08] bg-black/[0.03] text-[10px] uppercase font-medium tracking-wide text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
             >
               inactive
             </Badge>
           ) : null}
         </div>
-        <div className="mt-1 text-xs text-muted-foreground">
+        <div className="mt-1.5 text-[12px] text-muted-foreground">
           <span className="font-mono">{template.actionType}</span>
           <span className="mx-1.5 text-muted-foreground/50">·</span>
           <span className="font-mono">
@@ -104,7 +106,7 @@ export function ActionTemplateRow({ template, onEdit }: ActionTemplateRowProps) 
           </span>
         </div>
         {template.description ? (
-          <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground/80">
+          <p className="mt-1.5 line-clamp-2 text-[12px] text-muted-foreground/80">
             {template.description}
           </p>
         ) : null}
@@ -119,8 +121,9 @@ export function ActionTemplateRow({ template, onEdit }: ActionTemplateRowProps) 
                 variant="ghost"
                 onClick={() => onEdit(template)}
                 aria-label="Edit"
+                className="press-feedback rounded-full hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
               >
-                <Pencil className="h-3.5 w-3.5" />
+                <Pencil className="h-3.5 w-3.5" strokeWidth={2} />
               </Button>
             }
           />
@@ -136,8 +139,9 @@ export function ActionTemplateRow({ template, onEdit }: ActionTemplateRowProps) 
                 onClick={() => toggleActive.mutate()}
                 disabled={toggleActive.isPending}
                 aria-label={template.isActive ? "Deactivate" : "Activate"}
+                className="press-feedback rounded-full hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
               >
-                <Power className="h-3.5 w-3.5" />
+                <Power className="h-3.5 w-3.5" strokeWidth={2} />
               </Button>
             }
           />
@@ -152,9 +156,9 @@ export function ActionTemplateRow({ template, onEdit }: ActionTemplateRowProps) 
               size="icon"
               variant="ghost"
               aria-label="Delete"
-              className="text-destructive hover:text-destructive"
+              className="press-feedback rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
             </Button>
           }
           title={`Delete ${template.name}?`}

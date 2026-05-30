@@ -27,6 +27,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -48,75 +49,88 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ─── Apple palette (per user-provided design brief) ────────────────────
+   Six colors total: BG, Text, Primary, Secondary, Success, Error.
+   No purple/teal accents — everything reads as "iOS in a browser". */
 :root {
-  /* Soft off-white base, very faint blue cast so the aurora blobs blend
-     instead of sitting on pure white. */
-  --background: oklch(0.99 0.005 240);
-  --foreground: oklch(0.18 0.02 250);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.02 250);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.02 250);
-  --primary: oklch(0.21 0.04 260);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0.005 250);
-  --secondary-foreground: oklch(0.21 0.04 260);
-  --muted: oklch(0.97 0.005 250);
-  --muted-foreground: oklch(0.48 0.02 250);
-  --accent: oklch(0.97 0.01 260);
-  --accent-foreground: oklch(0.21 0.04 260);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.01 250);
-  --input: oklch(0.92 0.01 250);
-  --ring: oklch(0.65 0.05 260);
-  --chart-1: oklch(0.7 0.15 250);
-  --chart-2: oklch(0.7 0.15 320);
-  --chart-3: oklch(0.7 0.15 170);
-  --chart-4: oklch(0.55 0.18 280);
-  --chart-5: oklch(0.45 0.15 220);
-  --radius: 0.75rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.18 0.02 250);
-  --sidebar-primary: oklch(0.21 0.04 260);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0.01 260);
-  --sidebar-accent-foreground: oklch(0.21 0.04 260);
-  --sidebar-border: oklch(0.92 0.01 250);
-  --sidebar-ring: oklch(0.65 0.05 260);
+  --background: #F5F5F7;              /* iOS canvas */
+  --foreground: #1D1D1F;              /* iOS primary text */
+  --card: #FFFFFF;
+  --card-foreground: #1D1D1F;
+  --popover: #FFFFFF;
+  --popover-foreground: #1D1D1F;
+  --primary: #007AFF;                 /* iOS blue */
+  --primary-foreground: #FFFFFF;
+  --secondary: #F5F5F7;
+  --secondary-foreground: #1D1D1F;
+  --muted: #F5F5F7;
+  --muted-foreground: #86868B;        /* iOS secondary text */
+  --accent: #F5F5F7;
+  --accent-foreground: #1D1D1F;
+  --destructive: #FF3B30;             /* iOS red */
+  --success: #34C759;                 /* iOS green */
+  --border: rgba(0, 0, 0, 0.08);      /* hairline */
+  --input: rgba(0, 0, 0, 0.08);
+  --ring: #007AFF;
+  --chart-1: #007AFF;
+  --chart-2: #34C759;
+  --chart-3: #FF9500;
+  --chart-4: #FF3B30;
+  --chart-5: #5856D6;
+
+  /* Cards land at ~22px (rounded-3xl reads as 1.4 * 0.875 = 1.225rem). */
+  --radius: 0.875rem;
+
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #1D1D1F;
+  --sidebar-primary: #007AFF;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F5F5F7;
+  --sidebar-accent-foreground: #1D1D1F;
+  --sidebar-border: rgba(0, 0, 0, 0.08);
+  --sidebar-ring: #007AFF;
+
+  /* Animation easings — the iOS standard. `--ease-apple` is what UIKit
+     uses for almost every interaction; --ease-spring is the slight
+     overshoot used for sheet/dialog reveals. */
+  --ease-apple: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .dark {
-  --background: oklch(0.18 0.025 260);
-  --foreground: oklch(0.97 0.005 250);
-  --card: oklch(0.22 0.03 260);
-  --card-foreground: oklch(0.97 0.005 250);
-  --popover: oklch(0.22 0.03 260);
-  --popover-foreground: oklch(0.97 0.005 250);
-  --primary: oklch(0.92 0.005 250);
-  --primary-foreground: oklch(0.22 0.03 260);
-  --secondary: oklch(0.28 0.03 260);
-  --secondary-foreground: oklch(0.97 0.005 250);
-  --muted: oklch(0.28 0.03 260);
-  --muted-foreground: oklch(0.7 0.02 250);
-  --accent: oklch(0.28 0.04 270);
-  --accent-foreground: oklch(0.97 0.005 250);
-  --destructive: oklch(0.7 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.55 0.05 260);
-  --chart-1: oklch(0.65 0.16 250);
-  --chart-2: oklch(0.65 0.16 320);
-  --chart-3: oklch(0.65 0.16 170);
-  --chart-4: oklch(0.55 0.18 280);
-  --chart-5: oklch(0.45 0.15 220);
-  --sidebar: oklch(0.22 0.03 260);
-  --sidebar-foreground: oklch(0.97 0.005 250);
-  --sidebar-primary: oklch(0.6 0.18 260);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.28 0.03 260);
-  --sidebar-accent-foreground: oklch(0.97 0.005 250);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.55 0.05 260);
+  /* True black canvas to match iOS dark mode on OLED. */
+  --background: #000000;
+  --foreground: #F5F5F7;
+  --card: #1C1C1E;                    /* iOS secondary grouped bg */
+  --card-foreground: #F5F5F7;
+  --popover: #1C1C1E;
+  --popover-foreground: #F5F5F7;
+  --primary: #0A84FF;                 /* iOS blue (dark) — brighter for contrast */
+  --primary-foreground: #FFFFFF;
+  --secondary: #1C1C1E;
+  --secondary-foreground: #F5F5F7;
+  --muted: #1C1C1E;
+  --muted-foreground: #98989D;        /* iOS secondary (dark) */
+  --accent: #1C1C1E;
+  --accent-foreground: #F5F5F7;
+  --destructive: #FF453A;             /* iOS red (dark) */
+  --success: #30D158;                 /* iOS green (dark) */
+  --border: rgba(255, 255, 255, 0.10);
+  --input: rgba(255, 255, 255, 0.10);
+  --ring: #0A84FF;
+  --chart-1: #0A84FF;
+  --chart-2: #30D158;
+  --chart-3: #FF9F0A;
+  --chart-4: #FF453A;
+  --chart-5: #5E5CE6;
+  --sidebar: #1C1C1E;
+  --sidebar-foreground: #F5F5F7;
+  --sidebar-primary: #0A84FF;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #1C1C1E;
+  --sidebar-accent-foreground: #F5F5F7;
+  --sidebar-border: rgba(255, 255, 255, 0.10);
+  --sidebar-ring: #0A84FF;
 }
 
 @layer base {
@@ -124,57 +138,82 @@
     @apply border-border outline-ring/50;
   }
   html {
-    @apply font-sans;
+    @apply font-sans antialiased;
+    /* Use SF Pro-style stylistic alternates when the font supports them.
+       Geist (default) implements a few that nudge it closer to SF. */
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   body {
     @apply text-foreground;
-    /* Aurora — three soft radial blobs anchored to the corners.
-       They paint over --background, so the foreground stays
-       readable while the page feels alive. fixed attachment so
-       the gradient doesn't scroll with content. */
     background-color: var(--background);
-    background-image:
-      radial-gradient(at 18% 24%, oklch(0.88 0.12 250 / 0.55) 0px, transparent 55%),
-      radial-gradient(at 82% 8%, oklch(0.9 0.1 320 / 0.5) 0px, transparent 55%),
-      radial-gradient(at 78% 84%, oklch(0.9 0.1 170 / 0.45) 0px, transparent 55%);
+    /* Single soft blob top-right — the only color in the layout besides
+       the primary blue. macOS Sequoia / iCloud uses this exact trick. */
+    background-image: radial-gradient(
+      120% 80% at 100% 0%,
+      rgba(0, 122, 255, 0.06) 0%,
+      transparent 55%
+    );
     background-attachment: fixed;
   }
   .dark body {
-    background-image:
-      radial-gradient(at 18% 24%, oklch(0.45 0.18 260 / 0.45) 0px, transparent 55%),
-      radial-gradient(at 82% 8%, oklch(0.45 0.18 320 / 0.4) 0px, transparent 55%),
-      radial-gradient(at 78% 84%, oklch(0.45 0.18 200 / 0.35) 0px, transparent 55%);
+    background-image: radial-gradient(
+      120% 80% at 100% 0%,
+      rgba(10, 132, 255, 0.10) 0%,
+      transparent 55%
+    );
+  }
+
+  /* Smoother default for interactive elements. Components can still
+     override duration/easing per-component when needed. */
+  button,
+  [role="button"],
+  a {
+    transition-property: background-color, border-color, color, fill, stroke,
+      opacity, box-shadow, transform;
+    transition-timing-function: var(--ease-apple);
+    transition-duration: 200ms;
   }
 }
 
 @layer components {
-  /* Glass surface — translucent fill + backdrop blur + soft hairline
-     border. Use this on cards/panels that should "float" over the
-     aurora background. Pair with `rounded-2xl` and `shadow-glass`. */
+  /* Apple-style frosted glass. Solider than the aurora version
+     (72% vs 55%) and tighter blur (12px vs 20px) so type stays crisp. */
   .glass {
-    background-color: oklch(1 0 0 / 0.55);
-    backdrop-filter: blur(20px) saturate(140%);
-    -webkit-backdrop-filter: blur(20px) saturate(140%);
-    border: 1px solid oklch(1 0 0 / 0.45);
+    background-color: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border: 0.5px solid rgba(0, 0, 0, 0.06);
     box-shadow:
-      0 1px 0 0 oklch(1 0 0 / 0.6) inset,
-      0 12px 40px -12px oklch(0.2 0.04 260 / 0.18);
+      0 1px 0 0 rgba(255, 255, 255, 0.7) inset,
+      0 1px 2px 0 rgba(0, 0, 0, 0.04);
   }
   .dark .glass {
-    background-color: oklch(0.25 0.03 260 / 0.55);
-    border-color: oklch(1 0 0 / 0.1);
+    background-color: rgba(28, 28, 30, 0.72);
+    border-color: rgba(255, 255, 255, 0.08);
     box-shadow:
-      0 1px 0 0 oklch(1 0 0 / 0.06) inset,
-      0 12px 40px -12px oklch(0 0 0 / 0.6);
+      0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
+      0 1px 2px 0 rgba(0, 0, 0, 0.4);
   }
 
-  /* Quieter variant for nested surfaces — list rows inside a glass card. */
+  /* Lower-fi variant for nested surfaces (list rows inside a glass card). */
   .glass-subtle {
-    background-color: oklch(1 0 0 / 0.4);
-    border: 1px solid oklch(1 0 0 / 0.3);
+    background-color: rgba(255, 255, 255, 0.6);
+    border: 0.5px solid rgba(0, 0, 0, 0.05);
   }
   .dark .glass-subtle {
-    background-color: oklch(1 0 0 / 0.03);
-    border-color: oklch(1 0 0 / 0.06);
+    background-color: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+
+  /* Apple-feel button press — runs on every Button via the global
+     `[role="button"]` transition above. Tiny scale gives the haptic
+     mental model without needing a press animation library. */
+  .press-feedback {
+    transition-timing-function: var(--ease-apple);
+  }
+  .press-feedback:active {
+    transform: scale(0.97);
   }
 }
