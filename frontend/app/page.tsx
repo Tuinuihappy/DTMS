@@ -2,44 +2,62 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Inbox, Loader2, Plus } from "lucide-react";
+import { Inbox, Loader2, PackageCheck, Plus } from "lucide-react";
 
 import { actionTemplatesApi } from "@/lib/action-templates";
+import { deliveryOrdersApi } from "@/lib/delivery-orders";
 import { orderTemplatesApi } from "@/lib/order-templates";
 import { queryKeys } from "@/lib/query-keys";
 import type { ActionTemplateDto } from "@/types/action-template";
 import type { OrderTemplateDto } from "@/types/order-template";
+import {
+  ORDER_STATUS_VALUES,
+  type DeliveryOrderListDto,
+  type OrderStatus,
+} from "@/types/delivery-order";
 
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { ActionTemplateCard } from "@/components/action-template/action-template-card";
 import { ActionTemplateForm } from "@/components/action-template/action-template-form";
 import { OrderTemplateCard } from "@/components/order-template/order-template-card";
 import { OrderTemplateForm } from "@/components/order-template/order-template-form";
 import { InstantiateDialog } from "@/components/order-template/instantiate-dialog";
+import { DeliveryOrderCard } from "@/components/delivery-order/delivery-order-card";
+import { DeliveryOrderDetailSheet } from "@/components/delivery-order/delivery-order-detail-sheet";
+import { DeliveryOrderFormSheet } from "@/components/delivery-order/delivery-order-form-sheet";
 import { EmptyState } from "@/components/shared/empty-state";
 import { HeroBanner } from "@/components/shell/hero-banner";
-import { Sidebar, type TemplateFilter } from "@/components/shell/sidebar";
+import { Sidebar, type NavFilter } from "@/components/shell/sidebar";
 import { TopBar } from "@/components/shell/top-bar";
+import { cn } from "@/lib/utils";
+
+// Pill strip filter values for the Delivery Orders view. "all" maps to
+// "no status filter on the API request".
+const STATUS_FILTERS: { label: string; value: "all" | OrderStatus }[] = [
+  { label: "All", value: "all" },
+  ...ORDER_STATUS_VALUES.map((s) => ({ label: s, value: s })),
+];
 
 export default function Home() {
-  // Sidebar filter + search drive what shows in the grids. Selected
-  // OrderTemplate (when not null) reveals the inline editor at the
-  // bottom of the page.
-  const [filter, setFilter] = useState<TemplateFilter>("all");
+  const [filter, setFilter] = useState<NavFilter>("all");
   const [search, setSearch] = useState("");
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [instantiating, setInstantiating] = useState<OrderTemplateDto | null>(
     null
   );
 
-  // ActionTemplate form (create / edit dialog) state.
   const [actionFormOpen, setActionFormOpen] = useState(false);
   const [actionFormEditing, setActionFormEditing] =
     useState<ActionTemplateDto | null>(null);
 
-  // For the filter view we always want both active and inactive in the
-  // dataset; we slice locally based on `filter`. Reduces query count.
+  // Delivery Orders state.
+  const [doStatusFilter, setDoStatusFilter] = useState<"all" | OrderStatus>(
+    "all"
+  );
+  const [doFormSheetOpen, setDoFormSheetOpen] = useState(false);
+  const [doDetailId, setDoDetailId] = useState<string | null>(null);
+
+  // Template queries (used for the Templates view + sidebar counts).
   const actionQuery = useQuery({
     queryKey: queryKeys.actionTemplates.list({ includeInactive: true }),
     queryFn: () => actionTemplatesApi.list({ includeInactive: true }),
@@ -49,8 +67,33 @@ export default function Home() {
     queryFn: () => orderTemplatesApi.list({ includeInactive: true }),
   });
 
+  // Delivery Orders query — sidebar count uses an unfiltered fetch so
+  // navigating into the DO view doesn't have to hit the network for the
+  // total. The DO view re-uses this same query when the pill filter is
+  // "all" and only re-fetches when a status is picked.
+  const deliveryOrdersAllQuery = useQuery({
+    queryKey: queryKeys.deliveryOrders.list(),
+    queryFn: () => deliveryOrdersApi.list({ pageSize: 100 }),
+  });
+  const deliveryOrdersFilteredQuery = useQuery({
+    queryKey: queryKeys.deliveryOrders.list({
+      status: doStatusFilter === "all" ? undefined : doStatusFilter,
+    }),
+    queryFn: () =>
+      deliveryOrdersApi.list({
+        status: doStatusFilter === "all" ? undefined : doStatusFilter,
+        pageSize: 100,
+      }),
+    enabled: filter === "delivery-orders",
+  });
+
   const actionAll = actionQuery.data ?? [];
   const orderAll = orderQuery.data ?? [];
+  const deliveryAll = deliveryOrdersAllQuery.data?.items ?? [];
+  const deliveryVisible =
+    doStatusFilter === "all"
+      ? deliveryAll
+      : deliveryOrdersFilteredQuery.data?.items ?? [];
 
   const visibleActions = useMemo(
     () => filterAndSearchActions(actionAll, filter, search),
@@ -60,18 +103,24 @@ export default function Home() {
     () => filterAndSearchOrders(orderAll, filter, search),
     [orderAll, filter, search]
   );
+  const visibleDeliveryOrders = useMemo(
+    () =>
+      deliveryVisible.filter((o) =>
+        matchesSearch(`${o.orderRef} ${o.priority}`, search)
+      ),
+    [deliveryVisible, search]
+  );
 
-  const showActions = filter !== "orders";
-  const showOrders = filter !== "actions";
+  const isDeliveryView = filter === "delivery-orders";
+  const showActions = !isDeliveryView && filter !== "orders";
+  const showOrders = !isDeliveryView && filter !== "actions";
 
-  const selectedOrder = useMemo(
+  const selectedOrderTemplate = useMemo(
     () => orderAll.find((t) => t.id === selectedOrderId) ?? null,
     [orderAll, selectedOrderId]
   );
-  const latestOrder = useMemo(() => {
+  const latestOrderTemplate = useMemo(() => {
     if (orderAll.length === 0) return null;
-    // The list comes back sorted server-side; first active item is fine
-    // as "latest" until we wire a real `lastRunAt` field.
     return orderAll.find((t) => t.isActive) ?? orderAll[0];
   }, [orderAll]);
 
@@ -86,149 +135,173 @@ export default function Home() {
         orderAll.filter((t) => !t.isActive).length,
       actions: actionAll.length,
       orders: orderAll.length,
+      "delivery-orders": deliveryOrdersAllQuery.data?.totalCount ?? deliveryAll.length,
     }),
-    [actionAll, orderAll]
+    [actionAll, orderAll, deliveryAll.length, deliveryOrdersAllQuery.data?.totalCount]
   );
 
   function openCreateAction() {
     setActionFormEditing(null);
     setActionFormOpen(true);
   }
-
   function openEditAction(t: ActionTemplateDto) {
     setActionFormEditing(t);
     setActionFormOpen(true);
   }
+  function openDeliveryDetail(id: string) {
+    setDoDetailId(id);
+  }
 
   return (
     <div className="grid min-h-screen grid-cols-1 gap-4 p-4 lg:grid-cols-[240px_1fr] lg:gap-5 lg:p-5">
-      {/* ─── Left sidebar (collapses below lg) ────────────────────────── */}
+      {/* ─── Left sidebar ────────────────────────────────────────────── */}
       <div className="lg:sticky lg:top-5 lg:h-[calc(100vh-2.5rem)]">
         <Sidebar selected={filter} onSelect={setFilter} counts={counts} />
       </div>
 
-      {/* ─── Main shell ───────────────────────────────────────────────── */}
+      {/* ─── Main shell ──────────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-col gap-5">
         <TopBar search={search} onSearchChange={setSearch} />
 
-        <HeroBanner
-          latest={latestOrder}
-          totalAction={actionAll.length}
-          totalOrder={orderAll.length}
-          onInstantiate={setInstantiating}
-          onCreateNewOrder={() => setSelectedOrderId(null)}
-        />
-
-        {actionQuery.isLoading || orderQuery.isLoading ? (
-          <div className="liquid-glass flex items-center justify-center rounded-[24px] p-16">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
+        {isDeliveryView ? (
+          <DeliveryOrdersView
+            statusFilter={doStatusFilter}
+            onStatusFilterChange={setDoStatusFilter}
+            ordersByStatus={countByStatus(deliveryAll)}
+            visible={visibleDeliveryOrders}
+            isLoading={
+              deliveryOrdersAllQuery.isLoading ||
+              (doStatusFilter !== "all" && deliveryOrdersFilteredQuery.isLoading)
+            }
+            search={search}
+            selectedId={doDetailId}
+            onSelectCard={openDeliveryDetail}
+            onCreate={() => setDoFormSheetOpen(true)}
+          />
         ) : (
           <>
-            {showActions ? (
-              <Section
-                title="ActionTemplates"
-                subtitle="Reusable RIOT3 ACT recipes."
-                action={
-                  <Button
-                    size="sm"
-                    onClick={openCreateAction}
-                    className="liquid-pill-primary rounded-full px-4 font-medium"
-                  >
-                    <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                    New
-                  </Button>
-                }
-              >
-                {visibleActions.length === 0 ? (
-                  <EmptyState
-                    icon={<Inbox className="h-7 w-7" />}
-                    title={search ? "No matches" : "No ActionTemplates yet"}
-                    description={
-                      search
-                        ? "Try a different search."
-                        : "Create one to get started."
-                    }
-                  />
-                ) : (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {visibleActions.map((t) => (
-                      <ActionTemplateCard
-                        key={t.id}
-                        template={t}
-                        onEdit={openEditAction}
-                      />
-                    ))}
-                  </div>
-                )}
-              </Section>
-            ) : null}
+            <HeroBanner
+              latest={latestOrderTemplate}
+              totalAction={actionAll.length}
+              totalOrder={orderAll.length}
+              onInstantiate={setInstantiating}
+              onCreateNewOrder={() => setSelectedOrderId(null)}
+            />
 
-            {showOrders ? (
-              <Section
-                title="OrderTemplates"
-                subtitle="Composed RIOT3 order plans."
-                action={
-                  <Button
-                    size="sm"
-                    onClick={() => setSelectedOrderId(null)}
-                    disabled={selectedOrderId === null}
-                    variant="ghost"
-                    className="press-feedback rounded-full px-4 text-[13px] font-medium text-primary hover:bg-primary/10 disabled:opacity-40"
-                  >
-                    <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                    New
-                  </Button>
-                }
-              >
-                {visibleOrders.length === 0 ? (
-                  <EmptyState
-                    icon={<Inbox className="h-7 w-7" />}
-                    title={search ? "No matches" : "No OrderTemplates yet"}
-                    description={
-                      search
-                        ? "Try a different search."
-                        : "Build the first one in the editor below."
+            {actionQuery.isLoading || orderQuery.isLoading ? (
+              <div className="liquid-glass flex items-center justify-center rounded-[24px] p-16">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <>
+                {showActions ? (
+                  <Section
+                    title="ActionTemplates"
+                    subtitle="Reusable RIOT3 ACT recipes."
+                    action={
+                      <Button
+                        size="sm"
+                        onClick={openCreateAction}
+                        className="liquid-pill-primary rounded-full px-4 font-medium"
+                      >
+                        <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+                        New
+                      </Button>
                     }
-                  />
-                ) : (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {visibleOrders.map((t) => (
-                      <OrderTemplateCard
-                        key={t.id}
-                        template={t}
-                        selected={t.id === selectedOrderId}
-                        onSelect={setSelectedOrderId}
-                        onInstantiate={setInstantiating}
+                  >
+                    {visibleActions.length === 0 ? (
+                      <EmptyState
+                        icon={<Inbox className="h-7 w-7" />}
+                        title={search ? "No matches" : "No ActionTemplates yet"}
+                        description={
+                          search
+                            ? "Try a different search."
+                            : "Create one to get started."
+                        }
                       />
-                    ))}
-                  </div>
-                )}
-              </Section>
-            ) : null}
+                    ) : (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {visibleActions.map((t) => (
+                          <ActionTemplateCard
+                            key={t.id}
+                            template={t}
+                            onEdit={openEditAction}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </Section>
+                ) : null}
 
-            {showOrders ? (
-              <Section
-                title={selectedOrder ? "Editor" : "Composer"}
-                subtitle={
-                  selectedOrder
-                    ? `Editing ${selectedOrder.name}`
-                    : "Building a new OrderTemplate"
-                }
-              >
-                <div className="liquid-glass relative rounded-[24px] p-6">
-                  <div className="relative z-[2]">
-                    <OrderTemplateForm
-                      template={selectedOrder}
-                      onSaved={(id) => setSelectedOrderId(id)}
-                      onCancel={
-                        selectedOrder ? () => setSelectedOrderId(null) : undefined
-                      }
-                    />
-                  </div>
-                </div>
-              </Section>
-            ) : null}
+                {showOrders ? (
+                  <Section
+                    title="OrderTemplates"
+                    subtitle="Composed RIOT3 order plans."
+                    action={
+                      <Button
+                        size="sm"
+                        onClick={() => setSelectedOrderId(null)}
+                        disabled={selectedOrderId === null}
+                        variant="ghost"
+                        className="press-feedback rounded-full px-4 text-[13px] font-medium text-primary hover:bg-primary/10 disabled:opacity-40"
+                      >
+                        <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+                        New
+                      </Button>
+                    }
+                  >
+                    {visibleOrders.length === 0 ? (
+                      <EmptyState
+                        icon={<Inbox className="h-7 w-7" />}
+                        title={search ? "No matches" : "No OrderTemplates yet"}
+                        description={
+                          search
+                            ? "Try a different search."
+                            : "Build the first one in the editor below."
+                        }
+                      />
+                    ) : (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {visibleOrders.map((t) => (
+                          <OrderTemplateCard
+                            key={t.id}
+                            template={t}
+                            selected={t.id === selectedOrderId}
+                            onSelect={setSelectedOrderId}
+                            onInstantiate={setInstantiating}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </Section>
+                ) : null}
+
+                {showOrders ? (
+                  <Section
+                    title={selectedOrderTemplate ? "Editor" : "Composer"}
+                    subtitle={
+                      selectedOrderTemplate
+                        ? `Editing ${selectedOrderTemplate.name}`
+                        : "Building a new OrderTemplate"
+                    }
+                  >
+                    <div className="liquid-glass relative rounded-[24px] p-6">
+                      <div className="relative z-[2]">
+                        <OrderTemplateForm
+                          template={selectedOrderTemplate}
+                          onSaved={(id) => setSelectedOrderId(id)}
+                          onCancel={
+                            selectedOrderTemplate
+                              ? () => setSelectedOrderId(null)
+                              : undefined
+                          }
+                        />
+                      </div>
+                    </div>
+                  </Section>
+                ) : null}
+              </>
+            )}
           </>
         )}
       </div>
@@ -246,7 +319,145 @@ export default function Home() {
         }}
         template={instantiating}
       />
+
+      <DeliveryOrderFormSheet
+        open={doFormSheetOpen}
+        onOpenChange={setDoFormSheetOpen}
+        onCreated={(id) => setDoDetailId(id)}
+      />
+
+      <DeliveryOrderDetailSheet
+        open={doDetailId !== null}
+        onOpenChange={(o) => {
+          if (!o) setDoDetailId(null);
+        }}
+        orderId={doDetailId}
+      />
     </div>
+  );
+}
+
+// ── Delivery Orders view ─────────────────────────────────────────────────
+
+interface DeliveryOrdersViewProps {
+  statusFilter: "all" | OrderStatus;
+  onStatusFilterChange: (next: "all" | OrderStatus) => void;
+  ordersByStatus: Partial<Record<OrderStatus, number>>;
+  visible: DeliveryOrderListDto[];
+  isLoading: boolean;
+  search: string;
+  selectedId: string | null;
+  onSelectCard: (id: string) => void;
+  onCreate: () => void;
+}
+
+function DeliveryOrdersView(props: DeliveryOrdersViewProps) {
+  const {
+    statusFilter,
+    onStatusFilterChange,
+    ordersByStatus,
+    visible,
+    isLoading,
+    search,
+    selectedId,
+    onSelectCard,
+    onCreate,
+  } = props;
+
+  return (
+    <>
+      <section className="liquid-glass relative overflow-hidden rounded-[24px] p-6">
+        <div className="relative z-[2] flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="liquid-puck flex h-10 w-10 items-center justify-center rounded-2xl">
+              <PackageCheck
+                className="relative z-[2] h-4 w-4 text-foreground"
+                strokeWidth={2.25}
+              />
+            </div>
+            <div>
+              <h2 className="text-[17px] font-semibold tracking-tight leading-tight">
+                Delivery Orders
+              </h2>
+              <p className="text-[12px] text-muted-foreground">
+                Runtime orders that Planning will turn into RIOT3 jobs.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={onCreate}
+            className="liquid-pill-primary rounded-full px-4 font-medium"
+          >
+            <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+            New draft
+          </Button>
+        </div>
+      </section>
+
+      <Section title="Filter" subtitle="By lifecycle status.">
+        <div className="liquid-glass-subtle relative flex flex-wrap items-center gap-1.5 rounded-2xl p-2">
+          {STATUS_FILTERS.map((f) => {
+            const count = f.value === "all" ? undefined : ordersByStatus[f.value];
+            const active = statusFilter === f.value;
+            return (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => onStatusFilterChange(f.value)}
+                className={cn(
+                  "press-feedback inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium transition-colors",
+                  active
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
+                )}
+              >
+                {f.label}
+                {count !== undefined && count > 0 ? (
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 text-[10px]",
+                      active ? "bg-primary/20" : "bg-black/[0.05] dark:bg-white/[0.08]"
+                    )}
+                  >
+                    {count}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      </Section>
+
+      <Section title="Orders" subtitle={`${visible.length} shown`}>
+        {isLoading ? (
+          <div className="liquid-glass flex items-center justify-center rounded-[24px] p-16">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : visible.length === 0 ? (
+          <EmptyState
+            icon={<PackageCheck className="h-7 w-7" />}
+            title={search ? "No matches" : "No delivery orders yet"}
+            description={
+              search
+                ? "Try a different search."
+                : "Click 'New draft' to create one."
+            }
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {visible.map((o) => (
+              <DeliveryOrderCard
+                key={o.id}
+                order={o}
+                selected={selectedId === o.id}
+                onSelect={onSelectCard}
+              />
+            ))}
+          </div>
+        )}
+      </Section>
+    </>
   );
 }
 
@@ -283,21 +494,18 @@ function Section({
   );
 }
 
-function matchesSearch(
-  text: string,
-  search: string
-): boolean {
+function matchesSearch(text: string, search: string): boolean {
   if (search.trim().length === 0) return true;
   return text.toLowerCase().includes(search.trim().toLowerCase());
 }
 
 function filterAndSearchActions(
   list: ActionTemplateDto[],
-  filter: TemplateFilter,
+  filter: NavFilter,
   search: string
 ): ActionTemplateDto[] {
   return list.filter((t) => {
-    if (filter === "orders") return false;
+    if (filter === "orders" || filter === "delivery-orders") return false;
     if (filter === "active" && !t.isActive) return false;
     if (filter === "inactive" && t.isActive) return false;
     return matchesSearch(`${t.name} ${t.actionType}`, search);
@@ -306,17 +514,23 @@ function filterAndSearchActions(
 
 function filterAndSearchOrders(
   list: OrderTemplateDto[],
-  filter: TemplateFilter,
+  filter: NavFilter,
   search: string
 ): OrderTemplateDto[] {
   return list.filter((t) => {
-    if (filter === "actions") return false;
+    if (filter === "actions" || filter === "delivery-orders") return false;
     if (filter === "active" && !t.isActive) return false;
     if (filter === "inactive" && t.isActive) return false;
     return matchesSearch(`${t.name} ${t.description ?? ""}`, search);
   });
 }
 
-// Separator kept in scope so the form imports don't tree-shake it.
-// (Order template form uses it internally.)
-void Separator;
+function countByStatus(
+  orders: DeliveryOrderListDto[]
+): Partial<Record<OrderStatus, number>> {
+  const out: Partial<Record<OrderStatus, number>> = {};
+  for (const o of orders) {
+    out[o.status] = (out[o.status] ?? 0) + 1;
+  }
+  return out;
+}

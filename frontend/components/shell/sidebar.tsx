@@ -7,6 +7,7 @@ import {
   Cog,
   Cloud,
   Library,
+  PackageCheck,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
@@ -22,21 +23,26 @@ import { cn } from "@/lib/utils";
 // sidebar is a pure presentational component so the page can swap in
 // query-derived counts.
 
-export type TemplateFilter =
+export type NavFilter =
   | "all"
   | "active"
   | "inactive"
   | "actions"
-  | "orders";
+  | "orders"
+  | "delivery-orders";
+
+// Legacy alias for backwards compatibility — existing imports referencing
+// `TemplateFilter` continue to compile while the new code uses NavFilter.
+export type TemplateFilter = NavFilter;
 
 interface SidebarProps {
-  selected: TemplateFilter;
-  onSelect: (filter: TemplateFilter) => void;
-  counts?: Partial<Record<TemplateFilter, number>>;
+  selected: NavFilter;
+  onSelect: (filter: NavFilter) => void;
+  counts?: Partial<Record<NavFilter, number>>;
 }
 
 interface SidebarItem {
-  id: TemplateFilter;
+  id: NavFilter;
   label: string;
   icon: LucideIcon;
 }
@@ -50,6 +56,10 @@ const FILTER_GROUP: SidebarItem[] = [
 const LIBRARY_GROUP: SidebarItem[] = [
   { id: "actions", label: "ActionTemplates", icon: Sparkles },
   { id: "orders", label: "OrderTemplates", icon: Library },
+];
+
+const OPERATIONS_GROUP: SidebarItem[] = [
+  { id: "delivery-orders", label: "Delivery Orders", icon: PackageCheck },
 ];
 
 export function Sidebar({ selected, onSelect, counts = {} }: SidebarProps) {
@@ -95,9 +105,21 @@ export function Sidebar({ selected, onSelect, counts = {} }: SidebarProps) {
         ))}
       </SidebarGroup>
 
+      <SidebarGroup label="Operations">
+        {OPERATIONS_GROUP.map((item) => (
+          <SidebarRow
+            key={item.id}
+            item={item}
+            selected={selected === item.id}
+            count={counts[item.id]}
+            onClick={() => onSelect(item.id)}
+          />
+        ))}
+      </SidebarGroup>
+
       <SidebarGroup label="Settings">
         <SidebarRow
-          item={{ id: "all" as TemplateFilter, label: "RIOT3 connection", icon: Cloud }}
+          item={{ id: "all" as NavFilter, label: "RIOT3 connection", icon: Cloud }}
           selected={false}
           // Placeholder — no settings page yet. Disabled-but-visible so
           // the IA hints at where it'll live.
@@ -105,7 +127,7 @@ export function Sidebar({ selected, onSelect, counts = {} }: SidebarProps) {
           disabled
         />
         <SidebarRow
-          item={{ id: "all" as TemplateFilter, label: "Preferences", icon: Cog }}
+          item={{ id: "all" as NavFilter, label: "Preferences", icon: Cog }}
           selected={false}
           onClick={() => {}}
           disabled

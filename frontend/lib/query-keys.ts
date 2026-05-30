@@ -17,4 +17,13 @@ export const queryKeys = {
     detail: (id: string) =>
       [...queryKeys.orderTemplates.all, "detail", id] as const,
   },
+  deliveryOrders: {
+    all: ["delivery-orders"] as const,
+    list: (filters?: { status?: string; page?: number }) =>
+      [...queryKeys.deliveryOrders.all, "list", filters ?? {}] as const,
+    detail: (id: string) =>
+      [...queryKeys.deliveryOrders.all, "detail", id] as const,
+    items: (id: string) =>
+      [...queryKeys.deliveryOrders.all, "items", id] as const,
+  },
 } as const;
