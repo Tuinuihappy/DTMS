@@ -2,116 +2,242 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Sparkles } from "lucide-react";
+import { Inbox, Loader2, Plus } from "lucide-react";
 
+import { actionTemplatesApi } from "@/lib/action-templates";
 import { orderTemplatesApi } from "@/lib/order-templates";
 import { queryKeys } from "@/lib/query-keys";
+import type { ActionTemplateDto } from "@/types/action-template";
 import type { OrderTemplateDto } from "@/types/order-template";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ActionTemplateList } from "@/components/action-template/action-template-list";
+import { ActionTemplateCard } from "@/components/action-template/action-template-card";
+import { ActionTemplateForm } from "@/components/action-template/action-template-form";
+import { OrderTemplateCard } from "@/components/order-template/order-template-card";
 import { OrderTemplateForm } from "@/components/order-template/order-template-form";
-import { OrderTemplateList } from "@/components/order-template/order-template-list";
 import { InstantiateDialog } from "@/components/order-template/instantiate-dialog";
+import { EmptyState } from "@/components/shared/empty-state";
+import { HeroBanner } from "@/components/shell/hero-banner";
+import { Sidebar, type TemplateFilter } from "@/components/shell/sidebar";
+import { TopBar } from "@/components/shell/top-bar";
 
 export default function Home() {
-  // Right pane mode: null = the composer is in "new template" mode;
-  // a string = editing the picked saved template by id.
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [includeInactive, setIncludeInactive] = useState(false);
+  // Sidebar filter + search drive what shows in the grids. Selected
+  // OrderTemplate (when not null) reveals the inline editor at the
+  // bottom of the page.
+  const [filter, setFilter] = useState<TemplateFilter>("all");
+  const [search, setSearch] = useState("");
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [instantiating, setInstantiating] = useState<OrderTemplateDto | null>(
     null
   );
 
+  // ActionTemplate form (create / edit dialog) state.
+  const [actionFormOpen, setActionFormOpen] = useState(false);
+  const [actionFormEditing, setActionFormEditing] =
+    useState<ActionTemplateDto | null>(null);
+
+  // For the filter view we always want both active and inactive in the
+  // dataset; we slice locally based on `filter`. Reduces query count.
+  const actionQuery = useQuery({
+    queryKey: queryKeys.actionTemplates.list({ includeInactive: true }),
+    queryFn: () => actionTemplatesApi.list({ includeInactive: true }),
+  });
   const orderQuery = useQuery({
-    queryKey: queryKeys.orderTemplates.list({ includeInactive }),
-    queryFn: () => orderTemplatesApi.list({ includeInactive }),
+    queryKey: queryKeys.orderTemplates.list({ includeInactive: true }),
+    queryFn: () => orderTemplatesApi.list({ includeInactive: true }),
   });
 
-  const selected = useMemo(
-    () => orderQuery.data?.find((t) => t.id === selectedId) ?? null,
-    [orderQuery.data, selectedId]
+  const actionAll = actionQuery.data ?? [];
+  const orderAll = orderQuery.data ?? [];
+
+  const visibleActions = useMemo(
+    () => filterAndSearchActions(actionAll, filter, search),
+    [actionAll, filter, search]
+  );
+  const visibleOrders = useMemo(
+    () => filterAndSearchOrders(orderAll, filter, search),
+    [orderAll, filter, search]
   );
 
+  const showActions = filter !== "orders";
+  const showOrders = filter !== "actions";
+
+  const selectedOrder = useMemo(
+    () => orderAll.find((t) => t.id === selectedOrderId) ?? null,
+    [orderAll, selectedOrderId]
+  );
+  const latestOrder = useMemo(() => {
+    if (orderAll.length === 0) return null;
+    // The list comes back sorted server-side; first active item is fine
+    // as "latest" until we wire a real `lastRunAt` field.
+    return orderAll.find((t) => t.isActive) ?? orderAll[0];
+  }, [orderAll]);
+
+  const counts = useMemo(
+    () => ({
+      all: actionAll.length + orderAll.length,
+      active:
+        actionAll.filter((t) => t.isActive).length +
+        orderAll.filter((t) => t.isActive).length,
+      inactive:
+        actionAll.filter((t) => !t.isActive).length +
+        orderAll.filter((t) => !t.isActive).length,
+      actions: actionAll.length,
+      orders: orderAll.length,
+    }),
+    [actionAll, orderAll]
+  );
+
+  function openCreateAction() {
+    setActionFormEditing(null);
+    setActionFormOpen(true);
+  }
+
+  function openEditAction(t: ActionTemplateDto) {
+    setActionFormEditing(t);
+    setActionFormOpen(true);
+  }
+
   return (
-    <div className="relative flex min-h-screen flex-col">
-      {/* iOS 26 Floating Pill Header — detaches from the page edges, hovers
-          over content. The page below scrolls under it. Width is capped so
-          the pill never reaches the viewport edges (Apple keeps ~16px gap
-          even on iPad). */}
-      <header className="sticky top-0 z-40 flex justify-center px-4 pt-4 md:px-6 md:pt-6">
-        <div className="liquid-glass liquid-iridescent mx-auto flex w-full max-w-[1560px] items-center justify-between gap-4 rounded-full px-3 py-2 md:px-4 md:py-2.5">
-          <div className="relative z-[2] flex items-center gap-3 pl-1">
-            {/* 3D Liquid Puck — bright blue glass ball with specular spot
-                top-left and tinted shadow underneath. Replaces the flat
-                rounded-2xl chip from the previous pass. */}
-            <div className="liquid-puck liquid-puck-primary flex h-10 w-10 items-center justify-center rounded-full">
-              <Sparkles className="h-4 w-4 relative z-[2]" strokeWidth={2.25} />
-            </div>
-            <div className="hidden sm:block">
-              <h1 className="text-[15px] font-semibold tracking-tight leading-tight">
-                DTMS Templates
-              </h1>
-              <p className="text-[12px] text-muted-foreground leading-tight">
-                Compose RIOT3 action recipes and order plans.
-              </p>
-            </div>
+    <div className="grid min-h-screen grid-cols-1 gap-4 p-4 lg:grid-cols-[240px_1fr] lg:gap-5 lg:p-5">
+      {/* ─── Left sidebar (collapses below lg) ────────────────────────── */}
+      <div className="lg:sticky lg:top-5 lg:h-[calc(100vh-2.5rem)]">
+        <Sidebar selected={filter} onSelect={setFilter} counts={counts} />
+      </div>
+
+      {/* ─── Main shell ───────────────────────────────────────────────── */}
+      <div className="flex min-w-0 flex-col gap-5">
+        <TopBar search={search} onSearchChange={setSearch} />
+
+        <HeroBanner
+          latest={latestOrder}
+          totalAction={actionAll.length}
+          totalOrder={orderAll.length}
+          onInstantiate={setInstantiating}
+          onCreateNewOrder={() => setSelectedOrderId(null)}
+        />
+
+        {actionQuery.isLoading || orderQuery.isLoading ? (
+          <div className="liquid-glass flex items-center justify-center rounded-[24px] p-16">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedId(null)}
-            disabled={selectedId === null}
-            className="press-feedback relative z-[2] rounded-full px-4 text-[13px] font-medium text-primary hover:bg-primary/10 disabled:opacity-40"
-          >
-            <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-            New OrderTemplate
-          </Button>
-        </div>
-      </header>
+        ) : (
+          <>
+            {showActions ? (
+              <Section
+                title="ActionTemplates"
+                subtitle="Reusable RIOT3 ACT recipes."
+                action={
+                  <Button
+                    size="sm"
+                    onClick={openCreateAction}
+                    className="liquid-pill-primary rounded-full px-4 font-medium"
+                  >
+                    <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+                    New
+                  </Button>
+                }
+              >
+                {visibleActions.length === 0 ? (
+                  <EmptyState
+                    icon={<Inbox className="h-7 w-7" />}
+                    title={search ? "No matches" : "No ActionTemplates yet"}
+                    description={
+                      search
+                        ? "Try a different search."
+                        : "Create one to get started."
+                    }
+                  />
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {visibleActions.map((t) => (
+                      <ActionTemplateCard
+                        key={t.id}
+                        template={t}
+                        onEdit={openEditAction}
+                      />
+                    ))}
+                  </div>
+                )}
+              </Section>
+            ) : null}
 
-      {/* Content edges to viewport. Top padding pushes below the floating
-          header pill (visual height ~64px + spacing). Tablet ≤1024px stacks
-          panels vertically per the iPad-app brief. */}
-      <main className="mx-auto grid w-full max-w-[1600px] flex-1 grid-cols-1 gap-5 px-4 pb-6 pt-4 md:px-6 md:gap-6 md:pb-8 lg:grid-cols-[minmax(380px,28rem)_1fr]">
-        <aside className="liquid-glass flex min-h-0 flex-col overflow-hidden rounded-[28px] lg:max-h-[calc(100vh-8rem)]">
-          <ActionTemplateList />
-        </aside>
+            {showOrders ? (
+              <Section
+                title="OrderTemplates"
+                subtitle="Composed RIOT3 order plans."
+                action={
+                  <Button
+                    size="sm"
+                    onClick={() => setSelectedOrderId(null)}
+                    disabled={selectedOrderId === null}
+                    variant="ghost"
+                    className="press-feedback rounded-full px-4 text-[13px] font-medium text-primary hover:bg-primary/10 disabled:opacity-40"
+                  >
+                    <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+                    New
+                  </Button>
+                }
+              >
+                {visibleOrders.length === 0 ? (
+                  <EmptyState
+                    icon={<Inbox className="h-7 w-7" />}
+                    title={search ? "No matches" : "No OrderTemplates yet"}
+                    description={
+                      search
+                        ? "Try a different search."
+                        : "Build the first one in the editor below."
+                    }
+                  />
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {visibleOrders.map((t) => (
+                      <OrderTemplateCard
+                        key={t.id}
+                        template={t}
+                        selected={t.id === selectedOrderId}
+                        onSelect={setSelectedOrderId}
+                        onInstantiate={setInstantiating}
+                      />
+                    ))}
+                  </div>
+                )}
+              </Section>
+            ) : null}
 
-        <section className="liquid-glass flex min-h-0 flex-col overflow-hidden rounded-[28px] lg:max-h-[calc(100vh-8rem)]">
-          <div className="relative z-[2] flex items-center justify-between border-b border-black/[0.06] px-6 py-5 dark:border-white/10">
-            <div className="min-w-0">
-              <h2 className="text-[15px] font-semibold tracking-tight leading-tight">
-                OrderTemplate composer
-              </h2>
-              <p className="mt-1 text-[13px] text-muted-foreground">
-                {selected
-                  ? `Editing ${selected.name}`
-                  : "Building a new template"}
-              </p>
-            </div>
-          </div>
+            {showOrders ? (
+              <Section
+                title={selectedOrder ? "Editor" : "Composer"}
+                subtitle={
+                  selectedOrder
+                    ? `Editing ${selectedOrder.name}`
+                    : "Building a new OrderTemplate"
+                }
+              >
+                <div className="liquid-glass relative rounded-[24px] p-6">
+                  <div className="relative z-[2]">
+                    <OrderTemplateForm
+                      template={selectedOrder}
+                      onSaved={(id) => setSelectedOrderId(id)}
+                      onCancel={
+                        selectedOrder ? () => setSelectedOrderId(null) : undefined
+                      }
+                    />
+                  </div>
+                </div>
+              </Section>
+            ) : null}
+          </>
+        )}
+      </div>
 
-          <div className="relative z-[2] flex-1 space-y-6 overflow-auto p-6">
-            <OrderTemplateList
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onInstantiate={setInstantiating}
-              includeInactive={includeInactive}
-              onIncludeInactiveChange={setIncludeInactive}
-            />
-
-            <Separator className="bg-black/[0.06] dark:bg-white/10" />
-
-            <OrderTemplateForm
-              template={selected}
-              onSaved={(id) => setSelectedId(id)}
-              onCancel={selected ? () => setSelectedId(null) : undefined}
-            />
-          </div>
-        </section>
-      </main>
+      <ActionTemplateForm
+        open={actionFormOpen}
+        onOpenChange={setActionFormOpen}
+        template={actionFormEditing}
+      />
 
       <InstantiateDialog
         open={instantiating !== null}
@@ -123,3 +249,74 @@ export default function Home() {
     </div>
   );
 }
+
+// ── helpers ──────────────────────────────────────────────────────────────
+
+function Section({
+  title,
+  subtitle,
+  action,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h2 className="text-[15px] font-semibold tracking-tight leading-tight">
+            {title}
+          </h2>
+          {subtitle ? (
+            <p className="mt-0.5 text-[12px] text-muted-foreground">
+              {subtitle}
+            </p>
+          ) : null}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function matchesSearch(
+  text: string,
+  search: string
+): boolean {
+  if (search.trim().length === 0) return true;
+  return text.toLowerCase().includes(search.trim().toLowerCase());
+}
+
+function filterAndSearchActions(
+  list: ActionTemplateDto[],
+  filter: TemplateFilter,
+  search: string
+): ActionTemplateDto[] {
+  return list.filter((t) => {
+    if (filter === "orders") return false;
+    if (filter === "active" && !t.isActive) return false;
+    if (filter === "inactive" && t.isActive) return false;
+    return matchesSearch(`${t.name} ${t.actionType}`, search);
+  });
+}
+
+function filterAndSearchOrders(
+  list: OrderTemplateDto[],
+  filter: TemplateFilter,
+  search: string
+): OrderTemplateDto[] {
+  return list.filter((t) => {
+    if (filter === "actions") return false;
+    if (filter === "active" && !t.isActive) return false;
+    if (filter === "inactive" && t.isActive) return false;
+    return matchesSearch(`${t.name} ${t.description ?? ""}`, search);
+  });
+}
+
+// Separator kept in scope so the form imports don't tree-shake it.
+// (Order template form uses it internally.)
+void Separator;

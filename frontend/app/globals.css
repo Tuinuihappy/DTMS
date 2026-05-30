@@ -149,21 +149,22 @@
   body {
     @apply text-foreground;
     background-color: var(--background);
-    /* Single soft blob top-right — the only color in the layout besides
-       the primary blue. macOS Sequoia / iCloud uses this exact trick. */
-    background-image: radial-gradient(
-      120% 80% at 100% 0%,
-      rgba(0, 122, 255, 0.06) 0%,
-      transparent 55%
-    );
+    /* Apple Sequoia / iCloud-style ambient gradient. Three soft blobs:
+       blue top-right (iOS brand), purple bottom-left (depth), teal
+       middle-top (cool accent). Fixed attachment so it doesn't scroll
+       with content. The blobs land just outside the content gutter so
+       they bleed in from the page edges. */
+    background-image:
+      radial-gradient(80% 60% at 100% 0%, rgba(0, 122, 255, 0.10) 0%, transparent 55%),
+      radial-gradient(70% 60% at 0% 100%, rgba(175, 82, 222, 0.10) 0%, transparent 55%),
+      radial-gradient(60% 50% at 50% 0%, rgba(48, 209, 196, 0.06) 0%, transparent 55%);
     background-attachment: fixed;
   }
   .dark body {
-    background-image: radial-gradient(
-      120% 80% at 100% 0%,
-      rgba(10, 132, 255, 0.10) 0%,
-      transparent 55%
-    );
+    background-image:
+      radial-gradient(80% 60% at 100% 0%, rgba(10, 132, 255, 0.18) 0%, transparent 55%),
+      radial-gradient(70% 60% at 0% 100%, rgba(191, 90, 242, 0.16) 0%, transparent 55%),
+      radial-gradient(60% 50% at 50% 0%, rgba(48, 209, 196, 0.10) 0%, transparent 55%);
   }
 
   /* Smoother default for interactive elements. Components can still
