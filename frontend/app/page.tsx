@@ -41,11 +41,13 @@ export default function Home() {
           the pill never reaches the viewport edges (Apple keeps ~16px gap
           even on iPad). */}
       <header className="sticky top-0 z-40 flex justify-center px-4 pt-4 md:px-6 md:pt-6">
-        <div className="liquid-glass mx-auto flex w-full max-w-[1560px] items-center justify-between gap-4 rounded-full px-3 py-2 md:px-4 md:py-2.5">
+        <div className="liquid-glass liquid-iridescent mx-auto flex w-full max-w-[1560px] items-center justify-between gap-4 rounded-full px-3 py-2 md:px-4 md:py-2.5">
           <div className="relative z-[2] flex items-center gap-3 pl-1">
-            {/* Solid iOS-blue chip — the only saturated color on the surface. */}
-            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm shadow-primary/25">
-              <Sparkles className="h-4 w-4" strokeWidth={2.25} />
+            {/* 3D Liquid Puck — bright blue glass ball with specular spot
+                top-left and tinted shadow underneath. Replaces the flat
+                rounded-2xl chip from the previous pass. */}
+            <div className="liquid-puck liquid-puck-primary flex h-10 w-10 items-center justify-center rounded-full">
+              <Sparkles className="h-4 w-4 relative z-[2]" strokeWidth={2.25} />
             </div>
             <div className="hidden sm:block">
               <h1 className="text-[15px] font-semibold tracking-tight leading-tight">

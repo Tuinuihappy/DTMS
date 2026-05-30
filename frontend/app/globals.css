@@ -193,16 +193,24 @@
     isolation: isolate;
     background: linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.55) 0%,
-      rgba(255, 255, 255, 0.28) 100%
+      rgba(255, 255, 255, 0.62) 0%,
+      rgba(255, 255, 255, 0.32) 100%
     );
-    backdrop-filter: blur(30px) saturate(200%);
-    -webkit-backdrop-filter: blur(30px) saturate(200%);
+    /* Boosted saturation (200% → 280%) so colors behind the glass stay
+       vivid after diffusion. Mirrors what Apple does in iOS 26 — the
+       blur is strong but content keeps its chroma. */
+    backdrop-filter: blur(30px) saturate(280%);
+    -webkit-backdrop-filter: blur(30px) saturate(280%);
     box-shadow:
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.70),
-      inset 0 -1px 0 0 rgba(255, 255, 255, 0.18),
+      /* Brighter top specular — main "light catches" cue */
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.92),
+      /* Soft bottom rim — reflection of ambient light */
+      inset 0 -1px 0 0 rgba(255, 255, 255, 0.22),
+      /* Inner glow hint — gives the glass an inner ambient lighting feel */
+      inset 0 0 30px -8px rgba(255, 255, 255, 0.35),
+      /* Drop shadow — material thickness */
       0 8px 32px -4px rgba(0, 0, 0, 0.10),
-      0 2px 8px -2px rgba(0, 0, 0, 0.04);
+      0 2px 8px -2px rgba(0, 0, 0, 0.05);
   }
   /* Top-to-bottom gradient border via mask-composite. Renders as a
      1px ring that fades from bright (top) to subtle (bottom) — reads
@@ -275,39 +283,145 @@
       0 1px 2px 0 rgba(0, 0, 0, 0.40);
   }
 
-  /* Tinted liquid pill — for primary CTAs. Same composition as
-     .liquid-glass but with a saturated color base so the button reads
-     as "blue glass" instead of "clear glass". The backdrop-blur still
-     applies so content behind it bleeds through subtly. */
+  /* Tinted liquid pill — for primary CTAs. Now with iridescent rim,
+     stronger inner glow, and tinted drop shadow that picks up --tint
+     (defaults to primary blue). The dual-layer background creates the
+     "light from above" cue: white-blended at top, saturated at bottom. */
   .liquid-pill-primary {
+    --tint: var(--primary);
     position: relative;
     isolation: isolate;
     background: linear-gradient(
       180deg,
-      color-mix(in oklch, var(--primary) 90%, white) 0%,
-      var(--primary) 100%
+      color-mix(in oklch, var(--tint) 75%, white) 0%,
+      var(--tint) 100%
     );
     color: var(--primary-foreground);
     box-shadow:
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.35),
-      inset 0 -1px 0 0 rgba(0, 0, 0, 0.08),
-      0 1px 2px 0 rgba(0, 0, 0, 0.05),
-      0 4px 12px -2px color-mix(in oklch, var(--primary) 40%, transparent);
+      /* Strong top specular line */
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.55),
+      /* Inner glow — bottom-up tinted highlight */
+      inset 0 -1px 4px 0 color-mix(in oklch, white 30%, transparent),
+      /* Bottom rim shadow */
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.10),
+      /* Resting depth */
+      0 1px 2px 0 rgba(0, 0, 0, 0.06),
+      /* Tinted glow — pill seems to "emit" light */
+      0 6px 18px -2px color-mix(in oklch, var(--tint) 45%, transparent);
     transition-property: filter, box-shadow, transform;
     transition-duration: 200ms;
     transition-timing-function: var(--ease-apple);
   }
   .liquid-pill-primary:hover {
-    filter: brightness(1.05);
+    filter: brightness(1.06);
     box-shadow:
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.45),
-      inset 0 -1px 0 0 rgba(0, 0, 0, 0.08),
-      0 1px 2px 0 rgba(0, 0, 0, 0.05),
-      0 6px 16px -2px color-mix(in oklch, var(--primary) 50%, transparent);
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.65),
+      inset 0 -1px 4px 0 color-mix(in oklch, white 40%, transparent),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.10),
+      0 1px 2px 0 rgba(0, 0, 0, 0.06),
+      0 8px 24px -2px color-mix(in oklch, var(--tint) 55%, transparent);
   }
   .liquid-pill-primary:active {
     filter: brightness(0.95);
-    transform: scale(0.97);
+    transform: scale(0.96);
+  }
+
+  /* ─── Liquid Puck — 3D circular button (logo chip, icon buttons) ──────
+     Multi-layer radial gradient gives the "glass sphere" feel: a bright
+     specular spot top-left, a tinted body, and a soft cast shadow.
+     Defaults to neutral white glass; pass `--tint: ...` for a colored
+     puck (e.g. blue CTA, success green). */
+  .liquid-puck {
+    --tint: rgba(255, 255, 255, 0.8);
+    position: relative;
+    isolation: isolate;
+    background:
+      /* Layer 1: Specular highlight (light source upper-left) */
+      radial-gradient(
+        circle at 30% 25%,
+        rgba(255, 255, 255, 0.85) 0%,
+        rgba(255, 255, 255, 0.25) 30%,
+        transparent 55%
+      ),
+      /* Layer 2: Tinted body with subtle gradient */
+      linear-gradient(
+        165deg,
+        color-mix(in oklch, var(--tint) 70%, white) 0%,
+        var(--tint) 100%
+      );
+    backdrop-filter: blur(12px) saturate(200%);
+    -webkit-backdrop-filter: blur(12px) saturate(200%);
+    box-shadow:
+      /* Top inner highlight — strong rim light */
+      inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.55),
+      /* Bottom inner shadow — gives the ball its underside */
+      inset 0 -1px 2px 0 rgba(0, 0, 0, 0.08),
+      /* Tinted glow shadow */
+      0 4px 12px -2px color-mix(in oklch, var(--tint) 35%, transparent),
+      0 1px 2px 0 rgba(0, 0, 0, 0.10);
+    transition-property: filter, box-shadow, transform;
+    transition-duration: 200ms;
+    transition-timing-function: var(--ease-apple);
+  }
+  .liquid-puck:hover {
+    filter: brightness(1.05);
+    box-shadow:
+      inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.7),
+      inset 0 -1px 2px 0 rgba(0, 0, 0, 0.08),
+      0 6px 18px -2px color-mix(in oklch, var(--tint) 50%, transparent),
+      0 1px 2px 0 rgba(0, 0, 0, 0.10);
+  }
+  .liquid-puck:active {
+    transform: scale(0.93);
+    filter: brightness(0.95);
+  }
+  .liquid-puck:disabled {
+    filter: grayscale(0.5) opacity(0.5);
+    pointer-events: none;
+  }
+
+  /* Blue tint variant — for primary CTAs (matches iOS blue brand). */
+  .liquid-puck-primary {
+    --tint: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  /* ─── Iridescent border — chromatic dispersion at the rim ─────────────
+     Adds a multi-stop gradient ring (white → purple → cyan → white) via
+     pseudo-element + mask-composite. Stacks on top of any .liquid-*
+     surface. Looks like real glass refracting white light into colors. */
+  .liquid-iridescent {
+    position: relative;
+  }
+  .liquid-iridescent::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.85) 0%,
+      rgba(180, 160, 255, 0.55) 30%,
+      rgba(120, 220, 255, 0.55) 60%,
+      rgba(255, 255, 255, 0.85) 100%
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .dark .liquid-iridescent::after {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.4) 0%,
+      rgba(180, 160, 255, 0.35) 30%,
+      rgba(120, 220, 255, 0.35) 60%,
+      rgba(255, 255, 255, 0.4) 100%
+    );
   }
 
   /* Apple-feel button press — used on neutral / ghost buttons.

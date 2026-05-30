@@ -152,7 +152,7 @@ export function OrderTemplateList({
                   </p>
                 </div>
                 <div
-                  className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+                  className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Tooltip>
@@ -166,8 +166,9 @@ export function OrderTemplateList({
                             onSelect(t.id);
                           }}
                           aria-label="Edit"
+                          className="liquid-puck size-7 rounded-full text-foreground hover:bg-transparent"
                         >
-                          <Pencil className="h-3 w-3" />
+                          <Pencil className="relative z-[2] h-3 w-3" strokeWidth={2.25} />
                         </Button>
                       }
                     />
@@ -184,8 +185,9 @@ export function OrderTemplateList({
                             onInstantiate(t);
                           }}
                           aria-label="Instantiate"
+                          className="liquid-puck liquid-puck-primary size-7 rounded-full hover:bg-transparent"
                         >
-                          <Play className="h-3 w-3" />
+                          <Play className="relative z-[2] h-3 w-3 fill-current" strokeWidth={0} />
                         </Button>
                       }
                     />
@@ -203,8 +205,9 @@ export function OrderTemplateList({
                           }}
                           disabled={toggleActive.isPending}
                           aria-label={t.isActive ? "Deactivate" : "Activate"}
+                          className="liquid-puck size-7 rounded-full text-foreground hover:bg-transparent"
                         >
-                          <Power className="h-3 w-3" />
+                          <Power className="relative z-[2] h-3 w-3" strokeWidth={2.25} />
                         </Button>
                       }
                     />
@@ -218,10 +221,10 @@ export function OrderTemplateList({
                         size="icon"
                         variant="ghost"
                         aria-label="Delete"
-                        className="text-destructive hover:text-destructive"
+                        className="liquid-puck size-7 rounded-full text-destructive hover:bg-transparent"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="relative z-[2] h-3 w-3" strokeWidth={2.25} />
                       </Button>
                     }
                     title={`Delete ${t.name}?`}

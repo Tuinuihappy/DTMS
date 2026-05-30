@@ -60,7 +60,7 @@ export function ActionTemplateList() {
         <Button
           size="sm"
           onClick={openCreate}
-          className="liquid-pill-primary rounded-full px-4"
+          className="liquid-pill-primary liquid-iridescent rounded-full px-4"
         >
           <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
           New

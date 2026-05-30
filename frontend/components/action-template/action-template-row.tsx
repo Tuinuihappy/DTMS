@@ -112,7 +112,7 @@ export function ActionTemplateRow({ template, onEdit }: ActionTemplateRowProps) 
         ) : null}
       </div>
 
-      <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
         <Tooltip>
           <TooltipTrigger
             render={
@@ -121,9 +121,9 @@ export function ActionTemplateRow({ template, onEdit }: ActionTemplateRowProps) 
                 variant="ghost"
                 onClick={() => onEdit(template)}
                 aria-label="Edit"
-                className="press-feedback rounded-full hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
+                className="liquid-puck size-7 rounded-full text-foreground hover:bg-transparent"
               >
-                <Pencil className="h-3.5 w-3.5" strokeWidth={2} />
+                <Pencil className="relative z-[2] h-3 w-3" strokeWidth={2.25} />
               </Button>
             }
           />
@@ -139,9 +139,9 @@ export function ActionTemplateRow({ template, onEdit }: ActionTemplateRowProps) 
                 onClick={() => toggleActive.mutate()}
                 disabled={toggleActive.isPending}
                 aria-label={template.isActive ? "Deactivate" : "Activate"}
-                className="press-feedback rounded-full hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
+                className="liquid-puck size-7 rounded-full text-foreground hover:bg-transparent"
               >
-                <Power className="h-3.5 w-3.5" strokeWidth={2} />
+                <Power className="relative z-[2] h-3 w-3" strokeWidth={2.25} />
               </Button>
             }
           />
@@ -156,9 +156,9 @@ export function ActionTemplateRow({ template, onEdit }: ActionTemplateRowProps) 
               size="icon"
               variant="ghost"
               aria-label="Delete"
-              className="press-feedback rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+              className="liquid-puck size-7 rounded-full text-destructive hover:bg-transparent"
             >
-              <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
+              <Trash2 className="relative z-[2] h-3 w-3" strokeWidth={2.25} />
             </Button>
           }
           title={`Delete ${template.name}?`}

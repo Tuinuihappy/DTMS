@@ -216,7 +216,7 @@ export function InstantiateDialog({
           <Button
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending}
-            className="liquid-pill-primary rounded-full px-5 font-medium"
+            className="liquid-pill-primary liquid-iridescent rounded-full px-5 font-medium"
           >
             {mutation.isPending
               ? "Working…"
