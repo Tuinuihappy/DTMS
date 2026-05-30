@@ -12,6 +12,7 @@ import type { ActionTemplateDto } from "@/types/action-template";
 import type { OrderTemplateDto } from "@/types/order-template";
 import {
   ORDER_STATUS_VALUES,
+  formatEnumLabel,
   type DeliveryOrderListDto,
   type OrderStatus,
 } from "@/types/delivery-order";
@@ -31,20 +32,38 @@ import { Sidebar, type NavFilter } from "@/components/shell/sidebar";
 import { TopBar } from "@/components/shell/top-bar";
 import { cn } from "@/lib/utils";
 
+// In-view Active/Inactive toggle for the template grids. "all" = no
+// status filter. Lives inside the page, not the sidebar — the rail
+// stays focused on top-level navigation.
+type ActiveFilter = "all" | "active" | "inactive";
+const ACTIVE_FILTERS: { label: string; value: ActiveFilter }[] = [
+  { label: "All", value: "all" },
+  { label: "Active", value: "active" },
+  { label: "Inactive", value: "inactive" },
+];
+
 // Pill strip filter values for the Delivery Orders view. "all" maps to
 // "no status filter on the API request".
 const STATUS_FILTERS: { label: string; value: "all" | OrderStatus }[] = [
   { label: "All", value: "all" },
-  ...ORDER_STATUS_VALUES.map((s) => ({ label: s, value: s })),
+  ...ORDER_STATUS_VALUES.map((s) => ({ label: formatEnumLabel(s), value: s })),
 ];
 
 export default function Home() {
-  const [filter, setFilter] = useState<NavFilter>("all");
+  const [filter, setFilter] = useState<NavFilter>("actions");
   const [search, setSearch] = useState("");
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [instantiating, setInstantiating] = useState<OrderTemplateDto | null>(
     null
   );
+
+  // Per-view Active/Inactive filter, scoped to whichever template grid
+  // is on screen. Kept separate so switching between actions/orders
+  // doesn't leak state across the views.
+  const [actionStatusFilter, setActionStatusFilter] =
+    useState<ActiveFilter>("all");
+  const [orderStatusFilter, setOrderStatusFilter] =
+    useState<ActiveFilter>("all");
 
   const [actionFormOpen, setActionFormOpen] = useState(false);
   const [actionFormEditing, setActionFormEditing] =
@@ -89,19 +108,19 @@ export default function Home() {
 
   const actionAll = actionQuery.data ?? [];
   const orderAll = orderQuery.data ?? [];
-  const deliveryAll = deliveryOrdersAllQuery.data?.items ?? [];
+  const deliveryAll = deliveryOrdersAllQuery.data?.data ?? [];
   const deliveryVisible =
     doStatusFilter === "all"
       ? deliveryAll
-      : deliveryOrdersFilteredQuery.data?.items ?? [];
+      : deliveryOrdersFilteredQuery.data?.data ?? [];
 
   const visibleActions = useMemo(
-    () => filterAndSearchActions(actionAll, filter, search),
-    [actionAll, filter, search]
+    () => filterAndSearchActions(actionAll, actionStatusFilter, search),
+    [actionAll, actionStatusFilter, search]
   );
   const visibleOrders = useMemo(
-    () => filterAndSearchOrders(orderAll, filter, search),
-    [orderAll, filter, search]
+    () => filterAndSearchOrders(orderAll, orderStatusFilter, search),
+    [orderAll, orderStatusFilter, search]
   );
   const visibleDeliveryOrders = useMemo(
     () =>
@@ -110,10 +129,6 @@ export default function Home() {
       ),
     [deliveryVisible, search]
   );
-
-  const isDeliveryView = filter === "delivery-orders";
-  const showActions = !isDeliveryView && filter !== "orders";
-  const showOrders = !isDeliveryView && filter !== "actions";
 
   const selectedOrderTemplate = useMemo(
     () => orderAll.find((t) => t.id === selectedOrderId) ?? null,
@@ -126,18 +141,17 @@ export default function Home() {
 
   const counts = useMemo(
     () => ({
-      all: actionAll.length + orderAll.length,
-      active:
-        actionAll.filter((t) => t.isActive).length +
-        orderAll.filter((t) => t.isActive).length,
-      inactive:
-        actionAll.filter((t) => !t.isActive).length +
-        orderAll.filter((t) => !t.isActive).length,
       actions: actionAll.length,
       orders: orderAll.length,
-      "delivery-orders": deliveryOrdersAllQuery.data?.totalCount ?? deliveryAll.length,
+      "delivery-orders":
+        deliveryOrdersAllQuery.data?.totalCount ?? deliveryAll.length,
     }),
-    [actionAll, orderAll, deliveryAll.length, deliveryOrdersAllQuery.data?.totalCount]
+    [
+      actionAll.length,
+      orderAll.length,
+      deliveryAll.length,
+      deliveryOrdersAllQuery.data?.totalCount,
+    ]
   );
 
   function openCreateAction() {
@@ -151,6 +165,10 @@ export default function Home() {
   function openDeliveryDetail(id: string) {
     setDoDetailId(id);
   }
+
+  const isDeliveryView = filter === "delivery-orders";
+  const isActionsView = filter === "actions";
+  const isOrdersView = filter === "orders";
 
   return (
     <div className="grid min-h-screen grid-cols-1 gap-4 p-4 lg:grid-cols-[240px_1fr] lg:gap-5 lg:p-5">
@@ -194,7 +212,7 @@ export default function Home() {
               </div>
             ) : (
               <>
-                {showActions ? (
+                {isActionsView ? (
                   <Section
                     title="ActionTemplates"
                     subtitle="Reusable RIOT3 ACT recipes."
@@ -209,6 +227,12 @@ export default function Home() {
                       </Button>
                     }
                   >
+                    <PillStrip
+                      filters={ACTIVE_FILTERS}
+                      value={actionStatusFilter}
+                      onChange={setActionStatusFilter}
+                      counts={countActive(actionAll)}
+                    />
                     {visibleActions.length === 0 ? (
                       <EmptyState
                         icon={<Inbox className="h-7 w-7" />}
@@ -233,72 +257,78 @@ export default function Home() {
                   </Section>
                 ) : null}
 
-                {showOrders ? (
-                  <Section
-                    title="OrderTemplates"
-                    subtitle="Composed RIOT3 order plans."
-                    action={
-                      <Button
-                        size="sm"
-                        onClick={() => setSelectedOrderId(null)}
-                        disabled={selectedOrderId === null}
-                        variant="ghost"
-                        className="press-feedback rounded-full px-4 text-[13px] font-medium text-primary hover:bg-primary/10 disabled:opacity-40"
-                      >
-                        <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                        New
-                      </Button>
-                    }
-                  >
-                    {visibleOrders.length === 0 ? (
-                      <EmptyState
-                        icon={<Inbox className="h-7 w-7" />}
-                        title={search ? "No matches" : "No OrderTemplates yet"}
-                        description={
-                          search
-                            ? "Try a different search."
-                            : "Build the first one in the editor below."
-                        }
+                {isOrdersView ? (
+                  <>
+                    <Section
+                      title="OrderTemplates"
+                      subtitle="Composed RIOT3 order plans."
+                      action={
+                        <Button
+                          size="sm"
+                          onClick={() => setSelectedOrderId(null)}
+                          disabled={selectedOrderId === null}
+                          variant="ghost"
+                          className="press-feedback rounded-full px-4 text-[13px] font-medium text-primary hover:bg-primary/10 disabled:opacity-40"
+                        >
+                          <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+                          New
+                        </Button>
+                      }
+                    >
+                      <PillStrip
+                        filters={ACTIVE_FILTERS}
+                        value={orderStatusFilter}
+                        onChange={setOrderStatusFilter}
+                        counts={countActive(orderAll)}
                       />
-                    ) : (
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {visibleOrders.map((t) => (
-                          <OrderTemplateCard
-                            key={t.id}
-                            template={t}
-                            selected={t.id === selectedOrderId}
-                            onSelect={setSelectedOrderId}
-                            onInstantiate={setInstantiating}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </Section>
-                ) : null}
-
-                {showOrders ? (
-                  <Section
-                    title={selectedOrderTemplate ? "Editor" : "Composer"}
-                    subtitle={
-                      selectedOrderTemplate
-                        ? `Editing ${selectedOrderTemplate.name}`
-                        : "Building a new OrderTemplate"
-                    }
-                  >
-                    <div className="liquid-glass relative rounded-[24px] p-6">
-                      <div className="relative z-[2]">
-                        <OrderTemplateForm
-                          template={selectedOrderTemplate}
-                          onSaved={(id) => setSelectedOrderId(id)}
-                          onCancel={
-                            selectedOrderTemplate
-                              ? () => setSelectedOrderId(null)
-                              : undefined
+                      {visibleOrders.length === 0 ? (
+                        <EmptyState
+                          icon={<Inbox className="h-7 w-7" />}
+                          title={search ? "No matches" : "No OrderTemplates yet"}
+                          description={
+                            search
+                              ? "Try a different search."
+                              : "Build the first one in the editor below."
                           }
                         />
+                      ) : (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          {visibleOrders.map((t) => (
+                            <OrderTemplateCard
+                              key={t.id}
+                              template={t}
+                              selected={t.id === selectedOrderId}
+                              onSelect={setSelectedOrderId}
+                              onInstantiate={setInstantiating}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </Section>
+
+                    <Section
+                      title={selectedOrderTemplate ? "Editor" : "Composer"}
+                      subtitle={
+                        selectedOrderTemplate
+                          ? `Editing ${selectedOrderTemplate.name}`
+                          : "Building a new OrderTemplate"
+                      }
+                    >
+                      <div className="liquid-glass relative rounded-[24px] p-6">
+                        <div className="relative z-[2]">
+                          <OrderTemplateForm
+                            template={selectedOrderTemplate}
+                            onSaved={(id) => setSelectedOrderId(id)}
+                            onCancel={
+                              selectedOrderTemplate
+                                ? () => setSelectedOrderId(null)
+                                : undefined
+                            }
+                          />
+                        </div>
                       </div>
-                    </div>
-                  </Section>
+                    </Section>
+                  </>
                 ) : null}
               </>
             )}
@@ -494,6 +524,52 @@ function Section({
   );
 }
 
+function PillStrip<T extends string>({
+  filters,
+  value,
+  onChange,
+  counts,
+}: {
+  filters: { label: string; value: T }[];
+  value: T;
+  onChange: (next: T) => void;
+  counts: Partial<Record<T, number>>;
+}) {
+  return (
+    <div className="liquid-glass-subtle relative flex flex-wrap items-center gap-1.5 rounded-2xl p-2">
+      {filters.map((f) => {
+        const count = counts[f.value];
+        const active = value === f.value;
+        return (
+          <button
+            key={f.value}
+            type="button"
+            onClick={() => onChange(f.value)}
+            className={cn(
+              "press-feedback inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium transition-colors",
+              active
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
+            )}
+          >
+            {f.label}
+            {count !== undefined && count > 0 ? (
+              <span
+                className={cn(
+                  "rounded-full px-1.5 text-[10px]",
+                  active ? "bg-primary/20" : "bg-black/[0.05] dark:bg-white/[0.08]"
+                )}
+              >
+                {count}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function matchesSearch(text: string, search: string): boolean {
   if (search.trim().length === 0) return true;
   return text.toLowerCase().includes(search.trim().toLowerCase());
@@ -501,28 +577,37 @@ function matchesSearch(text: string, search: string): boolean {
 
 function filterAndSearchActions(
   list: ActionTemplateDto[],
-  filter: NavFilter,
+  activeFilter: ActiveFilter,
   search: string
 ): ActionTemplateDto[] {
   return list.filter((t) => {
-    if (filter === "orders" || filter === "delivery-orders") return false;
-    if (filter === "active" && !t.isActive) return false;
-    if (filter === "inactive" && t.isActive) return false;
+    if (activeFilter === "active" && !t.isActive) return false;
+    if (activeFilter === "inactive" && t.isActive) return false;
     return matchesSearch(`${t.name} ${t.actionType}`, search);
   });
 }
 
 function filterAndSearchOrders(
   list: OrderTemplateDto[],
-  filter: NavFilter,
+  activeFilter: ActiveFilter,
   search: string
 ): OrderTemplateDto[] {
   return list.filter((t) => {
-    if (filter === "actions" || filter === "delivery-orders") return false;
-    if (filter === "active" && !t.isActive) return false;
-    if (filter === "inactive" && t.isActive) return false;
+    if (activeFilter === "active" && !t.isActive) return false;
+    if (activeFilter === "inactive" && t.isActive) return false;
     return matchesSearch(`${t.name} ${t.description ?? ""}`, search);
   });
+}
+
+function countActive<T extends { isActive: boolean }>(
+  list: T[]
+): Record<ActiveFilter, number> {
+  const active = list.filter((t) => t.isActive).length;
+  return {
+    all: list.length,
+    active,
+    inactive: list.length - active,
+  };
 }
 
 function countByStatus(
@@ -530,7 +615,7 @@ function countByStatus(
 ): Partial<Record<OrderStatus, number>> {
   const out: Partial<Record<OrderStatus, number>> = {};
   for (const o of orders) {
-    out[o.status] = (out[o.status] ?? 0) + 1;
+    out[o.orderStatus] = (out[o.orderStatus] ?? 0) + 1;
   }
   return out;
 }

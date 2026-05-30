@@ -37,12 +37,13 @@ import { ConfirmDestructive } from "@/components/shared/confirm-destructive";
 import { deliveryOrdersApi } from "@/lib/delivery-orders";
 import { queryKeys } from "@/lib/query-keys";
 import { ApiError } from "@/lib/api";
-import type {
-  ItemDto,
-  LifecycleResult,
-  OrderStatus,
+import {
+  TERMINAL_STATUSES,
+  formatEnumLabel,
+  type ItemDto,
+  type LifecycleResult,
+  type OrderStatus,
 } from "@/types/delivery-order";
-import { TERMINAL_STATUSES } from "@/types/delivery-order";
 
 import { StatusBadge } from "./status-badge";
 
@@ -181,7 +182,7 @@ function DetailBody({ orderId }: { orderId: string }) {
 
   const order = orderQuery.data;
   const items = itemsQuery.data ?? order.items;
-  const canAct = !TERMINAL_STATUSES.includes(order.status);
+  const canAct = !TERMINAL_STATUSES.includes(order.orderStatus);
 
   return (
     <>
@@ -196,7 +197,7 @@ function DetailBody({ orderId }: { orderId: string }) {
               {new Date(order.createdDate).toLocaleString()}
             </SheetDescription>
           </div>
-          <StatusBadge status={order.status} />
+          <StatusBadge status={order.orderStatus} />
         </div>
       </SheetHeader>
 
@@ -215,7 +216,7 @@ function DetailBody({ orderId }: { orderId: string }) {
           </TabsList>
 
           <TabsContent value="order" className="space-y-3">
-            <Detail label="Priority" value={order.priority} />
+            <Detail label="Priority" value={formatEnumLabel(order.priority)} />
             <Detail
               label="Total items / weight"
               value={`${order.totalItems} · ${order.totalWeightKg.toFixed(2)} kg`}
@@ -255,7 +256,7 @@ function DetailBody({ orderId }: { orderId: string }) {
       {canAct ? (
         <div className="border-t border-black/[0.06] bg-white/40 px-6 py-4 backdrop-blur-md dark:border-white/10 dark:bg-white/[0.04]">
           <ActionRow
-            status={order.status}
+            status={order.orderStatus}
             isPending={
               submit.isPending ||
               confirm.isPending ||
@@ -385,13 +386,17 @@ function ActionRow({
 }: ActionRowProps) {
   // Which lifecycle buttons make sense per status. The backend enforces
   // these too; this is the UI's first line of defence.
-  const canSubmit = status === "Draft";
-  const canConfirm = status === "Submitted" || status === "Validated";
-  const canHold = ["Confirmed", "Validated", "Planning", "Planned", "Dispatched"].includes(
-    status
-  );
-  const canRelease = status === "Held";
-  const canReject = ["Submitted", "Validated", "Confirmed"].includes(status);
+  const canSubmit = status === "DRAFT";
+  const canConfirm = status === "SUBMITTED" || status === "VALIDATED";
+  const canHold = [
+    "CONFIRMED",
+    "VALIDATED",
+    "PLANNING",
+    "PLANNED",
+    "DISPATCHED",
+  ].includes(status);
+  const canRelease = status === "HELD";
+  const canReject = ["SUBMITTED", "VALIDATED", "CONFIRMED"].includes(status);
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">

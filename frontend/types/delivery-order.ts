@@ -4,15 +4,27 @@ import { z } from "zod";
 //   d:\DTMS\src\Modules\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Presentation\DeliveryOrderEndpoints.cs
 // and the domain at:
 //   d:\DTMS\src\Modules\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Domain\Entities\DeliveryOrder.cs
-// Server-set fields (id, createdDate, updatedDate, createdBy, status,
-// sourceSystem) are NOT in the request schemas — the backend rejects /
-// ignores them on the create path.
+//
+// IMPORTANT — the API serializes enums via System.Text.Json's
+// JsonStringEnumConverter with the SnakeCaseUpper naming policy
+// (configured in Program.cs). So `Priority.Normal` lands as
+// "NORMAL" on the wire, `OrderStatus.InProgress` as "IN_PROGRESS",
+// `HandlingInstruction.ThisSideUp` as "THIS_SIDE_UP", etc.
+// We use those exact wire strings as the source of truth on the TS
+// side too and convert to a human-readable label only at render
+// time via formatEnumLabel().
+//
+// Also: the list endpoint returns `{ data, page, pageSize, totalCount,
+// totalPages }` and each item exposes the status via `orderStatus`,
+// NOT `status` — this caused the "no orders" empty state even when
+// the API had data.
 
-// ── Enums (canonical strings the backend uses) ──────────────────────────
+// ── Enums (canonical wire values) ───────────────────────────────────────
 
-export const PRIORITY_VALUES = ["Low", "Normal", "High", "Critical"] as const;
+export const PRIORITY_VALUES = ["LOW", "NORMAL", "HIGH", "CRITICAL"] as const;
 export type Priority = (typeof PRIORITY_VALUES)[number];
 
+// UOM values are already uppercase in C# so SnakeCaseUpper is a no-op.
 export const UOM_VALUES = [
   "KG",
   "G",
@@ -28,42 +40,42 @@ export const PACKING_GROUP_VALUES = ["I", "II", "III"] as const;
 export type PackingGroup = (typeof PACKING_GROUP_VALUES)[number];
 
 export const HANDLING_VALUES = [
-  "Fragile",
-  "ThisSideUp",
-  "DoNotStack",
-  "HeavyLift",
-  "Sharp",
-  "KeepDry",
-  "KeepDark",
-  "PinchHazard",
+  "FRAGILE",
+  "THIS_SIDE_UP",
+  "DO_NOT_STACK",
+  "HEAVY_LIFT",
+  "SHARP",
+  "KEEP_DRY",
+  "KEEP_DARK",
+  "PINCH_HAZARD",
 ] as const;
 export type HandlingInstruction = (typeof HANDLING_VALUES)[number];
 
 export const ORDER_STATUS_VALUES = [
-  "Draft",
-  "Submitted",
-  "Validated",
-  "Confirmed",
-  "Planning",
-  "Planned",
-  "Dispatched",
-  "InProgress",
-  "Completed",
-  "Held",
-  "Rejected",
-  "Cancelled",
-  "Amended",
-  "Failed",
+  "DRAFT",
+  "SUBMITTED",
+  "VALIDATED",
+  "CONFIRMED",
+  "PLANNING",
+  "PLANNED",
+  "DISPATCHED",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "HELD",
+  "REJECTED",
+  "CANCELLED",
+  "AMENDED",
+  "FAILED",
 ] as const;
 export type OrderStatus = (typeof ORDER_STATUS_VALUES)[number];
 
 export const ITEM_STATUS_VALUES = [
-  "Pending",
-  "Picked",
-  "Delivered",
-  "Failed",
-  "Returned",
-  "Cancelled",
+  "PENDING",
+  "PICKED",
+  "DELIVERED",
+  "FAILED",
+  "RETURNED",
+  "CANCELLED",
 ] as const;
 export type ItemStatus = (typeof ITEM_STATUS_VALUES)[number];
 
@@ -71,11 +83,23 @@ export type ItemStatus = (typeof ITEM_STATUS_VALUES)[number];
 // buttons). The other statuses (Completed / Failed / Cancelled /
 // Rejected) render a read-only sheet.
 export const TERMINAL_STATUSES: OrderStatus[] = [
-  "Completed",
-  "Failed",
-  "Cancelled",
-  "Rejected",
+  "COMPLETED",
+  "FAILED",
+  "CANCELLED",
+  "REJECTED",
 ];
+
+// Converts a wire-format enum value like "IN_PROGRESS" or "FRAGILE"
+// into a human-readable label: "In Progress" / "Fragile". Used by
+// badges, pills, and dropdown options.
+export function formatEnumLabel(value: string): string {
+  return value
+    .split("_")
+    .map((w) =>
+      w.length === 0 ? "" : w[0].toUpperCase() + w.slice(1).toLowerCase()
+    )
+    .join(" ");
+}
 
 // ── Form / request schemas ──────────────────────────────────────────────
 
@@ -104,10 +128,6 @@ export const serviceWindowSchema = z
     }
   });
 
-// The form-side shape lets users leave optional advanced fields blank.
-// We convert empty strings → undefined at submit time so the backend
-// receives a clean DTO. Numeric fields come in as strings via Input,
-// the API mapper coerces.
 export const itemFormSchema = z
   .object({
     itemId: z.string().min(1, "itemId is required").max(100),
@@ -201,6 +221,9 @@ export interface DimensionsDto {
   lengthMm: number;
   widthMm: number;
   heightMm: number;
+  // Detail responses include the computed volume; the request shape
+  // ignores it (server recomputes).
+  volumeCBM?: number;
 }
 
 export interface HazmatDto {
@@ -245,7 +268,6 @@ export interface CreateDraftDeliveryOrderRequest {
 
 export interface ItemDto {
   id: string;
-  deliveryOrderId: string;
   itemSeq: number;
   itemId: string;
   description: string | null;
@@ -259,8 +281,10 @@ export interface ItemDto {
   quantity: QuantityDto;
   hazmat: HazmatDto | null;
   temperature: TemperatureDto | null;
-  handlingInstructions: HandlingInstruction[];
-  status: ItemStatus;
+  handlingInstructions: HandlingInstruction[] | null;
+  // Detail items don't include status (they're embedded inside the
+  // order); the items endpoint does.
+  status?: ItemStatus;
 }
 
 export interface DeliveryOrderListDto {
@@ -268,20 +292,22 @@ export interface DeliveryOrderListDto {
   orderRef: string;
   sourceSystem: string;
   priority: Priority;
-  status: OrderStatus;
+  // ⚠️ field name is `orderStatus`, NOT `status` — this is the
+  // most-recently-discovered API contract surprise.
+  orderStatus: OrderStatus;
   totalItems: number;
   totalWeightKg: number;
+  totalQuantity: number;
   serviceWindow: ServiceWindowDto | null;
+  createdBy: string | null;
+  requestedBy: string | null;
+  notes: string | null;
   createdDate: string;
   updatedDate: string | null;
   submittedAt: string | null;
 }
 
 export interface DeliveryOrderDetailDto extends DeliveryOrderListDto {
-  totalQuantity: number;
-  requestedBy: string | null;
-  notes: string | null;
-  createdBy: string | null;
   items: ItemDto[];
 }
 
@@ -297,11 +323,15 @@ export interface LifecycleResult {
   warnings: OrderQualityIssue[];
 }
 
+// Field is `data`, NOT `items`. (The shadcn TanStack Query patterns
+// elsewhere call list items "items", but the C# PagedResult wraps
+// them as `data`.)
 export interface PagedResult<T> {
-  items: T[];
+  data: T[];
   page: number;
   pageSize: number;
   totalCount: number;
+  totalPages: number;
 }
 
 // ── form → wire converter ───────────────────────────────────────────────
@@ -337,8 +367,6 @@ function itemFormToRequest(it: ItemFormValues): CreateItemRequest {
       }
     : undefined;
 
-  const tempMin = asPositiveNumber(it.temperatureMinC) ?? undefined;
-  const tempMax = asPositiveNumber(it.temperatureMaxC) ?? undefined;
   const tempMinSet = nonEmpty(it.temperatureMinC) !== undefined;
   const tempMaxSet = nonEmpty(it.temperatureMaxC) !== undefined;
   const temperature: TemperatureDto | undefined =
@@ -348,10 +376,6 @@ function itemFormToRequest(it: ItemFormValues): CreateItemRequest {
           maxC: tempMaxSet ? Number(it.temperatureMaxC) : null,
         }
       : undefined;
-  // (asPositiveNumber gracefully handles negatives via Number coercion;
-  // the "Positive" name only refers to the empty-string filter.)
-  void tempMin;
-  void tempMax;
 
   return {
     itemId: it.itemId.trim(),

@@ -29,6 +29,7 @@ import {
   HANDLING_VALUES,
   PACKING_GROUP_VALUES,
   UOM_VALUES,
+  formatEnumLabel,
   type CreateDraftDeliveryOrderFormValues,
 } from "@/types/delivery-order";
 import { cn } from "@/lib/utils";
@@ -376,7 +377,7 @@ export function ItemRowForm({ index, fieldArray }: ItemRowFormProps) {
                         }}
                         className="h-3 w-3"
                       />
-                      {h}
+                      {formatEnumLabel(h)}
                     </label>
                   );
                 })}

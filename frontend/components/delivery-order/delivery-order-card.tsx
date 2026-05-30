@@ -3,7 +3,10 @@
 import { PackageCheck } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import type { DeliveryOrderListDto } from "@/types/delivery-order";
+import {
+  formatEnumLabel,
+  type DeliveryOrderListDto,
+} from "@/types/delivery-order";
 
 import { StatusBadge } from "./status-badge";
 
@@ -46,7 +49,7 @@ export function DeliveryOrderCard({
             strokeWidth={2.25}
           />
         </div>
-        <StatusBadge status={order.status} />
+        <StatusBadge status={order.orderStatus} />
       </div>
 
       <div className="relative z-[2] mt-3 space-y-1">
@@ -58,7 +61,7 @@ export function DeliveryOrderCard({
           {order.totalWeightKg > 0
             ? `${order.totalWeightKg.toFixed(1)} kg`
             : "no weight"}{" "}
-          · {order.priority}
+          · {formatEnumLabel(order.priority)}
         </p>
         <ServiceWindowLine
           earliestUtc={order.serviceWindow?.earliestUtc}

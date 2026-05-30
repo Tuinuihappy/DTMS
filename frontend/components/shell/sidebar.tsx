@@ -1,9 +1,6 @@
 "use client";
 
 import {
-  Boxes,
-  CircleDot,
-  Circle,
   Cog,
   Cloud,
   Library,
@@ -23,16 +20,12 @@ import { cn } from "@/lib/utils";
 // sidebar is a pure presentational component so the page can swap in
 // query-derived counts.
 
-export type NavFilter =
-  | "all"
-  | "active"
-  | "inactive"
-  | "actions"
-  | "orders"
-  | "delivery-orders";
+// One row per top-level view. Per-view filters (Active/Inactive for
+// templates, status pills for delivery orders) live INSIDE the view,
+// not on the rail.
+export type NavFilter = "actions" | "orders" | "delivery-orders";
 
-// Legacy alias for backwards compatibility — existing imports referencing
-// `TemplateFilter` continue to compile while the new code uses NavFilter.
+// Legacy alias kept for back-compat with older imports.
 export type TemplateFilter = NavFilter;
 
 interface SidebarProps {
@@ -47,13 +40,7 @@ interface SidebarItem {
   icon: LucideIcon;
 }
 
-const FILTER_GROUP: SidebarItem[] = [
-  { id: "all", label: "All", icon: Boxes },
-  { id: "active", label: "Active", icon: CircleDot },
-  { id: "inactive", label: "Inactive", icon: Circle },
-];
-
-const LIBRARY_GROUP: SidebarItem[] = [
+const TEMPLATES_GROUP: SidebarItem[] = [
   { id: "actions", label: "ActionTemplates", icon: Sparkles },
   { id: "orders", label: "OrderTemplates", icon: Library },
 ];
@@ -82,19 +69,7 @@ export function Sidebar({ selected, onSelect, counts = {} }: SidebarProps) {
       </div>
 
       <SidebarGroup label="Templates">
-        {FILTER_GROUP.map((item) => (
-          <SidebarRow
-            key={item.id}
-            item={item}
-            selected={selected === item.id}
-            count={counts[item.id]}
-            onClick={() => onSelect(item.id)}
-          />
-        ))}
-      </SidebarGroup>
-
-      <SidebarGroup label="Library">
-        {LIBRARY_GROUP.map((item) => (
+        {TEMPLATES_GROUP.map((item) => (
           <SidebarRow
             key={item.id}
             item={item}
@@ -119,7 +94,7 @@ export function Sidebar({ selected, onSelect, counts = {} }: SidebarProps) {
 
       <SidebarGroup label="Settings">
         <SidebarRow
-          item={{ id: "all" as NavFilter, label: "RIOT3 connection", icon: Cloud }}
+          item={{ id: "actions", label: "RIOT3 connection", icon: Cloud }}
           selected={false}
           // Placeholder — no settings page yet. Disabled-but-visible so
           // the IA hints at where it'll live.
@@ -127,7 +102,7 @@ export function Sidebar({ selected, onSelect, counts = {} }: SidebarProps) {
           disabled
         />
         <SidebarRow
-          item={{ id: "all" as NavFilter, label: "Preferences", icon: Cog }}
+          item={{ id: "actions", label: "Preferences", icon: Cog }}
           selected={false}
           onClick={() => {}}
           disabled

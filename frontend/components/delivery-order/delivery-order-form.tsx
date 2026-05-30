@@ -13,6 +13,7 @@ import {
   PRIORITY_VALUES,
   blankItem,
   createDraftDeliveryOrderFormSchema,
+  formatEnumLabel,
   formToCreateRequest,
   type CreateDraftDeliveryOrderFormValues,
 } from "@/types/delivery-order";
@@ -46,7 +47,7 @@ interface DeliveryOrderFormProps {
 
 const emptyDefaults: CreateDraftDeliveryOrderFormValues = {
   orderRef: "",
-  priority: "Normal",
+  priority: "NORMAL",
   serviceWindow: { earliestUtc: "", latestUtc: "" },
   requestedBy: "",
   notes: "",
@@ -127,7 +128,7 @@ export function DeliveryOrderForm({
                   <SelectContent>
                     {PRIORITY_VALUES.map((p) => (
                       <SelectItem key={p} value={p}>
-                        {p}
+                        {formatEnumLabel(p)}
                       </SelectItem>
                     ))}
                   </SelectContent>
