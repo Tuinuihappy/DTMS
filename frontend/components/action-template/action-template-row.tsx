@@ -78,8 +78,8 @@ export function ActionTemplateRow({ template, onEdit }: ActionTemplateRowProps) 
       className={cn(
         // Apple-style row: subtle hover via shadow + bg, no lift.
         // Less motion = more "settled" / less playful.
-        "group glass-subtle relative flex items-start justify-between gap-2 rounded-2xl p-4 transition-all duration-200",
-        "hover:bg-card hover:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.08)] dark:hover:bg-white/[0.06]",
+        "group liquid-glass-subtle relative flex items-start justify-between gap-2 rounded-2xl p-4 transition-all duration-200",
+        "hover:shadow-[0_6px_20px_-4px_rgba(0,0,0,0.10)]",
         !template.isActive && "opacity-55"
       )}
     >

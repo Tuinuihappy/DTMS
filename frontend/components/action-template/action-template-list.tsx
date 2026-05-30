@@ -46,7 +46,7 @@ export function ActionTemplateList() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between gap-2 border-b border-black/[0.06] px-6 py-5 dark:border-white/10">
+      <div className="relative z-[2] flex items-center justify-between gap-2 border-b border-black/[0.06] px-6 py-5 dark:border-white/10">
         <div className="min-w-0">
           <h2 className="text-[15px] font-semibold tracking-tight leading-tight">
             ActionTemplate catalog
@@ -60,14 +60,14 @@ export function ActionTemplateList() {
         <Button
           size="sm"
           onClick={openCreate}
-          className="press-feedback rounded-full bg-primary text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary/90"
+          className="liquid-pill-primary rounded-full px-4"
         >
           <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
           New
         </Button>
       </div>
 
-      <div className="flex items-center gap-3 border-b border-black/[0.06] px-6 py-3.5 dark:border-white/10">
+      <div className="relative z-[2] flex items-center gap-3 border-b border-black/[0.06] px-6 py-3.5 dark:border-white/10">
         <div className="relative flex-1">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
@@ -89,7 +89,7 @@ export function ActionTemplateList() {
         </label>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="relative z-[2] flex-1">
         <div className="space-y-2 p-5">
           {query.isLoading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">

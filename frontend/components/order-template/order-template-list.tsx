@@ -90,7 +90,7 @@ export function OrderTemplateList({
         </label>
       </div>
 
-      <ScrollArea className="glass-subtle h-52 rounded-2xl">
+      <ScrollArea className="liquid-glass-subtle h-52 rounded-2xl">
         <div className="space-y-1 p-2.5">
           {query.isLoading ? (
             <p className="p-3 text-xs text-muted-foreground">Loading…</p>

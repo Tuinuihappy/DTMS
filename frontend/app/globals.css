@@ -178,42 +178,144 @@
 }
 
 @layer components {
-  /* Apple-style frosted glass. Solider than the aurora version
-     (72% vs 55%) and tighter blur (12px vs 20px) so type stays crisp. */
-  .glass {
-    background-color: rgba(255, 255, 255, 0.72);
-    backdrop-filter: blur(12px) saturate(180%);
-    -webkit-backdrop-filter: blur(12px) saturate(180%);
-    border: 0.5px solid rgba(0, 0, 0, 0.06);
+  /* ─── Liquid Glass (iOS 26 / WWDC 2025 approximation) ─────────────────
+     The real thing uses Metal shaders for refraction; we approximate
+     with a five-layer CSS composition:
+       1. Translucent gradient fill (lighter at top — light "falls" from above)
+       2. Heavy backdrop blur + saturation boost (the signature look)
+       3. Inset top highlight (specular — where light catches the glass edge)
+       4. Inset bottom rim (soft reflection)
+       5. Pseudo-element with gradient mask for the bright border
+     Mixed with `position: relative` so the ::before can absolute-anchor. */
+  .liquid-glass {
+    position: relative;
+    isolation: isolate;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.55) 0%,
+      rgba(255, 255, 255, 0.28) 100%
+    );
+    backdrop-filter: blur(30px) saturate(200%);
+    -webkit-backdrop-filter: blur(30px) saturate(200%);
     box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.7) inset,
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.70),
+      inset 0 -1px 0 0 rgba(255, 255, 255, 0.18),
+      0 8px 32px -4px rgba(0, 0, 0, 0.10),
+      0 2px 8px -2px rgba(0, 0, 0, 0.04);
+  }
+  /* Top-to-bottom gradient border via mask-composite. Renders as a
+     1px ring that fades from bright (top) to subtle (bottom) — reads
+     as light reflecting off the curved top edge. */
+  .liquid-glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.55) 0%,
+      rgba(255, 255, 255, 0.12) 35%,
+      rgba(0, 0, 0, 0.04) 100%
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .dark .liquid-glass {
+    background: linear-gradient(
+      180deg,
+      rgba(50, 50, 55, 0.55) 0%,
+      rgba(28, 28, 30, 0.35) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.10),
+      inset 0 -1px 0 0 rgba(255, 255, 255, 0.04),
+      0 8px 32px -4px rgba(0, 0, 0, 0.50),
+      0 2px 8px -2px rgba(0, 0, 0, 0.30);
+  }
+  .dark .liquid-glass::before {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.18) 0%,
+      rgba(255, 255, 255, 0.04) 35%,
+      rgba(0, 0, 0, 0.30) 100%
+    );
+  }
+
+  /* Quieter variant for nested surfaces (rows inside a panel). Skips
+     the heavy specular sweep — just a subtle translucent fill with a
+     hairline gradient ring. */
+  .liquid-glass-subtle {
+    position: relative;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.42) 0%,
+      rgba(255, 255, 255, 0.18) 100%
+    );
+    backdrop-filter: blur(14px) saturate(180%);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.50),
       0 1px 2px 0 rgba(0, 0, 0, 0.04);
   }
-  .dark .glass {
-    background-color: rgba(28, 28, 30, 0.72);
-    border-color: rgba(255, 255, 255, 0.08);
+  .dark .liquid-glass-subtle {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.06) 0%,
+      rgba(255, 255, 255, 0.02) 100%
+    );
     box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
-      0 1px 2px 0 rgba(0, 0, 0, 0.4);
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+      0 1px 2px 0 rgba(0, 0, 0, 0.40);
   }
 
-  /* Lower-fi variant for nested surfaces (list rows inside a glass card). */
-  .glass-subtle {
-    background-color: rgba(255, 255, 255, 0.6);
-    border: 0.5px solid rgba(0, 0, 0, 0.05);
+  /* Tinted liquid pill — for primary CTAs. Same composition as
+     .liquid-glass but with a saturated color base so the button reads
+     as "blue glass" instead of "clear glass". The backdrop-blur still
+     applies so content behind it bleeds through subtly. */
+  .liquid-pill-primary {
+    position: relative;
+    isolation: isolate;
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--primary) 90%, white) 0%,
+      var(--primary) 100%
+    );
+    color: var(--primary-foreground);
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.35),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.08),
+      0 1px 2px 0 rgba(0, 0, 0, 0.05),
+      0 4px 12px -2px color-mix(in oklch, var(--primary) 40%, transparent);
+    transition-property: filter, box-shadow, transform;
+    transition-duration: 200ms;
+    transition-timing-function: var(--ease-apple);
   }
-  .dark .glass-subtle {
-    background-color: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.06);
+  .liquid-pill-primary:hover {
+    filter: brightness(1.05);
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.45),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.08),
+      0 1px 2px 0 rgba(0, 0, 0, 0.05),
+      0 6px 16px -2px color-mix(in oklch, var(--primary) 50%, transparent);
+  }
+  .liquid-pill-primary:active {
+    filter: brightness(0.95);
+    transform: scale(0.97);
   }
 
-  /* Apple-feel button press — runs on every Button via the global
-     `[role="button"]` transition above. Tiny scale gives the haptic
-     mental model without needing a press animation library. */
+  /* Apple-feel button press — used on neutral / ghost buttons.
+     Pairs with the global `[role="button"]` transition. */
   .press-feedback {
     transition-timing-function: var(--ease-apple);
   }
   .press-feedback:active {
     transform: scale(0.97);
   }
+
 }

@@ -331,7 +331,7 @@ export function OrderTemplateForm({
           <Button
             type="submit"
             disabled={mutation.isPending}
-            className="press-feedback rounded-full bg-primary px-5 font-medium text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary/90"
+            className="liquid-pill-primary rounded-full px-5 font-medium"
           >
             {mutation.isPending
               ? "Saving…"

@@ -53,10 +53,11 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          // Apple sheet-style: 24px radius, generous padding, hairline
-          // ring instead of the default border. The bigger zoom-95 →
-          // zoom-90 entry feels closer to iOS sheet reveals.
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 rounded-[24px] bg-popover p-6 text-sm text-popover-foreground ring-1 ring-foreground/[0.06] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.18)] duration-200 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // Liquid Glass sheet — heavy blur + saturated translucent
+          // surface. Specular hint via the inset top highlight. The
+          // overlay (DialogOverlay) tints the page behind so the glass
+          // has something interesting to refract.
+          "liquid-glass fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 rounded-[28px] p-6 text-sm text-popover-foreground duration-200 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
@@ -105,7 +106,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "-mx-6 -mb-6 mt-2 flex flex-col-reverse gap-2 rounded-b-[24px] border-t border-black/[0.06] bg-muted/40 p-4 sm:flex-row sm:justify-end dark:border-white/10",
+        "relative z-[2] -mx-6 -mb-6 mt-2 flex flex-col-reverse gap-2 rounded-b-[28px] border-t border-black/[0.06] bg-white/30 p-4 backdrop-blur-md sm:flex-row sm:justify-end dark:border-white/10 dark:bg-white/[0.04]",
         className
       )}
       {...props}

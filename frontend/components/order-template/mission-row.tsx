@@ -49,7 +49,7 @@ export function MissionRow({
   const total = fieldArray.fields.length;
 
   return (
-    <div className="glass-subtle space-y-4 rounded-2xl p-4">
+    <div className="liquid-glass-subtle space-y-4 rounded-2xl p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium text-muted-foreground">
           Mission #{index + 1}
