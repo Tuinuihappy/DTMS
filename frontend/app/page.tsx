@@ -13,7 +13,7 @@ export default function DashboardPage() {
     <>
       <TopNav />
       <LeftRail />
-      <main className="layer-content mx-auto max-w-[1340px] px-4 pb-24 pt-28 sm:px-6 md:pl-20 md:pr-6 md:pt-32">
+      <main className="layer-content mx-auto max-w-[1340px] px-4 pb-24 pt-28 sm:px-6 md:pl-[var(--rail-width,80px)] md:pr-6 md:pt-32 transition-[padding] duration-300 ease-out">
         <GreetingStrip />
 
         <section className="grid grid-cols-12 gap-5">

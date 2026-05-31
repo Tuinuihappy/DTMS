@@ -27,7 +27,6 @@ type RailAction = {
 };
 
 const actions: RailAction[] = [
-  { icon: <ChevronLeft className="h-4 w-4" strokeWidth={2} />, label: "Collapse panel" },
   { icon: <Share2 className="h-4 w-4" strokeWidth={2} />, label: "Share dispatch" },
   { icon: <Upload className="h-4 w-4" strokeWidth={2} />, label: "Export report" },
   { icon: <Star className="h-4 w-4" strokeWidth={2} />, label: "Saved routes" },
@@ -38,6 +37,15 @@ const actions: RailAction[] = [
   { icon: <Send className="h-4 w-4" strokeWidth={2} />, label: "Broadcast" },
   { icon: <AlertTriangle className="h-4 w-4" strokeWidth={2} />, label: "Active alerts", badge: true },
 ];
+
+const COLLAPSED_PX = 56;
+const EXPANDED_PX = 232;
+// Total horizontal space the rail consumes on the page (rail width + the
+// fixed left-4 inset + an 8 px breathing buffer). The dashboard's <main>
+// reads this from `--rail-width` to shift its left padding in lock-step.
+const COLLAPSED_RAIL_LANE = `${COLLAPSED_PX + 16 + 8}px`; // 80 px
+const EXPANDED_RAIL_LANE = `${EXPANDED_PX + 16 + 0}px`; //  248 px
+const STORAGE_KEY = "tms-rail-expanded";
 
 export function LeftRail() {
   // next-themes drives the global theme — `resolvedTheme` collapses
@@ -50,16 +58,48 @@ export function LeftRail() {
   const active: "light" | "dark" =
     mounted && resolvedTheme === "dark" ? "dark" : "light";
 
+  // Rail expansion — persisted to localStorage and broadcast to <main>
+  // via the `--rail-width` CSS variable on <html>. We default to false
+  // for SSR (the markup matches), then hydrate the saved value on mount.
+  const [expanded, setExpanded] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY) === "1";
+    setExpanded(saved);
+    document.documentElement.style.setProperty(
+      "--rail-width",
+      saved ? EXPANDED_RAIL_LANE : COLLAPSED_RAIL_LANE,
+    );
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem(STORAGE_KEY, expanded ? "1" : "0");
+    document.documentElement.style.setProperty(
+      "--rail-width",
+      expanded ? EXPANDED_RAIL_LANE : COLLAPSED_RAIL_LANE,
+    );
+  }, [expanded, hydrated]);
+
   return (
     <motion.aside
       initial={{ opacity: 0, x: -12 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.55, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-      className="hidden md:block fixed left-4 inset-y-0 z-30 w-12 pointer-events-none"
+      animate={{ opacity: 1, x: 0, width: expanded ? EXPANDED_PX : COLLAPSED_PX }}
+      transition={{
+        opacity: { duration: 0.55, delay: 0.15, ease: [0.22, 1, 0.36, 1] },
+        x: { duration: 0.55, delay: 0.15, ease: [0.22, 1, 0.36, 1] },
+        width: { type: "spring", stiffness: 220, damping: 28, mass: 0.6 },
+      }}
+      className="hidden md:block fixed left-4 inset-y-0 z-30 pointer-events-none"
       aria-label="Quick actions"
     >
       {/* Action stack — vertically centered in the viewport */}
-      <ul className="pointer-events-auto absolute left-0 right-0 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2.5">
+      <ul className="pointer-events-auto absolute left-0 right-0 top-1/2 -translate-y-1/2 flex flex-col gap-2 px-0">
+        {/* Toggle is the FIRST button — its chevron rotates 180° when open. */}
+        <PanelToggle expanded={expanded} onToggle={() => setExpanded((e) => !e)} />
+
         {actions.map((a, i) => (
           <motion.li
             key={a.label}
@@ -71,7 +111,7 @@ export function LeftRail() {
               ease: [0.22, 1, 0.36, 1],
             }}
           >
-            <RailButton label={a.label} badge={a.badge}>
+            <RailButton label={a.label} badge={a.badge} expanded={expanded}>
               {a.icon}
             </RailButton>
           </motion.li>
@@ -116,34 +156,107 @@ export function LeftRail() {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/* Panel toggle — chevron pill that flips 180° when the rail expands.         */
+/* Visually it's identical to a RailButton so the toggle reads as part of the */
+/* same stack, just with a chevron icon that animates.                        */
+/* -------------------------------------------------------------------------- */
+function PanelToggle({
+  expanded,
+  onToggle,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <li>
+      <button
+        aria-label={expanded ? "Collapse panel" : "Expand panel"}
+        aria-expanded={expanded}
+        onClick={onToggle}
+        className={cn(
+          "group relative flex h-10 items-center rounded-full bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] transition-all duration-200 hover:bg-white hover:text-[var(--color-ink-900)] cursor-pointer dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_-2px_rgba(0,0,0,0.5)]",
+          expanded ? "w-full justify-start gap-3 px-3" : "w-10 justify-center",
+        )}
+      >
+        <motion.span
+          animate={{ rotate: expanded ? 180 : 0 }}
+          transition={{ type: "spring", stiffness: 320, damping: 22 }}
+          className="flex h-4 w-4 items-center justify-center shrink-0"
+        >
+          <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+        </motion.span>
+        {expanded && (
+          <motion.span
+            initial={{ opacity: 0, x: -4 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.25, delay: 0.1 }}
+            className="text-[12.5px] font-medium tracking-tight whitespace-nowrap"
+          >
+            Collapse
+          </motion.span>
+        )}
+      </button>
+    </li>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* RailButton — circular when collapsed, full-width pill when expanded.       */
+/* Tooltip only shows in collapsed state (label is in-place when expanded).   */
+/* -------------------------------------------------------------------------- */
 function RailButton({
   children,
   label,
   badge,
+  expanded,
 }: {
   children: React.ReactNode;
   label: string;
   badge?: boolean;
+  expanded: boolean;
 }) {
   return (
     <button
       aria-label={label}
-      className="group relative grid h-10 w-10 place-items-center rounded-full bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] transition-all duration-200 hover:-translate-y-px hover:bg-white hover:text-[var(--color-ink-900)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_6px_14px_-4px_rgba(15,23,42,0.14)] cursor-pointer dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_-2px_rgba(0,0,0,0.5)]"
+      className={cn(
+        "group relative flex h-10 items-center rounded-full bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] transition-all duration-200 hover:-translate-y-px hover:bg-white hover:text-[var(--color-ink-900)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_6px_14px_-4px_rgba(15,23,42,0.14)] cursor-pointer dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_-2px_rgba(0,0,0,0.5)]",
+        expanded ? "w-full justify-start gap-3 px-3" : "w-10 justify-center",
+      )}
     >
-      {children}
+      <span className="flex h-4 w-4 items-center justify-center shrink-0">{children}</span>
+
+      {expanded ? (
+        <motion.span
+          initial={{ opacity: 0, x: -4 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.22, delay: 0.08 }}
+          className="flex-1 min-w-0 text-left text-[12.5px] font-medium tracking-tight whitespace-nowrap truncate"
+        >
+          {label}
+        </motion.span>
+      ) : null}
+
       {badge && (
-        <span className="absolute top-1 right-1 inline-flex">
+        <span
+          className={cn(
+            "absolute inline-flex",
+            expanded ? "right-2 top-1/2 -translate-y-1/2" : "top-1 right-1",
+          )}
+        >
           <StatusPulse tone="coral" />
         </span>
       )}
 
-      {/* Tooltip on hover */}
-      <span
-        role="tooltip"
-        className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-[var(--color-brand-900)] px-2 py-1 text-[11px] font-medium text-white opacity-0 translate-x-[-4px] transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0"
-      >
-        {label}
-      </span>
+      {/* Tooltip only when collapsed — when expanded the label is in-place. */}
+      {!expanded && (
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-[var(--color-brand-900)] px-2 py-1 text-[11px] font-medium text-white opacity-0 translate-x-[-4px] transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0"
+        >
+          {label}
+        </span>
+      )}
     </button>
   );
 }
