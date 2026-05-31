@@ -130,7 +130,7 @@ function IconBtn({
   return (
     <button
       aria-label={label}
-      className="relative grid h-10 w-10 place-items-center rounded-full bg-white/70 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_2px_6px_-2px_rgba(15,23,42,0.08)] transition-all duration-200 hover:bg-white hover:text-[var(--color-ink-900)] hover:-translate-y-px cursor-pointer"
+      className="relative grid h-10 w-10 place-items-center rounded-full bg-white/70 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_2px_6px_-2px_rgba(15,23,42,0.08)] transition-all duration-200 hover:bg-white hover:text-[var(--color-ink-900)] hover:-translate-y-px cursor-pointer dark:bg-white/[0.06] dark:hover:bg-white/[0.12]"
     >
       {children}
       {badge && (

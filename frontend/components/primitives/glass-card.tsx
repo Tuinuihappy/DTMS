@@ -13,11 +13,14 @@ type GlassCardProps = HTMLAttributes<HTMLDivElement> &
 const variantClass: Record<NonNullable<GlassCardProps["variant"]>, string> = {
   default: "glass",
   strong: "glass-strong",
-  "pastel-sky": "bg-[var(--color-pastel-sky)] border border-white/60",
-  "pastel-lavender": "bg-[var(--color-pastel-lavender)] border border-white/60",
-  "pastel-peach": "bg-[var(--color-pastel-peach)] border border-white/60",
-  "pastel-mint": "bg-[var(--color-pastel-mint)] border border-white/60",
-  ink: "bg-[var(--color-brand-900)] text-white border border-white/8",
+  "pastel-sky": "bg-[var(--color-pastel-sky)] border border-white/60 dark:border-white/[0.08]",
+  "pastel-lavender": "bg-[var(--color-pastel-lavender)] border border-white/60 dark:border-white/[0.08]",
+  "pastel-peach": "bg-[var(--color-pastel-peach)] border border-white/60 dark:border-white/[0.08]",
+  "pastel-mint": "bg-[var(--color-pastel-mint)] border border-white/60 dark:border-white/[0.08]",
+  // Comms / dark-surface variant. Light: deep navy (#0E1530 token). Dark:
+  // raised navy surface so it differentiates from the canvas without
+  // flipping to the electric brand-blue.
+  ink: "bg-[#0E1530] dark:bg-[var(--color-surface-soft)] text-white border border-white/[0.08]",
 };
 
 export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(

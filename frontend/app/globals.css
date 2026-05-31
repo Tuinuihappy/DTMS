@@ -1,10 +1,19 @@
 @import "tailwindcss";
 
+/* Enable the `dark:` Tailwind variant under either the `.dark` class
+   (set by next-themes) or any descendant of it. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* =========================================================================
    TMS — Design tokens
    Premium light dashboard, soft pastel canvas, frosted glass surfaces.
    Fonts are loaded via next/font/google in app/layout.tsx and exposed
    through the CSS variables below.
+
+   Dark theme (premium navy) overrides the same CSS variables inside the
+   `.dark` selector further down — all utility classes that resolve to
+   `var(--color-*)` flip automatically. Literal Tailwind utilities like
+   `bg-white/X` still need explicit `dark:` variants in components.
    ========================================================================= */
 @theme {
   --font-display: var(--font-google-sans), ui-sans-serif, system-ui, sans-serif;
@@ -63,6 +72,60 @@
 }
 
 /* =========================================================================
+   Dark theme — Premium navy
+   Cobalt-deep canvas, raised navy surfaces, lifted ink ramp, brighter
+   functional colors so they still sing against the deep background.
+   Pastels translate to deep-saturated "velvet jewel-box" surfaces with
+   lifted inks so the category coding survives the theme flip.
+   ========================================================================= */
+.dark {
+  color-scheme: dark;
+
+  /* Canvas + surfaces */
+  --color-canvas: #0b1224;
+  --color-canvas-deep: #060b18;
+  --color-surface: #141e37;
+  --color-surface-soft: #1a2547;
+
+  /* Ink ramp — flipped + tuned (ink-900 is now the brightest,
+     ink-50 the darkest, so existing `text-ink-900` reads as bright). */
+  --color-ink-50: #0e1730;
+  --color-ink-100: #1a2547;
+  --color-ink-200: #2a3760;
+  --color-ink-300: #4a5780;
+  --color-ink-400: #6b78a0;
+  --color-ink-500: #8a95b5;
+  --color-ink-600: #b0bad3;
+  --color-ink-700: #cdd5e6;
+  --color-ink-800: #e3e8f2;
+  --color-ink-900: #f5f7fc;
+
+  /* Brand — same hue family, lifted for AA contrast on dark */
+  --color-brand-900: #4f5dff;
+  --color-brand-800: #6f7bff;
+  --color-brand-500: #8b95ff;
+  --color-brand-400: #a2aaff;
+  --color-brand-200: #3a47cc;
+
+  /* Functional — slightly brighter to hold against deep navy */
+  --color-amber: #fcb347;
+  --color-amber-soft: #4a3617;
+  --color-coral: #ff7b6d;
+  --color-success: #34d399;
+  --color-success-soft: #143728;
+
+  /* Pastel category — deep saturated translations */
+  --color-pastel-sky: #1a2654;
+  --color-pastel-sky-ink: #b8c8ff;
+  --color-pastel-lavender: #271d4b;
+  --color-pastel-lavender-ink: #d4c6ff;
+  --color-pastel-peach: #3d1f18;
+  --color-pastel-peach-ink: #ffc9b0;
+  --color-pastel-mint: #143728;
+  --color-pastel-mint-ink: #a8e6c9;
+}
+
+/* =========================================================================
    Base
    ========================================================================= */
 html,
@@ -94,6 +157,13 @@ body::before {
     radial-gradient(800px 700px at 60% 105%, rgba(216, 241, 228, 0.4), transparent 60%);
 }
 
+.dark body::before {
+  background:
+    radial-gradient(900px 600px at 12% -5%, rgba(79, 93, 255, 0.18), transparent 60%),
+    radial-gradient(700px 500px at 95% 8%, rgba(139, 92, 246, 0.14), transparent 65%),
+    radial-gradient(800px 700px at 60% 105%, rgba(56, 189, 248, 0.10), transparent 60%);
+}
+
 body::after {
   content: "";
   position: fixed;
@@ -103,6 +173,13 @@ body::after {
   opacity: 0.5;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+.dark body::after {
+  opacity: 0.35;
+  mix-blend-mode: soft-light;
+  /* Lift noise alpha so it stays perceptible on the deep canvas. */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
 main,
@@ -142,6 +219,17 @@ main,
     0 30px 60px -32px rgba(15, 23, 42, 0.15);
 }
 
+.dark .glass {
+  background: rgba(20, 30, 55, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 12px 28px -16px rgba(0, 0, 0, 0.5),
+    0 30px 60px -32px rgba(0, 0, 0, 0.6);
+}
+
 .glass-strong {
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(24px) saturate(160%);
@@ -151,6 +239,15 @@ main,
     inset 0 1px 0 rgba(255, 255, 255, 1),
     0 2px 6px rgba(15, 23, 42, 0.04),
     0 24px 48px -20px rgba(15, 23, 42, 0.14);
+}
+
+.dark .glass-strong {
+  background: rgba(26, 37, 71, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.35),
+    0 24px 48px -20px rgba(0, 0, 0, 0.55);
 }
 
 .glass-pill {
@@ -164,6 +261,17 @@ main,
     0 24px 50px -24px rgba(14, 21, 48, 0.5);
 }
 
+.dark .glass-pill {
+  /* In dark mode the pill is the *brightest* surface — it pops up
+     against the deep canvas instead of sitting on top of white. */
+  background: rgba(245, 247, 252, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 8px 22px -8px rgba(0, 0, 0, 0.55),
+    0 24px 50px -24px rgba(0, 0, 0, 0.7);
+}
+
 /* Halftone dot pattern overlay (for "premium upgrade" style cards) */
 .halftone {
   background-image:
@@ -171,6 +279,11 @@ main,
   background-size: 10px 10px;
   -webkit-mask-image: radial-gradient(ellipse 80% 100% at 100% 50%, black 30%, transparent 70%);
   mask-image: radial-gradient(ellipse 80% 100% at 100% 50%, black 30%, transparent 70%);
+}
+
+.dark .halftone {
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.16) 1px, transparent 1.4px);
 }
 
 /* Subtle inset divider line */
@@ -183,6 +296,16 @@ main,
     transparent
   );
   height: 1px;
+}
+
+.dark .inset-divider {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1) 20%,
+    rgba(255, 255, 255, 0.1) 80%,
+    transparent
+  );
 }
 
 /* =========================================================================
@@ -272,6 +395,15 @@ main,
   background: rgba(15, 23, 42, 0.2);
   background-clip: padding-box;
   border: 2px solid transparent;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  background-clip: padding-box;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.24);
+  background-clip: padding-box;
 }
 
 /* =========================================================================

@@ -15,7 +15,8 @@ import {
   Upload,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { cn } from "@/lib/utils";
 
@@ -39,10 +40,15 @@ const actions: RailAction[] = [
 ];
 
 export function LeftRail() {
-  // Local toggle — the dark theme isn't wired into globals yet, this is
-  // a placeholder so the visual state matches the reference (sun = active
-  // dark pill at the bottom, moon = inactive light circle above it).
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  // next-themes drives the global theme — `resolvedTheme` collapses
+  // "system" into the active light|dark so the toggle's pressed state
+  // is always correct. Gate on `mounted` to dodge SSR/CSR mismatch
+  // (the server can't know the user's OS preference).
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const active: "light" | "dark" =
+    mounted && resolvedTheme === "dark" ? "dark" : "light";
 
   return (
     <motion.aside
@@ -81,26 +87,26 @@ export function LeftRail() {
       >
         <button
           aria-label="Dark mode"
-          aria-pressed={theme === "dark"}
+          aria-pressed={active === "dark"}
           onClick={() => setTheme("dark")}
           className={cn(
             "grid h-10 w-10 place-items-center rounded-full transition-all duration-200 cursor-pointer",
-            theme === "dark"
+            active === "dark"
               ? "bg-[var(--color-brand-900)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_8px_20px_-6px_rgba(14,21,48,0.55)]"
-              : "bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] hover:-translate-y-px hover:bg-white",
+              : "bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] hover:-translate-y-px hover:bg-white dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_-2px_rgba(0,0,0,0.5)]",
           )}
         >
           <Moon className="h-4 w-4" strokeWidth={2} />
         </button>
         <button
           aria-label="Light mode"
-          aria-pressed={theme === "light"}
+          aria-pressed={active === "light"}
           onClick={() => setTheme("light")}
           className={cn(
             "grid h-10 w-10 place-items-center rounded-full transition-all duration-200 cursor-pointer",
-            theme === "light"
+            active === "light"
               ? "bg-[var(--color-brand-900)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_8px_20px_-6px_rgba(14,21,48,0.55)]"
-              : "bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] hover:-translate-y-px hover:bg-white",
+              : "bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] hover:-translate-y-px hover:bg-white dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_-2px_rgba(0,0,0,0.5)]",
           )}
         >
           <Sun className="h-4 w-4" strokeWidth={2.2} />
@@ -122,7 +128,7 @@ function RailButton({
   return (
     <button
       aria-label={label}
-      className="group relative grid h-10 w-10 place-items-center rounded-full bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] transition-all duration-200 hover:-translate-y-px hover:bg-white hover:text-[var(--color-ink-900)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_6px_14px_-4px_rgba(15,23,42,0.14)] cursor-pointer"
+      className="group relative grid h-10 w-10 place-items-center rounded-full bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] transition-all duration-200 hover:-translate-y-px hover:bg-white hover:text-[var(--color-ink-900)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_6px_14px_-4px_rgba(15,23,42,0.14)] cursor-pointer dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_-2px_rgba(0,0,0,0.5)]"
     >
       {children}
       {badge && (

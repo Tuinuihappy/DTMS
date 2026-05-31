@@ -12,7 +12,7 @@ const tierStyles: Record<PriorityShipment["tier"], { card: string; ink: string; 
   sky: {
     card: "pastel-sky",
     ink: "text-[var(--color-pastel-sky-ink)]",
-    chip: "bg-white/70 text-[var(--color-pastel-sky-ink)]",
+    chip: "bg-white/70 text-[var(--color-pastel-sky-ink)] dark:bg-white/[0.08]",
     bar: "bg-[var(--color-pastel-sky-ink)]",
     route: "text-[var(--color-pastel-sky-ink)]",
   },
@@ -41,7 +41,7 @@ export function PriorityShipments() {
         action={
           <a
             href="#"
-            className="inline-flex items-center gap-1 rounded-full border border-[var(--color-ink-100)] bg-white/70 px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-ink-700)] backdrop-blur transition-colors hover:bg-white"
+            className="inline-flex items-center gap-1 rounded-full border border-[var(--color-ink-100)] bg-white/70 px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-ink-700)] backdrop-blur transition-colors hover:bg-white dark:bg-white/[0.06] dark:hover:bg-white/[0.12]"
           >
             See all 14
             <ChevronRight className="h-3.5 w-3.5" strokeWidth={2.4} />
@@ -114,7 +114,7 @@ export function PriorityShipments() {
 
               {/* Progress */}
               <div className="mt-4">
-                <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-white/50">
+                <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-white/50 dark:bg-white/[0.08]">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${pct}%` }}

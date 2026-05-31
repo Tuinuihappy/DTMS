@@ -28,7 +28,7 @@ export function LiveActivityCard() {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3.5">
-          <span className="grid h-11 w-11 place-items-center rounded-[14px] bg-gradient-to-br from-[var(--color-pastel-sky)] to-[#c8d4ff] text-[var(--color-brand-900)] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_10px_-4px_rgba(15,23,42,0.12)]">
+          <span className="grid h-11 w-11 place-items-center rounded-[14px] bg-gradient-to-br from-[var(--color-pastel-sky)] to-[#c8d4ff] text-[var(--color-brand-900)] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_10px_-4px_rgba(15,23,42,0.12)] dark:to-[#2a3a7a] dark:text-[var(--color-pastel-sky-ink)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_4px_10px_-4px_rgba(0,0,0,0.5)]">
             <Truck className="h-5 w-5" strokeWidth={2} />
           </span>
           <div>
@@ -42,7 +42,7 @@ export function LiveActivityCard() {
         </div>
 
         {/* Period selector */}
-        <div className="flex items-center gap-1 rounded-full border border-[var(--color-ink-100)] bg-white/70 p-1">
+        <div className="flex items-center gap-1 rounded-full border border-[var(--color-ink-100)] bg-white/70 p-1 dark:bg-white/[0.05]">
           {periods.map((p) => (
             <button
               key={p}

@@ -13,7 +13,7 @@ export function GreetingStrip() {
       className="mt-2 mb-7 flex flex-col gap-5 md:flex-row md:items-end md:justify-between"
     >
       <div className="min-w-0">
-        <div className="inline-flex items-center gap-2 rounded-full border border-[var(--color-ink-100)] bg-white/60 px-3 py-1.5 text-[11.5px] font-medium text-[var(--color-ink-600)]">
+        <div className="inline-flex items-center gap-2 rounded-full border border-[var(--color-ink-100)] bg-white/60 px-3 py-1.5 text-[11.5px] font-medium text-[var(--color-ink-600)] dark:bg-white/[0.04]">
           <StatusPulse tone="success" />
           <span>All operations nominal</span>
           <span className="text-[var(--color-ink-300)]">·</span>
@@ -29,7 +29,7 @@ export function GreetingStrip() {
       </div>
 
       <div className="flex items-center gap-2.5">
-        <button className="group inline-flex items-center gap-2 rounded-full border border-[var(--color-ink-100)] bg-white/70 px-4 py-2.5 text-[13px] font-medium text-[var(--color-ink-700)] backdrop-blur transition-colors hover:bg-white cursor-pointer">
+        <button className="group inline-flex items-center gap-2 rounded-full border border-[var(--color-ink-100)] bg-white/70 px-4 py-2.5 text-[13px] font-medium text-[var(--color-ink-700)] backdrop-blur transition-colors hover:bg-white cursor-pointer dark:bg-white/[0.05] dark:hover:bg-white/[0.12]">
           <Sparkles className="h-4 w-4 text-[var(--color-brand-500)]" strokeWidth={2} />
           Ask Co-pilot
         </button>
