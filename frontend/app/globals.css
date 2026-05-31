@@ -62,13 +62,14 @@
   --color-pastel-mint: #d8f1e4;
   --color-pastel-mint-ink: #186449;
 
-  /* Radii */
-  --radius-xs: 8px;
-  --radius-sm: 12px;
-  --radius: 18px;
-  --radius-lg: 24px;
-  --radius-xl: 32px;
-  --radius-2xl: 40px;
+  /* Radii — bumped for liquid-glass chunkiness. Big cards land at 36px
+     so they read as "rounded panels" not "rectangles with corners". */
+  --radius-xs: 10px;
+  --radius-sm: 14px;
+  --radius: 22px;
+  --radius-lg: 28px;
+  --radius-xl: 36px;
+  --radius-2xl: 44px;
 }
 
 /* =========================================================================
@@ -144,7 +145,10 @@ body {
   letter-spacing: -0.005em;
 }
 
-/* Canvas atmospheric layers */
+/* Canvas atmospheric layers
+   Liquid-glass auroras: bigger, softer, more saturated. Four light
+   sources instead of three, so the canvas always has color refracting
+   through the glass cards no matter where on the page they land. */
 body::before {
   content: "";
   position: fixed;
@@ -152,16 +156,18 @@ body::before {
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(900px 600px at 12% -5%, rgba(199, 204, 255, 0.55), transparent 60%),
-    radial-gradient(700px 500px at 95% 8%, rgba(253, 226, 209, 0.45), transparent 65%),
-    radial-gradient(800px 700px at 60% 105%, rgba(216, 241, 228, 0.4), transparent 60%);
+    radial-gradient(1100px 700px at 8% -8%, rgba(199, 204, 255, 0.7), transparent 60%),
+    radial-gradient(900px 600px at 95% 5%, rgba(253, 226, 209, 0.6), transparent 65%),
+    radial-gradient(800px 700px at 60% 110%, rgba(216, 241, 228, 0.55), transparent 60%),
+    radial-gradient(700px 500px at 25% 75%, rgba(232, 228, 250, 0.55), transparent 65%);
 }
 
 .dark body::before {
   background:
-    radial-gradient(900px 600px at 12% -5%, rgba(79, 93, 255, 0.18), transparent 60%),
-    radial-gradient(700px 500px at 95% 8%, rgba(139, 92, 246, 0.14), transparent 65%),
-    radial-gradient(800px 700px at 60% 105%, rgba(56, 189, 248, 0.10), transparent 60%);
+    radial-gradient(1100px 700px at 8% -8%, rgba(79, 93, 255, 0.22), transparent 60%),
+    radial-gradient(900px 600px at 95% 5%, rgba(139, 92, 246, 0.18), transparent 65%),
+    radial-gradient(800px 700px at 60% 110%, rgba(56, 189, 248, 0.14), transparent 60%),
+    radial-gradient(700px 500px at 25% 75%, rgba(244, 114, 182, 0.10), transparent 65%);
 }
 
 body::after {
@@ -205,71 +211,150 @@ main,
   font-feature-settings: "tnum", "zero";
 }
 
-/* Glass card */
+/* =========================================================================
+   Liquid Glass — surface utilities
+   "Refined" liquid glass: heavier blur, stacked shadows for layered depth
+   (close + mid + ambient), inset top highlight for the "wet" top edge,
+   inset bottom shadow for grounded weight. The four shadow layers mimic
+   the way a real glass panel reflects light: a sharp top highlight, a
+   close contact shadow, a mid drop, and a long ambient diffusion.
+   ========================================================================= */
 .glass {
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(26px) saturate(160%);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.78);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -1px 0 rgba(15, 23, 42, 0.04),
+    inset 0 1.5px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.05),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.15),
     0 1px 2px rgba(15, 23, 42, 0.04),
-    0 12px 28px -16px rgba(15, 23, 42, 0.12),
-    0 30px 60px -32px rgba(15, 23, 42, 0.15);
+    0 8px 20px -8px rgba(15, 23, 42, 0.1),
+    0 22px 48px -18px rgba(15, 23, 42, 0.14),
+    0 60px 100px -40px rgba(15, 23, 42, 0.18);
 }
 
 .dark .glass {
-  background: rgba(20, 30, 55, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(20, 30, 55, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-    0 1px 2px rgba(0, 0, 0, 0.3),
-    0 12px 28px -16px rgba(0, 0, 0, 0.5),
-    0 30px 60px -32px rgba(0, 0, 0, 0.6);
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    0 8px 20px -8px rgba(0, 0, 0, 0.4),
+    0 22px 48px -18px rgba(0, 0, 0, 0.55),
+    0 60px 100px -40px rgba(0, 0, 0, 0.7);
 }
 
 .glass-strong {
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 2px 6px rgba(15, 23, 42, 0.04),
-    0 24px 48px -20px rgba(15, 23, 42, 0.14);
+    inset 0 2px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.05),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2),
+    0 2px 6px rgba(15, 23, 42, 0.05),
+    0 16px 36px -14px rgba(15, 23, 42, 0.14),
+    0 40px 80px -28px rgba(15, 23, 42, 0.16);
 }
 
 .dark .glass-strong {
-  background: rgba(26, 37, 71, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(26, 37, 71, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 2px 6px rgba(0, 0, 0, 0.35),
-    0 24px 48px -20px rgba(0, 0, 0, 0.55);
+    inset 0 2px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 2px 6px rgba(0, 0, 0, 0.4),
+    0 16px 36px -14px rgba(0, 0, 0, 0.55),
+    0 40px 80px -28px rgba(0, 0, 0, 0.65);
 }
 
 .glass-pill {
   background: rgba(14, 21, 48, 0.82);
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 8px 22px -8px rgba(14, 21, 48, 0.4),
-    0 24px 50px -24px rgba(14, 21, 48, 0.5);
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.18),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 8px 22px -8px rgba(14, 21, 48, 0.45),
+    0 24px 50px -24px rgba(14, 21, 48, 0.55);
 }
 
 .dark .glass-pill {
   /* In dark mode the pill is the *brightest* surface — it pops up
      against the deep canvas instead of sitting on top of white. */
   background: rgba(245, 247, 252, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.16),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 8px 22px -8px rgba(0, 0, 0, 0.6),
+    0 24px 50px -24px rgba(0, 0, 0, 0.75);
+}
+
+/* Floating glass bubble — for avatars / circular tactile elements. The
+   inner radial gradient gives a faint "specular" highlight at top-left
+   so the bubble reads as a 3D sphere, not a flat disc. */
+.glass-bubble {
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.45), transparent 55%),
+    rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 2px 6px -2px rgba(15, 23, 42, 0.1),
+    0 10px 24px -10px rgba(15, 23, 42, 0.18);
+}
+
+.dark .glass-bubble {
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.12), transparent 55%),
+    rgba(20, 30, 55, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    0 8px 22px -8px rgba(0, 0, 0, 0.55),
-    0 24px 50px -24px rgba(0, 0, 0, 0.7);
+    0 2px 6px -2px rgba(0, 0, 0, 0.4),
+    0 10px 24px -10px rgba(0, 0, 0, 0.55);
+}
+
+/* Decorative inner edge ring — adds a faint extra highlight stroke just
+   inside the card border. Compose with .glass when you want extra
+   "polish" on hero/feature cards. */
+.glass-edge {
+  position: relative;
+}
+.glass-edge::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    transparent 30%,
+    transparent 70%,
+    rgba(255, 255, 255, 0.15) 100%
+  );
+  mix-blend-mode: overlay;
+  opacity: 0.7;
+}
+.dark .glass-edge::before {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.18) 0%,
+    transparent 30%,
+    transparent 70%,
+    rgba(255, 255, 255, 0.06) 100%
+  );
+  opacity: 0.55;
 }
 
 /* Halftone dot pattern overlay (for "premium upgrade" style cards) */

@@ -29,9 +29,13 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(
       <motion.div
         ref={ref}
         className={cn(
-          "relative rounded-[var(--radius-lg)] overflow-hidden",
+          "relative rounded-[var(--radius-xl)] overflow-hidden",
           variantClass[variant],
-          interactive && "cursor-pointer transition-shadow duration-300 hover:shadow-[0_30px_60px_-24px_rgba(15,23,42,0.18)]",
+          // Featured / hero glass surfaces get the decorative inner edge
+          // ring on top of their base utility — pastels stay clean.
+          (variant === "default" || variant === "strong") && "glass-edge",
+          interactive &&
+            "cursor-pointer transition-shadow duration-300 hover:shadow-[0_38px_80px_-28px_rgba(15,23,42,0.22)] dark:hover:shadow-[0_38px_80px_-28px_rgba(0,0,0,0.7)]",
           className,
         )}
         {...props}
