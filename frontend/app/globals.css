@@ -1,437 +1,295 @@
 @import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* =========================================================================
+   TMS — Design tokens
+   Premium light dashboard, soft pastel canvas, frosted glass surfaces.
+   Fonts are loaded via next/font/google in app/layout.tsx and exposed
+   through the CSS variables below.
+   ========================================================================= */
+@theme {
+  --font-display: var(--font-google-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-google-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-google-sans-code), ui-monospace, SFMono-Regular, monospace;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-success: var(--success);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* Canvas + surfaces */
+  --color-canvas: #eef2f7;
+  --color-canvas-deep: #e6ebf3;
+  --color-surface: #ffffff;
+  --color-surface-soft: #f6f8fc;
+
+  /* Ink ramp (cool gray-blue) */
+  --color-ink-50: #f2f4f9;
+  --color-ink-100: #e4e8f0;
+  --color-ink-200: #c8d0e0;
+  --color-ink-300: #a3aec5;
+  --color-ink-400: #7c89a6;
+  --color-ink-500: #5a6886;
+  --color-ink-600: #3f4c69;
+  --color-ink-700: #2a3551;
+  --color-ink-800: #18213b;
+  --color-ink-900: #0b1428;
+
+  /* Brand — deep navy + electric blue accent */
+  --color-brand-900: #0e1530;
+  --color-brand-800: #182144;
+  --color-brand-500: #4f5dff;
+  --color-brand-400: #6f7bff;
+  --color-brand-200: #c7ccff;
+
+  /* Functional */
+  --color-amber: #f59e0b;
+  --color-amber-soft: #fef0d4;
+  --color-coral: #ff6b5b;
+  --color-success: #10b981;
+  --color-success-soft: #d4f3e3;
+
+  /* Pastel category blocks */
+  --color-pastel-sky: #dde7ff;
+  --color-pastel-sky-ink: #2b3a78;
+  --color-pastel-lavender: #ebe5fb;
+  --color-pastel-lavender-ink: #4a3b80;
+  --color-pastel-peach: #fde2d1;
+  --color-pastel-peach-ink: #8a3a1f;
+  --color-pastel-mint: #d8f1e4;
+  --color-pastel-mint-ink: #186449;
+
+  /* Radii */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-2xl: 40px;
 }
 
-/* ─── Apple palette (per user-provided design brief) ────────────────────
-   Six colors total: BG, Text, Primary, Secondary, Success, Error.
-   No purple/teal accents — everything reads as "iOS in a browser". */
-:root {
-  --background: #F5F5F7;              /* iOS canvas */
-  --foreground: #1D1D1F;              /* iOS primary text */
-  --card: #FFFFFF;
-  --card-foreground: #1D1D1F;
-  --popover: #FFFFFF;
-  --popover-foreground: #1D1D1F;
-  --primary: #007AFF;                 /* iOS blue */
-  --primary-foreground: #FFFFFF;
-  --secondary: #F5F5F7;
-  --secondary-foreground: #1D1D1F;
-  --muted: #F5F5F7;
-  --muted-foreground: #86868B;        /* iOS secondary text */
-  --accent: #F5F5F7;
-  --accent-foreground: #1D1D1F;
-  --destructive: #FF3B30;             /* iOS red */
-  --success: #34C759;                 /* iOS green */
-  --border: rgba(0, 0, 0, 0.08);      /* hairline */
-  --input: rgba(0, 0, 0, 0.08);
-  --ring: #007AFF;
-  --chart-1: #007AFF;
-  --chart-2: #34C759;
-  --chart-3: #FF9500;
-  --chart-4: #FF3B30;
-  --chart-5: #5856D6;
-
-  /* Cards land at ~22px (rounded-3xl reads as 1.4 * 0.875 = 1.225rem). */
-  --radius: 0.875rem;
-
-  --sidebar: #FFFFFF;
-  --sidebar-foreground: #1D1D1F;
-  --sidebar-primary: #007AFF;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F5F5F7;
-  --sidebar-accent-foreground: #1D1D1F;
-  --sidebar-border: rgba(0, 0, 0, 0.08);
-  --sidebar-ring: #007AFF;
-
-  /* Animation easings — the iOS standard. `--ease-apple` is what UIKit
-     uses for almost every interaction; --ease-spring is the slight
-     overshoot used for sheet/dialog reveals. */
-  --ease-apple: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+/* =========================================================================
+   Base
+   ========================================================================= */
+html,
+body {
+  height: 100%;
 }
 
-.dark {
-  /* True black canvas to match iOS dark mode on OLED. */
-  --background: #000000;
-  --foreground: #F5F5F7;
-  --card: #1C1C1E;                    /* iOS secondary grouped bg */
-  --card-foreground: #F5F5F7;
-  --popover: #1C1C1E;
-  --popover-foreground: #F5F5F7;
-  --primary: #0A84FF;                 /* iOS blue (dark) — brighter for contrast */
-  --primary-foreground: #FFFFFF;
-  --secondary: #1C1C1E;
-  --secondary-foreground: #F5F5F7;
-  --muted: #1C1C1E;
-  --muted-foreground: #98989D;        /* iOS secondary (dark) */
-  --accent: #1C1C1E;
-  --accent-foreground: #F5F5F7;
-  --destructive: #FF453A;             /* iOS red (dark) */
-  --success: #30D158;                 /* iOS green (dark) */
-  --border: rgba(255, 255, 255, 0.10);
-  --input: rgba(255, 255, 255, 0.10);
-  --ring: #0A84FF;
-  --chart-1: #0A84FF;
-  --chart-2: #30D158;
-  --chart-3: #FF9F0A;
-  --chart-4: #FF453A;
-  --chart-5: #5E5CE6;
-  --sidebar: #1C1C1E;
-  --sidebar-foreground: #F5F5F7;
-  --sidebar-primary: #0A84FF;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #1C1C1E;
-  --sidebar-accent-foreground: #F5F5F7;
-  --sidebar-border: rgba(255, 255, 255, 0.10);
-  --sidebar-ring: #0A84FF;
+body {
+  font-family: var(--font-sans);
+  background: var(--color-canvas);
+  color: var(--color-ink-900);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "ss02", "cv11";
+  letter-spacing: -0.005em;
 }
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  html {
-    @apply font-sans antialiased;
-    /* Google Sans is well-balanced by default — no stylistic alternates
-       needed. Enable contextual alternates + kerning for clean ligature
-       handling (e.g. `fi`, `fl`). */
-    font-feature-settings: "calt", "kern";
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-  body {
-    @apply text-foreground;
-    background-color: var(--background);
-    /* Apple Sequoia / iCloud-style ambient gradient. Three soft blobs:
-       blue top-right (iOS brand), purple bottom-left (depth), teal
-       middle-top (cool accent). Fixed attachment so it doesn't scroll
-       with content. The blobs land just outside the content gutter so
-       they bleed in from the page edges. */
-    background-image:
-      radial-gradient(80% 60% at 100% 0%, rgba(0, 122, 255, 0.10) 0%, transparent 55%),
-      radial-gradient(70% 60% at 0% 100%, rgba(175, 82, 222, 0.10) 0%, transparent 55%),
-      radial-gradient(60% 50% at 50% 0%, rgba(48, 209, 196, 0.06) 0%, transparent 55%);
-    background-attachment: fixed;
-  }
-  .dark body {
-    background-image:
-      radial-gradient(80% 60% at 100% 0%, rgba(10, 132, 255, 0.18) 0%, transparent 55%),
-      radial-gradient(70% 60% at 0% 100%, rgba(191, 90, 242, 0.16) 0%, transparent 55%),
-      radial-gradient(60% 50% at 50% 0%, rgba(48, 209, 196, 0.10) 0%, transparent 55%);
-  }
+/* Canvas atmospheric layers */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(900px 600px at 12% -5%, rgba(199, 204, 255, 0.55), transparent 60%),
+    radial-gradient(700px 500px at 95% 8%, rgba(253, 226, 209, 0.45), transparent 65%),
+    radial-gradient(800px 700px at 60% 105%, rgba(216, 241, 228, 0.4), transparent 60%);
+}
 
-  /* Smoother default for interactive elements. Components can still
-     override duration/easing per-component when needed. */
-  button,
-  [role="button"],
-  a {
-    transition-property: background-color, border-color, color, fill, stroke,
-      opacity, box-shadow, transform;
-    transition-timing-function: var(--ease-apple);
-    transition-duration: 200ms;
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+main,
+.layer-content {
+  position: relative;
+  z-index: 1;
+}
+
+::selection {
+  background: var(--color-brand-200);
+  color: var(--color-brand-900);
+}
+
+/* =========================================================================
+   Reusable utility patterns
+   ========================================================================= */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.025em;
+}
+.font-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum", "zero";
+}
+
+/* Glass card */
+.glass {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.04),
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 12px 28px -16px rgba(15, 23, 42, 0.12),
+    0 30px 60px -32px rgba(15, 23, 42, 0.15);
+}
+
+.glass-strong {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 2px 6px rgba(15, 23, 42, 0.04),
+    0 24px 48px -20px rgba(15, 23, 42, 0.14);
+}
+
+.glass-pill {
+  background: rgba(14, 21, 48, 0.82);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 8px 22px -8px rgba(14, 21, 48, 0.4),
+    0 24px 50px -24px rgba(14, 21, 48, 0.5);
+}
+
+/* Halftone dot pattern overlay (for "premium upgrade" style cards) */
+.halftone {
+  background-image:
+    radial-gradient(circle, rgba(15, 23, 42, 0.18) 1px, transparent 1.4px);
+  background-size: 10px 10px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 100% at 100% 50%, black 30%, transparent 70%);
+  mask-image: radial-gradient(ellipse 80% 100% at 100% 50%, black 30%, transparent 70%);
+}
+
+/* Subtle inset divider line */
+.inset-divider {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(15, 23, 42, 0.08) 20%,
+    rgba(15, 23, 42, 0.08) 80%,
+    transparent
+  );
+  height: 1px;
+}
+
+/* =========================================================================
+   Animations
+   ========================================================================= */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
   }
 }
 
-@layer components {
-  /* ─── Liquid Glass (iOS 26 / WWDC 2025 approximation) ─────────────────
-     The real thing uses Metal shaders for refraction; we approximate
-     with a five-layer CSS composition:
-       1. Translucent gradient fill (lighter at top — light "falls" from above)
-       2. Heavy backdrop blur + saturation boost (the signature look)
-       3. Inset top highlight (specular — where light catches the glass edge)
-       4. Inset bottom rim (soft reflection)
-       5. Pseudo-element with gradient mask for the bright border
-     Mixed with `position: relative` so the ::before can absolute-anchor. */
-  .liquid-glass {
-    position: relative;
-    isolation: isolate;
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.62) 0%,
-      rgba(255, 255, 255, 0.32) 100%
-    );
-    /* Boosted saturation (200% → 280%) so colors behind the glass stay
-       vivid after diffusion. Mirrors what Apple does in iOS 26 — the
-       blur is strong but content keeps its chroma. */
-    backdrop-filter: blur(30px) saturate(280%);
-    -webkit-backdrop-filter: blur(30px) saturate(280%);
-    box-shadow:
-      /* Brighter top specular — main "light catches" cue */
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.92),
-      /* Soft bottom rim — reflection of ambient light */
-      inset 0 -1px 0 0 rgba(255, 255, 255, 0.22),
-      /* Inner glow hint — gives the glass an inner ambient lighting feel */
-      inset 0 0 30px -8px rgba(255, 255, 255, 0.35),
-      /* Drop shadow — material thickness */
-      0 8px 32px -4px rgba(0, 0, 0, 0.10),
-      0 2px 8px -2px rgba(0, 0, 0, 0.05);
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
   }
-  /* Top-to-bottom gradient border via mask-composite. Renders as a
-     1px ring that fades from bright (top) to subtle (bottom) — reads
-     as light reflecting off the curved top edge. */
-  .liquid-glass::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.55) 0%,
-      rgba(255, 255, 255, 0.12) 35%,
-      rgba(0, 0, 0, 0.04) 100%
-    );
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    mask-composite: exclude;
-    pointer-events: none;
+  100% {
+    background-position: 200% 0;
   }
-  .dark .liquid-glass {
-    background: linear-gradient(
-      180deg,
-      rgba(50, 50, 55, 0.55) 0%,
-      rgba(28, 28, 30, 0.35) 100%
-    );
-    box-shadow:
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.10),
-      inset 0 -1px 0 0 rgba(255, 255, 255, 0.04),
-      0 8px 32px -4px rgba(0, 0, 0, 0.50),
-      0 2px 8px -2px rgba(0, 0, 0, 0.30);
-  }
-  .dark .liquid-glass::before {
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.18) 0%,
-      rgba(255, 255, 255, 0.04) 35%,
-      rgba(0, 0, 0, 0.30) 100%
-    );
-  }
+}
 
-  /* Quieter variant for nested surfaces (rows inside a panel). Skips
-     the heavy specular sweep — just a subtle translucent fill with a
-     hairline gradient ring. */
-  .liquid-glass-subtle {
-    position: relative;
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.42) 0%,
-      rgba(255, 255, 255, 0.18) 100%
-    );
-    backdrop-filter: blur(14px) saturate(180%);
-    -webkit-backdrop-filter: blur(14px) saturate(180%);
-    box-shadow:
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.50),
-      0 1px 2px 0 rgba(0, 0, 0, 0.04);
+@keyframes float-y {
+  0%, 100% {
+    transform: translateY(0);
   }
-  .dark .liquid-glass-subtle {
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.06) 0%,
-      rgba(255, 255, 255, 0.02) 100%
-    );
-    box-shadow:
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
-      0 1px 2px 0 rgba(0, 0, 0, 0.40);
+  50% {
+    transform: translateY(-4px);
   }
+}
 
-  /* Tinted liquid pill — for primary CTAs. Now with iridescent rim,
-     stronger inner glow, and tinted drop shadow that picks up --tint
-     (defaults to primary blue). The dual-layer background creates the
-     "light from above" cue: white-blended at top, saturated at bottom. */
-  .liquid-pill-primary {
-    --tint: var(--primary);
-    position: relative;
-    isolation: isolate;
-    background: linear-gradient(
-      180deg,
-      color-mix(in oklch, var(--tint) 75%, white) 0%,
-      var(--tint) 100%
-    );
-    color: var(--primary-foreground);
-    box-shadow:
-      /* Strong top specular line */
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.55),
-      /* Inner glow — bottom-up tinted highlight */
-      inset 0 -1px 4px 0 color-mix(in oklch, white 30%, transparent),
-      /* Bottom rim shadow */
-      inset 0 -1px 0 0 rgba(0, 0, 0, 0.10),
-      /* Resting depth */
-      0 1px 2px 0 rgba(0, 0, 0, 0.06),
-      /* Tinted glow — pill seems to "emit" light */
-      0 6px 18px -2px color-mix(in oklch, var(--tint) 45%, transparent);
-    transition-property: filter, box-shadow, transform;
-    transition-duration: 200ms;
-    transition-timing-function: var(--ease-apple);
+@keyframes wave-bar {
+  0%, 100% {
+    transform: scaleY(0.35);
   }
-  .liquid-pill-primary:hover {
-    filter: brightness(1.06);
-    box-shadow:
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.65),
-      inset 0 -1px 4px 0 color-mix(in oklch, white 40%, transparent),
-      inset 0 -1px 0 0 rgba(0, 0, 0, 0.10),
-      0 1px 2px 0 rgba(0, 0, 0, 0.06),
-      0 8px 24px -2px color-mix(in oklch, var(--tint) 55%, transparent);
+  50% {
+    transform: scaleY(1);
   }
-  .liquid-pill-primary:active {
-    filter: brightness(0.95);
-    transform: scale(0.96);
-  }
+}
 
-  /* ─── Liquid Puck — 3D circular button (logo chip, icon buttons) ──────
-     Multi-layer radial gradient gives the "glass sphere" feel: a bright
-     specular spot top-left, a tinted body, and a soft cast shadow.
-     Defaults to neutral white glass; pass `--tint: ...` for a colored
-     puck (e.g. blue CTA, success green). */
-  .liquid-puck {
-    --tint: rgba(255, 255, 255, 0.8);
-    position: relative;
-    isolation: isolate;
-    background:
-      /* Layer 1: Specular highlight (light source upper-left) */
-      radial-gradient(
-        circle at 30% 25%,
-        rgba(255, 255, 255, 0.85) 0%,
-        rgba(255, 255, 255, 0.25) 30%,
-        transparent 55%
-      ),
-      /* Layer 2: Tinted body with subtle gradient */
-      linear-gradient(
-        165deg,
-        color-mix(in oklch, var(--tint) 70%, white) 0%,
-        var(--tint) 100%
-      );
-    backdrop-filter: blur(12px) saturate(200%);
-    -webkit-backdrop-filter: blur(12px) saturate(200%);
-    box-shadow:
-      /* Top inner highlight — strong rim light */
-      inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.55),
-      /* Bottom inner shadow — gives the ball its underside */
-      inset 0 -1px 2px 0 rgba(0, 0, 0, 0.08),
-      /* Tinted glow shadow */
-      0 4px 12px -2px color-mix(in oklch, var(--tint) 35%, transparent),
-      0 1px 2px 0 rgba(0, 0, 0, 0.10);
-    transition-property: filter, box-shadow, transform;
-    transition-duration: 200ms;
-    transition-timing-function: var(--ease-apple);
-  }
-  .liquid-puck:hover {
-    filter: brightness(1.05);
-    box-shadow:
-      inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.7),
-      inset 0 -1px 2px 0 rgba(0, 0, 0, 0.08),
-      0 6px 18px -2px color-mix(in oklch, var(--tint) 50%, transparent),
-      0 1px 2px 0 rgba(0, 0, 0, 0.10);
-  }
-  .liquid-puck:active {
-    transform: scale(0.93);
-    filter: brightness(0.95);
-  }
-  .liquid-puck:disabled {
-    filter: grayscale(0.5) opacity(0.5);
-    pointer-events: none;
-  }
+.animate-pulse-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  opacity: 0.4;
+  z-index: -1;
+}
 
-  /* Blue tint variant — for primary CTAs (matches iOS blue brand). */
-  .liquid-puck-primary {
-    --tint: var(--primary);
-    color: var(--primary-foreground);
-  }
+.shimmer {
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.6),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+}
 
-  /* ─── Iridescent border — chromatic dispersion at the rim ─────────────
-     Adds a multi-stop gradient ring (white → purple → cyan → white) via
-     pseudo-element + mask-composite. Stacks on top of any .liquid-*
-     surface. Looks like real glass refracting white light into colors. */
-  .liquid-iridescent {
-    position: relative;
-  }
-  .liquid-iridescent::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1.5px;
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.85) 0%,
-      rgba(180, 160, 255, 0.55) 30%,
-      rgba(120, 220, 255, 0.55) 60%,
-      rgba(255, 255, 255, 0.85) 100%
-    );
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    mask-composite: exclude;
-    pointer-events: none;
-  }
-  .dark .liquid-iridescent::after {
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.4) 0%,
-      rgba(180, 160, 255, 0.35) 30%,
-      rgba(120, 220, 255, 0.35) 60%,
-      rgba(255, 255, 255, 0.4) 100%
-    );
-  }
+/* =========================================================================
+   Scrollbar
+   ========================================================================= */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.2);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
 
-  /* Apple-feel button press — used on neutral / ghost buttons.
-     Pairs with the global `[role="button"]` transition. */
-  .press-feedback {
-    transition-timing-function: var(--ease-apple);
-  }
-  .press-feedback:active {
-    transform: scale(0.97);
-  }
+/* =========================================================================
+   Focus
+   ========================================================================= */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

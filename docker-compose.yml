@@ -80,31 +80,31 @@ services:
       # Dev-only placeholder secret — NOT for production (production uses Vault/KMS)
       - Jwt__Secret=dev-only-secret-min-32-chars-placeholder!
 
-  # Frontend (Next.js standalone). Opted in by the `prod` profile so
-  # day-to-day backend work doesn't pay the build cost — UI devs run
-  # `npm run dev` directly (see frontend/README.md).
-  #   docker compose --profile prod up -d        # full stack incl. UI
-  #   docker compose up -d                       # backend services only
+  # TMS dashboard (Next.js 16 standalone). Currently renders from mock
+  # data so it doesn't depend on the .NET API — opt-in via the `prod`
+  # profile so day-to-day backend work doesn't pay the build cost.
+  # UI devs run `npm run dev` from frontend/ directly.
+  #   docker compose --profile prod up -d frontend   # build + run UI only
+  #   docker compose --profile prod up -d            # full stack
   frontend:
     profiles: ["prod"]
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        # Next.js standalone bakes the rewrite target during `next build`,
-        # so we have to pass DTMS_BACKEND_URL at build time. Inside the
-        # compose network the API service is reachable as `api:8080`.
-        DTMS_BACKEND_URL: http://api:8080
-    container_name: dtms-frontend
+    image: tms-frontend:latest
+    container_name: tms-frontend
     ports:
       - "3000:3000"
-    depends_on:
-      - api
     environment:
-      # Same value at runtime, just in case any non-rewrite code reads
-      # it (e.g. server-side fetch outside `rewrites()`).
-      - DTMS_BACKEND_URL=http://api:8080
       - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   pgdata:
