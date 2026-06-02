@@ -13,11 +13,13 @@ import {
   Star,
   Sun,
   Upload,
+  X,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { StatusPulse } from "@/components/primitives/status-pulse";
+import { useShell } from "@/components/shell/shell-context";
 import { cn } from "@/lib/utils";
 
 type RailAction = {
@@ -64,6 +66,10 @@ export function LeftRail() {
   const [expanded, setExpanded] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
+  // Drawer state (tablet portrait) lives in ShellContext — TopNav's
+  // hamburger toggles it. ESC closes; route changes auto-close.
+  const { railDrawerOpen, closeRailDrawer } = useShell();
+
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY) === "1";
     setExpanded(saved);
@@ -83,7 +89,17 @@ export function LeftRail() {
     );
   }, [expanded, hydrated]);
 
+  useEffect(() => {
+    if (!railDrawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeRailDrawer();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [railDrawerOpen, closeRailDrawer]);
+
   return (
+    <>
     <motion.aside
       initial={{ opacity: 0, x: -12 }}
       animate={{ opacity: 1, x: 0, width: expanded ? EXPANDED_PX : COLLAPSED_PX }}
@@ -92,7 +108,7 @@ export function LeftRail() {
         x: { duration: 0.55, delay: 0.15, ease: [0.22, 1, 0.36, 1] },
         width: { type: "spring", stiffness: 220, damping: 28, mass: 0.6 },
       }}
-      className="hidden md:block fixed left-4 inset-y-0 z-30 pointer-events-none"
+      className="hidden lg:block fixed left-4 inset-y-0 z-30 pointer-events-none"
       aria-label="Quick actions"
     >
       {/* Action stack — vertically centered in the viewport */}
@@ -153,6 +169,98 @@ export function LeftRail() {
         </button>
       </motion.div>
     </motion.aside>
+
+    {/* ── Tablet-portrait drawer ──────────────────────────────────── */}
+    {/* Slides in from the left when the hamburger toggles it. Hidden  */}
+    {/* on lg+ (the permanent rail takes over). Backdrop closes; ESC   */}
+    {/* closes (see effect above).                                     */}
+    <AnimatePresence>
+      {railDrawerOpen && (
+        <motion.div
+          key="rail-drawer"
+          className="lg:hidden fixed inset-0 z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          {/* Backdrop */}
+          <button
+            type="button"
+            aria-label="Close menu"
+            onClick={closeRailDrawer}
+            className="absolute inset-0 bg-[var(--color-ink-900)]/30 backdrop-blur-sm cursor-default"
+          />
+
+          {/* Panel */}
+          <motion.aside
+            initial={{ x: -320 }}
+            animate={{ x: 0 }}
+            exit={{ x: -320 }}
+            transition={{ type: "spring", stiffness: 320, damping: 32, mass: 0.7 }}
+            className="absolute left-0 inset-y-0 w-[280px] bg-white/95 dark:bg-[var(--color-ink-950)]/95 backdrop-blur-xl shadow-[0_20px_60px_-20px_rgba(15,23,42,0.35)] border-r border-[var(--color-ink-100)]/70 dark:border-white/[0.06] flex flex-col"
+            aria-label="Quick actions"
+          >
+            {/* Drawer header — close button */}
+            <div className="flex items-center justify-between px-4 py-4 border-b border-[var(--color-ink-100)]/70 dark:border-white/[0.06]">
+              <span className="font-display text-[13px] font-semibold uppercase tracking-[0.08em] text-[var(--color-ink-500)]">
+                Quick actions
+              </span>
+              <button
+                type="button"
+                aria-label="Close menu"
+                onClick={closeRailDrawer}
+                className="grid h-9 w-9 place-items-center rounded-full text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)] dark:hover:bg-white/[0.06] cursor-pointer"
+              >
+                <X className="h-4 w-4" strokeWidth={2} />
+              </button>
+            </div>
+
+            {/* Action list — always expanded in the drawer */}
+            <ul className="flex-1 flex flex-col gap-1.5 px-3 py-4 overflow-y-auto">
+              {actions.map((a) => (
+                <li key={a.label} onClick={closeRailDrawer}>
+                  <RailButton label={a.label} badge={a.badge} expanded>
+                    {a.icon}
+                  </RailButton>
+                </li>
+              ))}
+            </ul>
+
+            {/* Theme toggles — bottom of drawer */}
+            <div className="flex items-center justify-center gap-2.5 px-4 py-4 border-t border-[var(--color-ink-100)]/70 dark:border-white/[0.06]">
+              <button
+                aria-label="Dark mode"
+                aria-pressed={active === "dark"}
+                onClick={() => setTheme("dark")}
+                className={cn(
+                  "grid h-10 w-10 place-items-center rounded-full transition-all duration-200 cursor-pointer",
+                  active === "dark"
+                    ? "bg-[var(--color-brand-900)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_8px_20px_-6px_rgba(14,21,48,0.55)]"
+                    : "bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 hover:bg-white dark:bg-white/[0.06] dark:hover:bg-white/[0.12]",
+                )}
+              >
+                <Moon className="h-4 w-4" strokeWidth={2} />
+              </button>
+              <button
+                aria-label="Light mode"
+                aria-pressed={active === "light"}
+                onClick={() => setTheme("light")}
+                className={cn(
+                  "grid h-10 w-10 place-items-center rounded-full transition-all duration-200 cursor-pointer",
+                  active === "light"
+                    ? "bg-[var(--color-brand-900)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_8px_20px_-6px_rgba(14,21,48,0.55)]"
+                    : "bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 hover:bg-white dark:bg-white/[0.06] dark:hover:bg-white/[0.12]",
+                )}
+              >
+                <Sun className="h-4 w-4" strokeWidth={2.2} />
+              </button>
+            </div>
+          </motion.aside>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   );
 }
 

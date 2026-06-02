@@ -132,6 +132,13 @@
 html,
 body {
   height: 100%;
+  /* Clip any accidental horizontal overflow at the root so a single wide
+     descendant (marquee, decorative blob, hero visual at narrow widths)
+     can't make the whole page scroll sideways. `clip` is the modern
+     equivalent of `hidden` that doesn't create a scroll container, so
+     in-page horizontal scrollers (testimonials marquee, tables) still
+     work. */
+  overflow-x: clip;
 }
 
 body {

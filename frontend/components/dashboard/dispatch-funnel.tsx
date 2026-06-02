@@ -24,7 +24,7 @@ export function DispatchFunnel() {
   return (
     <GlassCard
       variant="default"
-      className="col-span-12 lg:col-span-5 p-6"
+      className="col-span-12 md:col-span-6 lg:col-span-5 p-6"
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, delay: 0.7, ease: [0.22, 1, 0.36, 1] }}

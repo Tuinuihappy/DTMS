@@ -1,16 +1,18 @@
 "use client";
 
-import { Bell, Compass, Search } from "lucide-react";
+import { Bell, Compass, Menu, Search } from "lucide-react";
 import { motion, useScroll, useTransform } from "motion/react";
 import { useState } from "react";
 import { Avatar } from "@/components/primitives/avatar";
 import { StatusPulse } from "@/components/primitives/status-pulse";
+import { useShell } from "@/components/shell/shell-context";
 import { cn } from "@/lib/utils";
 
 const navItems = ["Home", "Messages", "Discover", "Wallet", "Projects"] as const;
 
 export function TopNav() {
   const [active, setActive] = useState<(typeof navItems)[number]>("Home");
+  const { toggleRailDrawer, railDrawerOpen } = useShell();
 
   // Stay pinned for the first 100 px of scroll, then slide up + fade
   // out so the dashboard content owns the rest of the viewport.
@@ -30,6 +32,17 @@ export function TopNav() {
         style={{ opacity, y: driftY, pointerEvents }}
         className="relative flex items-center gap-2 px-2"
       >
+        {/* Hamburger — tablet portrait only; opens the rail drawer */}
+        <button
+          type="button"
+          aria-label={railDrawerOpen ? "Close menu" : "Open menu"}
+          aria-expanded={railDrawerOpen}
+          onClick={toggleRailDrawer}
+          className="grid lg:hidden h-10 w-10 place-items-center rounded-full bg-white/70 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_2px_6px_-2px_rgba(15,23,42,0.08)] transition-all duration-200 hover:bg-white hover:text-[var(--color-ink-900)] cursor-pointer dark:bg-white/[0.06] dark:hover:bg-white/[0.12]"
+        >
+          <Menu className="h-[18px] w-[18px]" strokeWidth={2} />
+        </button>
+
         {/* Logo + wordmark */}
         <a
           href="#"

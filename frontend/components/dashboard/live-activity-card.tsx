@@ -20,7 +20,7 @@ export function LiveActivityCard() {
   return (
     <GlassCard
       variant="strong"
-      className="p-7 lg:p-8 col-span-12 lg:col-span-8"
+      className="p-6 md:p-7 lg:p-8 col-span-12 lg:col-span-8"
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}

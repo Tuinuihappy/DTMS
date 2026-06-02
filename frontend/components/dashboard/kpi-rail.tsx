@@ -68,7 +68,7 @@ const toneRing: Record<Kpi["tone"], string> = {
 
 export function KpiRail() {
   return (
-    <div className="col-span-12 lg:col-span-4 grid grid-cols-2 lg:grid-cols-1 gap-4">
+    <div className="col-span-12 md:col-span-6 lg:col-span-4 grid grid-cols-2 lg:grid-cols-1 gap-4">
       {kpis.map((k, i) => (
         <GlassCard
           key={i}

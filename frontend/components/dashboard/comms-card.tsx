@@ -20,7 +20,7 @@ export function CommsCard() {
   return (
     <GlassCard
       variant="ink"
-      className="col-span-12 lg:col-span-3 p-6 relative overflow-hidden"
+      className="col-span-12 md:col-span-6 lg:col-span-3 p-6 relative overflow-hidden"
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, delay: 0.75, ease: [0.22, 1, 0.36, 1] }}
