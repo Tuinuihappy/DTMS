@@ -23,7 +23,7 @@ const cols = [
 
 export function LandingFooter() {
   return (
-    <footer className="mx-auto max-w-[1240px] px-4 pt-24 pb-12 sm:px-6 md:pt-32">
+    <footer id="contact" className="mx-auto max-w-[1240px] px-4 pt-24 pb-12 sm:px-6 md:pt-32">
       <div className="glass glass-edge rounded-[var(--radius-2xl)] p-8 md:p-12">
         <div className="grid grid-cols-2 gap-10 md:grid-cols-6">
           {/* Brand block */}

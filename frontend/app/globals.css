@@ -141,6 +141,13 @@ body {
   overflow-x: clip;
 }
 
+html {
+  /* Smooth in-page anchor navigation, with top padding so anchored
+     sections don't end up tucked under the fixed top nav. */
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
 body {
   font-family: var(--font-sans);
   background: var(--color-canvas);

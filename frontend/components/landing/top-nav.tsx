@@ -12,6 +12,7 @@ const items = [
   { label: "Platforms", href: "#platforms" },
   { label: "Testimonials", href: "#testimonials" },
   { label: "Pricing", href: "#pricing" },
+  { label: "Contact", href: "#contact" },
 ] as const;
 
 export function LandingTopNav() {
@@ -25,14 +26,21 @@ export function LandingTopNav() {
   const driftY = useTransform(scrollY, [60, 100], [0, -24], { clamp: true });
   const pointerEvents = useTransform(scrollY, (v) => (v >= 100 ? "none" : "auto"));
 
-  // Close the mobile menu on ESC
+  // Close the mobile menu on ESC + lock body scroll so the background
+  // doesn't scroll behind the overlay (and so layout shifts don't push
+  // content around when the menu opens).
   useEffect(() => {
     if (!mobileOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setMobileOpen(false);
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [mobileOpen]);
 
   return (
@@ -153,7 +161,7 @@ export function LandingTopNav() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="lg:hidden fixed inset-0 z-40 bg-[var(--color-ink-900)]/50 backdrop-blur-md cursor-default"
+          className="lg:hidden fixed inset-0 z-40 bg-[var(--color-ink-900)]/30 backdrop-blur-2xl cursor-default"
         />
       )}
     </AnimatePresence>
@@ -166,7 +174,7 @@ export function LandingTopNav() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          className="lg:hidden fixed top-[68px] left-1/2 -translate-x-1/2 z-50 w-[calc(100vw-4rem)] rounded-[var(--radius-xl)] glass-strong glass-edge p-2 flex flex-col gap-0.5 shadow-[0_18px_50px_-18px_rgba(15,23,42,0.45)]"
+          className="lg:hidden fixed top-[68px] left-1/2 -translate-x-1/2 z-50 w-[calc(100vw-4rem)] rounded-[var(--radius-xl)] bg-white dark:bg-[var(--color-ink-950)] border border-[var(--color-ink-100)] dark:border-white/[0.06] p-2 flex flex-col gap-0.5 shadow-[0_18px_50px_-18px_rgba(15,23,42,0.45)]"
           aria-label="Mobile navigation"
         >
           {items.map((it) => {

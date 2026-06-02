@@ -1,8 +1,9 @@
 "use client";
 
-import { Bell, Compass, Menu, Search } from "lucide-react";
+import { Bell, Compass, Menu, Moon, Search, Sun } from "lucide-react";
 import { motion, useScroll, useTransform } from "motion/react";
-import { useState } from "react";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import { Avatar } from "@/components/primitives/avatar";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { useShell } from "@/components/shell/shell-context";
@@ -117,6 +118,7 @@ export function TopNav() {
         <IconBtn label="Notifications" badge>
           <Bell className="h-[18px] w-[18px]" strokeWidth={2} />
         </IconBtn>
+        <ThemeToggleBtn />
 
         {/* Avatar */}
         <a
@@ -128,6 +130,34 @@ export function TopNav() {
         </a>
       </motion.div>
     </motion.header>
+  );
+}
+
+function ThemeToggleBtn() {
+  // Gate on `mounted` to avoid SSR/CSR mismatch — the server can't know
+  // the user's resolved theme preference.
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) {
+    return <div aria-hidden className="h-10 w-10" />;
+  }
+
+  const isDark = resolvedTheme === "dark";
+  return (
+    <button
+      type="button"
+      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      className="relative grid h-10 w-10 place-items-center rounded-full bg-white/70 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_2px_6px_-2px_rgba(15,23,42,0.08)] transition-all duration-200 hover:bg-white hover:text-[var(--color-ink-900)] hover:-translate-y-px cursor-pointer dark:bg-white/[0.06] dark:hover:bg-white/[0.12]"
+    >
+      {isDark ? (
+        <Sun className="h-[18px] w-[18px]" strokeWidth={2.2} />
+      ) : (
+        <Moon className="h-[18px] w-[18px]" strokeWidth={2} />
+      )}
+    </button>
   );
 }
 

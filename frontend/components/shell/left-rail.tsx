@@ -5,18 +5,15 @@ import {
   Calendar,
   ChevronLeft,
   Database,
-  Moon,
   Plus,
   Send,
   Share2,
   Smartphone,
   Star,
-  Sun,
   Upload,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { useShell } from "@/components/shell/shell-context";
@@ -50,16 +47,6 @@ const EXPANDED_RAIL_LANE = `${EXPANDED_PX + 16 + 0}px`; //  248 px
 const STORAGE_KEY = "tms-rail-expanded";
 
 export function LeftRail() {
-  // next-themes drives the global theme — `resolvedTheme` collapses
-  // "system" into the active light|dark so the toggle's pressed state
-  // is always correct. Gate on `mounted` to dodge SSR/CSR mismatch
-  // (the server can't know the user's OS preference).
-  const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const active: "light" | "dark" =
-    mounted && resolvedTheme === "dark" ? "dark" : "light";
-
   // Rail expansion — persisted to localStorage and broadcast to <main>
   // via the `--rail-width` CSS variable on <html>. We default to false
   // for SSR (the markup matches), then hydrate the saved value on mount.
@@ -95,7 +82,12 @@ export function LeftRail() {
       if (e.key === "Escape") closeRailDrawer();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [railDrawerOpen, closeRailDrawer]);
 
   return (
@@ -108,66 +100,37 @@ export function LeftRail() {
         x: { duration: 0.55, delay: 0.15, ease: [0.22, 1, 0.36, 1] },
         width: { type: "spring", stiffness: 220, damping: 28, mass: 0.6 },
       }}
-      className="hidden lg:block fixed left-4 inset-y-0 z-30 pointer-events-none"
+      className="hidden lg:flex flex-col fixed left-4 top-20 bottom-4 z-30 pointer-events-none"
       aria-label="Quick actions"
     >
-      {/* Action stack — vertically centered in the viewport */}
-      <ul className="pointer-events-auto absolute left-0 right-0 top-1/2 -translate-y-1/2 flex flex-col gap-2 px-0">
-        {/* Toggle is the FIRST button — its chevron rotates 180° when open. */}
-        <PanelToggle expanded={expanded} onToggle={() => setExpanded((e) => !e)} />
+      {/* Action stack — centered in the available space between TopNav
+          (cleared via top-20) and the theme toggles below. Using flex
+          layout so the stack and the toggles can never overlap, even
+          on short viewports — instead the stack shrinks/scrolls. */}
+      <div className="flex-1 min-h-0 flex items-center justify-center">
+        <ul className="pointer-events-auto flex flex-col gap-2 w-full">
+          {/* Toggle is the FIRST button — its chevron rotates 180° when open. */}
+          <PanelToggle expanded={expanded} onToggle={() => setExpanded((e) => !e)} />
 
-        {actions.map((a, i) => (
-          <motion.li
-            key={a.label}
-            initial={{ opacity: 0, y: -8, scale: 0.85 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{
-              duration: 0.4,
-              delay: 0.25 + i * 0.04,
-              ease: [0.22, 1, 0.36, 1],
-            }}
-          >
-            <RailButton label={a.label} badge={a.badge} expanded={expanded}>
-              {a.icon}
-            </RailButton>
-          </motion.li>
-        ))}
-      </ul>
+          {actions.map((a, i) => (
+            <motion.li
+              key={a.label}
+              initial={{ opacity: 0, y: -8, scale: 0.85 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{
+                duration: 0.4,
+                delay: 0.25 + i * 0.04,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+            >
+              <RailButton label={a.label} badge={a.badge} expanded={expanded}>
+                {a.icon}
+              </RailButton>
+            </motion.li>
+          ))}
+        </ul>
+      </div>
 
-      {/* Bottom — theme toggle pair, pinned to viewport bottom */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        className="pointer-events-auto absolute bottom-6 left-0 right-0 flex flex-col items-center gap-2.5"
-      >
-        <button
-          aria-label="Dark mode"
-          aria-pressed={active === "dark"}
-          onClick={() => setTheme("dark")}
-          className={cn(
-            "grid h-10 w-10 place-items-center rounded-full transition-all duration-200 cursor-pointer",
-            active === "dark"
-              ? "bg-[var(--color-brand-900)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_8px_20px_-6px_rgba(14,21,48,0.55)]"
-              : "bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] hover:-translate-y-px hover:bg-white dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_-2px_rgba(0,0,0,0.5)]",
-          )}
-        >
-          <Moon className="h-4 w-4" strokeWidth={2} />
-        </button>
-        <button
-          aria-label="Light mode"
-          aria-pressed={active === "light"}
-          onClick={() => setTheme("light")}
-          className={cn(
-            "grid h-10 w-10 place-items-center rounded-full transition-all duration-200 cursor-pointer",
-            active === "light"
-              ? "bg-[var(--color-brand-900)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_8px_20px_-6px_rgba(14,21,48,0.55)]"
-              : "bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] hover:-translate-y-px hover:bg-white dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_-2px_rgba(0,0,0,0.5)]",
-          )}
-        >
-          <Sun className="h-4 w-4" strokeWidth={2.2} />
-        </button>
-      </motion.div>
     </motion.aside>
 
     {/* ── Tablet-portrait drawer ──────────────────────────────────── */}
@@ -227,35 +190,6 @@ export function LeftRail() {
               ))}
             </ul>
 
-            {/* Theme toggles — bottom of drawer */}
-            <div className="flex items-center justify-center gap-2.5 px-4 py-4 border-t border-[var(--color-ink-100)]/70 dark:border-white/[0.06]">
-              <button
-                aria-label="Dark mode"
-                aria-pressed={active === "dark"}
-                onClick={() => setTheme("dark")}
-                className={cn(
-                  "grid h-10 w-10 place-items-center rounded-full transition-all duration-200 cursor-pointer",
-                  active === "dark"
-                    ? "bg-[var(--color-brand-900)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_8px_20px_-6px_rgba(14,21,48,0.55)]"
-                    : "bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 hover:bg-white dark:bg-white/[0.06] dark:hover:bg-white/[0.12]",
-                )}
-              >
-                <Moon className="h-4 w-4" strokeWidth={2} />
-              </button>
-              <button
-                aria-label="Light mode"
-                aria-pressed={active === "light"}
-                onClick={() => setTheme("light")}
-                className={cn(
-                  "grid h-10 w-10 place-items-center rounded-full transition-all duration-200 cursor-pointer",
-                  active === "light"
-                    ? "bg-[var(--color-brand-900)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_8px_20px_-6px_rgba(14,21,48,0.55)]"
-                    : "bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 hover:bg-white dark:bg-white/[0.06] dark:hover:bg-white/[0.12]",
-                )}
-              >
-                <Sun className="h-4 w-4" strokeWidth={2.2} />
-              </button>
-            </div>
           </motion.aside>
         </motion.div>
       )}
