@@ -5,80 +5,50 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { AuthPanel } from "./auth-panel";
-import { DuskScene } from "./dusk-scene";
+import { BrandScene } from "./brand-scene";
 
 /* -------------------------------------------------------------------------- */
-/* LoginExperience — full-bleed page that combines the cinematic dusk scene   */
-/* with the floating glass auth panel.                                        */
+/* LoginExperience — full-page /login route.                                   */
 /*                                                                            */
-/* Desktop (lg+): two columns, scene left, panel right.                       */
-/* Tablet / mobile: stacked — scene becomes a 280-380px hero band at top,    */
-/* form takes the rest of the viewport. The scene stays full-bleed even when  */
-/* stacked so the dusk drama survives at narrow widths.                       */
+/* Theme-aware via the existing canvas + glass tokens. No hard-coded colors    */
+/* — the page sits on the global pastel-aurora canvas in light mode and the    */
+/* deep-navy canvas in dark mode, with the form panel rendered through        */
+/* .glass utilities so it matches every other card in the app.                 */
+/*                                                                            */
+/* Desktop (lg+): two columns, BrandScene on the left, form on the right.      */
+/* Tablet / mobile: stacked — scene shrinks to a compact hero band, form       */
+/* takes the rest. Animations gracefully scale.                                */
 /* -------------------------------------------------------------------------- */
 
-const EASE_OUT_QUART = [0.22, 1, 0.36, 1] as const;
+const ease = [0.22, 1, 0.36, 1] as const;
 
 export function LoginExperience() {
   return (
-    <main className="dusk-root relative min-h-svh w-full overflow-hidden bg-[#0A0420] text-amber-50">
-      {/* DESKTOP LAYOUT — side-by-side, dusk scene as the left half ─────── */}
-      <div className="hidden lg:grid h-svh grid-cols-[1.15fr_1fr]">
-        {/* LEFT — cinematic scene + display copy overlay */}
+    <main className="layer-content relative min-h-svh w-full overflow-x-clip">
+      <TopBar />
+
+      {/* DESKTOP — side-by-side ─────────────────────────────────────────── */}
+      <div className="hidden lg:grid min-h-svh grid-cols-[1.05fr_1fr] xl:grid-cols-[1.15fr_1fr]">
         <div className="relative">
-          <DuskScene />
-          <DisplayCopy variant="desktop" />
-          <TopBar variant="overlay" />
+          <BrandScene />
         </div>
-        {/* RIGHT — auth panel sitting over a deep velvet field */}
-        <div
-          className="relative grid place-items-center px-10"
-          style={{
-            background:
-              "radial-gradient(120% 80% at 20% 0%, #2A1248 0%, #14082C 55%, #0A0420 100%)",
-          }}
-        >
+        <div className="relative grid place-items-center px-8 py-16 xl:px-12">
           <Suspense fallback={null}>
             <AuthPanel />
           </Suspense>
-          {/* Tiny corner ornament — a thin sun-glow stripe like cabin trim */}
-          <span
-            aria-hidden
-            className="pointer-events-none absolute left-0 top-1/2 h-40 w-px -translate-y-1/2"
-            style={{
-              background:
-                "linear-gradient(180deg, transparent, rgba(255,200,150,0.4), transparent)",
-            }}
-          />
         </div>
       </div>
 
-      {/* MOBILE / TABLET LAYOUT — stacked ───────────────────────────────── */}
+      {/* MOBILE / TABLET — stacked ──────────────────────────────────────── */}
       <div className="lg:hidden flex min-h-svh flex-col">
-        {/* Hero band */}
-        <div className="relative h-[58svh] min-h-[420px]">
-          <DuskScene />
-          <DisplayCopy variant="mobile" />
-          <TopBar variant="overlay" />
+        {/* Compact brand band — hides the constellation orbit (which needs
+            wide canvas) but keeps the eyebrow + heading + trust footnote. */}
+        <div className="relative pt-20">
+          <CompactBrand />
         </div>
         {/* Form */}
-        <div
-          className="relative -mt-10 flex-1 px-5 pb-10 pt-8 sm:px-8"
-          style={{
-            background:
-              "linear-gradient(180deg, #14082C 0%, #0A0420 70%, #06031A 100%)",
-          }}
-        >
-          {/* Top edge fade — blends the hero band into the form half */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 -top-12 h-12"
-            style={{
-              background:
-                "linear-gradient(180deg, transparent 0%, rgba(20, 8, 44, 0.7) 60%, #14082C 100%)",
-            }}
-          />
-          <div className="mx-auto w-full max-w-[460px]">
+        <div className="relative flex-1 px-5 pb-12 pt-6 sm:px-8">
+          <div className="mx-auto w-full max-w-[440px]">
             <Suspense fallback={null}>
               <AuthPanel />
             </Suspense>
@@ -90,53 +60,62 @@ export function LoginExperience() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Display copy — "MOVE / DELIVER / ARRIVE" stacked, big Fraunces italic.     */
-/* Three-word stagger lands while the sun is mid-rise so the eye is led      */
-/* from the sun upward to the words and then back down to the highway.       */
+/* TopBar — minimal "back home" link in the page corner. Same glass-pill      */
+/* shape used by the dashboard's icon buttons so it reads like part of the    */
+/* shell, not the login.                                                       */
+/* -------------------------------------------------------------------------- */
+
+function TopBar() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.55, delay: 0.15, ease }}
+      className="absolute left-5 top-5 z-20 sm:left-7 sm:top-7"
+    >
+      <Link
+        href="/"
+        className="group inline-flex items-center gap-1.5 rounded-full border border-[var(--color-ink-100)] bg-white/70 px-3 py-1.5 text-[12px] font-medium tracking-tight text-[var(--color-ink-700)] backdrop-blur transition-all hover:-translate-y-px hover:bg-white dark:border-white/[0.06] dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
+        aria-label="Back to home"
+      >
+        <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" strokeWidth={2.2} />
+        Home
+      </Link>
+    </motion.div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* CompactBrand — mobile / tablet replacement for BrandScene's wide layout.   */
+/* Keeps the eyebrow + headline + paragraph + truck mark in a smaller stack.  */
 /* -------------------------------------------------------------------------- */
 
 const WORDS = ["Move.", "Deliver.", "Arrive."] as const;
 
-function DisplayCopy({ variant }: { variant: "desktop" | "mobile" }) {
-  const base = variant === "desktop"
-    ? "absolute left-10 bottom-16 xl:left-14 xl:bottom-20 max-w-[640px]"
-    : "absolute left-5 sm:left-7 bottom-10 right-5 sm:right-7";
-
+function CompactBrand() {
   return (
-    <div className={base}>
-      <motion.p
-        initial={{ opacity: 0, y: 12 }}
+    <div className="relative mx-auto max-w-[480px] px-5 pb-2 sm:px-7">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, delay: 0.45, ease: EASE_OUT_QUART }}
-        className="font-dusk-body text-[11px] tracking-[0.4em] uppercase text-amber-100/75 mb-4 sm:mb-5"
+        transition={{ duration: 0.55, delay: 0.2, ease }}
+        className="inline-flex items-center gap-2 rounded-full border border-[var(--color-ink-100)] bg-white/65 px-3 py-1.5 text-[11px] font-medium text-[var(--color-ink-600)] backdrop-blur dark:border-white/[0.06] dark:bg-white/[0.05]"
       >
-        <span
-          className="inline-block h-px w-8 align-middle mr-3"
-          style={{ background: "rgba(255, 220, 170, 0.6)" }}
-        />
-        Logistics, at dusk
-      </motion.p>
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-success)] opacity-75" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--color-success)]" />
+        </span>
+        Welcome to the operations deck
+      </motion.div>
 
-      <h1 className="font-dusk-display text-amber-50">
+      <h1 className="mt-5 font-display text-[2.25rem] leading-[1.02] tracking-[-0.035em] font-semibold text-[var(--color-ink-900)] sm:text-[2.75rem]">
         {WORDS.map((w, i) => (
           <motion.span
             key={w}
-            initial={{ opacity: 0, y: 22, filter: "blur(10px)" }}
+            initial={{ opacity: 0, y: 14, filter: "blur(8px)" }}
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{
-              duration: 0.85,
-              delay: 0.55 + i * 0.14,
-              ease: EASE_OUT_QUART,
-            }}
-            className={
-              variant === "desktop"
-                ? "block leading-[0.95] text-[clamp(60px,7vw,120px)] font-semibold tracking-[-0.03em]"
-                : "block leading-[0.96] text-[clamp(42px,10.5vw,76px)] font-semibold tracking-[-0.03em]"
-            }
-            style={{
-              textShadow:
-                "0 6px 24px rgba(0,0,0,0.4), 0 0 60px rgba(255, 170, 120, 0.18)",
-            }}
+            transition={{ duration: 0.7, delay: 0.3 + i * 0.12, ease }}
+            className="inline-block mr-2"
           >
             {w}
           </motion.span>
@@ -146,41 +125,11 @@ function DisplayCopy({ variant }: { variant: "desktop" | "mobile" }) {
       <motion.p
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, delay: 1.05, ease: EASE_OUT_QUART }}
-        className={
-          variant === "desktop"
-            ? "mt-6 max-w-[480px] font-dusk-body text-[16.5px] leading-relaxed text-amber-50/80"
-            : "mt-4 max-w-[420px] font-dusk-body text-[14px] leading-relaxed text-amber-50/75"
-        }
+        transition={{ duration: 0.55, delay: 0.82, ease }}
+        className="mt-4 max-w-[380px] text-[14px] leading-relaxed text-[var(--color-ink-500)]"
       >
-        Where freight finds its line. Dispatch, live activity and driver
-        comms — one calm console for the long haul.
+        Live fleet activity, dispatch funnels, driver comms — sign in to take the wheel.
       </motion.p>
     </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* TopBar — minimal "back to home" link sitting in the top-left of the scene  */
-/* on desktop, and as a subtle pill at the top of the hero on mobile.         */
-/* -------------------------------------------------------------------------- */
-
-function TopBar({ variant }: { variant: "overlay" }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.35, ease: EASE_OUT_QUART }}
-      className="absolute left-5 top-5 sm:left-7 sm:top-7"
-    >
-      <Link
-        href="/"
-        className="group inline-flex items-center gap-1.5 rounded-full bg-white/[0.07] px-3 py-1.5 font-dusk-body text-[11.5px] font-medium tracking-tight text-amber-50/80 ring-1 ring-white/[0.12] backdrop-blur-md transition-all hover:bg-white/[0.13] hover:text-amber-50"
-        aria-label="Back to home"
-      >
-        <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" strokeWidth={2.2} />
-        Home
-      </Link>
-    </motion.div>
   );
 }

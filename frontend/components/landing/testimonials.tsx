@@ -18,7 +18,7 @@ const testimonials: Testimonial[] = [
     quote:
       "Switched our 240-truck fleet to TMS in 6 weeks. Dispatcher load dropped 38%, on-time SLA went from 84% to 96%.",
     name: "Marisa Petchara",
-    role: "Head of Ops, SCG Logistics",
+    role: "Head of Ops, Delta Logistics",
     handle: "@marisa.p",
     hue: 280,
   },

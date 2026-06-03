@@ -94,19 +94,7 @@ export function LandingHero() {
           >
             <span>Trusted by</span>
             <span className="font-display normal-case tracking-tight font-semibold text-[var(--color-ink-700)] text-[15px]">
-              SCG Logistics
-            </span>
-            <span className="font-display normal-case tracking-tight font-semibold text-[var(--color-ink-700)] text-[15px]">
-              Linfox
-            </span>
-            <span className="font-display normal-case tracking-tight font-semibold text-[var(--color-ink-700)] text-[15px]">
-              Yusen
-            </span>
-            <span className="font-display normal-case tracking-tight font-semibold text-[var(--color-ink-700)] text-[15px]">
-              Maersk
-            </span>
-            <span className="font-display normal-case tracking-tight font-semibold text-[var(--color-ink-700)] text-[15px]">
-              DKSH
+              Delta Logistics
             </span>
           </motion.div>
         </div>
