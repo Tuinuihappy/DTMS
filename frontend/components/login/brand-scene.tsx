@@ -7,23 +7,25 @@ import {
   Truck,
 } from "lucide-react";
 import { motion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 
 /* -------------------------------------------------------------------------- */
 /* BrandScene — the left half of /login.                                       */
 /*                                                                            */
 /* Theme-aware by design: every color flows through existing CSS tokens.       */
 /*                                                                            */
+/* Responsive constellation: a ResizeObserver on the column measures the      */
+/* actual available width and computes a scale factor. The truck mark, the    */
+/* sparkle halo, the pill orbit radii, and the arc SVG dimensions all derive  */
+/* from that scale, so the composition stays proportional from iPad mini      */
+/* landscape (1024px) up through ultra-wide displays.                          */
+/*                                                                            */
 /* Layered (back to front):                                                    */
 /*   1. Pastel mesh (atmosphere)                                               */
 /*   2. Dotted chart grid (light theme only)                                   */
-/*   3. Constellation backdrop — truck mark + orbiting pills + dashed arcs,    */
-/*      anchored to the column centre and positioned BEHIND the text so the   */
-/*      headline reads on top of the pastel halo                              */
+/*   3. Constellation backdrop — truck mark + orbiting pills + dashed arcs    */
 /*   4. Text content — eyebrow / "Move. Deliver. Arrive." / paragraph         */
 /*   5. Trust footnote                                                         */
-/*                                                                            */
-/* Constellation only renders xl+ (1280px+) — below that the column doesn't   */
-/* have enough breathing room for the orbit and the text stands alone.        */
 /* -------------------------------------------------------------------------- */
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -35,7 +37,7 @@ type PillSpec = {
   icon: typeof Truck;
   tone: "sky" | "peach" | "mint";
   angle: number;  // degrees, 0° = right, 90° = down
-  radius: number; // px from column centre
+  radius: number; // px from column centre at scale=1
   delay: number;  // motion entrance delay
 };
 
@@ -66,53 +68,62 @@ const PILLS: PillSpec[] = [
   },
 ];
 
-export function BrandScene() {
-  return (
-    <div className="brand-scene relative h-full w-full overflow-hidden">
-      {/* Soft pastel mesh — sits on top of the global body::before auroras
-          to give this side a little extra warmth than the dashboard canvas. */}
-      <div className="pointer-events-none absolute inset-0 z-0 opacity-[0.85] dark:opacity-[0.55]">
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(900px 600px at 18% 18%, var(--color-pastel-peach), transparent 60%), radial-gradient(800px 700px at 82% 78%, var(--color-pastel-lavender), transparent 65%), radial-gradient(700px 600px at 60% 20%, var(--color-pastel-sky), transparent 65%)",
-          }}
-        />
-      </div>
+/* Responsive sizing constants — the constellation is designed against a
+   reference column width of 720px (xl viewport, 1.15fr:1fr grid). Anything
+   wider gets a slightly bigger constellation up to MAX_SCALE; anything
+   narrower shrinks down to MIN_SCALE so iPad mini landscape (1024px → col
+   ~525px → scale ~0.73) still fits the orbit inside the column. */
+const REF_COLUMN_WIDTH = 720;
+const MIN_SCALE = 0.55;
+const MAX_SCALE = 1.2;
+const TRUCK_BASE = 300;
+const SPARKLE_BASE = 320;
+const ARC_PADDING = 80; // extra room around the orbit so dashes don't clip
 
-      {/* Soft tickmark grid — barely visible, gives the canvas a chart feel.
-          Hidden in dark mode where it'd add noise. */}
-      <svg
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-0 h-full w-full text-[var(--color-ink-300)] opacity-[0.18] dark:opacity-0"
-        preserveAspectRatio="none"
-      >
-        <defs>
-          <pattern id="dotgrid" width="22" height="22" patternUnits="userSpaceOnUse">
-            <circle cx="1" cy="1" r="0.9" fill="currentColor" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#dotgrid)" />
-      </svg>
+export function BrandScene() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const next = Math.min(
+        MAX_SCALE,
+        Math.max(MIN_SCALE, entry.contentRect.width / REF_COLUMN_WIDTH),
+      );
+      setScale(next);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const truckSize = Math.round(TRUCK_BASE * scale);
+  const sparkleSize = Math.round(SPARKLE_BASE * scale);
+  const maxRadius = Math.max(...PILLS.map((p) => p.radius)) * scale;
+  const arcSize = Math.round((maxRadius * 2) + ARC_PADDING);
+
+  return (
+    <div
+      ref={containerRef}
+      className="brand-scene relative h-full w-full overflow-hidden"
+    >
+      {/* Pastel mesh + dot grid moved to LoginExperience so both columns
+          share one seamless atmosphere — no more column-edge colour seam. */}
 
       {/* CONSTELLATION BACKDROP — absolute layer centred on the column.
-          Pills + arcs + truck mark sit behind the text content. xl+ only. */}
+          Pills + arcs + truck mark sit behind the text content. lg+ only. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-0 hidden xl:block"
+        className="pointer-events-none absolute inset-0 z-0 hidden lg:block"
       >
-        <ConstellationArcs />
+        <ConstellationArcs scale={scale} size={arcSize} />
 
-        {/* Pills positioned via polar coords from column centre. Outer div
-            handles the (left + top + centre-on-anchor) static placement,
-            inner motion.div carries the entrance animation, and the
-            FeaturePill itself owns the perpetual idle bob — three layers
-            of transform compose cleanly. */}
         {PILLS.map((p) => {
           const rad = (p.angle * Math.PI) / 180;
-          const x = Math.cos(rad) * p.radius;
-          const y = Math.sin(rad) * p.radius;
+          const r = p.radius * scale;
+          const x = Math.cos(rad) * r;
+          const y = Math.sin(rad) * r;
           return (
             <div
               key={p.label}
@@ -146,8 +157,10 @@ export function BrandScene() {
             <motion.div
               animate={{ y: [0, -6, 0] }}
               transition={{ duration: 6, ease: "easeInOut", repeat: Infinity }}
-              className="grid h-[300px] w-[300px] place-items-center rounded-[28%] text-white"
+              className="grid place-items-center rounded-[28%] text-white"
               style={{
+                width: truckSize,
+                height: truckSize,
                 background:
                   "conic-gradient(from 45deg, #c7d4ff, #e0d4ff, #ffd4e6, #ffe7c7, #d4f0ff, #c7d4ff)",
                 boxShadow:
@@ -169,8 +182,10 @@ export function BrandScene() {
               className="absolute inset-0 grid place-items-center"
             >
               <span
-                className="block h-[320px] w-[320px] rounded-full"
+                className="block rounded-full"
                 style={{
+                  width: sparkleSize,
+                  height: sparkleSize,
                   background:
                     "radial-gradient(circle at top, var(--color-amber) 0%, transparent 6%)",
                 }}
@@ -280,17 +295,19 @@ function FeaturePill({
 
 /* -------------------------------------------------------------------------- */
 /* ConstellationArcs — three faint dashed arcs from each pill toward the      */
-/* centre, like freight routes on an atlas. The SVG is anchored at column     */
-/* centre with a fixed 600x600 viewBox so the arc math matches the pill       */
-/* polar coords exactly.                                                       */
+/* centre, like freight routes on an atlas. The SVG renders at exactly the    */
+/* same px size as its viewBox so arc end-points land precisely on the pill   */
+/* anchors at every scale.                                                     */
 /* -------------------------------------------------------------------------- */
 
-function ConstellationArcs() {
+function ConstellationArcs({ scale, size }: { scale: number; size: number }) {
+  const half = size / 2;
   return (
     <svg
       aria-hidden
-      viewBox="-300 -300 600 600"
-      className="absolute left-1/2 top-1/2 h-[700px] w-[700px] -translate-x-1/2 -translate-y-1/2 text-[var(--color-ink-400)]"
+      viewBox={`${-half} ${-half} ${size} ${size}`}
+      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[var(--color-ink-400)]"
+      style={{ width: size, height: size }}
       preserveAspectRatio="xMidYMid meet"
     >
       <defs>
@@ -301,8 +318,9 @@ function ConstellationArcs() {
       </defs>
       {PILLS.map((p) => {
         const rad = (p.angle * Math.PI) / 180;
-        const x = Math.cos(rad) * p.radius;
-        const y = Math.sin(rad) * p.radius;
+        const r = p.radius * scale;
+        const x = Math.cos(rad) * r;
+        const y = Math.sin(rad) * r;
         // Bow the curve outward via a perpendicular control point.
         const cx = (x / 2) + Math.cos(rad + Math.PI / 2) * 26;
         const cy = (y / 2) + Math.sin(rad + Math.PI / 2) * 26;

@@ -25,10 +25,11 @@ const ease = [0.22, 1, 0.36, 1] as const;
 export function LoginExperience() {
   return (
     <main className="layer-content relative min-h-svh w-full overflow-x-clip">
+      <PageAtmosphere />
       <TopBar />
 
       {/* DESKTOP — side-by-side ─────────────────────────────────────────── */}
-      <div className="hidden lg:grid min-h-svh grid-cols-[1.05fr_1fr] xl:grid-cols-[1.15fr_1fr]">
+      <div className="hidden lg:grid relative z-10 min-h-svh grid-cols-[1.05fr_1fr] xl:grid-cols-[1.15fr_1fr]">
         <div className="relative">
           <BrandScene />
         </div>
@@ -40,7 +41,7 @@ export function LoginExperience() {
       </div>
 
       {/* MOBILE / TABLET — stacked ──────────────────────────────────────── */}
-      <div className="lg:hidden flex min-h-svh flex-col">
+      <div className="lg:hidden relative z-10 flex min-h-svh flex-col">
         {/* Compact brand band — hides the constellation orbit (which needs
             wide canvas) but keeps the eyebrow + heading + trust footnote. */}
         <div className="relative pt-20">
@@ -56,6 +57,41 @@ export function LoginExperience() {
         </div>
       </div>
     </main>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* PageAtmosphere — page-level pastel mesh + dotted chart grid.                */
+/*                                                                            */
+/* Sits at z-0 of the main element, spans the whole viewport so both columns  */
+/* share one seamless atmosphere — no colour seam down the centre. The form   */
+/* panel's backdrop-filter on .glass picks up the pastels softly through it.   */
+/* -------------------------------------------------------------------------- */
+
+function PageAtmosphere() {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
+      {/* Soft pastel mesh — layered on top of body::before for extra warmth. */}
+      <div
+        className="absolute inset-0 opacity-[0.85] dark:opacity-[0.55]"
+        style={{
+          background:
+            "radial-gradient(900px 600px at 18% 18%, var(--color-pastel-peach), transparent 60%), radial-gradient(800px 700px at 82% 78%, var(--color-pastel-lavender), transparent 65%), radial-gradient(700px 600px at 60% 20%, var(--color-pastel-sky), transparent 65%)",
+        }}
+      />
+      {/* Dotted chart-grid texture — only renders in light mode. */}
+      <svg
+        className="absolute inset-0 h-full w-full text-[var(--color-ink-300)] opacity-[0.18] dark:opacity-0"
+        preserveAspectRatio="none"
+      >
+        <defs>
+          <pattern id="login-dotgrid" width="22" height="22" patternUnits="userSpaceOnUse">
+            <circle cx="1" cy="1" r="0.9" fill="currentColor" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#login-dotgrid)" />
+      </svg>
+    </div>
   );
 }
 
