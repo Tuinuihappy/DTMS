@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Compass, LogOut, Menu, Moon, Search, Sun, User } from "lucide-react";
+import { Bell, Compass, LogOut, Menu, Moon, Search, Sun, Truck, User } from "lucide-react";
 import { AnimatePresence, motion, useScroll, useTransform } from "motion/react";
 import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
@@ -58,9 +58,7 @@ export function TopNav() {
             }}
             aria-hidden
           >
-            <span className="font-display text-[15px] font-semibold leading-none tracking-tight italic">
-              t
-            </span>
+            <Truck className="h-[18px] w-[18px]" strokeWidth={2.2} />
             <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-white shadow-[0_0_0_2px_rgba(255,107,91,0.25)]" />
           </span>
           <span className="font-display text-[1.05rem] font-semibold tracking-[0.04em] text-[var(--color-ink-900)] uppercase">
