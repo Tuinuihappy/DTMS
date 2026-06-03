@@ -71,7 +71,7 @@ export function LandingHero() {
             className="mt-8 flex flex-wrap items-center gap-3"
           >
             <Link
-              href="/dashboard"
+              href="/login?mode=signup"
               className="group inline-flex items-center gap-2 rounded-full bg-[var(--color-brand-900)] pl-5 pr-2 py-2 text-[14px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_14px_30px_-12px_rgba(14,21,48,0.65)] transition-transform duration-200 hover:-translate-y-0.5"
             >
               Start free trial

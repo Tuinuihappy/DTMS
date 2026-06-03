@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, Menu, X } from "lucide-react";
+import { ArrowUpRight, Menu, Truck, X } from "lucide-react";
 import { AnimatePresence, motion, useScroll, useTransform } from "motion/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -58,18 +58,14 @@ export function LandingTopNav() {
         {/* Wordmark */}
         <Link href="/" className="flex items-center gap-2.5 pr-4">
           <span
-            className="relative grid h-9 w-9 place-items-center rounded-full text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_6px_14px_-4px_rgba(79,93,255,0.6)]"
+            className="relative grid h-9 w-9 place-items-center rounded-[10px] text-[var(--color-ink-900)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_6px_14px_-4px_rgba(15,23,42,0.18)]"
             style={{
               background:
-                "radial-gradient(circle at 30% 25%, #A2AAFF 0%, #6F7BFF 40%, #3441C8 100%)",
+                "linear-gradient(135deg, #FFD8CC 0%, #F3D5EC 55%, #D7DBFF 100%)",
             }}
             aria-hidden
           >
-            <span className="absolute inset-1 rounded-full border border-white/25" />
-            <span
-              className="absolute h-1.5 w-1.5 rounded-full bg-white"
-              style={{ top: 5, right: 5 }}
-            />
+            <Truck className="h-[22px] w-[22px]" strokeWidth={1.75} />
           </span>
           <span className="font-display text-[1.05rem] font-semibold tracking-[0.04em] uppercase">
             TMS
@@ -110,13 +106,13 @@ export function LandingTopNav() {
         {/* Right side — CTAs + mobile menu toggle */}
         <div className="flex items-center gap-2 ml-auto">
           <Link
-            href="/dashboard"
+            href="/login"
             className="hidden sm:inline-flex items-center rounded-full border border-[var(--color-ink-100)] bg-white/70 px-4 py-2 text-[13px] font-medium text-[var(--color-ink-700)] backdrop-blur transition-colors hover:bg-white dark:bg-white/[0.06] dark:hover:bg-white/[0.12]"
           >
             Sign in
           </Link>
           <Link
-            href="/dashboard"
+            href="/login?mode=signup"
             aria-label="Get started"
             className="group inline-flex items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] py-1.5 pl-1.5 sm:pl-4 pr-1.5 text-[13px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_10px_24px_-10px_rgba(14,21,48,0.6)] transition-transform duration-200 hover:-translate-y-0.5"
           >
@@ -200,7 +196,7 @@ export function LandingTopNav() {
           })}
           <div className="mt-1 border-t border-[var(--color-ink-100)]/70 dark:border-white/[0.06] pt-2">
             <Link
-              href="/dashboard"
+              href="/login"
               onClick={() => setMobileOpen(false)}
               className="block rounded-[var(--radius-md)] px-4 py-3 text-[14px] font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-ink-50)]/70 dark:hover:bg-white/[0.04]"
             >

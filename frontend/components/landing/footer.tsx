@@ -1,6 +1,6 @@
 "use client";
 
-import { Github, Linkedin, Twitter, Youtube } from "lucide-react";
+import { Github, Linkedin, Truck, Twitter, Youtube } from "lucide-react";
 
 const cols = [
   {
@@ -30,18 +30,14 @@ export function LandingFooter() {
           <div className="col-span-2 md:col-span-2">
             <div className="flex items-center gap-2.5">
               <span
-                className="relative grid h-10 w-10 place-items-center rounded-full text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_6px_14px_-4px_rgba(79,93,255,0.6)]"
+                className="relative grid h-10 w-10 place-items-center rounded-[12px] text-[var(--color-ink-900)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_6px_14px_-4px_rgba(15,23,42,0.18)]"
                 style={{
                   background:
-                    "radial-gradient(circle at 30% 25%, #A2AAFF 0%, #6F7BFF 40%, #3441C8 100%)",
+                    "linear-gradient(135deg, #FFD8CC 0%, #F3D5EC 55%, #D7DBFF 100%)",
                 }}
                 aria-hidden
               >
-                <span className="absolute inset-1 rounded-full border border-white/25" />
-                <span
-                  className="absolute h-1.5 w-1.5 rounded-full bg-white"
-                  style={{ top: 6, right: 6 }}
-                />
+                <Truck className="h-6 w-6" strokeWidth={1.75} />
               </span>
               <span className="font-display text-[1.15rem] font-semibold tracking-[0.04em] uppercase">
                 TMS
