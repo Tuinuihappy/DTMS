@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowRight, Check, Eye, EyeOff, Loader2, Truck } from "lucide-react";
+import { AlertCircle, ArrowRight, Check, Eye, EyeOff, Loader2, Truck } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useId, useState } from "react";
+import { useAuth } from "@/components/auth/auth-provider";
 
 /* -------------------------------------------------------------------------- */
 /* AuthPanel — the right-hand form panel.                                      */
@@ -27,36 +28,50 @@ type Status = "idle" | "submitting" | "success";
 export function AuthPanel() {
   const router = useRouter();
   const params = useSearchParams();
+  const { login } = useAuth();
   // Landing CTAs may land users on the sign-up tab via ?mode=signup.
   const initialMode: Mode = params?.get("mode") === "signup" ? "up" : "in";
   const [mode, setMode] = useState<Mode>(initialMode);
   const [status, setStatus] = useState<Status>("idle");
+  const [error, setError] = useState<string | null>(null);
   // After a successful sign-up we route back to the sign-in tab so the
   // user authenticates with the credentials they just registered. The
-  // banner + prefilled email give them a clear signal that the account
+  // banner + prefilled username give them a clear signal that the account
   // exists; password is intentionally left blank.
   const [justCreated, setJustCreated] = useState(false);
-  const [prefilledEmail, setPrefilledEmail] = useState("");
+  const [prefilledUsername, setPrefilledUsername] = useState("");
 
-  // Sign-in: theatrical pacing, then push to /dashboard.
-  const handleSignInSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  // Sign-in: call /api/auth/login, then push to from-param or /dashboard.
+  const handleSignInSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (status !== "idle") return;
+    const fd = new FormData(e.currentTarget);
+    const username = ((fd.get("username") as string) || "").trim();
+    const password = (fd.get("password") as string) || "";
+    setError(null);
     setStatus("submitting");
-    window.setTimeout(() => setStatus("success"), 950);
-    window.setTimeout(() => router.push("/dashboard"), 1700);
+    const result = await login(username, password);
+    if (!result.ok) {
+      setError(result.message);
+      setStatus("idle");
+      return;
+    }
+    setStatus("success");
+    const dest = params?.get("from") || "/dashboard";
+    window.setTimeout(() => router.push(dest), 650);
   };
 
-  // Sign-up: same pacing, but on success we flip the tab back to sign-in
-  // with the just-registered email pre-filled and a welcome banner shown.
+  // Sign-up: theatrical only — no backend endpoint exists yet. On "success"
+  // flip back to sign-in with the just-registered username pre-filled and
+  // a welcome banner shown.
   const handleSignUpSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (status !== "idle") return;
-    const email = (new FormData(e.currentTarget).get("email") as string) || "";
+    const username = (new FormData(e.currentTarget).get("email") as string) || "";
     setStatus("submitting");
     window.setTimeout(() => setStatus("success"), 950);
     window.setTimeout(() => {
-      setPrefilledEmail(email);
+      setPrefilledUsername(username);
       setJustCreated(true);
       setMode("in");
       setStatus("idle");
@@ -67,6 +82,7 @@ export function AuthPanel() {
   // away from sign-in (e.g. flips back to sign-up).
   const handleModeChange = (next: Mode) => {
     if (next !== "in") setJustCreated(false);
+    setError(null);
     setMode(next);
   };
 
@@ -149,7 +165,8 @@ export function AuthPanel() {
               status={status}
               onSubmit={handleSignInSubmit}
               welcome={justCreated}
-              defaultEmail={prefilledEmail}
+              defaultUsername={prefilledUsername}
+              error={error}
             />
           ) : (
             <SignUpForm key="up" status={status} onSubmit={handleSignUpSubmit} />
@@ -200,12 +217,14 @@ function SignInForm({
   status,
   onSubmit,
   welcome,
-  defaultEmail,
+  defaultUsername,
+  error,
 }: {
   status: Status;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   welcome: boolean;
-  defaultEmail: string;
+  defaultUsername: string;
+  error: string | null;
 }) {
   return (
     <motion.form
@@ -236,8 +255,8 @@ function SignInForm({
             >
               <Check className="mt-[2px] h-4 w-4 shrink-0" strokeWidth={2.6} />
               <span>
-                Account created. Sign in with the email you just registered
-                to finish setting up your fleet.
+                Account created. Sign in with the credentials you just
+                registered to finish setting up your fleet.
               </span>
             </div>
           </motion.div>
@@ -246,17 +265,43 @@ function SignInForm({
 
       <FieldStagger delay={0.86}>
         <FloatingInput
-          label="Work email"
-          type="email"
-          name="email"
-          autoComplete="email"
-          defaultValue={defaultEmail}
+          label="Username"
+          type="text"
+          name="username"
+          autoComplete="username"
+          defaultValue={defaultUsername}
           required
         />
       </FieldStagger>
       <FieldStagger delay={0.92}>
         <PasswordInput label="Password" name="password" autoComplete="current-password" required />
       </FieldStagger>
+      <AnimatePresence initial={false}>
+        {error && (
+          <motion.div
+            key="error"
+            initial={{ opacity: 0, y: -4, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: "auto" }}
+            exit={{ opacity: 0, y: -4, height: 0 }}
+            transition={{ duration: 0.32, ease }}
+            className="overflow-hidden"
+            role="alert"
+            aria-live="polite"
+          >
+            <div
+              className="flex items-start gap-2.5 rounded-2xl px-4 py-3 text-[12.5px] leading-relaxed ring-1"
+              style={{
+                background: "color-mix(in srgb, var(--color-coral) 14%, transparent)",
+                color: "var(--color-coral)",
+                borderColor: "transparent",
+              }}
+            >
+              <AlertCircle className="mt-[2px] h-4 w-4 shrink-0" strokeWidth={2.4} />
+              <span>{error}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <FieldStagger delay={0.98}>
         <div className="flex items-center justify-between text-[12.5px]">
           <label className="flex cursor-pointer items-center gap-2 text-[var(--color-ink-600)]">
@@ -277,12 +322,6 @@ function SignInForm({
           submittingLabel="Routing…"
           successLabel="On the road"
         />
-      </FieldStagger>
-      <FieldStagger delay={1.1}>
-        <Divider />
-      </FieldStagger>
-      <FieldStagger delay={1.14}>
-        <GoogleButton label="Continue with Google" />
       </FieldStagger>
     </motion.form>
   );
@@ -348,12 +387,6 @@ function SignUpForm({
           submittingLabel="Creating account…"
           successLabel="Account created"
         />
-      </FieldStagger>
-      <FieldStagger delay={0.41}>
-        <Divider />
-      </FieldStagger>
-      <FieldStagger delay={0.46}>
-        <GoogleButton label="Sign up with Google" />
       </FieldStagger>
     </motion.form>
   );
@@ -579,48 +612,3 @@ function SubmitButton({
   );
 }
 
-function Divider() {
-  return (
-    <div className="relative flex items-center justify-center">
-      <span className="h-px w-full bg-gradient-to-r from-transparent via-[var(--color-ink-200)] to-transparent" />
-      <span className="absolute px-3 text-[11px] uppercase tracking-[0.18em] text-[var(--color-ink-400)]" style={{ background: "var(--color-surface)" }}>
-        or
-      </span>
-    </div>
-  );
-}
-
-function GoogleButton({ label }: { label: string }) {
-  return (
-    <button
-      type="button"
-      className="group flex h-11 w-full cursor-pointer items-center justify-center gap-2.5 rounded-full border border-[var(--color-ink-100)] bg-white/70 text-[13.5px] font-medium text-[var(--color-ink-800)] backdrop-blur transition-all hover:-translate-y-px hover:bg-white dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-[var(--color-ink-800)] dark:hover:bg-white/[0.1]"
-    >
-      <GoogleGlyph />
-      {label}
-    </button>
-  );
-}
-
-function GoogleGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-      <path
-        fill="#EA4335"
-        d="M12 5.04c1.86 0 3.5.64 4.8 1.9l3.57-3.57C18.16 1.18 15.31 0 12 0 7.27 0 3.19 2.7 1.24 6.65l4.17 3.23C6.4 7.04 8.96 5.04 12 5.04Z"
-      />
-      <path
-        fill="#34A853"
-        d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.45c-.28 1.45-1.12 2.68-2.39 3.5l3.66 2.84c2.14-1.98 3.37-4.9 3.37-8.58Z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.41 14.12a7.07 7.07 0 0 1 0-4.24L1.24 6.65a12 12 0 0 0 0 10.7l4.17-3.23Z"
-      />
-      <path
-        fill="#4285F4"
-        d="M12 24c3.24 0 5.95-1.07 7.93-2.9l-3.66-2.84c-1.02.69-2.33 1.1-4.27 1.1-3.04 0-5.6-2-6.59-4.69l-4.17 3.23C3.19 21.3 7.27 24 12 24Z"
-      />
-    </svg>
-  );
-}

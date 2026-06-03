@@ -1,9 +1,10 @@
 "use client";
 
-import { Bell, Compass, Menu, Moon, Search, Sun } from "lucide-react";
-import { motion, useScroll, useTransform } from "motion/react";
+import { Bell, Compass, LogOut, Menu, Moon, Search, Sun, User } from "lucide-react";
+import { AnimatePresence, motion, useScroll, useTransform } from "motion/react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useAuth } from "@/components/auth/auth-provider";
 import { Avatar } from "@/components/primitives/avatar";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { useShell } from "@/components/shell/shell-context";
@@ -120,16 +121,128 @@ export function TopNav() {
         </IconBtn>
         <ThemeToggleBtn />
 
-        {/* Avatar */}
-        <a
-          href="#"
-          aria-label="Account"
-          className="ml-1 rounded-full ring-2 ring-white shadow-[0_2px_8px_-2px_rgba(15,23,42,0.18)] hover:ring-[var(--color-brand-200)] transition-all cursor-pointer"
-        >
-          <Avatar name="Tuinui K." hue={32} size="md" />
-        </a>
+        <AccountMenu />
       </motion.div>
     </motion.header>
+  );
+}
+
+function AccountMenu() {
+  const { user, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const displayName = user?.displayName || "Account";
+  const employeeCode = user?.employeeCode || "";
+  const role = user?.role || "";
+  const photo = user?.thumbnailPhoto;
+  const photoSrc = photo
+    ? photo.startsWith("data:")
+      ? photo
+      : `data:image/jpeg;base64,${photo}`
+    : null;
+
+  return (
+    <div ref={ref} className="relative ml-1">
+      <button
+        type="button"
+        aria-label="Account"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="grid place-items-center rounded-full ring-2 ring-white shadow-[0_2px_8px_-2px_rgba(15,23,42,0.18)] hover:ring-[var(--color-brand-200)] transition-all cursor-pointer dark:ring-white/[0.12]"
+      >
+        {photoSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={photoSrc}
+            alt={displayName}
+            className="h-10 w-10 rounded-full object-cover"
+          />
+        ) : (
+          <Avatar name={displayName} hue={32} size="md" />
+        )}
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="menu"
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute right-0 top-12 z-50 w-64 rounded-2xl border border-[var(--color-ink-100)] bg-white p-2 shadow-[0_18px_42px_-18px_rgba(15,23,42,0.28)] dark:border-white/[0.08] dark:bg-[var(--color-surface)]"
+          >
+            <div className="flex items-center gap-3 rounded-xl px-3 py-2.5">
+              {photoSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={photoSrc}
+                  alt=""
+                  className="h-10 w-10 rounded-full object-cover"
+                />
+              ) : (
+                <Avatar name={displayName} hue={32} size="md" />
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-[13.5px] font-semibold text-[var(--color-ink-900)]">
+                  {displayName}
+                </p>
+                {employeeCode && (
+                  <p className="truncate font-mono text-[11.5px] text-[var(--color-ink-500)]">
+                    {employeeCode}
+                  </p>
+                )}
+                {role && (
+                  <p className="truncate text-[11px] uppercase tracking-[0.1em] text-[var(--color-ink-400)]">
+                    {role}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="my-1 h-px bg-[var(--color-ink-100)] dark:bg-white/[0.06]" />
+            <a
+              role="menuitem"
+              href="/profile"
+              onClick={() => setOpen(false)}
+              className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[13px] font-medium text-[var(--color-ink-800)] transition-colors hover:bg-[var(--color-ink-50)] dark:hover:bg-white/[0.06]"
+            >
+              <User className="h-4 w-4" strokeWidth={2} />
+              Profile
+            </a>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                void logout();
+              }}
+              className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[13px] font-medium text-[var(--color-ink-800)] transition-colors hover:bg-[var(--color-ink-50)] dark:hover:bg-white/[0.06]"
+            >
+              <LogOut className="h-4 w-4" strokeWidth={2} />
+              Sign out
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 

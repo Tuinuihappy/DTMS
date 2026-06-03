@@ -1,35 +1,147 @@
 "use client";
 
 import {
+  Activity,
   AlertTriangle,
+  BarChart3,
+  Bot,
   Calendar,
+  Gauge,
+  ChevronDown,
   ChevronLeft,
+  ChevronRight,
+  CircuitBoard,
+  ClipboardList,
   Database,
-  Plus,
+  DoorOpen,
+  FileStack,
+  Home,
+  IdCard,
+  LayoutDashboard,
+  ListChecks,
+  Map,
   Send,
-  Share2,
   Smartphone,
-  Star,
-  Upload,
+  Truck,
+  Warehouse,
+  Workflow,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { useShell } from "@/components/shell/shell-context";
 import { cn } from "@/lib/utils";
+
+type RailChild = {
+  icon: React.ReactNode;
+  label: string;
+  href: string;
+  hint?: string;
+};
 
 type RailAction = {
   icon: React.ReactNode;
   label: string;
   badge?: boolean;
+  href?: string;
+  children?: RailChild[];
 };
 
 const actions: RailAction[] = [
-  { icon: <Share2 className="h-4 w-4" strokeWidth={2} />, label: "Share dispatch" },
-  { icon: <Upload className="h-4 w-4" strokeWidth={2} />, label: "Export report" },
-  { icon: <Star className="h-4 w-4" strokeWidth={2} />, label: "Saved routes" },
-  { icon: <Plus className="h-4 w-4" strokeWidth={2} />, label: "New shipment" },
+  { icon: <Home className="h-4 w-4" strokeWidth={2} />, label: "Home" },
+  {
+    icon: <LayoutDashboard className="h-4 w-4" strokeWidth={2} />,
+    label: "Dashboard",
+    children: [
+      {
+        icon: <Gauge className="h-3.5 w-3.5" strokeWidth={2.1} />,
+        label: "Overview",
+        href: "/dashboard",
+        hint: "Live operations cockpit",
+      },
+      {
+        icon: <BarChart3 className="h-3.5 w-3.5" strokeWidth={2.1} />,
+        label: "Order analysis",
+        href: "/dashboard/orders",
+        hint: "Volume, SLA, dispatch funnel",
+      },
+      {
+        icon: <Activity className="h-3.5 w-3.5" strokeWidth={2.1} />,
+        label: "Robot analysis",
+        href: "/dashboard/robots",
+        hint: "Uptime, telemetry, alerts",
+      },
+    ],
+  },
+  {
+    icon: <ClipboardList className="h-4 w-4" strokeWidth={2} />,
+    label: "Delivery order",
+    children: [
+      {
+        icon: <ListChecks className="h-3.5 w-3.5" strokeWidth={2.1} />,
+        label: "Order list",
+        href: "/delivery-orders/list",
+        hint: "All active & past orders",
+      },
+      {
+        icon: <FileStack className="h-3.5 w-3.5" strokeWidth={2.1} />,
+        label: "Order template",
+        href: "/delivery-orders/order-templates",
+        hint: "Reusable order recipes",
+      },
+      {
+        icon: <Workflow className="h-3.5 w-3.5" strokeWidth={2.1} />,
+        label: "Action template",
+        href: "/delivery-orders/action-templates",
+        hint: "Workflow building blocks",
+      },
+    ],
+  },
+  {
+    icon: <Truck className="h-4 w-4" strokeWidth={2} />,
+    label: "Fleet",
+    children: [
+      {
+        icon: <Bot className="h-3.5 w-3.5" strokeWidth={2.1} />,
+        label: "Robot",
+        href: "/fleet/robots",
+        hint: "Autonomous units",
+      },
+      {
+        icon: <IdCard className="h-3.5 w-3.5" strokeWidth={2.1} />,
+        label: "Driver",
+        href: "/fleet/drivers",
+        hint: "Roster & credentials",
+      },
+    ],
+  },
+  {
+    icon: <Warehouse className="h-4 w-4" strokeWidth={2} />,
+    label: "Facility",
+    children: [
+      {
+        icon: <Map className="h-3.5 w-3.5" strokeWidth={2.1} />,
+        label: "Map",
+        href: "/facility/maps",
+        hint: "Site layouts & zones",
+      },
+    ],
+  },
+  {
+    icon: <CircuitBoard className="h-4 w-4" strokeWidth={2} />,
+    label: "Equipment",
+    children: [
+      {
+        icon: <DoorOpen className="h-3.5 w-3.5" strokeWidth={2.1} />,
+        label: "Auto door",
+        href: "/equipment/auto-doors",
+        hint: "Door controllers & gates",
+      },
+    ],
+  },
   { icon: <Smartphone className="h-4 w-4" strokeWidth={2} />, label: "Driver app" },
   { icon: <Database className="h-4 w-4" strokeWidth={2} />, label: "Records" },
   { icon: <Calendar className="h-4 w-4" strokeWidth={2} />, label: "Schedule" },
@@ -123,9 +235,13 @@ export function LeftRail() {
                 ease: [0.22, 1, 0.36, 1],
               }}
             >
-              <RailButton label={a.label} badge={a.badge} expanded={expanded}>
-                {a.icon}
-              </RailButton>
+              {a.children ? (
+                <RailGroup action={a} expanded={expanded} />
+              ) : (
+                <RailButton label={a.label} badge={a.badge} expanded={expanded} href={a.href}>
+                  {a.icon}
+                </RailButton>
+              )}
             </motion.li>
           ))}
         </ul>
@@ -182,10 +298,14 @@ export function LeftRail() {
             {/* Action list — always expanded in the drawer */}
             <ul className="flex-1 flex flex-col gap-1.5 px-3 py-4 overflow-y-auto">
               {actions.map((a) => (
-                <li key={a.label} onClick={closeRailDrawer}>
-                  <RailButton label={a.label} badge={a.badge} expanded>
-                    {a.icon}
-                  </RailButton>
+                <li key={a.label} onClick={a.children ? undefined : closeRailDrawer}>
+                  {a.children ? (
+                    <RailGroup action={a} expanded onChildNavigate={closeRailDrawer} />
+                  ) : (
+                    <RailButton label={a.label} badge={a.badge} expanded href={a.href}>
+                      {a.icon}
+                    </RailButton>
+                  )}
                 </li>
               ))}
             </ul>
@@ -252,20 +372,21 @@ function RailButton({
   label,
   badge,
   expanded,
+  href,
 }: {
   children: React.ReactNode;
   label: string;
   badge?: boolean;
   expanded: boolean;
+  href?: string;
 }) {
-  return (
-    <button
-      aria-label={label}
-      className={cn(
-        "group relative flex h-10 items-center rounded-full bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] transition-all duration-200 hover:-translate-y-px hover:bg-white hover:text-[var(--color-ink-900)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_6px_14px_-4px_rgba(15,23,42,0.14)] cursor-pointer dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_-2px_rgba(0,0,0,0.5)]",
-        expanded ? "w-full justify-start gap-3 px-3" : "w-10 justify-center",
-      )}
-    >
+  const className = cn(
+    "group relative flex h-10 items-center rounded-full bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] transition-all duration-200 hover:-translate-y-px hover:bg-white hover:text-[var(--color-ink-900)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_6px_14px_-4px_rgba(15,23,42,0.14)] cursor-pointer dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_-2px_rgba(0,0,0,0.5)]",
+    expanded ? "w-full justify-start gap-3 px-3" : "w-10 justify-center",
+  );
+
+  const inner = (
+    <>
       <span className="flex h-4 w-4 items-center justify-center shrink-0">{children}</span>
 
       {expanded ? (
@@ -299,6 +420,325 @@ function RailButton({
           {label}
         </span>
       )}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} aria-label={label} className={className}>
+        {inner}
+      </Link>
+    );
+  }
+
+  return (
+    <button aria-label={label} className={className}>
+      {inner}
     </button>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* RailGroup — multi-level entry point.                                       */
+/* Collapsed rail → hovering the trigger opens a flyout panel anchored to the */
+/* right, sized for 3 children with iconography + secondary hints.            */
+/* Expanded rail  → clicking the trigger toggles an inline accordion that     */
+/* reveals the children indented beneath the parent pill, with a chevron that */
+/* rotates 180° and child rows that stagger in.                               */
+/* Active child detection via usePathname → highlight + auto-expand on mount. */
+/* -------------------------------------------------------------------------- */
+function RailGroup({
+  action,
+  expanded,
+  onChildNavigate,
+}: {
+  action: RailAction;
+  expanded: boolean;
+  onChildNavigate?: () => void;
+}) {
+  const children = action.children ?? [];
+  const pathname = usePathname();
+  const hasActiveChild = children.some((c) => pathname?.startsWith(c.href));
+
+  // Inline accordion (expanded rail). Persisted across renders so toggling
+  // the rail doesn't kill the user's intent. Auto-opens if the current
+  // route is one of this group's children, so deep links feel resolved.
+  const [accordionOpen, setAccordionOpen] = useState(hasActiveChild);
+  useEffect(() => {
+    if (hasActiveChild) setAccordionOpen(true);
+  }, [hasActiveChild]);
+
+  // Flyout (collapsed rail). Hover-driven but with a small grace timer so
+  // moving the cursor from trigger → panel doesn't dismiss the panel.
+  const [flyoutOpen, setFlyoutOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openFlyout = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setFlyoutOpen(true);
+  };
+  const closeFlyout = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setFlyoutOpen(false), 140);
+  };
+
+  const triggerBase = cn(
+    "group relative flex h-10 items-center rounded-full bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] transition-all duration-200 hover:-translate-y-px hover:bg-white hover:text-[var(--color-ink-900)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_6px_14px_-4px_rgba(15,23,42,0.14)] cursor-pointer dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_-2px_rgba(0,0,0,0.5)]",
+    expanded ? "w-full justify-start gap-3 px-3" : "w-10 justify-center",
+    // Active-route ring on the trigger (any child route active)
+    hasActiveChild &&
+      "ring-2 ring-[var(--color-brand-200)] dark:ring-[var(--color-brand-500)]/40 bg-white dark:bg-white/[0.1] text-[var(--color-ink-900)]",
+  );
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={!expanded ? openFlyout : undefined}
+      onMouseLeave={!expanded ? closeFlyout : undefined}
+    >
+      <button
+        type="button"
+        aria-label={action.label}
+        aria-haspopup="menu"
+        aria-expanded={expanded ? accordionOpen : flyoutOpen}
+        onClick={expanded ? () => setAccordionOpen((v) => !v) : undefined}
+        className={triggerBase}
+      >
+        <span className="flex h-4 w-4 items-center justify-center shrink-0">
+          {action.icon}
+        </span>
+
+        {expanded && (
+          <>
+            <motion.span
+              initial={{ opacity: 0, x: -4 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.22, delay: 0.08 }}
+              className="flex-1 min-w-0 text-left text-[12.5px] font-medium tracking-tight whitespace-nowrap truncate"
+            >
+              {action.label}
+            </motion.span>
+            <motion.span
+              animate={{ rotate: accordionOpen ? 180 : 0 }}
+              transition={{ type: "spring", stiffness: 380, damping: 24 }}
+              className="flex h-3.5 w-3.5 items-center justify-center text-[var(--color-ink-500)] shrink-0"
+            >
+              <ChevronDown className="h-3.5 w-3.5" strokeWidth={2.2} />
+            </motion.span>
+          </>
+        )}
+
+        {/* Active-child dot pip — sits at top-right when collapsed so the
+            user knows this group contains the current page even when the
+            label/chevron aren't visible. */}
+        {!expanded && hasActiveChild && (
+          <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-[var(--color-brand-500)] ring-2 ring-white dark:ring-[var(--color-canvas)]" />
+        )}
+
+        {/* Tooltip when collapsed — replaced by flyout on hover, but stays
+            as a fallback for keyboard-focus / no-hover devices. */}
+        {!expanded && !flyoutOpen && (
+          <span
+            role="tooltip"
+            className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-[var(--color-brand-900)] px-2 py-1 text-[11px] font-medium text-white opacity-0 translate-x-[-4px] transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0"
+          >
+            {action.label}
+          </span>
+        )}
+      </button>
+
+      {/* ── Inline accordion (expanded rail) ─────────────────────────── */}
+      {expanded && (
+        <AnimatePresence initial={false}>
+          {accordionOpen && (
+            <motion.ul
+              key="acc"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{
+                height: { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
+                opacity: { duration: 0.2 },
+              }}
+              className="relative overflow-hidden pl-3 mt-1"
+            >
+              {/* Vertical thread connecting children to parent — anchored to
+                  the icon column so it reads as a structured tree. */}
+              <span
+                aria-hidden
+                className="absolute left-[16px] top-1 bottom-1 w-px bg-gradient-to-b from-[var(--color-ink-200)] via-[var(--color-ink-100)] to-transparent dark:from-white/[0.12] dark:via-white/[0.06]"
+              />
+              {children.map((c, i) => {
+                const active = pathname?.startsWith(c.href);
+                return (
+                  <motion.li
+                    key={c.href}
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{
+                      duration: 0.28,
+                      delay: 0.04 + i * 0.05,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    className="py-0.5"
+                  >
+                    <Link
+                      href={c.href}
+                      onClick={onChildNavigate}
+                      className={cn(
+                        "relative flex h-8 items-center gap-2.5 rounded-full pl-3 pr-3 text-[12px] font-medium transition-colors",
+                        active
+                          ? "bg-[var(--color-brand-900)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_6px_14px_-6px_rgba(14,21,48,0.5)] dark:bg-[var(--color-brand-500)] dark:text-white"
+                          : "text-[var(--color-ink-600)] hover:bg-white/80 hover:text-[var(--color-ink-900)] dark:hover:bg-white/[0.06]",
+                      )}
+                    >
+                      {/* Branch tick into the vertical thread */}
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "absolute left-[1px] top-1/2 h-px w-2 -translate-y-1/2",
+                          active
+                            ? "bg-[var(--color-brand-500)]"
+                            : "bg-[var(--color-ink-200)] dark:bg-white/[0.12]",
+                        )}
+                      />
+                      <span className="flex h-3.5 w-3.5 items-center justify-center shrink-0">
+                        {c.icon}
+                      </span>
+                      <span className="truncate">{c.label}</span>
+                    </Link>
+                  </motion.li>
+                );
+              })}
+            </motion.ul>
+          )}
+        </AnimatePresence>
+      )}
+
+      {/* ── Flyout panel (collapsed rail) ────────────────────────────── */}
+      {!expanded && (
+        <AnimatePresence>
+          {flyoutOpen && (
+            <motion.div
+              key="fly"
+              role="menu"
+              initial={{ opacity: 0, x: -8, scale: 0.97 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: -6, scale: 0.97 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              onMouseEnter={openFlyout}
+              onMouseLeave={closeFlyout}
+              className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-40 w-[252px] rounded-[20px] glass-strong p-2.5 pointer-events-auto"
+            >
+              {/* Aurora bleed inside the panel — bright coral wedge top-left,
+                  brand-blue wedge bottom-right. Subtle, mostly washed out. */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-[20px] overflow-hidden"
+              >
+                <span
+                  className="absolute -top-6 -left-6 h-24 w-24 rounded-full opacity-60 blur-2xl"
+                  style={{
+                    background:
+                      "radial-gradient(circle at 40% 40%, rgba(255,138,120,0.55), transparent 60%)",
+                  }}
+                />
+                <span
+                  className="absolute -bottom-8 -right-6 h-28 w-28 rounded-full opacity-50 blur-2xl"
+                  style={{
+                    background:
+                      "radial-gradient(circle at 60% 60%, rgba(143,156,255,0.55), transparent 60%)",
+                  }}
+                />
+              </span>
+
+              {/* Header */}
+              <div className="relative flex items-center gap-2 px-2.5 pb-2 pt-1">
+                <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-[var(--color-pastel-peach)] to-[#fcb98a] text-[var(--color-pastel-peach-ink)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+                  {action.icon}
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[9.5px] font-bold uppercase tracking-[0.16em] text-[var(--color-ink-400)]">
+                    Section
+                  </div>
+                  <div className="text-[12.5px] font-semibold tracking-tight text-[var(--color-ink-900)] truncate">
+                    {action.label}
+                  </div>
+                </div>
+              </div>
+
+              <div className="relative inset-divider my-1" />
+
+              {/* Children list */}
+              <ul className="relative flex flex-col gap-0.5 mt-1">
+                {children.map((c, i) => {
+                  const active = pathname?.startsWith(c.href);
+                  return (
+                    <motion.li
+                      key={c.href}
+                      initial={{ opacity: 0, x: -6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{
+                        duration: 0.28,
+                        delay: 0.04 + i * 0.05,
+                        ease: [0.22, 1, 0.36, 1],
+                      }}
+                    >
+                      <Link
+                        href={c.href}
+                        onClick={() => {
+                          setFlyoutOpen(false);
+                          onChildNavigate?.();
+                        }}
+                        className={cn(
+                          "group/flyitem relative flex items-center gap-2.5 rounded-[14px] px-2 py-2 transition-colors",
+                          active
+                            ? "bg-[var(--color-brand-900)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_8px_18px_-8px_rgba(14,21,48,0.6)] dark:bg-[var(--color-brand-500)]"
+                            : "text-[var(--color-ink-800)] hover:bg-white/80 dark:hover:bg-white/[0.08]",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "grid h-7 w-7 place-items-center rounded-lg shrink-0 transition-colors",
+                            active
+                              ? "bg-white/15 text-white"
+                              : "bg-[var(--color-ink-50)] text-[var(--color-ink-700)] dark:bg-white/[0.06] dark:text-[var(--color-ink-700)]",
+                          )}
+                        >
+                          {c.icon}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[12.5px] font-semibold tracking-tight truncate">
+                            {c.label}
+                          </span>
+                          {c.hint && (
+                            <span
+                              className={cn(
+                                "block text-[10.5px] truncate transition-colors",
+                                active ? "text-white/70" : "text-[var(--color-ink-500)]",
+                              )}
+                            >
+                              {c.hint}
+                            </span>
+                          )}
+                        </span>
+                        <ChevronRight
+                          className={cn(
+                            "h-3.5 w-3.5 shrink-0 transition-all",
+                            active
+                              ? "text-white"
+                              : "text-[var(--color-ink-300)] -translate-x-0.5 opacity-0 group-hover/flyitem:opacity-100 group-hover/flyitem:translate-x-0",
+                          )}
+                          strokeWidth={2.4}
+                        />
+                      </Link>
+                    </motion.li>
+                  );
+                })}
+              </ul>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
+    </div>
   );
 }

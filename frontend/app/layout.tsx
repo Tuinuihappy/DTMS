@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Google_Sans, Google_Sans_Code } from "next/font/google";
+import { getServerSession } from "@/lib/auth/server-session";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -29,11 +30,12 @@ export const viewport: Viewport = {
   themeColor: "#eef2f7",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const initialClaims = await getServerSession();
   return (
     <html
       lang="en"
@@ -41,7 +43,7 @@ export default function RootLayout({
       className={`${googleSans.variable} ${googleSansCode.variable}`}
     >
       <body className="min-h-screen antialiased">
-        <Providers>{children}</Providers>
+        <Providers initialClaims={initialClaims}>{children}</Providers>
       </body>
     </html>
   );

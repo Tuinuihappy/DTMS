@@ -15,13 +15,18 @@ import { useEffect, useState } from "react";
 /* A miniature constellation comes online: truck mark scales in centre, three  */
 /* pastel pills (Live freight / Smart dispatch / Driver comms) materialize at  */
 /* 25/50/75% with their arcs fading in alongside, a big 0→100 counter and      */
-/* progress bar climb together, then a "MOVE · DELIVER · ARRIVE" tagline       */
-/* stagger-reveals near 90%. Hits 100 → holds 300ms → fades 450ms.             */
+/* progress bar climb together, then T · M · S brand letters stagger-reveal    */
+/* near the end. Hits 100 → holds 320ms → fades 450ms.                         */
 /*                                                                            */
-/* Theme-aware via the existing canvas + pastel + ink tokens. Responsive via   */
-/* a one-shot viewport-width measurement on mount (no need to watch resize     */
-/* during a 1.5s overlay). prefers-reduced-motion fast-forwards to 100 and     */
-/* dismisses in 200ms.                                                         */
+/* Theme-aware via the existing canvas + pastel + ink tokens.                  */
+/*                                                                            */
+/* Fully responsive: a single `scale` factor derived from viewport min-dim     */
+/* drives every size (truck, sparkle, pill radii, arc SVG, pill chip via       */
+/* transform, counter font, bar width, tagline font). Scale = clamp(0.55,     */
+/* min(w/1024, h/768), 1.2) — treats 1024×768 (iPad landscape) as the          */
+/* design reference. Resize listener keeps everything in sync.                 */
+/*                                                                            */
+/* prefers-reduced-motion fast-forwards to 100 and dismisses in 200ms.         */
 /* -------------------------------------------------------------------------- */
 
 const CLIMB_MS = 1500;
@@ -29,8 +34,7 @@ const HOLD_MS = 320;
 const FADE_MS = 450;
 const ease = [0.22, 1, 0.36, 1] as const;
 
-// Three letters of the brand mark — stagger-revealed near the end of the climb
-// using the same three thresholds the tagline used to drive.
+// Three letters of the brand mark — stagger-revealed near the end of the climb.
 const WORDS = ["T", "M", "S"] as const;
 
 type PillSpec = {
@@ -47,20 +51,52 @@ const PILLS: PillSpec[] = [
   { label: "Driver comms", icon: MessageSquareDot, tone: "mint", angle: 80, threshold: 75 },
 ];
 
+/* Responsive sizing — every visual element derives from a single scale factor
+   so the composition stays proportional from narrow phones up to ultra-wide
+   monitors. The reference design lives at 1280×900 (laptop) → scale = 1;
+   tablets land naturally at 0.8–0.95 with comfortable breathing room above
+   and below the constellation so the overlay never crowds the viewport edges
+   (especially under iOS Safari's URL bar). */
+const REF_WIDTH = 1280;
+const REF_HEIGHT = 900;
+const MIN_SCALE = 0.55;
+const MAX_SCALE = 1.0;
+const TRUCK_BASE = 200;
+const PILL_RADIUS_BASE = 200;
+const ARC_PAD_BASE = 80;
+const BAR_WIDTH_BASE = 300;
+const COUNTER_FONT_BASE = 4.5; // rem
+const PERCENT_FONT_BASE = 2;   // rem
+const TAGLINE_FONT_BASE = 17;  // px
+
+function computeScale() {
+  if (typeof window === "undefined") return 1;
+  const byWidth = window.innerWidth / REF_WIDTH;
+  const byHeight = window.innerHeight / REF_HEIGHT;
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.min(byWidth, byHeight)));
+}
+
 export function LandingIntro() {
   const [progress, setProgress] = useState(0);
   const [visible, setVisible] = useState(true);
-  // Compact (mobile) vs full (≥sm) sizing. Measured once on mount.
-  const [compact, setCompact] = useState(false);
+  // Lazy initializer reads window if available (client). Server gets 1 →
+  // hydration is identical on desktop; on mobile a single-frame correction
+  // happens once useEffect runs.
+  const [scale, setScale] = useState(computeScale);
 
   useEffect(() => {
-    setCompact(window.innerWidth < 640);
+    const updateScale = () => setScale(computeScale());
+    updateScale();
+    window.addEventListener("resize", updateScale);
 
     // Respect prefers-reduced-motion — jump to 100 and dismiss immediately.
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setProgress(100);
       const t = window.setTimeout(() => setVisible(false), 200);
-      return () => window.clearTimeout(t);
+      return () => {
+        window.clearTimeout(t);
+        window.removeEventListener("resize", updateScale);
+      };
     }
 
     let raf = 0;
@@ -79,14 +115,21 @@ export function LandingIntro() {
       }
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", updateScale);
+    };
   }, []);
 
-  const truckSize = compact ? 156 : 200;
-  const pillRadius = compact ? 152 : 200;
-  // Arc SVG sized exactly to the orbit + padding so the dashed curves end
-  // precisely at the pill anchors (1 viewBox unit = 1 screen px).
-  const arcSize = pillRadius * 2 + 80;
+  const truckSize = Math.round(TRUCK_BASE * scale);
+  const pillRadius = Math.round(PILL_RADIUS_BASE * scale);
+  const arcSize = Math.round(pillRadius * 2 + ARC_PAD_BASE * scale);
+  const barWidth = Math.round(BAR_WIDTH_BASE * scale);
+  // Counter / tagline floor at a readable minimum so very narrow viewports
+  // don't render unreadable type even at MIN_SCALE.
+  const counterFontRem = Math.max(2.4, COUNTER_FONT_BASE * scale);
+  const percentFontRem = Math.max(1.2, PERCENT_FONT_BASE * scale);
+  const taglineFontPx = Math.max(12, TAGLINE_FONT_BASE * scale);
 
   return (
     <AnimatePresence>
@@ -104,13 +147,18 @@ export function LandingIntro() {
           <div className="relative z-10 flex flex-col items-center px-6">
             <Constellation
               progress={progress}
+              scale={scale}
               truckSize={truckSize}
               pillRadius={pillRadius}
               arcSize={arcSize}
             />
-            <Counter progress={progress} />
-            <ProgressBar progress={progress} compact={compact} />
-            <Tagline progress={progress} />
+            <Counter
+              progress={progress}
+              counterFontRem={counterFontRem}
+              percentFontRem={percentFontRem}
+            />
+            <ProgressBar progress={progress} width={barWidth} />
+            <Tagline progress={progress} fontSizePx={taglineFontPx} />
           </div>
         </motion.div>
       )}
@@ -149,29 +197,33 @@ function IntroAtmosphere() {
 
 /* -------------------------------------------------------------------------- */
 /* Constellation — truck mark centre, three pills materialising at thresholds, */
-/* arcs fading in toward each pill. Static positioning (the orbit is brief).   */
+/* arcs fading in toward each pill. All sizes derive from the shared scale.    */
 /* -------------------------------------------------------------------------- */
 
 function Constellation({
   progress,
+  scale,
   truckSize,
   pillRadius,
   arcSize,
 }: {
   progress: number;
+  scale: number;
   truckSize: number;
   pillRadius: number;
   arcSize: number;
 }) {
   const half = arcSize / 2;
+  // Bow control offset scales with the orbit too so arcs keep their curvature.
+  const ctrlOffset = 22 * scale;
 
   return (
     <div
       className="relative grid place-items-center"
       style={{ width: arcSize, height: arcSize }}
     >
-      {/* Arcs — fade in per pill threshold; pathLength stays at 1 (no draw-in
-          animation here, the brief overlay benefits from instant reveal). */}
+      {/* Arcs — viewBox renders 1:1 with px size so endpoints land exactly on
+          each pill anchor at every scale. */}
       <svg
         aria-hidden
         viewBox={`${-half} ${-half} ${arcSize} ${arcSize}`}
@@ -189,8 +241,8 @@ function Constellation({
           const rad = (p.angle * Math.PI) / 180;
           const x = Math.cos(rad) * pillRadius;
           const y = Math.sin(rad) * pillRadius;
-          const cx = x / 2 + Math.cos(rad + Math.PI / 2) * 22;
-          const cy = y / 2 + Math.sin(rad + Math.PI / 2) * 22;
+          const cx = x / 2 + Math.cos(rad + Math.PI / 2) * ctrlOffset;
+          const cy = y / 2 + Math.sin(rad + Math.PI / 2) * ctrlOffset;
           // Reveal: pill threshold → +15% to fully drawn.
           const reveal = Math.min(1, Math.max(0, (progress - p.threshold) / 15));
           return (
@@ -207,7 +259,8 @@ function Constellation({
         })}
       </svg>
 
-      {/* Pills */}
+      {/* Pills — outer div positions on the anchor + scales the chip; inner
+          motion.div carries the entrance animation. */}
       {PILLS.map((p) => {
         const rad = (p.angle * Math.PI) / 180;
         const x = Math.cos(rad) * pillRadius;
@@ -220,7 +273,7 @@ function Constellation({
             style={{
               left: `calc(50% + ${x}px)`,
               top: `calc(50% + ${y}px)`,
-              transform: "translate(-50%, -50%)",
+              transform: `translate(-50%, -50%) scale(${scale})`,
             }}
           >
             <motion.div
@@ -303,17 +356,29 @@ function Pill({
 
 /* -------------------------------------------------------------------------- */
 /* Counter — the big 0–100 number. tabular-nums so digits don't jump width.    */
+/* Font size scales with the page (floored to stay readable on phones).        */
 /* -------------------------------------------------------------------------- */
 
-function Counter({ progress }: { progress: number }) {
+function Counter({
+  progress,
+  counterFontRem,
+  percentFontRem,
+}: {
+  progress: number;
+  counterFontRem: number;
+  percentFontRem: number;
+}) {
   return (
     <div
       className="mt-10 flex items-start gap-1.5 font-display font-medium leading-none tracking-[-0.04em] tabular-nums text-[var(--color-ink-900)]"
       aria-live="polite"
       aria-label={`Loading ${progress} percent`}
     >
-      <span className="text-[3.25rem] sm:text-[4.5rem]">{progress}</span>
-      <span className="mt-1.5 text-[1.5rem] sm:text-[2rem] text-[var(--color-ink-400)]">
+      <span style={{ fontSize: `${counterFontRem}rem` }}>{progress}</span>
+      <span
+        className="mt-1.5 text-[var(--color-ink-400)]"
+        style={{ fontSize: `${percentFontRem}rem` }}
+      >
         %
       </span>
     </div>
@@ -321,20 +386,20 @@ function Counter({ progress }: { progress: number }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* ProgressBar — thin brand-gradient fill, 240/300px wide.                    */
+/* ProgressBar — thin brand-gradient fill, width scales with viewport.        */
 /* -------------------------------------------------------------------------- */
 
 function ProgressBar({
   progress,
-  compact,
+  width,
 }: {
   progress: number;
-  compact: boolean;
+  width: number;
 }) {
   return (
     <div
       className="mt-5 h-[3px] overflow-hidden rounded-full bg-[var(--color-ink-100)] dark:bg-white/[0.08]"
-      style={{ width: compact ? 240 : 300 }}
+      style={{ width }}
     >
       <div
         className="h-full rounded-full"
@@ -351,13 +416,23 @@ function ProgressBar({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Tagline — three uppercase words appear one by one near the end.            */
+/* Tagline — T · M · S brand letters appear one by one near the end.          */
+/* Font scales with the page (floored at 12px for legibility).                 */
 /* -------------------------------------------------------------------------- */
 
-function Tagline({ progress }: { progress: number }) {
+function Tagline({
+  progress,
+  fontSizePx,
+}: {
+  progress: number;
+  fontSizePx: number;
+}) {
   const thresholds = [80, 88, 95];
   return (
-    <div className="mt-6 flex items-center justify-center gap-x-4 font-display text-[15px] font-semibold uppercase text-[var(--color-ink-500)] sm:text-[17px]">
+    <div
+      className="mt-6 flex items-center justify-center gap-x-4 font-display font-semibold uppercase text-[var(--color-ink-500)]"
+      style={{ fontSize: `${fontSizePx}px` }}
+    >
       {WORDS.map((w, i) => {
         const shown = progress >= thresholds[i];
         return (

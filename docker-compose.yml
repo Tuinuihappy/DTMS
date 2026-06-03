@@ -98,6 +98,7 @@ services:
     environment:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
+      - DTMS_API_BASE_URL=${DTMS_API_BASE_URL:-http://10.204.212.28:15000}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/"]

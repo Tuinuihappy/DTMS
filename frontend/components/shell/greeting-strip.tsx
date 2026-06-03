@@ -2,9 +2,12 @@
 
 import { ArrowUpRight, Plus, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
+import { useAuth } from "@/components/auth/auth-provider";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 
 export function GreetingStrip() {
+  const { user } = useAuth();
+  const firstName = user?.displayName?.split(" ")[0] || "there";
   return (
     <motion.section
       initial={{ opacity: 0, y: 12 }}
@@ -20,7 +23,7 @@ export function GreetingStrip() {
           <span className="font-mono text-[var(--color-ink-500)]">07:42 GMT+7</span>
         </div>
         <h1 className="mt-3 font-display text-[2.5rem] leading-[1.05] font-semibold tracking-[-0.03em] text-[var(--color-ink-900)] md:text-[3rem]">
-          Good evening, <span className="text-[var(--color-ink-500)]">Tuinui</span>
+          Good evening, <span className="text-[var(--color-ink-500)]">{firstName}</span>
         </h1>
         <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-[var(--color-ink-500)]">
           Three high-priority dispatches need your review before the Eastern Seaboard window
