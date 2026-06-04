@@ -43,7 +43,7 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
                 : null;
 
             order.UpdateDraft(request.OrderRef, request.Priority, serviceWindow,
-                request.RequestedBy, request.Notes);
+                request.RequestedBy, request.Notes, request.RequestedTransportMode);
 
             foreach (var (item, idx) in request.Items.Select((p, i) => (p, i + 1)))
             {

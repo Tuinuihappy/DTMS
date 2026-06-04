@@ -47,7 +47,8 @@ public record DeliveryOrderListDto(
     DateTime? UpdatedDate,
     double TotalWeightKg,
     double TotalQuantity,
-    int TotalItems);
+    int TotalItems,
+    TransportMode? RequestedTransportMode);
 
 public record DeliveryOrderDetailDto(
     Guid Id,
@@ -65,6 +66,7 @@ public record DeliveryOrderDetailDto(
     double TotalWeightKg,
     double TotalQuantity,
     int TotalItems,
+    TransportMode? RequestedTransportMode,
     IReadOnlyList<ItemDto> Items);
 
 public record GetDeliveryOrderQuery(Guid OrderId) : IQuery<DeliveryOrderDetailDto>;
@@ -127,7 +129,8 @@ internal static class DeliveryOrderMapper
             order.UpdatedDate,
             order.TotalWeightKg,
             order.TotalQuantity,
-            order.TotalItems);
+            order.TotalItems,
+            order.RequestedTransportMode);
 
     public static DeliveryOrderDetailDto MapToDetailDto(Domain.Entities.DeliveryOrder order) =>
         new(
@@ -146,6 +149,7 @@ internal static class DeliveryOrderMapper
             order.TotalWeightKg,
             order.TotalQuantity,
             order.TotalItems,
+            order.RequestedTransportMode,
             order.Items.Select(p => new ItemDto(
                 p.Id,
                 p.ItemSeq,

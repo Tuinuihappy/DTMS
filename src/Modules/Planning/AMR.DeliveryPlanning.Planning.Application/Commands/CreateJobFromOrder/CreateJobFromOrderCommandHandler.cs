@@ -37,10 +37,13 @@ public class CreateJobFromOrderCommandHandler : ICommandHandler<CreateJobFromOrd
             job.SetRequiredCapability(request.RequiredCapability);
         if (request.TotalWeight > 0)
             job.SetTotalWeight(request.TotalWeight);
+        if (!string.IsNullOrEmpty(request.RequestedTransportMode))
+            job.SetTransportMode(request.RequestedTransportMode);
+        if (request.SlaDeadline.HasValue)
+            job.SetSlaDeadline(request.SlaDeadline.Value);
 
         var pickupCost = await _routeCostCalculator.CalculateCostAsync(Guid.Empty, request.PickupStationId, cancellationToken);
-        var pickupLeg = job.AddLeg(Guid.Empty, request.PickupStationId, 1, pickupCost);
-        pickupLeg.AddStop(request.PickupStationId, StopType.Pickup, 1);
+        job.AddLeg(Guid.Empty, request.PickupStationId, 1, pickupCost);
 
         if (pattern == PatternType.MultiStop)
         {
@@ -50,16 +53,14 @@ public class CreateJobFromOrderCommandHandler : ICommandHandler<CreateJobFromOrd
             {
                 var dropStation = optimizedRoute[i];
                 var cost = await _routeCostCalculator.CalculateCostAsync(previousStation, dropStation, cancellationToken);
-                var leg = job.AddLeg(previousStation, dropStation, i + 2, cost);
-                leg.AddStop(dropStation, StopType.Drop, 1);
+                job.AddLeg(previousStation, dropStation, i + 2, cost);
                 previousStation = dropStation;
             }
         }
         else
         {
             var deliveryCost = await _routeCostCalculator.CalculateCostAsync(request.PickupStationId, request.DropStationId, cancellationToken);
-            var deliveryLeg = job.AddLeg(request.PickupStationId, request.DropStationId, 2, deliveryCost);
-            deliveryLeg.AddStop(request.DropStationId, StopType.Drop, 1);
+            job.AddLeg(request.PickupStationId, request.DropStationId, 2, deliveryCost);
         }
 
         await _jobRepository.AddAsync(job, cancellationToken);

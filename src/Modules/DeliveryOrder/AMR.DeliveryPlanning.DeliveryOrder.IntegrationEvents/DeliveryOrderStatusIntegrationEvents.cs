@@ -21,6 +21,11 @@ public record DeliveryOrderCompletedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
     string SchemaVersion = "1.0") : IIntegrationEvent;
 
+public record DeliveryOrderPartiallyCompletedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
+    int DeliveredCount, int NotDeliveredCount, int TotalItems,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
+
 public record DeliveryOrderAmendedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
     string SchemaVersion = "1.0") : IIntegrationEvent;

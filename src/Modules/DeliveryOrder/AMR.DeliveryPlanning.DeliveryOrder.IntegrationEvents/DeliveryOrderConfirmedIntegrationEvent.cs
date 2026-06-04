@@ -28,4 +28,5 @@ public record DeliveryOrderConfirmedIntegrationEventV1(
     DateTime? LatestUtc,
     DateTime? SubmittedAt,
     IReadOnlyList<ItemSummaryDto> Items,
+    string? RequestedTransportMode = null,
     string SchemaVersion = "1.0") : IIntegrationEvent;

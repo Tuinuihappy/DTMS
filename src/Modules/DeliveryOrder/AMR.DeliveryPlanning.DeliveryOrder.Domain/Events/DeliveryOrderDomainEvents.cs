@@ -26,7 +26,8 @@ public record DeliveryOrderConfirmedDomainEvent(
     DateTime? EarliestUtc,
     DateTime? LatestUtc,
     DateTime? SubmittedAt,
-    IReadOnlyList<ItemEventDto> Items) : IDomainEvent;
+    IReadOnlyList<ItemEventDto> Items,
+    string? RequestedTransportMode = null) : IDomainEvent;
 public record DeliveryOrderRejectedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string Reason) : IDomainEvent;
 public record DeliveryOrderCancelledDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string Reason) : IDomainEvent;
 public record DeliveryOrderPlanningStartedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
@@ -38,4 +39,11 @@ public record DeliveryOrderReleasedDomainEvent(Guid EventId, DateTime OccurredOn
 public record DeliveryOrderFailedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string Reason) : IDomainEvent;
 public record DeliveryOrderAmendedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string Reason) : IDomainEvent;
 public record DeliveryOrderCompletedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
+public record DeliveryOrderPartiallyCompletedDomainEvent(
+    Guid EventId,
+    DateTime OccurredOn,
+    Guid OrderId,
+    int DeliveredCount,
+    int NotDeliveredCount,
+    int TotalItems) : IDomainEvent;
 public record DeliveryOrderDraftUpdatedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;

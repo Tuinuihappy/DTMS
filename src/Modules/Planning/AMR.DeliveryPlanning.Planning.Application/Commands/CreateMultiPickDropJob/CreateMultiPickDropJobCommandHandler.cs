@@ -35,13 +35,11 @@ public class CreateMultiPickDropJobCommandHandler : ICommandHandler<CreateMultiP
         foreach (var pair in request.Pairs)
         {
             var pickupCost = await _costCalc.CalculateCostAsync(previousStation, pair.PickupStationId, cancellationToken);
-            var pickupLeg = job.AddLeg(previousStation, pair.PickupStationId, sequence++, pickupCost);
-            pickupLeg.AddStop(pair.PickupStationId, StopType.Pickup, 1);
+            job.AddLeg(previousStation, pair.PickupStationId, sequence++, pickupCost);
             previousStation = pair.PickupStationId;
 
             var dropCost = await _costCalc.CalculateCostAsync(pair.PickupStationId, pair.DropStationId, cancellationToken);
-            var dropLeg = job.AddLeg(pair.PickupStationId, pair.DropStationId, sequence++, dropCost);
-            dropLeg.AddStop(pair.DropStationId, StopType.Drop, 1);
+            job.AddLeg(pair.PickupStationId, pair.DropStationId, sequence++, dropCost);
             previousStation = pair.DropStationId;
         }
 

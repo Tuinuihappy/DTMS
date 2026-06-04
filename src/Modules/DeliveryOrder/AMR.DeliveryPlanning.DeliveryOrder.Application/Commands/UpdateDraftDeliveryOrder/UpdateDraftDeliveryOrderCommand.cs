@@ -13,5 +13,6 @@ public record UpdateDraftDeliveryOrderCommand(
     ServiceWindowDto? ServiceWindow,
     List<CommandItemDto> Items,
     string? RequestedBy = null,
-    string? Notes = null
+    string? Notes = null,
+    TransportMode? RequestedTransportMode = TransportMode.Amr
 ) : ICommand<DeliveryOrderDetailDto>;

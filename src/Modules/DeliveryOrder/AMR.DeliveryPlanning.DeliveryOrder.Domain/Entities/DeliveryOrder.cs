@@ -21,6 +21,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     public double TotalWeightKg { get; private set; }
     public double TotalQuantity { get; private set; }
     public int TotalItems { get; private set; }
+    public TransportMode? RequestedTransportMode { get; private set; }
 
     private readonly List<Item> _items = new();
     public IReadOnlyCollection<Item> Items => _items.AsReadOnly();
@@ -32,7 +33,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     public static DeliveryOrder Create(string orderRef, Priority priority,
         ServiceWindow? serviceWindow, SourceSystem sourceSystem = SourceSystem.Manual,
-        string? createdBy = null, string? requestedBy = null, string? notes = null)
+        string? createdBy = null, string? requestedBy = null, string? notes = null,
+        TransportMode? requestedTransportMode = Enums.TransportMode.Amr)
     {
         var order = new DeliveryOrder
         {
@@ -44,7 +46,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             SourceSystem = sourceSystem,
             CreatedBy = createdBy,
             RequestedBy = requestedBy,
-            Notes = notes
+            Notes = notes,
+            RequestedTransportMode = requestedTransportMode
         };
 
         order.AddDomainEvent(new DeliveryOrderDraftedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, order.Id));
@@ -53,7 +56,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     public static DeliveryOrder CreateFromUpstream(string orderRef, Priority priority,
         ServiceWindow? serviceWindow, SourceSystem sourceSystem, string? createdBy = null,
-        string? requestedBy = null, string? notes = null)
+        string? requestedBy = null, string? notes = null,
+        TransportMode? requestedTransportMode = Enums.TransportMode.Amr)
     {
         if (sourceSystem == SourceSystem.Manual)
             throw new InvalidOperationException("Upstream orders cannot have Manual source system.");
@@ -69,7 +73,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             SourceSystem = sourceSystem,
             CreatedBy = createdBy,
             RequestedBy = requestedBy,
-            Notes = notes
+            Notes = notes,
+            RequestedTransportMode = requestedTransportMode
         };
 
         order.AddDomainEvent(new DeliveryOrderSubmittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, order.Id));
@@ -77,7 +82,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     }
 
     public void UpdateDraft(string orderRef, Priority priority, ServiceWindow? serviceWindow,
-        string? requestedBy = null, string? notes = null)
+        string? requestedBy = null, string? notes = null,
+        TransportMode? requestedTransportMode = Enums.TransportMode.Amr)
     {
         if (Status != OrderStatus.Draft)
             throw new InvalidOperationException($"Only Draft orders can be edited. Current status: {Status}.");
@@ -87,6 +93,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         ServiceWindow = serviceWindow;
         RequestedBy = requestedBy;
         Notes = notes;
+        RequestedTransportMode = requestedTransportMode;
 
         _items.Clear();
         TotalWeightKg = 0;
@@ -201,7 +208,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         return new DeliveryOrderConfirmedDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, Priority.ToString(),
             ServiceWindow?.EarliestUtc, ServiceWindow?.LatestUtc,
-            SubmittedAt, itemDtos);
+            SubmittedAt, itemDtos, RequestedTransportMode?.ToString());
     }
 
     public void MarkPlanned()
@@ -233,7 +240,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     public void Hold(string reason)
     {
-        if (Status == OrderStatus.Completed || Status == OrderStatus.Cancelled || Status == OrderStatus.Failed)
+        if (Status is OrderStatus.Completed or OrderStatus.PartiallyCompleted
+                    or OrderStatus.Cancelled or OrderStatus.Failed)
             throw new InvalidOperationException($"Cannot hold an order in {Status} status.");
 
         Status = OrderStatus.Held;
@@ -252,7 +260,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     public void MarkFailed(string reason)
     {
-        if (Status == OrderStatus.Completed || Status == OrderStatus.Cancelled)
+        if (Status is OrderStatus.Completed or OrderStatus.PartiallyCompleted or OrderStatus.Cancelled)
             throw new InvalidOperationException($"Cannot fail an order in {Status} status.");
 
         Status = OrderStatus.Failed;
@@ -262,11 +270,43 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     public void Cancel(string reason)
     {
         if (Status == OrderStatus.Cancelled) return;
-        if (Status is OrderStatus.Completed or OrderStatus.InProgress)
-            throw new InvalidOperationException("Cannot cancel an order that is in progress or completed.");
+        if (Status is OrderStatus.Completed or OrderStatus.PartiallyCompleted or OrderStatus.InProgress)
+            throw new InvalidOperationException($"Cannot cancel an order in {Status} status.");
 
         Status = OrderStatus.Cancelled;
         AddDomainEvent(new DeliveryOrderCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+    }
+
+    // Envelope-flow completion: vendor (RIOT3) reported the order finished.
+    // No POD scans happen in envelope flow, so we treat the vendor's "task
+    // finished" as authoritative and mark all items Delivered. Idempotent —
+    // safe to call multiple times if multiple trips complete for the same
+    // multi-group order.
+    public void MarkVendorCompleted()
+    {
+        if (Status == OrderStatus.Completed)
+            return; // already finalized
+        if (Status is OrderStatus.Cancelled or OrderStatus.Rejected or OrderStatus.Failed)
+            throw new InvalidOperationException($"Cannot complete an order in {Status} status.");
+
+        foreach (var item in _items)
+            if (item.Status != ItemStatus.Delivered)
+                item.UpdateStatus(ItemStatus.Delivered);
+
+        Status = OrderStatus.Completed;
+        AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+    }
+
+    // Envelope-flow failure: vendor reported the order failed. Idempotent.
+    public void MarkVendorFailed(string reason)
+    {
+        if (Status == OrderStatus.Failed)
+            return; // already finalized
+        if (Status is OrderStatus.Completed or OrderStatus.Cancelled or OrderStatus.Rejected)
+            throw new InvalidOperationException($"Cannot fail an order in {Status} status.");
+
+        Status = OrderStatus.Failed;
+        AddDomainEvent(new DeliveryOrderFailedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
     }
 
     public void MarkAsCompleted()
@@ -274,8 +314,31 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         if (Status != OrderStatus.InProgress && Status != OrderStatus.Dispatched)
             throw new InvalidOperationException($"Cannot complete an order in {Status} status.");
 
-        Status = OrderStatus.Completed;
-        AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+        // Source of truth = item statuses set by POD scan. Anything not Delivered
+        // (Pending/Picked/Failed/Returned/Cancelled) counts as not-delivered.
+        var totalCount     = _items.Count;
+        var deliveredCount = _items.Count(i => i.Status == ItemStatus.Delivered);
+        var notDelivered   = totalCount - deliveredCount;
+
+        if (deliveredCount == 0)
+        {
+            Status = OrderStatus.Failed;
+            AddDomainEvent(new DeliveryOrderFailedDomainEvent(
+                Guid.NewGuid(), DateTime.UtcNow, Id,
+                $"Trip completed but no items were delivered ({totalCount} not delivered)."));
+        }
+        else if (notDelivered > 0)
+        {
+            Status = OrderStatus.PartiallyCompleted;
+            AddDomainEvent(new DeliveryOrderPartiallyCompletedDomainEvent(
+                Guid.NewGuid(), DateTime.UtcNow, Id,
+                deliveredCount, notDelivered, totalCount));
+        }
+        else
+        {
+            Status = OrderStatus.Completed;
+            AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+        }
     }
 
     public void AmendServiceWindow(ServiceWindow? newServiceWindow, string reason)
@@ -283,7 +346,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         if (Status is OrderStatus.Draft)
             throw new InvalidOperationException("Cannot amend a Draft order — use UpdateDraft instead.");
 
-        if (Status is OrderStatus.Completed or OrderStatus.Cancelled)
+        if (Status is OrderStatus.Completed or OrderStatus.PartiallyCompleted or OrderStatus.Cancelled)
             throw new InvalidOperationException($"Cannot amend a {Status} order.");
 
         ServiceWindow = newServiceWindow;

@@ -33,5 +33,6 @@ public record CreateDraftDeliveryOrderCommand(
     List<ItemDto> Items,
     Priority Priority = Priority.Normal,
     string? RequestedBy = null,
-    string? Notes = null
+    string? Notes = null,
+    TransportMode? RequestedTransportMode = TransportMode.Amr
 ) : ICommand<DeliveryOrderDetailDto>;

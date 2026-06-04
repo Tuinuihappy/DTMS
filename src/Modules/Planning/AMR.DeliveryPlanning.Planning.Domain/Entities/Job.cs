@@ -18,6 +18,10 @@ public class Job : AggregateRoot<Guid>
     public PatternType Pattern { get; private set; } = PatternType.PointToPoint;
     public string? RequiredCapability { get; private set; }
     public double TotalWeight { get; private set; }
+    // Transport mode the planner uses for this job — sourced from
+    // DeliveryOrder.RequestedTransportMode at creation; null = unspecified
+    // (planner chose whatever default the dispatch layer applies).
+    public string? TransportMode { get; private set; }
 
     // Phase 4: Package assignment
     private readonly List<string> _packageBarcodes = new();
@@ -68,6 +72,7 @@ public class Job : AggregateRoot<Guid>
     public void SetTotalWeight(double weight) => TotalWeight = weight;
     public void SetSlaDeadline(DateTime deadline) => SlaDeadline = deadline;
     public void SetPlanningTrace(string trace) => PlanningTrace = trace;
+    public void SetTransportMode(string mode) => TransportMode = mode;
 
     public void SetPackageBarcodes(IEnumerable<string> barcodes)
     {

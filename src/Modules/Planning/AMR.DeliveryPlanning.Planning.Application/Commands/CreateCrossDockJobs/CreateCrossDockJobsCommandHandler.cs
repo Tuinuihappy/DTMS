@@ -23,12 +23,10 @@ public class CreateCrossDockJobsCommandHandler : ICommandHandler<CreateCrossDock
         inboundJob.SetPattern(PatternType.CrossDock);
 
         var pickupCost = await _costCalc.CalculateCostAsync(Guid.Empty, request.InboundPickupStationId, cancellationToken);
-        var pickupLeg = inboundJob.AddLeg(Guid.Empty, request.InboundPickupStationId, 1, pickupCost);
-        pickupLeg.AddStop(request.InboundPickupStationId, StopType.Pickup, 1);
+        inboundJob.AddLeg(Guid.Empty, request.InboundPickupStationId, 1, pickupCost);
 
         var toDockCost = await _costCalc.CalculateCostAsync(request.InboundPickupStationId, request.DockStationId, cancellationToken);
-        var dockLeg = inboundJob.AddLeg(request.InboundPickupStationId, request.DockStationId, 2, toDockCost);
-        dockLeg.AddStop(request.DockStationId, StopType.Drop, 1);
+        inboundJob.AddLeg(request.InboundPickupStationId, request.DockStationId, 2, toDockCost);
 
         await _jobRepository.AddAsync(inboundJob, cancellationToken);
 
@@ -36,12 +34,10 @@ public class CreateCrossDockJobsCommandHandler : ICommandHandler<CreateCrossDock
         outboundJob.SetPattern(PatternType.CrossDock);
 
         var fromDockCost = await _costCalc.CalculateCostAsync(Guid.Empty, request.DockStationId, cancellationToken);
-        var dockPickupLeg = outboundJob.AddLeg(Guid.Empty, request.DockStationId, 1, fromDockCost);
-        dockPickupLeg.AddStop(request.DockStationId, StopType.Pickup, 1);
+        outboundJob.AddLeg(Guid.Empty, request.DockStationId, 1, fromDockCost);
 
         var deliveryCost = await _costCalc.CalculateCostAsync(request.DockStationId, request.OutboundDropStationId, cancellationToken);
-        var deliveryLeg = outboundJob.AddLeg(request.DockStationId, request.OutboundDropStationId, 2, deliveryCost);
-        deliveryLeg.AddStop(request.OutboundDropStationId, StopType.Drop, 1);
+        outboundJob.AddLeg(request.DockStationId, request.OutboundDropStationId, 2, deliveryCost);
 
         await _jobRepository.AddAsync(outboundJob, cancellationToken);
 

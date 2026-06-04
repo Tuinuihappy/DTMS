@@ -12,7 +12,8 @@ public record CreateUpstreamDeliveryOrderCommand(
     Priority Priority,
     SourceSystem SourceSystem,
     string? RequestedBy = null,
-    string? Notes = null
+    string? Notes = null,
+    TransportMode? RequestedTransportMode = TransportMode.Amr
 ) : ICommand<UpstreamOrderAckDto>;
 
 public record UpstreamOrderAckDto(

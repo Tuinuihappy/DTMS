@@ -860,4 +860,311 @@ public class DeliveryOrderTests
         // capacity-aware aggregation by Uom is Planning-solver territory).
         order.TotalQuantity.Should().Be(12);
     }
+
+    [Fact]
+    public void Create_WithoutMode_DefaultsToAmr()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "TM-001", Priority.Normal, serviceWindow: null);
+
+        order.RequestedTransportMode.Should().Be(TransportMode.Amr);
+    }
+
+    [Fact]
+    public void Create_WithExplicitMode_PersistsValue()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "TM-002", Priority.Normal, serviceWindow: null,
+            requestedTransportMode: TransportMode.Fleet);
+
+        order.RequestedTransportMode.Should().Be(TransportMode.Fleet);
+    }
+
+    [Fact]
+    public void Create_WithNullMode_LeavesNull()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "TM-003", Priority.Normal, serviceWindow: null,
+            requestedTransportMode: null);
+
+        order.RequestedTransportMode.Should().BeNull();
+    }
+
+    [Fact]
+    public void CreateFromUpstream_WithoutMode_DefaultsToAmr()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.CreateFromUpstream(
+            "TM-UPS", Priority.High,
+            ServiceWindow.Create(earliestUtc: null, latestUtc: DateTime.UtcNow.AddHours(2)),
+            SourceSystem.Sap);
+
+        order.RequestedTransportMode.Should().Be(TransportMode.Amr);
+    }
+
+    [Fact]
+    public void UpdateDraft_CanChangeTransportMode()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "TM-UPD", Priority.Normal, serviceWindow: null,
+            requestedTransportMode: TransportMode.Amr);
+
+        order.UpdateDraft("TM-UPD", Priority.Normal, serviceWindow: null,
+            requestedTransportMode: TransportMode.Manual);
+
+        order.RequestedTransportMode.Should().Be(TransportMode.Manual);
+    }
+
+    [Fact]
+    public void Confirm_DomainEventCarriesRequestedTransportMode()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "TM-CONF", Priority.Normal, serviceWindow: null,
+            requestedTransportMode: TransportMode.Fleet);
+        AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
+        order.Confirm(weightFallbackKg: 500);
+
+        var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
+        confirmed.RequestedTransportMode.Should().Be("Fleet");
+    }
+
+    // ── PartiallyCompleted finalize logic ─────────────────────────────────
+
+    private static AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder
+        OrderInProgress(int itemCount = 3, string refPrefix = "PC")
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            $"{refPrefix}-{Guid.NewGuid():N}", Priority.Normal, serviceWindow: null);
+        for (var i = 1; i <= itemCount; i++)
+            AddTestItem(order, itemSeq: i, "WH-01", "STORE-05", $"SKU-{i:000}");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
+        order.Confirm(weightFallbackKg: 500);
+        order.MarkPlanning();
+        order.MarkPlanned();
+        order.MarkDispatched();
+        order.MarkInProgress();
+        return order;
+    }
+
+    [Fact]
+    public void MarkAsCompleted_AllItemsDelivered_BecomesCompleted()
+    {
+        var order = OrderInProgress(itemCount: 3);
+        order.MarkItemsDelivered(["SKU-001", "SKU-002", "SKU-003"]);
+
+        order.MarkAsCompleted();
+
+        order.Status.Should().Be(OrderStatus.Completed);
+        order.DomainEvents.OfType<DeliveryOrderCompletedDomainEvent>().Should().ContainSingle();
+        order.DomainEvents.OfType<DeliveryOrderPartiallyCompletedDomainEvent>().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void MarkAsCompleted_SomeItemsDelivered_BecomesPartiallyCompleted()
+    {
+        var order = OrderInProgress(itemCount: 3);
+        // 2 delivered, 1 still Pending (POD scan never arrived)
+        order.MarkItemsDelivered(["SKU-001", "SKU-002"]);
+
+        order.MarkAsCompleted();
+
+        order.Status.Should().Be(OrderStatus.PartiallyCompleted);
+        var partial = order.DomainEvents.OfType<DeliveryOrderPartiallyCompletedDomainEvent>().Single();
+        partial.DeliveredCount.Should().Be(2);
+        partial.NotDeliveredCount.Should().Be(1);
+        partial.TotalItems.Should().Be(3);
+        order.DomainEvents.OfType<DeliveryOrderCompletedDomainEvent>().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void MarkAsCompleted_NoItemsDelivered_BecomesFailed()
+    {
+        var order = OrderInProgress(itemCount: 2);
+        // no MarkItemsDelivered call — both items remain Pending
+
+        order.MarkAsCompleted();
+
+        order.Status.Should().Be(OrderStatus.Failed);
+        var failed = order.DomainEvents.OfType<DeliveryOrderFailedDomainEvent>().Single();
+        failed.Reason.Should().Contain("no items were delivered");
+    }
+
+    [Fact]
+    public void MarkAsCompleted_SingleItemDelivered_BecomesCompleted()
+    {
+        var order = OrderInProgress(itemCount: 1);
+        order.MarkItemsDelivered(["SKU-001"]);
+
+        order.MarkAsCompleted();
+
+        order.Status.Should().Be(OrderStatus.Completed);
+    }
+
+    [Fact]
+    public void MarkAsCompleted_SingleItemNotDelivered_BecomesFailed()
+    {
+        var order = OrderInProgress(itemCount: 1);
+
+        order.MarkAsCompleted();
+
+        order.Status.Should().Be(OrderStatus.Failed);
+    }
+
+    // ── Envelope-flow finalization (Phase b6) ───────────────────────────
+
+    [Fact]
+    public void MarkVendorCompleted_FromConfirmed_MarksAllItemsDeliveredAndCompletes()
+    {
+        // Envelope flow: order is Confirmed (skipped legacy planning) when
+        // vendor reports finished. All items get marked Delivered.
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "ENV-1", Priority.Normal, serviceWindow: null);
+        AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
+        AddTestItem(order, itemSeq: 2, "WH-A", "Pack-1", "SKU-2");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-A", "Pack-1"));
+        order.Confirm(weightFallbackKg: 500);
+
+        order.MarkVendorCompleted();
+
+        order.Status.Should().Be(OrderStatus.Completed);
+        order.Items.Should().OnlyContain(i => i.Status == ItemStatus.Delivered);
+        order.DomainEvents.OfType<DeliveryOrderCompletedDomainEvent>().Should().ContainSingle();
+    }
+
+    [Fact]
+    public void MarkVendorCompleted_AlreadyCompleted_IsIdempotent()
+    {
+        // Multi-group envelope orders fire TripCompleted multiple times.
+        // Second call must be a no-op, not throw.
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "ENV-IDM", Priority.Normal, serviceWindow: null);
+        AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-A", "Pack-1"));
+        order.Confirm(weightFallbackKg: 500);
+
+        order.MarkVendorCompleted();
+        var firstCompleteEventCount = order.DomainEvents.OfType<DeliveryOrderCompletedDomainEvent>().Count();
+
+        var act = () => order.MarkVendorCompleted();
+        act.Should().NotThrow();
+        order.DomainEvents.OfType<DeliveryOrderCompletedDomainEvent>().Count()
+            .Should().Be(firstCompleteEventCount, "should not fire a duplicate event");
+    }
+
+    [Fact]
+    public void MarkVendorCompleted_FromCancelled_Throws()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "ENV-X", Priority.Normal, serviceWindow: null);
+        AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
+        order.Cancel("oops");
+
+        var act = () => order.MarkVendorCompleted();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Cancelled*");
+    }
+
+    [Fact]
+    public void MarkVendorFailed_FromConfirmed_MovesToFailed()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "ENV-FAIL", Priority.Normal, serviceWindow: null);
+        AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-A", "Pack-1"));
+        order.Confirm(weightFallbackKg: 500);
+
+        order.MarkVendorFailed("vendor rejected: obstacle");
+
+        order.Status.Should().Be(OrderStatus.Failed);
+        var failed = order.DomainEvents.OfType<DeliveryOrderFailedDomainEvent>().Single();
+        failed.Reason.Should().Contain("obstacle");
+    }
+
+    [Fact]
+    public void MarkVendorFailed_AlreadyFailed_IsIdempotent()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "ENV-FAIL-IDM", Priority.Normal, serviceWindow: null);
+        AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-A", "Pack-1"));
+        order.Confirm(weightFallbackKg: 500);
+
+        order.MarkVendorFailed("first");
+        var act = () => order.MarkVendorFailed("second");
+        act.Should().NotThrow();
+        order.Status.Should().Be(OrderStatus.Failed);
+    }
+
+    [Fact]
+    public void MarkVendorFailed_FromCompleted_Throws()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "ENV-CONFLICT", Priority.Normal, serviceWindow: null);
+        AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-A", "Pack-1"));
+        order.Confirm(weightFallbackKg: 500);
+        order.MarkVendorCompleted();
+
+        var act = () => order.MarkVendorFailed("late failure");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Completed*");
+    }
+
+    [Fact]
+    public void PartiallyCompleted_IsTerminal_CannotBeHeld()
+    {
+        var order = OrderInProgress(itemCount: 2);
+        order.MarkItemsDelivered(["SKU-001"]);
+        order.MarkAsCompleted();
+        order.Status.Should().Be(OrderStatus.PartiallyCompleted);
+
+        var act = () => order.Hold("retry");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*PartiallyCompleted*");
+    }
+
+    [Fact]
+    public void PartiallyCompleted_IsTerminal_CannotBeCancelled()
+    {
+        var order = OrderInProgress(itemCount: 2);
+        order.MarkItemsDelivered(["SKU-001"]);
+        order.MarkAsCompleted();
+
+        var act = () => order.Cancel("change of plan");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*PartiallyCompleted*");
+    }
+
+    [Fact]
+    public void PartiallyCompleted_IsTerminal_CannotBeMarkedFailed()
+    {
+        var order = OrderInProgress(itemCount: 2);
+        order.MarkItemsDelivered(["SKU-001"]);
+        order.MarkAsCompleted();
+
+        var act = () => order.MarkFailed("oops");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*PartiallyCompleted*");
+    }
+
+    [Fact]
+    public void PartiallyCompleted_IsTerminal_CannotBeAmended()
+    {
+        var order = OrderInProgress(itemCount: 2);
+        order.MarkItemsDelivered(["SKU-001"]);
+        order.MarkAsCompleted();
+
+        var act = () => order.AmendServiceWindow(
+            ServiceWindow.Create(earliestUtc: null, latestUtc: DateTime.UtcNow.AddHours(1)),
+            "shift window");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*PartiallyCompleted*");
+    }
 }

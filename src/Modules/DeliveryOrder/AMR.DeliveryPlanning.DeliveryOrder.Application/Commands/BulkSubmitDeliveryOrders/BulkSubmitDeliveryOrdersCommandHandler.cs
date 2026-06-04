@@ -57,7 +57,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                 order = Domain.Entities.DeliveryOrder.Create(
                     cmd.OrderRef, cmd.Priority, serviceWindow,
                     Domain.Enums.SourceSystem.Manual, _currentUser.GetCurrentUserName(),
-                    cmd.RequestedBy, cmd.Notes);
+                    cmd.RequestedBy, cmd.Notes, cmd.RequestedTransportMode);
 
                 var uomFailureForOrder = false;
                 foreach (var (pkg, idx) in cmd.Items.Select((p, i) => (p, i + 1)))

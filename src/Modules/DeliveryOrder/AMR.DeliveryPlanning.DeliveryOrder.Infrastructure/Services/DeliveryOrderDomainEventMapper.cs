@@ -20,7 +20,8 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
                         i.ItemId, i.WeightKg, i.PickupStationId, i.DropStationId,
                         i.Hazmat is { } hz ? new ItemHazmatSummaryDto(hz.ClassCode, hz.PackingGroup) : null,
                         i.Temperature is { } tr ? new ItemTemperatureSummaryDto(tr.MinC, tr.MaxC) : null,
-                        i.HandlingInstructions)).ToList())
+                        i.HandlingInstructions)).ToList(),
+                    evt.RequestedTransportMode)
             ],
             DeliveryOrderCancelledDomainEvent evt =>
             [
@@ -33,6 +34,12 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             DeliveryOrderCompletedDomainEvent evt =>
             [
                 new DeliveryOrderCompletedIntegrationEventV1(evt.EventId, evt.OccurredOn, evt.OrderId)
+            ],
+            DeliveryOrderPartiallyCompletedDomainEvent evt =>
+            [
+                new DeliveryOrderPartiallyCompletedIntegrationEventV1(
+                    evt.EventId, evt.OccurredOn, evt.OrderId,
+                    evt.DeliveredCount, evt.NotDeliveredCount, evt.TotalItems)
             ],
             DeliveryOrderAmendedDomainEvent evt =>
             [

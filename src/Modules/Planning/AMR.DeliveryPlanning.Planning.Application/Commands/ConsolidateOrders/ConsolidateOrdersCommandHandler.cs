@@ -28,12 +28,10 @@ public class ConsolidateOrdersCommandHandler : ICommandHandler<ConsolidateOrders
             job.SetRequiredCapability(request.RequiredCapability);
 
         var pickupCost = await _routeCostCalculator.CalculateCostAsync(Guid.Empty, request.PickupStationId, cancellationToken);
-        var pickupLeg = job.AddLeg(Guid.Empty, request.PickupStationId, 1, pickupCost);
-        pickupLeg.AddStop(request.PickupStationId, StopType.Pickup, 1);
+        job.AddLeg(Guid.Empty, request.PickupStationId, 1, pickupCost);
 
         var deliveryCost = await _routeCostCalculator.CalculateCostAsync(request.PickupStationId, request.DropStationId, cancellationToken);
-        var deliveryLeg = job.AddLeg(request.PickupStationId, request.DropStationId, 2, deliveryCost);
-        deliveryLeg.AddStop(request.DropStationId, StopType.Drop, 1);
+        job.AddLeg(request.PickupStationId, request.DropStationId, 2, deliveryCost);
 
         await _jobRepository.AddAsync(job, cancellationToken);
 

@@ -10,9 +10,6 @@ public class Leg : Entity<Guid>
     public int SequenceOrder { get; private set; }
     public double EstimatedCost { get; private set; }
 
-    private readonly List<Stop> _stops = new();
-    public IReadOnlyCollection<Stop> Stops => _stops.AsReadOnly();
-
     private Leg() { } // EF Core
 
     internal Leg(Guid jobId, Guid fromStationId, Guid toStationId, int sequenceOrder, double estimatedCost)
@@ -23,10 +20,5 @@ public class Leg : Entity<Guid>
         ToStationId = toStationId;
         SequenceOrder = sequenceOrder;
         EstimatedCost = estimatedCost;
-    }
-
-    public void AddStop(Guid stationId, Enums.StopType type, int sequenceOrder, DateTime? expectedArrival = null)
-    {
-        _stops.Add(new Stop(Id, stationId, type, sequenceOrder, expectedArrival));
     }
 }

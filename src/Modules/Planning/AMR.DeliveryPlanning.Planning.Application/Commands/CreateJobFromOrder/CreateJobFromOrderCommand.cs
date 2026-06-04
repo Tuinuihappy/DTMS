@@ -9,5 +9,7 @@ public record CreateJobFromOrderCommand(
     string Priority,
     List<Guid>? AdditionalDropStationIds = null,
     string? RequiredCapability = null,
-    double TotalWeight = 0
+    double TotalWeight = 0,
+    string? RequestedTransportMode = null,
+    DateTime? SlaDeadline = null
 ) : ICommand<Guid>;

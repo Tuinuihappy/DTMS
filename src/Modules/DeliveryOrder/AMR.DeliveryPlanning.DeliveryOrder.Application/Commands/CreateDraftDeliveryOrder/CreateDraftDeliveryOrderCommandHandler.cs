@@ -40,7 +40,8 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
             SourceSystem.Manual,
             _currentUser.GetCurrentUserName(),
             request.RequestedBy,
-            request.Notes);
+            request.Notes,
+            request.RequestedTransportMode);
 
         foreach (var (pkg, idx) in request.Items.Select((p, i) => (p, i + 1)))
         {

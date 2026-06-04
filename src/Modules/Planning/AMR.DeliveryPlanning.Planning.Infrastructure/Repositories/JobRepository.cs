@@ -19,7 +19,6 @@ public class JobRepository : IJobRepository
     {
         return await _context.Jobs
             .Include(j => j.Legs)
-                .ThenInclude(l => l.Stops)
             .FirstOrDefaultAsync(j => j.Id == id, cancellationToken);
     }
 

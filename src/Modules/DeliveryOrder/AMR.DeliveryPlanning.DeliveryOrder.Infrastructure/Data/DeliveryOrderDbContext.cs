@@ -34,6 +34,7 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(o => o.SourceSystem).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
+            b.Property(o => o.RequestedTransportMode).HasConversion<string>().HasMaxLength(20);
             b.Property(o => o.RequestedBy).HasMaxLength(200);
             b.Property(o => o.Notes).HasMaxLength(1000);
             b.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion().IsConcurrencyToken();

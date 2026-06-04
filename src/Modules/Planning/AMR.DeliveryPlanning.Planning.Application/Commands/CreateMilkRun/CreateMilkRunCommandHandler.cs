@@ -43,11 +43,7 @@ public class CreateMilkRunCommandHandler : ICommandHandler<CreateMilkRunCommand,
             var from = orderedStops[i].StationId;
             var to = orderedStops[i + 1].StationId;
             var cost = await _costCalc.CalculateCostAsync(from, to, cancellationToken);
-            var leg = job.AddLeg(from, to, i + 1, cost);
-
-            if (i == 0)
-                leg.AddStop(from, StopType.Pickup, 1);
-            leg.AddStop(to, i == orderedStops.Count - 2 ? StopType.Drop : StopType.Pickup, 2);
+            job.AddLeg(from, to, i + 1, cost);
         }
 
         await _jobRepository.AddAsync(job, cancellationToken);

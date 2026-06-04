@@ -11,6 +11,7 @@ public enum OrderStatus
     Dispatched,
     InProgress,
     Completed,
+    PartiallyCompleted,   // ≥1 item Delivered AND ≥1 item not-Delivered when trip finalized — terminal
     Held,
     Failed,
     Amended,     // reserved: set when order is amended after entering planning pipeline (Confirmed→Dispatched)

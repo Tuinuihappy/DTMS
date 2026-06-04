@@ -107,6 +107,49 @@ public class JobTests
         job.Legs.Should().HaveCount(2);
         job.EstimatedDistance.Should().Be(30.0);
     }
+
+    // ── Phase 2 wiring: TransportMode / SlaDeadline / RequiredCapability ──
+
+    [Fact]
+    public void NewJob_TransportMode_IsNull()
+    {
+        var job = new Job(Guid.NewGuid(), "Normal");
+
+        job.TransportMode.Should().BeNull();
+        job.SlaDeadline.Should().BeNull();
+        job.RequiredCapability.Should().BeNull();
+    }
+
+    [Fact]
+    public void SetTransportMode_PersistsValue()
+    {
+        var job = new Job(Guid.NewGuid(), "Normal");
+
+        job.SetTransportMode("Amr");
+
+        job.TransportMode.Should().Be("Amr");
+    }
+
+    [Fact]
+    public void SetSlaDeadline_PersistsValue()
+    {
+        var job = new Job(Guid.NewGuid(), "Normal");
+        var deadline = DateTime.UtcNow.AddHours(8);
+
+        job.SetSlaDeadline(deadline);
+
+        job.SlaDeadline.Should().Be(deadline);
+    }
+
+    [Fact]
+    public void SetRequiredCapability_PersistsValue()
+    {
+        var job = new Job(Guid.NewGuid(), "Normal");
+
+        job.SetRequiredCapability("Hazmat");
+
+        job.RequiredCapability.Should().Be("Hazmat");
+    }
 }
 
 public class ActionTemplateTests
@@ -257,6 +300,59 @@ public class OrderTemplateTests
         t.Missions[1].Sequence.Should().Be(2);
         t.Missions[0].Type.Should().Be(MissionType.Move);
         t.Missions[1].Type.Should().Be(MissionType.Act);
+    }
+
+    [Fact]
+    public void Construct_WithoutRouteFields_LeavesPickupAndDropNull()
+    {
+        var t = new OrderTemplate(
+            name: "GENERIC", priority: 10,
+            structureType: "sequence", transportOrderPriority: 10,
+            missions: new[] { Move() });
+
+        t.PickupStationId.Should().BeNull();
+        t.DropStationId.Should().BeNull();
+    }
+
+    [Fact]
+    public void Construct_WithRouteFields_PersistsBoth()
+    {
+        var pickup = Guid.NewGuid();
+        var drop = Guid.NewGuid();
+
+        var t = new OrderTemplate(
+            name: "ROUTE-A-TO-B", priority: 10,
+            structureType: "sequence", transportOrderPriority: 10,
+            missions: new[] { Move() },
+            pickupStationId: pickup,
+            dropStationId: drop);
+
+        t.PickupStationId.Should().Be(pickup);
+        t.DropStationId.Should().Be(drop);
+    }
+
+    [Fact]
+    public void Update_CanChangeRouteFields()
+    {
+        var t = new OrderTemplate(
+            name: "ROUTE", priority: 10,
+            structureType: "sequence", transportOrderPriority: 10,
+            missions: new[] { Move() },
+            pickupStationId: Guid.NewGuid(),
+            dropStationId: Guid.NewGuid());
+
+        var newPickup = Guid.NewGuid();
+        var newDrop = Guid.NewGuid();
+        t.Update(
+            priority: 20, structureType: "sequence", transportOrderPriority: 20,
+            missions: new[] { Move() },
+            appointVehicleKey: null, appointVehicleName: null,
+            appointVehicleGroupKey: null, appointVehicleGroupName: null,
+            appointQueueWaitArea: null, description: null,
+            pickupStationId: newPickup, dropStationId: newDrop);
+
+        t.PickupStationId.Should().Be(newPickup);
+        t.DropStationId.Should().Be(newDrop);
     }
 
     [Fact]
@@ -547,5 +643,274 @@ public class OrderTemplateResolverTests
         public void Update(ActionTemplate t) { }
         public void Remove(ActionTemplate t) { }
         public Task SaveChangesAsync(CancellationToken c = default) => Task.CompletedTask;
+    }
+}
+
+public class EnvelopeUpperKeyTests
+{
+    [Fact]
+    public void Build_FormatsAsGuidNHyphenGN()
+    {
+        var orderId = Guid.Parse("48752c3e-35bb-4d0d-b227-cbde6c1da95b");
+        var key = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.Build(orderId, 1);
+        key.Should().Be("48752c3e35bb4d0db227cbde6c1da95b-G1");
+    }
+
+    [Fact]
+    public void TryParse_ValidComposite_ReturnsParts()
+    {
+        var ok = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.TryParse(
+            "48752c3e35bb4d0db227cbde6c1da95b-G3", out var orderId, out var groupIndex);
+        ok.Should().BeTrue();
+        orderId.Should().Be(Guid.Parse("48752c3e-35bb-4d0d-b227-cbde6c1da95b"));
+        groupIndex.Should().Be(3);
+    }
+
+    [Fact]
+    public void TryParse_PlainGuid_ReturnsFalse()
+    {
+        // legacy upperKey (plain Guid) should NOT match envelope format —
+        // webhook needs this so it falls through to the legacy branch.
+        var ok = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.TryParse(
+            "48752c3e-35bb-4d0d-b227-cbde6c1da95b", out _, out _);
+        ok.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("not-a-key")]
+    [InlineData("48752c3e35bb4d0db227cbde6c1da95b")]      // no group suffix
+    [InlineData("48752c3e35bb4d0db227cbde6c1da95b-X1")]   // wrong separator
+    [InlineData("zzzzz35bb4d0db227cbde6c1da95b-G1")]      // bad hex
+    public void TryParse_Invalid_ReturnsFalse(string? input)
+    {
+        AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey
+            .TryParse(input, out _, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void RoundTrip()
+    {
+        var orderId = Guid.NewGuid();
+        var key = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.Build(orderId, 7);
+        AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.TryParse(key, out var roundOrder, out var roundGroup)
+            .Should().BeTrue();
+        roundOrder.Should().Be(orderId);
+        roundGroup.Should().Be(7);
+    }
+}
+
+public class DispatchOrderTemplateServiceTests
+{
+    private static OrderTemplate TemplateFor(Guid pickup, Guid drop, string name = "ROUTE")
+        => new(
+            name: name,
+            priority: 10,
+            structureType: "sequence",
+            transportOrderPriority: 10,
+            missions: new[] { OrderTemplateMission.CreateMove(1, "agv", 27, 10) },
+            pickupStationId: pickup,
+            dropStationId: drop);
+
+    [Fact]
+    public async Task DispatchByRoute_NoTemplate_ReturnsFailure()
+    {
+        var pickup = Guid.NewGuid();
+        var drop = Guid.NewGuid();
+        var repo = new StubTemplateRepo(matching: null);
+        var resolver = new StubResolver();
+        var dispatcher = new StubDispatcher();
+
+        var svc = new AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService(
+            repo, resolver, dispatcher, new StubSender(), Microsoft.Extensions.Logging.Abstractions.NullLogger<AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
+
+        var result = await svc.DispatchByRouteAsync(Guid.NewGuid(), pickup, drop, upperKey: "trip-1");
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("No active OrderTemplate");
+        dispatcher.Called.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DispatchByRoute_EmptyUpperKey_ReturnsFailure()
+    {
+        var svc = new AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService(
+            new StubTemplateRepo(matching: null),
+            new StubResolver(),
+            new StubDispatcher(),
+            new StubSender(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
+
+        var result = await svc.DispatchByRouteAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), upperKey: "  ");
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("UpperKey is required");
+    }
+
+    [Fact]
+    public async Task DispatchByRoute_HappyPath_SendsResolvedToDispatcher()
+    {
+        var pickup = Guid.NewGuid();
+        var drop = Guid.NewGuid();
+        var template = TemplateFor(pickup, drop, "WH-A_to_Pack-1");
+        var dispatcher = new StubDispatcher { ReturnVendorKey = "RIOT-ORDER-123" };
+
+        var svc = new AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService(
+            new StubTemplateRepo(matching: template),
+            new StubResolver(),
+            dispatcher,
+            new StubSender(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
+
+        var result = await svc.DispatchByRouteAsync(Guid.NewGuid(), pickup, drop, upperKey: "trip-abc");
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.OrderTemplateId.Should().Be(template.Id);
+        result.Value.TemplateName.Should().Be("WH-A_to_Pack-1");
+        result.Value.VendorOrderKey.Should().Be("RIOT-ORDER-123");
+        dispatcher.LastUpperKey.Should().Be("trip-abc");
+        dispatcher.LastSentOrder.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task DispatchByRoute_AppliesPriorityOverride()
+    {
+        var template = TemplateFor(Guid.NewGuid(), Guid.NewGuid());
+        var dispatcher = new StubDispatcher { ReturnVendorKey = "K" };
+
+        var svc = new AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService(
+            new StubTemplateRepo(matching: template),
+            new StubResolver(),
+            dispatcher,
+            new StubSender(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
+
+        await svc.DispatchByRouteAsync(Guid.NewGuid(), template.PickupStationId!.Value, template.DropStationId!.Value,
+            upperKey: "trip", priorityOverride: 99);
+
+        dispatcher.LastSentOrder!.Priority.Should().Be(99);
+    }
+
+    [Fact]
+    public async Task DispatchByRoute_BlankOverrides_KeepTemplateDefault()
+    {
+        var template = TemplateFor(Guid.NewGuid(), Guid.NewGuid());
+        var resolver = new StubResolver { AppointVehicleKey = "robot-7" };
+        var dispatcher = new StubDispatcher { ReturnVendorKey = "K" };
+
+        var svc = new AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService(
+            new StubTemplateRepo(matching: template),
+            resolver,
+            dispatcher,
+            new StubSender(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
+
+        await svc.DispatchByRouteAsync(Guid.NewGuid(), template.PickupStationId!.Value, template.DropStationId!.Value,
+            upperKey: "trip", appointVehicleKeyOverride: "   ");
+
+        dispatcher.LastSentOrder!.AppointVehicleKey.Should().Be("robot-7");
+    }
+
+    [Fact]
+    public async Task DispatchByRoute_VendorRejects_ReturnsFailure()
+    {
+        var template = TemplateFor(Guid.NewGuid(), Guid.NewGuid());
+        var dispatcher = new StubDispatcher { FailWith = "vendor rejected: capacity" };
+
+        var svc = new AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService(
+            new StubTemplateRepo(matching: template),
+            new StubResolver(),
+            dispatcher,
+            new StubSender(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
+
+        var result = await svc.DispatchByRouteAsync(Guid.NewGuid(), template.PickupStationId!.Value, template.DropStationId!.Value, upperKey: "trip");
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("vendor rejected");
+    }
+
+    private sealed class StubTemplateRepo : AMR.DeliveryPlanning.Planning.Domain.Repositories.IOrderTemplateRepository
+    {
+        private readonly OrderTemplate? _matching;
+        public StubTemplateRepo(OrderTemplate? matching) => _matching = matching;
+        public Task<OrderTemplate?> FindByRouteAsync(Guid pickupStationId, Guid dropStationId, CancellationToken c = default)
+            => Task.FromResult(_matching);
+        public Task<OrderTemplate?> GetByIdAsync(Guid id, CancellationToken c = default) => Task.FromResult<OrderTemplate?>(null);
+        public Task<OrderTemplate?> GetByNameAsync(string name, CancellationToken c = default) => Task.FromResult<OrderTemplate?>(null);
+        public Task<bool> NameExistsAsync(string name, Guid? excludeId = null, CancellationToken c = default) => Task.FromResult(false);
+        public Task<IReadOnlyList<OrderTemplate>> ListAsync(bool includeInactive = false, CancellationToken c = default)
+            => Task.FromResult<IReadOnlyList<OrderTemplate>>(Array.Empty<OrderTemplate>());
+        public Task AddAsync(OrderTemplate t, CancellationToken c = default) => Task.CompletedTask;
+        public void Update(OrderTemplate t) { }
+        public void Remove(OrderTemplate t) { }
+        public Task SaveChangesAsync(CancellationToken c = default) => Task.CompletedTask;
+    }
+
+    private sealed class StubResolver : AMR.DeliveryPlanning.Planning.Application.Services.IOrderTemplateResolver
+    {
+        public string? AppointVehicleKey { get; set; }
+        public Task<AMR.DeliveryPlanning.Planning.Application.Services.ResolvedOrder> ResolveAsync(
+            OrderTemplate template, CancellationToken c = default)
+        {
+            var resolved = new AMR.DeliveryPlanning.Planning.Application.Services.ResolvedOrder(
+                Name: template.Name,
+                Priority: template.Priority,
+                StructureType: template.StructureType,
+                TransportOrderPriority: template.TransportOrderPriority,
+                Missions: Array.Empty<AMR.DeliveryPlanning.Planning.Application.Services.ResolvedMission>(),
+                AppointVehicleKey: AppointVehicleKey ?? template.AppointVehicleKey,
+                AppointVehicleName: template.AppointVehicleName,
+                AppointVehicleGroupKey: template.AppointVehicleGroupKey,
+                AppointVehicleGroupName: template.AppointVehicleGroupName,
+                AppointQueueWaitArea: template.AppointQueueWaitArea);
+            return Task.FromResult(resolved);
+        }
+    }
+
+    // Minimal MediatR ISender stub — DispatchOrderTemplateService uses it
+    // to send CreateEnvelopeTripCommand into the Dispatch module. Tests
+    // don't care about the resulting TripId so return a fresh Guid.
+    private sealed class StubSender : MediatR.ISender
+    {
+        public Task<TResponse> Send<TResponse>(MediatR.IRequest<TResponse> request, CancellationToken cancellationToken = default)
+        {
+            // The only thing DispatchOrderTemplateService sends is
+            // CreateEnvelopeTripCommand which returns Result<Guid>.
+            object response = AMR.DeliveryPlanning.SharedKernel.Messaging.Result<Guid>.Success(Guid.NewGuid());
+            return Task.FromResult((TResponse)response);
+        }
+        public Task<object?> Send(object request, CancellationToken cancellationToken = default)
+            => Task.FromResult<object?>(null);
+        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default) where TRequest : MediatR.IRequest
+            => Task.CompletedTask;
+        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(MediatR.IStreamRequest<TResponse> request, CancellationToken cancellationToken = default)
+            => throw new NotImplementedException();
+        public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default)
+            => throw new NotImplementedException();
+    }
+
+    private sealed class StubDispatcher : AMR.DeliveryPlanning.Planning.Application.Services.IRobotOrderDispatcher
+    {
+        public bool Called { get; private set; }
+        public string? LastUpperKey { get; private set; }
+        public AMR.DeliveryPlanning.Planning.Application.Services.ResolvedOrder? LastSentOrder { get; private set; }
+        public string? ReturnVendorKey { get; set; }
+        public string? FailWith { get; set; }
+
+        public Task<AMR.DeliveryPlanning.SharedKernel.Messaging.Result<string>> SendAsync(
+            string upperKey,
+            AMR.DeliveryPlanning.Planning.Application.Services.ResolvedOrder order,
+            CancellationToken cancellationToken = default)
+        {
+            Called = true;
+            LastUpperKey = upperKey;
+            LastSentOrder = order;
+            return Task.FromResult(FailWith is not null
+                ? AMR.DeliveryPlanning.SharedKernel.Messaging.Result<string>.Failure(FailWith)
+                : AMR.DeliveryPlanning.SharedKernel.Messaging.Result<string>.Success(ReturnVendorKey!));
+        }
     }
 }

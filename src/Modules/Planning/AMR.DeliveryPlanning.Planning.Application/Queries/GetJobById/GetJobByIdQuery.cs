@@ -16,12 +16,13 @@ public record JobDto(
     string? RequiredCapability,
     DateTime? SlaDeadline,
     string? PlanningTrace,
-    int LegCount)
+    int LegCount,
+    string? TransportMode)
 {
     public static JobDto From(Job job) => new(
         job.Id, job.DeliveryOrderId,
         job.Status.ToString(), job.Pattern.ToString(),
         job.AssignedVehicleId, job.EstimatedDuration, job.EstimatedDistance,
         job.RequiredCapability, job.SlaDeadline, job.PlanningTrace,
-        job.Legs.Count);
+        job.Legs.Count, job.TransportMode);
 }
