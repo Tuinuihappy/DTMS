@@ -76,6 +76,10 @@ services:
       - Auth__DevTenantId=00000000-0000-0000-0000-000000000001
       - VendorAdapter__Riot3__BaseUrl=http://10.204.212.28:12000
       - VendorAdapter__Riot3__ApiKey=${VendorAdapter__Riot3__ApiKey:-}
+      - Dispatch__UseOrderTemplateDispatch=${Dispatch__UseOrderTemplateDispatch:-false}
+      - Dispatch__Reconciliation__Enabled=${Dispatch__Reconciliation__Enabled:-false}
+      - Dispatch__Reconciliation__PollIntervalSeconds=${Dispatch__Reconciliation__PollIntervalSeconds:-60}
+      - Dispatch__Reconciliation__StaleThresholdHours=${Dispatch__Reconciliation__StaleThresholdHours:-24}
       - OpenTelemetry__Endpoint=http://jaeger:4317
       # Dev-only placeholder secret — NOT for production (production uses Vault/KMS)
       - Jwt__Secret=dev-only-secret-min-32-chars-placeholder!

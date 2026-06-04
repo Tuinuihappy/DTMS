@@ -6,6 +6,7 @@
     <ProjectReference Include="..\..\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents\AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.csproj" />
     <ProjectReference Include="..\..\Facility\AMR.DeliveryPlanning.Facility.Domain\AMR.DeliveryPlanning.Facility.Domain.csproj" />
     <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.Domain\AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
+    <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.Application\AMR.DeliveryPlanning.Dispatch.Application.csproj" />
     <ProjectReference Include="..\AMR.DeliveryPlanning.Planning.IntegrationEvents\AMR.DeliveryPlanning.Planning.IntegrationEvents.csproj" />
   </ItemGroup>
 

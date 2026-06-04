@@ -11,7 +11,6 @@ public class PlanningDbContext : DbContext
 
     public DbSet<Job> Jobs { get; set; } = null!;
     public DbSet<Leg> Legs { get; set; } = null!;
-    public DbSet<Stop> Stops { get; set; } = null!;
     public DbSet<JobDependency> JobDependencies { get; set; } = null!;
     public DbSet<MilkRunTemplate> MilkRunTemplates { get; set; } = null!;
     public DbSet<MilkRunStop> MilkRunStops { get; set; } = null!;
@@ -35,6 +34,7 @@ public class PlanningDbContext : DbContext
             builder.Property(j => j.RequiredCapability).HasMaxLength(50);
             builder.Property(j => j.TotalWeight);
             builder.Property(j => j.SlaDeadline);
+            builder.Property(j => j.TransportMode).HasMaxLength(20);
             builder.Property(j => j.PlanningTrace).HasColumnType("text");
             builder.Ignore(j => j.DomainEvents);
 
@@ -58,17 +58,6 @@ public class PlanningDbContext : DbContext
         modelBuilder.Entity<Leg>(builder =>
         {
             builder.HasKey(l => l.Id);
-
-            builder.HasMany(l => l.Stops)
-                   .WithOne()
-                   .HasForeignKey(s => s.LegId)
-                   .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<Stop>(builder =>
-        {
-            builder.HasKey(s => s.Id);
-            builder.Property(s => s.Type).HasConversion<string>().HasMaxLength(20);
         });
 
         modelBuilder.Entity<JobDependency>(builder =>
@@ -130,6 +119,12 @@ public class PlanningDbContext : DbContext
             builder.Property(t => t.Description).HasMaxLength(500);
             builder.Property(t => t.IsActive).HasDefaultValue(true).IsRequired();
             builder.HasIndex(t => t.IsActive);
+
+            builder.Property(t => t.PickupStationId);
+            builder.Property(t => t.DropStationId);
+            // Composite index for route-based template lookup from
+            // DeliveryOrderValidatedConsumer when an order is confirmed.
+            builder.HasIndex(t => new { t.PickupStationId, t.DropStationId, t.IsActive });
 
             // Missions are owned solely by the parent template; storing them as
             // a single jsonb document keeps reads cheap and matches the RIOT3

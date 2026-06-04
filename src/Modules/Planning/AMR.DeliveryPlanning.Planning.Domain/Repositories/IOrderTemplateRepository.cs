@@ -14,6 +14,17 @@ public interface IOrderTemplateRepository
         bool includeInactive = false,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Find an active template matching the given route (pickup → drop station).
+    /// Used by the Planning consumer when a DeliveryOrder is confirmed to
+    /// select which RIOT3 envelope to instantiate. Returns null when no
+    /// route-specific template exists for this pair.
+    /// </summary>
+    Task<OrderTemplate?> FindByRouteAsync(
+        Guid pickupStationId,
+        Guid dropStationId,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(OrderTemplate template, CancellationToken cancellationToken = default);
 
     void Update(OrderTemplate template);

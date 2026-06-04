@@ -1,39 +1,31 @@
 using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
-using AMR.DeliveryPlanning.Planning.Application.Commands.AssignPackagesToJob;
-using AMR.DeliveryPlanning.Planning.Application.Commands.CommitPlan;
-using AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder;
+using AMR.DeliveryPlanning.Planning.Application.Services;
+using AMR.DeliveryPlanning.SharedKernel;
 using MassTransit;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Consumers;
 
 /// <summary>
-/// Auto Planning Pipeline:
-///   DeliveryOrder (Confirmed) → Group items by station pair → Create Job per group → Commit Plan
+/// Auto Planning Pipeline (envelope-only — legacy job/leg/task path
+/// removed in Phase b7):
+///   DeliveryOrder (Confirmed) → Group items by station pair → for each
+///   group, look up an active OrderTemplate for the route and POST the
+///   RIOT3 envelope. Vendor takes over execution; callbacks land via
+///   webhook (Riot3Webhooks.HandleEnvelopeTaskEvent). Groups without a
+///   matching template are rejected with a warning — ops must register
+///   a template before re-confirming the order.
 /// </summary>
 public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIntegrationEventV1>
 {
-    private readonly ISender _sender;
-    private readonly ICarrierTypeProfileRepository _carrierTypeRepo;
-    private readonly IShelfRepository _shelfRepo;
-    private readonly IShelfManifestRepository _shelfManifestRepo;
+    private readonly IDispatchOrderTemplateService _envelopeDispatch;
     private readonly ILogger<DeliveryOrderValidatedConsumer> _logger;
 
     public DeliveryOrderValidatedConsumer(
-        ISender sender,
-        ICarrierTypeProfileRepository carrierTypeRepo,
-        IShelfRepository shelfRepo,
-        IShelfManifestRepository shelfManifestRepo,
+        IDispatchOrderTemplateService envelopeDispatch,
         ILogger<DeliveryOrderValidatedConsumer> logger)
     {
-        _sender = sender;
-        _carrierTypeRepo = carrierTypeRepo;
-        _shelfRepo = shelfRepo;
-        _shelfManifestRepo = shelfManifestRepo;
+        _envelopeDispatch = envelopeDispatch;
         _logger = logger;
     }
 
@@ -45,55 +37,45 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
             .GroupBy(i => (i.PickupStationId, i.DropStationId))
             .ToList();
 
-        _logger.LogInformation("[AutoPlan] Order {OrderId} with {ItemCount} item(s) in {GroupCount} station group(s) — starting auto planning...",
-            evt.DeliveryOrderId, evt.Items.Count, stationGroups.Count);
+        _logger.LogInformation("[AutoPlan] Order {OrderId} with {ItemCount} item(s) in {GroupCount} station group(s) (transport mode: {Mode}, SLA deadline: {Sla})",
+            evt.DeliveryOrderId, evt.Items.Count, stationGroups.Count,
+            evt.RequestedTransportMode ?? "(unspecified)",
+            evt.LatestUtc?.ToString("o") ?? "(none)");
 
         foreach (var (groupIndex, stationGroup) in stationGroups.Index())
         {
             var items = stationGroup.ToList();
-            var groupWeight = items.Sum(i => i.WeightKg);
-            var itemIds = items.Select(i => i.ItemId).ToList();
 
-            _logger.LogInformation("[AutoPlan] Group {G}: {Count} item(s), {Weight}kg ({Pickup} → {Drop})",
-                groupIndex + 1, items.Count, groupWeight,
+            _logger.LogInformation("[AutoPlan] Group {G}: {Count} item(s) ({Pickup} → {Drop})",
+                groupIndex + 1, items.Count,
                 stationGroup.Key.PickupStationId, stationGroup.Key.DropStationId);
 
-            var createResult = await _sender.Send(new CreateJobFromOrderCommand(
+            // Composite upperKey scheme: see EnvelopeUpperKey for the
+            // format. RIOT3 echoes this back in every webhook.
+            var upperKey = EnvelopeUpperKey.Build(evt.DeliveryOrderId, groupIndex + 1);
+
+            var envelopeResult = await _envelopeDispatch.DispatchByRouteAsync(
                 evt.DeliveryOrderId,
                 stationGroup.Key.PickupStationId,
                 stationGroup.Key.DropStationId,
-                evt.Priority,
-                RequiredCapability: null,
-                TotalWeight: groupWeight),
-                context.CancellationToken);
+                upperKey,
+                appointVehicleKeyOverride: null,
+                cancellationToken: context.CancellationToken);
 
-            if (!createResult.IsSuccess)
+            if (envelopeResult.IsSuccess)
             {
-                _logger.LogWarning("[AutoPlan] Failed to create job for Group {G}: {Error}", groupIndex + 1, createResult.Error);
-                continue;
+                _logger.LogInformation(
+                    "[AutoPlan] ✓ Group {G} dispatched via envelope template '{Template}' (upperKey {UpperKey} → vendorOrderKey {VendorKey}, tripId {TripId})",
+                    groupIndex + 1, envelopeResult.Value.TemplateName, upperKey, envelopeResult.Value.VendorOrderKey, envelopeResult.Value.TripId);
             }
-
-            var jobId = createResult.Value;
-
-            await AssignPackagesToJobAsync(jobId, itemIds, context.CancellationToken);
-
-            var commitResult = await _sender.Send(new CommitPlanCommand(jobId), context.CancellationToken);
-            if (!commitResult.IsSuccess)
+            else
             {
-                _logger.LogWarning("[AutoPlan] Failed to commit Job {JobId}: {Error}", jobId, commitResult.Error);
-                continue;
+                _logger.LogWarning(
+                    "[AutoPlan] ✗ Group {G} ({Pickup} → {Drop}) skipped: {Reason}. Register an OrderTemplate for this route and re-confirm.",
+                    groupIndex + 1, stationGroup.Key.PickupStationId, stationGroup.Key.DropStationId, envelopeResult.Error);
             }
-
-            _logger.LogInformation("[AutoPlan] ✓ Job {JobId} committed (Group {G})", jobId, groupIndex + 1);
         }
 
         _logger.LogInformation("[AutoPlan] ═══ Pipeline complete for Order {OrderId} ═══", evt.DeliveryOrderId);
-    }
-
-    private async Task AssignPackagesToJobAsync(Guid jobId, List<string> itemIds, CancellationToken ct)
-    {
-        var result = await _sender.Send(new AssignPackagesToJobCommand(jobId, itemIds), ct);
-        if (!result.IsSuccess)
-            _logger.LogWarning("[AutoPlan] Failed to assign items to Job {JobId}: {Error}", jobId, result.Error);
     }
 }

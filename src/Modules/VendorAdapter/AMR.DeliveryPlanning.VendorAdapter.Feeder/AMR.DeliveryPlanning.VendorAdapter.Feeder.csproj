@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AMR.DeliveryPlanning.VendorAdapter.Abstractions\AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.Domain\AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
     <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.IntegrationEvents\AMR.DeliveryPlanning.Dispatch.IntegrationEvents.csproj" />
     <ProjectReference Include="..\AMR.DeliveryPlanning.VendorAdapter.Riot3\AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj" />
     <ProjectReference Include="..\..\Fleet\AMR.DeliveryPlanning.Fleet.IntegrationEvents\AMR.DeliveryPlanning.Fleet.IntegrationEvents.csproj" />

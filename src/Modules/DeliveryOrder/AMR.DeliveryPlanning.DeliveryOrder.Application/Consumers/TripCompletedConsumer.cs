@@ -1,4 +1,3 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
 using MassTransit;
@@ -8,8 +7,15 @@ using Microsoft.Extensions.Logging;
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Consumers;
 
 /// <summary>
-/// Listens for TripCompletedIntegrationEvent and marks the DeliveryOrder as Completed.
-/// Flow: Dispatch (Trip Completed) → DeliveryOrder (Completed)
+/// Finalizes a DeliveryOrder when its Trip completes. Branches on
+/// VendorUpperKey:
+///   non-null (envelope flow) → MarkVendorCompleted (vendor-authoritative,
+///       marks all items Delivered then moves order to Completed)
+///   null (legacy flow)       → MarkAsCompleted (reads POD-driven item
+///       statuses; may yield Completed / PartiallyCompleted / Failed)
+///
+/// Invariant for legacy: POD scan events must arrive BEFORE TripCompleted
+/// for the finalization to read the right item state.
 /// </summary>
 public class TripCompletedConsumer : IConsumer<TripCompletedIntegrationEvent>
 {
@@ -25,7 +31,10 @@ public class TripCompletedConsumer : IConsumer<TripCompletedIntegrationEvent>
     public async Task Consume(ConsumeContext<TripCompletedIntegrationEvent> context)
     {
         var evt = context.Message;
-        _logger.LogInformation("Received TripCompleted event for Trip {TripId}, Job {JobId}", evt.TripId, evt.JobId);
+        var isEnvelope = !string.IsNullOrEmpty(evt.VendorUpperKey);
+        _logger.LogInformation(
+            "Received TripCompleted event for Trip {TripId}, Job {JobId} (envelope: {Envelope}, vendorUpperKey: {UpperKey})",
+            evt.TripId, evt.JobId, isEnvelope, evt.VendorUpperKey ?? "(none)");
 
         var order = await _repository.GetByIdAsync(evt.DeliveryOrderId, context.CancellationToken);
         if (order is null)
@@ -36,18 +45,22 @@ public class TripCompletedConsumer : IConsumer<TripCompletedIntegrationEvent>
 
         try
         {
-            order.MarkAsCompleted();
-            order.UpdateAllItemStatuses(ItemStatus.Delivered);
+            if (isEnvelope)
+                order.MarkVendorCompleted();
+            else
+                order.MarkAsCompleted();
+
             await _repository.SaveChangesAsync(context.CancellationToken);
-            _logger.LogInformation("DeliveryOrder {OrderId} marked Completed via Trip {TripId}", order.Id, evt.TripId);
+            _logger.LogInformation("DeliveryOrder {OrderId} finalized as {FinalStatus} via Trip {TripId} ({Flow})",
+                order.Id, order.Status, evt.TripId, isEnvelope ? "envelope" : "legacy");
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogError(ex, "Cannot complete DeliveryOrder {OrderId}: {Message}", order.Id, ex.Message);
+            _logger.LogError(ex, "Cannot finalize DeliveryOrder {OrderId}: {Message}", order.Id, ex.Message);
         }
         catch (DbUpdateConcurrencyException)
         {
-            _logger.LogWarning("Concurrency conflict completing DeliveryOrder {OrderId}. MassTransit will retry.", order.Id);
+            _logger.LogWarning("Concurrency conflict finalizing DeliveryOrder {OrderId}. MassTransit will retry.", order.Id);
             throw;
         }
     }

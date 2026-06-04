@@ -37,6 +37,12 @@ public class OrderTemplate : AggregateRoot<Guid>
     public DateTime CreatedAt { get; private set; }
     public DateTime? ModifiedAt { get; private set; }
 
+    // Route fields — used by Planning consumer to lookup a template by
+    // (PickupStationId, DropStationId) when a DeliveryOrder is confirmed.
+    // Nullable: legacy templates / generic recipes won't have these set.
+    public Guid? PickupStationId { get; private set; }
+    public Guid? DropStationId { get; private set; }
+
     public IReadOnlyList<OrderTemplateMission> Missions { get; private set; } = new List<OrderTemplateMission>();
 
     private OrderTemplate() { } // EF Core
@@ -52,7 +58,9 @@ public class OrderTemplate : AggregateRoot<Guid>
         string? appointVehicleGroupKey = null,
         string? appointVehicleGroupName = null,
         string? appointQueueWaitArea = null,
-        string? description = null)
+        string? description = null,
+        Guid? pickupStationId = null,
+        Guid? dropStationId = null)
     {
         Id = Guid.NewGuid();
         SetName(name);
@@ -66,6 +74,8 @@ public class OrderTemplate : AggregateRoot<Guid>
         AppointVehicleGroupName = Normalize(appointVehicleGroupName);
         AppointQueueWaitArea = Normalize(appointQueueWaitArea);
         Description = Normalize(description);
+        PickupStationId = pickupStationId;
+        DropStationId = dropStationId;
         IsActive = true;
         CreatedAt = DateTime.UtcNow;
     }
@@ -80,7 +90,9 @@ public class OrderTemplate : AggregateRoot<Guid>
         string? appointVehicleGroupKey,
         string? appointVehicleGroupName,
         string? appointQueueWaitArea,
-        string? description)
+        string? description,
+        Guid? pickupStationId = null,
+        Guid? dropStationId = null)
     {
         Priority = priority;
         SetStructureType(structureType);
@@ -92,6 +104,8 @@ public class OrderTemplate : AggregateRoot<Guid>
         AppointVehicleGroupName = Normalize(appointVehicleGroupName);
         AppointQueueWaitArea = Normalize(appointQueueWaitArea);
         Description = Normalize(description);
+        PickupStationId = pickupStationId;
+        DropStationId = dropStationId;
         ModifiedAt = DateTime.UtcNow;
     }
 

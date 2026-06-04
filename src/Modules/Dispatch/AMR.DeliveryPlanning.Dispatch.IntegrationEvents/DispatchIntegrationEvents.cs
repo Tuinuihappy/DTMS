@@ -5,8 +5,15 @@ namespace AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
 public record TripStartedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid VehicleId) : IIntegrationEvent;
 
+// VendorUpperKey is the composite envelope correlation key
+// (see EnvelopeUpperKey) that RIOT3 echoes back on every webhook.
 public record TripCompletedIntegrationEvent(
-    Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId) : IIntegrationEvent;
+    Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId,
+    string VendorUpperKey) : IIntegrationEvent;
+
+public record TripFailedIntegrationEvent(
+    Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId,
+    string Reason, string VendorUpperKey) : IIntegrationEvent;
 
 public record TripCancelledIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, string Reason) : IIntegrationEvent;
@@ -22,10 +29,3 @@ public record PodCapturedIntegrationEvent(
     Guid StopId,
     IReadOnlyList<string> ScannedIds) : IIntegrationEvent;
 
-// RIOT3 vendor callbacks → Dispatch consumers route these to ReportTaskCompleted/Failed
-public record Riot3TaskCompletedIntegrationEvent(
-    Guid EventId, DateTime OccurredOn, Guid TaskId, string VendorOrderKey) : IIntegrationEvent;
-
-public record Riot3TaskFailedIntegrationEvent(
-    Guid EventId, DateTime OccurredOn, Guid TaskId, string VendorOrderKey,
-    string ErrorCode, string ErrorMessage) : IIntegrationEvent;

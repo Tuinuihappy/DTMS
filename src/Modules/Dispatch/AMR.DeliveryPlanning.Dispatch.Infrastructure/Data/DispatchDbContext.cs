@@ -9,7 +9,6 @@ public class DispatchDbContext : DbContext
     public const string Schema = "dispatch";
 
     public DbSet<Trip> Trips { get; set; } = null!;
-    public DbSet<RobotTask> RobotTasks { get; set; } = null!;
     public DbSet<ExecutionEvent> ExecutionEvents { get; set; } = null!;
     public DbSet<TripException> TripExceptions { get; set; } = null!;
     public DbSet<ProofOfDelivery> ProofsOfDelivery { get; set; } = null!;
@@ -26,15 +25,14 @@ public class DispatchDbContext : DbContext
         {
             builder.HasKey(t => t.Id);
             builder.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);
+            builder.Property(t => t.UpperKey).HasMaxLength(80).IsRequired();
+            builder.Property(t => t.VendorOrderKey).HasMaxLength(100);
+            builder.Property(t => t.FailureReason).HasMaxLength(1000);
+            // UpperKey is the RIOT3 correlation key (and unique). Legacy
+            // job/task trips (which had null UpperKey) were dropped in
+            // Phase b7 — all surviving rows are envelope-dispatched.
+            builder.HasIndex(t => t.UpperKey).IsUnique();
             builder.Ignore(t => t.DomainEvents);
-
-            builder.HasMany(t => t.Tasks)
-                   .WithOne()
-                   .HasForeignKey(rt => rt.TripId)
-                   .OnDelete(DeleteBehavior.Cascade);
-            builder.Navigation(t => t.Tasks)
-                   .HasField("_tasks")
-                   .UsePropertyAccessMode(PropertyAccessMode.Field);
 
             builder.HasMany(t => t.Events)
                    .WithOne()
@@ -59,14 +57,6 @@ public class DispatchDbContext : DbContext
             builder.Navigation(t => t.ProofsOfDelivery)
                    .HasField("_proofs")
                    .UsePropertyAccessMode(PropertyAccessMode.Field);
-        });
-
-        modelBuilder.Entity<RobotTask>(builder =>
-        {
-            builder.HasKey(rt => rt.Id);
-            builder.Property(rt => rt.Type).HasConversion<string>().HasMaxLength(20);
-            builder.Property(rt => rt.Status).HasConversion<string>().HasMaxLength(20);
-            builder.Property(rt => rt.FailureReason).HasMaxLength(500);
         });
 
         modelBuilder.Entity<ExecutionEvent>(builder =>

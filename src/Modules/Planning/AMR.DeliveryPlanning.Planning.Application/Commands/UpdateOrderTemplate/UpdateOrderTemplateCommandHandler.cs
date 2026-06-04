@@ -43,7 +43,9 @@ internal sealed class UpdateOrderTemplateCommandHandler : ICommandHandler<Update
                 appointVehicleGroupKey: request.AppointVehicleGroupKey,
                 appointVehicleGroupName: request.AppointVehicleGroupName,
                 appointQueueWaitArea: request.AppointQueueWaitArea,
-                description: request.Description);
+                description: request.Description,
+                pickupStationId: request.PickupStationId,
+                dropStationId: request.DropStationId);
         }
         catch (ArgumentException ex)
         {

@@ -18,7 +18,19 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     evt.OccurredOn,
                     evt.TripId,
                     evt.JobId,
-                    evt.DeliveryOrderId)
+                    evt.DeliveryOrderId,
+                    evt.VendorUpperKey)
+            ],
+            TripFailedDomainEvent evt =>
+            [
+                new TripFailedIntegrationEvent(
+                    evt.EventId,
+                    evt.OccurredOn,
+                    evt.TripId,
+                    evt.JobId,
+                    evt.DeliveryOrderId,
+                    evt.Reason,
+                    evt.VendorUpperKey)
             ],
             TripCancelledDomainEvent evt =>
             [

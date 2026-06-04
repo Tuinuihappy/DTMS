@@ -40,7 +40,9 @@ public sealed record OrderTemplateDto(
     string? Description,
     bool IsActive,
     DateTime CreatedAt,
-    DateTime? ModifiedAt);
+    DateTime? ModifiedAt,
+    Guid? PickupStationId,
+    Guid? DropStationId);
 
 public record GetOrderTemplatesQuery(bool IncludeInactive = false) : IQuery<List<OrderTemplateDto>>;
 
@@ -98,7 +100,9 @@ public static class OrderTemplateDtoFactory
             Description: t.Description,
             IsActive: t.IsActive,
             CreatedAt: t.CreatedAt,
-            ModifiedAt: t.ModifiedAt);
+            ModifiedAt: t.ModifiedAt,
+            PickupStationId: t.PickupStationId,
+            DropStationId: t.DropStationId);
     }
 
     // Mission action params are stored as strings but RIOT3 expects integers

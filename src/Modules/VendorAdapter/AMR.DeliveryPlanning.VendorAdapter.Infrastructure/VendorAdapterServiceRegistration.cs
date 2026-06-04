@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.VendorAdapter.Abstractions.Services;
+using AMR.DeliveryPlanning.VendorAdapter.Feeder.Options;
 using AMR.DeliveryPlanning.VendorAdapter.Feeder.Services;
 using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data;
 using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Extensions;
@@ -32,6 +33,23 @@ public static class VendorAdapterServiceRegistration
         })
         .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
         .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
+
+        // Read-side query client for the reconciliation poller (GET /orders/{key}?isUpper=true)
+        services.AddHttpClient<IRiot3OrderQueryService, Riot3OrderQueryService>(client =>
+        {
+            client.BaseAddress = new Uri(riot3BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(15);
+            if (!string.IsNullOrWhiteSpace(riot3ApiKey))
+                client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
+        })
+        .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
+        .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
+
+        // Reconciliation poller — safety net for missed envelope webhooks.
+        // Gated by Dispatch:Reconciliation:Enabled; off by default.
+        services.Configure<ReconciliationOptions>(
+            configuration.GetSection(ReconciliationOptions.SectionName));
+        services.AddHostedService<Riot3ReconciliationService>();
 
         // Feeder adapter HttpClient with Polly resilience
         services.AddHttpClient<FeederCommandService>(client =>

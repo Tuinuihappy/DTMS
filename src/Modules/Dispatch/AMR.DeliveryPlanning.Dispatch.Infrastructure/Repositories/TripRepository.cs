@@ -18,40 +18,41 @@ public class TripRepository : ITripRepository
     public async Task<Trip?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.Trips
-            .Include(t => t.Tasks)
             .Include(t => t.Events)
             .Include(t => t.Exceptions)
             .Include(t => t.ProofsOfDelivery)
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
     }
 
-    public async Task<Trip?> GetTripByTaskIdAsync(Guid taskId, CancellationToken cancellationToken = default)
+    public async Task<Trip?> GetByUpperKeyAsync(string upperKey, CancellationToken cancellationToken = default)
     {
-        // RobotTasks has no global filter; look up the owning TripId first.
-        var tripId = await _context.RobotTasks
-            .Where(rt => rt.Id == taskId)
-            .Select(rt => rt.TripId)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (tripId == Guid.Empty) return null;
+        if (string.IsNullOrWhiteSpace(upperKey)) return null;
 
         // IgnoreQueryFilters: RIOT3 vendor callbacks carry no tenant claim.
-        // We look up by TripId (which is RIOT3-internal), so there is no cross-tenant
-        // ambiguity — one TaskId maps to exactly one Trip.
+        // UpperKey is globally unique so cross-tenant leakage isn't a concern.
         return await _context.Trips
             .IgnoreQueryFilters()
-            .Include(t => t.Tasks)
             .Include(t => t.Events)
-            .Include(t => t.Exceptions)
-            .Include(t => t.ProofsOfDelivery)
-            .FirstOrDefaultAsync(t => t.Id == tripId, cancellationToken);
+            .FirstOrDefaultAsync(t => t.UpperKey == upperKey, cancellationToken);
     }
 
     public async Task<List<Trip>> GetActiveTripsByVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default)
     {
         return await _context.Trips
             .Where(t => t.VehicleId == vehicleId && t.Status == TripStatus.InProgress)
-            .Include(t => t.Tasks)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<Trip>> GetInFlightEnvelopeTripsAsync(DateTime staleCutoffUtc, CancellationToken cancellationToken = default)
+    {
+        // IgnoreQueryFilters: the reconciler runs as a system service with no
+        // tenant context.
+        return await _context.Trips
+            .IgnoreQueryFilters()
+            .Where(t => (t.Status == TripStatus.Created
+                         || t.Status == TripStatus.InProgress
+                         || t.Status == TripStatus.Paused)
+                        && t.CreatedAt >= staleCutoffUtc)
             .ToListAsync(cancellationToken);
     }
 
@@ -74,16 +75,8 @@ public class TripRepository : ITripRepository
             entry.Property(t => t.Status).IsModified = true;
             entry.Property(t => t.StartedAt).IsModified = true;
             entry.Property(t => t.CompletedAt).IsModified = true;
-
-            foreach (var task in trip.Tasks)
-            {
-                _context.RobotTasks.Attach(task);
-                var taskEntry = _context.Entry(task);
-                taskEntry.Property(t => t.Status).IsModified = true;
-                taskEntry.Property(t => t.StartedAt).IsModified = true;
-                taskEntry.Property(t => t.CompletedAt).IsModified = true;
-                taskEntry.Property(t => t.FailureReason).IsModified = true;
-            }
+            entry.Property(t => t.FailureReason).IsModified = true;
+            entry.Property(t => t.VehicleId).IsModified = true;
 
             foreach (var exception in trip.Exceptions)
             {

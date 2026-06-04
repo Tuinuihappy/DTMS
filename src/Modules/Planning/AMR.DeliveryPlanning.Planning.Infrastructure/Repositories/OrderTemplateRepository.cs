@@ -43,6 +43,19 @@ public class OrderTemplateRepository : IOrderTemplateRepository
         return await query.OrderBy(t => t.Name).ToListAsync(cancellationToken);
     }
 
+    public Task<OrderTemplate?> FindByRouteAsync(
+        Guid pickupStationId,
+        Guid dropStationId,
+        CancellationToken cancellationToken = default)
+    {
+        return _context.OrderTemplates
+            .Where(t => t.IsActive
+                     && t.PickupStationId == pickupStationId
+                     && t.DropStationId == dropStationId)
+            .OrderBy(t => t.Name)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public Task AddAsync(OrderTemplate template, CancellationToken cancellationToken = default)
         => _context.OrderTemplates.AddAsync(template, cancellationToken).AsTask();
 

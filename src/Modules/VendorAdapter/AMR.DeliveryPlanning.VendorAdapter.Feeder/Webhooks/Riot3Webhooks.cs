@@ -1,10 +1,13 @@
+using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.Fleet.IntegrationEvents;
+using AMR.DeliveryPlanning.SharedKernel;
 using AMR.DeliveryPlanning.VendorAdapter.Abstractions.Services;
 using AMR.DeliveryPlanning.VendorAdapter.Riot3.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.VendorAdapter.Feeder.Webhooks;
@@ -20,6 +23,7 @@ public static class Riot3Webhooks
             Riot3NotifyPayload payload,
             IVendorAdapterOutbox outbox,
             IVehicleIdentityResolver vehicleIdentityResolver,
+            ITripRepository tripRepository,
             ILogger<Riot3NotifyPayload> logger,
             CancellationToken cancellationToken) =>
         {
@@ -29,7 +33,7 @@ public static class Riot3Webhooks
             switch (NormalizeNotifyType(payload.Type))
             {
                 case "task":
-                    await HandleTaskEvent(payload, outbox, logger, cancellationToken);
+                    await HandleTaskEvent(payload, outbox, tripRepository, logger, cancellationToken);
                     break;
 
                 case "subtask":
@@ -90,57 +94,100 @@ public static class Riot3Webhooks
     private static async Task HandleTaskEvent(
         Riot3NotifyPayload payload,
         IVendorAdapterOutbox outbox,
+        ITripRepository tripRepository,
         ILogger logger,
         CancellationToken cancellationToken)
     {
-        // upperKey = our TaskId (used as idempotency key when submitting)
         var upperKey = payload.Task?.UpperKey;
-        if (!Guid.TryParse(upperKey, out var taskId))
+        var orderKey = payload.Task?.Key ?? string.Empty;
+
+        // Envelope-dispatched orders use a composite upperKey
+        // ("{deliveryOrderId:N}-G{groupIndex}"). All RIOT3 trips are
+        // envelope-dispatched now (legacy per-task path removed in Phase b7).
+        if (!EnvelopeUpperKey.TryParse(upperKey, out _, out _))
         {
-            logger.LogWarning("RIOT3 task event missing/invalid upperKey: {UpperKey}", upperKey);
+            logger.LogWarning("RIOT3 task event has unrecognized upperKey format: {UpperKey} — ignored.", upperKey);
             return;
         }
 
-        var orderKey = payload.Task?.Key ?? string.Empty;
+        await HandleEnvelopeTaskEvent(payload, upperKey!, orderKey, tripRepository, logger, cancellationToken);
+    }
 
-        switch (payload.TaskEventType?.ToUpperInvariant())
+    // ── envelope-dispatched task events ──────────────────────────────────────
+    // For envelope-dispatched trips, upperKey is the composite DTMS key
+    // ("{orderId:N}-G{groupIndex}"). We look up the Trip we persisted at
+    // dispatch time and update its status directly via the vendor lifecycle
+    // methods. No integration event propagation yet — Phase (b6) wires that
+    // into DeliveryOrder.MarkAsCompleted.
+    private static async Task HandleEnvelopeTaskEvent(
+        Riot3NotifyPayload payload,
+        string upperKey,
+        string orderKey,
+        ITripRepository tripRepository,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var trip = await tripRepository.GetByUpperKeyAsync(upperKey, cancellationToken);
+        if (trip is null)
         {
-            case "TASK_FINISHED":
-                logger.LogInformation("RIOT3 task finished: {TaskId}", taskId);
-                await outbox.AddAsync(new Riot3TaskCompletedIntegrationEvent(
-                    Guid.NewGuid(), DateTime.UtcNow, taskId, orderKey), cancellationToken);
-                break;
-
-            case "TASK_FAILED":
-                var failResult = payload.Task?.FailReason;
-                var errorCode = failResult?.ErrorCode ?? "UNKNOWN";
-                var errorMsg = failResult?.ErrorDescription ?? "Task failed";
-                logger.LogWarning("RIOT3 task failed: {TaskId} [{Code}] {Msg}", taskId, errorCode, errorMsg);
-                await outbox.AddAsync(new Riot3TaskFailedIntegrationEvent(
-                    Guid.NewGuid(), DateTime.UtcNow, taskId, orderKey, errorCode, errorMsg), cancellationToken);
-                break;
-
-            case "TASK_CANCELED":
-                logger.LogInformation("RIOT3 task canceled: {TaskId} reason={Reason}",
-                    taskId, payload.Task?.CancelReason);
-                break;
-
-            case "TASK_PROCESSING":
-                logger.LogDebug("RIOT3 task started: {TaskId}", taskId);
-                break;
-
-            case "TASK_HANG":
-            case "TASK_HELD":
-                logger.LogInformation("RIOT3 task paused: {TaskId} event={Event} reason={Reason}",
-                    taskId, payload.TaskEventType, payload.Task?.HangReason);
-                break;
-
-            case "TASK_HANG_TO_CONTINUE":
-            case "TASK_HELD_TO_CONTINUE":
-                logger.LogDebug("RIOT3 task resumed: {TaskId} event={Event}",
-                    taskId, payload.TaskEventType);
-                break;
+            logger.LogWarning(
+                "[EnvelopeWebhook] No Trip found for upperKey {UpperKey} (vendor orderKey {OrderKey}, event {Event}) — webhook ignored.",
+                upperKey, orderKey, payload.TaskEventType);
+            return;
         }
+
+        var eventType = payload.TaskEventType?.ToUpperInvariant();
+        try
+        {
+            switch (eventType)
+            {
+                case "TASK_PROCESSING":
+                    // RIOT3 may also report the chosen robot here via
+                    // processingVehicle.key — propagate if present.
+                    Guid? vehicleId = null;
+                    var vehKey = payload.Task?.ProcessingVehicle?.Key;
+                    if (Guid.TryParse(vehKey, out var v)) vehicleId = v;
+                    trip.MarkVendorStarted(vehicleId);
+                    logger.LogInformation("[EnvelopeWebhook] Trip {TripId} started (upperKey {UpperKey}, vehicle {VehicleId})",
+                        trip.Id, upperKey, vehicleId?.ToString() ?? "(unassigned)");
+                    break;
+
+                case "TASK_FINISHED":
+                    trip.MarkVendorCompleted();
+                    logger.LogInformation("[EnvelopeWebhook] ✓ Trip {TripId} completed (upperKey {UpperKey})",
+                        trip.Id, upperKey);
+                    break;
+
+                case "TASK_FAILED":
+                    var failReason = payload.Task?.FailReason?.ErrorDescription
+                                     ?? payload.Task?.FailReason?.ErrorCode
+                                     ?? "vendor reported failure";
+                    trip.MarkVendorFailed(failReason);
+                    logger.LogWarning("[EnvelopeWebhook] Trip {TripId} failed (upperKey {UpperKey}): {Reason}",
+                        trip.Id, upperKey, failReason);
+                    break;
+
+                case "TASK_CANCELED":
+                    var cancelReason = payload.Task?.CancelReason ?? "vendor cancelled";
+                    trip.MarkVendorFailed(cancelReason);
+                    logger.LogInformation("[EnvelopeWebhook] Trip {TripId} cancelled by vendor (upperKey {UpperKey}): {Reason}",
+                        trip.Id, upperKey, cancelReason);
+                    break;
+
+                default:
+                    logger.LogDebug("[EnvelopeWebhook] Trip {TripId} event {Event} — no state change applied.",
+                        trip.Id, eventType);
+                    return;
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning("[EnvelopeWebhook] Trip {TripId} state transition rejected for event {Event}: {Error}",
+                trip.Id, eventType, ex.Message);
+            return;
+        }
+
+        await tripRepository.UpdateAsync(trip, cancellationToken);
     }
 
     private static async Task HandleSubTaskEvent(
@@ -149,40 +196,22 @@ public static class Riot3Webhooks
         ILogger logger,
         CancellationToken cancellationToken)
     {
-        // Sub-tasks carry their own RIOT-side key; the parent order's
-        // upperKey lives on the task object alongside.
+        // Envelope flow consumes only the parent task lifecycle (see
+        // HandleEnvelopeTaskEvent). Sub-task events are useful for ops
+        // visibility but no longer drive aggregate state. Log and move on.
         var subTaskKey = payload.SubTask?.Key;
-        if (!Guid.TryParse(subTaskKey, out var subTaskId))
+        var eventType = payload.TaskEventType?.ToUpperInvariant();
+        if (eventType is "SUB_TASK_FAILED")
         {
-            logger.LogDebug("RIOT3 sub-task event missing/invalid key: {Key}", subTaskKey);
-            return;
+            var failResult = payload.SubTask?.FailResult;
+            logger.LogWarning("RIOT3 sub-task {SubTaskKey} failed: [{Code}] {Msg}",
+                subTaskKey, failResult?.ErrorCode ?? "UNKNOWN", failResult?.ErrorDescription ?? "(no description)");
         }
-
-        var orderKey = payload.Task?.Key ?? payload.SubTask?.TaskKey ?? string.Empty;
-
-        switch (payload.TaskEventType?.ToUpperInvariant())
+        else
         {
-            case "SUB_TASK_FINISHED":
-                await outbox.AddAsync(new Riot3TaskCompletedIntegrationEvent(
-                    Guid.NewGuid(), DateTime.UtcNow, subTaskId, orderKey), cancellationToken);
-                break;
-
-            case "SUB_TASK_FAILED":
-                var failResult = payload.SubTask?.FailResult;
-                var code = failResult?.ErrorCode ?? "UNKNOWN";
-                var msg = failResult?.ErrorDescription ?? "SubTask failed";
-                await outbox.AddAsync(new Riot3TaskFailedIntegrationEvent(
-                    Guid.NewGuid(), DateTime.UtcNow, subTaskId, orderKey, code, msg), cancellationToken);
-                break;
-
-            case "SUB_TASK_CANCELED":
-                logger.LogInformation("RIOT3 sub-task canceled: {SubTaskId}", subTaskId);
-                break;
-
-            case "SUB_TASK_PROCESSING":
-                logger.LogDebug("RIOT3 sub-task started: {SubTaskId}", subTaskId);
-                break;
+            logger.LogDebug("RIOT3 sub-task event {Event} for {SubTaskKey}", eventType, subTaskKey);
         }
+        await Task.CompletedTask;
     }
 
     private static async Task HandleVehicleEvent(

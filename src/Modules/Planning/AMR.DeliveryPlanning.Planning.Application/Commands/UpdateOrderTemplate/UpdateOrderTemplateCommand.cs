@@ -16,5 +16,7 @@ public record UpdateOrderTemplateCommand(
     string? AppointVehicleGroupKey = null,
     string? AppointVehicleGroupName = null,
     string? AppointQueueWaitArea = null,
-    string? Description = null
+    string? Description = null,
+    Guid? PickupStationId = null,
+    Guid? DropStationId = null
 ) : ICommand;

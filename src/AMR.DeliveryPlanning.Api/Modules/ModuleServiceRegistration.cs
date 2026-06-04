@@ -7,7 +7,6 @@ using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Presentation.Idempotency;
-using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories;
@@ -167,6 +166,9 @@ public static class ModuleServiceRegistration
         services.AddScoped<IOrderTemplateRepository, OrderTemplateRepository>();
         services.AddScoped<IOrderTemplateResolver, OrderTemplateResolver>();
         services.AddScoped<IRobotOrderDispatcher, AMR.DeliveryPlanning.Api.Adapters.Riot3OrderDispatcherAdapter>();
+        services.AddScoped<IDispatchOrderTemplateService, DispatchOrderTemplateService>();
+        services.Configure<AMR.DeliveryPlanning.Planning.Application.Options.DispatchOptions>(
+            configuration.GetSection(AMR.DeliveryPlanning.Planning.Application.Options.DispatchOptions.SectionName));
         services.AddScoped<ICostModelService, DbCostModelService>();
         services.AddScoped<IVehicleSelector, GreedyVehicleSelector>();
         services.AddScoped<SimpleRouteCostCalculator>();
@@ -184,7 +186,6 @@ public static class ModuleServiceRegistration
                 sp.GetRequiredService<DispatchDomainEventMapper>())));
         services.AddScoped<ITripRepository, TripRepository>();
         services.AddScoped<IShelfManifestRepository, ShelfManifestRepository>();
-        services.AddScoped<ITaskDispatcher, VendorAdapterTaskDispatcher>();
 
         // ── VendorAdapter Module ──────────────────────────────────────
         services.AddVendorAdapterInfrastructure(configuration);
@@ -196,7 +197,7 @@ public static class ModuleServiceRegistration
             bus.AddConsumers(
                 typeof(AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly,
                 typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly,
-                typeof(AMR.DeliveryPlanning.Dispatch.Application.Commands.DispatchTrip.DispatchTripCommand).Assembly,
+                typeof(AMR.DeliveryPlanning.Dispatch.Application.Commands.CreateEnvelopeTrip.CreateEnvelopeTripCommand).Assembly,
                 typeof(VehicleStateChangedConsumer).Assembly
             );
 

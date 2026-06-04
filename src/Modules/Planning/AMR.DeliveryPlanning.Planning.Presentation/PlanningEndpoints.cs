@@ -268,7 +268,9 @@ public static class PlanningEndpoints
                 AppointVehicleGroupKey: req.AppointVehicleGroupKey,
                 AppointVehicleGroupName: req.AppointVehicleGroupName,
                 AppointQueueWaitArea: req.AppointQueueWaitArea,
-                Description: req.Description));
+                Description: req.Description,
+                PickupStationId: req.PickupStationId,
+                DropStationId: req.DropStationId));
             return result.IsSuccess
                 ? Results.Created($"/api/v1/planning/order-templates/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
@@ -314,7 +316,9 @@ public static class PlanningEndpoints
                     AppointVehicleGroupKey: req.AppointVehicleGroupKey,
                     AppointVehicleGroupName: req.AppointVehicleGroupName,
                     AppointQueueWaitArea: req.AppointQueueWaitArea,
-                    Description: req.Description));
+                    Description: req.Description,
+                    PickupStationId: req.PickupStationId,
+                    DropStationId: req.DropStationId));
                 return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
             });
 
@@ -383,7 +387,9 @@ public record CreateOrderTemplateRequest(
     string? AppointVehicleGroupKey = null,
     string? AppointVehicleGroupName = null,
     string? AppointQueueWaitArea = null,
-    string? Description = null);
+    string? Description = null,
+    Guid? PickupStationId = null,
+    Guid? DropStationId = null);
 
 public record UpdateOrderTemplateRequest(
     int Priority,
@@ -393,7 +399,9 @@ public record UpdateOrderTemplateRequest(
     string? AppointVehicleGroupKey = null,
     string? AppointVehicleGroupName = null,
     string? AppointQueueWaitArea = null,
-    string? Description = null);
+    string? Description = null,
+    Guid? PickupStationId = null,
+    Guid? DropStationId = null);
 
 public record TransportOrderRequest(
     string? StructureType = null,

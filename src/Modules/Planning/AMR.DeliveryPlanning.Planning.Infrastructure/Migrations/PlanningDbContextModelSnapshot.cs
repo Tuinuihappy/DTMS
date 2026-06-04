@@ -131,6 +131,12 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                     b.Property<int>("Priority")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("PickupStationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("DropStationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("StructureType")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -146,6 +152,8 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique()
                         .HasDatabaseName("IX_OrderTemplates_Name_Unique");
+
+                    b.HasIndex("PickupStationId", "DropStationId", "IsActive");
 
                     b.ToTable("OrderTemplates", "planning");
                 });
@@ -206,6 +214,10 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
 
                     b.Property<double>("TotalWeight")
                         .HasColumnType("double precision");
+
+                    b.Property<string>("TransportMode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.HasKey("Id");
 
@@ -327,36 +339,6 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                     b.ToTable("MilkRunTemplates", "planning");
                 });
 
-            modelBuilder.Entity("AMR.DeliveryPlanning.Planning.Domain.Entities.Stop", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("ExpectedArrival")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("LegId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("SequenceOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("StationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LegId");
-
-                    b.ToTable("Stops", "planning");
-                });
-
             modelBuilder.Entity("AMR.DeliveryPlanning.Planning.Infrastructure.Data.Records.CostModelConfigRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -449,23 +431,9 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("AMR.DeliveryPlanning.Planning.Domain.Entities.Stop", b =>
-                {
-                    b.HasOne("AMR.DeliveryPlanning.Planning.Domain.Entities.Leg", null)
-                        .WithMany("Stops")
-                        .HasForeignKey("LegId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("AMR.DeliveryPlanning.Planning.Domain.Entities.Job", b =>
                 {
                     b.Navigation("Legs");
-                });
-
-            modelBuilder.Entity("AMR.DeliveryPlanning.Planning.Domain.Entities.Leg", b =>
-                {
-                    b.Navigation("Stops");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.Planning.Domain.Entities.MilkRunTemplate", b =>
