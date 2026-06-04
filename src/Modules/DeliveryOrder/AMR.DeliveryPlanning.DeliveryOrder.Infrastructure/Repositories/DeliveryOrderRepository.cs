@@ -50,6 +50,90 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
             ? _context.DeliveryOrders.CountAsync(o => o.Status == status.Value, cancellationToken)
             : _context.DeliveryOrders.CountAsync(cancellationToken);
 
+    public async Task<(List<Domain.Entities.DeliveryOrder> Items, int TotalCount)> SearchAsync(
+        DeliveryOrderSearchFilters filters,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.DeliveryOrders.AsNoTracking().AsQueryable();
+
+        if (filters.Status.HasValue)
+            query = query.Where(o => o.Status == filters.Status.Value);
+        // Bucket — a group of statuses (Active/Completed/Terminal). Applied
+        // as a separate predicate so callers can combine a bucket with an
+        // exact status (rare, but harmless) or use them independently.
+        if (filters.Bucket.HasValue)
+        {
+            var bucketStatuses = OrderStatusBuckets.For(filters.Bucket.Value);
+            query = query.Where(o => bucketStatuses.Contains(o.Status));
+        }
+        if (filters.Priority.HasValue)
+            query = query.Where(o => o.Priority == filters.Priority.Value);
+        if (filters.TransportMode.HasValue)
+            query = query.Where(o => o.RequestedTransportMode == filters.TransportMode.Value);
+
+        if (!string.IsNullOrWhiteSpace(filters.Search))
+        {
+            // Case-insensitive substring across the four free-text fields
+            // users actually scan for. Npgsql translates EF.Functions.ILike
+            // into PostgreSQL's ILIKE; the wildcards run on the DB side so
+            // we never materialize the table.
+            var pattern = $"%{filters.Search.Trim()}%";
+            query = query.Where(o =>
+                EF.Functions.ILike(o.OrderRef, pattern) ||
+                (o.RequestedBy != null && EF.Functions.ILike(o.RequestedBy, pattern)) ||
+                (o.CreatedBy != null && EF.Functions.ILike(o.CreatedBy, pattern)) ||
+                (o.Notes != null && EF.Functions.ILike(o.Notes, pattern)));
+        }
+
+        // Whitelist sort columns to prevent injection-by-sort. CreatedDate
+        // is the default and the column most ops users expect.
+        query = (filters.SortBy?.ToLowerInvariant(), filters.SortDescending) switch
+        {
+            ("orderref", false) => query.OrderBy(o => o.OrderRef),
+            ("orderref", true) => query.OrderByDescending(o => o.OrderRef),
+            ("priority", false) => query.OrderBy(o => o.Priority),
+            ("priority", true) => query.OrderByDescending(o => o.Priority),
+            ("status", false) => query.OrderBy(o => o.Status),
+            ("status", true) => query.OrderByDescending(o => o.Status),
+            ("totalweightkg", false) => query.OrderBy(o => o.TotalWeightKg),
+            ("totalweightkg", true) => query.OrderByDescending(o => o.TotalWeightKg),
+            (_, false) => query.OrderBy(o => o.CreatedDate),
+            _ => query.OrderByDescending(o => o.CreatedDate),
+        };
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return (items, total);
+    }
+
+    public async Task<DeliveryOrderStats> GetStatsAsync(CancellationToken cancellationToken = default)
+    {
+        // Two DB roundtrips (group-by + sum) instead of one fat aggregate —
+        // EF Core can't combine a GroupBy with a non-grouped Sum in a single
+        // SQL projection cleanly, and the two queries each hit the same
+        // small table so the overhead is negligible.
+        var byStatusRaw = await _context.DeliveryOrders
+            .AsNoTracking()
+            .GroupBy(o => o.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var byStatus = byStatusRaw.ToDictionary(x => x.Status, x => x.Count);
+        var total = byStatus.Values.Sum();
+
+        var totalWeight = total == 0
+            ? 0d
+            : await _context.DeliveryOrders.AsNoTracking().SumAsync(o => o.TotalWeightKg, cancellationToken);
+
+        return new DeliveryOrderStats(total, byStatus, totalWeight);
+    }
+
     public async Task<List<Domain.Entities.DeliveryOrder>> GetOrdersByItemIdsAsync(
         IEnumerable<string> itemIds, CancellationToken cancellationToken = default)
     {

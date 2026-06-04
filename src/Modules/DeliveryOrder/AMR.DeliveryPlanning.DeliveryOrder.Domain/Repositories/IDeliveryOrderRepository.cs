@@ -3,6 +3,20 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 
+public record DeliveryOrderSearchFilters(
+    OrderStatus? Status,
+    StatusBucket? Bucket,
+    Priority? Priority,
+    TransportMode? TransportMode,
+    string? Search,
+    string? SortBy,
+    bool SortDescending);
+
+public record DeliveryOrderStats(
+    int Total,
+    Dictionary<OrderStatus, int> ByStatus,
+    double TotalWeightKg);
+
 public interface IDeliveryOrderRepository
 {
     Task<Entities.DeliveryOrder?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
@@ -11,6 +25,12 @@ public interface IDeliveryOrderRepository
     Task<List<Entities.DeliveryOrder>> GetByStatusAsync(OrderStatus status, int page, int pageSize, CancellationToken cancellationToken = default);
     Task<List<Entities.DeliveryOrder>> GetAllAsync(int page, int pageSize, CancellationToken cancellationToken = default);
     Task<int> CountAsync(OrderStatus? status, CancellationToken cancellationToken = default);
+    Task<(List<Entities.DeliveryOrder> Items, int TotalCount)> SearchAsync(
+        DeliveryOrderSearchFilters filters,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+    Task<DeliveryOrderStats> GetStatsAsync(CancellationToken cancellationToken = default);
     Task<List<Entities.DeliveryOrder>> GetOrdersByItemIdsAsync(IEnumerable<string> itemIds, CancellationToken cancellationToken = default);
     Task<List<Entities.DeliveryOrder>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken = default);
     Task<(List<Item> Items, int TotalCount)> SearchItemsAsync(string? itemId, ItemStatus? status, string? pickupCode, Guid? pickupStationId, string? dropCode, Guid? dropStationId, int page, int pageSize, CancellationToken cancellationToken = default);

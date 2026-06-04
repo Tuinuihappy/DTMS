@@ -1,6 +1,9 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 
@@ -85,7 +88,16 @@ public class GetDeliveryOrderQueryHandler : IQueryHandler<GetDeliveryOrderQuery,
     }
 }
 
-public record GetDeliveryOrdersQuery(OrderStatus? Status, int Page = 1, int PageSize = 20)
+public record GetDeliveryOrdersQuery(
+    OrderStatus? Status,
+    StatusBucket? Bucket = null,
+    Priority? Priority = null,
+    TransportMode? TransportMode = null,
+    string? Search = null,
+    string? SortBy = null,
+    bool SortDescending = true,
+    int Page = 1,
+    int PageSize = 20)
     : IQuery<PagedResult<DeliveryOrderListDto>>;
 
 public class GetDeliveryOrdersQueryHandler : IQueryHandler<GetDeliveryOrdersQuery, PagedResult<DeliveryOrderListDto>>
@@ -95,11 +107,16 @@ public class GetDeliveryOrdersQueryHandler : IQueryHandler<GetDeliveryOrdersQuer
 
     public async Task<Result<PagedResult<DeliveryOrderListDto>>> Handle(GetDeliveryOrdersQuery request, CancellationToken cancellationToken)
     {
-        var data = request.Status.HasValue
-            ? await _repo.GetByStatusAsync(request.Status.Value, request.Page, request.PageSize, cancellationToken)
-            : await _repo.GetAllAsync(request.Page, request.PageSize, cancellationToken);
+        var filters = new DeliveryOrderSearchFilters(
+            request.Status,
+            request.Bucket,
+            request.Priority,
+            request.TransportMode,
+            request.Search,
+            request.SortBy,
+            request.SortDescending);
 
-        var count = await _repo.CountAsync(request.Status, cancellationToken);
+        var (data, count) = await _repo.SearchAsync(filters, request.Page, request.PageSize, cancellationToken);
 
         var paged = new PagedResult<DeliveryOrderListDto>(
             data.Select(DeliveryOrderMapper.MapToListDto).ToList(),
@@ -108,6 +125,86 @@ public class GetDeliveryOrdersQueryHandler : IQueryHandler<GetDeliveryOrdersQuer
             request.PageSize);
 
         return Result<PagedResult<DeliveryOrderListDto>>.Success(paged);
+    }
+}
+
+public record DeliveryOrderStatsDto(
+    int Total,
+    int Active,
+    int Completed,
+    double TotalWeightKg,
+    Dictionary<OrderStatus, int> ByStatus);
+
+public record GetDeliveryOrderStatsQuery() : IQuery<DeliveryOrderStatsDto>;
+
+public class GetDeliveryOrderStatsQueryHandler : IQueryHandler<GetDeliveryOrderStatsQuery, DeliveryOrderStatsDto>
+{
+    // Short TTL — stale up to 5s is acceptable for an ops dashboard
+    // (humans don't perceive sub-5s lag) and one DB hit per 5s no
+    // matter how many users are polling crushes the load curve when
+    // there are 10+ tabs open in a control room.
+    private const string CacheKey = "stats:delivery-orders:v1";
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(5);
+    private static readonly JsonSerializerOptions CacheJsonOptions = new()
+    {
+        // Enum keys in Dictionary<OrderStatus, int> need a string
+        // converter to roundtrip cleanly through the cache layer.
+        Converters = { new JsonStringEnumConverter() },
+    };
+
+    private readonly IDeliveryOrderRepository _repo;
+    private readonly IDistributedCache _cache;
+
+    public GetDeliveryOrderStatsQueryHandler(IDeliveryOrderRepository repo, IDistributedCache cache)
+    {
+        _repo = repo;
+        _cache = cache;
+    }
+
+    public async Task<Result<DeliveryOrderStatsDto>> Handle(GetDeliveryOrderStatsQuery request, CancellationToken cancellationToken)
+    {
+        // Cache lookup — best-effort. Any deserialization issue silently
+        // falls through to a fresh DB query rather than failing the call.
+        var cached = await _cache.GetStringAsync(CacheKey, cancellationToken);
+        if (!string.IsNullOrEmpty(cached))
+        {
+            try
+            {
+                var hit = JsonSerializer.Deserialize<DeliveryOrderStatsDto>(cached, CacheJsonOptions);
+                if (hit is not null)
+                    return Result<DeliveryOrderStatsDto>.Success(hit);
+            }
+            catch (JsonException)
+            {
+                // Schema drift across deployments — proceed to refill.
+            }
+        }
+
+        var stats = await _repo.GetStatsAsync(cancellationToken);
+
+        var active = OrderStatusBuckets.Active.Sum(s => stats.ByStatus.GetValueOrDefault(s));
+        var completed = OrderStatusBuckets.Completed.Sum(s => stats.ByStatus.GetValueOrDefault(s));
+
+        // Ensure every status appears in the response (with 0 if absent)
+        // so the frontend chip counts don't render "undefined".
+        var byStatus = Enum.GetValues<OrderStatus>().ToDictionary(s => s, s => stats.ByStatus.GetValueOrDefault(s));
+
+        var dto = new DeliveryOrderStatsDto(stats.Total, active, completed, stats.TotalWeightKg, byStatus);
+
+        try
+        {
+            await _cache.SetStringAsync(
+                CacheKey,
+                JsonSerializer.Serialize(dto, CacheJsonOptions),
+                new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = CacheTtl },
+                cancellationToken);
+        }
+        catch
+        {
+            // Cache write is best-effort — Redis blip shouldn't fail the API.
+        }
+
+        return Result<DeliveryOrderStatsDto>.Success(dto);
     }
 }
 

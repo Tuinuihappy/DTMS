@@ -115,11 +115,49 @@ public static class DeliveryOrderEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         });
 
-        // GET /api/v1/delivery-orders?status=&page=&pageSize=
-        group.MapGet("/", async (string? status, ISender sender, int page = 1, int pageSize = 20) =>
+        // GET /api/v1/delivery-orders?status=&statusBucket=&priority=&transportMode=&search=&sortBy=&sortDir=&page=&pageSize=
+        group.MapGet("/", async (
+            string? status,
+            string? statusBucket,
+            string? priority,
+            string? transportMode,
+            string? search,
+            string? sortBy,
+            string? sortDir,
+            ISender sender,
+            int page = 1,
+            int pageSize = 20) =>
         {
             OrderStatus? orderStatus = status != null && Enum.TryParse<OrderStatus>(status, true, out var s) ? s : null;
-            var result = await sender.Send(new GetDeliveryOrdersQuery(orderStatus, page <= 0 ? 1 : page, pageSize <= 0 ? 20 : pageSize));
+            StatusBucket? bucket = statusBucket != null && Enum.TryParse<StatusBucket>(statusBucket, true, out var b) ? b : null;
+            Priority? orderPriority = priority != null && Enum.TryParse<Priority>(priority, true, out var p) ? p : null;
+            TransportMode? mode = transportMode != null && Enum.TryParse<TransportMode>(transportMode, true, out var m) ? m : null;
+            // Sort defaults to newest first — the dispatcher's mental model.
+            var descending = !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
+            var clampedPage = page <= 0 ? 1 : page;
+            var clampedSize = pageSize is <= 0 or > 200 ? 20 : pageSize;
+
+            var query = new GetDeliveryOrdersQuery(
+                orderStatus,
+                bucket,
+                orderPriority,
+                mode,
+                string.IsNullOrWhiteSpace(search) ? null : search.Trim(),
+                string.IsNullOrWhiteSpace(sortBy) ? null : sortBy.Trim(),
+                descending,
+                clampedPage,
+                clampedSize);
+
+            var result = await sender.Send(query);
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
+        // GET /api/v1/delivery-orders/stats — aggregate counts for the KPI strip
+        // and filter chips. Unfiltered by design: the strip is a system-wide
+        // overview, not a "what's in your current view" readout.
+        group.MapGet("/stats", async (ISender sender) =>
+        {
+            var result = await sender.Send(new GetDeliveryOrderStatsQuery());
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
