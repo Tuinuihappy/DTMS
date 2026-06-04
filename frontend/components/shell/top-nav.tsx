@@ -51,15 +51,14 @@ export function TopNav() {
           className="flex items-center gap-3 pl-1 pr-4 py-1.5 rounded-full transition-colors hover:bg-[var(--color-ink-50)]/60"
         >
           <span
-            className="relative grid h-10 w-10 place-items-center rounded-full text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_6px_14px_-4px_rgba(255,107,91,0.55)]"
+            className="relative grid h-9 w-9 place-items-center rounded-[10px] text-[var(--color-ink-900)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_6px_14px_-4px_rgba(15,23,42,0.18)]"
             style={{
               background:
-                "radial-gradient(circle at 35% 30%, #FF8A78 0%, #FF6B5B 45%, #E8492F 100%)",
+                "linear-gradient(135deg, #FFD8CC 0%, #F3D5EC 55%, #D7DBFF 100%)",
             }}
             aria-hidden
           >
-            <Truck className="h-[18px] w-[18px]" strokeWidth={2.2} />
-            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-white shadow-[0_0_0_2px_rgba(255,107,91,0.25)]" />
+            <Truck className="h-[22px] w-[22px]" strokeWidth={1.75} />
           </span>
           <span className="font-display text-[1.05rem] font-semibold tracking-[0.04em] text-[var(--color-ink-900)] uppercase">
             TMS
