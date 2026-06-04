@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { NextResponse } from "next/server";
 import { decodeJwt } from "@/lib/auth/jwt";
 import {
@@ -7,15 +8,20 @@ import {
   type LoginResponse,
 } from "@/lib/auth/session";
 
-export async function POST(req: Request) {
-  const apiBase = process.env.DTMS_API_BASE_URL;
-  if (!apiBase) {
-    return NextResponse.json(
-      { message: "Server misconfigured: DTMS_API_BASE_URL is not set." },
-      { status: 500 },
-    );
-  }
+function base64Url(buf: Buffer): string {
+  return buf.toString("base64").replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
 
+function signDevJwt(claims: Record<string, unknown>, secret: string): string {
+  const header = { alg: "HS256", typ: "JWT" };
+  const headerSeg = base64Url(Buffer.from(JSON.stringify(header)));
+  const payloadSeg = base64Url(Buffer.from(JSON.stringify(claims)));
+  const signingInput = `${headerSeg}.${payloadSeg}`;
+  const sig = createHmac("sha256", secret).update(signingInput).digest();
+  return `${signingInput}.${base64Url(sig)}`;
+}
+
+export async function POST(req: Request) {
   let body: { username?: unknown; password?: unknown };
   try {
     body = await req.json();
@@ -29,6 +35,50 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { message: "Username and password are required." },
       { status: 400 },
+    );
+  }
+
+  // Dev-only short-circuit: when the external auth service is unreachable
+  // (e.g. local docker without VPN), set DTMS_AUTH_BYPASS=true to issue a
+  // self-signed JWT for whatever username was typed. Backend honors this
+  // because Auth__Disable=true uses DevAuthenticationHandler and ignores
+  // the bearer signature in Development.
+  if (process.env.DTMS_AUTH_BYPASS === "true") {
+    const secret = process.env.DTMS_JWT_SECRET ?? "dev-only-secret-min-32-chars-placeholder!";
+    const nowSec = Math.floor(Date.now() / 1000);
+    const expSec = nowSec + 24 * 60 * 60;
+    const token = signDevJwt(
+      {
+        EmployeeId: username,
+        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name": username,
+        "http://schemas.microsoft.com/ws/2008/06/identity/claims/role": "Admin",
+        iat: nowSec,
+        exp: expSec,
+      },
+      secret,
+    );
+    const user: AuthUser = {
+      employeeCode: username,
+      displayName: username,
+      role: "Admin",
+      thumbnailPhoto: "",
+    };
+    const res = NextResponse.json({ user });
+    res.cookies.set(SESSION_COOKIE, token, {
+      httpOnly: true,
+      secure: isSecureRequest(req),
+      sameSite: "lax",
+      path: "/",
+      expires: new Date(expSec * 1000),
+    });
+    return res;
+  }
+
+  const apiBase = process.env.DTMS_API_BASE_URL;
+  if (!apiBase) {
+    return NextResponse.json(
+      { message: "Server misconfigured: DTMS_API_BASE_URL is not set." },
+      { status: 500 },
     );
   }
 

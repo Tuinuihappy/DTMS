@@ -103,6 +103,14 @@ services:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
       - DTMS_API_BASE_URL=${DTMS_API_BASE_URL:-http://10.204.212.28:15000}
+      # Dev-only: skip the external auth service and mint a self-signed
+      # session JWT for any submitted username. Must match the backend
+      # Jwt__Secret so the token is verifiable if Auth__Disable is off.
+      - DTMS_AUTH_BYPASS=${DTMS_AUTH_BYPASS:-false}
+      - DTMS_JWT_SECRET=${DTMS_JWT_SECRET:-dev-only-secret-min-32-chars-placeholder!}
+      # Base URL of the local .NET API for proxied feature endpoints
+      # (delivery-orders etc). Defaults to the in-network compose host.
+      - DTMS_BACKEND_URL=${DTMS_BACKEND_URL:-http://dtms-api:8080}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/"]
