@@ -7,199 +7,193 @@ namespace Dispatch.UnitTests;
 
 public class TripTests
 {
-    private Trip CreateTripWithTasks()
-    {
-        var trip = new Trip(Guid.Empty, Guid.NewGuid(), Guid.NewGuid());
-        trip.AddTask(TaskType.Move, 1, Guid.NewGuid());
-        trip.AddTask(TaskType.Lift, 2);
-        trip.AddTask(TaskType.Move, 3, Guid.NewGuid());
-        trip.AddTask(TaskType.Drop, 4);
-        return trip;
-    }
+    private static Trip NewEnvelopeTrip(string upperKey = "abc123-G1") =>
+        Trip.CreateForEnvelope(Guid.NewGuid(), upperKey, "ORD-1");
 
     [Fact]
-    public void NewTrip_ShouldHaveCreatedStatus()
+    public void CreateForEnvelope_ProducesCreatedTripWithUpperKey()
     {
-        var trip = new Trip(Guid.Empty, Guid.NewGuid(), Guid.NewGuid());
+        var trip = NewEnvelopeTrip();
 
         trip.Status.Should().Be(TripStatus.Created);
-        trip.Tasks.Should().BeEmpty();
-        trip.StartedAt.Should().BeNull();
+        trip.UpperKey.Should().Be("abc123-G1");
+        trip.VendorOrderKey.Should().Be("ORD-1");
+        trip.JobId.Should().Be(Guid.Empty);
+        trip.VehicleId.Should().BeNull();
+        trip.Events.Should().ContainSingle(e => e.EventType == "EnvelopeDispatched");
     }
 
     [Fact]
-    public void AddTask_ShouldAddToCollection()
+    public void CreateForEnvelope_AllowsEmptyVendorOrderKey()
     {
-        var trip = CreateTripWithTasks();
+        // RIOT3 occasionally returns 200 OK with no orderKey. Correlation
+        // still works via UpperKey alone.
+        var trip = Trip.CreateForEnvelope(Guid.NewGuid(), "abc-G1", null);
 
-        trip.Tasks.Should().HaveCount(4);
-        trip.Tasks.Select(t => t.Type).Should().ContainInOrder(
-            TaskType.Move, TaskType.Lift, TaskType.Move, TaskType.Drop);
+        trip.VendorOrderKey.Should().BeNull();
+        trip.UpperKey.Should().Be("abc-G1");
     }
 
     [Fact]
-    public void Start_ShouldDispatchFirstTask()
+    public void CreateForEnvelope_RejectsEmptyUpperKey()
     {
-        var trip = CreateTripWithTasks();
-
-        trip.Start();
-
-        trip.Status.Should().Be(TripStatus.InProgress);
-        trip.StartedAt.Should().NotBeNull();
-        var firstTask = trip.Tasks.OrderBy(t => t.SequenceOrder).First();
-        firstTask.Status.Should().Be(AMR.DeliveryPlanning.Dispatch.Domain.Enums.TaskStatus.Dispatched);
-    }
-
-    [Fact]
-    public void Start_FromNonCreated_ShouldThrow()
-    {
-        var trip = CreateTripWithTasks();
-        trip.Start();
-
-        var act = () => trip.Start();
-
-        act.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
-    public void CompleteTask_ShouldAutoDispatchNext()
-    {
-        var trip = CreateTripWithTasks();
-        trip.Start();
-
-        var firstTask = trip.Tasks.OrderBy(t => t.SequenceOrder).First();
-        trip.CompleteTask(firstTask.Id);
-
-        firstTask.Status.Should().Be(AMR.DeliveryPlanning.Dispatch.Domain.Enums.TaskStatus.Completed);
-        var secondTask = trip.Tasks.OrderBy(t => t.SequenceOrder).ElementAt(1);
-        secondTask.Status.Should().Be(AMR.DeliveryPlanning.Dispatch.Domain.Enums.TaskStatus.Dispatched);
-        trip.Status.Should().Be(TripStatus.InProgress); // not yet done
-    }
-
-    [Fact]
-    public void CompleteAllTasks_ShouldCompleteTrip()
-    {
-        var trip = CreateTripWithTasks();
-        trip.Start();
-
-        foreach (var task in trip.Tasks.OrderBy(t => t.SequenceOrder))
-        {
-            trip.CompleteTask(task.Id);
-        }
-
-        trip.Status.Should().Be(TripStatus.Completed);
-        trip.CompletedAt.Should().NotBeNull();
-        trip.Tasks.Should().OnlyContain(t => t.Status == AMR.DeliveryPlanning.Dispatch.Domain.Enums.TaskStatus.Completed);
-    }
-
-    [Fact]
-    public void FailTask_ShouldFailEntireTrip()
-    {
-        var trip = CreateTripWithTasks();
-        trip.Start();
-
-        var firstTask = trip.Tasks.OrderBy(t => t.SequenceOrder).First();
-        trip.FailTask(firstTask.Id, "Motor malfunction");
-
-        trip.Status.Should().Be(TripStatus.Failed);
-        firstTask.Status.Should().Be(AMR.DeliveryPlanning.Dispatch.Domain.Enums.TaskStatus.Failed);
-        firstTask.FailureReason.Should().Be("Motor malfunction");
-    }
-
-    [Fact]
-    public void CompleteTask_WithInvalidId_ShouldThrow()
-    {
-        var trip = CreateTripWithTasks();
-        trip.Start();
-
-        var act = () => trip.CompleteTask(Guid.NewGuid());
-
-        act.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
-    public void Events_ShouldBeRecorded()
-    {
-        var trip = CreateTripWithTasks();
-        trip.Start();
-
-        trip.Events.Should().HaveCount(1); // TripStarted
-        trip.Events.First().EventType.Should().Be("TripStarted");
-    }
-
-    // ── SetAssignedVehicle ─────────────────────────────────────────────────
-    // RIOT3 may auto-select the robot when we submit an order without
-    // appointVehicleKey. The chosen robot key arrives later via the
-    // task callback (processingVehicle.key), at which point we bind it
-    // to the trip without disturbing tasks the vendor is already running.
-
-    [Fact]
-    public void SetAssignedVehicle_FromNull_ShouldBindVehicleAndEmitEvent()
-    {
-        var trip = new Trip(Guid.NewGuid(), Guid.NewGuid(), null);
-        trip.AddTask(TaskType.Move, 1, Guid.NewGuid());
-        trip.Start();
-        var firstTask = trip.Tasks.First();
-        var vehicleId = Guid.NewGuid();
-
-        trip.SetAssignedVehicle(vehicleId);
-
-        trip.VehicleId.Should().Be(vehicleId);
-        firstTask.Status.Should().Be(AMR.DeliveryPlanning.Dispatch.Domain.Enums.TaskStatus.Dispatched,
-            "binding a vehicle must NOT reset task state — the vendor is already executing");
-        trip.DomainEvents.Should().ContainSingle(e => e is TripVehicleAssignedDomainEvent);
-    }
-
-    [Fact]
-    public void SetAssignedVehicle_WithSameVehicle_ShouldBeIdempotent()
-    {
-        var vehicleId = Guid.NewGuid();
-        var trip = new Trip(Guid.NewGuid(), Guid.NewGuid(), null);
-        trip.SetAssignedVehicle(vehicleId);
-        // Clear the first event so we can assert no extra event on the second call.
-        trip.ClearDomainEvents();
-
-        trip.SetAssignedVehicle(vehicleId);
-
-        trip.VehicleId.Should().Be(vehicleId);
-        trip.DomainEvents.Should().NotContain(e => e is TripVehicleAssignedDomainEvent);
-    }
-
-    [Fact]
-    public void SetAssignedVehicle_WhenDifferentVehicleAlreadyAssigned_ShouldThrow()
-    {
-        // A different vendor key arriving on a trip that already has a
-        // vehicle is a reassignment, which is a different operation (it
-        // resets tasks to Pending so they can be re-dispatched).
-        var trip = new Trip(Guid.NewGuid(), Guid.NewGuid(), null);
-        trip.SetAssignedVehicle(Guid.NewGuid());
-
-        var act = () => trip.SetAssignedVehicle(Guid.NewGuid());
-
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*Reassign*");
-    }
-
-    [Fact]
-    public void SetAssignedVehicle_WithEmptyGuid_ShouldThrow()
-    {
-        var trip = new Trip(Guid.NewGuid(), Guid.NewGuid(), null);
-
-        var act = () => trip.SetAssignedVehicle(Guid.Empty);
-
+        var act = () => Trip.CreateForEnvelope(Guid.NewGuid(), "", "ORD");
         act.Should().Throw<ArgumentException>();
     }
 
     [Fact]
-    public void SetAssignedVehicle_OnTerminalTrip_ShouldThrow()
+    public void MarkVendorStarted_FromCreated_TransitionsToInProgressAndBindsVehicle()
     {
-        var trip = new Trip(Guid.NewGuid(), Guid.NewGuid(), null);
-        trip.AddTask(TaskType.Move, 1, Guid.NewGuid());
-        trip.Start();
-        trip.Cancel("test");
+        var trip = NewEnvelopeTrip();
+        var vehicle = Guid.NewGuid();
+
+        trip.MarkVendorStarted(vehicle);
+
+        trip.Status.Should().Be(TripStatus.InProgress);
+        trip.VehicleId.Should().Be(vehicle);
+        trip.StartedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void MarkVendorStarted_DuplicateWebhook_IsNoOp()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted(Guid.NewGuid());
+        var startedAt = trip.StartedAt;
+
+        var act = () => trip.MarkVendorStarted(Guid.NewGuid());
+
+        act.Should().NotThrow();
+        trip.StartedAt.Should().Be(startedAt);
+    }
+
+    [Fact]
+    public void MarkVendorCompleted_FromCreated_CompletesAndFiresEventWithUpperKey()
+    {
+        var trip = NewEnvelopeTrip("ord-G1");
+
+        trip.MarkVendorCompleted();
+
+        trip.Status.Should().Be(TripStatus.Completed);
+        trip.CompletedAt.Should().NotBeNull();
+        var evt = trip.DomainEvents.OfType<TripCompletedDomainEvent>().Single();
+        evt.VendorUpperKey.Should().Be("ord-G1");
+        evt.DeliveryOrderId.Should().Be(trip.DeliveryOrderId);
+    }
+
+    [Fact]
+    public void MarkVendorCompleted_AlreadyCompleted_IsIdempotent()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorCompleted();
+        var eventCount = trip.DomainEvents.OfType<TripCompletedDomainEvent>().Count();
+
+        var act = () => trip.MarkVendorCompleted();
+
+        act.Should().NotThrow();
+        trip.DomainEvents.OfType<TripCompletedDomainEvent>().Count().Should().Be(eventCount);
+    }
+
+    [Fact]
+    public void MarkVendorCompleted_FromCancelled_Throws()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.Cancel("ops");
+
+        var act = () => trip.MarkVendorCompleted();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void MarkVendorFailed_FromCreated_FailsAndFiresEvent()
+    {
+        var trip = NewEnvelopeTrip("ord-G1");
+
+        trip.MarkVendorFailed("path blocked");
+
+        trip.Status.Should().Be(TripStatus.Failed);
+        trip.FailureReason.Should().Be("path blocked");
+        var evt = trip.DomainEvents.OfType<TripFailedDomainEvent>().Single();
+        evt.VendorUpperKey.Should().Be("ord-G1");
+        evt.Reason.Should().Be("path blocked");
+    }
+
+    [Fact]
+    public void MarkVendorFailed_AlreadyFailed_IsIdempotent()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorFailed("first");
+        var act = () => trip.MarkVendorFailed("second");
+        act.Should().NotThrow();
+        trip.FailureReason.Should().Be("first");
+    }
+
+    [Fact]
+    public void MarkVendorFailed_FromCompleted_Throws()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorCompleted();
+
+        var act = () => trip.MarkVendorFailed("late");
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void SetAssignedVehicle_FirstAssignment_Binds()
+    {
+        var trip = NewEnvelopeTrip();
+        var vehicle = Guid.NewGuid();
+
+        trip.SetAssignedVehicle(vehicle);
+
+        trip.VehicleId.Should().Be(vehicle);
+    }
+
+    [Fact]
+    public void SetAssignedVehicle_SameVehicle_IsNoOp()
+    {
+        var trip = NewEnvelopeTrip();
+        var vehicle = Guid.NewGuid();
+        trip.SetAssignedVehicle(vehicle);
+
+        var act = () => trip.SetAssignedVehicle(vehicle);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void SetAssignedVehicle_DifferentVehicle_Throws()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.SetAssignedVehicle(Guid.NewGuid());
 
         var act = () => trip.SetAssignedVehicle(Guid.NewGuid());
 
         act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void PauseAndResume_RoundTrip()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted();
+
+        trip.Pause();
+        trip.Status.Should().Be(TripStatus.Paused);
+
+        trip.Resume();
+        trip.Status.Should().Be(TripStatus.InProgress);
+    }
+
+    [Fact]
+    public void Cancel_FromCreated_Cancels()
+    {
+        var trip = NewEnvelopeTrip();
+
+        trip.Cancel("operator");
+
+        trip.Status.Should().Be(TripStatus.Cancelled);
     }
 }

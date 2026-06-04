@@ -91,48 +91,6 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.ToTable("ProofsOfDelivery", "dispatch");
                 });
 
-            modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.RobotTask", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("FailureReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<int>("SequenceOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<Guid?>("TargetStationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TripId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TripId");
-
-                    b.ToTable("RobotTasks", "dispatch");
-                });
-
             modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.ShelfManifest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -186,6 +144,10 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.Property<Guid>("DeliveryOrderId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<Guid>("JobId")
                         .HasColumnType("uuid");
 
@@ -197,10 +159,22 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("UpperKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
                     b.Property<Guid?>("VehicleId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("VendorOrderKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UpperKey")
+                        .IsUnique();
 
                     b.ToTable("Trips", "dispatch");
                 });
@@ -309,15 +283,6 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.RobotTask", b =>
-                {
-                    b.HasOne("AMR.DeliveryPlanning.Dispatch.Domain.Entities.Trip", null)
-                        .WithMany("Tasks")
-                        .HasForeignKey("TripId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.TripException", b =>
                 {
                     b.HasOne("AMR.DeliveryPlanning.Dispatch.Domain.Entities.Trip", null)
@@ -334,8 +299,6 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.Navigation("Exceptions");
 
                     b.Navigation("ProofsOfDelivery");
-
-                    b.Navigation("Tasks");
                 });
 #pragma warning restore 612, 618
         }
