@@ -67,6 +67,11 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             DeliveryOrderPlannedDomainEvent          => [],
             DeliveryOrderDispatchedDomainEvent       => [],
             DeliveryOrderInProgressDomainEvent       => [],
+            // Reopen is an admin action that brings Failed → Confirmed for
+            // retry. We intentionally do NOT re-fire DeliveryOrderConfirmed
+            // here — the operator must explicitly call /trips/{id}/retry
+            // so the audit trail separates "who reopened" from "who retried".
+            DeliveryOrderReopenedDomainEvent         => [],
 
             _ => throw new InvalidOperationException(
                 $"Unhandled domain event '{domainEvent.GetType().Name}'. " +

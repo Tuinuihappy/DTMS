@@ -267,6 +267,24 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         AddDomainEvent(new DeliveryOrderFailedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
     }
 
+    /// <summary>
+    /// Bring a Failed order back to Confirmed so an operator can retry
+    /// the failed trip(s). Mirrors the Held → Release flow but is an
+    /// explicit admin override: only Failed (terminal) orders qualify.
+    /// Does NOT re-fire the confirmed integration event — the operator
+    /// must trigger Trip-level retry separately so the audit trail
+    /// distinguishes "who reopened" from "who retried".
+    /// </summary>
+    public void Reopen(string reason)
+    {
+        if (Status != OrderStatus.Failed)
+            throw new InvalidOperationException(
+                $"Only Failed orders can be reopened. Current status: {Status}.");
+
+        Status = OrderStatus.Confirmed;
+        AddDomainEvent(new DeliveryOrderReopenedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+    }
+
     public void Cancel(string reason)
     {
         if (Status == OrderStatus.Cancelled) return;

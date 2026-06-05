@@ -33,6 +33,19 @@ public class Trip : AggregateRoot<Guid>
     public string? VendorOrderKey { get; private set; }
     public string? VendorVehicleKey { get; private set; }
 
+    // Route context — the station pair the trip dispatches against.
+    // Captured at create time so retry can re-resolve the OrderTemplate
+    // without re-reading the DeliveryOrder items. Nullable because
+    // trips persisted before retry support don't have these set.
+    public Guid? PickupStationId { get; private set; }
+    public Guid? DropStationId { get; private set; }
+
+    // Retry chain. First dispatch = 1, each retry increments.
+    // PreviousAttemptId points to the trip this one supersedes (null for
+    // first attempt). See TripRetryEvent for the immutable audit record.
+    public int AttemptNumber { get; private set; } = 1;
+    public Guid? PreviousAttemptId { get; private set; }
+
     private readonly List<ExecutionEvent> _events = new();
     public IReadOnlyCollection<ExecutionEvent> Events => _events.AsReadOnly();
 
@@ -44,10 +57,19 @@ public class Trip : AggregateRoot<Guid>
 
     private Trip() { }
 
-    public static Trip CreateForEnvelope(Guid deliveryOrderId, string upperKey, string? vendorOrderKey)
+    public static Trip CreateForEnvelope(
+        Guid deliveryOrderId,
+        string upperKey,
+        string? vendorOrderKey,
+        Guid? pickupStationId = null,
+        Guid? dropStationId = null,
+        int attemptNumber = 1,
+        Guid? previousAttemptId = null)
     {
         if (string.IsNullOrWhiteSpace(upperKey))
             throw new ArgumentException("UpperKey must not be empty.", nameof(upperKey));
+        if (attemptNumber < 1)
+            throw new ArgumentOutOfRangeException(nameof(attemptNumber), "AttemptNumber must be >= 1.");
 
         // VendorOrderKey may be missing if RIOT3 accepted the envelope but
         // didn't return an orderKey in the response body. Correlation still
@@ -63,9 +85,15 @@ public class Trip : AggregateRoot<Guid>
             Status = TripStatus.Created,
             CreatedAt = DateTime.UtcNow,
             UpperKey = upperKey.Trim(),
-            VendorOrderKey = trimmedVendor
+            VendorOrderKey = trimmedVendor,
+            PickupStationId = pickupStationId,
+            DropStationId = dropStationId,
+            AttemptNumber = attemptNumber,
+            PreviousAttemptId = previousAttemptId
         };
-        trip.RecordEvent("EnvelopeDispatched", $"vendorOrderKey={trimmedVendor ?? "(empty)"}");
+        var detail = $"vendorOrderKey={trimmedVendor ?? "(empty)"} attempt={attemptNumber}";
+        if (previousAttemptId.HasValue) detail += $" retryOf={previousAttemptId.Value}";
+        trip.RecordEvent("EnvelopeDispatched", detail);
         return trip;
     }
 

@@ -13,6 +13,7 @@ public class DispatchDbContext : DbContext
     public DbSet<TripException> TripExceptions { get; set; } = null!;
     public DbSet<ProofOfDelivery> ProofsOfDelivery { get; set; } = null!;
     public DbSet<ShelfManifest> ShelfManifests { get; set; } = null!;
+    public DbSet<TripRetryEvent> TripRetryEvents { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public DispatchDbContext(DbContextOptions<DispatchDbContext> options) : base(options) { }
@@ -29,6 +30,9 @@ public class DispatchDbContext : DbContext
             builder.Property(t => t.VendorOrderKey).HasMaxLength(100);
             builder.Property(t => t.VendorVehicleKey).HasMaxLength(100);
             builder.Property(t => t.FailureReason).HasMaxLength(1000);
+            builder.Property(t => t.AttemptNumber).HasDefaultValue(1);
+            builder.HasIndex(t => t.PreviousAttemptId)
+                .HasFilter("\"PreviousAttemptId\" IS NOT NULL");
             // UpperKey is the RIOT3 correlation key (and unique). Legacy
             // job/task trips (which had null UpperKey) were dropped in
             // Phase b7 — all surviving rows are envelope-dispatched.
@@ -65,6 +69,19 @@ public class DispatchDbContext : DbContext
             builder.HasKey(e => e.Id);
             builder.Property(e => e.EventType).HasMaxLength(50);
             builder.Property(e => e.Details).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<TripRetryEvent>(builder =>
+        {
+            builder.HasKey(e => e.Id);
+            builder.Property(e => e.RetrySource).HasMaxLength(20).IsRequired();
+            builder.Property(e => e.RetriedBy).HasMaxLength(100);
+            builder.Property(e => e.RetryReason).HasMaxLength(1000);
+            builder.Property(e => e.OriginalStatus).HasMaxLength(20).IsRequired();
+            // Indexes for the common ops/compliance queries.
+            builder.HasIndex(e => e.OriginalTripId);
+            builder.HasIndex(e => e.DeliveryOrderId);
+            builder.HasIndex(e => e.OccurredAt);
         });
 
         modelBuilder.Entity<TripException>(builder =>

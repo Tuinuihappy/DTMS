@@ -34,7 +34,14 @@ public class CreateEnvelopeTripCommandHandler : ICommandHandler<CreateEnvelopeTr
         Trip trip;
         try
         {
-            trip = Trip.CreateForEnvelope(request.DeliveryOrderId, request.UpperKey, request.VendorOrderKey);
+            trip = Trip.CreateForEnvelope(
+                request.DeliveryOrderId,
+                request.UpperKey,
+                request.VendorOrderKey,
+                request.PickupStationId,
+                request.DropStationId,
+                request.AttemptNumber,
+                request.PreviousAttemptId);
         }
         catch (ArgumentException ex)
         {
@@ -43,8 +50,11 @@ public class CreateEnvelopeTripCommandHandler : ICommandHandler<CreateEnvelopeTr
 
         await _tripRepository.AddAsync(trip, cancellationToken);
 
-        _logger.LogInformation("[EnvelopeTrip] ✓ Trip {TripId} created for DeliveryOrder {OrderId} (UpperKey {UpperKey} → VendorOrderKey {VendorKey})",
-            trip.Id, request.DeliveryOrderId, request.UpperKey, request.VendorOrderKey);
+        _logger.LogInformation(
+            "[EnvelopeTrip] ✓ Trip {TripId} created for DeliveryOrder {OrderId} (UpperKey {UpperKey} → VendorOrderKey {VendorKey}, attempt {Attempt}{Retry})",
+            trip.Id, request.DeliveryOrderId, request.UpperKey, request.VendorOrderKey,
+            request.AttemptNumber,
+            request.PreviousAttemptId.HasValue ? $", retryOf {request.PreviousAttemptId.Value}" : "");
 
         return Result<Guid>.Success(trip.Id);
     }

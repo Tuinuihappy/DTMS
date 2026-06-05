@@ -33,6 +33,8 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
         Guid pickupStationId,
         Guid dropStationId,
         string upperKey,
+        int attemptNumber = 1,
+        Guid? previousAttemptId = null,
         int? priorityOverride = null,
         string? appointVehicleKeyOverride = null,
         string? appointVehicleNameOverride = null,
@@ -95,8 +97,18 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
         // Cross-module via MediatR — Dispatch.Application owns the handler.
         // Fall back to empty TripId if the create fails (vendor side already
         // accepted the envelope, so we can't roll back the dispatch).
+        // Route context + retry lineage are persisted on the Trip so a
+        // future retry can re-resolve the template without re-reading the
+        // delivery order.
         var tripCreate = await _sender.Send(
-            new CreateEnvelopeTripCommand(deliveryOrderId, upperKey, vendorOrderKey),
+            new CreateEnvelopeTripCommand(
+                deliveryOrderId,
+                upperKey,
+                vendorOrderKey,
+                pickupStationId,
+                dropStationId,
+                attemptNumber,
+                previousAttemptId),
             cancellationToken);
         var tripId = tripCreate.IsSuccess ? tripCreate.Value : Guid.Empty;
         if (!tripCreate.IsSuccess)

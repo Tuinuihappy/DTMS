@@ -7,6 +7,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateUpstreamDeli
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.HoldDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.RejectDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReleaseDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReopenDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.UpdateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
@@ -28,6 +29,7 @@ public record ConfirmOrderRequest(string? ConfirmedBy = null);
 public record RejectOrderRequest(string Reason, string? RejectedBy = null);
 public record HoldOrderRequest(string Reason, string? HeldBy = null);
 public record ReleaseOrderRequest(string? ReleasedBy = null);
+public record ReopenOrderRequest(string ReopenedBy, string Reason);
 
 public static class DeliveryOrderEndpoints
 {
@@ -79,6 +81,16 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new ReleaseDeliveryOrderCommand(id, body?.ReleasedBy));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        }).RequireIdempotencyKey();
+
+        // POST /api/v1/delivery-orders/{id}/reopen — admin override: bring a
+        // Failed order back to Confirmed so the operator can call
+        // /dispatch/trips/{tripId}/retry on its failed trip(s). Does NOT
+        // auto-retry — the two actions are audited separately on purpose.
+        group.MapPost("/{id:guid}/reopen", async (Guid id, [FromBody] ReopenOrderRequest body, ISender sender) =>
+        {
+            var result = await sender.Send(new ReopenDeliveryOrderCommand(id, body.ReopenedBy, body.Reason));
+            return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
         }).RequireIdempotencyKey();
 
         // POST /api/v1/delivery-orders/upstream — auto pipeline for upstream sources (SAP/ERP/OMS)

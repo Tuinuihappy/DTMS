@@ -2,6 +2,7 @@ using AMR.DeliveryPlanning.Dispatch.Application.Commands.CancelTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.CapturePoD;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.PauseTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.RaiseException;
+using AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.ResolveException;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.ResumeTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripById;
@@ -53,6 +54,22 @@ public static class DispatchEndpoints
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         });
 
+        // POST /api/v1/dispatch/trips/{id}/retry — reissue a Cancelled trip.
+        // Failed trips reject with a hint to reopen the order first.
+        group.MapPost("/trips/{id:guid}/retry", async (Guid id, RetryTripRequest? req, ISender sender) =>
+        {
+            var command = new ReissueTripCommand(
+                OriginalTripId: id,
+                RetrySource: req?.Source ?? "Manual",
+                RetriedBy: req?.RetriedBy,
+                RetryReason: req?.Reason,
+                CorrelationId: req?.CorrelationId);
+            var result = await sender.Send(command);
+            return result.IsSuccess
+                ? Results.Created($"/api/v1/dispatch/trips/{result.Value}", new { newTripId = result.Value })
+                : Results.BadRequest(result.Error);
+        });
+
         // POST /api/v1/dispatch/trips/{id}/exceptions — Raise an exception
         group.MapPost("/trips/{id:guid}/exceptions", async (Guid id, RaiseExceptionRequest req, ISender sender) =>
         {
@@ -84,3 +101,4 @@ public static class DispatchEndpoints
 public record RaiseExceptionRequest(string Code, string Severity, string Detail);
 public record ResolveExceptionRequest(string Resolution, string ResolvedBy);
 public record CapturePodRequest(Guid StopId, string? PhotoUrl, string? SignatureData, List<string>? ScannedIds, string? Notes);
+public record RetryTripRequest(string? Source, string? RetriedBy, string? Reason, Guid? CorrelationId);

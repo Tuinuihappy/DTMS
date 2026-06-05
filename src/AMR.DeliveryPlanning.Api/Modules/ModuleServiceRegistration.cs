@@ -187,6 +187,10 @@ public static class ModuleServiceRegistration
             .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
                 sp.GetRequiredService<DispatchDomainEventMapper>())));
         services.AddScoped<ITripRepository, TripRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Repositories.ITripRetryEventRepository,
+            AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories.TripRetryEventRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.ITripRetryDispatcher,
+            AMR.DeliveryPlanning.Api.Adapters.PlanningTripRetryDispatcher>();
         services.AddScoped<IShelfManifestRepository, ShelfManifestRepository>();
 
         // ── VendorAdapter Module ──────────────────────────────────────

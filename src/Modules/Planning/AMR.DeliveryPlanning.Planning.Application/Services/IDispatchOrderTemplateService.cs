@@ -15,6 +15,8 @@ public interface IDispatchOrderTemplateService
         Guid pickupStationId,
         Guid dropStationId,
         string upperKey,
+        int attemptNumber = 1,
+        Guid? previousAttemptId = null,
         int? priorityOverride = null,
         string? appointVehicleKeyOverride = null,
         string? appointVehicleNameOverride = null,

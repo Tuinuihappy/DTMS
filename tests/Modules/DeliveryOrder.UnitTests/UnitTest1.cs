@@ -1117,6 +1117,53 @@ public class DeliveryOrderTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*Completed*");
     }
 
+    // ── Reopen (Failed → Confirmed, admin override) ─────────────────────
+
+    [Fact]
+    public void Reopen_FromFailed_TransitionsToConfirmedAndFiresEvent()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "ENV-REOPEN", Priority.Normal, serviceWindow: null);
+        AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-A", "Pack-1"));
+        order.Confirm(weightFallbackKg: 500);
+        order.MarkVendorFailed("vendor cancelled all attempts");
+
+        order.Reopen("operator override — vendor reissue");
+
+        order.Status.Should().Be(OrderStatus.Confirmed);
+        order.DomainEvents.OfType<DeliveryOrderReopenedDomainEvent>().Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Reopen_FromConfirmed_Throws()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "ENV-REOPEN-BAD", Priority.Normal, serviceWindow: null);
+        AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-A", "Pack-1"));
+        order.Confirm(weightFallbackKg: 500);
+
+        var act = () => order.Reopen("trying to reopen non-failed order");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Only Failed*");
+    }
+
+    [Fact]
+    public void Reopen_FromCancelled_Throws()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "ENV-REOPEN-CXL", Priority.Normal, serviceWindow: null);
+        AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
+        order.Cancel("operator stopped");
+
+        var act = () => order.Reopen("reopen cancelled order");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Only Failed*");
+    }
+
     [Fact]
     public void PartiallyCompleted_IsTerminal_CannotBeHeld()
     {

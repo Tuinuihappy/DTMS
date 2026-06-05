@@ -105,6 +105,46 @@ public class TripTests
         trip.VendorVehicleKey.Should().Be("Delta6FAN1");
     }
 
+    // ── Retry / route context ─────────────────────────────────────────
+
+    [Fact]
+    public void CreateForEnvelope_CapturesStationContextAndAttemptOne()
+    {
+        var orderId = Guid.NewGuid();
+        var pickup = Guid.NewGuid();
+        var drop = Guid.NewGuid();
+
+        var trip = Trip.CreateForEnvelope(orderId, "abc-G1", "ORD-1", pickup, drop);
+
+        trip.PickupStationId.Should().Be(pickup);
+        trip.DropStationId.Should().Be(drop);
+        trip.AttemptNumber.Should().Be(1);
+        trip.PreviousAttemptId.Should().BeNull();
+    }
+
+    [Fact]
+    public void CreateForEnvelope_RetryLinks_PreviousAttemptId()
+    {
+        var original = Trip.CreateForEnvelope(Guid.NewGuid(), "abc-G1", "ORD-1",
+            Guid.NewGuid(), Guid.NewGuid());
+        var retry = Trip.CreateForEnvelope(
+            original.DeliveryOrderId, "abc-G1-A2", "ORD-2",
+            original.PickupStationId, original.DropStationId,
+            attemptNumber: 2, previousAttemptId: original.Id);
+
+        retry.AttemptNumber.Should().Be(2);
+        retry.PreviousAttemptId.Should().Be(original.Id);
+    }
+
+    [Fact]
+    public void CreateForEnvelope_RejectsZeroAttempt()
+    {
+        var act = () => Trip.CreateForEnvelope(
+            Guid.NewGuid(), "abc-G1", "ORD",
+            attemptNumber: 0);
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
     [Fact]
     public void MarkVendorStarted_WithEmptyVendorKey_DoesNotSetField()
     {
@@ -246,6 +286,60 @@ public class TripTests
         trip.Cancel("operator");
 
         trip.Status.Should().Be(TripStatus.Cancelled);
+    }
+}
+
+public class EnvelopeUpperKeyTests
+{
+    [Fact]
+    public void Build_FirstAttempt_OmitsAttemptSuffix()
+    {
+        // Backward compat — RIOT3 + persisted rows must round-trip unchanged
+        // for first attempts.
+        var orderId = Guid.NewGuid();
+        var key = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.Build(orderId, 1);
+        key.Should().NotContain("-A");
+        key.Should().EndWith("-G1");
+    }
+
+    [Fact]
+    public void Build_RetryAttempt_AppendsAttemptSuffix()
+    {
+        var orderId = Guid.NewGuid();
+        var key = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.Build(orderId, 1, attemptNumber: 3);
+        key.Should().EndWith("-G1-A3");
+    }
+
+    [Fact]
+    public void TryParse_LegacyShape_ReturnsAttemptOne()
+    {
+        var key = "48752c3e35bb4d0db227cbde6c1da95b-G2";
+        var ok = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.TryParse(
+            key, out _, out var group, out var attempt);
+        ok.Should().BeTrue();
+        group.Should().Be(2);
+        attempt.Should().Be(1);
+    }
+
+    [Fact]
+    public void TryParse_RetryShape_ReturnsAttemptNumber()
+    {
+        var key = "48752c3e35bb4d0db227cbde6c1da95b-G2-A5";
+        var ok = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.TryParse(
+            key, out _, out var group, out var attempt);
+        ok.Should().BeTrue();
+        group.Should().Be(2);
+        attempt.Should().Be(5);
+    }
+
+    [Fact]
+    public void TryParse_2OutOverload_StillWorks()
+    {
+        // Existing webhook + reconciler callers use the 2-out overload.
+        var ok = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.TryParse(
+            "48752c3e35bb4d0db227cbde6c1da95b-G1-A2", out _, out var group);
+        ok.Should().BeTrue();
+        group.Should().Be(1);
     }
 }
 
