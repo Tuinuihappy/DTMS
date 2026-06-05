@@ -30,7 +30,16 @@ public sealed class Riot3OrderQueryService : IRiot3OrderQueryService
             response.EnsureSuccessStatusCode();
 
             var payload = await response.Content.ReadFromJsonAsync<Riot3OrderQueryResponse>(cancellationToken);
-            return payload?.Data;
+            if (payload?.Code != "0")
+            {
+                // RIOT3 returns HTTP 200 + code "E110014" ("订单为空" / order is
+                // empty) when the upperKey doesn't exist on the vendor side —
+                // treat as "no record" so the reconciler doesn't keep retrying.
+                _logger.LogDebug("RIOT3 GET {Path} returned non-success code {Code} ({Message}) — treating as no record",
+                    path, payload?.Code ?? "(null)", payload?.Message ?? "(no message)");
+                return null;
+            }
+            return payload.Data;
         }
         catch (HttpRequestException ex)
         {

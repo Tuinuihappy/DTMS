@@ -59,6 +59,58 @@ public class UnitTest1
         Assert.Contains("isUpper=true", handler.LastUri);
     }
 
+    // RIOT3 returns HTTP 200 even on logical failures — the success signal
+    // is in the response body (code "0"). Verify the silent-failure
+    // detection so these never silently mark a Trip as dispatched when the
+    // vendor actually refused.
+
+    [Fact]
+    public async Task SendOrderAsync_RejectionInBody_ReturnsFailure()
+    {
+        var handler = new ScriptedHandler("""{"code":"E100006","message":"station not on road network"}""");
+        var client = new HttpClient(handler) { BaseAddress = new Uri("http://riot3.local") };
+        var service = new Riot3CommandService(client, NullLogger<Riot3CommandService>.Instance);
+
+        var result = await service.SendOrderAsync(new Riot3OrderRequest
+        {
+            UpperKey = "abc-G1", OrderName = "x", OrderType = "WORK", Priority = 10,
+            StructureType = "sequence",
+            Missions = new List<Riot3Mission> { new() { MissionKey = "m1", Type = "MOVE", Category = "agv", MapId = 1, StationId = 99 } }
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("E100006", result.Error);
+        Assert.Contains("station not on road network", result.Error);
+    }
+
+    [Fact]
+    public async Task CancelEnvelopeAsync_RejectionInBody_ReturnsFailure()
+    {
+        var handler = new ScriptedHandler("""{"code":"E110014","message":"order is empty"}""");
+        var client = new HttpClient(handler) { BaseAddress = new Uri("http://riot3.local") };
+        var service = new Riot3CommandService(client, NullLogger<Riot3CommandService>.Instance);
+
+        var result = await service.CancelEnvelopeAsync("nonexistent-G1");
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("E110014", result.Error);
+    }
+
+    [Fact]
+    public async Task QueryService_RejectionInBody_ReturnsNull()
+    {
+        // RIOT3 returns 200 + "E110014" (order is empty) when an upperKey
+        // does not exist on the vendor side. The reconciler must treat this
+        // like a 404 — no record — not like a successful query.
+        var handler = new ScriptedHandler("""{"code":"E110014","message":"order is empty"}""");
+        var client = new HttpClient(handler) { BaseAddress = new Uri("http://riot3.local") };
+        var service = new Riot3OrderQueryService(client, NullLogger<Riot3OrderQueryService>.Instance);
+
+        var data = await service.GetOrderByUpperKeyAsync("nonexistent-G1");
+
+        Assert.Null(data);
+    }
+
     private sealed class CaptureHandler : HttpMessageHandler
     {
         public int CallCount { get; private set; }
@@ -78,5 +130,14 @@ public class UnitTest1
                 Content = new StringContent("""{"code":"0","message":"SUCCESS","data":{"orderKey":"ORD-1"}}""")
             };
         }
+    }
+
+    private sealed class ScriptedHandler : HttpMessageHandler
+    {
+        private readonly string _responseBody;
+        public ScriptedHandler(string responseBody) { _responseBody = responseBody; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(_responseBody) });
     }
 }

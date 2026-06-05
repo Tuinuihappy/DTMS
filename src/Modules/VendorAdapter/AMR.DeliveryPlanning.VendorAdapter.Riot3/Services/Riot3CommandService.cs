@@ -38,10 +38,21 @@ public class Riot3CommandService : IVehicleCommandService
             var response = await _httpClient.PostAsJsonAsync("/api/v4/orders", request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            // RIOT3 returns the created order; parse out the orderKey so the
-            // caller can correlate later callbacks.
+            // RIOT3 returns HTTP 200 even when the order is rejected (e.g. station
+            // not on road network → code "E100006"). The success signal is in the
+            // response body: code == "0". Anything else is a vendor-side rejection
+            // and must surface as a Failure so the caller doesn't create a Trip
+            // for an order the vendor never actually accepted.
             var payload = await response.Content.ReadFromJsonAsync<Riot3CreateOrderResponse>(cancellationToken);
-            var orderKey = payload?.Data?.OrderKey ?? string.Empty;
+            if (payload?.Code != "0")
+            {
+                var msg = payload?.Message ?? "(no message)";
+                _logger.LogWarning("RIOT3 rejected order upperKey={UpperKey}: code={Code} message={Message}",
+                    request.UpperKey, payload?.Code ?? "(null)", msg);
+                return Result<string>.Failure($"RIOT3 rejected order (code {payload?.Code ?? "null"}): {msg}");
+            }
+
+            var orderKey = payload.Data?.OrderKey ?? string.Empty;
             _logger.LogInformation("RIOT3 accepted order upperKey={UpperKey} orderKey={OrderKey}",
                 request.UpperKey, orderKey);
             return Result<string>.Success(orderKey);
@@ -118,6 +129,18 @@ public class Riot3CommandService : IVehicleCommandService
                 envelope,
                 cancellationToken);
             response.EnsureSuccessStatusCode();
+
+            // Same body-level check as SendOrderAsync: RIOT3 returns HTTP 200
+            // even on logical failures (e.g. order already finished, vendor
+            // can't pause). Code "0" means accepted.
+            var payload = await response.Content.ReadFromJsonAsync<Riot3CreateOrderResponse>(cancellationToken);
+            if (payload?.Code != "0")
+            {
+                var msg = payload?.Message ?? "(no message)";
+                _logger.LogWarning("RIOT3 rejected {Operation} on upperKey {UpperKey}: code={Code} message={Message}",
+                    operationLabel, upperKey, payload?.Code ?? "(null)", msg);
+                return Result.Failure($"RIOT3 rejected {operationLabel} (code {payload?.Code ?? "null"}): {msg}");
+            }
             return Result.Success();
         }
         catch (HttpRequestException ex)
