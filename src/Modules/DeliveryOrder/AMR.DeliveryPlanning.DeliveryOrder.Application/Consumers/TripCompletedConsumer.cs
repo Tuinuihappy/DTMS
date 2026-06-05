@@ -7,15 +7,17 @@ using Microsoft.Extensions.Logging;
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Consumers;
 
 /// <summary>
-/// Finalizes a DeliveryOrder when its Trip completes. Branches on
-/// VendorUpperKey:
-///   non-null (envelope flow) → MarkVendorCompleted (vendor-authoritative,
-///       marks all items Delivered then moves order to Completed)
-///   null (legacy flow)       → MarkAsCompleted (reads POD-driven item
-///       statuses; may yield Completed / PartiallyCompleted / Failed)
+/// Finalizes a DeliveryOrder when one of its Trips completes. The trip's
+/// items are marked Delivered, then the order's status is recomputed —
+/// it stays InProgress while other trips are still in flight, and
+/// transitions to Completed / PartiallyCompleted only when every item
+/// is terminal. Multi-group orders no longer finalize prematurely.
 ///
-/// Invariant for legacy: POD scan events must arrive BEFORE TripCompleted
-/// for the finalization to read the right item state.
+/// Two branches:
+///   - Envelope flow (non-null VendorUpperKey): per-trip item update,
+///     then derive order status from item states.
+///   - Legacy flow (null VendorUpperKey): POD-driven, kept on the
+///     original MarkAsCompleted path for backwards compatibility.
 /// </summary>
 public class TripCompletedConsumer : IConsumer<TripCompletedIntegrationEvent>
 {
@@ -46,13 +48,35 @@ public class TripCompletedConsumer : IConsumer<TripCompletedIntegrationEvent>
         try
         {
             if (isEnvelope)
-                order.MarkVendorCompleted();
+            {
+                var delivered = order.MarkTripItemsDelivered(evt.TripId);
+
+                // Legacy fallback: pre-Option-D rows have Item.TripId null
+                // and won't match a TripId-keyed update. Fall back to the
+                // old "mark whole order" semantic only when the per-trip
+                // update affected nothing AND there's no other trip-bound
+                // item in the order (i.e. the order pre-dates retry/binding).
+                if (delivered == 0 && !order.Items.Any(i => i.TripId.HasValue))
+                {
+                    _logger.LogWarning(
+                        "[Legacy fallback] Trip {TripId} affected no items on Order {OrderId} — pre-binding row. " +
+                        "Falling back to MarkVendorCompleted.",
+                        evt.TripId, order.Id);
+                    order.MarkVendorCompleted();
+                }
+                else
+                {
+                    order.RecomputeStatusFromItems();
+                }
+            }
             else
+            {
                 order.MarkAsCompleted();
+            }
 
             await _repository.SaveChangesAsync(context.CancellationToken);
-            _logger.LogInformation("DeliveryOrder {OrderId} finalized as {FinalStatus} via Trip {TripId} ({Flow})",
-                order.Id, order.Status, evt.TripId, isEnvelope ? "envelope" : "legacy");
+            _logger.LogInformation("DeliveryOrder {OrderId} status after Trip {TripId} {Flow}: {Status}",
+                order.Id, evt.TripId, isEnvelope ? "(envelope)" : "(legacy)", order.Status);
         }
         catch (InvalidOperationException ex)
         {

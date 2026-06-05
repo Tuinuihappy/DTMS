@@ -16,7 +16,7 @@ public record TripFailedDomainEvent(
 
 public record TripPausedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId) : IDomainEvent;
 public record TripResumedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId) : IDomainEvent;
-public record TripCancelledDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, string Reason) : IDomainEvent;
+public record TripCancelledDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId, string Reason, string? VendorUpperKey) : IDomainEvent;
 
 // Emitted the first time a vehicle is bound to a trip that was created
 // without one (e.g. RIOT3 auto-selected the robot and reported it back

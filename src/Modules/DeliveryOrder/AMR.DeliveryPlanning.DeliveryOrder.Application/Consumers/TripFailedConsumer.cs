@@ -7,9 +7,11 @@ using Microsoft.Extensions.Logging;
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Consumers;
 
 /// <summary>
-/// Handles trip-level failures for envelope-dispatched orders. Legacy
-/// trips don't fire TripFailedIntegrationEvent (their failure path is
-/// per-task), so this consumer ignores any event with a null VendorUpperKey.
+/// Handles trip-level failures for envelope-dispatched orders. The
+/// failed trip's items are marked Failed, then the order's status is
+/// recomputed. The order transitions to Failed only when ALL trips
+/// failed; mixed outcomes yield PartiallyCompleted on the final tally.
+/// Legacy trips (null VendorUpperKey) fail per-task and are ignored.
 /// </summary>
 public class TripFailedConsumer : IConsumer<TripFailedIntegrationEvent>
 {
@@ -45,10 +47,25 @@ public class TripFailedConsumer : IConsumer<TripFailedIntegrationEvent>
 
         try
         {
-            order.MarkVendorFailed(evt.Reason);
+            var failed = order.MarkTripItemsFailed(evt.TripId, evt.Reason);
+
+            // Legacy fallback for pre-binding rows.
+            if (failed == 0 && !order.Items.Any(i => i.TripId.HasValue))
+            {
+                _logger.LogWarning(
+                    "[Legacy fallback] Trip {TripId} affected no items on Order {OrderId} — pre-binding row. " +
+                    "Falling back to MarkVendorFailed.",
+                    evt.TripId, order.Id);
+                order.MarkVendorFailed(evt.Reason);
+            }
+            else
+            {
+                order.RecomputeStatusFromItems();
+            }
+
             await _repository.SaveChangesAsync(context.CancellationToken);
-            _logger.LogInformation("DeliveryOrder {OrderId} marked Failed via Trip {TripId}: {Reason}",
-                order.Id, evt.TripId, evt.Reason);
+            _logger.LogInformation("DeliveryOrder {OrderId} status after Trip {TripId} failure: {Status}",
+                order.Id, evt.TripId, order.Status);
         }
         catch (InvalidOperationException ex)
         {

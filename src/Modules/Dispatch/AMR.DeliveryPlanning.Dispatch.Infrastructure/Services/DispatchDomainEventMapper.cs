@@ -39,7 +39,9 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     evt.OccurredOn,
                     evt.TripId,
                     evt.JobId,
-                    evt.Reason)
+                    evt.DeliveryOrderId,
+                    evt.Reason,
+                    evt.VendorUpperKey)
             ],
             ExceptionRaisedDomainEvent evt =>
             [

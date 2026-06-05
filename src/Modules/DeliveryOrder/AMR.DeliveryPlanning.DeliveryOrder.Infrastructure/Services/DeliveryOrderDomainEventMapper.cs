@@ -73,6 +73,13 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             // so the audit trail separates "who reopened" from "who retried".
             DeliveryOrderReopenedDomainEvent         => [],
 
+            // Item-level lifecycle events fired by the trip-aware item
+            // methods. They're useful for audit + analytics but no other
+            // module needs to react — kept internal until a consumer asks.
+            TripItemsAssignedDomainEvent             => [],
+            TripItemsDeliveredDomainEvent            => [],
+            TripItemsFailedDomainEvent               => [],
+
             _ => throw new InvalidOperationException(
                 $"Unhandled domain event '{domainEvent.GetType().Name}'. " +
                 "Add a mapping or explicitly return [] if internal-only.")

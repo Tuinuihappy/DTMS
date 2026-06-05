@@ -147,6 +147,154 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
                 item.UpdateStatus(ItemStatus.Delivered);
     }
 
+    // ── Trip-aware item lifecycle (Option D: item-level state derivation) ──
+
+    /// <summary>
+    /// Bind the items of a station pair to a Trip. Called by the dispatcher
+    /// right after a Trip is created so subsequent webhook callbacks can
+    /// update only THIS trip's items, not the whole order. Idempotent —
+    /// re-binding the same trip is a no-op; binding to a higher attempt
+    /// resets any Failed/Returned items back to Pending so the new trip
+    /// can drive them terminal.
+    /// </summary>
+    public int AssignItemsToTrip(Guid tripId, int attemptNumber, Guid pickupStationId, Guid dropStationId)
+    {
+        if (tripId == Guid.Empty)
+            throw new ArgumentException("TripId must not be empty.", nameof(tripId));
+
+        var bound = 0;
+        foreach (var item in _items)
+        {
+            if (item.PickupStationId != pickupStationId || item.DropStationId != dropStationId)
+                continue;
+            // Skip terminal items the operator already finalised (Cancelled
+            // by admin etc.) — they don't ride retries.
+            if (item.Status is ItemStatus.Cancelled or ItemStatus.Delivered)
+                continue;
+
+            item.AssignToTrip(tripId, attemptNumber);
+            bound++;
+        }
+
+        if (bound > 0)
+            AddDomainEvent(new TripItemsAssignedDomainEvent(
+                Guid.NewGuid(), DateTime.UtcNow, Id, tripId, attemptNumber, bound));
+        return bound;
+    }
+
+    /// <summary>
+    /// Mark every item bound to a Trip as Delivered. Called when the Trip
+    /// completes — the trip-aware filter keeps multi-group orders from
+    /// finalising prematurely.
+    /// </summary>
+    public int MarkTripItemsDelivered(Guid tripId)
+    {
+        var changed = 0;
+        foreach (var item in _items)
+        {
+            if (item.TripId != tripId) continue;
+            if (item.Status == ItemStatus.Delivered) continue;
+            item.UpdateStatus(ItemStatus.Delivered);
+            changed++;
+        }
+        if (changed > 0)
+            AddDomainEvent(new TripItemsDeliveredDomainEvent(
+                Guid.NewGuid(), DateTime.UtcNow, Id, tripId, changed));
+        return changed;
+    }
+
+    /// <summary>
+    /// Mark every item bound to a Trip as Failed. Picked items stay Picked
+    /// (operator may resolve them manually); only in-flight items
+    /// transition. Already-Delivered items are untouched.
+    /// </summary>
+    public int MarkTripItemsFailed(Guid tripId, string reason)
+    {
+        var changed = 0;
+        foreach (var item in _items)
+        {
+            if (item.TripId != tripId) continue;
+            if (item.Status is ItemStatus.Pending)
+            {
+                item.UpdateStatus(ItemStatus.Failed);
+                changed++;
+            }
+        }
+        if (changed > 0)
+            AddDomainEvent(new TripItemsFailedDomainEvent(
+                Guid.NewGuid(), DateTime.UtcNow, Id, tripId, changed, reason));
+        return changed;
+    }
+
+    /// <summary>
+    /// Release items from a Trip binding without marking them terminal.
+    /// Used when a Trip is Cancelled and the operator can still retry —
+    /// items go back to "awaiting dispatch" so the next /retry rebinds
+    /// them cleanly.
+    /// </summary>
+    public int UnassignItemsFromTrip(Guid tripId)
+    {
+        var changed = 0;
+        foreach (var item in _items)
+        {
+            if (item.TripId != tripId) continue;
+            item.UnassignFromTrip();
+            changed++;
+        }
+        return changed;
+    }
+
+    /// <summary>
+    /// Derive the order's terminal status from item states. No-op when
+    /// the order is in an admin-overriden state (Cancelled / Rejected)
+    /// or while any item is still in-flight (Pending / Picked).
+    /// </summary>
+    public void RecomputeStatusFromItems()
+    {
+        // Admin overrides — never auto-transition out of these.
+        if (Status is OrderStatus.Cancelled or OrderStatus.Rejected) return;
+        // Already terminal — RecomputeStatusFromItems should be idempotent.
+        if (Status is OrderStatus.Completed or OrderStatus.Failed
+                   or OrderStatus.PartiallyCompleted) return;
+
+        var total = _items.Count;
+        if (total == 0) return;
+
+        var delivered = 0;
+        var inFlight  = 0;
+        foreach (var item in _items)
+        {
+            switch (item.Status)
+            {
+                case ItemStatus.Delivered:                          delivered++; break;
+                case ItemStatus.Pending or ItemStatus.Picked:       inFlight++;  break;
+                // Failed / Returned / Cancelled → terminal, not delivered
+            }
+        }
+
+        if (inFlight > 0) return;   // still waiting for the rest
+
+        if (delivered == total)
+        {
+            Status = OrderStatus.Completed;
+            AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+        }
+        else if (delivered == 0)
+        {
+            Status = OrderStatus.Failed;
+            AddDomainEvent(new DeliveryOrderFailedDomainEvent(
+                Guid.NewGuid(), DateTime.UtcNow, Id,
+                $"All {total} items failed delivery."));
+        }
+        else
+        {
+            Status = OrderStatus.PartiallyCompleted;
+            AddDomainEvent(new DeliveryOrderPartiallyCompletedDomainEvent(
+                Guid.NewGuid(), DateTime.UtcNow, Id,
+                delivered, total - delivered, total));
+        }
+    }
+
     public void MarkAsValidated(IReadOnlyDictionary<string, Guid> stationMap)
     {
         if (Status != OrderStatus.Submitted)

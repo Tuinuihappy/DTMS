@@ -872,14 +872,21 @@ public class DispatchOrderTemplateServiceTests
 
     // Minimal MediatR ISender stub — DispatchOrderTemplateService uses it
     // to send CreateEnvelopeTripCommand into the Dispatch module. Tests
-    // don't care about the resulting TripId so return a fresh Guid.
+    // DispatchOrderTemplateService now sends two commands:
+    //   CreateEnvelopeTripCommand   → Result<Guid>
+    //   AssignItemsToTripCommand    → Result<int>
+    // Branch on the response generic so each test target sees a valid result.
     private sealed class StubSender : MediatR.ISender
     {
         public Task<TResponse> Send<TResponse>(MediatR.IRequest<TResponse> request, CancellationToken cancellationToken = default)
         {
-            // The only thing DispatchOrderTemplateService sends is
-            // CreateEnvelopeTripCommand which returns Result<Guid>.
-            object response = AMR.DeliveryPlanning.SharedKernel.Messaging.Result<Guid>.Success(Guid.NewGuid());
+            object response;
+            if (typeof(TResponse) == typeof(AMR.DeliveryPlanning.SharedKernel.Messaging.Result<Guid>))
+                response = AMR.DeliveryPlanning.SharedKernel.Messaging.Result<Guid>.Success(Guid.NewGuid());
+            else if (typeof(TResponse) == typeof(AMR.DeliveryPlanning.SharedKernel.Messaging.Result<int>))
+                response = AMR.DeliveryPlanning.SharedKernel.Messaging.Result<int>.Success(0);
+            else
+                throw new NotSupportedException($"StubSender doesn't model {typeof(TResponse).Name}.");
             return Task.FromResult((TResponse)response);
         }
         public Task<object?> Send(object request, CancellationToken cancellationToken = default)

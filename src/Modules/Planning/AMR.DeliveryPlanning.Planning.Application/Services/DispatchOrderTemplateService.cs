@@ -123,6 +123,24 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
                 "[EnvelopeDispatch] Vendor accepted envelope but Trip persistence failed for UpperKey {UpperKey}: {Error}",
                 upperKey, tripCreate.Error);
         }
+        else
+        {
+            // Bind the order's items at this (pickup, drop) pair to the new
+            // Trip so the trip's terminal webhook updates only THIS trip's
+            // items — multi-group orders no longer finalize off the first
+            // completed trip. The consumer also falls back to (pickup, drop)
+            // matching if this binding fails, so we log and proceed.
+            var assignResult = await _sender.Send(
+                new AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AssignItemsToTrip.AssignItemsToTripCommand(
+                    deliveryOrderId, tripId, attemptNumber, pickupStationId, dropStationId),
+                cancellationToken);
+            if (!assignResult.IsSuccess)
+            {
+                _logger.LogWarning(
+                    "[EnvelopeDispatch] Item binding failed for Trip {TripId} on Order {OrderId} ({UpperKey}): {Error}",
+                    tripId, deliveryOrderId, upperKey, assignResult.Error);
+            }
+        }
 
         return Result<DispatchTemplateResult>.Success(
             new DispatchTemplateResult(template.Id, template.Name, vendorOrderKey, tripId, resolved));

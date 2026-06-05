@@ -225,7 +225,9 @@ public class Trip : AggregateRoot<Guid>
 
         Status = TripStatus.Cancelled;
         CompletedAt = DateTime.UtcNow;
-        AddDomainEvent(new TripCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, JobId, reason));
+        AddDomainEvent(new TripCancelledDomainEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, JobId, DeliveryOrderId, reason,
+            string.IsNullOrWhiteSpace(UpperKey) ? null : UpperKey));
         RecordEvent("TripCancelled", reason);
     }
 

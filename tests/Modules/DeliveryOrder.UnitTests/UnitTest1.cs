@@ -1164,6 +1164,184 @@ public class DeliveryOrderTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*Only Failed*");
     }
 
+    // ── Trip-aware item lifecycle (Option D — multi-group completion) ──
+
+    /// <summary>Builds a Confirmed order with N items spread across two
+    /// (pickup, drop) station pairs. Returns the order and the two pair tuples.</summary>
+    private static (AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder Order,
+                    (Guid Pickup, Guid Drop) GroupA,
+                    (Guid Pickup, Guid Drop) GroupB)
+        MultiGroupOrder()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "MG-" + Guid.NewGuid().ToString("N")[..6],
+            Priority.Normal, serviceWindow: null);
+        AddTestItem(order, itemSeq: 1, "WH-A", "DOCK-1", "SKU-A1");
+        AddTestItem(order, itemSeq: 2, "WH-A", "DOCK-1", "SKU-A2");
+        AddTestItem(order, itemSeq: 3, "WH-B", "DOCK-2", "SKU-B1");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-A", "DOCK-1", "WH-B", "DOCK-2"));
+        order.Confirm(weightFallbackKg: 5.0);
+        var groupA = (order.Items.First(i => i.PickupLocationCode == "WH-A").PickupStationId!.Value,
+                      order.Items.First(i => i.PickupLocationCode == "WH-A").DropStationId!.Value);
+        var groupB = (order.Items.First(i => i.PickupLocationCode == "WH-B").PickupStationId!.Value,
+                      order.Items.First(i => i.PickupLocationCode == "WH-B").DropStationId!.Value);
+        return (order, groupA, groupB);
+    }
+
+    [Fact]
+    public void AssignItemsToTrip_BindsOnlyMatchingStationPair()
+    {
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+
+        var bound = order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+
+        bound.Should().Be(2);  // SKU-A1, SKU-A2
+        order.Items.Count(i => i.TripId == tripA).Should().Be(2);
+        order.Items.Count(i => i.TripId == null).Should().Be(1);  // SKU-B1 unbound
+    }
+
+    [Fact]
+    public void MarkTripItemsDelivered_OnlyAffectsBoundItems_NotOtherGroup()
+    {
+        var (order, groupA, groupB) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        var tripB = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.AssignItemsToTrip(tripB, 1, groupB.Pickup, groupB.Drop);
+
+        order.MarkTripItemsDelivered(tripA);
+
+        order.Items.Count(i => i.Status == ItemStatus.Delivered).Should().Be(2);
+        order.Items.Single(i => i.TripId == tripB).Status.Should().Be(ItemStatus.Pending);
+    }
+
+    [Fact]
+    public void RecomputeStatusFromItems_WaitsWhileOtherTripsInFlight()
+    {
+        var (order, groupA, groupB) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        var tripB = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.AssignItemsToTrip(tripB, 1, groupB.Pickup, groupB.Drop);
+        order.MarkTripItemsDelivered(tripA);   // group A done
+
+        order.RecomputeStatusFromItems();
+
+        // Group B items still Pending → order should NOT transition
+        order.Status.Should().Be(OrderStatus.Confirmed);
+    }
+
+    [Fact]
+    public void RecomputeStatusFromItems_AllDelivered_MarksCompleted()
+    {
+        var (order, groupA, groupB) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        var tripB = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.AssignItemsToTrip(tripB, 1, groupB.Pickup, groupB.Drop);
+        order.MarkTripItemsDelivered(tripA);
+        order.MarkTripItemsDelivered(tripB);
+
+        order.RecomputeStatusFromItems();
+
+        order.Status.Should().Be(OrderStatus.Completed);
+        order.DomainEvents.OfType<DeliveryOrderCompletedDomainEvent>().Should().ContainSingle();
+    }
+
+    [Fact]
+    public void RecomputeStatusFromItems_MixedOutcomes_MarksPartiallyCompleted()
+    {
+        var (order, groupA, groupB) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        var tripB = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.AssignItemsToTrip(tripB, 1, groupB.Pickup, groupB.Drop);
+        order.MarkTripItemsDelivered(tripA);
+        order.MarkTripItemsFailed(tripB, "robot stuck");
+
+        order.RecomputeStatusFromItems();
+
+        order.Status.Should().Be(OrderStatus.PartiallyCompleted);
+        var partial = order.DomainEvents.OfType<DeliveryOrderPartiallyCompletedDomainEvent>().Single();
+        partial.DeliveredCount.Should().Be(2);
+        partial.NotDeliveredCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void RecomputeStatusFromItems_AllFailed_MarksFailed()
+    {
+        var (order, groupA, groupB) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        var tripB = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.AssignItemsToTrip(tripB, 1, groupB.Pickup, groupB.Drop);
+        order.MarkTripItemsFailed(tripA, "x");
+        order.MarkTripItemsFailed(tripB, "y");
+
+        order.RecomputeStatusFromItems();
+
+        order.Status.Should().Be(OrderStatus.Failed);
+    }
+
+    [Fact]
+    public void AssignToTrip_RebindHigherAttempt_ResetsFailedToPending()
+    {
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA1 = Guid.NewGuid();
+        var tripA2 = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA1, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsFailed(tripA1, "first attempt failed");
+        order.Items.Where(i => i.TripId == tripA1).Should().AllSatisfy(i =>
+            i.Status.Should().Be(ItemStatus.Failed));
+
+        order.AssignItemsToTrip(tripA2, 2, groupA.Pickup, groupA.Drop);
+
+        var retried = order.Items.Where(i => i.PickupStationId == groupA.Pickup).ToList();
+        retried.Should().AllSatisfy(i =>
+        {
+            i.TripId.Should().Be(tripA2);
+            i.AttemptNumber.Should().Be(2);
+            i.Status.Should().Be(ItemStatus.Pending);   // reset on rebind
+        });
+    }
+
+    [Fact]
+    public void UnassignItemsFromTrip_ClearsBinding_StatusUnchanged()
+    {
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+
+        var released = order.UnassignItemsFromTrip(tripA);
+
+        released.Should().Be(2);
+        order.Items.Where(i => i.PickupStationId == groupA.Pickup).Should().AllSatisfy(i =>
+        {
+            i.TripId.Should().BeNull();
+            i.AttemptNumber.Should().BeNull();
+            i.Status.Should().Be(ItemStatus.Pending);   // unchanged
+        });
+    }
+
+    [Fact]
+    public void RecomputeStatusFromItems_RespectsAdminCancel()
+    {
+        var (order, groupA, groupB) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        var tripB = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.AssignItemsToTrip(tripB, 1, groupB.Pickup, groupB.Drop);
+        order.Cancel("admin override");
+        order.MarkTripItemsDelivered(tripA);
+        order.MarkTripItemsDelivered(tripB);
+
+        order.RecomputeStatusFromItems();
+
+        order.Status.Should().Be(OrderStatus.Cancelled);   // admin override wins
+    }
+
     [Fact]
     public void PartiallyCompleted_IsTerminal_CannotBeHeld()
     {

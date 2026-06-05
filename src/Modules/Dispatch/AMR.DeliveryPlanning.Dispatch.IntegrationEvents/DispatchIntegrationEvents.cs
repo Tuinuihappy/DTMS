@@ -16,7 +16,7 @@ public record TripFailedIntegrationEvent(
     string Reason, string VendorUpperKey) : IIntegrationEvent;
 
 public record TripCancelledIntegrationEvent(
-    Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, string Reason) : IIntegrationEvent;
+    Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId, string Reason, string? VendorUpperKey) : IIntegrationEvent;
 
 public record ExceptionRaisedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid ExceptionId,

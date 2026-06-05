@@ -155,6 +155,12 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.Property<double?>("WeightKg")
                         .HasColumnType("double precision");
 
+                    b.Property<Guid?>("TripId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("AttemptNumber")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("DeliveryOrderId", "ItemId")
@@ -162,6 +168,9 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 
                     b.HasIndex("DeliveryOrderId", "ItemSeq")
                         .IsUnique();
+
+                    b.HasIndex("TripId")
+                        .HasFilter("\"TripId\" IS NOT NULL");
 
                     b.ToTable("Items", "deliveryorder");
                 });

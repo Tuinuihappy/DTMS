@@ -69,6 +69,11 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(p => p.DropLocationCode).HasColumnName("DropLocationCode").HasMaxLength(50).IsRequired();
             b.Property(p => p.PickupStationId);
             b.Property(p => p.DropStationId);
+            // Trip binding (Option D — item-level state derivation). Null
+            // before first dispatch and between Cancel-with-retry steps.
+            b.Property(p => p.TripId);
+            b.Property(p => p.AttemptNumber);
+            b.HasIndex(p => p.TripId).HasFilter("\"TripId\" IS NOT NULL");
             b.Property(p => p.ItemSeq).IsRequired();
             b.Property(p => p.ItemId).HasMaxLength(100).IsRequired();
             b.OwnsOne(p => p.Dimensions, d =>

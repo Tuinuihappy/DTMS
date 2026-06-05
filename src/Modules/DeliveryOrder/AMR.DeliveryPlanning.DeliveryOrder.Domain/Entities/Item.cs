@@ -26,6 +26,17 @@ public class Item : Entity<Guid>
         = Array.Empty<HandlingInstruction>();
     public ItemStatus Status { get; private set; }
 
+    /// <summary>The Trip currently dispatching this item, or null when the
+    /// item is awaiting first dispatch / has been unbound after a retryable
+    /// cancellation. Rebound at retry time so the latest attempt is the
+    /// authoritative owner.</summary>
+    public Guid? TripId { get; private set; }
+
+    /// <summary>Attempt number of the Trip this item is bound to (1 = first
+    /// dispatch). Mirrors Trip.AttemptNumber so per-item audit queries
+    /// don't have to join.</summary>
+    public int? AttemptNumber { get; private set; }
+
     private Item() { }
 
     internal Item(Guid deliveryOrderId, string pickupLocationCode, string dropLocationCode,
@@ -70,4 +81,29 @@ public class Item : Entity<Guid>
     }
 
     internal void UpdateStatus(ItemStatus status) => Status = status;
+
+    /// <summary>Bind the item to a Trip. A re-bind (different TripId or
+    /// higher AttemptNumber) resets a Failed/Returned status back to
+    /// Pending so the new trip can drive it terminal again.</summary>
+    internal void AssignToTrip(Guid tripId, int attemptNumber)
+    {
+        if (attemptNumber < 1)
+            throw new ArgumentOutOfRangeException(nameof(attemptNumber), "AttemptNumber must be >= 1.");
+
+        var isRebind = TripId != tripId || (AttemptNumber ?? 0) < attemptNumber;
+        TripId = tripId;
+        AttemptNumber = attemptNumber;
+
+        if (isRebind && Status is ItemStatus.Failed or ItemStatus.Returned)
+            Status = ItemStatus.Pending;
+    }
+
+    /// <summary>Remove the trip binding so the item is discoverable as
+    /// "awaiting dispatch" again. Used when an envelope is cancelled and
+    /// the order is still live (operator may retry).</summary>
+    internal void UnassignFromTrip()
+    {
+        TripId = null;
+        AttemptNumber = null;
+    }
 }
