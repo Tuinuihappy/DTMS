@@ -84,16 +84,50 @@ public class UnitTest1
     }
 
     [Fact]
-    public async Task CancelEnvelopeAsync_RejectionInBody_ReturnsFailure()
+    public async Task CancelEnvelopeAsync_E110014_ReturnsNoVendorRecord()
     {
+        // Gap #6: E110014 ("order is empty") is the vendor's soft-404
+        // for cancel/pause/resume. The service surfaces it as the
+        // NoVendorRecord outcome so handlers can apply per-command
+        // policy (Cancel forgives, Pause/Resume escalate).
         var handler = new ScriptedHandler("""{"code":"E110014","message":"order is empty"}""");
         var client = new HttpClient(handler) { BaseAddress = new Uri("http://riot3.local") };
         var service = new Riot3CommandService(client, NullLogger<Riot3CommandService>.Instance);
 
         var result = await service.CancelEnvelopeAsync("nonexistent-G1");
 
+        Assert.True(result.IsSuccess);
+        Assert.Equal(AMR.DeliveryPlanning.VendorAdapter.Riot3.Models.Riot3OperationOutcome.NoVendorRecord, result.Value);
+    }
+
+    [Fact]
+    public async Task CancelEnvelopeAsync_Http404_ReturnsNoVendorRecord()
+    {
+        // Hard 404 from RIOT3 (order purged / never received) maps to
+        // the same outcome as the body-level E110014.
+        var handler = new ScriptedHandler("""{"code":"E1","message":"not found"}""", System.Net.HttpStatusCode.NotFound);
+        var client = new HttpClient(handler) { BaseAddress = new Uri("http://riot3.local") };
+        var service = new Riot3CommandService(client, NullLogger<Riot3CommandService>.Instance);
+
+        var result = await service.CancelEnvelopeAsync("missing-G1");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(AMR.DeliveryPlanning.VendorAdapter.Riot3.Models.Riot3OperationOutcome.NoVendorRecord, result.Value);
+    }
+
+    [Fact]
+    public async Task CancelEnvelopeAsync_OtherRejection_ReturnsFailure()
+    {
+        // Non-zero, non-empty codes (e.g. permission denied) stay as
+        // Failure — handler should escalate to the operator.
+        var handler = new ScriptedHandler("""{"code":"E100007","message":"permission denied"}""");
+        var client = new HttpClient(handler) { BaseAddress = new Uri("http://riot3.local") };
+        var service = new Riot3CommandService(client, NullLogger<Riot3CommandService>.Instance);
+
+        var result = await service.CancelEnvelopeAsync("forbidden-G1");
+
         Assert.False(result.IsSuccess);
-        Assert.Contains("E110014", result.Error);
+        Assert.Contains("E100007", result.Error);
     }
 
     [Fact]
@@ -135,9 +169,14 @@ public class UnitTest1
     private sealed class ScriptedHandler : HttpMessageHandler
     {
         private readonly string _responseBody;
-        public ScriptedHandler(string responseBody) { _responseBody = responseBody; }
+        private readonly HttpStatusCode _statusCode;
+        public ScriptedHandler(string responseBody, HttpStatusCode statusCode = HttpStatusCode.OK)
+        {
+            _responseBody = responseBody;
+            _statusCode = statusCode;
+        }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(_responseBody) });
+            => Task.FromResult(new HttpResponseMessage(_statusCode) { Content = new StringContent(_responseBody) });
     }
 }

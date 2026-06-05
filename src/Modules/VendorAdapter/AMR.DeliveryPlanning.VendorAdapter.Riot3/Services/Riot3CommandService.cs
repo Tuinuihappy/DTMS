@@ -81,13 +81,13 @@ public class Riot3CommandService : IVehicleCommandService
     }
 
     // Envelope-level operation (cancel / pause / resume an entire upperKey).
-    public Task<Result> CancelEnvelopeAsync(string upperKey, CancellationToken cancellationToken = default)
+    public Task<Result<Riot3OperationOutcome>> CancelEnvelopeAsync(string upperKey, CancellationToken cancellationToken = default)
         => SendOrderOperationAsync(upperKey, Riot3OrderCommandType.Cancel, "cancel", cancellationToken);
 
-    public Task<Result> PauseEnvelopeAsync(string upperKey, CancellationToken cancellationToken = default)
+    public Task<Result<Riot3OperationOutcome>> PauseEnvelopeAsync(string upperKey, CancellationToken cancellationToken = default)
         => SendOrderOperationAsync(upperKey, Riot3OrderCommandType.Hold, "pause", cancellationToken);
 
-    public Task<Result> ResumeEnvelopeAsync(string upperKey, CancellationToken cancellationToken = default)
+    public Task<Result<Riot3OperationOutcome>> ResumeEnvelopeAsync(string upperKey, CancellationToken cancellationToken = default)
         // CMD_ORDER_CONTINUE_FROM_HELD pairs with CMD_ORDER_HELD; HANG-from-* is for system-initiated hangs.
         => SendOrderOperationAsync(upperKey, Riot3OrderCommandType.ContinueFromHeld, "resume", cancellationToken);
 
@@ -120,7 +120,7 @@ public class Riot3CommandService : IVehicleCommandService
 
     // ── helpers ─────────────────────────────────────────────────────────────
 
-    private async Task<Result> SendOrderOperationAsync(
+    private async Task<Result<Riot3OperationOutcome>> SendOrderOperationAsync(
         string upperKey,
         string orderCommandType,
         string operationLabel,
@@ -144,25 +144,43 @@ public class Riot3CommandService : IVehicleCommandService
                 $"/api/v4/orders/{Uri.EscapeDataString(upperKey)}/operation?isUpper=true",
                 envelope,
                 cancellationToken);
+
+            // Vendor purged / never received → graceful path for the caller.
+            // We surface the outcome rather than throwing so each handler can
+            // pick its own policy (Cancel forgives, Pause/Resume escalate).
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _logger.LogWarning("RIOT3 {Operation}: vendor has no record of upperKey {UpperKey} (HTTP 404)",
+                    operationLabel, upperKey);
+                return Result<Riot3OperationOutcome>.Success(Riot3OperationOutcome.NoVendorRecord);
+            }
             response.EnsureSuccessStatusCode();
 
             // Same body-level check as SendOrderAsync: RIOT3 returns HTTP 200
             // even on logical failures (e.g. order already finished, vendor
-            // can't pause). Code "0" means accepted.
+            // can't pause). Code "0" means accepted; E110014 ("order is empty")
+            // is the soft-404 equivalent of HTTP 404 and gets the same outcome.
             var payload = await response.Content.ReadFromJsonAsync<Riot3CreateOrderResponse>(cancellationToken);
-            if (payload?.Code != "0")
+            if (payload?.Code == "0")
+                return Result<Riot3OperationOutcome>.Success(Riot3OperationOutcome.Accepted);
+
+            if (payload?.Code == "E110014")
             {
-                var msg = payload?.Message ?? "(no message)";
-                _logger.LogWarning("RIOT3 rejected {Operation} on upperKey {UpperKey}: code={Code} message={Message}",
-                    operationLabel, upperKey, payload?.Code ?? "(null)", msg);
-                return Result.Failure($"RIOT3 rejected {operationLabel} (code {payload?.Code ?? "null"}): {msg}");
+                _logger.LogWarning("RIOT3 {Operation}: vendor returned E110014 (order is empty) for upperKey {UpperKey}",
+                    operationLabel, upperKey);
+                return Result<Riot3OperationOutcome>.Success(Riot3OperationOutcome.NoVendorRecord);
             }
-            return Result.Success();
+
+            var msg = payload?.Message ?? "(no message)";
+            _logger.LogWarning("RIOT3 rejected {Operation} on upperKey {UpperKey}: code={Code} message={Message}",
+                operationLabel, upperKey, payload?.Code ?? "(null)", msg);
+            return Result<Riot3OperationOutcome>.Failure(
+                $"RIOT3 rejected {operationLabel} (code {payload?.Code ?? "null"}): {msg}");
         }
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "Failed to {Operation} RIOT3 envelope {UpperKey}", operationLabel, upperKey);
-            return Result.Failure($"RIOT3 {operationLabel} error: {ex.Message}");
+            return Result<Riot3OperationOutcome>.Failure($"RIOT3 {operationLabel} error: {ex.Message}");
         }
     }
 

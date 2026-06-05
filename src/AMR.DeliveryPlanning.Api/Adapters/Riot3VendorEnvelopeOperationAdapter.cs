@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using AMR.DeliveryPlanning.VendorAdapter.Riot3.Models;
 using AMR.DeliveryPlanning.VendorAdapter.Riot3.Services;
 
 namespace AMR.DeliveryPlanning.Api.Adapters;
@@ -16,12 +17,35 @@ internal sealed class Riot3VendorEnvelopeOperationAdapter : IVendorEnvelopeOpera
         _riot3 = riot3;
     }
 
-    public Task<Result> CancelAsync(string upperKey, CancellationToken cancellationToken = default)
-        => _riot3.CancelEnvelopeAsync(upperKey, cancellationToken);
+    public async Task<Result<VendorOperationOutcome>> CancelAsync(string upperKey, CancellationToken cancellationToken = default)
+    {
+        var result = await _riot3.CancelEnvelopeAsync(upperKey, cancellationToken);
+        return MapResult(result);
+    }
 
-    public Task<Result> PauseAsync(string upperKey, CancellationToken cancellationToken = default)
-        => _riot3.PauseEnvelopeAsync(upperKey, cancellationToken);
+    public async Task<Result<VendorOperationOutcome>> PauseAsync(string upperKey, CancellationToken cancellationToken = default)
+    {
+        var result = await _riot3.PauseEnvelopeAsync(upperKey, cancellationToken);
+        return MapResult(result);
+    }
 
-    public Task<Result> ResumeAsync(string upperKey, CancellationToken cancellationToken = default)
-        => _riot3.ResumeEnvelopeAsync(upperKey, cancellationToken);
+    public async Task<Result<VendorOperationOutcome>> ResumeAsync(string upperKey, CancellationToken cancellationToken = default)
+    {
+        var result = await _riot3.ResumeEnvelopeAsync(upperKey, cancellationToken);
+        return MapResult(result);
+    }
+
+    private static Result<VendorOperationOutcome> MapResult(Result<Riot3OperationOutcome> source)
+    {
+        if (source.IsFailure)
+            return Result<VendorOperationOutcome>.Failure(source.Error!);
+
+        var mapped = source.Value switch
+        {
+            Riot3OperationOutcome.Accepted       => VendorOperationOutcome.Accepted,
+            Riot3OperationOutcome.NoVendorRecord => VendorOperationOutcome.NoVendorRecord,
+            _ => VendorOperationOutcome.Rejected
+        };
+        return Result<VendorOperationOutcome>.Success(mapped);
+    }
 }

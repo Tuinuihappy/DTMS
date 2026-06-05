@@ -7,9 +7,11 @@ namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.CancelTrip;
 
 // Operator-initiated cancel: validate the transition locally first, then
 // instruct the vendor to cancel the envelope, then persist. Vendor
-// rejection leaves DTMS untouched (the in-memory mutation is discarded
-// when the scope disposes) so the next operator action sees consistent
-// state with what RIOT3 actually has.
+// rejection (a real "no" — auth, business rule, etc.) leaves DTMS
+// untouched. A "no-record" outcome (vendor purged / never received) is
+// treated as graceful success — the operator's intent is met regardless,
+// and refusing would leave the Trip stuck forever with no recovery
+// short of a manual DB edit.
 public class CancelTripCommandHandler : ICommandHandler<CancelTripCommand>
 {
     private readonly ITripRepository _tripRepository;
@@ -32,7 +34,7 @@ public class CancelTripCommandHandler : ICommandHandler<CancelTripCommand>
         if (trip == null) return Result.Failure($"Trip {request.TripId} not found.");
 
         try { trip.Cancel(request.Reason); }
-        catch (InvalidOperationException ex) { return Result.Failure(ex.Message); }
+        catch (System.InvalidOperationException ex) { return Result.Failure(ex.Message); }
 
         var vendorResult = await _vendorOps.CancelAsync(trip.UpperKey, cancellationToken);
         if (vendorResult.IsFailure)
@@ -42,9 +44,18 @@ public class CancelTripCommandHandler : ICommandHandler<CancelTripCommand>
             return Result.Failure($"Vendor cancel failed: {vendorResult.Error}");
         }
 
+        // Both Accepted and NoVendorRecord mean "the order is no longer
+        // live at the vendor" — the operator's cancel intent is satisfied.
+        // We just label the audit event differently.
+        if (vendorResult.Value == VendorOperationOutcome.NoVendorRecord)
+            _logger.LogInformation(
+                "Trip {TripId} cancelled gracefully (vendor had no record of upperKey {UpperKey}): {Reason}",
+                trip.Id, trip.UpperKey, request.Reason);
+        else
+            _logger.LogInformation("Trip {TripId} cancelled (upperKey {UpperKey}): {Reason}",
+                trip.Id, trip.UpperKey, request.Reason);
+
         await _tripRepository.UpdateAsync(trip, cancellationToken);
-        _logger.LogInformation("Trip {TripId} cancelled (upperKey {UpperKey}): {Reason}",
-            trip.Id, trip.UpperKey, request.Reason);
         return Result.Success();
     }
 }

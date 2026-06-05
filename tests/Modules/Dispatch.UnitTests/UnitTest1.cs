@@ -372,7 +372,7 @@ public class CancelTripCommandHandlerTests
     {
         var trip = NewTripInProgress();
         var repo = new FakeTripRepository(trip);
-        var vendor = new StubVendorOps { NextResult = Result.Failure("network blip") };
+        var vendor = new StubVendorOps { NextError = "network blip" };
 
         var handler = new CancelTripCommandHandler(repo, vendor, NullLogger<CancelTripCommandHandler>.Instance);
         var result = await handler.Handle(new CancelTripCommand(trip.Id, "ops"), default);
@@ -428,7 +428,7 @@ public class PauseAndResumeTripHandlerTests
     {
         var trip = NewTripInProgress();
         var repo = new FakeTripRepository(trip);
-        var vendor = new StubVendorOps { NextResult = Result.Failure("vendor 500") };
+        var vendor = new StubVendorOps { NextError = "vendor 500" };
 
         var handler = new PauseTripCommandHandler(repo, vendor, NullLogger<PauseTripCommandHandler>.Instance);
         var result = await handler.Handle(new PauseTripCommand(trip.Id), default);
@@ -465,6 +465,75 @@ public class PauseAndResumeTripHandlerTests
 
         result.IsFailure.Should().BeTrue();
         vendor.ResumeCalls.Should().BeEmpty();
+    }
+
+    // ── Gap #6: Vendor NoVendorRecord policy per command ────────────────
+
+    [Fact]
+    public async Task Cancel_VendorNoRecord_GracefulSuccess_PersistsCancellation()
+    {
+        var trip = NewTripInProgress();
+        var repo = new FakeTripRepository(trip);
+        var vendor = new StubVendorOps { NextOutcome = VendorOperationOutcome.NoVendorRecord };
+
+        var handler = new CancelTripCommandHandler(repo, vendor, NullLogger<CancelTripCommandHandler>.Instance);
+        var result = await handler.Handle(new CancelTripCommand(trip.Id, "ops"), default);
+
+        result.IsSuccess.Should().BeTrue();           // operator intent met
+        repo.UpdateCalls.Should().Be(1);              // trip saved as Cancelled
+        trip.Status.Should().Be(TripStatus.Cancelled);
+    }
+
+    [Fact]
+    public async Task Pause_VendorNoRecord_AutoMarksFailed_ReturnsActionableError()
+    {
+        var trip = NewTripInProgress();
+        var repo = new FakeTripRepository(trip);
+        var vendor = new StubVendorOps { NextOutcome = VendorOperationOutcome.NoVendorRecord };
+
+        var handler = new PauseTripCommandHandler(repo, vendor, NullLogger<PauseTripCommandHandler>.Instance);
+        var result = await handler.Handle(new PauseTripCommand(trip.Id), default);
+
+        result.IsFailure.Should().BeTrue();           // operator told to take action
+        result.Error!.ToLowerInvariant().Should().Contain("vendor has no record");
+        result.Error.Should().Contain("/reopen");   // next-step guidance
+        trip.Status.Should().Be(TripStatus.Failed);    // auto-reconciled
+        repo.UpdateCalls.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Resume_VendorNoRecord_AutoMarksFailed_ReturnsActionableError()
+    {
+        var trip = NewTripInProgress();
+        trip.Pause();
+        var repo = new FakeTripRepository(trip);
+        var vendor = new StubVendorOps { NextOutcome = VendorOperationOutcome.NoVendorRecord };
+
+        var handler = new ResumeTripCommandHandler(repo, vendor, NullLogger<ResumeTripCommandHandler>.Instance);
+        var result = await handler.Handle(new ResumeTripCommand(trip.Id), default);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error!.ToLowerInvariant().Should().Contain("vendor has no record");
+        trip.Status.Should().Be(TripStatus.Failed);
+        repo.UpdateCalls.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Cancel_VendorRejected_DoesNotPersistAndReturnsFailure()
+    {
+        // Distinguish "rejected with reason" from "no record" — Rejected
+        // must NOT cancel locally (otherwise we hide vendor business rules
+        // like permissions / locked orders from the operator).
+        var trip = NewTripInProgress();
+        var repo = new FakeTripRepository(trip);
+        var vendor = new StubVendorOps { NextError = "RIOT3 rejected cancel (code E100007): not allowed" };
+
+        var handler = new CancelTripCommandHandler(repo, vendor, NullLogger<CancelTripCommandHandler>.Instance);
+        var result = await handler.Handle(new CancelTripCommand(trip.Id, "ops"), default);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Contain("E100007");
+        repo.UpdateCalls.Should().Be(0);             // trip stays InProgress
     }
 
     private static Trip NewTripInProgress()
@@ -507,26 +576,35 @@ internal sealed class FakeTripRepository : ITripRepository
 
 internal sealed class StubVendorOps : IVendorEnvelopeOperationService
 {
-    public Result NextResult { get; set; } = Result.Success();
+    // Default to vendor-accepted so existing tests that don't care keep
+    // exercising the happy path. Override per-test via NextOutcome /
+    // NextError to drive the new outcome branches.
+    public VendorOperationOutcome NextOutcome { get; set; } = VendorOperationOutcome.Accepted;
+    public string? NextError { get; set; }
     public List<string> CancelCalls { get; } = new();
     public List<string> PauseCalls { get; } = new();
     public List<string> ResumeCalls { get; } = new();
 
-    public Task<Result> CancelAsync(string upperKey, CancellationToken ct = default)
+    public Task<Result<VendorOperationOutcome>> CancelAsync(string upperKey, CancellationToken ct = default)
     {
         CancelCalls.Add(upperKey);
-        return Task.FromResult(NextResult);
+        return Task.FromResult(BuildResult());
     }
 
-    public Task<Result> PauseAsync(string upperKey, CancellationToken ct = default)
+    public Task<Result<VendorOperationOutcome>> PauseAsync(string upperKey, CancellationToken ct = default)
     {
         PauseCalls.Add(upperKey);
-        return Task.FromResult(NextResult);
+        return Task.FromResult(BuildResult());
     }
 
-    public Task<Result> ResumeAsync(string upperKey, CancellationToken ct = default)
+    public Task<Result<VendorOperationOutcome>> ResumeAsync(string upperKey, CancellationToken ct = default)
     {
         ResumeCalls.Add(upperKey);
-        return Task.FromResult(NextResult);
+        return Task.FromResult(BuildResult());
     }
+
+    private Result<VendorOperationOutcome> BuildResult()
+        => NextError is not null
+            ? Result<VendorOperationOutcome>.Failure(NextError)
+            : Result<VendorOperationOutcome>.Success(NextOutcome);
 }

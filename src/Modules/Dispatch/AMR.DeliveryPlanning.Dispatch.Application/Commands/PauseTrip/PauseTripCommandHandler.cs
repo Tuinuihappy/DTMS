@@ -5,6 +5,12 @@ using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.PauseTrip;
 
+// Operator-initiated pause. Unlike cancel, pause's intent is "freeze for
+// later resume" — if the vendor doesn't have the order anymore, there's
+// nothing to freeze and the operator's intent CAN'T be met. We surface
+// that mismatch by marking the Trip Failed (vendor is the source of
+// truth on execution state) and returning an error that points the
+// operator at the next step.
 public class PauseTripCommandHandler : ICommandHandler<PauseTripCommand>
 {
     private readonly ITripRepository _tripRepository;
@@ -35,6 +41,31 @@ public class PauseTripCommandHandler : ICommandHandler<PauseTripCommand>
             _logger.LogWarning("Vendor pause rejected for Trip {TripId} (upperKey {UpperKey}): {Error}",
                 trip.Id, trip.UpperKey, vendorResult.Error);
             return Result.Failure($"Vendor pause failed: {vendorResult.Error}");
+        }
+
+        // Vendor has no record of this order — pause is impossible to
+        // satisfy. Reconcile the Trip to Failed so it stops showing up in
+        // in-flight queries, and tell the operator the next step.
+        if (vendorResult.Value == VendorOperationOutcome.NoVendorRecord)
+        {
+            const string reason = "Vendor has no record of the order at pause time — auto-reconciled.";
+            try
+            {
+                // Discard the in-memory Pause we already applied; MarkVendorFailed
+                // expects the trip not to be in a terminal state — Created /
+                // InProgress / Paused are all eligible.
+                trip.MarkVendorFailed(reason);
+                await _tripRepository.UpdateAsync(trip, cancellationToken);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning("Auto-reconcile failed for Trip {TripId} after pause NoVendorRecord: {Error}",
+                    trip.Id, ex.Message);
+            }
+
+            return Result.Failure(
+                "Cannot pause — the vendor has no record of this order. " +
+                "Trip auto-marked Failed; use /reopen on the delivery order then /retry to redispatch if needed.");
         }
 
         await _tripRepository.UpdateAsync(trip, cancellationToken);
