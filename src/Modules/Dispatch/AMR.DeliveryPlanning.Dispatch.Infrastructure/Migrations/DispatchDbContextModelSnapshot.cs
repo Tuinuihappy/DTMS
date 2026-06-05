@@ -171,6 +171,10 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("VendorVehicleKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("UpperKey")

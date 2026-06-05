@@ -23,9 +23,15 @@ public class Trip : AggregateRoot<Guid>
 
     // Envelope dispatch correlation fields. UpperKey is the DTMS-side key
     // RIOT3 echoes back on every webhook; VendorOrderKey is what RIOT3
-    // assigned.
+    // assigned. VendorVehicleKey is the deviceKey string the vendor
+    // reports on processingVehicle (e.g. "Delta6FAN1"); it is captured
+    // verbatim for audit and so the operator can see who picked up the
+    // trip even when Fleet has no mapping for it yet. Trip.VehicleId
+    // (DTMS Guid) is intentionally separate — populating it requires a
+    // Fleet lookup, which today is deferred to a future iteration.
     public string UpperKey { get; private set; } = string.Empty;
     public string? VendorOrderKey { get; private set; }
+    public string? VendorVehicleKey { get; private set; }
 
     private readonly List<ExecutionEvent> _events = new();
     public IReadOnlyCollection<ExecutionEvent> Events => _events.AsReadOnly();
@@ -66,15 +72,20 @@ public class Trip : AggregateRoot<Guid>
     // Envelope-flow vendor state transitions. All idempotent — duplicate
     // webhooks (or race with the reconciliation poller) are safe.
 
-    public void MarkVendorStarted(Guid? vehicleId = null)
+    public void MarkVendorStarted(Guid? vehicleId = null, string? vendorVehicleKey = null)
     {
         if (Status != TripStatus.Created)
             return;
         if (vehicleId.HasValue && !VehicleId.HasValue)
             VehicleId = vehicleId.Value;
+        // Capture the vendor's raw deviceKey ("Delta6FAN1" etc) once —
+        // first webhook wins. Empty/whitespace from the vendor doesn't
+        // overwrite a previously-captured value.
+        if (!string.IsNullOrWhiteSpace(vendorVehicleKey) && VendorVehicleKey is null)
+            VendorVehicleKey = vendorVehicleKey;
         Status = TripStatus.InProgress;
         StartedAt = DateTime.UtcNow;
-        RecordEvent("VendorStarted", vehicleId?.ToString());
+        RecordEvent("VendorStarted", vendorVehicleKey ?? vehicleId?.ToString());
     }
 
     public void MarkVendorCompleted()

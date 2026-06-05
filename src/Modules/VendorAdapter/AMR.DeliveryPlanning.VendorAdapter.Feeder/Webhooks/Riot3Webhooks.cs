@@ -148,14 +148,16 @@ public static class Riot3Webhooks
             switch (eventType)
             {
                 case "TASK_PROCESSING":
-                    // RIOT3 may also report the chosen robot here via
-                    // processingVehicle.key — propagate if present.
-                    Guid? vehicleId = null;
+                    // RIOT3's processingVehicle.key is the vendor deviceKey
+                    // (a string like "Delta6FAN1" / "SEER-001"), not a Guid.
+                    // Store it verbatim on Trip.VendorVehicleKey so operator
+                    // dashboards can see who picked up the trip. Trip.VehicleId
+                    // (DTMS Guid) intentionally stays null in this flow — a
+                    // Fleet lookup is left for a future iteration.
                     var vehKey = payload.Task?.ProcessingVehicle?.Key;
-                    if (Guid.TryParse(vehKey, out var v)) vehicleId = v;
-                    trip.MarkVendorStarted(vehicleId);
-                    logger.LogInformation("[EnvelopeWebhook] Trip {TripId} started (upperKey {UpperKey}, vehicle {VehicleId})",
-                        trip.Id, upperKey, vehicleId?.ToString() ?? "(unassigned)");
+                    trip.MarkVendorStarted(vehicleId: null, vendorVehicleKey: vehKey);
+                    logger.LogInformation("[EnvelopeWebhook] Trip {TripId} started (upperKey {UpperKey}, vendor vehicle '{VehKey}')",
+                        trip.Id, upperKey, vehKey ?? "(none)");
                     break;
 
                 case "TASK_FINISHED":

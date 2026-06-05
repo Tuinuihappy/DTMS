@@ -27,6 +27,7 @@ public class DispatchDbContext : DbContext
             builder.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);
             builder.Property(t => t.UpperKey).HasMaxLength(80).IsRequired();
             builder.Property(t => t.VendorOrderKey).HasMaxLength(100);
+            builder.Property(t => t.VendorVehicleKey).HasMaxLength(100);
             builder.Property(t => t.FailureReason).HasMaxLength(1000);
             // UpperKey is the RIOT3 correlation key (and unique). Legacy
             // job/task trips (which had null UpperKey) were dropped in

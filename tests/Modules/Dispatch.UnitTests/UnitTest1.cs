@@ -75,6 +75,50 @@ public class TripTests
     }
 
     [Fact]
+    public void MarkVendorStarted_WithVendorKey_StoresVendorVehicleKey()
+    {
+        // RIOT3 reports processingVehicle.key as a deviceKey string. Capture
+        // it verbatim so the operator dashboard can show who's executing
+        // the trip — even when there's no Fleet.Vehicles entry mapped yet.
+        var trip = NewEnvelopeTrip();
+
+        trip.MarkVendorStarted(vehicleId: null, vendorVehicleKey: "Delta6FAN1");
+
+        trip.VendorVehicleKey.Should().Be("Delta6FAN1");
+        trip.VehicleId.Should().BeNull();
+        trip.Status.Should().Be(TripStatus.InProgress);
+        trip.StartedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void MarkVendorStarted_SecondCallDoesNotOverwriteVendorKey()
+    {
+        // Duplicate TASK_PROCESSING webhooks (vendor retry, etc.) must
+        // leave the first captured vendor key intact. Combined with the
+        // existing Status-based short-circuit this gives a single audit
+        // value per trip.
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted(vendorVehicleKey: "Delta6FAN1");
+
+        trip.MarkVendorStarted(vendorVehicleKey: "Something-Else");
+
+        trip.VendorVehicleKey.Should().Be("Delta6FAN1");
+    }
+
+    [Fact]
+    public void MarkVendorStarted_WithEmptyVendorKey_DoesNotSetField()
+    {
+        // Defensive: if the vendor reports processingVehicle as missing /
+        // empty (e.g. assignment race), don't write whitespace to the
+        // audit field.
+        var trip = NewEnvelopeTrip();
+
+        trip.MarkVendorStarted(vendorVehicleKey: "");
+
+        trip.VendorVehicleKey.Should().BeNull();
+    }
+
+    [Fact]
     public void MarkVendorCompleted_FromCreated_CompletesAndFiresEventWithUpperKey()
     {
         var trip = NewEnvelopeTrip("ord-G1");

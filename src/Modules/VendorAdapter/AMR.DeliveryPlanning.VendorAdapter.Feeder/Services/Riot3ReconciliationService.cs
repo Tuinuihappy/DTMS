@@ -166,9 +166,11 @@ public sealed class Riot3ReconciliationService : BackgroundService
                 case "PROCESSING":
                     if (trip.Status == AMR.DeliveryPlanning.Dispatch.Domain.Enums.TripStatus.Created)
                     {
-                        Guid? vehicleId = null;
-                        if (Guid.TryParse(data.ProcessingVehicle?.Key, out var v)) vehicleId = v;
-                        trip.MarkVendorStarted(vehicleId);
+                        // Same as the webhook: capture the vendor deviceKey
+                        // string as-is. No Fleet resolver call here.
+                        trip.MarkVendorStarted(
+                            vehicleId: null,
+                            vendorVehicleKey: data.ProcessingVehicle?.Key);
                         return Transition.Started;
                     }
                     if (trip.Status == AMR.DeliveryPlanning.Dispatch.Domain.Enums.TripStatus.Paused)
