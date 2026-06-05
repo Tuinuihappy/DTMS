@@ -80,6 +80,16 @@ services:
       - Dispatch__Reconciliation__Enabled=${Dispatch__Reconciliation__Enabled:-false}
       - Dispatch__Reconciliation__PollIntervalSeconds=${Dispatch__Reconciliation__PollIntervalSeconds:-60}
       - Dispatch__Reconciliation__StaleThresholdHours=${Dispatch__Reconciliation__StaleThresholdHours:-24}
+      # Inbound webhook auth (RIOT3 has no signature support — IP + URL secret).
+      # Start with RequireAuth=false to log the actual remote IP in warn mode,
+      # then add the IP to AllowedIPs and flip to true to enforce.
+      # UrlSecrets is an array — use UrlSecrets__1 to add a second valid
+      # secret during zero-downtime rotation; drop UrlSecrets__0 once RIOT3
+      # has migrated to the new URL.
+      - VendorAdapter__Riot3__Webhook__RequireAuth=${VendorAdapter__Riot3__Webhook__RequireAuth:-false}
+      - VendorAdapter__Riot3__Webhook__AllowedIPs__0=${VendorAdapter__Riot3__Webhook__AllowedIPs__0:-}
+      - VendorAdapter__Riot3__Webhook__UrlSecrets__0=${VendorAdapter__Riot3__Webhook__UrlSecrets__0:-}
+      - VendorAdapter__Riot3__Webhook__UrlSecrets__1=${VendorAdapter__Riot3__Webhook__UrlSecrets__1:-}
       - OpenTelemetry__Endpoint=http://jaeger:4317
       # Dev-only placeholder secret — NOT for production (production uses Vault/KMS)
       - Jwt__Secret=dev-only-secret-min-32-chars-placeholder!

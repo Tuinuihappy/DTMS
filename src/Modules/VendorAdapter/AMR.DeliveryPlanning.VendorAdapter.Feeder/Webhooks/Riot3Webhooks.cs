@@ -18,8 +18,14 @@ public static class Riot3Webhooks
     {
         var group = app.MapGroup("/api/webhooks/riot3").WithTags("Webhooks");
 
-        // RIOT3.0 v4 /api/v4/notify callback — task / subTask / vehicle events
-        group.MapPost("/notify", async (
+        // RIOT3.0 v4 /api/v4/notify callback — task / subTask / vehicle events.
+        //
+        // Auth: RIOT3 has no built-in webhook signature/header support, so
+        // the auth filter layers an IP allowlist + URL-path secret. The
+        // optional {secret} segment lets ops configure RIOT3 with the
+        // notification URL "/api/webhooks/riot3/notify/{secret}" without
+        // touching DTMS — see Riot3WebhookAuthFilter for the gates.
+        group.MapPost("/notify/{secret?}", async (
             Riot3NotifyPayload payload,
             IVendorAdapterOutbox outbox,
             IVehicleIdentityResolver vehicleIdentityResolver,
@@ -51,7 +57,7 @@ public static class Riot3Webhooks
 
             await outbox.SaveChangesAsync(cancellationToken);
             return Results.Ok();
-        });
+        }).AddEndpointFilter<Riot3WebhookAuthFilter>();
 
         // Legacy simple status endpoint (kept for backward compatibility)
         group.MapPost("/status", async (

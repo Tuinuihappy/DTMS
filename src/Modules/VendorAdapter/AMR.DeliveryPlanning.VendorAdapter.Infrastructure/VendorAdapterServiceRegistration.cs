@@ -1,6 +1,7 @@
 using AMR.DeliveryPlanning.VendorAdapter.Abstractions.Services;
 using AMR.DeliveryPlanning.VendorAdapter.Feeder.Options;
 using AMR.DeliveryPlanning.VendorAdapter.Feeder.Services;
+using AMR.DeliveryPlanning.VendorAdapter.Feeder.Webhooks;
 using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data;
 using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Extensions;
 using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Services;
@@ -50,6 +51,14 @@ public static class VendorAdapterServiceRegistration
         services.Configure<ReconciliationOptions>(
             configuration.GetSection(ReconciliationOptions.SectionName));
         services.AddHostedService<Riot3ReconciliationService>();
+
+        // Inbound webhook auth — IP allowlist + URL-path secret. Reads
+        // VendorAdapter:Riot3:Webhook section. RequireAuth=false by
+        // default so warn-mode logs the actual remote IP the container
+        // sees before ops enforce.
+        services.Configure<Riot3WebhookOptions>(
+            configuration.GetSection(Riot3WebhookOptions.SectionName));
+        services.AddScoped<Riot3WebhookAuthFilter>();
 
         // Feeder adapter HttpClient with Polly resilience
         services.AddHttpClient<FeederCommandService>(client =>
