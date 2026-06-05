@@ -168,13 +168,56 @@ public static class Riot3Webhooks
                     break;
 
                 case "TASK_CANCELED":
+                    // Vendor cancel is treated the same as operator cancel —
+                    // Trip moves to Cancelled and the DeliveryOrder is left
+                    // untouched so it remains eligible for re-dispatch.
+                    // Distinct from TASK_FAILED which propagates to mark the
+                    // DeliveryOrder as Failed via TripFailedConsumer.
                     var cancelReason = payload.Task?.CancelReason ?? "vendor cancelled";
-                    trip.MarkVendorFailed(cancelReason);
+                    trip.Cancel(cancelReason);
                     logger.LogInformation("[EnvelopeWebhook] Trip {TripId} cancelled by vendor (upperKey {UpperKey}): {Reason}",
                         trip.Id, upperKey, cancelReason);
                     break;
 
+                case "TASK_HANG":
+                case "TASK_HELD":
+                    // Vendor paused the order (obstacle, traffic stop, admin
+                    // hold, etc). Mirror to Trip.Paused so operators see the
+                    // real state and don't issue a duplicate Pause command.
+                    var hangReason = payload.Task?.HangReason;
+                    trip.Pause();
+                    logger.LogInformation("[EnvelopeWebhook] Trip {TripId} paused by vendor (upperKey {UpperKey}) event={Event} reason={Reason}",
+                        trip.Id, upperKey, eventType, hangReason ?? "(none)");
+                    break;
+
+                case "TASK_HANG_TO_CONTINUE":
+                case "TASK_HELD_TO_CONTINUE":
+                    // Vendor resumed from hang/held — pair with the
+                    // HANG/HELD events above. Idempotent: if Trip was never
+                    // paused (vendor recovered before we received HANG)
+                    // Trip.Resume throws and we just log + ignore.
+                    trip.Resume();
+                    logger.LogInformation("[EnvelopeWebhook] Trip {TripId} resumed by vendor (upperKey {UpperKey}) event={Event}",
+                        trip.Id, upperKey, eventType);
+                    break;
+
+                case "TASK_REJECTED":
+                    // Vendor refused the task post-dispatch (rare — usually
+                    // POST /orders catches bad payloads; REJECTED would be
+                    // a late vendor-side issue). Treat as failure so the
+                    // DeliveryOrder reflects the operational outcome.
+                    var rejectReason = payload.Task?.FailReason?.ErrorDescription
+                                       ?? payload.Task?.FailReason?.ErrorCode
+                                       ?? "vendor rejected task";
+                    trip.MarkVendorFailed(rejectReason);
+                    logger.LogWarning("[EnvelopeWebhook] Trip {TripId} rejected by vendor (upperKey {UpperKey}): {Reason}",
+                        trip.Id, upperKey, rejectReason);
+                    break;
+
                 default:
+                    // TASK_CREATE / TASK_QUEUEING / SUB_TASK_* land here —
+                    // no state change applied (Trip already exists in DTMS
+                    // before dispatch; queueing is intermediate).
                     logger.LogDebug("[EnvelopeWebhook] Trip {TripId} event {Event} — no state change applied.",
                         trip.Id, eventType);
                     return;

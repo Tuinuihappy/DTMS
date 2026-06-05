@@ -73,7 +73,10 @@ public sealed class Riot3ReconciliationService : BackgroundService
         var reconciled = 0;
         var completed = 0;
         var failed = 0;
+        var cancelled = 0;
         var started = 0;
+        var paused = 0;
+        var resumed = 0;
         var skippedNoVendorRecord = 0;
         var skippedFetchError = 0;
 
@@ -108,7 +111,10 @@ public sealed class Riot3ReconciliationService : BackgroundService
             {
                 case Transition.Completed: completed++; break;
                 case Transition.Failed: failed++; break;
+                case Transition.Cancelled: cancelled++; break;
                 case Transition.Started: started++; break;
+                case Transition.Paused: paused++; break;
+                case Transition.Resumed: resumed++; break;
                 case Transition.None: continue;
             }
 
@@ -126,8 +132,8 @@ public sealed class Riot3ReconciliationService : BackgroundService
 
         var stale = await CountStaleTripsAsync(scope, staleCutoff, ct);
         _logger.LogInformation(
-            "[Reconciler] tick: in-flight={InFlight} reconciled={Reconciled} (completed={Completed} failed={Failed} started={Started}) noVendor={NoVendor} fetchErr={FetchErr} stale-skipped={Stale}",
-            inFlight.Count, reconciled, completed, failed, started, skippedNoVendorRecord, skippedFetchError, stale);
+            "[Reconciler] tick: in-flight={InFlight} reconciled={Reconciled} (completed={Completed} failed={Failed} cancelled={Cancelled} started={Started} paused={Paused} resumed={Resumed}) noVendor={NoVendor} fetchErr={FetchErr} stale-skipped={Stale}",
+            inFlight.Count, reconciled, completed, failed, cancelled, started, paused, resumed, skippedNoVendorRecord, skippedFetchError, stale);
     }
 
     private static Transition ApplyVendorState(Trip trip, Riot3OrderQueryData data)
@@ -150,8 +156,12 @@ public sealed class Riot3ReconciliationService : BackgroundService
 
                 case "CANCELED":
                 case "CANCELLED":
-                    trip.MarkVendorFailed(data.CancelReason ?? "vendor cancelled");
-                    return Transition.Failed;
+                    // Vendor cancel mirrors operator cancel — Trip.Cancel
+                    // moves to Cancelled and DeliveryOrder is left alone so
+                    // the order can be re-dispatched. (TASK_FAILED below
+                    // remains the only path that fails the DeliveryOrder.)
+                    trip.Cancel(data.CancelReason ?? "vendor cancelled");
+                    return Transition.Cancelled;
 
                 case "PROCESSING":
                     if (trip.Status == AMR.DeliveryPlanning.Dispatch.Domain.Enums.TripStatus.Created)
@@ -161,7 +171,35 @@ public sealed class Riot3ReconciliationService : BackgroundService
                         trip.MarkVendorStarted(vehicleId);
                         return Transition.Started;
                     }
+                    if (trip.Status == AMR.DeliveryPlanning.Dispatch.Domain.Enums.TripStatus.Paused)
+                    {
+                        // Vendor resumed and we missed the HANG/HELD_TO_CONTINUE
+                        // webhook — sync back to InProgress so operator commands
+                        // map correctly.
+                        trip.Resume();
+                        return Transition.Resumed;
+                    }
                     return Transition.None;
+
+                case "HANG":
+                case "HELD":
+                    // Vendor paused — only transition if Trip is currently
+                    // InProgress. Created/Paused/terminal states are no-ops.
+                    if (trip.Status == AMR.DeliveryPlanning.Dispatch.Domain.Enums.TripStatus.InProgress)
+                    {
+                        trip.Pause();
+                        return Transition.Paused;
+                    }
+                    return Transition.None;
+
+                case "REJECTED":
+                    // Vendor refused the task post-dispatch. Treat as failure
+                    // so the DeliveryOrder propagates to Failed.
+                    var rejectReason = data.FailReason?.ErrorDescription
+                                       ?? data.FailReason?.ErrorCode
+                                       ?? "vendor rejected task";
+                    trip.MarkVendorFailed(rejectReason);
+                    return Transition.Failed;
 
                 default:
                     return Transition.None;
@@ -186,5 +224,5 @@ public sealed class Riot3ReconciliationService : BackgroundService
         return allEver.Count(t => t.CreatedAt < cutoff);
     }
 
-    private enum Transition { None, Completed, Failed, Started }
+    private enum Transition { None, Completed, Failed, Cancelled, Started, Paused, Resumed }
 }
