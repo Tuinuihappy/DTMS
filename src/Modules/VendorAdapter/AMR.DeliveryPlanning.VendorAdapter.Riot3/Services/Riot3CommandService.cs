@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.VendorAdapter.Abstractions.Models;
 using AMR.DeliveryPlanning.VendorAdapter.Abstractions.Services;
@@ -25,7 +26,7 @@ public class Riot3CommandService : IVehicleCommandService
 
     // Multi-mission send used by the OrderTemplate instantiate flow.
     // Returns the orderKey RIOT3 minted for the new order on success.
-    public async Task<Result<string>> SendOrderAsync(
+    public async Task<Result<Riot3DispatchResult>> SendOrderAsync(
         Riot3OrderRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -33,9 +34,24 @@ public class Riot3CommandService : IVehicleCommandService
             "Sending RIOT3 order upperKey={UpperKey} with {Count} missions (structureType={Structure})",
             request.UpperKey, request.Missions.Count, request.StructureType);
 
+        // Serialize ONCE and keep the JSON so the caller can snapshot
+        // exactly what we transmitted — the same bytes go on the wire
+        // and into Trip.VendorRequestSnapshot for forensic queries.
+        string requestJson;
         try
         {
-            var response = await _httpClient.PostAsJsonAsync("/api/v4/orders", request, cancellationToken);
+            requestJson = JsonSerializer.Serialize(request);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to serialize RIOT3 order upperKey={UpperKey}", request.UpperKey);
+            return Result<Riot3DispatchResult>.Failure($"RIOT3 request serialization failed: {ex.Message}");
+        }
+
+        try
+        {
+            using var content = new StringContent(requestJson, System.Text.Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync("/api/v4/orders", content, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             // RIOT3 returns HTTP 200 even when the order is rejected (e.g. station
@@ -49,18 +65,18 @@ public class Riot3CommandService : IVehicleCommandService
                 var msg = payload?.Message ?? "(no message)";
                 _logger.LogWarning("RIOT3 rejected order upperKey={UpperKey}: code={Code} message={Message}",
                     request.UpperKey, payload?.Code ?? "(null)", msg);
-                return Result<string>.Failure($"RIOT3 rejected order (code {payload?.Code ?? "null"}): {msg}");
+                return Result<Riot3DispatchResult>.Failure($"RIOT3 rejected order (code {payload?.Code ?? "null"}): {msg}");
             }
 
             var orderKey = payload.Data?.OrderKey ?? string.Empty;
             _logger.LogInformation("RIOT3 accepted order upperKey={UpperKey} orderKey={OrderKey}",
                 request.UpperKey, orderKey);
-            return Result<string>.Success(orderKey);
+            return Result<Riot3DispatchResult>.Success(new Riot3DispatchResult(orderKey, requestJson));
         }
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "Failed to send RIOT3 order upperKey={UpperKey}", request.UpperKey);
-            return Result<string>.Failure($"RIOT3 API error: {ex.Message}");
+            return Result<Riot3DispatchResult>.Failure($"RIOT3 API error: {ex.Message}");
         }
     }
 

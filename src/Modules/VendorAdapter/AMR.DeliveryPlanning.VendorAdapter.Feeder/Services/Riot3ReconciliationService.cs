@@ -63,6 +63,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
     {
         using var scope = _scopeFactory.CreateScope();
         var tripRepo = scope.ServiceProvider.GetRequiredService<ITripRepository>();
+        var missionRepo = scope.ServiceProvider.GetRequiredService<ITripMissionEventRepository>();
         var queryService = scope.ServiceProvider.GetRequiredService<IRiot3OrderQueryService>();
 
         var staleCutoff = DateTime.UtcNow.AddHours(-opts.StaleThresholdHours);
@@ -106,6 +107,11 @@ public sealed class Riot3ReconciliationService : BackgroundService
                 continue;
             }
 
+            // Mission diff — independent of state transition. Even when
+            // Trip status didn't change this tick, sub-task progress may
+            // have arrived; upsert is idempotent so duplicates are safe.
+            await UpsertMissionsAsync(missionRepo, trip.Id, data, ct);
+
             var transition = ApplyVendorState(trip, data);
             switch (transition)
             {
@@ -115,18 +121,48 @@ public sealed class Riot3ReconciliationService : BackgroundService
                 case Transition.Started: started++; break;
                 case Transition.Paused: paused++; break;
                 case Transition.Resumed: resumed++; break;
-                case Transition.None: continue;
+                case Transition.None: break;   // mission upsert may still have run
             }
 
-            try
+            if (transition != Transition.None)
             {
-                await tripRepo.UpdateAsync(trip, ct);
-                reconciled++;
+                try
+                {
+                    await tripRepo.UpdateAsync(trip, ct);
+                    reconciled++;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogError(ex, "[Reconciler] persist failed for Trip {TripId} (upperKey {UpperKey})",
+                        trip.Id, trip.UpperKey);
+                    continue;
+                }
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+
+            // Final snapshot capture — safety net for the webhook consumer.
+            // Only fetch if we don't already have one AND the vendor state
+            // is terminal. The Trip.CaptureFinalSnapshot guard ensures
+            // first-write-wins so the webhook consumer and us are race-safe.
+            if (trip.VendorFinalSnapshot is null && IsTerminalVendorState(data.State))
             {
-                _logger.LogError(ex, "[Reconciler] persist failed for Trip {TripId} (upperKey {UpperKey})",
-                    trip.Id, trip.UpperKey);
+                try
+                {
+                    var raw = await queryService.GetRawByUpperKeyAsync(trip.UpperKey!, ct);
+                    if (!string.IsNullOrWhiteSpace(raw))
+                    {
+                        var expectedCompletion = TryParseRiot3Time(data.OrderStateChangeTime ?? data.FinalTime);
+                        trip.CaptureFinalSnapshot(raw, expectedCompletion);
+                        await tripRepo.UpdateAsync(trip, ct);
+                        _logger.LogInformation(
+                            "[Reconciler] Captured final snapshot for Trip {TripId} (upperKey {UpperKey}, state {State})",
+                            trip.Id, trip.UpperKey, data.State);
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogWarning(ex, "[Reconciler] snapshot capture failed for Trip {TripId} — will retry",
+                        trip.Id);
+                }
             }
         }
 
@@ -224,6 +260,66 @@ public sealed class Riot3ReconciliationService : BackgroundService
         // for ops visibility; if perf ever matters we'll add a dedicated count.
         var allEver = await tripRepo.GetInFlightEnvelopeTripsAsync(DateTime.MinValue, ct);
         return allEver.Count(t => t.CreatedAt < cutoff);
+    }
+
+    // ── Mission diff + final snapshot helpers ────────────────────────────
+
+    private static async Task UpsertMissionsAsync(
+        ITripMissionEventRepository repo,
+        Guid tripId,
+        Riot3OrderQueryData data,
+        CancellationToken ct)
+    {
+        if (data.Missions is null || data.Missions.Count == 0) return;
+
+        for (var i = 0; i < data.Missions.Count; i++)
+        {
+            var m = data.Missions[i];
+            if (string.IsNullOrWhiteSpace(m.MissionKey) || string.IsNullOrWhiteSpace(m.State))
+                continue;
+
+            var state = m.State!.ToUpperInvariant();
+            if (state is "NA" or "QUEUEING")
+                // Mission not yet picked up by vendor; nothing useful to record.
+                continue;
+
+            try
+            {
+                var ev = TripMissionEvent.Record(
+                    tripId: tripId,
+                    missionIndex: m.MissionIndex ?? i,
+                    missionKey: m.MissionKey!,
+                    missionType: string.IsNullOrWhiteSpace(m.Type) ? "UNKNOWN" : m.Type!,
+                    state: state,
+                    changeStateTime: TryParseRiot3Time(m.ChangeStateTime) ?? DateTime.UtcNow,
+                    stationName: m.StationName,
+                    actionName: m.ActionName,
+                    actionType: m.ActionType,
+                    resultCode: m.ResultCode,
+                    errorMessage: m.ResultStr);
+                await repo.AddIfNotExistsAsync(ev, ct);
+            }
+            catch (ArgumentException)
+            {
+                // Defensive: vendor sent a malformed mission record. Skip
+                // this one rather than abort the whole tick.
+            }
+        }
+    }
+
+    private static bool IsTerminalVendorState(string? state)
+    {
+        if (string.IsNullOrWhiteSpace(state)) return false;
+        var s = state.ToUpperInvariant();
+        return s is "FINISHED" or "FAILED" or "CANCELED" or "CANCELLED" or "REJECTED";
+    }
+
+    private static DateTime? TryParseRiot3Time(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return DateTime.TryParse(value, null,
+            System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal,
+            out var dt) ? dt : null;
     }
 
     private enum Transition { None, Completed, Failed, Cancelled, Started, Paused, Resumed }

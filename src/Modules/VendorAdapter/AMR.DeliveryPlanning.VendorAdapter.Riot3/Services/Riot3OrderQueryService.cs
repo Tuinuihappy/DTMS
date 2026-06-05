@@ -47,4 +47,34 @@ public sealed class Riot3OrderQueryService : IRiot3OrderQueryService
             throw;
         }
     }
+
+    public async Task<string?> GetRawByUpperKeyAsync(string upperKey, CancellationToken cancellationToken = default)
+    {
+        var path = $"/api/v4/orders/{Uri.EscapeDataString(upperKey)}?isUpper=true";
+        try
+        {
+            using var response = await _httpClient.GetAsync(path, cancellationToken);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                _logger.LogDebug("RIOT3 GET {Path} returned 404 (no raw payload to capture)", path);
+                return null;
+            }
+            response.EnsureSuccessStatusCode();
+
+            var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+            // Quick guard against the E110014 "order is empty" case — don't
+            // pollute Trip.VendorFinalSnapshot with a not-found stub.
+            if (raw.Contains("\"E110014\"", StringComparison.Ordinal))
+            {
+                _logger.LogDebug("RIOT3 GET {Path} returned E110014 — treating as no record", path);
+                return null;
+            }
+            return raw;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "RIOT3 GET {Path} (raw) failed", path);
+            throw;
+        }
+    }
 }

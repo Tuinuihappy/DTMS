@@ -6,6 +6,7 @@ using AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.ResolveException;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.ResumeTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripById;
+using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripDetails;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -23,6 +24,16 @@ public static class DispatchEndpoints
         group.MapGet("/trips/{id:guid}", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new GetTripByIdQuery(id));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
+        });
+
+        // GET /api/v1/dispatch/trips/{id}/details — Full operator view: trip
+        // state + vendor snapshot fields + per-mission timeline. Append
+        // ?includeRaw=true to also return the raw vendor JSON blobs
+        // (compliance use only — they can be megabytes each).
+        group.MapGet("/trips/{id:guid}/details", async (Guid id, bool? includeRaw, ISender sender) =>
+        {
+            var result = await sender.Send(new GetTripDetailsQuery(id, includeRaw ?? false));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         });
 

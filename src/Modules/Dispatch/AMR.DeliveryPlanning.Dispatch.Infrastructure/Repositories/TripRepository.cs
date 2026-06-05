@@ -77,6 +77,10 @@ public class TripRepository : ITripRepository
             entry.Property(t => t.CompletedAt).IsModified = true;
             entry.Property(t => t.FailureReason).IsModified = true;
             entry.Property(t => t.VehicleId).IsModified = true;
+            // Vendor snapshot fields — modifiable post-create when the
+            // final snapshot consumer captures the terminal-state response.
+            entry.Property(t => t.VendorFinalSnapshot).IsModified = true;
+            entry.Property(t => t.VendorExpectedCompletionAt).IsModified = true;
 
             foreach (var exception in trip.Exceptions)
             {

@@ -70,7 +70,7 @@ internal sealed class InstantiateOrderTemplateCommandHandler
         }
 
         return Result<InstantiateOrderTemplateResult>.Success(
-            new InstantiateOrderTemplateResult(upperKey, sendResult.Value, resolved, DryRun: false));
+            new InstantiateOrderTemplateResult(upperKey, sendResult.Value!.VendorOrderKey, resolved, DryRun: false));
     }
 
     private static ResolvedOrder ApplyOverrides(ResolvedOrder resolved, InstantiateOrderTemplateCommand request)

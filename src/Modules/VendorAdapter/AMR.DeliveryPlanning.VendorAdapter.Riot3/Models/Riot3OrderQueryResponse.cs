@@ -39,4 +39,49 @@ public sealed class Riot3OrderQueryData
 
     [JsonPropertyName("processingVehicle")]
     public Riot3NotifyProcessingVehicle? ProcessingVehicle { get; init; }
+
+    [JsonPropertyName("orderStateChangeTime")]
+    public string? OrderStateChangeTime { get; init; }
+
+    [JsonPropertyName("finalTime")]
+    public string? FinalTime { get; init; }
+
+    [JsonPropertyName("missions")]
+    public List<Riot3OrderMission>? Missions { get; init; }
+}
+
+public sealed class Riot3OrderMission
+{
+    [JsonPropertyName("missionKey")]
+    public string? MissionKey { get; init; }
+
+    [JsonPropertyName("missionIndex")]
+    public int? MissionIndex { get; init; }
+
+    [JsonPropertyName("type")]
+    public string? Type { get; init; }
+
+    [JsonPropertyName("state")]
+    public string? State { get; init; }
+
+    [JsonPropertyName("stationName")]
+    public string? StationName { get; init; }
+
+    [JsonPropertyName("stationId")]
+    public int? StationId { get; init; }
+
+    [JsonPropertyName("actionName")]
+    public string? ActionName { get; init; }
+
+    [JsonPropertyName("actionType")]
+    public string? ActionType { get; init; }
+
+    [JsonPropertyName("resultCode")]
+    public string? ResultCode { get; init; }
+
+    [JsonPropertyName("resultStr")]
+    public string? ResultStr { get; init; }
+
+    [JsonPropertyName("changeStateTime")]
+    public string? ChangeStateTime { get; init; }
 }

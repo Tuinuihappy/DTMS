@@ -14,6 +14,7 @@ public class DispatchDbContext : DbContext
     public DbSet<ProofOfDelivery> ProofsOfDelivery { get; set; } = null!;
     public DbSet<ShelfManifest> ShelfManifests { get; set; } = null!;
     public DbSet<TripRetryEvent> TripRetryEvents { get; set; } = null!;
+    public DbSet<TripMissionEvent> TripMissionEvents { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public DispatchDbContext(DbContextOptions<DispatchDbContext> options) : base(options) { }
@@ -33,6 +34,13 @@ public class DispatchDbContext : DbContext
             builder.Property(t => t.AttemptNumber).HasDefaultValue(1);
             builder.HasIndex(t => t.PreviousAttemptId)
                 .HasFilter("\"PreviousAttemptId\" IS NOT NULL");
+
+            // Vendor detail snapshots — lifted columns are indexable;
+            // raw JSONB blobs use Postgres jsonb so JSON path queries
+            // work and TOAST compresses large payloads automatically.
+            builder.Property(t => t.TemplateNameAtDispatch).HasMaxLength(200);
+            builder.Property(t => t.VendorRequestSnapshot).HasColumnType("jsonb");
+            builder.Property(t => t.VendorFinalSnapshot).HasColumnType("jsonb");
             // UpperKey is the RIOT3 correlation key (and unique). Legacy
             // job/task trips (which had null UpperKey) were dropped in
             // Phase b7 — all surviving rows are envelope-dispatched.
@@ -82,6 +90,21 @@ public class DispatchDbContext : DbContext
             builder.HasIndex(e => e.OriginalTripId);
             builder.HasIndex(e => e.DeliveryOrderId);
             builder.HasIndex(e => e.OccurredAt);
+        });
+
+        modelBuilder.Entity<TripMissionEvent>(builder =>
+        {
+            builder.HasKey(e => e.Id);
+            builder.Property(e => e.MissionKey).HasMaxLength(100).IsRequired();
+            builder.Property(e => e.MissionType).HasMaxLength(20).IsRequired();
+            builder.Property(e => e.State).HasMaxLength(20).IsRequired();
+            builder.Property(e => e.StationName).HasMaxLength(100);
+            builder.Property(e => e.ActionName).HasMaxLength(100);
+            builder.Property(e => e.ActionType).HasMaxLength(50);
+            builder.Property(e => e.ResultCode).HasMaxLength(20);
+            // Idempotency: webhook + reconciler can both write without coordination.
+            builder.HasIndex(e => new { e.TripId, e.MissionKey, e.State }).IsUnique();
+            builder.HasIndex(e => new { e.TripId, e.MissionIndex });
         });
 
         modelBuilder.Entity<TripException>(builder =>

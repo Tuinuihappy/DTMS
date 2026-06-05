@@ -900,7 +900,8 @@ public class DispatchOrderTemplateServiceTests
         public string? ReturnVendorKey { get; set; }
         public string? FailWith { get; set; }
 
-        public Task<AMR.DeliveryPlanning.SharedKernel.Messaging.Result<string>> SendAsync(
+        public Task<AMR.DeliveryPlanning.SharedKernel.Messaging.Result<
+            AMR.DeliveryPlanning.Planning.Application.Services.RobotOrderDispatchResult>> SendAsync(
             string upperKey,
             AMR.DeliveryPlanning.Planning.Application.Services.ResolvedOrder order,
             CancellationToken cancellationToken = default)
@@ -909,8 +910,12 @@ public class DispatchOrderTemplateServiceTests
             LastUpperKey = upperKey;
             LastSentOrder = order;
             return Task.FromResult(FailWith is not null
-                ? AMR.DeliveryPlanning.SharedKernel.Messaging.Result<string>.Failure(FailWith)
-                : AMR.DeliveryPlanning.SharedKernel.Messaging.Result<string>.Success(ReturnVendorKey!));
+                ? AMR.DeliveryPlanning.SharedKernel.Messaging.Result<
+                    AMR.DeliveryPlanning.Planning.Application.Services.RobotOrderDispatchResult>.Failure(FailWith)
+                : AMR.DeliveryPlanning.SharedKernel.Messaging.Result<
+                    AMR.DeliveryPlanning.Planning.Application.Services.RobotOrderDispatchResult>.Success(
+                        new AMR.DeliveryPlanning.Planning.Application.Services.RobotOrderDispatchResult(
+                            ReturnVendorKey!, "{\"stub\":true}")));
         }
     }
 }

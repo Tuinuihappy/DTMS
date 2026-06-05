@@ -19,5 +19,8 @@ public record CreateEnvelopeTripCommand(
     Guid? PickupStationId = null,
     Guid? DropStationId = null,
     int AttemptNumber = 1,
-    Guid? PreviousAttemptId = null
+    Guid? PreviousAttemptId = null,
+    string? TemplateNameAtDispatch = null,
+    int? PriorityAtDispatch = null,
+    string? VendorRequestSnapshot = null
 ) : ICommand<Guid>;

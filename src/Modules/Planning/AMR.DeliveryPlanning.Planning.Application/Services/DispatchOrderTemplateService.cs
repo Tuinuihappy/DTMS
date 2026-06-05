@@ -89,7 +89,8 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
             return Result<DispatchTemplateResult>.Failure(sendResult.Error!);
         }
 
-        var vendorOrderKey = sendResult.Value!;
+        var vendorOrderKey = sendResult.Value!.VendorOrderKey;
+        var requestJson = sendResult.Value!.RequestJson;
         _logger.LogInformation("[EnvelopeDispatch] ✓ Dispatched {TemplateName} via envelope (upperKey {UpperKey} → vendorOrderKey {OrderKey})",
             template.Name, upperKey, vendorOrderKey);
 
@@ -100,6 +101,8 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
         // Route context + retry lineage are persisted on the Trip so a
         // future retry can re-resolve the template without re-reading the
         // delivery order.
+        // Snapshot data — template name, priority, and the exact request
+        // JSON DTMS sent — go into Trip.* fields for compliance / detail UI.
         var tripCreate = await _sender.Send(
             new CreateEnvelopeTripCommand(
                 deliveryOrderId,
@@ -108,7 +111,10 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
                 pickupStationId,
                 dropStationId,
                 attemptNumber,
-                previousAttemptId),
+                previousAttemptId,
+                TemplateNameAtDispatch: template.Name,
+                PriorityAtDispatch: resolved.Priority,
+                VendorRequestSnapshot: requestJson),
             cancellationToken);
         var tripId = tripCreate.IsSuccess ? tripCreate.Value : Guid.Empty;
         if (!tripCreate.IsSuccess)

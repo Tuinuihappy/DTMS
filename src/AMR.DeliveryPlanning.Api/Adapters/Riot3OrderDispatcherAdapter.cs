@@ -18,7 +18,7 @@ internal sealed class Riot3OrderDispatcherAdapter : IRobotOrderDispatcher
         _riot3 = riot3;
     }
 
-    public async Task<Result<string>> SendAsync(
+    public async Task<Result<RobotOrderDispatchResult>> SendAsync(
         string upperKey,
         ResolvedOrder order,
         CancellationToken cancellationToken = default)
@@ -36,7 +36,11 @@ internal sealed class Riot3OrderDispatcherAdapter : IRobotOrderDispatcher
             Missions = order.Missions.Select(MapMission).ToList()
         };
 
-        return await _riot3.SendOrderAsync(request, cancellationToken);
+        var result = await _riot3.SendOrderAsync(request, cancellationToken);
+        return result.IsSuccess
+            ? Result<RobotOrderDispatchResult>.Success(
+                new RobotOrderDispatchResult(result.Value.OrderKey, result.Value.RequestJson))
+            : Result<RobotOrderDispatchResult>.Failure(result.Error!);
     }
 
     private static Riot3Mission MapMission(ResolvedMission m)

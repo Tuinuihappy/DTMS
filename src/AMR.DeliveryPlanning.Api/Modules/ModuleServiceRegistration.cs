@@ -189,6 +189,8 @@ public static class ModuleServiceRegistration
         services.AddScoped<ITripRepository, TripRepository>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Repositories.ITripRetryEventRepository,
             AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories.TripRetryEventRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Repositories.ITripMissionEventRepository,
+            AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories.TripMissionEventRepository>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.ITripRetryDispatcher,
             AMR.DeliveryPlanning.Api.Adapters.PlanningTripRetryDispatcher>();
         services.AddScoped<IShelfManifestRepository, ShelfManifestRepository>();
@@ -204,7 +206,11 @@ public static class ModuleServiceRegistration
                 typeof(AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly,
                 typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly,
                 typeof(AMR.DeliveryPlanning.Dispatch.Application.Commands.CreateEnvelopeTrip.CreateEnvelopeTripCommand).Assembly,
-                typeof(VehicleStateChangedConsumer).Assembly
+                typeof(VehicleStateChangedConsumer).Assembly,
+                // VendorAdapter.Feeder hosts CaptureFinalSnapshotConsumer — must
+                // be scanned explicitly; otherwise terminal-state events go
+                // past it and the snapshot is never persisted.
+                typeof(AMR.DeliveryPlanning.VendorAdapter.Feeder.Consumers.CaptureFinalSnapshotConsumer).Assembly
             );
 
             bus.UsingRabbitMq((context, cfg) =>

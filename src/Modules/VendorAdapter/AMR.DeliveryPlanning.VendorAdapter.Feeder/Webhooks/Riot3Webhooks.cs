@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.Fleet.IntegrationEvents;
@@ -30,6 +31,7 @@ public static class Riot3Webhooks
             IVendorAdapterOutbox outbox,
             IVehicleIdentityResolver vehicleIdentityResolver,
             ITripRepository tripRepository,
+            ITripMissionEventRepository missionEventRepository,
             ILogger<Riot3NotifyPayload> logger,
             CancellationToken cancellationToken) =>
         {
@@ -43,7 +45,7 @@ public static class Riot3Webhooks
                     break;
 
                 case "subtask":
-                    await HandleSubTaskEvent(payload, outbox, logger, cancellationToken);
+                    await HandleSubTaskEvent(payload, tripRepository, missionEventRepository, logger, cancellationToken);
                     break;
 
                 case "vehicle":
@@ -241,28 +243,106 @@ public static class Riot3Webhooks
         await tripRepository.UpdateAsync(trip, cancellationToken);
     }
 
+    // Persist per-mission lifecycle events for the trip detail UI.
+    // Idempotent at the repository (UNIQUE (TripId, MissionKey, State));
+    // the reconciler does the same upsert so dropped webhooks recover.
+    //
+    // Mapping RIOT3 sub-task event → DTMS TripMissionEvent.State:
+    //   SUB_TASK_PROCESSING → "PROCESSING"
+    //   SUB_TASK_FINISHED   → "FINISHED"
+    //   SUB_TASK_FAILED     → "FAILED"
+    //   SUB_TASK_CANCELED   → "CANCELED"
     private static async Task HandleSubTaskEvent(
         Riot3NotifyPayload payload,
-        IVendorAdapterOutbox outbox,
+        ITripRepository tripRepository,
+        ITripMissionEventRepository missionEventRepository,
         ILogger logger,
         CancellationToken cancellationToken)
     {
-        // Envelope flow consumes only the parent task lifecycle (see
-        // HandleEnvelopeTaskEvent). Sub-task events are useful for ops
-        // visibility but no longer drive aggregate state. Log and move on.
-        var subTaskKey = payload.SubTask?.Key;
+        var subTask = payload.SubTask;
+        var subTaskKey = subTask?.Key;
         var eventType = payload.TaskEventType?.ToUpperInvariant();
-        if (eventType is "SUB_TASK_FAILED")
+
+        if (subTask is null || string.IsNullOrWhiteSpace(subTaskKey))
         {
-            var failResult = payload.SubTask?.FailResult;
-            logger.LogWarning("RIOT3 sub-task {SubTaskKey} failed: [{Code}] {Msg}",
-                subTaskKey, failResult?.ErrorCode ?? "UNKNOWN", failResult?.ErrorDescription ?? "(no description)");
+            logger.LogDebug("RIOT3 sub-task event {Event} has no SubTask payload — ignored", eventType);
+            return;
         }
+
+        // Sub-task events carry the parent task's upperKey on payload.task,
+        // not payload.subTask. Need it to find the owning Trip.
+        var upperKey = payload.Task?.UpperKey;
+        if (string.IsNullOrWhiteSpace(upperKey))
+        {
+            logger.LogDebug("RIOT3 sub-task event {Event} for {SubTaskKey} has no parent upperKey — cannot correlate to a Trip",
+                eventType, subTaskKey);
+            return;
+        }
+
+        var trip = await tripRepository.GetByUpperKeyAsync(upperKey, cancellationToken);
+        if (trip is null)
+        {
+            logger.LogWarning("[SubTaskWebhook] No Trip found for upperKey {UpperKey} (subTask {SubTaskKey}, event {Event}) — ignored.",
+                upperKey, subTaskKey, eventType);
+            return;
+        }
+
+        var state = eventType switch
+        {
+            "SUB_TASK_PROCESSING" => "PROCESSING",
+            "SUB_TASK_FINISHED"   => "FINISHED",
+            "SUB_TASK_FAILED"     => "FAILED",
+            "SUB_TASK_CANCELED"   => "CANCELED",
+            _                     => null
+        };
+        if (state is null)
+        {
+            logger.LogDebug("RIOT3 sub-task event {Event} not mapped to a mission state — ignored", eventType);
+            return;
+        }
+
+        var failResult = subTask.FailResult;
+        var actResult  = subTask.ActResult;
+        var stationName = subTask.Station?.Station?.Name;
+
+        // RIOT3 timestamps come as strings; tolerate missing or malformed.
+        var changeTime = ParseRiot3Time(subTask.FinishedTime)
+                         ?? ParseRiot3Time(subTask.StartedTime)
+                         ?? DateTime.UtcNow;
+
+        // MissionIndex isn't on the sub-task payload — fall back to 0 so
+        // the row is still stored. The detail endpoint orders by
+        // ChangeStateTime when index ties.
+        var missionEvent = TripMissionEvent.Record(
+            tripId: trip.Id,
+            missionIndex: 0,
+            missionKey: subTaskKey,
+            missionType: string.IsNullOrWhiteSpace(subTask.SubTaskType) ? "UNKNOWN" : subTask.SubTaskType,
+            state: state,
+            changeStateTime: changeTime,
+            stationName: stationName,
+            actionName: subTask.ActionName,
+            actionType: subTask.ActionType,
+            resultCode: failResult?.ErrorCode ?? actResult?.Code,
+            errorMessage: failResult?.ErrorDescription);
+
+        var inserted = await missionEventRepository.AddIfNotExistsAsync(missionEvent, cancellationToken);
+        if (inserted)
+            logger.LogInformation("[SubTaskWebhook] Trip {TripId} mission {MissionKey} → {State}",
+                trip.Id, subTaskKey, state);
         else
-        {
-            logger.LogDebug("RIOT3 sub-task event {Event} for {SubTaskKey}", eventType, subTaskKey);
-        }
-        await Task.CompletedTask;
+            logger.LogDebug("[SubTaskWebhook] Trip {TripId} mission {MissionKey} {State} — duplicate, skipped",
+                trip.Id, subTaskKey, state);
+    }
+
+    private static DateTime? ParseRiot3Time(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return DateTime.TryParse(value, null,
+            System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal,
+            out var dt)
+            ? dt
+            : null;
     }
 
     private static async Task HandleVehicleEvent(

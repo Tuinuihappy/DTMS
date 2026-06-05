@@ -46,6 +46,29 @@ public class Trip : AggregateRoot<Guid>
     public int AttemptNumber { get; private set; } = 1;
     public Guid? PreviousAttemptId { get; private set; }
 
+    // ── Vendor detail snapshots ──────────────────────────────────────────
+    // Lifted fields are extracted at dispatch time from the OrderTemplate
+    // we resolved + the request we built. They're indexable for dashboards
+    // and sort/filter queries. Raw blobs are the authoritative forensic
+    // record — they survive vendor schema drift.
+    //
+    // TemplateNameAtDispatch / PriorityAtDispatch come from OUR request
+    // (what DTMS sent). VendorExpectedCompletionAt comes from the vendor's
+    // RESPONSE at terminal time.
+    public string? TemplateNameAtDispatch { get; private set; }
+    public int? PriorityAtDispatch { get; private set; }
+    public DateTime? VendorExpectedCompletionAt { get; private set; }
+
+    /// <summary>Frozen copy of the JSON DTMS POSTed to RIOT3 at dispatch.
+    /// Used for compliance / "what exactly did we send" forensic queries.
+    /// </summary>
+    public string? VendorRequestSnapshot { get; private set; }
+
+    /// <summary>Frozen copy of RIOT3's GET response captured once the trip
+    /// reaches a terminal state (FINISHED/FAILED/CANCELED). Null until
+    /// the capture consumer succeeds; idempotent (first write wins).</summary>
+    public string? VendorFinalSnapshot { get; private set; }
+
     private readonly List<ExecutionEvent> _events = new();
     public IReadOnlyCollection<ExecutionEvent> Events => _events.AsReadOnly();
 
@@ -64,7 +87,10 @@ public class Trip : AggregateRoot<Guid>
         Guid? pickupStationId = null,
         Guid? dropStationId = null,
         int attemptNumber = 1,
-        Guid? previousAttemptId = null)
+        Guid? previousAttemptId = null,
+        string? templateNameAtDispatch = null,
+        int? priorityAtDispatch = null,
+        string? vendorRequestSnapshot = null)
     {
         if (string.IsNullOrWhiteSpace(upperKey))
             throw new ArgumentException("UpperKey must not be empty.", nameof(upperKey));
@@ -89,12 +115,39 @@ public class Trip : AggregateRoot<Guid>
             PickupStationId = pickupStationId,
             DropStationId = dropStationId,
             AttemptNumber = attemptNumber,
-            PreviousAttemptId = previousAttemptId
+            PreviousAttemptId = previousAttemptId,
+            TemplateNameAtDispatch = string.IsNullOrWhiteSpace(templateNameAtDispatch) ? null : templateNameAtDispatch.Trim(),
+            PriorityAtDispatch = priorityAtDispatch,
+            VendorRequestSnapshot = string.IsNullOrWhiteSpace(vendorRequestSnapshot) ? null : vendorRequestSnapshot
         };
         var detail = $"vendorOrderKey={trimmedVendor ?? "(empty)"} attempt={attemptNumber}";
         if (previousAttemptId.HasValue) detail += $" retryOf={previousAttemptId.Value}";
+        if (!string.IsNullOrWhiteSpace(templateNameAtDispatch)) detail += $" template={templateNameAtDispatch}";
         trip.RecordEvent("EnvelopeDispatched", detail);
         return trip;
+    }
+
+    /// <summary>
+    /// Persist the vendor's authoritative final state. Captured by either
+    /// the webhook-driven CaptureFinalSnapshotConsumer or the reconciler;
+    /// both are guarded by an "if null" check so this is idempotent at the
+    /// caller. The JSON blob is the source of truth — keep it raw to
+    /// survive any vendor schema drift.
+    /// </summary>
+    public void CaptureFinalSnapshot(string snapshotJson, DateTime? expectedCompletionAt = null)
+    {
+        if (string.IsNullOrWhiteSpace(snapshotJson))
+            throw new ArgumentException("Final snapshot JSON must not be empty.", nameof(snapshotJson));
+
+        // First write wins. Callers should guard for null before calling,
+        // but the domain enforces it too so race-driven duplicates are safe.
+        if (VendorFinalSnapshot is not null) return;
+
+        VendorFinalSnapshot = snapshotJson;
+        if (expectedCompletionAt.HasValue && !VendorExpectedCompletionAt.HasValue)
+            VendorExpectedCompletionAt = expectedCompletionAt.Value;
+
+        RecordEvent("VendorSnapshotCaptured", $"sizeBytes={snapshotJson.Length}");
     }
 
     // Envelope-flow vendor state transitions. All idempotent — duplicate
