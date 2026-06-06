@@ -97,6 +97,8 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             TripItemsDeliveredDomainEvent            => [],
             TripItemsFailedDomainEvent               => [],
             TripItemsPickedDomainEvent               => [],
+            TripItemsDroppedOffDomainEvent           => [],
+            ItemPodConfirmedDomainEvent              => [],
 
             _ => throw new InvalidOperationException(
                 $"Unhandled domain event '{domainEvent.GetType().Name}'. " +

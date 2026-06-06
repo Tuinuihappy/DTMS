@@ -4,6 +4,7 @@ public enum ItemStatus
 {
     Pending,
     Picked,
+    DroppedOff,
     Delivered,
     Failed,
     Returned,

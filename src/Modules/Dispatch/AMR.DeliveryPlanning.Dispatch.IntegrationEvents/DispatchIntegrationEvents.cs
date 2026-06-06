@@ -9,6 +9,9 @@ public record TripStartedIntegrationEvent(
 public record TripPickupCompletedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId) : IIntegrationEvent;
 
+public record TripDropCompletedIntegrationEvent(
+    Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId) : IIntegrationEvent;
+
 // VendorUpperKey is the composite envelope correlation key
 // (see EnvelopeUpperKey) that RIOT3 echoes back on every webhook.
 public record TripCompletedIntegrationEvent(

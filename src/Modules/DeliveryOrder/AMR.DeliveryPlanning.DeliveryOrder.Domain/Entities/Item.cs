@@ -37,6 +37,16 @@ public class Item : Entity<Guid>
     /// don't have to join.</summary>
     public int? AttemptNumber { get; private set; }
 
+    // ── POD (Proof of Delivery) evidence ───────────────────────────────
+    // Populated when the operator submits /pod-scan against a DroppedOff
+    // item. PodScannedAt is the audit-grade timestamp; DroppedOffAt is
+    // the SLA clock anchor.
+    public DateTime? DroppedOffAt { get; private set; }
+    public DateTime? PodScannedAt { get; private set; }
+    public string? PodScannedBy { get; private set; }
+    public string? PodMethod { get; private set; }    // "Barcode" / "Manual" / "Signature" / "Confirm"
+    public string? PodReference { get; private set; } // scanned code / signature hash / null
+
     private Item() { }
 
     internal Item(Guid deliveryOrderId, string pickupLocationCode, string dropLocationCode,
@@ -108,7 +118,15 @@ public class Item : Entity<Guid>
     {
         TripId = null;
         AttemptNumber = null;
-        if (Status is ItemStatus.Picked) Status = ItemStatus.Pending;
+        // Cancel cascade after pickup OR drop — the trip is gone, the
+        // item is no longer "in transit" or "at the dock". Reset to
+        // Pending so retry can rebind cleanly. Delivered items are
+        // never touched (terminal).
+        if (Status is ItemStatus.Picked or ItemStatus.DroppedOff)
+        {
+            Status = ItemStatus.Pending;
+            DroppedOffAt = null;
+        }
     }
 
     /// <summary>Transition Pending → Picked when the vendor reports the
@@ -123,5 +141,36 @@ public class Item : Entity<Guid>
             throw new InvalidOperationException(
                 $"Cannot mark item Picked from {Status}.");
         Status = ItemStatus.Picked;
+    }
+
+    /// <summary>Transition Picked → DroppedOff when the vendor reports the
+    /// robot finished its drop action at the trip's drop station. The
+    /// item is physically at the dock but not yet POD-confirmed. Records
+    /// DroppedOffAt as the SLA anchor for the POD-overdue chip.</summary>
+    internal void MarkDroppedOff()
+    {
+        if (Status is ItemStatus.DroppedOff or ItemStatus.Delivered) return;
+        if (Status is not ItemStatus.Picked)
+            throw new InvalidOperationException(
+                $"Cannot mark item DroppedOff from {Status}.");
+        Status = ItemStatus.DroppedOff;
+        DroppedOffAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Operator scanned POD — item is now Delivered with audit.
+    /// Accepts from both Picked and DroppedOff (DroppedOff is the common
+    /// path; Picked allows the rare race where TASK_FINISHED + POD scan
+    /// arrive before the drop-station SUB_TASK_FINISHED).</summary>
+    internal void ConfirmPodAndDeliver(string scannedBy, string method, string? reference)
+    {
+        if (Status is ItemStatus.Delivered) return;
+        if (Status is not (ItemStatus.Picked or ItemStatus.DroppedOff))
+            throw new InvalidOperationException(
+                $"Cannot confirm POD from {Status}.");
+        Status = ItemStatus.Delivered;
+        PodScannedAt = DateTime.UtcNow;
+        PodScannedBy = scannedBy;
+        PodMethod = method;
+        PodReference = reference;
     }
 }

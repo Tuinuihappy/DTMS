@@ -40,7 +40,11 @@ public class GetOrderItemsQueryHandler : IQueryHandler<GetOrderItemsQuery, IRead
                 p.HandlingInstructions,
                 p.Status,
                 p.TripId,
-                p.AttemptNumber
+                p.AttemptNumber,
+                p.DroppedOffAt,
+                p.PodScannedAt,
+                p.PodScannedBy,
+                p.PodMethod
             ))
             .ToList();
 

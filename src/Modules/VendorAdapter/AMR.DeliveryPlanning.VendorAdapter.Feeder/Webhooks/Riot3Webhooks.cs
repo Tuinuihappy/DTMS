@@ -336,29 +336,37 @@ public static class Riot3Webhooks
             logger.LogDebug("[SubTaskWebhook] Trip {TripId} mission {MissionKey} {State} — duplicate, skipped",
                 trip.Id, subTaskKey, state);
 
-        // ── Item-Picked detection ──────────────────────────────────────
-        // Once an ACT (pickup/drop action) finishes at the trip's pickup
-        // station, the robot has physically loaded the items — flip them
-        // Pending → Picked via the dispatch outbox so the DeliveryOrder
-        // side picks it up. Ignored when:
+        // ── Item-Picked / DroppedOff detection ─────────────────────────
+        // Once an ACT (pickup/drop action) finishes at the trip's
+        // pickup OR drop station, fire the matching domain event so the
+        // DeliveryOrder side flips item status. Ignored when:
         //   • state != FINISHED         (only completion counts)
         //   • mission type != ACT       (MOVE arrivals don't mean loaded)
-        //   • trip has no PickupStation (pre-Gap-3 trip — degrade silently)
-        //   • station code can't resolve to the trip's pickup station
-        // Mission storage above is unconditional so the operator timeline
-        // is complete; this hook is layered on top.
-        if (state == "FINISHED" && inserted && trip.PickupStationId is Guid pickupId)
+        //   • duplicate webhook         (already-stored row, no event)
+        //   • trip has no pickup/drop   (pre-Gap-3 trip — degrade silently)
+        //   • station code resolves to neither pickup nor drop
+        if (state == "FINISHED" && inserted)
         {
             var missionType = string.IsNullOrWhiteSpace(subTask.SubTaskType) ? "" : subTask.SubTaskType.ToUpperInvariant();
             if (missionType == "ACT" && !string.IsNullOrWhiteSpace(stationName))
             {
                 var resolvedId = await facilityReadService.ResolveStationByCodeAsync(stationName, cancellationToken);
-                if (resolvedId == pickupId)
+                var pickupHit = trip.PickupStationId.HasValue && resolvedId == trip.PickupStationId.Value;
+                var dropHit   = trip.DropStationId.HasValue   && resolvedId == trip.DropStationId.Value;
+                if (pickupHit)
                 {
                     trip.MarkVendorPickedUp();
                     await tripRepository.UpdateAsync(trip, cancellationToken);
                     logger.LogInformation(
                         "[SubTaskWebhook] Trip {TripId} pickup completed at {Station} — items will be marked Picked",
+                        trip.Id, stationName);
+                }
+                else if (dropHit)
+                {
+                    trip.MarkVendorDropCompleted();
+                    await tripRepository.UpdateAsync(trip, cancellationToken);
+                    logger.LogInformation(
+                        "[SubTaskWebhook] Trip {TripId} drop completed at {Station} — items will be marked DroppedOff",
                         trip.Id, stationName);
                 }
             }

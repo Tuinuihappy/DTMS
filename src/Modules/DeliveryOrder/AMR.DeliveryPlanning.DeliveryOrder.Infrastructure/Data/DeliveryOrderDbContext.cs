@@ -35,6 +35,7 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
             b.Property(o => o.RequestedTransportMode).HasConversion<string>().HasMaxLength(20);
+            b.Property(o => o.RequiresPod).HasColumnName("RequiresPod");
             b.Property(o => o.RequestedBy).HasMaxLength(200);
             b.Property(o => o.Notes).HasMaxLength(1000);
             b.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion().IsConcurrencyToken();
@@ -121,6 +122,14 @@ public class DeliveryOrderDbContext : DbContext
                 .HasColumnType("text[]")
                 .HasColumnName("HandlingInstructions")
                 .IsRequired();
+
+            // POD evidence — populated when /pod-scan confirms delivery.
+            // All five fields are nullable: pre-POD orders never set them.
+            b.Property(p => p.DroppedOffAt).HasColumnName("DroppedOffAt");
+            b.Property(p => p.PodScannedAt).HasColumnName("PodScannedAt");
+            b.Property(p => p.PodScannedBy).HasColumnName("PodScannedBy").HasMaxLength(200);
+            b.Property(p => p.PodMethod).HasColumnName("PodMethod").HasMaxLength(20);
+            b.Property(p => p.PodReference).HasColumnName("PodReference").HasMaxLength(500);
         });
 
         modelBuilder.Entity<OrderAmendment>(b =>

@@ -1531,6 +1531,145 @@ public class DeliveryOrderTests
         order.Status.Should().Be(OrderStatus.Confirmed);   // unchanged
     }
 
+    // ── DroppedOff + POD scan (RequiresPod flow) ───────────────────────
+
+    [Fact]
+    public void MarkTripItemsDroppedOff_TransitionsPickedToDroppedOff()
+    {
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+
+        var changed = order.MarkTripItemsDroppedOff(tripA);
+
+        changed.Should().Be(2);
+        order.Items.Where(i => i.TripId == tripA)
+            .Should().OnlyContain(i => i.Status == ItemStatus.DroppedOff);
+        order.Items.Where(i => i.TripId == tripA)
+            .Should().OnlyContain(i => i.DroppedOffAt != null);
+    }
+
+    [Fact]
+    public void MarkTripItemsDroppedOff_SkipsPendingItems()
+    {
+        // Race: drop event arrives before pickup event processed.
+        // DroppedOff transition is Picked-only, so Pending items
+        // are skipped — they'll skip DroppedOff entirely.
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        // Items are Pending (no MarkTripItemsPicked)
+
+        var changed = order.MarkTripItemsDroppedOff(tripA);
+
+        changed.Should().Be(0);
+        order.Items.Should().OnlyContain(i => i.Status == ItemStatus.Pending);
+    }
+
+    [Fact]
+    public void ConfirmItemPod_DroppedOffToDelivered_WithAuditFields()
+    {
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+        order.MarkTripItemsDroppedOff(tripA);
+
+        var firstItem = order.Items.First();
+        var changed = order.ConfirmItemPod(firstItem.Id, "ops-1", "Barcode", "SKU-A-CODE");
+
+        changed.Should().Be(1);
+        firstItem.Status.Should().Be(ItemStatus.Delivered);
+        firstItem.PodScannedBy.Should().Be("ops-1");
+        firstItem.PodMethod.Should().Be("Barcode");
+        firstItem.PodReference.Should().Be("SKU-A-CODE");
+        firstItem.PodScannedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void ConfirmItemPod_FromPickedDirectly_AllowsRace()
+    {
+        // Race: operator scanned before SUB_TASK_FINISHED at drop fired,
+        // so item is still Picked. Allowed — POD is the authoritative
+        // delivery signal regardless of intermediate states.
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+
+        var firstItem = order.Items.First();
+        var changed = order.ConfirmItemPod(firstItem.Id, "ops-1", "Confirm", null);
+
+        changed.Should().Be(1);
+        firstItem.Status.Should().Be(ItemStatus.Delivered);
+    }
+
+    [Fact]
+    public void RequiresPod_True_MarkDeliveredOrLeaveForPod_IsNoOp()
+    {
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+        order.MarkTripItemsDroppedOff(tripA);
+        order.SetRequiresPod(true);
+
+        var delivered = order.MarkTripItemsDeliveredOrLeaveForPod(tripA, templateRequiresPod: false);
+
+        delivered.Should().Be(0);
+        order.Items.Where(i => i.TripId == tripA)
+            .Should().OnlyContain(i => i.Status == ItemStatus.DroppedOff);
+    }
+
+    [Fact]
+    public void RequiresPod_False_MarkDeliveredOrLeaveForPod_AutoDelivers()
+    {
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+        order.MarkTripItemsDroppedOff(tripA);
+        // RequiresPod is null AND template default false → effective false
+
+        var delivered = order.MarkTripItemsDeliveredOrLeaveForPod(tripA, templateRequiresPod: false);
+
+        delivered.Should().Be(2);
+        order.Items.Where(i => i.TripId == tripA)
+            .Should().OnlyContain(i => i.Status == ItemStatus.Delivered);
+    }
+
+    [Fact]
+    public void DroppedOff_ThenTripCancelled_ResetsItemsToPending()
+    {
+        // Cancel cascade after drop but before POD: items unbind +
+        // status reverts so retry can rebind cleanly.
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+        order.MarkTripItemsDroppedOff(tripA);
+
+        order.UnassignItemsFromTrip(tripA);
+
+        order.Items.Should().OnlyContain(i => i.Status == ItemStatus.Pending);
+        order.Items.Should().OnlyContain(i => i.DroppedOffAt == null);
+    }
+
+    [Fact]
+    public void RecomputeStatusFromItems_DroppedOffCountsAsInFlight()
+    {
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+        order.MarkTripItemsDroppedOff(tripA);
+
+        order.RecomputeStatusFromItems();
+
+        order.Status.Should().Be(OrderStatus.Confirmed);   // still waiting
+    }
+
     [Fact]
     public void RecomputeStatusFromItems_WaitsWhileOtherTripsInFlight()
     {

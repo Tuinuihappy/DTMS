@@ -104,6 +104,11 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         {
             order.MarkAsValidated(stationMap.Value);
             order.Confirm(_options.WeightFallbackKg);
+            // POD-required orders sit at DroppedOff until operator scans;
+            // upstream caller opts in via the optional flag. Null leaves
+            // it for the order-level / template-level default to decide.
+            if (request.RequiresPod.HasValue)
+                order.SetRequiresPod(request.RequiresPod.Value);
 
             await _repository.AddAsync(order, cancellationToken);
             await _auditRepo.AddAsync(new OrderAuditEvent(

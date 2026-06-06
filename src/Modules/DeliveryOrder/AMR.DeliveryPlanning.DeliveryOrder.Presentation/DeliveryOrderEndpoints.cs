@@ -2,6 +2,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AmendDeliveryOrder
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkSubmitDeliveryOrders;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CancelDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ConfirmDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ConfirmItemPod;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.HoldDeliveryOrder;
@@ -33,6 +34,9 @@ public record HoldOrderRequest(string Reason, string? HeldBy = null);
 public record ReleaseOrderRequest(string? ReleasedBy = null);
 public record ReopenOrderRequest(string ReopenedBy, string Reason);
 public record RedispatchOrderRequest(string RedispatchedBy, string Reason, double WeightFallbackKg = 0);
+public record ConfirmItemPodRequest(string ScannedBy, string Method, string? Reference = null);
+public record ConfirmItemPodBatchRequest(string ScannedBy, string Method, IReadOnlyList<ConfirmItemPodBatchEntry> Scans);
+public record ConfirmItemPodBatchEntry(Guid ItemId, string? Reference);
 
 public static class DeliveryOrderEndpoints
 {
@@ -94,6 +98,46 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new ReopenDeliveryOrderCommand(id, body.ReopenedBy, body.Reason));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+        }).RequireIdempotencyKey();
+
+        // POST /api/v1/delivery-orders/{id}/items/{itemId}/pod-scan —
+        // Operator submits Proof-of-Delivery for one item on a
+        // RequiresPod order. Transitions DroppedOff/Picked → Delivered,
+        // stamps audit columns. Idempotent against duplicate scans.
+        group.MapPost("/{id:guid}/items/{itemId:guid}/pod-scan",
+            async (Guid id, Guid itemId, [FromBody] ConfirmItemPodRequest body, ISender sender) =>
+        {
+            var result = await sender.Send(new ConfirmItemPodCommand(
+                id, itemId, body.ScannedBy, body.Method, body.Reference));
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.BadRequest(result.Error);
+        }).RequireIdempotencyKey();
+
+        // POST /api/v1/delivery-orders/{id}/pod-batch — Bulk POD scan
+        // for trip-level confirmation (one operator action covers
+        // every item). Returns per-item results so the UI can render
+        // which scans landed vs. which were already-Delivered no-ops.
+        group.MapPost("/{id:guid}/pod-batch",
+            async (Guid id, [FromBody] ConfirmItemPodBatchRequest body, ISender sender) =>
+        {
+            var results = new List<object>();
+            int confirmed = 0, skipped = 0;
+            foreach (var scan in body.Scans)
+            {
+                var r = await sender.Send(new ConfirmItemPodCommand(
+                    id, scan.ItemId, body.ScannedBy, body.Method, scan.Reference));
+                if (r.IsSuccess)
+                {
+                    if (r.Value!.Confirmed) confirmed++; else skipped++;
+                    results.Add(new { itemId = scan.ItemId, ok = true, confirmed = r.Value.Confirmed, status = r.Value.ItemStatus });
+                }
+                else
+                {
+                    results.Add(new { itemId = scan.ItemId, ok = false, error = r.Error });
+                }
+            }
+            return Results.Ok(new { confirmed, skipped, results });
         }).RequireIdempotencyKey();
 
         // POST /api/v1/delivery-orders/{id}/redispatch — recovery for orders

@@ -35,7 +35,11 @@ public record ItemDto(
     IReadOnlyList<HandlingInstruction> HandlingInstructions,
     ItemStatus Status,
     Guid? TripId,
-    int? AttemptNumber);
+    int? AttemptNumber,
+    DateTime? DroppedOffAt,
+    DateTime? PodScannedAt,
+    string? PodScannedBy,
+    string? PodMethod);
 
 public record DeliveryOrderListDto(
     Guid Id,
@@ -267,6 +271,10 @@ internal static class DeliveryOrderMapper
                 p.HandlingInstructions,
                 p.Status,
                 p.TripId,
-                p.AttemptNumber
+                p.AttemptNumber,
+                p.DroppedOffAt,
+                p.PodScannedAt,
+                p.PodScannedBy,
+                p.PodMethod
             )).ToList());
 }

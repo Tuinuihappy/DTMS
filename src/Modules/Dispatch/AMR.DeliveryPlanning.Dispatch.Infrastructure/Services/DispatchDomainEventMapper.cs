@@ -30,6 +30,11 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                 new TripPickupCompletedIntegrationEvent(
                     evt.EventId, evt.OccurredOn, evt.TripId, evt.DeliveryOrderId)
             ],
+            TripDropCompletedDomainEvent evt =>
+            [
+                new TripDropCompletedIntegrationEvent(
+                    evt.EventId, evt.OccurredOn, evt.TripId, evt.DeliveryOrderId)
+            ],
             TripCompletedDomainEvent evt =>
             [
                 new TripCompletedIntegrationEvent(

@@ -28,6 +28,7 @@ import { FilterBar, type StatusFilter } from "./filter-bar";
 import { OrdersKpiStrip } from "./kpi-strip";
 import { OrdersTable, type SortColumn, type SortDir } from "./orders-table";
 import { Pagination, type PageSize } from "./pagination";
+import { PodScanDialog } from "./pod-scan-dialog";
 import { RedispatchDialog } from "./redispatch-dialog";
 import { ReopenDialog } from "./reopen-dialog";
 import { ToastProvider, useToast } from "./toast";
@@ -241,6 +242,9 @@ function ExperienceInner() {
   const [redispatchTarget, setRedispatchTarget] = useState<DeliveryOrderListDto | null>(null);
   const [redispatchBusy, setRedispatchBusy] = useState(false);
   const [redispatchError, setRedispatchError] = useState<string | null>(null);
+  const [podTarget, setPodTarget] = useState<{ orderId: string; orderRef: string; itemId: string; itemLabel: string } | null>(null);
+  const [podBusy, setPodBusy] = useState(false);
+  const [podError, setPodError] = useState<string | null>(null);
   // In-flight trip count for the cancel cascade callout. Populated when
   // cancelTarget is set; resets to 0 when dialog closes.
   const [cancelTripCount, setCancelTripCount] = useState(0);
@@ -830,6 +834,56 @@ function ExperienceInner() {
           await runAction(a, id);
           if (a !== "delete") {
             setTimeout(() => setDetailId(id), 50);
+          }
+        }}
+        onPodScan={(itemId, itemLabel) => {
+          if (!detailId) return;
+          const order = orders.find((o) => o.id === detailId);
+          setPodTarget({
+            orderId: detailId,
+            orderRef: order?.orderRef ?? "",
+            itemId,
+            itemLabel,
+          });
+        }}
+      />
+
+      <PodScanDialog
+        open={podTarget !== null}
+        orderRef={podTarget?.orderRef ?? null}
+        itemId={podTarget?.itemId ?? null}
+        itemLabel={podTarget?.itemLabel ?? null}
+        currentUser={null}
+        busy={podBusy}
+        error={podError}
+        onClose={() => {
+          setPodTarget(null);
+          setPodError(null);
+        }}
+        onConfirm={async ({ scannedBy, method, reference }) => {
+          if (!podTarget) return;
+          setPodBusy(true);
+          setPodError(null);
+          try {
+            const { confirmItemPod } = await import("@/lib/api/delivery-orders");
+            await confirmItemPod(podTarget.orderId, podTarget.itemId, {
+              scannedBy, method, reference,
+            });
+            toast.push({
+              tone: "success",
+              message: `${podTarget.itemLabel} POD confirmed`,
+            });
+            setPodTarget(null);
+            // Refresh the drawer so the badge updates immediately
+            setTimeout(() => {
+              const id = podTarget.orderId;
+              setDetailId(null);
+              setTimeout(() => setDetailId(id), 30);
+            }, 80);
+          } catch (err) {
+            setPodError((err as Error).message);
+          } finally {
+            setPodBusy(false);
           }
         }}
       />

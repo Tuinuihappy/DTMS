@@ -194,6 +194,20 @@ public class Trip : AggregateRoot<Guid>
             Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId));
     }
 
+    /// <summary>
+    /// Vendor reports the robot finished its drop action at this trip's
+    /// drop station — items are physically at the dock. Doesn't change
+    /// Trip.Status (still InProgress until TASK_FINISHED). Fires an
+    /// integration event so DeliveryOrder flips items Picked → DroppedOff.
+    /// </summary>
+    public void MarkVendorDropCompleted()
+    {
+        if (Status is not TripStatus.InProgress) return;
+        RecordEvent("VendorDropCompleted", null);
+        AddDomainEvent(new TripDropCompletedDomainEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId));
+    }
+
     public void MarkVendorCompleted()
     {
         if (Status == TripStatus.Completed)

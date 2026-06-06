@@ -38,10 +38,12 @@ export function OrderDetailDrawer({
   orderId,
   onClose,
   onAction,
+  onPodScan,
 }: {
   orderId: string | null;
   onClose: () => void;
   onAction: (a: Action, id: string) => Promise<void> | void;
+  onPodScan?: (itemId: string, itemLabel: string) => void;
 }) {
   const [data, setData] = useState<DeliveryOrderDetailDto | null>(null);
   const [loading, setLoading] = useState(false);
@@ -325,7 +327,7 @@ export function OrderDetailDrawer({
                           className="rounded-xl border border-[var(--color-ink-100)] bg-[var(--color-surface)] px-4 py-3 dark:border-white/[0.05] dark:bg-white/[0.02]"
                         >
                           <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
+                            <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-mono text-[11px] font-bold text-[var(--color-ink-400)]">
                                   #{it.itemSeq.toString().padStart(2, "0")}
@@ -339,7 +341,26 @@ export function OrderDetailDrawer({
                                     attempt {it.attemptNumber}
                                   </span>
                                 )}
+                                {it.status === "DroppedOff" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onPodScan?.(it.id, `#${it.itemSeq.toString().padStart(2,"0")} ${it.itemId}`)}
+                                    className="ml-auto rounded-full bg-[var(--color-success)] px-2.5 py-[3px] text-[10px] font-bold uppercase tracking-[0.06em] text-white transition-opacity hover:opacity-90"
+                                  >
+                                    Scan POD
+                                  </button>
+                                )}
+                                {it.status === "Delivered" && it.podScannedBy && (
+                                  <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-[var(--color-success-soft)] px-2 py-[2px] text-[9.5px] font-semibold uppercase tracking-[0.06em] text-[var(--color-success)]">
+                                    POD · {it.podMethod}
+                                  </span>
+                                )}
                               </div>
+                              {it.status === "DroppedOff" && it.droppedOffAt && (
+                                <p className="mt-0.5 text-[10.5px] text-[var(--color-pastel-peach-ink)]">
+                                  ⏱ Awaiting POD · dropped {relativeFromNow(it.droppedOffAt)}
+                                </p>
+                              )}
                               {it.description && (
                                 <p className="mt-0.5 text-[12px] text-[var(--color-ink-500)] truncate">
                                   {it.description}
@@ -668,6 +689,11 @@ const STATUS_VISUAL: Record<
     className: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
     dot: "bg-[var(--color-amber)]",
     title: "Robot picked up — in transit to drop station",
+  },
+  DroppedOff: {
+    className: "bg-[var(--color-pastel-peach)] text-[var(--color-pastel-peach-ink)]",
+    dot: "bg-[var(--color-pastel-peach-ink)]",
+    title: "At drop dock — POD pending",
   },
   Delivered: {
     className: "bg-[var(--color-success-soft)] text-[var(--color-success)]",

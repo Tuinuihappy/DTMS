@@ -23,6 +23,14 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     public int TotalItems { get; private set; }
     public TransportMode? RequestedTransportMode { get; private set; }
 
+    /// <summary>
+    /// When true, items DO NOT auto-Deliver on TASK_FINISHED — they sit
+    /// at DroppedOff until an operator confirms via /pod-scan. Defaults
+    /// to false (current behaviour). Per-order override; null falls back
+    /// to whatever the route's OrderTemplate.RequiresPod says.
+    /// </summary>
+    public bool? RequiresPod { get; private set; }
+
     private readonly List<Item> _items = new();
     public IReadOnlyCollection<Item> Items => _items.AsReadOnly();
 
@@ -203,6 +211,68 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         return changed;
     }
 
+    /// <summary>Sets the per-order POD policy override. Null = fall back
+    /// to OrderTemplate.RequiresPod at TASK_FINISHED time.</summary>
+    public void SetRequiresPod(bool? requiresPod) => RequiresPod = requiresPod;
+
+    /// <summary>
+    /// Mark every Picked item bound to a Trip as DroppedOff (vendor
+    /// reported the robot finished its drop action at the drop station).
+    /// Idempotent. Items still Pending (race: drop event arrives before
+    /// pickup processed) are skipped — they'll skip DroppedOff entirely
+    /// and land at Delivered on TASK_FINISHED or POD scan.
+    /// </summary>
+    public int MarkTripItemsDroppedOff(Guid tripId)
+    {
+        if (Status is OrderStatus.Cancelled or OrderStatus.Rejected) return 0;
+
+        var changed = 0;
+        foreach (var item in _items)
+        {
+            if (item.TripId != tripId) continue;
+            if (item.Status is not ItemStatus.Picked) continue;
+            item.MarkDroppedOff();
+            changed++;
+        }
+        if (changed > 0)
+            AddDomainEvent(new TripItemsDroppedOffDomainEvent(
+                Guid.NewGuid(), DateTime.UtcNow, Id, tripId, changed));
+        return changed;
+    }
+
+    /// <summary>
+    /// Confirm POD for a single item — Picked/DroppedOff → Delivered.
+    /// Called from the POST /pod-scan endpoint. Returns the count of
+    /// items that transitioned (0 or 1). Recompute is the caller's
+    /// responsibility so a batch scan can do one pass at the end.
+    /// </summary>
+    public int ConfirmItemPod(Guid itemId, string scannedBy, string method, string? reference)
+    {
+        var item = _items.FirstOrDefault(i => i.Id == itemId);
+        if (item is null) return 0;
+        if (item.Status is ItemStatus.Delivered) return 0;
+        var before = item.Status;
+        item.ConfirmPodAndDeliver(scannedBy, method, reference);
+        if (item.Status == before) return 0;
+        AddDomainEvent(new ItemPodConfirmedDomainEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, itemId, scannedBy, method));
+        return 1;
+    }
+
+    /// <summary>
+    /// TASK_FINISHED arrived. Behaviour splits on the effective POD
+    /// policy: if POD is required, leave DroppedOff items alone — they
+    /// need /pod-scan to land at Delivered. Otherwise the existing
+    /// MarkTripItemsDelivered runs (Pending/Picked/DroppedOff all jump
+    /// to Delivered).
+    /// </summary>
+    public int MarkTripItemsDeliveredOrLeaveForPod(Guid tripId, bool templateRequiresPod)
+    {
+        var effective = RequiresPod ?? templateRequiresPod;
+        if (effective) return 0;   // POD required — wait for scans
+        return MarkTripItemsDelivered(tripId);
+    }
+
     /// <summary>
     /// Mark every Pending item bound to a Trip as Picked (vendor reports
     /// the robot finished its pickup action). Idempotent. Items already
@@ -293,7 +363,11 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             switch (item.Status)
             {
                 case ItemStatus.Delivered:                          delivered++; break;
-                case ItemStatus.Pending or ItemStatus.Picked:       inFlight++;  break;
+                // DroppedOff joins the in-flight set: the order isn't
+                // terminal until POD confirms it Delivered (or operator
+                // marks it Failed/Cancelled).
+                case ItemStatus.Pending or ItemStatus.Picked or ItemStatus.DroppedOff:
+                                                                    inFlight++;  break;
                 // Failed / Returned / Cancelled → terminal, not delivered
             }
         }

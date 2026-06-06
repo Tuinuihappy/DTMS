@@ -77,15 +77,41 @@ export type ItemDto = {
   status: ItemStatus;
   tripId: string | null;
   attemptNumber: number | null;
+  droppedOffAt: string | null;
+  podScannedAt: string | null;
+  podScannedBy: string | null;
+  podMethod: string | null;
 };
 
 export type ItemStatus =
   | "Pending"
   | "Picked"
+  | "DroppedOff"
   | "Delivered"
   | "Failed"
   | "Returned"
   | "Cancelled";
+
+export type PodMethod = "Barcode" | "Manual" | "Signature" | "Confirm";
+
+export async function confirmItemPod(
+  orderId: string,
+  itemId: string,
+  body: { scannedBy: string; method: PodMethod; reference?: string | null },
+): Promise<void> {
+  const res = await fetch(`/api/delivery-orders/${orderId}/items/${itemId}/pod-scan`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": crypto.randomUUID(),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `POD scan failed (${res.status})`);
+  }
+}
 
 export type DeliveryOrderDetailDto = DeliveryOrderListDto & {
   items: ItemDto[];
