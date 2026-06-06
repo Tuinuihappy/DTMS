@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Loader2, Trash2, X } from "lucide-react";
+import { AlertTriangle, Bot, Loader2, Trash2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,10 @@ export function CancelOrderDialog({
   orderRef,
   count = 1,
   busy,
+  // Number of in-flight Trips the cascade will stop (Created /
+  // InProgress / Paused). Surfaces as a callout so the operator knows
+  // robots will be told to stop, not just bookkeeping.
+  activeTripCount = 0,
   onClose,
   onConfirm,
 }: {
@@ -20,6 +24,7 @@ export function CancelOrderDialog({
   // ignored. The 6s undo grace period still applies per-order.
   count?: number;
   busy: boolean;
+  activeTripCount?: number;
   onClose: () => void;
   onConfirm: (reason: string) => void;
 }) {
@@ -95,6 +100,16 @@ export function CancelOrderDialog({
                     </>
                   )}
                 </p>
+                {activeTripCount > 0 && count <= 1 && (
+                  <div className="mt-3 flex items-start gap-2 rounded-lg bg-[#fde0db]/60 px-3 py-2 text-[11.5px] leading-relaxed text-[var(--color-coral)] dark:bg-[#3a1a17]">
+                    <Bot className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={2.4} />
+                    <span>
+                      <strong>Cascade:</strong> {activeTripCount} in-flight trip
+                      {activeTripCount === 1 ? "" : "s"} will be cancelled at RIOT3 — robot
+                      {activeTripCount === 1 ? "" : "s"} will stop and return to base.
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="px-6 pb-4">

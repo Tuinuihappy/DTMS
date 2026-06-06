@@ -9,8 +9,10 @@ import {
   Clock,
   Hash,
   History,
+  RotateCcw,
   Send,
   Trash2,
+  Truck,
   User,
   X,
 } from "lucide-react";
@@ -22,10 +24,13 @@ import {
   type DeliveryOrderDetailDto,
   type TimelineEntryDto,
 } from "@/lib/api/delivery-orders";
+import { getTripsByOrder, type TripSummaryDto } from "@/lib/api/trips";
+import { AttemptBadge, TripStatusBadge } from "@/components/dispatch/badges";
+import { TripDetailDrawer } from "@/components/dispatch/trip-detail-drawer";
 import { cn } from "@/lib/utils";
 import { PriorityBadge, StatusBadge, TransportModeBadge } from "./badges";
 
-type Action = "submit" | "confirm" | "delete";
+type Action = "submit" | "confirm" | "delete" | "reopen";
 
 export function OrderDetailDrawer({
   orderId,
@@ -43,11 +48,17 @@ export function OrderDetailDrawer({
   // own (just hide the section) without blocking the drawer from
   // rendering — most of the value is in the items list above.
   const [timeline, setTimeline] = useState<TimelineEntryDto[] | null>(null);
+  // Trips dispatched against this order (one per group × attempt). Soft-fail
+  // like timeline — the rest of the drawer still works without it.
+  const [trips, setTrips] = useState<TripSummaryDto[] | null>(null);
+  // Currently-open Trip detail drawer (stacks above this drawer).
+  const [openTripId, setOpenTripId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!orderId) {
       setData(null);
       setTimeline(null);
+      setTrips(null);
       setError(null);
       return;
     }
@@ -55,6 +66,7 @@ export function OrderDetailDrawer({
     setLoading(true);
     setError(null);
     setTimeline(null);
+    setTrips(null);
 
     getOrder(orderId)
       .then((d) => {
@@ -73,6 +85,14 @@ export function OrderDetailDrawer({
       })
       .catch(() => {
         // Soft-fail: leave timeline as null, the section just hides.
+      });
+
+    getTripsByOrder(orderId)
+      .then((t) => {
+        if (!cancelled) setTrips(t);
+      })
+      .catch(() => {
+        // Soft-fail too — the Trips section just hides.
       });
 
     return () => {
@@ -222,6 +242,50 @@ export function OrderDetailDrawer({
                       <SectionLabel>Notes</SectionLabel>
                       <div className="mt-2 rounded-xl bg-[var(--color-surface-soft)] px-4 py-3 text-[13px] leading-relaxed text-[var(--color-ink-700)] dark:bg-white/[0.04]">
                         {data.notes}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Trips dispatched for this order — drilldown into vendor execution */}
+                  {trips && trips.length > 0 && (
+                    <section>
+                      <SectionLabel>
+                        <span className="inline-flex items-center gap-1.5">
+                          <Truck className="h-3 w-3" strokeWidth={2.4} />
+                          Trips ({trips.length})
+                        </span>
+                      </SectionLabel>
+                      <div className="mt-3 space-y-2">
+                        {trips.map((t, i) => (
+                          <motion.button
+                            key={t.id}
+                            type="button"
+                            onClick={() => setOpenTripId(t.id)}
+                            initial={{ opacity: 0, x: -6 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.32, delay: i * 0.04 }}
+                            className="group flex w-full items-center justify-between gap-3 rounded-xl border border-[var(--color-ink-100)] bg-[var(--color-surface)] px-4 py-3 text-left transition-all hover:border-[var(--color-brand-500)]/40 hover:bg-[var(--color-surface-soft)] dark:border-white/[0.05] dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <TripStatusBadge status={t.status as never} />
+                                <AttemptBadge attempt={t.attemptNumber} />
+                                {t.vendorOrderKey && (
+                                  <span className="font-mono text-[11.5px] font-semibold text-[var(--color-ink-700)]">
+                                    #{t.vendorOrderKey}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-1 font-mono text-[10.5px] text-[var(--color-ink-400)] truncate">
+                                {t.upperKey}
+                              </div>
+                            </div>
+                            <ChevronRight
+                              className="h-4 w-4 flex-shrink-0 text-[var(--color-ink-400)] transition-transform group-hover:translate-x-0.5"
+                              strokeWidth={2.4}
+                            />
+                          </motion.button>
+                        ))}
                       </div>
                     </section>
                   )}
@@ -395,6 +459,15 @@ export function OrderDetailDrawer({
                       Cancel order
                     </DrawerActionButton>
                   )}
+                  {can(data.orderStatus, ["Failed"]) && (
+                    <DrawerActionButton
+                      tone="lavender"
+                      icon={<RotateCcw className="h-3.5 w-3.5" strokeWidth={2.4} />}
+                      onClick={() => onAction("reopen", data.id)}
+                    >
+                      Reopen
+                    </DrawerActionButton>
+                  )}
                   <button
                     type="button"
                     onClick={onClose}
@@ -406,6 +479,13 @@ export function OrderDetailDrawer({
               </footer>
             )}
           </motion.aside>
+          {/* Stacked Trip drawer — sits above the order drawer, escape and
+              backdrop close it without dismissing the order drawer. */}
+          <TripDetailDrawer
+            tripId={openTripId}
+            onClose={() => setOpenTripId(null)}
+            onOpenTrip={(id) => setOpenTripId(id)}
+          />
         </>
       )}
     </AnimatePresence>
@@ -535,7 +615,7 @@ function DrawerActionButton({
   onClick,
   children,
 }: {
-  tone: "brand" | "success" | "coral";
+  tone: "brand" | "success" | "coral" | "lavender";
   icon: React.ReactNode;
   onClick: () => void;
   children: React.ReactNode;
@@ -547,6 +627,8 @@ function DrawerActionButton({
       "bg-[var(--color-success)] text-white hover:shadow-[0_14px_36px_-12px_rgba(16,185,129,0.5)]",
     coral:
       "bg-[#fde0db] text-[var(--color-coral)] hover:bg-[#fbc7be] dark:bg-[#3a1a17] dark:hover:bg-[#4a2520]",
+    lavender:
+      "bg-[var(--color-pastel-lavender)] text-[var(--color-pastel-lavender-ink)] hover:bg-[var(--color-pastel-lavender)]/80",
   };
   return (
     <motion.button

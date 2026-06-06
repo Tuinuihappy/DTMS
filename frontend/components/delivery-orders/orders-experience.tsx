@@ -19,6 +19,7 @@ import {
   type Priority,
   type TransportMode,
 } from "@/lib/api/delivery-orders";
+import { getTripsByOrder, type TripStatus } from "@/lib/api/trips";
 import { BulkActionBar } from "./bulk-bar";
 import { CancelOrderDialog } from "./cancel-dialog";
 import { CreateOrderDialog } from "./create-dialog";
@@ -27,6 +28,7 @@ import { FilterBar, type StatusFilter } from "./filter-bar";
 import { OrdersKpiStrip } from "./kpi-strip";
 import { OrdersTable, type SortColumn, type SortDir } from "./orders-table";
 import { Pagination, type PageSize } from "./pagination";
+import { ReopenDialog } from "./reopen-dialog";
 import { ToastProvider, useToast } from "./toast";
 
 // Translate the UI's StatusFilter into backend query params. Virtual
@@ -229,6 +231,15 @@ function ExperienceInner() {
   const [cancelTarget, setCancelTarget] = useState<DeliveryOrderListDto | null>(null);
   const [bulkCancelTargets, setBulkCancelTargets] =
     useState<DeliveryOrderListDto[] | null>(null);
+  // Reopen dialog state — admin override for Failed orders. Captures
+  // reopenedBy + reason; the dialog calls /reopen directly so we don't
+  // need to thread another action through runAction's optimistic flow.
+  const [reopenTarget, setReopenTarget] = useState<DeliveryOrderListDto | null>(null);
+  const [reopenBusy, setReopenBusy] = useState(false);
+  const [reopenError, setReopenError] = useState<string | null>(null);
+  // In-flight trip count for the cancel cascade callout. Populated when
+  // cancelTarget is set; resets to 0 when dialog closes.
+  const [cancelTripCount, setCancelTripCount] = useState(0);
 
   const toast = useToast();
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -238,7 +249,7 @@ function ExperienceInner() {
   // be circular (runAction → openEdit → toast → … → orders).
   const runActionRef = useRef<
     | ((
-        action: "edit" | "submit" | "confirm" | "delete",
+        action: "edit" | "submit" | "confirm" | "delete" | "reopen",
         id: string,
         reason?: string,
       ) => Promise<void>)
@@ -510,7 +521,7 @@ function ExperienceInner() {
   // Edit opens the create dialog in edit mode (fetches full detail first).
   const runAction = useCallback(
     async (
-      action: "edit" | "submit" | "confirm" | "delete",
+      action: "edit" | "submit" | "confirm" | "delete" | "reopen",
       id: string,
       reason?: string,
     ) => {
@@ -524,6 +535,20 @@ function ExperienceInner() {
 
       if (action === "delete" && !reason) {
         setCancelTarget(target);
+        // Fire-and-forget query for the cascade callout. Soft-fail —
+        // dialog renders without the warning if the count isn't ready.
+        const IN_FLIGHT: TripStatus[] = ["Created", "InProgress", "Paused"];
+        void getTripsByOrder(target.id)
+          .then((trips) => setCancelTripCount(trips.filter((t) => IN_FLIGHT.includes(t.status)).length))
+          .catch(() => setCancelTripCount(0));
+        return;
+      }
+
+      // Reopen is admin-only. Open the dedicated dialog to collect
+      // reopenedBy + reason, then the dialog calls the API directly
+      // and refreshes the affected row in onConfirm.
+      if (action === "reopen") {
+        setReopenTarget(target);
         return;
       }
 
@@ -827,9 +852,65 @@ function ExperienceInner() {
         open={cancelTarget !== null}
         orderRef={cancelTarget?.orderRef ?? null}
         busy={busy}
-        onClose={() => setCancelTarget(null)}
+        activeTripCount={cancelTripCount}
+        onClose={() => {
+          setCancelTarget(null);
+          setCancelTripCount(0);
+        }}
         onConfirm={(reason) => {
           if (cancelTarget) runAction("delete", cancelTarget.id, reason);
+        }}
+      />
+
+      <ReopenDialog
+        open={reopenTarget !== null}
+        orderRef={reopenTarget?.orderRef ?? null}
+        currentUser={null}
+        busy={reopenBusy}
+        error={reopenError}
+        onClose={() => {
+          setReopenTarget(null);
+          setReopenError(null);
+        }}
+        onConfirm={async ({ reopenedBy, reason }) => {
+          if (!reopenTarget) return;
+          setReopenBusy(true);
+          setReopenError(null);
+          try {
+            const res = await fetch(
+              `/api/delivery-orders/${reopenTarget.id}/reopen`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Idempotency-Key": crypto.randomUUID(),
+                },
+                body: JSON.stringify({ reopenedBy, reason }),
+              },
+            );
+            if (!res.ok) {
+              const body = (await res.json().catch(() => null)) as {
+                message?: string;
+              } | null;
+              throw new Error(body?.message ?? `Reopen failed (${res.status})`);
+            }
+            // Optimistic: bump the row to Confirmed so the list reflects
+            // the new state immediately. Next poll will reconcile.
+            setOrders((prev) =>
+              prev.map((o) =>
+                o.id === reopenTarget.id ? { ...o, orderStatus: "Confirmed" } : o,
+              ),
+            );
+            toast.push({
+              tone: "success",
+              message: `${reopenTarget.orderRef} reopened — use Retry on the failed Trip to redispatch.`,
+            });
+            setReopenTarget(null);
+          } catch (err) {
+            setReopenError((err as Error).message);
+          } finally {
+            setReopenBusy(false);
+          }
         }}
       />
 
