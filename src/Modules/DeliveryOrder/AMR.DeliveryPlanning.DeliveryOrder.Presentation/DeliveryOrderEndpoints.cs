@@ -5,6 +5,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ConfirmDeliveryOrd
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.HoldDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.RedispatchDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.RejectDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReleaseDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReopenDeliveryOrder;
@@ -31,6 +32,7 @@ public record RejectOrderRequest(string Reason, string? RejectedBy = null);
 public record HoldOrderRequest(string Reason, string? HeldBy = null);
 public record ReleaseOrderRequest(string? ReleasedBy = null);
 public record ReopenOrderRequest(string ReopenedBy, string Reason);
+public record RedispatchOrderRequest(string RedispatchedBy, string Reason, double WeightFallbackKg = 0);
 
 public static class DeliveryOrderEndpoints
 {
@@ -91,6 +93,20 @@ public static class DeliveryOrderEndpoints
         group.MapPost("/{id:guid}/reopen", async (Guid id, [FromBody] ReopenOrderRequest body, ISender sender) =>
         {
             var result = await sender.Send(new ReopenDeliveryOrderCommand(id, body.ReopenedBy, body.Reason));
+            return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+        }).RequireIdempotencyKey();
+
+        // POST /api/v1/delivery-orders/{id}/redispatch — recovery for orders
+        // whose dispatch produced no Trip at all (every group failed at
+        // vendor / no OrderTemplate registered). Re-fires the Confirmed
+        // integration event so Planning's consumer re-runs. Rejects if
+        // any Trip is still active — operator should use /trips/{id}/retry
+        // in that case. Requires Confirmed state (operator usually
+        // /reopen first, fixes the underlying issue, then /redispatch).
+        group.MapPost("/{id:guid}/redispatch", async (Guid id, [FromBody] RedispatchOrderRequest body, ISender sender) =>
+        {
+            var result = await sender.Send(new RedispatchDeliveryOrderCommand(
+                id, body.RedispatchedBy, body.Reason, body.WeightFallbackKg));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
         }).RequireIdempotencyKey();
 

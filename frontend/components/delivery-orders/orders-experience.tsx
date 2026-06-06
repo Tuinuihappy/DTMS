@@ -28,6 +28,7 @@ import { FilterBar, type StatusFilter } from "./filter-bar";
 import { OrdersKpiStrip } from "./kpi-strip";
 import { OrdersTable, type SortColumn, type SortDir } from "./orders-table";
 import { Pagination, type PageSize } from "./pagination";
+import { RedispatchDialog } from "./redispatch-dialog";
 import { ReopenDialog } from "./reopen-dialog";
 import { ToastProvider, useToast } from "./toast";
 
@@ -237,6 +238,9 @@ function ExperienceInner() {
   const [reopenTarget, setReopenTarget] = useState<DeliveryOrderListDto | null>(null);
   const [reopenBusy, setReopenBusy] = useState(false);
   const [reopenError, setReopenError] = useState<string | null>(null);
+  const [redispatchTarget, setRedispatchTarget] = useState<DeliveryOrderListDto | null>(null);
+  const [redispatchBusy, setRedispatchBusy] = useState(false);
+  const [redispatchError, setRedispatchError] = useState<string | null>(null);
   // In-flight trip count for the cancel cascade callout. Populated when
   // cancelTarget is set; resets to 0 when dialog closes.
   const [cancelTripCount, setCancelTripCount] = useState(0);
@@ -249,7 +253,7 @@ function ExperienceInner() {
   // be circular (runAction → openEdit → toast → … → orders).
   const runActionRef = useRef<
     | ((
-        action: "edit" | "submit" | "confirm" | "delete" | "reopen",
+        action: "edit" | "submit" | "confirm" | "delete" | "reopen" | "redispatch",
         id: string,
         reason?: string,
       ) => Promise<void>)
@@ -521,7 +525,7 @@ function ExperienceInner() {
   // Edit opens the create dialog in edit mode (fetches full detail first).
   const runAction = useCallback(
     async (
-      action: "edit" | "submit" | "confirm" | "delete" | "reopen",
+      action: "edit" | "submit" | "confirm" | "delete" | "reopen" | "redispatch",
       id: string,
       reason?: string,
     ) => {
@@ -549,6 +553,15 @@ function ExperienceInner() {
       // and refreshes the affected row in onConfirm.
       if (action === "reopen") {
         setReopenTarget(target);
+        return;
+      }
+
+      // Redispatch is for Confirmed orders that never produced a Trip
+      // (every group failed dispatch — typical after Reopen + fixing the
+      // underlying cause like a missing OrderTemplate). Opens a dialog
+      // to collect actor + reason, then POSTs and refreshes.
+      if (action === "redispatch") {
+        setRedispatchTarget(target);
         return;
       }
 
@@ -910,6 +923,51 @@ function ExperienceInner() {
             setReopenError((err as Error).message);
           } finally {
             setReopenBusy(false);
+          }
+        }}
+      />
+
+      <RedispatchDialog
+        open={redispatchTarget !== null}
+        orderRef={redispatchTarget?.orderRef ?? null}
+        currentUser={null}
+        busy={redispatchBusy}
+        error={redispatchError}
+        onClose={() => {
+          setRedispatchTarget(null);
+          setRedispatchError(null);
+        }}
+        onConfirm={async ({ redispatchedBy, reason }) => {
+          if (!redispatchTarget) return;
+          setRedispatchBusy(true);
+          setRedispatchError(null);
+          try {
+            const res = await fetch(
+              `/api/delivery-orders/${redispatchTarget.id}/redispatch`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Idempotency-Key": crypto.randomUUID(),
+                },
+                body: JSON.stringify({ redispatchedBy, reason }),
+              },
+            );
+            if (!res.ok) {
+              const body = (await res.json().catch(() => null)) as {
+                message?: string;
+              } | null;
+              throw new Error(body?.message ?? `Redispatch failed (${res.status})`);
+            }
+            toast.push({
+              tone: "success",
+              message: `${redispatchTarget.orderRef} dispatch re-queued — Planning will run again.`,
+            });
+            setRedispatchTarget(null);
+          } catch (err) {
+            setRedispatchError((err as Error).message);
+          } finally {
+            setRedispatchBusy(false);
           }
         }}
       />

@@ -463,6 +463,38 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         AddDomainEvent(new DeliveryOrderReopenedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
     }
 
+    /// <summary>
+    /// Re-fires the Confirmed integration event so the Planning consumer
+    /// re-runs its dispatch loop. The standard Trip-level retry path
+    /// (POST /trips/{id}/retry) covers orders whose dispatch produced a
+    /// Trip that later went wrong. This is the "no Trip ever
+    /// materialised" recovery path — every group failed dispatch
+    /// (template not registered, vendor rejected, etc.) and the order
+    /// landed at Failed without any Trip the operator can /retry from.
+    ///
+    /// Required precondition: caller has already moved the order back
+    /// to Confirmed via Reopen. Items still Failed are fine — the
+    /// Planning consumer rebinds them via AssignItemsToTrip, which
+    /// resets Failed items back to Pending as part of the rebind.
+    /// </summary>
+    public void Redispatch(double weightFallbackKg, string reason)
+    {
+        if (Status != OrderStatus.Confirmed)
+            throw new InvalidOperationException(
+                $"Only Confirmed orders can be redispatched. Current status: {Status}. " +
+                "If the order is Failed, reopen it first.");
+
+        // Same event the original Confirm raises — the Planning consumer
+        // is idempotent for the dispatch loop (it groups items by route
+        // and dispatches per group, skipping anything already bound to
+        // an in-flight Trip).
+        AddDomainEvent(BuildConfirmedEvent(weightFallbackKg));
+        // Audit trail entry distinct from the original Confirm so the
+        // history makes it clear an operator re-triggered planning.
+        AddDomainEvent(new DeliveryOrderRedispatchedDomainEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+    }
+
     public void Cancel(string reason)
     {
         if (Status == OrderStatus.Cancelled) return;

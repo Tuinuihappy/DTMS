@@ -561,7 +561,9 @@ public class ReissueTripGuardTests
 
         result.IsFailure.Should().BeTrue();
         result.Error.Should().Contain("Cancelled");
-        result.Error.Should().Contain("Reopen");
+        // Cancelled is terminal — the hint says "terminal state", not "reopen"
+        // (you can't reopen a Cancelled order, only a Failed one).
+        result.Error.Should().Contain("terminal");
     }
 
     [Theory]
@@ -611,6 +613,40 @@ public class ReissueTripGuardTests
         result.Error.Should().Contain("not found");
     }
 
+    [Fact]
+    public async Task Retry_AllowedForFailedTripWhenOrderReopenedToConfirmed()
+    {
+        // BUG #3 path: Trip TASK_FAILED → Order Failed → operator /reopen
+        // → Order Confirmed → operator /retry on the Failed Trip succeeds.
+        var failed = NewFailedTrip();
+        var handler = NewHandler(failed, orderStatus: "Confirmed");
+
+        var result = await handler.Handle(
+            new AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
+                failed.Id, "Manual", "ops", "retry after reopen"),
+            default);
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Retry_BlockedForFailedTripWhenOrderStillFailed()
+    {
+        // The 2-step audit trail: operator MUST reopen the order first.
+        var failed = NewFailedTrip();
+        var handler = NewHandler(failed, orderStatus: "Failed");
+
+        var result = await handler.Handle(
+            new AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
+                failed.Id, "Manual", null, null),
+            default);
+
+        // Order-status guard fires before Trip status check; both messages
+        // are operator-friendly. Either contains "Failed" + "Reopen" hint.
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Contain("Failed");
+    }
+
     private static Trip NewCancelledTrip()
     {
         var t = Trip.CreateForEnvelope(
@@ -618,6 +654,17 @@ public class ReissueTripGuardTests
             pickupStationId: Guid.NewGuid(),
             dropStationId: Guid.NewGuid());
         t.Cancel("operator");
+        return t;
+    }
+
+    private static Trip NewFailedTrip()
+    {
+        var t = Trip.CreateForEnvelope(
+            Guid.NewGuid(), "abc-G1", "ORD-1",
+            pickupStationId: Guid.NewGuid(),
+            dropStationId: Guid.NewGuid());
+        t.MarkVendorStarted(Guid.NewGuid());
+        t.MarkVendorFailed("simulated vendor failure");
         return t;
     }
 

@@ -11,15 +11,23 @@ namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip;
 
 public class ReissueTripCommandHandler : ICommandHandler<ReissueTripCommand, Guid>
 {
-    // Order statuses that block a Trip-level retry — admin / terminal
-    // states the operator has already settled. Compared as strings so
-    // we don't reach for DeliveryOrder.Domain just for an enum.
+    // Order statuses that block a Trip-level retry. Two groups:
+    //   • Terminal admin-settled: Cancelled / Rejected / Completed /
+    //     PartiallyCompleted — operator already finished this order.
+    //   • Failed: recoverable, but only through /orders/{id}/reopen.
+    //     The 2-step audit trail (reopen + retry) separates "who
+    //     reopened" from "who retried" — collapsing them would lose
+    //     compliance signal. Once reopened, Order = Confirmed and
+    //     retry proceeds normally.
+    // Compared as strings so we don't reach for DeliveryOrder.Domain
+    // just for the enum.
     private static readonly HashSet<string> NonRetryableOrderStatuses = new(StringComparer.OrdinalIgnoreCase)
     {
         "Cancelled",
         "Rejected",
         "Completed",
         "PartiallyCompleted",
+        "Failed",
     };
 
     private readonly ITripRepository _tripRepository;
@@ -51,14 +59,14 @@ public class ReissueTripCommandHandler : ICommandHandler<ReissueTripCommand, Gui
         if (original is null)
             return Result<Guid>.Failure($"Trip {request.OriginalTripId} not found.");
 
-        // Failed trips require an explicit DeliveryOrder.Reopen first — the
-        // 2-step audit trail distinguishes "who reopened" from "who retried".
-        // Operators cancelling intentionally use the Cancelled state, which
-        // does NOT propagate to the order (retry-friendly semantic).
-        if (original.Status != TripStatus.Cancelled)
+        // Cancelled trips retry directly. Failed trips require the parent
+        // order to be moved out of Failed first (POST /orders/{id}/reopen)
+        // — the order-status guard a few lines down enforces that. The
+        // 2-step audit trail distinguishes "who reopened" from "who
+        // retried". Any other Trip state isn't retryable from this command.
+        if (original.Status != TripStatus.Cancelled && original.Status != TripStatus.Failed)
             return Result<Guid>.Failure(
-                $"Trip is {original.Status}. Only Cancelled trips can be retried. " +
-                "For Failed trips, reopen the delivery order first.");
+                $"Trip is {original.Status}. Only Cancelled or Failed trips can be retried.");
 
         // Bug fix (E2E scenario 5): a Cancelled trip on a Cancelled (or
         // otherwise terminal-admin) order must not be retried. Without
@@ -69,9 +77,13 @@ public class ReissueTripCommandHandler : ICommandHandler<ReissueTripCommand, Gui
         if (orderStatus is null)
             return Result<Guid>.Failure($"Delivery order {original.DeliveryOrderId} not found.");
         if (NonRetryableOrderStatuses.Contains(orderStatus))
+        {
+            var hint = string.Equals(orderStatus, "Failed", StringComparison.OrdinalIgnoreCase)
+                ? "Reopen the order first (POST /delivery-orders/{id}/reopen), then retry."
+                : "This order is in a terminal state and cannot be retried.";
             return Result<Guid>.Failure(
-                $"Cannot retry trip — the parent delivery order is {orderStatus}. " +
-                "Reopen the order first if you want to dispatch again.");
+                $"Cannot retry trip — the parent delivery order is {orderStatus}. {hint}");
+        }
 
         if (original.PickupStationId is null || original.DropStationId is null)
             return Result<Guid>.Failure(

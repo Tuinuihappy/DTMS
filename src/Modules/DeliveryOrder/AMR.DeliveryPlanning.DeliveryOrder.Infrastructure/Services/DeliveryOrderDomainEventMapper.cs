@@ -82,6 +82,13 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             // here — the operator must explicitly call /trips/{id}/retry
             // so the audit trail separates "who reopened" from "who retried".
             DeliveryOrderReopenedDomainEvent         => [],
+            // Redispatch is the "no Trip ever materialised" recovery path
+            // (e.g. every group failed dispatch). The Redispatch domain
+            // method re-fires DeliveryOrderConfirmedDomainEvent alongside
+            // this audit-only event, so Planning's consumer wakes up
+            // again. We don't publish this one to integration — it's a
+            // local audit marker.
+            DeliveryOrderRedispatchedDomainEvent     => [],
 
             // Item-level lifecycle events fired by the trip-aware item
             // methods. They're useful for audit + analytics but no other

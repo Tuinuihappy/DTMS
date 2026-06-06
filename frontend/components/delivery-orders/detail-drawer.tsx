@@ -31,7 +31,7 @@ import { FullAuditLog } from "./full-audit-log";
 import { cn } from "@/lib/utils";
 import { PriorityBadge, StatusBadge, TransportModeBadge } from "./badges";
 
-type Action = "submit" | "confirm" | "delete" | "reopen";
+type Action = "submit" | "confirm" | "delete" | "reopen" | "redispatch";
 
 export function OrderDetailDrawer({
   orderId,
@@ -427,6 +427,23 @@ export function OrderDetailDrawer({
                       Reopen
                     </DrawerActionButton>
                   )}
+                  {/* Redispatch: only meaningful when the order is
+                      Confirmed but no Trip ever materialised. We can't
+                      cheaply check the Trip count from this drawer's
+                      data, so we show the button on Confirmed orders
+                      and let the backend reject if active trips exist
+                      (clear error message). Operators following the
+                      Failed → Reopen → Redispatch path will land here
+                      naturally. */}
+                  {can(data.orderStatus, ["Confirmed"]) && (
+                    <DrawerActionButton
+                      tone="sky"
+                      icon={<Send className="h-3.5 w-3.5" strokeWidth={2.4} />}
+                      onClick={() => onAction("redispatch", data.id)}
+                    >
+                      Redispatch
+                    </DrawerActionButton>
+                  )}
                   <button
                     type="button"
                     onClick={onClose}
@@ -574,7 +591,7 @@ function DrawerActionButton({
   onClick,
   children,
 }: {
-  tone: "brand" | "success" | "coral" | "lavender";
+  tone: "brand" | "success" | "coral" | "lavender" | "sky";
   icon: React.ReactNode;
   onClick: () => void;
   children: React.ReactNode;
@@ -588,6 +605,8 @@ function DrawerActionButton({
       "bg-[#fde0db] text-[var(--color-coral)] hover:bg-[#fbc7be] dark:bg-[#3a1a17] dark:hover:bg-[#4a2520]",
     lavender:
       "bg-[var(--color-pastel-lavender)] text-[var(--color-pastel-lavender-ink)] hover:bg-[var(--color-pastel-lavender)]/80",
+    sky:
+      "bg-[var(--color-pastel-sky)] text-[var(--color-pastel-sky-ink)] hover:bg-[var(--color-pastel-sky)]/80",
   };
   return (
     <motion.button
