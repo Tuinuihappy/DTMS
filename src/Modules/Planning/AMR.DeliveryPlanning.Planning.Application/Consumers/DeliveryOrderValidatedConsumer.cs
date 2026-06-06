@@ -2,6 +2,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.MarkGroupItemsAsDi
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.MarkOrderDispatched;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.MarkOrderPlanned;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.MarkOrderPlanning;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.RecomputeOrderStatus;
 using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
 using AMR.DeliveryPlanning.Planning.Application.Services;
 using AMR.DeliveryPlanning.SharedKernel;
@@ -121,12 +122,15 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         }
         else
         {
-            // All groups failed — the per-group MarkGroupItemsAsDispatchFailed
-            // calls already moved every item to Failed. The next
-            // RecomputeStatusFromItems trigger (or the order Confirmed
-            // event mapper) will surface this as Order = Failed.
+            // All groups failed dispatch — every item is already Failed
+            // via MarkGroupItemsAsDispatchFailed, but no Trip exists so
+            // there's no TripCompleted/Failed/Cancelled consumer to
+            // trigger RecomputeStatusFromItems for us. Without an
+            // explicit kick the order would sit at "Planned" with all
+            // items Failed indefinitely (Bug #2 from manual E2E test).
             _logger.LogWarning("[AutoPlan] ═══ Order {OrderId}: all {Total} groups failed dispatch ═══",
                 evt.DeliveryOrderId, stationGroups.Count);
+            await _sender.Send(new RecomputeOrderStatusCommand(evt.DeliveryOrderId), ct);
         }
     }
 }
