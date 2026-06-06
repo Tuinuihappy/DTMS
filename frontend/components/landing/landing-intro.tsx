@@ -83,10 +83,16 @@ export function LandingIntro() {
   // hydration is identical on desktop; on mobile a single-frame correction
   // happens once useEffect runs.
   const [scale, setScale] = useState(computeScale);
+  // `mounted` gates the constellation column with opacity 0 → 1 so the
+  // viewport-correct scale is in place BEFORE the user sees anything. Kills
+  // the SSR-vs-client size jolt (server renders scale=1 → client recomputes
+  // → layout shifted big→small on first paint).
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const updateScale = () => setScale(computeScale());
     updateScale();
+    setMounted(true);
     window.addEventListener("resize", updateScale);
 
     // Respect prefers-reduced-motion — jump to 100 and dismiss immediately.
@@ -144,7 +150,13 @@ export function LandingIntro() {
         >
           <IntroAtmosphere />
 
-          <div className="relative z-10 flex flex-col items-center px-6">
+          <div
+            className="relative z-10 flex flex-col items-center px-6"
+            style={{
+              opacity: mounted ? 1 : 0,
+              transition: "opacity 220ms ease",
+            }}
+          >
             <Constellation
               progress={progress}
               scale={scale}

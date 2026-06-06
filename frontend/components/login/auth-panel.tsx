@@ -3,7 +3,7 @@
 import { AlertCircle, ArrowRight, Check, Eye, EyeOff, Loader2, Truck } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 
 /* -------------------------------------------------------------------------- */
@@ -21,6 +21,10 @@ import { useAuth } from "@/components/auth/auth-provider";
 /* -------------------------------------------------------------------------- */
 
 const ease = [0.22, 1, 0.36, 1] as const;
+
+// Account creation lives in the central employee onboarding portal.
+// Clicking "Create account" anywhere on this panel opens it in a new tab.
+const SIGNUP_URL = "https://10.204.212.22:8443/";
 
 type Mode = "in" | "up";
 type Status = "idle" | "submitting" | "success";
@@ -40,6 +44,11 @@ export function AuthPanel() {
   // exists; password is intentionally left blank.
   const [justCreated, setJustCreated] = useState(false);
   const [prefilledUsername, setPrefilledUsername] = useState("");
+  // Sign-up password fields are controlled so we can show a real-time
+  // "passwords do not match" indicator without waiting for submit.
+  const [signUpPassword, setSignUpPassword] = useState("");
+  const [signUpConfirmPassword, setSignUpConfirmPassword] = useState("");
+  const [signUpError, setSignUpError] = useState<string | null>(null);
 
   // Sign-in: call /api/auth/login, then push to from-param or /dashboard.
   const handleSignInSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -63,11 +72,21 @@ export function AuthPanel() {
 
   // Sign-up: theatrical only — no backend endpoint exists yet. On "success"
   // flip back to sign-in with the just-registered username pre-filled and
-  // a welcome banner shown.
+  // a welcome banner shown. Password/confirm-password must match before
+  // we let the submit proceed (HTML5 handles the email format check).
   const handleSignUpSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (status !== "idle") return;
-    const username = (new FormData(e.currentTarget).get("email") as string) || "";
+    if (signUpPassword !== signUpConfirmPassword) {
+      setSignUpError("Passwords do not match");
+      return;
+    }
+    if (signUpPassword.length === 0) {
+      setSignUpError("Password is required");
+      return;
+    }
+    const username = (new FormData(e.currentTarget).get("username") as string) || "";
+    setSignUpError(null);
     setStatus("submitting");
     window.setTimeout(() => setStatus("success"), 950);
     window.setTimeout(() => {
@@ -75,14 +94,18 @@ export function AuthPanel() {
       setJustCreated(true);
       setMode("in");
       setStatus("idle");
+      setSignUpPassword("");
+      setSignUpConfirmPassword("");
     }, 1700);
   };
 
   // Dismiss the welcome banner the moment the user manually navigates
-  // away from sign-in (e.g. flips back to sign-up).
+  // away from sign-in (e.g. flips back to sign-up). Also clears stale
+  // sign-up validation errors when switching tabs.
   const handleModeChange = (next: Mode) => {
     if (next !== "in") setJustCreated(false);
     setError(null);
+    setSignUpError(null);
     setMode(next);
   };
 
@@ -123,20 +146,44 @@ export function AuthPanel() {
           </div>
         </motion.header>
 
-        {/* Tabs — sliding pill on a shared layoutId. */}
+        {/* Tabs — single persistent pill that slides between positions.
+            Persistent (not conditionally rendered per button) so that the
+            Create-account click — which also calls window.open and steals
+            focus to the new tab — can't interrupt a mount/unmount layout
+            animation and leave the pill in a broken state. */}
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, delay: 0.78, ease }}
           className="relative mb-6 grid grid-cols-2 rounded-full bg-[var(--color-ink-50)] p-1 ring-1 ring-[var(--color-ink-100)] dark:ring-white/[0.06]"
         >
+          {/* Slide via transform: translateX (GPU-composited) — animating
+              `left`/`right` between rem and % can't interpolate cleanly and
+              snaps without a visible slide. Pill width = half the inner row,
+              x: 0% → 100% moves it exactly one cell over. */}
+          <motion.span
+            aria-hidden
+            className="absolute top-1 bottom-1 left-1 rounded-full bg-[var(--color-brand-900)] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_20px_-8px_rgba(14,21,48,0.45)]"
+            style={{ width: "calc(50% - 0.25rem)" }}
+            initial={false}
+            animate={{ x: mode === "in" ? "0%" : "100%" }}
+            transition={{ type: "spring", stiffness: 380, damping: 32 }}
+          />
           {(["in", "up"] as const).map((m) => {
             const active = mode === m;
+            const handleClick = () => {
+              if (m === "up") {
+                // Open the external onboarding portal alongside switching
+                // to the in-page sign-up form so the user can choose either.
+                window.open(SIGNUP_URL, "_blank", "noopener,noreferrer");
+              }
+              handleModeChange(m);
+            };
             return (
               <button
                 key={m}
                 type="button"
-                onClick={() => handleModeChange(m)}
+                onClick={handleClick}
                 className="relative z-10 cursor-pointer rounded-full py-2 text-[13px] font-medium tracking-tight transition-colors"
                 style={{
                   color: active
@@ -144,13 +191,6 @@ export function AuthPanel() {
                     : "var(--color-ink-500)",
                 }}
               >
-                {active && (
-                  <motion.span
-                    layoutId="auth-pill"
-                    transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                    className="absolute inset-0 rounded-full bg-[var(--color-brand-900)] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_20px_-8px_rgba(14,21,48,0.45)]"
-                  />
-                )}
                 <span className="relative">{m === "in" ? "Sign in" : "Create account"}</span>
               </button>
             );
@@ -169,7 +209,16 @@ export function AuthPanel() {
               error={error}
             />
           ) : (
-            <SignUpForm key="up" status={status} onSubmit={handleSignUpSubmit} />
+            <SignUpForm
+              key="up"
+              status={status}
+              onSubmit={handleSignUpSubmit}
+              password={signUpPassword}
+              setPassword={setSignUpPassword}
+              confirmPassword={signUpConfirmPassword}
+              setConfirmPassword={setSignUpConfirmPassword}
+              error={signUpError}
+            />
           )}
         </AnimatePresence>
 
@@ -185,7 +234,10 @@ export function AuthPanel() {
               New to the fleet?{" "}
               <button
                 type="button"
-                onClick={() => handleModeChange("up")}
+                onClick={() => {
+                  window.open(SIGNUP_URL, "_blank", "noopener,noreferrer");
+                  handleModeChange("up");
+                }}
                 className="cursor-pointer text-[var(--color-brand-900)] font-medium underline decoration-[var(--color-brand-200)] underline-offset-[3px] transition-colors hover:decoration-[var(--color-brand-500)] dark:text-[var(--color-brand-400)]"
               >
                 Create an account
@@ -263,7 +315,7 @@ function SignInForm({
         )}
       </AnimatePresence>
 
-      <FieldStagger delay={0.86}>
+      <FieldStagger delay={0.05}>
         <FloatingInput
           label="Username"
           type="text"
@@ -273,7 +325,7 @@ function SignInForm({
           required
         />
       </FieldStagger>
-      <FieldStagger delay={0.92}>
+      <FieldStagger delay={0.11}>
         <PasswordInput label="Password" name="password" autoComplete="current-password" required />
       </FieldStagger>
       <AnimatePresence initial={false}>
@@ -302,7 +354,7 @@ function SignInForm({
           </motion.div>
         )}
       </AnimatePresence>
-      <FieldStagger delay={0.98}>
+      <FieldStagger delay={0.17}>
         <div className="flex items-center justify-between text-[12.5px]">
           <label className="flex cursor-pointer items-center gap-2 text-[var(--color-ink-600)]">
             <CustomCheckbox /> Remember me
@@ -315,7 +367,7 @@ function SignInForm({
           </a>
         </div>
       </FieldStagger>
-      <FieldStagger delay={1.04}>
+      <FieldStagger delay={0.23}>
         <SubmitButton
           status={status}
           label="Take the wheel"
@@ -330,12 +382,39 @@ function SignInForm({
 function SignUpForm({
   status,
   onSubmit,
+  password,
+  setPassword,
+  confirmPassword,
+  setConfirmPassword,
+  error,
 }: {
   status: Status;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  password: string;
+  setPassword: (v: string) => void;
+  confirmPassword: string;
+  setConfirmPassword: (v: string) => void;
+  error: string | null;
 }) {
+  // Show the inline mismatch hint as soon as the user has typed anything
+  // into Confirm password — no need to wait for submit.
+  const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
+  // Mirror the form's HTML5 validity into React so the submit button can
+  // visually reflect "all required fields filled + email well-formed" in
+  // real time. `required` + `type="email"` already prevent submit; this is
+  // purely for the disabled state UX. Recomputed on every keystroke via
+  // `onInput` on the <form>.
+  const formRef = useRef<HTMLFormElement>(null);
+  const [formValid, setFormValid] = useState(false);
+  const refreshFormValidity = () => {
+    if (formRef.current) setFormValid(formRef.current.checkValidity());
+  };
+  const blockSubmit = mismatch || !formValid;
+
   return (
     <motion.form
+      ref={formRef}
+      onInput={refreshFormValidity}
       onSubmit={onSubmit}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
@@ -344,48 +423,70 @@ function SignUpForm({
       className="relative space-y-5"
     >
       <FieldStagger delay={0.05}>
-        <div className="grid grid-cols-2 gap-4">
-          <FloatingInput label="First name" name="first" autoComplete="given-name" required />
-          <FloatingInput label="Last name" name="last" autoComplete="family-name" required />
-        </div>
+        <FloatingInput label="Employee No." name="employeeNo" autoComplete="off" required />
       </FieldStagger>
       <FieldStagger delay={0.11}>
-        <FloatingInput label="Work email" type="email" name="email" autoComplete="email" required />
+        <FloatingInput label="Username" name="username" autoComplete="username" required />
       </FieldStagger>
       <FieldStagger delay={0.17}>
-        <FloatingInput label="Carrier or company" name="company" autoComplete="organization" required />
+        <FloatingInput label="Display name" name="displayName" autoComplete="name" required />
       </FieldStagger>
       <FieldStagger delay={0.23}>
-        <PasswordInput label="Choose a password" name="password" autoComplete="new-password" required />
+        <FloatingInput label="Email" type="email" name="email" autoComplete="email" required />
       </FieldStagger>
       <FieldStagger delay={0.29}>
-        <label className="flex cursor-pointer items-start gap-2 text-[12px] text-[var(--color-ink-600)]">
-          <CustomCheckbox className="mt-[3px]" />
-          <span className="leading-relaxed">
-            I agree to the{" "}
-            <a
-              href="#"
-              className="text-[var(--color-brand-900)] font-medium underline decoration-[var(--color-brand-200)] hover:decoration-[var(--color-brand-500)] dark:text-[var(--color-brand-400)]"
-            >
-              Carrier Terms
-            </a>{" "}
-            and{" "}
-            <a
-              href="#"
-              className="text-[var(--color-brand-900)] font-medium underline decoration-[var(--color-brand-200)] hover:decoration-[var(--color-brand-500)] dark:text-[var(--color-brand-400)]"
-            >
-              Privacy Policy
-            </a>
-            .
-          </span>
-        </label>
+        <PasswordInput
+          label="Password"
+          name="password"
+          autoComplete="new-password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
       </FieldStagger>
       <FieldStagger delay={0.35}>
+        <PasswordInput
+          label="Confirm password"
+          name="confirmPassword"
+          autoComplete="new-password"
+          required
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+        />
+      </FieldStagger>
+      <AnimatePresence initial={false}>
+        {(mismatch || error) && (
+          <motion.div
+            key="signup-error"
+            initial={{ opacity: 0, y: -4, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: "auto" }}
+            exit={{ opacity: 0, y: -4, height: 0 }}
+            transition={{ duration: 0.32, ease }}
+            className="overflow-hidden"
+            role="alert"
+            aria-live="polite"
+          >
+            <div
+              className="flex items-start gap-2.5 rounded-2xl px-4 py-3 text-[12.5px] leading-relaxed ring-1"
+              style={{
+                background: "color-mix(in srgb, var(--color-coral) 14%, transparent)",
+                color: "var(--color-coral)",
+                borderColor: "transparent",
+              }}
+            >
+              <AlertCircle className="mt-[2px] h-4 w-4 shrink-0" strokeWidth={2.4} />
+              <span>{mismatch ? "Passwords do not match" : error}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <FieldStagger delay={0.41}>
         <SubmitButton
           status={status}
-          label="Start your route"
+          label="Create account"
           submittingLabel="Creating account…"
           successLabel="Account created"
+          disabled={blockSubmit}
         />
       </FieldStagger>
     </motion.form>
@@ -418,16 +519,26 @@ function FloatingInput({
   label,
   type = "text",
   defaultValue,
+  value,
+  onFocus: externalOnFocus,
+  onBlur: externalOnBlur,
+  onChange: externalOnChange,
   ...rest
 }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   const id = useId();
   const [focused, setFocused] = useState(false);
-  // Seed `hasValue` from the defaultValue so the label floats up immediately
-  // when an email is pre-filled (e.g. after a successful sign-up routes the
-  // user back to the sign-in tab).
-  const seeded = typeof defaultValue === "string" && defaultValue.length > 0;
+  // Seed `hasValue` from defaultValue or (controlled) value so the label
+  // floats immediately when prefilled. For controlled inputs the floated
+  // state then tracks `value` directly so it stays in sync without an
+  // initial render flicker.
+  const controlled = value !== undefined;
+  const seeded =
+    (typeof defaultValue === "string" && defaultValue.length > 0) ||
+    (typeof value === "string" && value.length > 0);
   const [hasValue, setHasValue] = useState(seeded);
-  const floated = focused || hasValue;
+  const floated =
+    focused ||
+    (controlled ? typeof value === "string" && value.length > 0 : hasValue);
 
   return (
     <div className="relative pt-3">
@@ -450,14 +561,23 @@ function FloatingInput({
       <input
         id={id}
         type={type}
-        defaultValue={defaultValue}
-        onFocus={() => setFocused(true)}
+        // React forbids passing both `value` and `defaultValue` — when the
+        // caller controls the field, drop defaultValue.
+        {...(controlled ? { value } : { defaultValue })}
+        onFocus={(e) => {
+          setFocused(true);
+          externalOnFocus?.(e);
+        }}
         onBlur={(e) => {
           setFocused(false);
           setHasValue(e.currentTarget.value.length > 0);
+          externalOnBlur?.(e);
         }}
-        onChange={(e) => setHasValue(e.currentTarget.value.length > 0)}
-        className="block w-full bg-transparent pb-2 pt-1 text-[14px] text-[var(--color-ink-900)] placeholder:text-transparent outline-none"
+        onChange={(e) => {
+          setHasValue(e.currentTarget.value.length > 0);
+          externalOnChange?.(e);
+        }}
+        className="block w-full bg-transparent pb-2 pt-1 text-[14px] text-[var(--color-ink-900)] placeholder:text-transparent outline-none! focus:outline-none! focus-visible:outline-none! focus:[box-shadow:none]! focus-visible:[box-shadow:none]! [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
         {...rest}
       />
       {/* Underline — ink at rest, brand-gradient on focus */}
@@ -548,19 +668,21 @@ function SubmitButton({
   label,
   submittingLabel = "Routing…",
   successLabel = "On the road",
+  disabled = false,
 }: {
   status: Status;
   label: string;
   submittingLabel?: string;
   successLabel?: string;
+  disabled?: boolean;
 }) {
   const submitting = status === "submitting";
   const success = status === "success";
   return (
     <button
       type="submit"
-      disabled={status !== "idle"}
-      className="group relative flex h-12 w-full cursor-pointer items-center justify-center overflow-hidden rounded-full bg-[var(--color-brand-900)] pl-1.5 pr-1.5 text-[14px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_14px_30px_-12px_rgba(14,21,48,0.6)] transition-transform disabled:cursor-default"
+      disabled={status !== "idle" || disabled}
+      className="group relative flex h-12 w-full cursor-pointer items-center justify-center overflow-hidden rounded-full bg-[var(--color-brand-900)] pl-1.5 pr-1.5 text-[14px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_14px_30px_-12px_rgba(14,21,48,0.6)] transition-transform disabled:cursor-not-allowed disabled:opacity-60"
     >
       {/* Sliding sheen on hover */}
       <span

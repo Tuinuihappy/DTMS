@@ -157,15 +157,6 @@ function CompactBrand() {
           </motion.span>
         ))}
       </h1>
-
-      <motion.p
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.55, delay: 0.82, ease }}
-        className="mt-4 max-w-[380px] text-[14px] leading-relaxed text-[var(--color-ink-500)]"
-      >
-        Live fleet activity, dispatch funnels, driver comms — sign in to take the wheel.
-      </motion.p>
     </div>
   );
 }

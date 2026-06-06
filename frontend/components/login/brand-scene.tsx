@@ -198,11 +198,13 @@ export function BrandScene() {
       {/* TEXT + FOOTNOTE — sit on top of the backdrop. */}
       <div className="relative z-10 flex h-full flex-col justify-between px-10 py-12 xl:px-14">
         <div className="max-w-[560px]">
+          {/* mt-12 keeps the badge clear of the absolutely-positioned
+              `Home` pill in the top-left corner (TopBar @ top-5/top-7). */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.2, ease }}
-            className="inline-flex items-center gap-2 rounded-full border border-[var(--color-ink-100)] bg-white/65 px-3 py-1.5 text-[11.5px] font-medium text-[var(--color-ink-600)] backdrop-blur dark:border-white/[0.06] dark:bg-white/[0.05]"
+            className="mt-12 inline-flex items-center gap-2 rounded-full border border-[var(--color-ink-100)] bg-white/65 px-3 py-1.5 text-[11.5px] font-medium text-[var(--color-ink-600)] backdrop-blur dark:border-white/[0.06] dark:bg-white/[0.05]"
           >
             <span className="relative flex h-1.5 w-1.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-success)] opacity-75" />
@@ -224,16 +226,6 @@ export function BrandScene() {
               </motion.span>
             ))}
           </h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.65, delay: 0.85, ease }}
-            className="mt-6 max-w-[440px] text-[15.5px] leading-relaxed text-[var(--color-ink-500)] md:text-[16.5px]"
-          >
-            Live fleet activity, dispatch funnels, driver comms — one calm
-            console for the long haul. Sign in to take the wheel.
-          </motion.p>
         </div>
 
         {/* Footnote — mini trust strip */}
