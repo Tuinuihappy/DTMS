@@ -33,14 +33,26 @@ public class OrderTemplateRepository : IOrderTemplateRepository
         return query.AnyAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<OrderTemplate>> ListAsync(
+    public async Task<(IReadOnlyList<OrderTemplate> Items, long Total)> ListPagedAsync(
+        int page,
+        int size,
         bool includeInactive = false,
         CancellationToken cancellationToken = default)
     {
         var query = _context.OrderTemplates.AsQueryable();
         if (!includeInactive)
             query = query.Where(t => t.IsActive);
-        return await query.OrderBy(t => t.Name).ToListAsync(cancellationToken);
+
+        // LongCount keeps the API safe past 2B rows; running it before the
+        // page slice means total + page slice come from the same snapshot
+        // even if a concurrent insert lands between the two SQL round trips.
+        var total = await query.LongCountAsync(cancellationToken);
+        var items = await query
+            .OrderBy(t => t.Name)
+            .Skip((page - 1) * size)
+            .Take(size)
+            .ToListAsync(cancellationToken);
+        return (items, total);
     }
 
     public Task<OrderTemplate?> FindByRouteAsync(

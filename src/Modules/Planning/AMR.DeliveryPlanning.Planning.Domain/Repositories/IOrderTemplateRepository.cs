@@ -10,7 +10,14 @@ public interface IOrderTemplateRepository
 
     Task<bool> NameExistsAsync(string name, Guid? excludeId = null, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<OrderTemplate>> ListAsync(
+    /// <summary>
+    /// Paged list with total count. Returns the page slice (sorted by Name)
+    /// plus the unfiltered-by-paging total so the caller can compute
+    /// page count for the RIOT3-style envelope.
+    /// </summary>
+    Task<(IReadOnlyList<OrderTemplate> Items, long Total)> ListPagedAsync(
+        int page,
+        int size,
         bool includeInactive = false,
         CancellationToken cancellationToken = default);
 

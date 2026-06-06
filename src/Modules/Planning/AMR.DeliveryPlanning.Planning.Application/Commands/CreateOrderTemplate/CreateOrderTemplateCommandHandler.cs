@@ -1,29 +1,34 @@
+using AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplates;
+using AMR.DeliveryPlanning.Planning.Application.Services;
 using AMR.DeliveryPlanning.Planning.Domain.Entities;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Commands.CreateOrderTemplate;
 
-internal sealed class CreateOrderTemplateCommandHandler : ICommandHandler<CreateOrderTemplateCommand, Guid>
+internal sealed class CreateOrderTemplateCommandHandler : ICommandHandler<CreateOrderTemplateCommand, OrderTemplateDto>
 {
     private readonly IOrderTemplateRepository _repository;
     private readonly IActionTemplateRepository _actionRepository;
+    private readonly ICurrentUserAccessor _currentUser;
 
     public CreateOrderTemplateCommandHandler(
         IOrderTemplateRepository repository,
-        IActionTemplateRepository actionRepository)
+        IActionTemplateRepository actionRepository,
+        ICurrentUserAccessor currentUser)
     {
         _repository = repository;
         _actionRepository = actionRepository;
+        _currentUser = currentUser;
     }
 
-    public async Task<Result<Guid>> Handle(CreateOrderTemplateCommand request, CancellationToken cancellationToken)
+    public async Task<Result<OrderTemplateDto>> Handle(CreateOrderTemplateCommand request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
-            return Result<Guid>.Failure("Name is required.");
+            return Result<OrderTemplateDto>.Failure("Name is required.");
 
         if (await _repository.NameExistsAsync(request.Name, excludeId: null, cancellationToken))
-            return Result<Guid>.Failure($"OrderTemplate with name '{request.Name}' already exists.");
+            return Result<OrderTemplateDto>.Failure($"OrderTemplate with name '{request.Name}' already exists.");
 
         // Validate any ActionTemplate references — fail fast with a friendly
         // 400 instead of letting the dispatcher hit a missing-action error
@@ -35,7 +40,7 @@ internal sealed class CreateOrderTemplateCommandHandler : ICommandHandler<Create
         {
             var found = await _actionRepository.GetByNameAsync(m.ActionTemplateName!, cancellationToken);
             if (found is null)
-                return Result<Guid>.Failure(
+                return Result<OrderTemplateDto>.Failure(
                     $"Mission {m.Sequence}: ActionTemplate '{m.ActionTemplateName}' not found.");
         }
 
@@ -55,16 +60,17 @@ internal sealed class CreateOrderTemplateCommandHandler : ICommandHandler<Create
                 appointQueueWaitArea: request.AppointQueueWaitArea,
                 description: request.Description,
                 pickupStationId: request.PickupStationId,
-                dropStationId: request.DropStationId);
+                dropStationId: request.DropStationId,
+                createdBy: _currentUser.GetCurrentUserName());
         }
         catch (ArgumentException ex)
         {
-            return Result<Guid>.Failure(ex.Message);
+            return Result<OrderTemplateDto>.Failure(ex.Message);
         }
 
         await _repository.AddAsync(template, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
 
-        return Result<Guid>.Success(template.Id);
+        return Result<OrderTemplateDto>.Success(OrderTemplateDtoFactory.From(template));
     }
 }

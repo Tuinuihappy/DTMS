@@ -126,6 +126,8 @@ public class PlanningDbContext : DbContext
             builder.Property(t => t.AppointVehicleGroupName).HasMaxLength(500);
             builder.Property(t => t.AppointQueueWaitArea).HasMaxLength(200);
             builder.Property(t => t.Description).HasMaxLength(500);
+            builder.Property(t => t.CreatedBy).HasMaxLength(100);
+            builder.Property(t => t.ModifiedBy).HasMaxLength(100);
             builder.Property(t => t.IsActive).HasDefaultValue(true).IsRequired();
             builder.HasIndex(t => t.IsActive);
 

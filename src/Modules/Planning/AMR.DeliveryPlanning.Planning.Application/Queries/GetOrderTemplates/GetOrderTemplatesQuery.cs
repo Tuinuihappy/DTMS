@@ -7,7 +7,7 @@ namespace AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplates;
 // Wire shape mirrors RIOT3 POST /order-templates body:
 //   { name, priority, transportOrder { structureType, priority, missions[] },
 //     appointVehicle*, appointQueueWaitArea }
-// plus DTMS metadata at the top level (id, isActive, audit timestamps).
+// plus DTMS metadata at the top level (id, isActive, audit timestamps + user).
 
 public sealed record MissionParameterDto(string Key, object? Value);
 
@@ -41,24 +41,51 @@ public sealed record OrderTemplateDto(
     bool IsActive,
     DateTime CreatedAt,
     DateTime? ModifiedAt,
+    string? CreatedBy,
+    string? ModifiedBy,
     Guid? PickupStationId,
     Guid? DropStationId);
 
-public record GetOrderTemplatesQuery(bool IncludeInactive = false) : IQuery<List<OrderTemplateDto>>;
+// RIOT3-style envelope for the paged list. Field names match the vendor
+// (`current`, `pages`, `size`, `total`, `records`) so a client that knows
+// RIOT3 can read DTMS without remapping.
+public sealed record PagedOrderTemplates(
+    long Current,
+    long Pages,
+    long Size,
+    long Total,
+    IReadOnlyList<OrderTemplateDto> Records);
 
-public class GetOrderTemplatesQueryHandler : IQueryHandler<GetOrderTemplatesQuery, List<OrderTemplateDto>>
+public record GetOrderTemplatesQuery(
+    int Page = 1,
+    int Size = 20,
+    bool IncludeInactive = false) : IQuery<PagedOrderTemplates>;
+
+public class GetOrderTemplatesQueryHandler : IQueryHandler<GetOrderTemplatesQuery, PagedOrderTemplates>
 {
+    private const int MaxPageSize = 200;
+
     private readonly IOrderTemplateRepository _repo;
 
     public GetOrderTemplatesQueryHandler(IOrderTemplateRepository repo) => _repo = repo;
 
-    public async Task<Result<List<OrderTemplateDto>>> Handle(
+    public async Task<Result<PagedOrderTemplates>> Handle(
         GetOrderTemplatesQuery request,
         CancellationToken cancellationToken)
     {
-        var templates = await _repo.ListAsync(request.IncludeInactive, cancellationToken);
-        var dtos = templates.Select(OrderTemplateDtoFactory.From).ToList();
-        return Result<List<OrderTemplateDto>>.Success(dtos);
+        // Clamp so a buggy client (size=0, size=-1, size=99999) can't OOM the
+        // server or send back an empty page that loops forever.
+        var page = request.Page < 1 ? 1 : request.Page;
+        var size = request.Size < 1 ? 20 : Math.Min(request.Size, MaxPageSize);
+
+        var (templates, total) = await _repo.ListPagedAsync(
+            page, size, request.IncludeInactive, cancellationToken);
+
+        var records = templates.Select(OrderTemplateDtoFactory.From).ToList();
+        // Mybatis-Plus convention: ceil(total/size), minimum 1 even when empty.
+        var pages = total == 0 ? 1 : (total + size - 1) / size;
+        return Result<PagedOrderTemplates>.Success(
+            new PagedOrderTemplates(page, pages, size, total, records));
     }
 }
 
@@ -101,6 +128,8 @@ public static class OrderTemplateDtoFactory
             IsActive: t.IsActive,
             CreatedAt: t.CreatedAt,
             ModifiedAt: t.ModifiedAt,
+            CreatedBy: t.CreatedBy,
+            ModifiedBy: t.ModifiedBy,
             PickupStationId: t.PickupStationId,
             DropStationId: t.DropStationId);
     }

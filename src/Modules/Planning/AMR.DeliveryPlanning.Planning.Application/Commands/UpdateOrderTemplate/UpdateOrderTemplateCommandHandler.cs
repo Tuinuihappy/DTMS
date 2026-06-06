@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Planning.Application.Services;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Exceptions;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
@@ -8,13 +9,16 @@ internal sealed class UpdateOrderTemplateCommandHandler : ICommandHandler<Update
 {
     private readonly IOrderTemplateRepository _repository;
     private readonly IActionTemplateRepository _actionRepository;
+    private readonly ICurrentUserAccessor _currentUser;
 
     public UpdateOrderTemplateCommandHandler(
         IOrderTemplateRepository repository,
-        IActionTemplateRepository actionRepository)
+        IActionTemplateRepository actionRepository,
+        ICurrentUserAccessor currentUser)
     {
         _repository = repository;
         _actionRepository = actionRepository;
+        _currentUser = currentUser;
     }
 
     public async Task<Result> Handle(UpdateOrderTemplateCommand request, CancellationToken cancellationToken)
@@ -45,7 +49,8 @@ internal sealed class UpdateOrderTemplateCommandHandler : ICommandHandler<Update
                 appointQueueWaitArea: request.AppointQueueWaitArea,
                 description: request.Description,
                 pickupStationId: request.PickupStationId,
-                dropStationId: request.DropStationId);
+                dropStationId: request.DropStationId,
+                modifiedBy: _currentUser.GetCurrentUserName());
         }
         catch (ArgumentException ex)
         {

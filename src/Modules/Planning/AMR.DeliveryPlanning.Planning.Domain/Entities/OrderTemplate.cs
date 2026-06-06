@@ -36,6 +36,8 @@ public class OrderTemplate : AggregateRoot<Guid>
     public bool IsActive { get; private set; } = true;
     public DateTime CreatedAt { get; private set; }
     public DateTime? ModifiedAt { get; private set; }
+    public string? CreatedBy { get; private set; }
+    public string? ModifiedBy { get; private set; }
 
     // Route fields — used by Planning consumer to lookup a template by
     // (PickupStationId, DropStationId) when a DeliveryOrder is confirmed.
@@ -60,7 +62,8 @@ public class OrderTemplate : AggregateRoot<Guid>
         string? appointQueueWaitArea = null,
         string? description = null,
         Guid? pickupStationId = null,
-        Guid? dropStationId = null)
+        Guid? dropStationId = null,
+        string? createdBy = null)
     {
         Id = Guid.NewGuid();
         SetName(name);
@@ -78,6 +81,7 @@ public class OrderTemplate : AggregateRoot<Guid>
         DropStationId = dropStationId;
         IsActive = true;
         CreatedAt = DateTime.UtcNow;
+        CreatedBy = Normalize(createdBy);
     }
 
     public void Update(
@@ -92,7 +96,8 @@ public class OrderTemplate : AggregateRoot<Guid>
         string? appointQueueWaitArea,
         string? description,
         Guid? pickupStationId = null,
-        Guid? dropStationId = null)
+        Guid? dropStationId = null,
+        string? modifiedBy = null)
     {
         Priority = priority;
         SetStructureType(structureType);
@@ -107,26 +112,30 @@ public class OrderTemplate : AggregateRoot<Guid>
         PickupStationId = pickupStationId;
         DropStationId = dropStationId;
         ModifiedAt = DateTime.UtcNow;
+        ModifiedBy = Normalize(modifiedBy);
     }
 
-    public void Rename(string newName)
+    public void Rename(string newName, string? modifiedBy = null)
     {
         SetName(newName);
         ModifiedAt = DateTime.UtcNow;
+        ModifiedBy = Normalize(modifiedBy);
     }
 
-    public void Activate()
+    public void Activate(string? modifiedBy = null)
     {
         if (IsActive) return;
         IsActive = true;
         ModifiedAt = DateTime.UtcNow;
+        ModifiedBy = Normalize(modifiedBy);
     }
 
-    public void Deactivate()
+    public void Deactivate(string? modifiedBy = null)
     {
         if (!IsActive) return;
         IsActive = false;
         ModifiedAt = DateTime.UtcNow;
+        ModifiedBy = Normalize(modifiedBy);
     }
 
     private void SetName(string name)

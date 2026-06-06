@@ -262,11 +262,16 @@ public static class PlanningEndpoints
         // vehicle binding hints. Missions array can mix RIOT3-style inline
         // ACT missions and DTMS extensions that reference ActionTemplate
         // entries by name (handler validates the names exist).
-        var orderTemplates = app.MapGroup("/api/v1/planning/order-templates")
-            .WithTags("Planning")
+        var orderTemplates = app.MapGroup("/api/v1/order-templates")
+            .WithTags("OrderTemplate")
             .RequireAuthorization();
 
-        // POST — create a new order template
+        // All responses use the same RIOT3 envelope { code, data, message }
+        // as ActionTemplate — clients written against RIOT3 read both
+        // catalog resources the same way.
+
+        // POST — create a new order template. Returns the full created
+        // resource in `data` (matches the RIOT3 echo-back contract).
         orderTemplates.MapPost("/", async (CreateOrderTemplateRequest req, ISender sender) =>
         {
             IReadOnlyList<OrderTemplateMission> missions;
@@ -276,7 +281,7 @@ public static class PlanningEndpoints
             }
             catch (ArgumentException ex)
             {
-                return Results.BadRequest(ex.Message);
+                return RiotEnvelope.BadRequest(ex.Message);
             }
 
             var transport = req.TransportOrder!;
@@ -295,26 +300,40 @@ public static class PlanningEndpoints
                 PickupStationId: req.PickupStationId,
                 DropStationId: req.DropStationId));
             return result.IsSuccess
-                ? Results.Created($"/api/v1/planning/order-templates/{result.Value}", result.Value)
-                : Results.BadRequest(result.Error);
+                ? RiotEnvelope.Created(
+                    $"/api/v1/order-templates/{result.Value!.Id}",
+                    result.Value)
+                : RiotEnvelope.BadRequest(result.Error);
         });
 
-        // GET — list templates
-        orderTemplates.MapGet("/", async (bool? includeInactive, ISender sender) =>
+        // GET — paged list (page/size mirror RIOT3 PageRequest semantics).
+        // Default order is Name asc — the catalog is small enough to sort
+        // client-side after fetch.
+        orderTemplates.MapGet("/", async (
+            int? page, int? size, bool? includeInactive, ISender sender) =>
         {
-            var result = await sender.Send(new GetOrderTemplatesQuery(includeInactive ?? false));
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+            var result = await sender.Send(new GetOrderTemplatesQuery(
+                Page: page ?? 1,
+                Size: size ?? 20,
+                IncludeInactive: includeInactive ?? false));
+            return result.IsSuccess
+                ? RiotEnvelope.Ok(result.Value)
+                : RiotEnvelope.BadRequest(result.Error);
         });
 
         // GET /{id}
         orderTemplates.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new GetOrderTemplateByIdQuery(id));
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
+            return result.IsSuccess
+                ? RiotEnvelope.Ok(result.Value)
+                : RiotEnvelope.NotFound(result.Error);
         });
 
-        // PATCH /{id}
-        orderTemplates.MapMethods("/{id:guid}", ["PATCH"],
+        // PUT /{id} — full resource replacement (body carries every field
+        // the entity exposes). Labelled PATCH originally but the handler
+        // overwrites all fields, so the HTTP method now matches the semantic.
+        orderTemplates.MapPut("/{id:guid}",
             async (Guid id, UpdateOrderTemplateRequest req, ISender sender) =>
             {
                 IReadOnlyList<OrderTemplateMission> missions;
@@ -324,7 +343,7 @@ public static class PlanningEndpoints
                 }
                 catch (ArgumentException ex)
                 {
-                    return Results.BadRequest(ex.Message);
+                    return RiotEnvelope.BadRequest(ex.Message);
                 }
 
                 var transport = req.TransportOrder!;
@@ -342,27 +361,35 @@ public static class PlanningEndpoints
                     Description: req.Description,
                     PickupStationId: req.PickupStationId,
                     DropStationId: req.DropStationId));
-                return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+                return result.IsSuccess
+                    ? RiotEnvelope.Ok<object?>(null)
+                    : RiotEnvelope.BadRequest(result.Error);
             });
 
-        // POST /{id}/activate, /deactivate
+        // POST /{id}/activate, /deactivate — soft enable/disable
         orderTemplates.MapPost("/{id:guid}/activate", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new SetOrderTemplateActiveCommand(id, true));
-            return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+            return result.IsSuccess
+                ? RiotEnvelope.Ok<object?>(null)
+                : RiotEnvelope.BadRequest(result.Error);
         });
 
         orderTemplates.MapPost("/{id:guid}/deactivate", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new SetOrderTemplateActiveCommand(id, false));
-            return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+            return result.IsSuccess
+                ? RiotEnvelope.Ok<object?>(null)
+                : RiotEnvelope.BadRequest(result.Error);
         });
 
         // DELETE /{id}
         orderTemplates.MapDelete("/{id:guid}", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new DeleteOrderTemplateCommand(id));
-            return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+            return result.IsSuccess
+                ? RiotEnvelope.Ok<object?>(null)
+                : RiotEnvelope.BadRequest(result.Error);
         });
 
         // POST /{id}/instantiate — resolve ActionTemplate references against
@@ -382,7 +409,9 @@ public static class PlanningEndpoints
                     AppointQueueWaitAreaOverride: req.AppointQueueWaitArea,
                     UpperKey: req.UpperKey,
                     DryRun: req.DryRun ?? false));
-                return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+                return result.IsSuccess
+                    ? RiotEnvelope.Ok(result.Value)
+                    : RiotEnvelope.BadRequest(result.Error);
             });
     }
 }
