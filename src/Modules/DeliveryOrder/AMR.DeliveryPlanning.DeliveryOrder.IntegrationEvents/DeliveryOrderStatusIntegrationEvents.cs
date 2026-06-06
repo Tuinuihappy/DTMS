@@ -41,3 +41,15 @@ public record DeliveryOrderReleasedIntegrationEventV1(
 public record DeliveryOrderRejectedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
     string SchemaVersion = "1.0") : IIntegrationEvent;
+
+// Option A: 4-state envelope flow visibility. Planning + Planned are
+// internal-only (sub-second transitions, no value to downstream).
+// Dispatched + InProgress have meaningful durations and surface to
+// frontend / dashboards.
+public record DeliveryOrderDispatchedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
+
+public record DeliveryOrderInProgressIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
+    string SchemaVersion = "1.0") : IIntegrationEvent;

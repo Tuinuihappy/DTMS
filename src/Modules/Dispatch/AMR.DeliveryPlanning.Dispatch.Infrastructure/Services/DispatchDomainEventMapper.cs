@@ -11,6 +11,20 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
     {
         return domainEvent switch
         {
+            TripStartedDomainEvent evt =>
+            [
+                new TripStartedIntegrationEvent(
+                    evt.EventId,
+                    evt.OccurredOn,
+                    evt.TripId,
+                    // JobId is no longer part of the envelope flow — kept on
+                    // the integration event for backward compat. Pass the
+                    // VehicleId (or Empty when unknown) so consumers that
+                    // care about robot binding still receive it.
+                    JobId: Guid.Empty,
+                    VehicleId: evt.VehicleId ?? Guid.Empty,
+                    DeliveryOrderId: evt.DeliveryOrderId)
+            ],
             TripCompletedDomainEvent evt =>
             [
                 new TripCompletedIntegrationEvent(

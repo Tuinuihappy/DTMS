@@ -167,6 +167,11 @@ public class Trip : AggregateRoot<Guid>
         Status = TripStatus.InProgress;
         StartedAt = DateTime.UtcNow;
         RecordEvent("VendorStarted", vendorVehicleKey ?? vehicleId?.ToString());
+        // Fires TripStartedIntegrationEvent via the outbox so the
+        // DeliveryOrder side can transition Dispatched → InProgress
+        // (Option A — order-level visibility).
+        AddDomainEvent(new TripStartedDomainEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, vehicleId));
     }
 
     public void MarkVendorCompleted()

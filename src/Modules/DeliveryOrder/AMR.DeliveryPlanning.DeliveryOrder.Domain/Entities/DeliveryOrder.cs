@@ -256,6 +256,9 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         // Already terminal — RecomputeStatusFromItems should be idempotent.
         if (Status is OrderStatus.Completed or OrderStatus.Failed
                    or OrderStatus.PartiallyCompleted) return;
+        // Held — operator paused; don't auto-terminal while held. They must
+        // release first; items may still be transitioning underneath.
+        if (Status is OrderStatus.Held) return;
 
         var total = _items.Count;
         if (total == 0) return;
@@ -331,10 +334,28 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         AddDomainEvent(new DeliveryOrderRejectedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
     }
 
+    // ── In-flight state machine (Option A: 4-state envelope progression) ─
+    //
+    // Planning → Planned → Dispatched → InProgress are forward-only states
+    // entered as the Planning consumer makes progress. Transitions are
+    // idempotent because the RabbitMQ consumer may redeliver, and the
+    // TASK_PROCESSING webhook can race ahead of the dispatch consumer.
+    // We use a rank to express "you can advance but never go back".
+    private static int FlowRank(OrderStatus s) => s switch
+    {
+        OrderStatus.Confirmed   => 1,
+        OrderStatus.Planning    => 2,
+        OrderStatus.Planned     => 3,
+        OrderStatus.Dispatched  => 4,
+        OrderStatus.InProgress  => 5,
+        _                       => -1   // terminal / admin / pre-Confirmed
+    };
+
     public void MarkPlanning()
     {
+        if (FlowRank(Status) >= FlowRank(OrderStatus.Planning)) return;   // idempotent forward-only
         if (Status != OrderStatus.Confirmed)
-            throw new InvalidOperationException("Only Confirmed orders can enter Planning.");
+            throw new InvalidOperationException($"Cannot enter Planning from {Status}.");
 
         Status = OrderStatus.Planning;
         AddDomainEvent(new DeliveryOrderPlanningStartedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
@@ -361,8 +382,9 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     public void MarkPlanned()
     {
-        if (Status != OrderStatus.Planning)
-            throw new InvalidOperationException("Only Planning orders can be marked Planned.");
+        if (FlowRank(Status) >= FlowRank(OrderStatus.Planned)) return;
+        if (Status is not (OrderStatus.Planning or OrderStatus.Confirmed))
+            throw new InvalidOperationException($"Cannot mark Planned from {Status}.");
 
         Status = OrderStatus.Planned;
         AddDomainEvent(new DeliveryOrderPlannedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
@@ -370,17 +392,25 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     public void MarkDispatched()
     {
-        if (Status != OrderStatus.Planned)
-            throw new InvalidOperationException("Only Planned orders can be dispatched.");
+        if (FlowRank(Status) >= FlowRank(OrderStatus.Dispatched)) return;
+        if (FlowRank(Status) < FlowRank(OrderStatus.Confirmed))
+            throw new InvalidOperationException($"Cannot mark Dispatched from {Status}.");
 
         Status = OrderStatus.Dispatched;
         AddDomainEvent(new DeliveryOrderDispatchedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
-    public void MarkInProgress()
+    /// <summary>
+    /// Idempotent forward-only transition triggered by the first
+    /// TripStarted webhook. Accepts any in-flight state — including
+    /// Confirmed (e.g. after Reopen+retry, the order skips Dispatched).
+    /// </summary>
+    public void MarkInProgressIfNotYet()
     {
-        if (Status != OrderStatus.Dispatched)
-            throw new InvalidOperationException("Only Dispatched orders can be in progress.");
+        if (FlowRank(Status) >= FlowRank(OrderStatus.InProgress)) return;
+        if (FlowRank(Status) < FlowRank(OrderStatus.Confirmed))
+            // Terminal / admin / pre-Confirmed — don't auto-transition out.
+            return;
 
         Status = OrderStatus.InProgress;
         AddDomainEvent(new DeliveryOrderInProgressDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
@@ -436,11 +466,44 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     public void Cancel(string reason)
     {
         if (Status == OrderStatus.Cancelled) return;
-        if (Status is OrderStatus.Completed or OrderStatus.PartiallyCompleted or OrderStatus.InProgress)
+        // Cancel during InProgress IS now allowed — the OrderCancelledCascadeConsumer
+        // propagates the cancel to all in-flight trips, which in turn calls the
+        // vendor's cancel API. Only true terminal / settled states are forbidden.
+        if (Status is OrderStatus.Completed or OrderStatus.PartiallyCompleted
+                    or OrderStatus.Rejected)
             throw new InvalidOperationException($"Cannot cancel an order in {Status} status.");
 
         Status = OrderStatus.Cancelled;
         AddDomainEvent(new DeliveryOrderCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+    }
+
+    /// <summary>
+    /// Mark every item of a (pickup, drop) station-pair group as Failed
+    /// after the dispatcher couldn't place a vendor order for that group.
+    /// Used by the Planning consumer when one group fails but others
+    /// succeeded — keeps the failed group's items from blocking the
+    /// order's eventual transition to terminal.
+    /// </summary>
+    public int MarkGroupItemsAsDispatchFailed(Guid pickupStationId, Guid dropStationId, string reason)
+    {
+        var changed = 0;
+        foreach (var item in _items)
+        {
+            if (item.PickupStationId != pickupStationId || item.DropStationId != dropStationId)
+                continue;
+            // Don't override items the operator already finalised or items
+            // that successfully bound to a Trip (different attempt etc.).
+            if (item.Status is ItemStatus.Pending && item.TripId is null)
+            {
+                item.UpdateStatus(ItemStatus.Failed);
+                changed++;
+            }
+        }
+        if (changed > 0)
+            AddDomainEvent(new TripItemsFailedDomainEvent(
+                Guid.NewGuid(), DateTime.UtcNow, Id, Guid.Empty, changed,
+                $"Group ({pickupStationId}→{dropStationId}) dispatch failed: {reason}"));
+        return changed;
     }
 
     // Envelope-flow completion: vendor (RIOT3) reported the order finished.

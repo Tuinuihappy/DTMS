@@ -565,6 +565,9 @@ internal sealed class FakeTripRepository : ITripRepository
     public Task<List<Trip>> GetInFlightEnvelopeTripsAsync(DateTime staleCutoffUtc, CancellationToken ct = default)
         => Task.FromResult(new List<Trip>());
 
+    public Task<List<Trip>> GetByDeliveryOrderIdAsync(Guid deliveryOrderId, CancellationToken ct = default)
+        => Task.FromResult(deliveryOrderId == _trip.DeliveryOrderId ? new List<Trip> { _trip } : new List<Trip>());
+
     public Task AddAsync(Trip trip, CancellationToken ct = default) => Task.CompletedTask;
 
     public Task UpdateAsync(Trip trip, CancellationToken ct = default)

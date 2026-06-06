@@ -2,7 +2,7 @@ using AMR.DeliveryPlanning.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.Dispatch.Domain.Events;
 
-public record TripStartedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid? VehicleId) : IDomainEvent;
+public record TripStartedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId, Guid? VehicleId) : IDomainEvent;
 
 // VendorUpperKey is the composite envelope correlation key
 // (see EnvelopeUpperKey) that RIOT3 echoes back on every webhook.

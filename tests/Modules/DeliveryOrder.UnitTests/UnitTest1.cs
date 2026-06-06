@@ -944,7 +944,7 @@ public class DeliveryOrderTests
         order.MarkPlanning();
         order.MarkPlanned();
         order.MarkDispatched();
-        order.MarkInProgress();
+        order.MarkInProgressIfNotYet();
         return order;
     }
 
@@ -1162,6 +1162,228 @@ public class DeliveryOrderTests
         var act = () => order.Reopen("reopen cancelled order");
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*Only Failed*");
+    }
+
+    // ── Option A: 4-state envelope flow transitions ─────────────────────
+
+    private static AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder ConfirmedOrder(string orderRef = "ENV-A")
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            orderRef, Priority.Normal, serviceWindow: null);
+        AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-A", "Pack-1"));
+        order.Confirm(weightFallbackKg: 5);
+        return order;
+    }
+
+    [Fact]
+    public void FullProgression_Confirmed_To_InProgress_WalksAllStates()
+    {
+        var order = ConfirmedOrder();
+
+        order.MarkPlanning();    order.Status.Should().Be(OrderStatus.Planning);
+        order.MarkPlanned();     order.Status.Should().Be(OrderStatus.Planned);
+        order.MarkDispatched();  order.Status.Should().Be(OrderStatus.Dispatched);
+        order.MarkInProgressIfNotYet();
+                                  order.Status.Should().Be(OrderStatus.InProgress);
+
+        order.DomainEvents.OfType<DeliveryOrderPlanningStartedDomainEvent>().Should().ContainSingle();
+        order.DomainEvents.OfType<DeliveryOrderPlannedDomainEvent>().Should().ContainSingle();
+        order.DomainEvents.OfType<DeliveryOrderDispatchedDomainEvent>().Should().ContainSingle();
+        order.DomainEvents.OfType<DeliveryOrderInProgressDomainEvent>().Should().ContainSingle();
+    }
+
+    [Fact]
+    public void MarkPlanning_IsIdempotent_RedeliveredEventIsNoOp()
+    {
+        var order = ConfirmedOrder();
+        order.MarkPlanning();
+        var firstEventCount = order.DomainEvents.OfType<DeliveryOrderPlanningStartedDomainEvent>().Count();
+
+        order.MarkPlanning();   // redelivered
+
+        order.Status.Should().Be(OrderStatus.Planning);
+        order.DomainEvents.OfType<DeliveryOrderPlanningStartedDomainEvent>()
+             .Count().Should().Be(firstEventCount);   // no extra event
+    }
+
+    [Fact]
+    public void MarkInProgressIfNotYet_FromConfirmed_SkipsIntermediates()
+    {
+        // Race / Reopen-retry path: webhook fires before MarkDispatched
+        // OR after Reopen + retry, the order is at Confirmed when the
+        // first TASK_PROCESSING arrives. Should still transition cleanly.
+        var order = ConfirmedOrder();
+
+        order.MarkInProgressIfNotYet();
+
+        order.Status.Should().Be(OrderStatus.InProgress);
+    }
+
+    [Fact]
+    public void MarkDispatched_OnceInProgress_IsNoOp()
+    {
+        // Race: webhook → MarkInProgressIfNotYet (Confirmed → InProgress)
+        // arrives before consumer's MarkDispatched. Rank prevents regress.
+        var order = ConfirmedOrder();
+        order.MarkInProgressIfNotYet();
+
+        order.MarkDispatched();   // late arrival
+
+        order.Status.Should().Be(OrderStatus.InProgress);   // unchanged
+    }
+
+    [Fact]
+    public void MarkInProgressIfNotYet_FromTerminal_DoesNothing()
+    {
+        // After RecomputeStatusFromItems lands Order=Completed, a stray
+        // TripStarted webhook shouldn't drag it back to InProgress.
+        var order = ConfirmedOrder();
+        order.MarkPlanning(); order.MarkPlanned(); order.MarkDispatched();
+        order.MarkInProgressIfNotYet();
+        // Simulate Completed
+        var tripId = Guid.NewGuid();
+        var pickup = order.Items.First().PickupStationId!.Value;
+        var drop   = order.Items.First().DropStationId!.Value;
+        order.AssignItemsToTrip(tripId, 1, pickup, drop);
+        order.MarkTripItemsDelivered(tripId);
+        order.RecomputeStatusFromItems();
+        order.Status.Should().Be(OrderStatus.Completed);
+
+        order.MarkInProgressIfNotYet();   // stray late webhook
+
+        order.Status.Should().Be(OrderStatus.Completed);   // unchanged
+    }
+
+    [Fact]
+    public void Cancel_FromInProgress_IsNowAllowed()
+    {
+        // Pre-Option-A: Cancel from InProgress threw. With Cancel cascade
+        // in place, the operator can stop a running order — cascade will
+        // propagate to trips.
+        var order = ConfirmedOrder();
+        order.MarkPlanning(); order.MarkPlanned(); order.MarkDispatched();
+        order.MarkInProgressIfNotYet();
+
+        order.Cancel("admin override");
+
+        order.Status.Should().Be(OrderStatus.Cancelled);
+        order.DomainEvents.OfType<DeliveryOrderCancelledDomainEvent>().Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Cancel_FromDispatched_IsAllowed()
+    {
+        var order = ConfirmedOrder();
+        order.MarkPlanning(); order.MarkPlanned(); order.MarkDispatched();
+
+        order.Cancel("operator change of plans");
+
+        order.Status.Should().Be(OrderStatus.Cancelled);
+    }
+
+    [Fact]
+    public void Cancel_FromCompleted_StillBlocked()
+    {
+        var order = ConfirmedOrder();
+        order.MarkPlanning(); order.MarkPlanned(); order.MarkDispatched();
+        order.MarkInProgressIfNotYet();
+        var tripId = Guid.NewGuid();
+        order.AssignItemsToTrip(tripId, 1,
+            order.Items.First().PickupStationId!.Value,
+            order.Items.First().DropStationId!.Value);
+        order.MarkTripItemsDelivered(tripId);
+        order.RecomputeStatusFromItems();
+        order.Status.Should().Be(OrderStatus.Completed);
+
+        var act = () => order.Cancel("too late");
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void MarkGroupItemsAsDispatchFailed_MarksOnlyMatchingPair()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "MG-FAIL", Priority.Normal, serviceWindow: null);
+        AddTestItem(order, itemSeq: 1, "WH-A", "DOCK-1", "SKU-A1");
+        AddTestItem(order, itemSeq: 2, "WH-A", "DOCK-1", "SKU-A2");
+        AddTestItem(order, itemSeq: 3, "WH-B", "DOCK-2", "SKU-B1");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-A", "DOCK-1", "WH-B", "DOCK-2"));
+        order.Confirm(weightFallbackKg: 5);
+        var groupA = (order.Items.First(i => i.PickupLocationCode == "WH-A").PickupStationId!.Value,
+                      order.Items.First(i => i.PickupLocationCode == "WH-A").DropStationId!.Value);
+
+        var marked = order.MarkGroupItemsAsDispatchFailed(groupA.Item1, groupA.Item2, "vendor 503");
+
+        marked.Should().Be(2);
+        order.Items.Count(i => i.Status == ItemStatus.Failed).Should().Be(2);
+        order.Items.Single(i => i.PickupLocationCode == "WH-B").Status
+             .Should().Be(ItemStatus.Pending);   // other group untouched
+    }
+
+    [Fact]
+    public void PartialDispatchFailure_LeadsToPartiallyCompleted_AfterOtherTripSucceeds()
+    {
+        // Multi-group: group A vendor fails at dispatch, group B succeeds.
+        // After B's items deliver, Order = PartiallyCompleted.
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "MG-PARTIAL", Priority.Normal, serviceWindow: null);
+        AddTestItem(order, itemSeq: 1, "WH-A", "DOCK-1", "SKU-A");
+        AddTestItem(order, itemSeq: 2, "WH-B", "DOCK-2", "SKU-B");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-A", "DOCK-1", "WH-B", "DOCK-2"));
+        order.Confirm(weightFallbackKg: 5);
+        var groupA = (order.Items.First(i => i.PickupLocationCode == "WH-A").PickupStationId!.Value,
+                      order.Items.First(i => i.PickupLocationCode == "WH-A").DropStationId!.Value);
+        var groupB = (order.Items.First(i => i.PickupLocationCode == "WH-B").PickupStationId!.Value,
+                      order.Items.First(i => i.PickupLocationCode == "WH-B").DropStationId!.Value);
+
+        // Consumer flow: Planning → Planned → fail group A → succeed group B → Dispatched
+        order.MarkPlanning();
+        order.MarkPlanned();
+        order.MarkGroupItemsAsDispatchFailed(groupA.Item1, groupA.Item2, "vendor 503");
+        var tripB = Guid.NewGuid();
+        order.AssignItemsToTrip(tripB, 1, groupB.Item1, groupB.Item2);
+        order.MarkDispatched();
+
+        // Trip B finishes
+        order.MarkInProgressIfNotYet();
+        order.MarkTripItemsDelivered(tripB);
+        order.RecomputeStatusFromItems();
+
+        order.Status.Should().Be(OrderStatus.PartiallyCompleted);
+        order.Items.Count(i => i.Status == ItemStatus.Delivered).Should().Be(1);
+        order.Items.Count(i => i.Status == ItemStatus.Failed).Should().Be(1);
+    }
+
+    [Fact]
+    public void AllDispatchesFail_OrderTransitionsToFailed()
+    {
+        // Both groups fail at the vendor → both groups' items → Failed.
+        // RecomputeStatusFromItems then transitions Order = Failed.
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "MG-ALLFAIL", Priority.Normal, serviceWindow: null);
+        AddTestItem(order, itemSeq: 1, "WH-A", "DOCK-1", "SKU-A");
+        AddTestItem(order, itemSeq: 2, "WH-B", "DOCK-2", "SKU-B");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-A", "DOCK-1", "WH-B", "DOCK-2"));
+        order.Confirm(weightFallbackKg: 5);
+        var groupA = (order.Items.First(i => i.PickupLocationCode == "WH-A").PickupStationId!.Value,
+                      order.Items.First(i => i.PickupLocationCode == "WH-A").DropStationId!.Value);
+        var groupB = (order.Items.First(i => i.PickupLocationCode == "WH-B").PickupStationId!.Value,
+                      order.Items.First(i => i.PickupLocationCode == "WH-B").DropStationId!.Value);
+
+        order.MarkPlanning();
+        order.MarkPlanned();
+        order.MarkGroupItemsAsDispatchFailed(groupA.Item1, groupA.Item2, "vendor 503");
+        order.MarkGroupItemsAsDispatchFailed(groupB.Item1, groupB.Item2, "vendor 503");
+        // No MarkDispatched — successCount = 0
+        order.RecomputeStatusFromItems();
+
+        order.Status.Should().Be(OrderStatus.Failed);
     }
 
     // ── Trip-aware item lifecycle (Option D — multi-group completion) ──

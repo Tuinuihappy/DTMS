@@ -63,10 +63,20 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             DeliveryOrderDraftUpdatedDomainEvent     => [],
             DeliveryOrderSubmittedDomainEvent        => [],
             DeliveryOrderValidatedDomainEvent        => [],
+            // Option A: Planning + Planned are sub-second transitions —
+            // surface in audit but don't broadcast to other modules.
             DeliveryOrderPlanningStartedDomainEvent  => [],
             DeliveryOrderPlannedDomainEvent          => [],
-            DeliveryOrderDispatchedDomainEvent       => [],
-            DeliveryOrderInProgressDomainEvent       => [],
+            // Dispatched + InProgress have meaningful durations and are
+            // useful to frontend / dashboards — publish via outbox.
+            DeliveryOrderDispatchedDomainEvent evt =>
+            [
+                new DeliveryOrderDispatchedIntegrationEventV1(evt.EventId, evt.OccurredOn, evt.OrderId)
+            ],
+            DeliveryOrderInProgressDomainEvent evt =>
+            [
+                new DeliveryOrderInProgressIntegrationEventV1(evt.EventId, evt.OccurredOn, evt.OrderId)
+            ],
             // Reopen is an admin action that brings Failed → Confirmed for
             // retry. We intentionally do NOT re-fire DeliveryOrderConfirmed
             // here — the operator must explicitly call /trips/{id}/retry

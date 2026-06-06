@@ -22,6 +22,14 @@ public interface ITripRepository
     /// poller stops chasing them and ops takes over.
     /// </summary>
     Task<List<Trip>> GetInFlightEnvelopeTripsAsync(DateTime staleCutoffUtc, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists every Trip belonging to a DeliveryOrder, regardless of
+    /// status. Used by the cancel-cascade flow to find which trips to
+    /// stop on the vendor side.
+    /// </summary>
+    Task<List<Trip>> GetByDeliveryOrderIdAsync(Guid deliveryOrderId, CancellationToken cancellationToken = default);
+
     Task AddAsync(Trip trip, CancellationToken cancellationToken = default);
     Task UpdateAsync(Trip trip, CancellationToken cancellationToken = default);
 }

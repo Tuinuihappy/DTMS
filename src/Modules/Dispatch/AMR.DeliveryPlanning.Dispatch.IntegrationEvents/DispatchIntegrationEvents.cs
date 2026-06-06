@@ -3,7 +3,8 @@ using AMR.DeliveryPlanning.SharedKernel.Domain;
 namespace AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
 
 public record TripStartedIntegrationEvent(
-    Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid VehicleId) : IIntegrationEvent;
+    Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid VehicleId,
+    Guid DeliveryOrderId) : IIntegrationEvent;
 
 // VendorUpperKey is the composite envelope correlation key
 // (see EnvelopeUpperKey) that RIOT3 echoes back on every webhook.

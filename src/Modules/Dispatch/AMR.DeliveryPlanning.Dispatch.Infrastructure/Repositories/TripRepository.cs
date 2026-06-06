@@ -56,6 +56,14 @@ public class TripRepository : ITripRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<List<Trip>> GetByDeliveryOrderIdAsync(Guid deliveryOrderId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Trips
+            .IgnoreQueryFilters()
+            .Where(t => t.DeliveryOrderId == deliveryOrderId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Trip trip, CancellationToken cancellationToken = default)
     {
         await _context.Trips.AddAsync(trip, cancellationToken);
