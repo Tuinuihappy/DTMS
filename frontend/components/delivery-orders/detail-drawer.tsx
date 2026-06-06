@@ -402,7 +402,14 @@ export function OrderDetailDrawer({
                       Confirm
                     </DrawerActionButton>
                   )}
-                  {can(data.orderStatus, ["Draft", "Submitted", "Validated"]) && (
+                  {/* Cancel mirrors the backend guard: any non-terminal,
+                      non-already-cancelled state. For in-flight states
+                      (Dispatched / InProgress), the cancel cascades to
+                      stop running trips at the vendor. For Failed, the
+                      operator's choice is Cancel (terminal) vs Reopen
+                      (recover and retry). */}
+                  {!["Completed", "PartiallyCompleted", "Cancelled", "Rejected"]
+                    .includes(data.orderStatus) && (
                     <DrawerActionButton
                       tone="coral"
                       icon={<Trash2 className="h-3.5 w-3.5" strokeWidth={2.4} />}
