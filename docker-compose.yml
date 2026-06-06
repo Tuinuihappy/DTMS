@@ -74,6 +74,10 @@ services:
       - RabbitMq__Password=guest
       - Auth__Disable=true
       - Auth__DevTenantId=00000000-0000-0000-0000-000000000001
+      # Override rate limiter for load testing — defaults to 100 req/min/IP
+      - RateLimit__PermitLimit=${RateLimit__PermitLimit:-100}
+      - RateLimit__WindowSeconds=${RateLimit__WindowSeconds:-60}
+      - RateLimit__QueueLimit=${RateLimit__QueueLimit:-5}
       - VendorAdapter__Riot3__BaseUrl=http://10.204.212.28:12000
       - VendorAdapter__Riot3__ApiKey=${VendorAdapter__Riot3__ApiKey:-}
       - Dispatch__UseOrderTemplateDispatch=${Dispatch__UseOrderTemplateDispatch:-false}

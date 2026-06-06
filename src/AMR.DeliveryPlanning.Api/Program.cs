@@ -189,7 +189,12 @@ builder.Services.AddHealthChecks()
         }
     }, tags: ["vendors"]);
 
-// Rate limiting — fixed window, 100 req/min, applied globally
+// Rate limiting — fixed window per remote IP. Defaults to 100 req/min; override
+// via RateLimit__PermitLimit / RateLimit__WindowSeconds / RateLimit__QueueLimit
+// for load tests (e.g. PermitLimit=100000, WindowSeconds=1).
+var rlPermitLimit = builder.Configuration.GetValue<int?>("RateLimit:PermitLimit") ?? 100;
+var rlWindowSeconds = builder.Configuration.GetValue<int?>("RateLimit:WindowSeconds") ?? 60;
+var rlQueueLimit = builder.Configuration.GetValue<int?>("RateLimit:QueueLimit") ?? 5;
 builder.Services.AddRateLimiter(options =>
 {
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
@@ -197,10 +202,10 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 100,
-                Window = TimeSpan.FromMinutes(1),
+                PermitLimit = rlPermitLimit,
+                Window = TimeSpan.FromSeconds(rlWindowSeconds),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 5
+                QueueLimit = rlQueueLimit
             }));
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
