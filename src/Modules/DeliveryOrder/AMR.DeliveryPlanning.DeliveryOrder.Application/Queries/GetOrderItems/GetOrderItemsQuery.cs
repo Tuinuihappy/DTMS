@@ -38,7 +38,9 @@ public class GetOrderItemsQueryHandler : IQueryHandler<GetOrderItemsQuery, IRead
                 p.Hazmat is { } hz ? new HazmatDto(hz.ClassCode, hz.PackingGroup) : null,
                 p.Temperature is { } tr ? new TemperatureRangeDto(tr.MinC, tr.MaxC) : null,
                 p.HandlingInstructions,
-                p.Status
+                p.Status,
+                p.TripId,
+                p.AttemptNumber
             ))
             .ToList();
 

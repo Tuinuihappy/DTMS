@@ -33,7 +33,9 @@ public record ItemDto(
     HazmatDto? Hazmat,
     TemperatureRangeDto? Temperature,
     IReadOnlyList<HandlingInstruction> HandlingInstructions,
-    ItemStatus Status);
+    ItemStatus Status,
+    Guid? TripId,
+    int? AttemptNumber);
 
 public record DeliveryOrderListDto(
     Guid Id,
@@ -263,6 +265,8 @@ internal static class DeliveryOrderMapper
                 p.Hazmat is { } hz ? new HazmatDto(hz.ClassCode, hz.PackingGroup) : null,
                 p.Temperature is { } tr ? new TemperatureRangeDto(tr.MinC, tr.MaxC) : null,
                 p.HandlingInstructions,
-                p.Status
+                p.Status,
+                p.TripId,
+                p.AttemptNumber
             )).ToList());
 }

@@ -25,6 +25,11 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     VehicleId: evt.VehicleId ?? Guid.Empty,
                     DeliveryOrderId: evt.DeliveryOrderId)
             ],
+            TripPickupCompletedDomainEvent evt =>
+            [
+                new TripPickupCompletedIntegrationEvent(
+                    evt.EventId, evt.OccurredOn, evt.TripId, evt.DeliveryOrderId)
+            ],
             TripCompletedDomainEvent evt =>
             [
                 new TripCompletedIntegrationEvent(

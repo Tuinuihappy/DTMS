@@ -204,6 +204,29 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     }
 
     /// <summary>
+    /// Mark every Pending item bound to a Trip as Picked (vendor reports
+    /// the robot finished its pickup action). Idempotent. Items already
+    /// Picked, Delivered, or in a terminal failure state are untouched.
+    /// </summary>
+    public int MarkTripItemsPicked(Guid tripId)
+    {
+        if (Status is OrderStatus.Cancelled or OrderStatus.Rejected) return 0;
+
+        var changed = 0;
+        foreach (var item in _items)
+        {
+            if (item.TripId != tripId) continue;
+            if (item.Status is not ItemStatus.Pending) continue;
+            item.MarkPicked();
+            changed++;
+        }
+        if (changed > 0)
+            AddDomainEvent(new TripItemsPickedDomainEvent(
+                Guid.NewGuid(), DateTime.UtcNow, Id, tripId, changed));
+        return changed;
+    }
+
+    /// <summary>
     /// Mark every item bound to a Trip as Failed. Picked items stay Picked
     /// (operator may resolve them manually); only in-flight items
     /// transition. Already-Delivered items are untouched.

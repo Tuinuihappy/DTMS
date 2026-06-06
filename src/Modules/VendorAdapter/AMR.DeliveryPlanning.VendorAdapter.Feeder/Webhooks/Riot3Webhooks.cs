@@ -32,6 +32,7 @@ public static class Riot3Webhooks
             IVehicleIdentityResolver vehicleIdentityResolver,
             ITripRepository tripRepository,
             ITripMissionEventRepository missionEventRepository,
+            AMR.DeliveryPlanning.Facility.Application.Services.IFacilityReadService facilityReadService,
             ILogger<Riot3NotifyPayload> logger,
             CancellationToken cancellationToken) =>
         {
@@ -45,7 +46,7 @@ public static class Riot3Webhooks
                     break;
 
                 case "subtask":
-                    await HandleSubTaskEvent(payload, tripRepository, missionEventRepository, logger, cancellationToken);
+                    await HandleSubTaskEvent(payload, tripRepository, missionEventRepository, facilityReadService, logger, cancellationToken);
                     break;
 
                 case "vehicle":
@@ -256,6 +257,7 @@ public static class Riot3Webhooks
         Riot3NotifyPayload payload,
         ITripRepository tripRepository,
         ITripMissionEventRepository missionEventRepository,
+        AMR.DeliveryPlanning.Facility.Application.Services.IFacilityReadService facilityReadService,
         ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -333,6 +335,34 @@ public static class Riot3Webhooks
         else
             logger.LogDebug("[SubTaskWebhook] Trip {TripId} mission {MissionKey} {State} — duplicate, skipped",
                 trip.Id, subTaskKey, state);
+
+        // ── Item-Picked detection ──────────────────────────────────────
+        // Once an ACT (pickup/drop action) finishes at the trip's pickup
+        // station, the robot has physically loaded the items — flip them
+        // Pending → Picked via the dispatch outbox so the DeliveryOrder
+        // side picks it up. Ignored when:
+        //   • state != FINISHED         (only completion counts)
+        //   • mission type != ACT       (MOVE arrivals don't mean loaded)
+        //   • trip has no PickupStation (pre-Gap-3 trip — degrade silently)
+        //   • station code can't resolve to the trip's pickup station
+        // Mission storage above is unconditional so the operator timeline
+        // is complete; this hook is layered on top.
+        if (state == "FINISHED" && inserted && trip.PickupStationId is Guid pickupId)
+        {
+            var missionType = string.IsNullOrWhiteSpace(subTask.SubTaskType) ? "" : subTask.SubTaskType.ToUpperInvariant();
+            if (missionType == "ACT" && !string.IsNullOrWhiteSpace(stationName))
+            {
+                var resolvedId = await facilityReadService.ResolveStationByCodeAsync(stationName, cancellationToken);
+                if (resolvedId == pickupId)
+                {
+                    trip.MarkVendorPickedUp();
+                    await tripRepository.UpdateAsync(trip, cancellationToken);
+                    logger.LogInformation(
+                        "[SubTaskWebhook] Trip {TripId} pickup completed at {Station} — items will be marked Picked",
+                        trip.Id, stationName);
+                }
+            }
+        }
     }
 
     private static DateTime? ParseRiot3Time(string? value)

@@ -1439,6 +1439,98 @@ public class DeliveryOrderTests
         order.Items.Single(i => i.TripId == tripB).Status.Should().Be(ItemStatus.Pending);
     }
 
+    // ── Picked status (vendor robot finished pickup action) ────────────
+
+    [Fact]
+    public void MarkTripItemsPicked_TransitionsPendingToPicked()
+    {
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+
+        var changed = order.MarkTripItemsPicked(tripA);
+
+        changed.Should().Be(2);
+        order.Items.Where(i => i.TripId == tripA)
+            .Should().OnlyContain(i => i.Status == ItemStatus.Picked);
+    }
+
+    [Fact]
+    public void MarkTripItemsPicked_IsIdempotent()
+    {
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+
+        order.MarkTripItemsPicked(tripA);
+        var secondCall = order.MarkTripItemsPicked(tripA);
+
+        secondCall.Should().Be(0);   // no-op on already-Picked items
+    }
+
+    [Fact]
+    public void MarkTripItemsPicked_DoesNotAffectOtherGroup()
+    {
+        var (order, groupA, groupB) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        var tripB = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.AssignItemsToTrip(tripB, 1, groupB.Pickup, groupB.Drop);
+
+        order.MarkTripItemsPicked(tripA);
+
+        order.Items.Single(i => i.TripId == tripB).Status.Should().Be(ItemStatus.Pending);
+    }
+
+    [Fact]
+    public void Picked_ThenTaskFinished_TransitionsToDelivered()
+    {
+        // Real-world flow: SUB_TASK_FINISHED at pickup → items Picked.
+        // Then TASK_FINISHED → items Delivered. The delivered sweep must
+        // override the in-transit Picked status.
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+
+        order.MarkTripItemsDelivered(tripA);
+
+        order.Items.Where(i => i.TripId == tripA)
+            .Should().OnlyContain(i => i.Status == ItemStatus.Delivered);
+    }
+
+    [Fact]
+    public void Picked_ThenTripCancelled_ResetsItemsToPending()
+    {
+        // Cancel cascade after pickup: the robot was carrying items but
+        // the trip got killed. The item is no longer "in transit" — it's
+        // back to Pending so the operator can rebind via retry.
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+
+        order.UnassignItemsFromTrip(tripA);
+
+        order.Items.Where(i => i.Status != ItemStatus.Delivered)
+            .Should().OnlyContain(i => i.Status == ItemStatus.Pending);
+    }
+
+    [Fact]
+    public void RecomputeStatusFromItems_PickedCountsAsInFlight_WaitsForCompletion()
+    {
+        // Single-group order with items Picked (in transit) should
+        // remain in-flight, not prematurely terminate the order.
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+
+        order.RecomputeStatusFromItems();
+
+        order.Status.Should().Be(OrderStatus.Confirmed);   // unchanged
+    }
+
     [Fact]
     public void RecomputeStatusFromItems_WaitsWhileOtherTripsInFlight()
     {

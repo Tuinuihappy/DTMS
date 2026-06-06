@@ -100,10 +100,28 @@ public class Item : Entity<Guid>
 
     /// <summary>Remove the trip binding so the item is discoverable as
     /// "awaiting dispatch" again. Used when an envelope is cancelled and
-    /// the order is still live (operator may retry).</summary>
+    /// the order is still live (operator may retry). If the item had
+    /// already been Picked, reset it to Pending — the cancel cascade
+    /// means the item never actually reached the drop station, so the
+    /// in-transit status no longer reflects reality.</summary>
     internal void UnassignFromTrip()
     {
         TripId = null;
         AttemptNumber = null;
+        if (Status is ItemStatus.Picked) Status = ItemStatus.Pending;
+    }
+
+    /// <summary>Transition Pending → Picked when the vendor reports the
+    /// robot finished its pickup action at the trip's pickup station.
+    /// Idempotent against duplicate webhooks (Picked → Picked = no-op).
+    /// Strictly forward-only: refuses to back-step from Delivered or
+    /// any terminal failure state.</summary>
+    internal void MarkPicked()
+    {
+        if (Status is ItemStatus.Picked) return;
+        if (Status is not ItemStatus.Pending)
+            throw new InvalidOperationException(
+                $"Cannot mark item Picked from {Status}.");
+        Status = ItemStatus.Picked;
     }
 }

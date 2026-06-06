@@ -22,6 +22,7 @@ import {
   getOrder,
   getOrderTimeline,
   type DeliveryOrderDetailDto,
+  type ItemStatus,
   type TimelineEntryDto,
 } from "@/lib/api/delivery-orders";
 import { getTripsByOrder, type TripSummaryDto } from "@/lib/api/trips";
@@ -325,13 +326,19 @@ export function OrderDetailDrawer({
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-mono text-[11px] font-bold text-[var(--color-ink-400)]">
                                   #{it.itemSeq.toString().padStart(2, "0")}
                                 </span>
                                 <span className="font-mono text-[12.5px] font-semibold text-[var(--color-ink-900)] truncate">
                                   {it.itemId}
                                 </span>
+                                <ItemStatusBadge status={it.status} />
+                                {it.attemptNumber && it.attemptNumber > 1 && (
+                                  <span className="rounded bg-[var(--color-pastel-lavender)] px-1.5 py-[2px] text-[9.5px] font-bold uppercase tracking-[0.06em] text-[var(--color-pastel-lavender-ink)]">
+                                    attempt {it.attemptNumber}
+                                  </span>
+                                )}
                               </div>
                               {it.description && (
                                 <p className="mt-0.5 text-[12px] text-[var(--color-ink-500)] truncate">
@@ -624,3 +631,62 @@ function DrawerActionButton({
     </motion.button>
   );
 }
+
+// ── Item status badge ──────────────────────────────────────────────────
+// Reflects the per-item lifecycle (Gap 5 + Picked addition):
+//   Pending   = awaiting / in vendor queue
+//   Picked    = robot finished pickup action, items in transit
+//   Delivered = terminal success
+//   Failed    = terminal failure (recoverable via Retry/Reopen)
+//   Returned / Cancelled = reserved for non-envelope flows
+function ItemStatusBadge({ status }: { status: ItemStatus }) {
+  const visual = STATUS_VISUAL[status] ?? STATUS_VISUAL.Pending;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-md px-1.5 py-[2px] text-[9.5px] font-bold uppercase tracking-[0.06em]",
+        visual.className,
+      )}
+      title={visual.title}
+    >
+      <span className={cn("h-1.5 w-1.5 rounded-full", visual.dot)} />
+      {status}
+    </span>
+  );
+}
+
+const STATUS_VISUAL: Record<
+  ItemStatus,
+  { className: string; dot: string; title: string }
+> = {
+  Pending: {
+    className: "bg-[var(--color-ink-100)] text-[var(--color-ink-700)] dark:bg-white/[0.06]",
+    dot: "bg-[var(--color-ink-400)]",
+    title: "Awaiting dispatch or in vendor queue",
+  },
+  Picked: {
+    className: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
+    dot: "bg-[var(--color-amber)]",
+    title: "Robot picked up — in transit to drop station",
+  },
+  Delivered: {
+    className: "bg-[var(--color-success-soft)] text-[var(--color-success)]",
+    dot: "bg-[var(--color-success)]",
+    title: "Delivered to drop station",
+  },
+  Failed: {
+    className: "bg-[#fde0db] text-[var(--color-coral)] dark:bg-[#3a1a17]",
+    dot: "bg-[var(--color-coral)]",
+    title: "Dispatch or delivery failed — Reopen + Retry to recover",
+  },
+  Returned: {
+    className: "bg-[var(--color-pastel-lavender)] text-[var(--color-pastel-lavender-ink)]",
+    dot: "bg-[var(--color-pastel-lavender-ink)]",
+    title: "Returned by vendor",
+  },
+  Cancelled: {
+    className: "bg-[var(--color-ink-100)] text-[var(--color-ink-500)] dark:bg-white/[0.06]",
+    dot: "bg-[var(--color-ink-400)]",
+    title: "Cancelled by admin",
+  },
+};

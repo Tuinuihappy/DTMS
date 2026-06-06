@@ -74,8 +74,18 @@ export type ItemDto = {
   hazmat: { classCode: string; packingGroup: PackingGroup | null } | null;
   temperature: { minC: number | null; maxC: number | null } | null;
   handlingInstructions: HandlingInstruction[];
-  status: string;
+  status: ItemStatus;
+  tripId: string | null;
+  attemptNumber: number | null;
 };
+
+export type ItemStatus =
+  | "Pending"
+  | "Picked"
+  | "Delivered"
+  | "Failed"
+  | "Returned"
+  | "Cancelled";
 
 export type DeliveryOrderDetailDto = DeliveryOrderListDto & {
   items: ItemDto[];

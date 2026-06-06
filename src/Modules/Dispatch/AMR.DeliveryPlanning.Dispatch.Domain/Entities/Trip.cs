@@ -174,6 +174,26 @@ public class Trip : AggregateRoot<Guid>
             Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, vehicleId));
     }
 
+    /// <summary>
+    /// Vendor reports the robot finished its pickup action at this trip's
+    /// pickup station — items are now physically loaded and in transit.
+    /// Doesn't change Trip.Status (the trip is still InProgress) — fires
+    /// an integration event so DeliveryOrder can flip its items
+    /// Pending → Picked. Idempotent: the consumer guards on item state,
+    /// and the underlying webhook handler only calls this once the
+    /// pickup station's mission finished.
+    /// </summary>
+    public void MarkVendorPickedUp()
+    {
+        // Pickup only makes sense while the trip is in flight. Fail-loud
+        // would mask network races; bail quietly instead.
+        if (Status is not TripStatus.InProgress) return;
+
+        RecordEvent("VendorPickupCompleted", null);
+        AddDomainEvent(new TripPickupCompletedDomainEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId));
+    }
+
     public void MarkVendorCompleted()
     {
         if (Status == TripStatus.Completed)
