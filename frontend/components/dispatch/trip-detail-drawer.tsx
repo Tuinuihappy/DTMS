@@ -19,6 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { AttemptBadge, RetryChainNav, TripStatusBadge } from "./badges";
 import { MissionTimeline } from "./mission-timeline";
+import { RetryHistoryPanel } from "./retry-history-panel";
 import { SnapshotInspector } from "./snapshot-inspector";
 import { TripActionBar } from "./trip-action-bar";
 
@@ -252,6 +253,15 @@ export function TripDetailDrawer({
                       />
                     </section>
                   )}
+
+                  {/* Retry history — shows only when this trip is part of a
+                      chain (i.e. there are 2+ attempts for its group). */}
+                  {data.attemptNumber > 1 || data.previousAttemptId ? (
+                    <section>
+                      <SectionTitle>Retry history</SectionTitle>
+                      <RetryHistoryPanel tripId={data.id} onOpenAttempt={onOpenTrip} />
+                    </section>
+                  ) : null}
 
                   <section>
                     <SectionTitle>Mission timeline ({data.missions.length})</SectionTitle>

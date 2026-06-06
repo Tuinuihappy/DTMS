@@ -7,6 +7,7 @@ using AMR.DeliveryPlanning.Dispatch.Application.Commands.ResolveException;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.ResumeTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripById;
 using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripDetails;
+using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripRetryHistory;
 using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripsByOrder;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
@@ -44,6 +45,16 @@ public static class DispatchEndpoints
         group.MapGet("/orders/{orderId:guid}/trips", async (Guid orderId, ISender sender) =>
         {
             var result = await sender.Send(new GetTripsByOrderQuery(orderId));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
+        });
+
+        // GET /api/v1/dispatch/trips/{id}/retry-history — every attempt of the
+        // same (Pickup, Drop) group on the same order, each tagged with the
+        // TripRetryEvent that produced it. Backs the operator retry-chain
+        // timeline in the Trip detail drawer.
+        group.MapGet("/trips/{id:guid}/retry-history", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new GetTripRetryHistoryQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         });
 

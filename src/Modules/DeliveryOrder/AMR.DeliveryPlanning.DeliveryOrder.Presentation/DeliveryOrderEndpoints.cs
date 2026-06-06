@@ -11,6 +11,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReopenDeliveryOrde
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.UpdateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetFullOrderAudit;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetItem;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderItems;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderTimeline;
@@ -198,6 +199,16 @@ public static class DeliveryOrderEndpoints
         group.MapGet("/{id:guid}/timeline", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new GetOrderTimelineQuery(id));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
+        });
+
+        // GET /api/v1/delivery-orders/{id}/audit-full — consolidated
+        // audit log: OrderAuditEvents + amendments + per-trip execution
+        // events + retry triggers, sorted newest-first. Backs the
+        // operator / support "what happened?" drawer view (Phase 4.2).
+        group.MapGet("/{id:guid}/audit-full", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new GetFullOrderAuditQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         });
 

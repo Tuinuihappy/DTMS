@@ -27,6 +27,7 @@ import {
 import { getTripsByOrder, type TripSummaryDto } from "@/lib/api/trips";
 import { AttemptBadge, TripStatusBadge } from "@/components/dispatch/badges";
 import { TripDetailDrawer } from "@/components/dispatch/trip-detail-drawer";
+import { FullAuditLog } from "./full-audit-log";
 import { cn } from "@/lib/utils";
 import { PriorityBadge, StatusBadge, TransportModeBadge } from "./badges";
 
@@ -290,72 +291,23 @@ export function OrderDetailDrawer({
                     </section>
                   )}
 
-                  {/* Timeline — audit + amendments, chronological */}
-                  {timeline && timeline.length > 0 && (
-                    <section>
-                      <SectionLabel>
-                        <span className="inline-flex items-center gap-1.5">
-                          <History className="h-3 w-3" strokeWidth={2.4} />
-                          Timeline ({timeline.length})
-                        </span>
-                      </SectionLabel>
-                      <ol className="relative mt-3 space-y-3 pl-5">
-                        {/* Spine line */}
-                        <div
-                          aria-hidden
-                          className="absolute left-[7px] top-2 bottom-2 w-px bg-gradient-to-b from-[var(--color-brand-500)]/30 via-[var(--color-ink-200)] to-transparent dark:via-white/10"
-                        />
-                        {timeline.map((t, i) => (
-                          <motion.li
-                            key={t.id}
-                            initial={{ opacity: 0, x: -6 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.32, delay: i * 0.04 }}
-                            className="relative"
-                          >
-                            {/* Node */}
-                            <span
-                              className={cn(
-                                "absolute -left-5 top-1.5 grid h-3.5 w-3.5 place-items-center rounded-full ring-2 ring-[var(--color-surface)]",
-                                eventTone(t.eventType).dot,
-                              )}
-                            >
-                              <span className="h-1.5 w-1.5 rounded-full bg-white/80" />
-                            </span>
-                            <div className="rounded-xl bg-[var(--color-surface-soft)] px-3 py-2 dark:bg-white/[0.04]">
-                              <div className="flex items-baseline justify-between gap-3">
-                                <span
-                                  className={cn(
-                                    "rounded-md px-1.5 py-[2px] text-[10px] font-bold uppercase tracking-[0.08em]",
-                                    eventTone(t.eventType).chip,
-                                  )}
-                                >
-                                  {t.eventType}
-                                </span>
-                                <time
-                                  className="font-mono text-[10.5px] text-[var(--color-ink-400)] whitespace-nowrap"
-                                  title={new Date(t.occurredAt).toLocaleString()}
-                                >
-                                  {relativeFromNow(t.occurredAt)}
-                                </time>
-                              </div>
-                              {t.details && (
-                                <p className="mt-1 text-[12px] leading-snug text-[var(--color-ink-700)]">
-                                  {t.details}
-                                </p>
-                              )}
-                              {t.actorId && (
-                                <p className="mt-1 text-[10.5px] text-[var(--color-ink-400)]">
-                                  by{" "}
-                                  <span className="font-mono">{t.actorId}</span>
-                                </p>
-                              )}
-                            </div>
-                          </motion.li>
-                        ))}
-                      </ol>
-                    </section>
-                  )}
+                  {/* Full audit log — order events + amendments + per-trip
+                      execution + retry triggers, consolidated (Phase 4.2). */}
+                  <section>
+                    <SectionLabel>
+                      <span className="inline-flex items-center gap-1.5">
+                        <History className="h-3 w-3" strokeWidth={2.4} />
+                        Full audit
+                      </span>
+                    </SectionLabel>
+                    <div className="mt-3">
+                      <FullAuditLog
+                        orderId={data.id}
+                        onOpenTrip={(tripId) => setOpenTripId(tripId)}
+                      />
+                    </div>
+                  </section>
+
 
                   {/* Items list with pickup → drop visual */}
                   <section>

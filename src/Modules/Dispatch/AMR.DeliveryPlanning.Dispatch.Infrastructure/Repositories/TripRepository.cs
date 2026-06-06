@@ -58,8 +58,13 @@ public class TripRepository : ITripRepository
 
     public async Task<List<Trip>> GetByDeliveryOrderIdAsync(Guid deliveryOrderId, CancellationToken cancellationToken = default)
     {
+        // Include Events so the order-level full-audit query (Phase 4.2)
+        // can fold per-trip execution events into the consolidated stream
+        // without an extra round trip. Other call sites tolerate the
+        // collection being populated.
         return await _context.Trips
             .IgnoreQueryFilters()
+            .Include(t => t.Events)
             .Where(t => t.DeliveryOrderId == deliveryOrderId)
             .ToListAsync(cancellationToken);
     }

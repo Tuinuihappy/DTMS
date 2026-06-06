@@ -322,6 +322,32 @@ export async function getOrderTimeline(id: string): Promise<TimelineEntryDto[]> 
   return unwrap<TimelineEntryDto[]>(res);
 }
 
+// ── Full audit (Phase 4.2) ──────────────────────────────────────────────
+
+export type FullAuditEntryDto = {
+  id: string;
+  source: "Order" | "Amendment" | "TripExecution" | "TripRetry";
+  eventType: string;
+  details: string | null;
+  actorId: string | null;
+  occurredAt: string;
+  relatedTripId: string | null;
+  attemptNumber: number | null;
+};
+
+export type FullOrderAuditDto = {
+  orderId: string;
+  totalEntries: number;
+  entries: FullAuditEntryDto[];
+};
+
+export async function getFullOrderAudit(id: string): Promise<FullOrderAuditDto> {
+  const res = await fetch(`/api/delivery-orders/${id}/audit-full`, {
+    cache: "no-store",
+  });
+  return unwrap<FullOrderAuditDto>(res);
+}
+
 export async function createOrder(payload: CreateOrderPayload): Promise<{ id: string }> {
   const res = await fetch(`/api/delivery-orders`, {
     method: "POST",

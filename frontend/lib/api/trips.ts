@@ -128,6 +128,48 @@ export async function getTripsByOrder(orderId: string): Promise<TripSummaryDto[]
   return raw.map(normalizeTrip);
 }
 
+// ── Retry history (Phase 4.1) ───────────────────────────────────────────
+
+export type TripRetryTriggerDto = {
+  id: string;
+  occurredAt: string;
+  retrySource: string; // "Manual" | "Automatic" | "Reopen"
+  retriedBy: string | null;
+  retryReason: string | null;
+  originalStatus: string;
+};
+
+export type TripChainEntryDto = {
+  tripId: string;
+  attemptNumber: number;
+  status: TripStatus;
+  upperKey: string;
+  vendorOrderKey: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  failureReason: string | null;
+  isCurrent: boolean;
+  retryTrigger: TripRetryTriggerDto | null;
+};
+
+export type TripRetryHistoryDto = {
+  tripId: string;
+  totalAttempts: number;
+  attempts: TripChainEntryDto[];
+};
+
+export async function getTripRetryHistory(tripId: string): Promise<TripRetryHistoryDto> {
+  const raw = await api<TripRetryHistoryDto>(`/api/dispatch/trips/${tripId}/retry-history`);
+  return {
+    ...raw,
+    attempts: (raw.attempts ?? []).map((a) => ({
+      ...a,
+      status: pascalFromUpperSnake(a.status) as TripStatus,
+    })),
+  };
+}
+
 export function cancelTrip(tripId: string, reason: string): Promise<void> {
   const qs = `?reason=${encodeURIComponent(reason)}`;
   return api<void>(`/api/dispatch/trips/${tripId}/cancel${qs}`, { method: "POST" });
