@@ -143,7 +143,10 @@ public static class ModuleServiceRegistration
                 new DomainEventOutboxSaveChangesInterceptor(
                     sp.GetRequiredService<DeliveryOrderDomainEventMapper>())));
         services.AddHttpContextAccessor();
-        services.AddScoped<ICurrentUserAccessor, AMR.DeliveryPlanning.Api.Auth.HttpContextCurrentUserAccessor>();
+        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Services.ICurrentUserAccessor,
+                           AMR.DeliveryPlanning.Api.Auth.HttpContextCurrentUserAccessor>();
+        services.AddScoped<AMR.DeliveryPlanning.Planning.Application.Services.ICurrentUserAccessor,
+                           AMR.DeliveryPlanning.Api.Auth.HttpContextCurrentUserAccessor>();
         services.AddScoped<IDeliveryOrderRepository, DeliveryOrderRepository>();
         services.AddScoped<FacilityStationLookup>();
         services.AddScoped<IStationLookup, CachedStationLookup>();

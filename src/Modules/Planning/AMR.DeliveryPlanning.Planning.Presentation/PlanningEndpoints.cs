@@ -24,6 +24,7 @@ using AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplateById;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplates;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetPendingJobs;
 using AMR.DeliveryPlanning.Planning.Domain.Entities;
+using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -140,9 +141,13 @@ public static class PlanningEndpoints
         // named recipe for one ACT mission (actionType + vendorActionId +
         // param0 + param1 + optional param_str). OrderTemplate (Phase 1C)
         // will reference these by Name.
-        var actionTemplates = app.MapGroup("/api/v1/planning/action-templates")
-            .WithTags("Planning")
+        var actionTemplates = app.MapGroup("/api/v1/action-templates")
+            .WithTags("ActionTemplate")
             .RequireAuthorization();
+
+        // All responses use the RIOT3 envelope { code, data, message } so a
+        // client written against RIOT3 can talk to DTMS without remapping.
+        // HTTP status stays semantic (201/400/404) for non-RIOT clients.
 
         // POST — create a new template. Body mirrors the RIOT3
         // /api/v4/order/action-templates payload shape:
@@ -150,8 +155,6 @@ public static class PlanningEndpoints
         // so operators can paste a RIOT3 example straight in.
         actionTemplates.MapPost("/", async (CreateActionTemplateRequest req, ISender sender) =>
         {
-            var actionType = string.IsNullOrWhiteSpace(req.ActionType) ? "STD" : req.ActionType;
-
             ActionTemplateParameterSet parsed;
             try
             {
@@ -159,7 +162,7 @@ public static class PlanningEndpoints
             }
             catch (ArgumentException ex)
             {
-                return Results.BadRequest(ex.Message);
+                return RiotEnvelope.BadRequest(ex.Message);
             }
 
             var result = await sender.Send(new CreateActionTemplateCommand(
@@ -167,37 +170,49 @@ public static class PlanningEndpoints
                 VendorActionId: parsed.Id,
                 Param0: parsed.Param0,
                 Param1: parsed.Param1,
-                ActionType: actionType,
-                ParamStr: parsed.ParamStr,
-                Description: req.Description));
+                ActionType: req.ActionType,
+                ParamStr: parsed.ParamStr));
             return result.IsSuccess
-                ? Results.Created($"/api/v1/planning/action-templates/{result.Value}", result.Value)
-                : Results.BadRequest(result.Error);
+                ? RiotEnvelope.Created(
+                    $"/api/v1/action-templates/{result.Value!.Id}",
+                    result.Value)
+                : RiotEnvelope.BadRequest(result.Error);
         });
 
-        // GET — list templates (filter by ActionType, optionally include inactive)
-        // bool query params must be nullable in minimal APIs so the caller
-        // can omit them — otherwise the framework returns 400.
-        actionTemplates.MapGet("/", async (bool? includeInactive, string? actionType, ISender sender) =>
+        // GET — paged list (page/size mirror RIOT3 PageRequest semantics).
+        // Default order is Name asc — no sort query params since the
+        // catalog is small enough to sort client-side after fetch.
+        // bool/int query params must be nullable in minimal APIs so the
+        // caller can omit them — otherwise the framework returns 400.
+        actionTemplates.MapGet("/", async (
+            int? page, int? size, bool? includeInactive, ActionType? actionType, ISender sender) =>
         {
-            var result = await sender.Send(new GetActionTemplatesQuery(includeInactive ?? false, actionType));
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+            var result = await sender.Send(new GetActionTemplatesQuery(
+                Page: page ?? 1,
+                Size: size ?? 20,
+                IncludeInactive: includeInactive ?? false,
+                ActionType: actionType));
+            return result.IsSuccess
+                ? RiotEnvelope.Ok(result.Value)
+                : RiotEnvelope.BadRequest(result.Error);
         });
 
         // GET /{id} — fetch one
         actionTemplates.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new GetActionTemplateByIdQuery(id));
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
+            return result.IsSuccess
+                ? RiotEnvelope.Ok(result.Value)
+                : RiotEnvelope.NotFound(result.Error);
         });
 
-        // PATCH /{id} — update the action params + meta (rename is separate).
-        // Body uses the same RIOT3 shape as POST.
-        actionTemplates.MapMethods("/{id:guid}", ["PATCH"],
+        // PUT /{id} — full resource replacement (rename is a separate command).
+        // Body uses the same RIOT3 shape as POST and requires every field
+        // the entity exposes — PATCH would imply partial updates, which the
+        // current handler doesn't actually support.
+        actionTemplates.MapPut("/{id:guid}",
             async (Guid id, UpdateActionTemplateRequest req, ISender sender) =>
             {
-                var actionType = string.IsNullOrWhiteSpace(req.ActionType) ? "STD" : req.ActionType;
-
                 ActionTemplateParameterSet parsed;
                 try
                 {
@@ -205,32 +220,40 @@ public static class PlanningEndpoints
                 }
                 catch (ArgumentException ex)
                 {
-                    return Results.BadRequest(ex.Message);
+                    return RiotEnvelope.BadRequest(ex.Message);
                 }
 
                 var result = await sender.Send(new UpdateActionTemplateCommand(
-                    id, actionType, parsed.Id, parsed.Param0, parsed.Param1, parsed.ParamStr, req.Description));
-                return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+                    id, req.ActionType, parsed.Id, parsed.Param0, parsed.Param1, parsed.ParamStr));
+                return result.IsSuccess
+                    ? RiotEnvelope.Ok<object?>(null)
+                    : RiotEnvelope.BadRequest(result.Error);
             });
 
         // POST /{id}/activate, /deactivate — soft enable/disable
         actionTemplates.MapPost("/{id:guid}/activate", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new SetActionTemplateActiveCommand(id, true));
-            return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+            return result.IsSuccess
+                ? RiotEnvelope.Ok<object?>(null)
+                : RiotEnvelope.BadRequest(result.Error);
         });
 
         actionTemplates.MapPost("/{id:guid}/deactivate", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new SetActionTemplateActiveCommand(id, false));
-            return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+            return result.IsSuccess
+                ? RiotEnvelope.Ok<object?>(null)
+                : RiotEnvelope.BadRequest(result.Error);
         });
 
         // DELETE /{id} — hard delete (no OrderTemplate ref check yet — Phase 1C)
         actionTemplates.MapDelete("/{id:guid}", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new DeleteActionTemplateCommand(id));
-            return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+            return result.IsSuccess
+                ? RiotEnvelope.Ok<object?>(null)
+                : RiotEnvelope.BadRequest(result.Error);
         });
 
         // ── OrderTemplate (Phase 1C) ─────────────────────────────────────────
@@ -520,14 +543,12 @@ internal static class OrderTemplateMissionParser
 // clearer 400 message than the framework's missing-property error.
 public record CreateActionTemplateRequest(
     string ActionName,
-    string? ActionType = null,
-    List<ActionParameterDto>? ActionParameters = null,
-    string? Description = null);
+    ActionType ActionType = ActionType.Std,
+    List<ActionParameterDto>? ActionParameters = null);
 
 public record UpdateActionTemplateRequest(
-    string? ActionType = null,
-    List<ActionParameterDto>? ActionParameters = null,
-    string? Description = null);
+    ActionType ActionType = ActionType.Std,
+    List<ActionParameterDto>? ActionParameters = null);
 
 // One entry in the actionParameters array. RIOT3 sends `value` as JSON
 // (int for id/param0/param1, string for param_str, or omitted entirely
@@ -605,4 +626,29 @@ internal static class ActionParameterParser
         var v = entry.Value.Value;
         return v.ValueKind == System.Text.Json.JsonValueKind.String ? v.GetString() : v.ToString();
     }
+}
+
+// RIOT3-style response envelope. `code` is a string in the vendor spec
+// ("0" for success) so RIOT3 clients deserializing into typed models can
+// keep their existing schema. We keep the HTTP status semantic (201/400/
+// 404) for non-RIOT clients and reverse proxies that gate on status code.
+public sealed record RiotEnvelope<T>(string Code, T? Data, string Message);
+
+internal static class RiotEnvelope
+{
+    private const string SuccessCode = "0";
+    private const string FailureCode = "1";
+    private const string SuccessMessage = "SUCCESS";
+
+    public static IResult Ok<T>(T data)
+        => Results.Ok(new RiotEnvelope<T>(SuccessCode, data, SuccessMessage));
+
+    public static IResult Created<T>(string location, T data)
+        => Results.Created(location, new RiotEnvelope<T>(SuccessCode, data, SuccessMessage));
+
+    public static IResult BadRequest(string? message)
+        => Results.BadRequest(new RiotEnvelope<object?>(FailureCode, null, message ?? "Bad Request"));
+
+    public static IResult NotFound(string? message)
+        => Results.NotFound(new RiotEnvelope<object?>(FailureCode, null, message ?? "Not Found"));
 }

@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.Planning.Domain.Entities;
@@ -19,76 +20,80 @@ namespace AMR.DeliveryPlanning.Planning.Domain.Entities;
 public class ActionTemplate : AggregateRoot<Guid>
 {
     public string Name { get; private set; } = string.Empty;
-    public string ActionType { get; private set; } = "STD";
+    public ActionType ActionType { get; private set; } = ActionType.Std;
     public int VendorActionId { get; private set; }
     public int Param0 { get; private set; }
     public int Param1 { get; private set; }
     public string? ParamStr { get; private set; }
-    public string? Description { get; private set; }
     public bool IsActive { get; private set; } = true;
     public DateTime CreatedAt { get; private set; }
     public DateTime? ModifiedAt { get; private set; }
+    public string? CreatedBy { get; private set; }
+    public string? ModifiedBy { get; private set; }
 
     private ActionTemplate() { } // EF Core
 
     public ActionTemplate(
         string name,
-        string actionType,
+        ActionType actionType,
         int vendorActionId,
         int param0,
         int param1,
         string? paramStr = null,
-        string? description = null)
+        string? createdBy = null)
     {
         Id = Guid.NewGuid();
         SetName(name);
-        SetActionType(actionType);
+        ActionType = actionType;
         VendorActionId = vendorActionId;
         Param0 = param0;
         Param1 = param1;
         ParamStr = string.IsNullOrWhiteSpace(paramStr) ? null : paramStr.Trim();
-        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
         IsActive = true;
         CreatedAt = DateTime.UtcNow;
+        CreatedBy = NormalizeUser(createdBy);
     }
 
     public void Update(
-        string actionType,
+        ActionType actionType,
         int vendorActionId,
         int param0,
         int param1,
         string? paramStr,
-        string? description)
+        string? modifiedBy = null)
     {
-        SetActionType(actionType);
+        ActionType = actionType;
         VendorActionId = vendorActionId;
         Param0 = param0;
         Param1 = param1;
         ParamStr = string.IsNullOrWhiteSpace(paramStr) ? null : paramStr.Trim();
-        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
         ModifiedAt = DateTime.UtcNow;
+        ModifiedBy = NormalizeUser(modifiedBy);
     }
 
-    public void Rename(string newName)
+    public void Rename(string newName, string? modifiedBy = null)
     {
         // Name change is allowed but callers must update any OrderTemplate
         // references separately — Repository uniqueness check guards the new name.
         SetName(newName);
         ModifiedAt = DateTime.UtcNow;
+        ModifiedBy = NormalizeUser(modifiedBy);
     }
 
-    public void Activate()
+    public void Activate(string? modifiedBy = null)
     {
         if (IsActive) return;
         IsActive = true;
         ModifiedAt = DateTime.UtcNow;
+        ModifiedBy = NormalizeUser(modifiedBy);
     }
 
-    public void Deactivate()
+    public void Deactivate(string? modifiedBy = null)
     {
         if (!IsActive) return;
         IsActive = false;
         ModifiedAt = DateTime.UtcNow;
+        ModifiedBy = NormalizeUser(modifiedBy);
     }
 
     private void SetName(string name)
@@ -100,12 +105,6 @@ public class ActionTemplate : AggregateRoot<Guid>
         Name = name.Trim();
     }
 
-    private void SetActionType(string actionType)
-    {
-        if (string.IsNullOrWhiteSpace(actionType))
-            throw new ArgumentException("ActionType must not be empty.", nameof(actionType));
-        if (actionType.Length > 50)
-            throw new ArgumentException("ActionType must be 50 characters or fewer.", nameof(actionType));
-        ActionType = actionType.Trim();
-    }
+    private static string? NormalizeUser(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

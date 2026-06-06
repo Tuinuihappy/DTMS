@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Commands.UpdateActionTemplate;
@@ -8,10 +9,9 @@ namespace AMR.DeliveryPlanning.Planning.Application.Commands.UpdateActionTemplat
 // later in Phase 1C.
 public record UpdateActionTemplateCommand(
     Guid Id,
-    string ActionType,
+    ActionType ActionType,
     int VendorActionId,
     int Param0,
     int Param1,
-    string? ParamStr = null,
-    string? Description = null
+    string? ParamStr = null
 ) : ICommand;

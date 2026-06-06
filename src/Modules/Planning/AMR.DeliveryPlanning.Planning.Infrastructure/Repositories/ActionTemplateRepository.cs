@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.Planning.Domain.Entities;
+using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -36,20 +37,32 @@ public class ActionTemplateRepository : IActionTemplateRepository
         return query.AnyAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<ActionTemplate>> ListAsync(
+    public async Task<(IReadOnlyList<ActionTemplate> Items, long Total)> ListPagedAsync(
+        int page,
+        int size,
         bool includeInactive = false,
-        string? actionType = null,
+        ActionType? actionType = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.ActionTemplates.AsQueryable();
         if (!includeInactive)
             query = query.Where(t => t.IsActive);
-        if (!string.IsNullOrWhiteSpace(actionType))
+        if (actionType.HasValue)
         {
-            var at = actionType.Trim();
+            var at = actionType.Value;
             query = query.Where(t => t.ActionType == at);
         }
-        return await query.OrderBy(t => t.Name).ToListAsync(cancellationToken);
+
+        // LongCount keeps the API safe past 2B rows; running it before the
+        // page slice means total + page slice come from the same snapshot
+        // even if a concurrent insert lands between the two SQL round trips.
+        var total = await query.LongCountAsync(cancellationToken);
+        var items = await query
+            .OrderBy(t => t.Name)
+            .Skip((page - 1) * size)
+            .Take(size)
+            .ToListAsync(cancellationToken);
+        return (items, total);
     }
 
     public Task AddAsync(ActionTemplate template, CancellationToken cancellationToken = default)

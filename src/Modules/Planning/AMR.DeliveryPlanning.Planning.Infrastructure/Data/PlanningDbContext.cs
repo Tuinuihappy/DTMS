@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.Planning.Domain.Entities;
+using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data.Records;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
 using Microsoft.EntityFrameworkCore;
@@ -92,12 +93,20 @@ public class PlanningDbContext : DbContext
             // Case-insensitive uniqueness via a lower(name) functional index.
             // Plain unique index would let "Lift" and "lift" coexist.
             builder.HasIndex(t => t.Name).IsUnique().HasDatabaseName("IX_ActionTemplates_Name_Unique");
-            builder.Property(t => t.ActionType).HasMaxLength(50).IsRequired();
+            // Store enum as the same uppercase token used on the wire
+            // ("STD"/"ACT") so existing rows round-trip and operators reading
+            // the table by hand see the RIOT3 vocabulary.
+            builder.Property(t => t.ActionType)
+                .HasConversion(v => v.ToString().ToUpperInvariant(),
+                               v => (ActionType)Enum.Parse(typeof(ActionType), v, true))
+                .HasMaxLength(50)
+                .IsRequired();
             builder.Property(t => t.VendorActionId).IsRequired();
             builder.Property(t => t.Param0).IsRequired();
             builder.Property(t => t.Param1).IsRequired();
             builder.Property(t => t.ParamStr).HasMaxLength(500);
-            builder.Property(t => t.Description).HasMaxLength(500);
+            builder.Property(t => t.CreatedBy).HasMaxLength(100);
+            builder.Property(t => t.ModifiedBy).HasMaxLength(100);
             builder.Property(t => t.IsActive).HasDefaultValue(true).IsRequired();
             builder.HasIndex(t => t.IsActive);
             builder.Ignore(t => t.DomainEvents);

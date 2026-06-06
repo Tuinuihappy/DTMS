@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.Planning.Domain.Entities;
+using AMR.DeliveryPlanning.Planning.Domain.Enums;
 
 namespace AMR.DeliveryPlanning.Planning.Domain.Repositories;
 
@@ -15,9 +16,16 @@ public interface IActionTemplateRepository
 
     Task<bool> NameExistsAsync(string name, Guid? excludeId = null, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<ActionTemplate>> ListAsync(
+    /// <summary>
+    /// Paged list with total count. Returns the page slice (sorted by Name)
+    /// plus the unfiltered-by-paging total so the caller can compute
+    /// page count for the RIOT3-style envelope.
+    /// </summary>
+    Task<(IReadOnlyList<ActionTemplate> Items, long Total)> ListPagedAsync(
+        int page,
+        int size,
         bool includeInactive = false,
-        string? actionType = null,
+        ActionType? actionType = null,
         CancellationToken cancellationToken = default);
 
     Task AddAsync(ActionTemplate template, CancellationToken cancellationToken = default);

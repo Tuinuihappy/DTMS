@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
@@ -6,35 +8,67 @@ namespace AMR.DeliveryPlanning.Planning.Application.Queries.GetActionTemplates;
 // Response shape mirrors the RIOT3 payload — actionName + actionType +
 // actionParameters[] — plus DTMS metadata (Id, IsActive, audit timestamps)
 // so the UI can edit/delete by id.
-public sealed record ActionParameterValueDto(string Key, object? Value);
+//
+// `Value` is omitted from the JSON when null so the `param_str` entry
+// renders as `{ "key": "param_str" }` — matches the RIOT3 wire shape
+// (param_str slot is always present so consumers know the key exists,
+// but the value is dropped when unset).
+public sealed record ActionParameterValueDto(
+    string Key,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] object? Value);
 
 public sealed record ActionTemplateDto(
     Guid Id,
     string ActionName,
-    string ActionType,
+    ActionType ActionType,
     IReadOnlyList<ActionParameterValueDto> ActionParameters,
-    string? Description,
     bool IsActive,
     DateTime CreatedAt,
-    DateTime? ModifiedAt);
+    DateTime? ModifiedAt,
+    string? CreatedBy,
+    string? ModifiedBy);
+
+// RIOT3-style envelope for the paged list. Field names match the vendor
+// (`current`, `pages`, `size`, `total`, `records`) so a client that knows
+// RIOT3 can read DTMS without remapping.
+public sealed record PagedActionTemplates(
+    long Current,
+    long Pages,
+    long Size,
+    long Total,
+    IReadOnlyList<ActionTemplateDto> Records);
 
 public record GetActionTemplatesQuery(
+    int Page = 1,
+    int Size = 20,
     bool IncludeInactive = false,
-    string? ActionType = null) : IQuery<List<ActionTemplateDto>>;
+    ActionType? ActionType = null) : IQuery<PagedActionTemplates>;
 
-public class GetActionTemplatesQueryHandler : IQueryHandler<GetActionTemplatesQuery, List<ActionTemplateDto>>
+public class GetActionTemplatesQueryHandler : IQueryHandler<GetActionTemplatesQuery, PagedActionTemplates>
 {
+    private const int MaxPageSize = 200;
+
     private readonly IActionTemplateRepository _repo;
 
     public GetActionTemplatesQueryHandler(IActionTemplateRepository repo) => _repo = repo;
 
-    public async Task<Result<List<ActionTemplateDto>>> Handle(
+    public async Task<Result<PagedActionTemplates>> Handle(
         GetActionTemplatesQuery request,
         CancellationToken cancellationToken)
     {
-        var templates = await _repo.ListAsync(request.IncludeInactive, request.ActionType, cancellationToken);
-        var dtos = templates.Select(ActionTemplateDtoFactory.From).ToList();
-        return Result<List<ActionTemplateDto>>.Success(dtos);
+        // Clamp so a buggy client (size=0, size=-1, size=99999) can't OOM the
+        // server or send back an empty page that loops forever.
+        var page = request.Page < 1 ? 1 : request.Page;
+        var size = request.Size < 1 ? 20 : Math.Min(request.Size, MaxPageSize);
+
+        var (templates, total) = await _repo.ListPagedAsync(
+            page, size, request.IncludeInactive, request.ActionType, cancellationToken);
+
+        var records = templates.Select(ActionTemplateDtoFactory.From).ToList();
+        // Mybatis-Plus convention: ceil(total/size), minimum 1 even when empty.
+        var pages = total == 0 ? 1 : (total + size - 1) / size;
+        return Result<PagedActionTemplates>.Success(
+            new PagedActionTemplates(page, pages, size, total, records));
     }
 }
 
@@ -55,6 +89,6 @@ public static class ActionTemplateDtoFactory
         };
         return new ActionTemplateDto(
             t.Id, t.Name, t.ActionType, parameters,
-            t.Description, t.IsActive, t.CreatedAt, t.ModifiedAt);
+            t.IsActive, t.CreatedAt, t.ModifiedAt, t.CreatedBy, t.ModifiedBy);
     }
 }

@@ -1,5 +1,3 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
-
 namespace AMR.DeliveryPlanning.Api.Auth;
 
 /// <summary>
@@ -7,7 +5,12 @@ namespace AMR.DeliveryPlanning.Api.Auth;
 /// Reads <c>User.Identity.Name</c> — populated from the JWT <c>name</c> claim
 /// (per Program.cs auth config).
 /// </summary>
-public sealed class HttpContextCurrentUserAccessor : ICurrentUserAccessor
+// Implements the per-module ICurrentUserAccessor interfaces. Each module
+// declares its own copy to avoid cross-module references; the API host
+// satisfies all of them with one implementation.
+public sealed class HttpContextCurrentUserAccessor :
+    AMR.DeliveryPlanning.DeliveryOrder.Application.Services.ICurrentUserAccessor,
+    AMR.DeliveryPlanning.Planning.Application.Services.ICurrentUserAccessor
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
 

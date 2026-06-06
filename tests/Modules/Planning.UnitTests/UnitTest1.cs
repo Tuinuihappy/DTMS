@@ -155,17 +155,17 @@ public class JobTests
 public class ActionTemplateTests
 {
     private static ActionTemplate New(string name = "Lift")
-        => new(name, "SR action", vendorActionId: 4, param0: 1, param1: 0);
+        => new(name, ActionType.Std, vendorActionId: 4, param0: 1, param1: 0);
 
     [Fact]
     public void Construct_TrimsNameAndAssignsDefaults()
     {
         // RIOT3 form values land verbatim — entity should normalize whitespace,
         // start active, and stamp CreatedAt at construction time.
-        var t = new ActionTemplate("  Waiting_Confirm  ", "SR action", 131, 0, 0);
+        var t = new ActionTemplate("  Waiting_Confirm  ", ActionType.Std, 131, 0, 0);
 
         t.Name.Should().Be("Waiting_Confirm");
-        t.ActionType.Should().Be("SR action");
+        t.ActionType.Should().Be(ActionType.Std);
         t.VendorActionId.Should().Be(131);
         t.Param0.Should().Be(0);
         t.Param1.Should().Be(0);
@@ -178,14 +178,7 @@ public class ActionTemplateTests
     [Fact]
     public void Construct_RejectsEmptyName()
     {
-        Action act = () => new ActionTemplate("   ", "SR action", 4, 1, 0);
-        act.Should().Throw<ArgumentException>();
-    }
-
-    [Fact]
-    public void Construct_RejectsEmptyActionType()
-    {
-        Action act = () => new ActionTemplate("Lift", " ", 4, 1, 0);
+        Action act = () => new ActionTemplate("   ", ActionType.Std, 4, 1, 0);
         act.Should().Throw<ArgumentException>();
     }
 
@@ -193,7 +186,7 @@ public class ActionTemplateTests
     public void Construct_RejectsNameOver100Chars()
     {
         var longName = new string('x', 101);
-        Action act = () => new ActionTemplate(longName, "SR action", 4, 1, 0);
+        Action act = () => new ActionTemplate(longName, ActionType.Std, 4, 1, 0);
         act.Should().Throw<ArgumentException>();
     }
 
@@ -203,12 +196,12 @@ public class ActionTemplateTests
         var t = New();
         t.ModifiedAt.Should().BeNull();
 
-        t.Update(actionType: "SR action", vendorActionId: 4, param0: 2, param1: 0,
-                 paramStr: "fragile", description: "Drop variant");
+        t.Update(actionType: ActionType.Act, vendorActionId: 4, param0: 2, param1: 0,
+                 paramStr: "fragile");
 
+        t.ActionType.Should().Be(ActionType.Act);
         t.Param0.Should().Be(2);
         t.ParamStr.Should().Be("fragile");
-        t.Description.Should().Be("Drop variant");
         t.ModifiedAt.Should().NotBeNull();
     }
 
@@ -218,7 +211,7 @@ public class ActionTemplateTests
         // Operators may type spaces in the UI; entity normalizes to null so
         // queries like "templates with no param_str" stay consistent.
         var t = New();
-        t.Update("SR action", 4, 1, 0, paramStr: "   ", description: null);
+        t.Update(ActionType.Std, 4, 1, 0, paramStr: "   ");
         t.ParamStr.Should().BeNull();
     }
 
@@ -481,8 +474,11 @@ public class OrderTemplateResolverTests
         public Task<bool> NameExistsAsync(string name, Guid? excludeId = null, CancellationToken cancellationToken = default)
             => Task.FromResult(_byName.ContainsKey(name));
 
-        public Task<IReadOnlyList<ActionTemplate>> ListAsync(bool includeInactive = false, string? actionType = null, CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<ActionTemplate>>(_byName.Values.ToList());
+        public Task<(IReadOnlyList<ActionTemplate> Items, long Total)> ListPagedAsync(int page, int size, bool includeInactive = false, ActionType? actionType = null, CancellationToken cancellationToken = default)
+        {
+            var all = _byName.Values.ToList();
+            return Task.FromResult<(IReadOnlyList<ActionTemplate>, long)>((all, all.Count));
+        }
 
         public Task AddAsync(ActionTemplate template, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public void Update(ActionTemplate template) { }
@@ -533,9 +529,9 @@ public class OrderTemplateResolverTests
         // The whole point of the catalog: an ACT mission with just
         // actionTemplateName must come out the other side with the four
         // RIOT3 parameter slots populated from the named ActionTemplate.
-        var lift = new ActionTemplate("Lift", "SR action",
+        var lift = new ActionTemplate("Lift", ActionType.Std,
             vendorActionId: 4, param0: 1, param1: 0,
-            paramStr: null, description: null);
+            paramStr: null);
 
         var template = new OrderTemplate(
             name: "REF", priority: 10,
@@ -551,7 +547,7 @@ public class OrderTemplateResolverTests
         var resolved = await resolver.ResolveAsync(template);
 
         var act = resolved.Missions[1];
-        act.ActionType.Should().Be("SR action");
+        act.ActionType.Should().Be("STD");
         act.BlockingType.Should().Be("NONE");
         act.ActionParameters.Should().HaveCount(3,
             "ParamStr was null on the ActionTemplate so the resolver omits the param_str slot");
@@ -564,9 +560,9 @@ public class OrderTemplateResolverTests
     [Fact]
     public async Task Resolve_ActByReference_IncludesParamStrWhenSet()
     {
-        var fancy = new ActionTemplate("Fancy", "SR action",
+        var fancy = new ActionTemplate("Fancy", ActionType.Std,
             vendorActionId: 7, param0: 0, param1: 0,
-            paramStr: "label-A", description: null);
+            paramStr: "label-A");
 
         var template = new OrderTemplate(
             name: "REF_STR", priority: 1,
@@ -607,7 +603,7 @@ public class OrderTemplateResolverTests
         // Cache check — two references to the same ActionTemplate in one
         // template must hit the repository only once. Counts the calls to
         // a tiny counting stub.
-        var lift = new ActionTemplate("Lift", "SR action", 4, 1, 0);
+        var lift = new ActionTemplate("Lift", ActionType.Std, 4, 1, 0);
         var counter = new CountingRepo(lift);
 
         var template = new OrderTemplate(
@@ -637,8 +633,8 @@ public class OrderTemplateResolverTests
             return Task.FromResult<ActionTemplate?>(string.Equals(name, _template.Name, StringComparison.OrdinalIgnoreCase) ? _template : null);
         }
         public Task<bool> NameExistsAsync(string name, Guid? excludeId = null, CancellationToken c = default) => Task.FromResult(true);
-        public Task<IReadOnlyList<ActionTemplate>> ListAsync(bool includeInactive = false, string? actionType = null, CancellationToken c = default)
-            => Task.FromResult<IReadOnlyList<ActionTemplate>>(new[] { _template });
+        public Task<(IReadOnlyList<ActionTemplate> Items, long Total)> ListPagedAsync(int page, int size, bool includeInactive = false, ActionType? actionType = null, CancellationToken c = default)
+            => Task.FromResult<(IReadOnlyList<ActionTemplate>, long)>((new[] { _template }, 1));
         public Task AddAsync(ActionTemplate t, CancellationToken c = default) => Task.CompletedTask;
         public void Update(ActionTemplate t) { }
         public void Remove(ActionTemplate t) { }
