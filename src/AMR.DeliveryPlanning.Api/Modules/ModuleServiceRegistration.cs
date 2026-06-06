@@ -193,6 +193,12 @@ public static class ModuleServiceRegistration
             AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories.TripMissionEventRepository>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.ITripRetryDispatcher,
             AMR.DeliveryPlanning.Api.Adapters.PlanningTripRetryDispatcher>();
+        // Composition-root seam — lets ReissueTripCommandHandler check the
+        // parent Order's status without taking a direct ref on
+        // DeliveryOrder.Application. Fixes the scenario-5 bug where a
+        // Cancelled-order's Trip could still be retried.
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IDeliveryOrderStatusReader,
+            AMR.DeliveryPlanning.Api.Adapters.DeliveryOrderStatusReader>();
         services.AddScoped<IShelfManifestRepository, ShelfManifestRepository>();
 
         // ── VendorAdapter Module ──────────────────────────────────────

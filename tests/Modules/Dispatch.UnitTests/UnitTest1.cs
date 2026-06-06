@@ -544,6 +544,121 @@ public class PauseAndResumeTripHandlerTests
     }
 }
 
+// ── ReissueTripCommandHandler — parent-order guard (Bug #1 fix) ─────────
+
+public class ReissueTripGuardTests
+{
+    [Fact]
+    public async Task Retry_BlockedWhenParentOrderCancelled()
+    {
+        var cancelled = NewCancelledTrip();
+        var handler = NewHandler(cancelled, orderStatus: "Cancelled");
+
+        var result = await handler.Handle(
+            new AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
+                cancelled.Id, "Manual", null, null),
+            default);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Contain("Cancelled");
+        result.Error.Should().Contain("Reopen");
+    }
+
+    [Theory]
+    [InlineData("Rejected")]
+    [InlineData("Completed")]
+    [InlineData("PartiallyCompleted")]
+    public async Task Retry_BlockedForAllTerminalOrderStatuses(string status)
+    {
+        var cancelled = NewCancelledTrip();
+        var handler = NewHandler(cancelled, orderStatus: status);
+
+        var result = await handler.Handle(
+            new AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
+                cancelled.Id, "Manual", null, null),
+            default);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Contain(status);
+    }
+
+    [Fact]
+    public async Task Retry_AllowedWhenOrderConfirmedAndTripCancelled()
+    {
+        var cancelled = NewCancelledTrip();
+        var handler = NewHandler(cancelled, orderStatus: "Confirmed");
+
+        var result = await handler.Handle(
+            new AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
+                cancelled.Id, "Manual", "ops", "valid retry"),
+            default);
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Retry_BlockedWhenOrderNotFound()
+    {
+        var cancelled = NewCancelledTrip();
+        var handler = NewHandler(cancelled, orderStatus: null);
+
+        var result = await handler.Handle(
+            new AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
+                cancelled.Id, "Manual", null, null),
+            default);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Contain("not found");
+    }
+
+    private static Trip NewCancelledTrip()
+    {
+        var t = Trip.CreateForEnvelope(
+            Guid.NewGuid(), "abc-G1", "ORD-1",
+            pickupStationId: Guid.NewGuid(),
+            dropStationId: Guid.NewGuid());
+        t.Cancel("operator");
+        return t;
+    }
+
+    private static AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommandHandler
+        NewHandler(Trip trip, string? orderStatus)
+    {
+        return new(
+            new FakeTripRepository(trip),
+            new StubRetryEventRepository(),
+            new StubRetryDispatcher(),
+            new StubOrderStatusReader(orderStatus),
+            NullLogger<AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommandHandler>.Instance);
+    }
+}
+
+internal sealed class StubOrderStatusReader : IDeliveryOrderStatusReader
+{
+    private readonly string? _status;
+    public StubOrderStatusReader(string? status) => _status = status;
+    public Task<string?> GetStatusAsync(Guid orderId, CancellationToken ct = default)
+        => Task.FromResult(_status);
+}
+
+internal sealed class StubRetryEventRepository : ITripRetryEventRepository
+{
+    public Task AddAsync(TripRetryEvent ev, CancellationToken ct = default) => Task.CompletedTask;
+    public Task<List<TripRetryEvent>> GetByOriginalTripIdAsync(Guid id, CancellationToken ct = default)
+        => Task.FromResult(new List<TripRetryEvent>());
+    public Task<List<TripRetryEvent>> GetByDeliveryOrderIdAsync(Guid id, CancellationToken ct = default)
+        => Task.FromResult(new List<TripRetryEvent>());
+}
+
+internal sealed class StubRetryDispatcher : ITripRetryDispatcher
+{
+    public Task<Result<Guid>> ReissueAsync(
+        Guid deliveryOrderId, Guid pickupStationId, Guid dropStationId,
+        string newUpperKey, int attemptNumber, Guid previousAttemptId,
+        CancellationToken ct = default)
+        => Task.FromResult(Result<Guid>.Success(Guid.NewGuid()));
+}
+
 // ── Test doubles ────────────────────────────────────────────────────────
 
 internal sealed class FakeTripRepository : ITripRepository
