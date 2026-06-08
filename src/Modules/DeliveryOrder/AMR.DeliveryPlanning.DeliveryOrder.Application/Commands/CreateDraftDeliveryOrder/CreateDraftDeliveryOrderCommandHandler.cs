@@ -43,6 +43,11 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
             request.Notes,
             request.RequestedTransportMode);
 
+        // Caller may override the factory default (true). Null leaves it
+        // for the order/template fallback chain to decide at POD time.
+        if (request.RequiresPod.HasValue)
+            order.SetRequiresPod(request.RequiresPod.Value);
+
         foreach (var (pkg, idx) in request.Items.Select((p, i) => (p, i + 1)))
         {
             var uom = _uomNormalizer.Normalize(pkg.Quantity.Uom);

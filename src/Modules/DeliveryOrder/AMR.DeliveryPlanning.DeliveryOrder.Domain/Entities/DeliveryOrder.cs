@@ -26,8 +26,9 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     /// <summary>
     /// When true, items DO NOT auto-Deliver on TASK_FINISHED — they sit
     /// at DroppedOff until an operator confirms via /pod-scan. Defaults
-    /// to false (current behaviour). Per-order override; null falls back
-    /// to whatever the route's OrderTemplate.RequiresPod says.
+    /// to true for new orders (POD required by default). Per-order
+    /// override; null falls back to whatever the route's
+    /// OrderTemplate.RequiresPod says.
     /// </summary>
     public bool? RequiresPod { get; private set; }
 
@@ -55,7 +56,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             CreatedBy = createdBy,
             RequestedBy = requestedBy,
             Notes = notes,
-            RequestedTransportMode = requestedTransportMode
+            RequestedTransportMode = requestedTransportMode,
+            RequiresPod = true
         };
 
         order.AddDomainEvent(new DeliveryOrderDraftedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, order.Id));
@@ -82,7 +84,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             CreatedBy = createdBy,
             RequestedBy = requestedBy,
             Notes = notes,
-            RequestedTransportMode = requestedTransportMode
+            RequestedTransportMode = requestedTransportMode,
+            RequiresPod = true
         };
 
         order.AddDomainEvent(new DeliveryOrderSubmittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, order.Id));

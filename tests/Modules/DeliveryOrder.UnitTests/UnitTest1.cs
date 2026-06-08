@@ -1630,7 +1630,9 @@ public class DeliveryOrderTests
         order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
         order.MarkTripItemsPicked(tripA);
         order.MarkTripItemsDroppedOff(tripA);
-        // RequiresPod is null AND template default false → effective false
+        // Explicitly clear the order-level default (now true) so we
+        // exercise the null-fallback path: null + template false → false.
+        order.SetRequiresPod(null);
 
         var delivered = order.MarkTripItemsDeliveredOrLeaveForPod(tripA, templateRequiresPod: false);
 
