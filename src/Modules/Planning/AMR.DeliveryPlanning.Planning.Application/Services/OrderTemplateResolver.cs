@@ -100,7 +100,8 @@ public sealed class OrderTemplateResolver : IOrderTemplateResolver
             // RIOT3 wire vocabulary.
             ActionType: action.ActionType.ToString().ToUpperInvariant(),
             BlockingType: m.BlockingType ?? "NONE",
-            ActionParameters: parameters);
+            ActionParameters: parameters,
+            ActionName: action.Name);
     }
 
     // Inline action params land in storage as strings (jsonb deserialization).

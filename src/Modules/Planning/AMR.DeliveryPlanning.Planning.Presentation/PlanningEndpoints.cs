@@ -206,13 +206,17 @@ public static class PlanningEndpoints
                 : RiotEnvelope.NotFound(result.Error);
         });
 
-        // PUT /{id} — full resource replacement (rename is a separate command).
+        // PUT /{id} — full resource replacement, including rename.
         // Body uses the same RIOT3 shape as POST and requires every field
         // the entity exposes — PATCH would imply partial updates, which the
-        // current handler doesn't actually support.
+        // current handler doesn't actually support. Renames are validated
+        // for catalog-wide uniqueness in the handler.
         actionTemplates.MapPut("/{id:guid}",
             async (Guid id, UpdateActionTemplateRequest req, ISender sender) =>
             {
+                if (string.IsNullOrWhiteSpace(req.ActionName))
+                    return RiotEnvelope.BadRequest("actionName is required.");
+
                 ActionTemplateParameterSet parsed;
                 try
                 {
@@ -224,7 +228,7 @@ public static class PlanningEndpoints
                 }
 
                 var result = await sender.Send(new UpdateActionTemplateCommand(
-                    id, req.ActionType, parsed.Id, parsed.Param0, parsed.Param1, parsed.ParamStr));
+                    id, req.ActionName, req.ActionType, parsed.Id, parsed.Param0, parsed.Param1, parsed.ParamStr));
                 return result.IsSuccess
                     ? RiotEnvelope.Ok<object?>(null)
                     : RiotEnvelope.BadRequest(result.Error);
@@ -272,7 +276,10 @@ public static class PlanningEndpoints
 
         // POST — create a new order template. Returns the full created
         // resource in `data` (matches the RIOT3 echo-back contract).
-        orderTemplates.MapPost("/", async (CreateOrderTemplateRequest req, ISender sender) =>
+        orderTemplates.MapPost("/", async (
+            CreateOrderTemplateRequest req,
+            ISender sender,
+            AMR.DeliveryPlanning.Facility.Application.Services.IFacilityReadService facilityReadService) =>
         {
             IReadOnlyList<OrderTemplateMission> missions;
             try
@@ -283,6 +290,15 @@ public static class PlanningEndpoints
             {
                 return RiotEnvelope.BadRequest(ex.Message);
             }
+
+            // Resolve pickup/drop station codes → GUIDs. Both must resolve when
+            // provided — a code that doesn't match any station is a 400 so the
+            // operator can't accidentally create a template no DeliveryOrder
+            // will ever match.
+            var pickupResolve = await StationCodeHelpers.ResolveStationCodeAsync(req.PickupStationCode, "pickupStationCode", facilityReadService);
+            if (pickupResolve.IsError) return RiotEnvelope.BadRequest(pickupResolve.Error!);
+            var dropResolve = await StationCodeHelpers.ResolveStationCodeAsync(req.DropStationCode, "dropStationCode", facilityReadService);
+            if (dropResolve.IsError) return RiotEnvelope.BadRequest(dropResolve.Error!);
 
             var transport = req.TransportOrder!;
             var result = await sender.Send(new CreateOrderTemplateCommand(
@@ -297,8 +313,8 @@ public static class PlanningEndpoints
                 AppointVehicleGroupName: req.AppointVehicleGroupName,
                 AppointQueueWaitArea: req.AppointQueueWaitArea,
                 Description: req.Description,
-                PickupStationId: req.PickupStationId,
-                DropStationId: req.DropStationId));
+                PickupStationId: pickupResolve.Value,
+                DropStationId: dropResolve.Value));
             return result.IsSuccess
                 ? RiotEnvelope.Created(
                     $"/api/v1/order-templates/{result.Value!.Id}",
@@ -334,7 +350,11 @@ public static class PlanningEndpoints
         // the entity exposes). Labelled PATCH originally but the handler
         // overwrites all fields, so the HTTP method now matches the semantic.
         orderTemplates.MapPut("/{id:guid}",
-            async (Guid id, UpdateOrderTemplateRequest req, ISender sender) =>
+            async (
+                Guid id,
+                UpdateOrderTemplateRequest req,
+                ISender sender,
+                AMR.DeliveryPlanning.Facility.Application.Services.IFacilityReadService facilityReadService) =>
             {
                 IReadOnlyList<OrderTemplateMission> missions;
                 try
@@ -345,6 +365,11 @@ public static class PlanningEndpoints
                 {
                     return RiotEnvelope.BadRequest(ex.Message);
                 }
+
+                var pickupResolve = await StationCodeHelpers.ResolveStationCodeAsync(req.PickupStationCode, "pickupStationCode", facilityReadService);
+                if (pickupResolve.IsError) return RiotEnvelope.BadRequest(pickupResolve.Error!);
+                var dropResolve = await StationCodeHelpers.ResolveStationCodeAsync(req.DropStationCode, "dropStationCode", facilityReadService);
+                if (dropResolve.IsError) return RiotEnvelope.BadRequest(dropResolve.Error!);
 
                 var transport = req.TransportOrder!;
                 var result = await sender.Send(new UpdateOrderTemplateCommand(
@@ -359,8 +384,8 @@ public static class PlanningEndpoints
                     AppointVehicleGroupName: req.AppointVehicleGroupName,
                     AppointQueueWaitArea: req.AppointQueueWaitArea,
                     Description: req.Description,
-                    PickupStationId: req.PickupStationId,
-                    DropStationId: req.DropStationId));
+                    PickupStationId: pickupResolve.Value,
+                    DropStationId: dropResolve.Value));
                 return result.IsSuccess
                     ? RiotEnvelope.Ok<object?>(null)
                     : RiotEnvelope.BadRequest(result.Error);
@@ -429,7 +454,36 @@ public record InstantiateOrderTemplateRequest(
     string? UpperKey = null,
     bool? DryRun = null);
 
+// Helper for the endpoint code-resolution pre-check. Defined alongside the
+// request DTOs so it stays close to the layer that owns the conversion.
+internal readonly record struct StationCodeResolution(Guid? Value, string? Error)
+{
+    public bool IsError => Error is not null;
+    public static StationCodeResolution Ok(Guid? value) => new(value, null);
+    public static StationCodeResolution Fail(string error) => new(null, error);
+}
+
+internal static partial class StationCodeHelpers
+{
+    public static async Task<StationCodeResolution> ResolveStationCodeAsync(
+        string? code,
+        string fieldName,
+        AMR.DeliveryPlanning.Facility.Application.Services.IFacilityReadService facilityReadService)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            return StationCodeResolution.Ok(null);
+
+        var guid = await facilityReadService.ResolveStationByCodeAsync(code.Trim());
+        return guid is null
+            ? StationCodeResolution.Fail($"'{code}' is not a valid station code for {fieldName}.")
+            : StationCodeResolution.Ok(guid);
+    }
+}
+
 // ── OrderTemplate request DTOs (RIOT3 wire shape) ─────────────────────────────
+// pickup/drop are accepted as Facility station codes (e.g. "SHELF1_STANDBY");
+// the endpoint resolves them to GUIDs before sending the command. Storing
+// codes externally keeps payloads human-readable and portable across envs.
 public record CreateOrderTemplateRequest(
     string Name,
     int Priority,
@@ -440,8 +494,8 @@ public record CreateOrderTemplateRequest(
     string? AppointVehicleGroupName = null,
     string? AppointQueueWaitArea = null,
     string? Description = null,
-    Guid? PickupStationId = null,
-    Guid? DropStationId = null);
+    string? PickupStationCode = null,
+    string? DropStationCode = null);
 
 public record UpdateOrderTemplateRequest(
     int Priority,
@@ -452,8 +506,8 @@ public record UpdateOrderTemplateRequest(
     string? AppointVehicleGroupName = null,
     string? AppointQueueWaitArea = null,
     string? Description = null,
-    Guid? PickupStationId = null,
-    Guid? DropStationId = null);
+    string? PickupStationCode = null,
+    string? DropStationCode = null);
 
 public record TransportOrderRequest(
     string? StructureType = null,
@@ -576,6 +630,7 @@ public record CreateActionTemplateRequest(
     List<ActionParameterDto>? ActionParameters = null);
 
 public record UpdateActionTemplateRequest(
+    string ActionName,
     ActionType ActionType = ActionType.Std,
     List<ActionParameterDto>? ActionParameters = null);
 

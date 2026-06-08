@@ -53,6 +53,7 @@ internal sealed class Riot3OrderDispatcherAdapter : IRobotOrderDispatcher
             MapId = m.MapId,
             StationId = m.StationId,
             ActionType = m.ActionType,
+            ActionName = m.ActionName,
             BlockingType = m.BlockingType ?? "NONE",
             ActionParameters = m.ActionParameters?
                 .Select(p => new Riot3ActionParam { Key = p.Key, Value = p.Value?.ToString() ?? string.Empty })

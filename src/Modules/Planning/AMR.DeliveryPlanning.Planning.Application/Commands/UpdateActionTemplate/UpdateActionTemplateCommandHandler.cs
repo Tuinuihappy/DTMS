@@ -23,13 +23,23 @@ internal sealed class UpdateActionTemplateCommandHandler : ICommandHandler<Updat
         var template = await _repository.GetByIdAsync(request.Id, cancellationToken)
             ?? throw new NotFoundException($"ActionTemplate {request.Id} not found.");
 
+        var modifiedBy = _currentUser.GetCurrentUserName();
+
+        if (!string.Equals(template.Name, request.ActionName, StringComparison.OrdinalIgnoreCase))
+        {
+            if (await _repository.NameExistsAsync(request.ActionName, excludeId: request.Id, cancellationToken))
+                return Result.Failure($"ActionTemplate name '{request.ActionName}' is already in use.");
+
+            template.Rename(request.ActionName, modifiedBy);
+        }
+
         template.Update(
             actionType: request.ActionType,
             vendorActionId: request.VendorActionId,
             param0: request.Param0,
             param1: request.Param1,
             paramStr: request.ParamStr,
-            modifiedBy: _currentUser.GetCurrentUserName());
+            modifiedBy: modifiedBy);
 
         _repository.Update(template);
         await _repository.SaveChangesAsync(cancellationToken);

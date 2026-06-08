@@ -26,7 +26,11 @@ public sealed record ResolvedMission(
     int? StationId,
     string? ActionType,
     string? BlockingType,
-    IReadOnlyList<ResolvedParam>? ActionParameters);
+    IReadOnlyList<ResolvedParam>? ActionParameters,
+    // Display label for ACT missions — surfaces in the RIOT3 operator UI.
+    // Set to the ActionTemplate.Name for reference-path ACTs; null for
+    // inline ACTs and for MOVE missions.
+    string? ActionName = null);
 
 // Value flows through as object so int / string params keep their JSON type.
 public sealed record ResolvedParam(string Key, object? Value);
