@@ -10,7 +10,10 @@ import {
   deleteOrder,
   getOrder,
   getOrderStats,
+  holdOrder,
   listOrders,
+  rejectOrder,
+  releaseOrder,
   submitOrder,
   type DeliveryOrderDetailDto,
   type DeliveryOrderListDto,
@@ -31,6 +34,10 @@ import { Pagination, type PageSize } from "./pagination";
 import { PodScanDialog } from "./pod-scan-dialog";
 import { RedispatchDialog } from "./redispatch-dialog";
 import { ReopenDialog } from "./reopen-dialog";
+import {
+  StateActionDialog,
+  type StateActionVariant,
+} from "./state-action-dialog";
 import { ToastProvider, useToast } from "./toast";
 
 // Translate the UI's StatusFilter into backend query params. Virtual
@@ -242,6 +249,14 @@ function ExperienceInner() {
   const [redispatchTarget, setRedispatchTarget] = useState<DeliveryOrderListDto | null>(null);
   const [redispatchBusy, setRedispatchBusy] = useState(false);
   const [redispatchError, setRedispatchError] = useState<string | null>(null);
+  // Hold / Release / Reject share one dialog component (StateActionDialog)
+  // — the variant decides labels, tone, and which fields are required.
+  const [stateActionTarget, setStateActionTarget] = useState<{
+    variant: StateActionVariant;
+    order: DeliveryOrderListDto;
+  } | null>(null);
+  const [stateActionBusy, setStateActionBusy] = useState(false);
+  const [stateActionError, setStateActionError] = useState<string | null>(null);
   const [podTarget, setPodTarget] = useState<{ orderId: string; orderRef: string; itemId: string; itemLabel: string } | null>(null);
   const [podBusy, setPodBusy] = useState(false);
   const [podError, setPodError] = useState<string | null>(null);
@@ -257,7 +272,16 @@ function ExperienceInner() {
   // be circular (runAction → openEdit → toast → … → orders).
   const runActionRef = useRef<
     | ((
-        action: "edit" | "submit" | "confirm" | "delete" | "reopen" | "redispatch",
+        action:
+          | "edit"
+          | "submit"
+          | "confirm"
+          | "delete"
+          | "reopen"
+          | "redispatch"
+          | "hold"
+          | "release"
+          | "reject",
         id: string,
         reason?: string,
       ) => Promise<void>)
@@ -529,7 +553,16 @@ function ExperienceInner() {
   // Edit opens the create dialog in edit mode (fetches full detail first).
   const runAction = useCallback(
     async (
-      action: "edit" | "submit" | "confirm" | "delete" | "reopen" | "redispatch",
+      action:
+        | "edit"
+        | "submit"
+        | "confirm"
+        | "delete"
+        | "reopen"
+        | "redispatch"
+        | "hold"
+        | "release"
+        | "reject",
       id: string,
       reason?: string,
     ) => {
@@ -538,6 +571,13 @@ function ExperienceInner() {
 
       if (action === "edit") {
         void openEdit(id);
+        return;
+      }
+
+      // Hold / Release / Reject — open the shared dialog to capture
+      // actor + reason. The dialog calls the API itself.
+      if (action === "hold" || action === "release" || action === "reject") {
+        setStateActionTarget({ variant: action, order: target });
         return;
       }
 
@@ -1022,6 +1062,64 @@ function ExperienceInner() {
             setRedispatchError((err as Error).message);
           } finally {
             setRedispatchBusy(false);
+          }
+        }}
+      />
+
+      <StateActionDialog
+        open={stateActionTarget !== null}
+        variant={stateActionTarget?.variant ?? null}
+        orderRef={stateActionTarget?.order.orderRef ?? null}
+        currentUser={null}
+        busy={stateActionBusy}
+        error={stateActionError}
+        onClose={() => {
+          setStateActionTarget(null);
+          setStateActionError(null);
+        }}
+        onConfirm={async ({ actor, reason }) => {
+          if (!stateActionTarget) return;
+          const { variant, order } = stateActionTarget;
+          setStateActionBusy(true);
+          setStateActionError(null);
+          try {
+            if (variant === "hold") {
+              await holdOrder(order.id, { reason, heldBy: actor || undefined });
+              setOrders((prev) =>
+                prev.map((o) =>
+                  o.id === order.id ? { ...o, orderStatus: "Held" } : o,
+                ),
+              );
+              toast.push({ tone: "info", message: `${order.orderRef} held` });
+            } else if (variant === "release") {
+              await releaseOrder(order.id, { releasedBy: actor || undefined });
+              setOrders((prev) =>
+                prev.map((o) =>
+                  o.id === order.id ? { ...o, orderStatus: "Confirmed" } : o,
+                ),
+              );
+              toast.push({
+                tone: "success",
+                message: `${order.orderRef} released — Planning will re-run`,
+              });
+            } else {
+              await rejectOrder(order.id, { reason, rejectedBy: actor || undefined });
+              setOrders((prev) =>
+                prev.map((o) =>
+                  o.id === order.id ? { ...o, orderStatus: "Rejected" } : o,
+                ),
+              );
+              toast.push({ tone: "info", message: `${order.orderRef} rejected` });
+            }
+            setStateActionTarget(null);
+            setTimeout(() => {
+              fetchOrders({ silent: true });
+              fetchStats();
+            }, 600);
+          } catch (err) {
+            setStateActionError((err as Error).message);
+          } finally {
+            setStateActionBusy(false);
           }
         }}
       />

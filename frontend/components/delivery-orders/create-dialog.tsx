@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createOrder,
   updateOrder,
@@ -24,6 +24,7 @@ import {
   type TransportMode,
   type Uom,
 } from "@/lib/api/delivery-orders";
+import { getStationOptions, type StationOption } from "@/lib/api/facility";
 import { cn } from "@/lib/utils";
 
 type ItemFormState = {
@@ -53,6 +54,7 @@ type FormState = {
   requestedBy: string;
   notes: string;
   transport: TransportMode;
+  requiresPod: boolean;
   windowEarliest: string; // datetime-local string ("YYYY-MM-DDTHH:mm")
   windowLatest: string;
   items: ItemFormState[];
@@ -100,6 +102,7 @@ function blankForm(): FormState {
     requestedBy: "",
     notes: "",
     transport: "Amr",
+    requiresPod: true,
     windowEarliest: "",
     windowLatest: "",
     items: [{ ...EMPTY_ITEM }],
@@ -126,6 +129,7 @@ function formFromOrder(o: DeliveryOrderDetailDto): FormState {
     requestedBy: o.requestedBy ?? "",
     notes: o.notes ?? "",
     transport: o.requestedTransportMode ?? "Amr",
+    requiresPod: o.requiresPod ?? true,
     windowEarliest: isoToLocalInput(o.serviceWindow?.earliestUtc),
     windowLatest: isoToLocalInput(o.serviceWindow?.latestUtc),
     items: o.items.map((it) => ({
@@ -174,6 +178,7 @@ function buildPayload(form: FormState): CreateOrderPayload {
     requestedBy: form.requestedBy.trim() || undefined,
     notes: form.notes.trim() || undefined,
     requestedTransportMode: form.transport,
+    requiresPod: form.requiresPod,
     serviceWindow:
       form.windowEarliest || form.windowLatest
         ? { earliestUtc: toIso(form.windowEarliest), latestUtc: toIso(form.windowLatest) }
@@ -237,6 +242,9 @@ export function CreateOrderDialog({
   const [form, setForm] = useState<FormState>(blankForm);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stations, setStations] = useState<StationOption[]>([]);
+  const [stationsLoading, setStationsLoading] = useState(false);
+  const [stationsError, setStationsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -245,6 +253,26 @@ export function CreateOrderDialog({
       setError(null);
     }
   }, [open, editing]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setStationsLoading(true);
+    setStationsError(null);
+    getStationOptions()
+      .then((opts) => {
+        if (!cancelled) setStations(opts);
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setStationsError(e.message || "Failed to load stations");
+      })
+      .finally(() => {
+        if (!cancelled) setStationsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -426,6 +454,40 @@ export function CreateOrderDialog({
                         </Field>
                       </div>
 
+                      <div>
+                        <span className="mb-1.5 block text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-500)]">
+                          Proof of delivery
+                        </span>
+                        <div className="flex gap-1.5">
+                          {(
+                            [
+                              { value: true, label: "Require POD scan" },
+                              { value: false, label: "Auto-deliver" },
+                            ] as const
+                          ).map((opt) => {
+                            const active = form.requiresPod === opt.value;
+                            return (
+                              <motion.button
+                                key={String(opt.value)}
+                                type="button"
+                                whileTap={{ scale: 0.96 }}
+                                onClick={() =>
+                                  setForm({ ...form, requiresPod: opt.value })
+                                }
+                                className={cn(
+                                  "rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition-all",
+                                  active
+                                    ? "bg-[var(--color-brand-900)] text-white shadow-[0_2px_8px_-3px_rgba(15,23,42,0.45)] dark:bg-[var(--color-brand-500)]"
+                                    : "bg-white/50 text-[var(--color-ink-600)] hover:bg-white/80 dark:bg-white/[0.05] dark:hover:bg-white/[0.1]",
+                                )}
+                              >
+                                {opt.label}
+                              </motion.button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
                       {/* Service window */}
                       <div className="rounded-2xl border border-white/60 bg-white/40 p-4 dark:border-white/[0.06] dark:bg-white/[0.03]">
                         <div className="mb-3 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-500)]">
@@ -539,21 +601,21 @@ export function CreateOrderDialog({
                               />
                             </Field>
                             <Field label="Pickup" required compact>
-                              <input
+                              <StationCombobox
                                 value={it.pickup}
-                                onChange={(e) =>
-                                  updateItem(idx, { pickup: e.target.value })
-                                }
-                                placeholder="LAB-03"
-                                className={inputCls}
+                                onChange={(v) => updateItem(idx, { pickup: v })}
+                                stations={stations}
+                                loading={stationsLoading}
+                                error={stationsError}
                               />
                             </Field>
                             <Field label="Drop" required compact>
-                              <input
+                              <StationCombobox
                                 value={it.drop}
-                                onChange={(e) => updateItem(idx, { drop: e.target.value })}
-                                placeholder="WARD-7"
-                                className={inputCls}
+                                onChange={(v) => updateItem(idx, { drop: v })}
+                                stations={stations}
+                                loading={stationsLoading}
+                                error={stationsError}
                               />
                             </Field>
                             <Field label="Qty" compact>
@@ -904,6 +966,177 @@ const inputCls = cn(
   "focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/40 focus:border-[var(--color-brand-500)]/30",
   "dark:bg-white/[0.05] dark:border-white/10",
 );
+
+function StationCombobox({
+  value,
+  onChange,
+  stations,
+  loading,
+  error,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  stations: StationOption[];
+  loading: boolean;
+  error: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [highlight, setHighlight] = useState(0);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!wrapperRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return stations;
+    return stations.filter(
+      (s) =>
+        s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q),
+    );
+  }, [query, stations]);
+
+  useEffect(() => {
+    setHighlight(0);
+  }, [query, open]);
+
+  useEffect(() => {
+    if (!open || !listRef.current) return;
+    const el = listRef.current.querySelector(
+      `[data-idx="${highlight}"]`,
+    ) as HTMLElement | null;
+    el?.scrollIntoView({ block: "nearest" });
+  }, [highlight, open]);
+
+  function commit(code: string) {
+    onChange(code);
+    setQuery("");
+    setOpen(false);
+    inputRef.current?.blur();
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!open) setOpen(true);
+      setHighlight((h) => Math.min(Math.max(filtered.length - 1, 0), h + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((h) => Math.max(0, h - 1));
+    } else if (e.key === "Enter") {
+      if (open && filtered[highlight]) {
+        e.preventDefault();
+        commit(filtered[highlight].code);
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  }
+
+  const displayValue = open ? query : value;
+  const notInList = !!value && stations.length > 0 && !stations.some((s) => s.code === value);
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={displayValue}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (!open) setOpen(true);
+          }}
+          onFocus={() => {
+            setQuery("");
+            setOpen(true);
+          }}
+          onKeyDown={onKeyDown}
+          disabled={loading || (!!error && stations.length === 0)}
+          placeholder={
+            loading
+              ? "Loading stations…"
+              : error
+                ? "Failed to load"
+                : "Search station…"
+          }
+          autoComplete="off"
+          className={cn(
+            inputCls,
+            "pr-7",
+            (loading || error) && "opacity-70",
+          )}
+        />
+        {value && !loading && (
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              commit("");
+            }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-[var(--color-ink-400)] transition-colors hover:bg-white/40 hover:text-[var(--color-ink-700)] dark:hover:bg-white/[0.1]"
+            aria-label="Clear selection"
+          >
+            <X className="h-3 w-3" strokeWidth={2.4} />
+          </button>
+        )}
+      </div>
+      {open && !loading && !error && (
+        <ul
+          ref={listRef}
+          className={cn(
+            "absolute left-0 right-0 z-30 mt-1 max-h-56 overflow-y-auto rounded-lg",
+            "border border-white/80 bg-white/95 shadow-lg backdrop-blur-md",
+            "dark:border-white/10 dark:bg-[#1a1f2e]/95",
+          )}
+        >
+          {filtered.length === 0 ? (
+            <li className="px-3 py-2 text-[12px] text-[var(--color-ink-400)]">
+              No matching station
+            </li>
+          ) : (
+            filtered.map((s, i) => (
+              <li
+                key={s.code}
+                data-idx={i}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  commit(s.code);
+                }}
+                onMouseEnter={() => setHighlight(i)}
+                className={cn(
+                  "flex cursor-pointer items-baseline gap-2 px-3 py-1.5 text-[12.5px] font-medium",
+                  i === highlight
+                    ? "bg-[var(--color-brand-500)]/15 text-[var(--color-ink-900)] dark:text-white"
+                    : "text-[var(--color-ink-700)] dark:text-[var(--color-ink-200)]",
+                )}
+              >
+                <span className="font-mono">{s.code}</span>
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+      {error && (
+        <p className="mt-1 text-[10.5px] text-[var(--color-coral)]">{error}</p>
+      )}
+      {notInList && !open && (
+        <p className="mt-1 text-[10.5px] text-[var(--color-amber)]">
+          {value} not in active list
+        </p>
+      )}
+    </div>
+  );
+}
 
 function Field({
   label,

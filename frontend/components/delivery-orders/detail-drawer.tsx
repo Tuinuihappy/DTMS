@@ -2,6 +2,7 @@
 
 import {
   ArrowRight,
+  Ban,
   Box,
   Calendar,
   Check,
@@ -9,6 +10,8 @@ import {
   Clock,
   Hash,
   History,
+  PauseCircle,
+  PlayCircle,
   RotateCcw,
   Send,
   Trash2,
@@ -32,7 +35,15 @@ import { FullAuditLog } from "./full-audit-log";
 import { cn } from "@/lib/utils";
 import { PriorityBadge, StatusBadge, TransportModeBadge } from "./badges";
 
-type Action = "submit" | "confirm" | "delete" | "reopen" | "redispatch";
+type Action =
+  | "submit"
+  | "confirm"
+  | "delete"
+  | "reopen"
+  | "redispatch"
+  | "hold"
+  | "release"
+  | "reject";
 
 export function OrderDetailDrawer({
   orderId,
@@ -154,6 +165,7 @@ export function OrderDetailDrawer({
                     <StatusBadge status={data.orderStatus} size="md" />
                     <PriorityBadge priority={data.priority} />
                     <TransportModeBadge mode={data.requestedTransportMode} />
+                    <RequiresPodBadge value={data.requiresPod} />
                   </div>
                 )}
               </div>
@@ -455,6 +467,41 @@ export function OrderDetailDrawer({
                       Reopen
                     </DrawerActionButton>
                   )}
+                  {/* Reject — terminal alternative to Cancel, only valid
+                      before the order is in-flight. After Confirmed →
+                      Dispatched the order is already executing; use
+                      Cancel (which cascades) instead. */}
+                  {can(data.orderStatus, ["Submitted", "Validated", "Confirmed"]) && (
+                    <DrawerActionButton
+                      tone="coral"
+                      icon={<Ban className="h-3.5 w-3.5" strokeWidth={2.4} />}
+                      onClick={() => onAction("reject", data.id)}
+                    >
+                      Reject
+                    </DrawerActionButton>
+                  )}
+                  {/* Hold — pause planning/dispatch on any live state.
+                      Excludes terminal + already-held states. */}
+                  {!["Held", "Completed", "PartiallyCompleted", "Cancelled", "Rejected", "Draft"]
+                    .includes(data.orderStatus) && (
+                    <DrawerActionButton
+                      tone="amber"
+                      icon={<PauseCircle className="h-3.5 w-3.5" strokeWidth={2.4} />}
+                      onClick={() => onAction("hold", data.id)}
+                    >
+                      Hold
+                    </DrawerActionButton>
+                  )}
+                  {/* Release — only from Held; re-fires planning. */}
+                  {can(data.orderStatus, ["Held"]) && (
+                    <DrawerActionButton
+                      tone="success"
+                      icon={<PlayCircle className="h-3.5 w-3.5" strokeWidth={2.4} />}
+                      onClick={() => onAction("release", data.id)}
+                    >
+                      Release
+                    </DrawerActionButton>
+                  )}
                   {/* Redispatch: only meaningful when the order is
                       Confirmed but no Trip ever materialised. We can't
                       cheaply check the Trip count from this drawer's
@@ -619,7 +666,7 @@ function DrawerActionButton({
   onClick,
   children,
 }: {
-  tone: "brand" | "success" | "coral" | "lavender" | "sky";
+  tone: "brand" | "success" | "coral" | "lavender" | "sky" | "amber";
   icon: React.ReactNode;
   onClick: () => void;
   children: React.ReactNode;
@@ -635,6 +682,8 @@ function DrawerActionButton({
       "bg-[var(--color-pastel-lavender)] text-[var(--color-pastel-lavender-ink)] hover:bg-[var(--color-pastel-lavender)]/80",
     sky:
       "bg-[var(--color-pastel-sky)] text-[var(--color-pastel-sky-ink)] hover:bg-[var(--color-pastel-sky)]/80",
+    amber:
+      "bg-[var(--color-amber-soft)] text-[var(--color-amber)] hover:bg-[var(--color-amber-soft)]/80",
   };
   return (
     <motion.button
@@ -650,6 +699,41 @@ function DrawerActionButton({
       {icon}
       {children}
     </motion.button>
+  );
+}
+
+// ── Requires-POD badge ─────────────────────────────────────────────────
+// Surfaces the tri-state per-order POD policy in the drawer header so
+// operators see at a glance whether the order will auto-deliver or sit
+// at DroppedOff waiting for a scan. Null = "inherit from template".
+function RequiresPodBadge({ value }: { value: boolean | null }) {
+  if (value === true) {
+    return (
+      <span
+        title="Items will sit at DroppedOff until /pod-scan is called"
+        className="inline-flex items-center gap-1 rounded-full bg-[var(--color-pastel-peach)] px-2 py-[2px] text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--color-pastel-peach-ink)]"
+      >
+        POD required
+      </span>
+    );
+  }
+  if (value === false) {
+    return (
+      <span
+        title="Items auto-deliver on TASK_FINISHED without a scan"
+        className="inline-flex items-center gap-1 rounded-full bg-[var(--color-ink-100)] px-2 py-[2px] text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-500)] dark:bg-white/[0.06]"
+      >
+        Auto-deliver
+      </span>
+    );
+  }
+  return (
+    <span
+      title="POD policy inherited from the route's OrderTemplate"
+      className="inline-flex items-center gap-1 rounded-full bg-[var(--color-pastel-lavender)] px-2 py-[2px] text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--color-pastel-lavender-ink)]"
+    >
+      POD: inherit
+    </span>
   );
 }
 

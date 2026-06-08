@@ -53,6 +53,9 @@ export type DeliveryOrderListDto = {
   totalQuantity: number;
   totalItems: number;
   requestedTransportMode: TransportMode | null;
+  // Tri-state: true = POD scan required, false = always auto-deliver,
+  // null = fall back to the route's OrderTemplate.RequiresPod.
+  requiresPod: boolean | null;
 };
 
 export type ItemDto = {
@@ -188,6 +191,7 @@ export type CreateOrderPayload = {
   requestedBy?: string;
   notes?: string;
   requestedTransportMode?: TransportMode;
+  requiresPod?: boolean | null;
   serviceWindow?: { earliestUtc?: string; latestUtc?: string };
   items: Array<{
     itemId: string;
@@ -430,6 +434,67 @@ export async function confirmOrder(id: string): Promise<void> {
   const res = await fetch(`/api/delivery-orders/${id}/confirm`, {
     method: "POST",
     headers: mutationHeaders(),
+  });
+  if (!res.ok && res.status !== 204) await unwrap(res);
+}
+
+export async function rejectOrder(
+  id: string,
+  body: { reason: string; rejectedBy?: string },
+): Promise<void> {
+  const res = await fetch(`/api/delivery-orders/${id}/reject`, {
+    method: "POST",
+    headers: mutationHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok && res.status !== 204) await unwrap(res);
+}
+
+export async function holdOrder(
+  id: string,
+  body: { reason: string; heldBy?: string },
+): Promise<void> {
+  const res = await fetch(`/api/delivery-orders/${id}/hold`, {
+    method: "POST",
+    headers: mutationHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok && res.status !== 204) await unwrap(res);
+}
+
+export async function releaseOrder(
+  id: string,
+  body: { releasedBy?: string } = {},
+): Promise<{ orderId: string; warnings?: string[] } | void> {
+  const res = await fetch(`/api/delivery-orders/${id}/release`, {
+    method: "POST",
+    headers: mutationHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (res.status === 204) return;
+  return unwrap<{ orderId: string; warnings?: string[] }>(res);
+}
+
+export async function reopenOrder(
+  id: string,
+  body: { reopenedBy: string; reason: string },
+): Promise<void> {
+  const res = await fetch(`/api/delivery-orders/${id}/reopen`, {
+    method: "POST",
+    headers: mutationHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok && res.status !== 204) await unwrap(res);
+}
+
+export async function redispatchOrder(
+  id: string,
+  body: { redispatchedBy: string; reason: string; weightFallbackKg?: number },
+): Promise<void> {
+  const res = await fetch(`/api/delivery-orders/${id}/redispatch`, {
+    method: "POST",
+    headers: mutationHeaders(),
+    body: JSON.stringify(body),
   });
   if (!res.ok && res.status !== 204) await unwrap(res);
 }
