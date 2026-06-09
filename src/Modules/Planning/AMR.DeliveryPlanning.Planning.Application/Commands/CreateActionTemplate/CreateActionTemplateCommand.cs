@@ -5,8 +5,11 @@ using AMR.DeliveryPlanning.SharedKernel.Messaging;
 namespace AMR.DeliveryPlanning.Planning.Application.Commands.CreateActionTemplate;
 
 // Mirrors the RIOT3 "New action template" form:
-//   Template name + Action template (= ActionType) + ID + param0 + param1 + param_str
-// ActionType defaults to STD matching the RIOT3 API request schema default.
+//   Template name + Action template (= ActionCategory) + ID + param0 + param1 + param_str
+// ActionCategory defaults to STD matching the RIOT3 API request schema default.
+//
+// ActionType is the literal RIOT3 wire string sent on every ACT mission
+// resolved from this template (e.g. "standardRobotsCustom").
 //
 // Returns the projected ActionTemplateDto so the POST response can echo
 // the full created resource — matches RIOT3's `data` envelope shape and
@@ -16,6 +19,7 @@ public record CreateActionTemplateCommand(
     int VendorActionId,
     int Param0,
     int Param1,
-    ActionType ActionType = ActionType.Std,
-    string? ParamStr = null
+    ActionCategory ActionCategory = ActionCategory.Std,
+    string? ParamStr = null,
+    string? ActionType = null
 ) : ICommand<ActionTemplateDto>;

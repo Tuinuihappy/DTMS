@@ -95,10 +95,10 @@ public sealed class OrderTemplateResolver : IOrderTemplateResolver
             Category: m.Category,
             MapId: null,
             StationId: null,
-            // ResolvedMission.ActionType is a free-text string passed to the
-            // vendor; emit the uppercase token ("STD"/"ACT") to match the
-            // RIOT3 wire vocabulary.
-            ActionType: action.ActionType.ToString().ToUpperInvariant(),
+            // RIOT3 expects the literal wire token here (e.g.
+            // "standardRobotsCustom"), stored per-template so each catalog
+            // entry can target a different vendor handler.
+            ActionType: action.ActionType,
             BlockingType: m.BlockingType ?? "NONE",
             ActionParameters: parameters,
             ActionName: action.Name);

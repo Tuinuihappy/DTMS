@@ -41,16 +41,16 @@ public class ActionTemplateRepository : IActionTemplateRepository
         int page,
         int size,
         bool includeInactive = false,
-        ActionType? actionType = null,
+        ActionCategory? actionCategory = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.ActionTemplates.AsQueryable();
         if (!includeInactive)
             query = query.Where(t => t.IsActive);
-        if (actionType.HasValue)
+        if (actionCategory.HasValue)
         {
-            var at = actionType.Value;
-            query = query.Where(t => t.ActionType == at);
+            var cat = actionCategory.Value;
+            query = query.Where(t => t.ActionCategory == cat);
         }
 
         // LongCount keeps the API safe past 2B rows; running it before the

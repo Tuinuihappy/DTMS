@@ -93,15 +93,21 @@ public class PlanningDbContext : DbContext
             // Case-insensitive uniqueness via a lower(name) functional index.
             // Plain unique index would let "Lift" and "lift" coexist.
             builder.HasIndex(t => t.Name).IsUnique().HasDatabaseName("IX_ActionTemplates_Name_Unique");
-            // Store enum as the same uppercase token used on the wire
-            // ("STD"/"ACT") so existing rows round-trip and operators reading
-            // the table by hand see the RIOT3 vocabulary.
-            builder.Property(t => t.ActionType)
+            // DTMS-local category — STD/ACT. Stored as the uppercase token
+            // for human-readable rows + easy filtering.
+            builder.Property(t => t.ActionCategory)
                 .HasConversion(v => v.ToString().ToUpperInvariant(),
-                               v => (ActionType)Enum.Parse(typeof(ActionType), v, true))
+                               v => (ActionCategory)Enum.Parse(typeof(ActionCategory), v, true))
                 .HasMaxLength(50)
                 .IsRequired();
             builder.Property(t => t.VendorActionId).IsRequired();
+            // RIOT3 wire actionType (e.g. "standardRobotsCustom"). Column
+            // name matches the field name on the wire so the entity, DB and
+            // RIOT3 payload all line up.
+            builder.Property(t => t.ActionType)
+                .HasMaxLength(50)
+                .HasDefaultValue(ActionTemplate.DefaultActionType)
+                .IsRequired();
             builder.Property(t => t.Param0).IsRequired();
             builder.Property(t => t.Param1).IsRequired();
             builder.Property(t => t.ParamStr).HasMaxLength(500);

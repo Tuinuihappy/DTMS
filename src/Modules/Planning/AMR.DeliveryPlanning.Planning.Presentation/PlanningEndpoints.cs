@@ -170,8 +170,9 @@ public static class PlanningEndpoints
                 VendorActionId: parsed.Id,
                 Param0: parsed.Param0,
                 Param1: parsed.Param1,
-                ActionType: req.ActionType,
-                ParamStr: parsed.ParamStr));
+                ActionCategory: req.ActionCategory,
+                ParamStr: parsed.ParamStr,
+                ActionType: req.ActionType));
             return result.IsSuccess
                 ? RiotEnvelope.Created(
                     $"/api/v1/action-templates/{result.Value!.Id}",
@@ -185,13 +186,13 @@ public static class PlanningEndpoints
         // bool/int query params must be nullable in minimal APIs so the
         // caller can omit them — otherwise the framework returns 400.
         actionTemplates.MapGet("/", async (
-            int? page, int? size, bool? includeInactive, ActionType? actionType, ISender sender) =>
+            int? page, int? size, bool? includeInactive, ActionCategory? actionCategory, ISender sender) =>
         {
             var result = await sender.Send(new GetActionTemplatesQuery(
                 Page: page ?? 1,
                 Size: size ?? 20,
                 IncludeInactive: includeInactive ?? false,
-                ActionType: actionType));
+                ActionCategory: actionCategory));
             return result.IsSuccess
                 ? RiotEnvelope.Ok(result.Value)
                 : RiotEnvelope.BadRequest(result.Error);
@@ -228,7 +229,8 @@ public static class PlanningEndpoints
                 }
 
                 var result = await sender.Send(new UpdateActionTemplateCommand(
-                    id, req.ActionName, req.ActionType, parsed.Id, parsed.Param0, parsed.Param1, parsed.ParamStr));
+                    id, req.ActionName, req.ActionCategory, parsed.Id, parsed.Param0, parsed.Param1,
+                    parsed.ParamStr, req.ActionType));
                 return result.IsSuccess
                     ? RiotEnvelope.Ok<object?>(null)
                     : RiotEnvelope.BadRequest(result.Error);
@@ -624,15 +626,22 @@ internal static class OrderTemplateMissionParser
 // ActionParameters is declared nullable (with default null) so it can sit
 // after the optional ActionType — the parser rejects null/empty with a
 // clearer 400 message than the framework's missing-property error.
+// `actionCategory` is the DTMS-local STD/ACT grouping; `actionType` is the
+// RIOT3 wire string (e.g. "standardRobotsCustom") sent verbatim on every
+// ACT mission resolved from this template. The latter is optional — server
+// falls back to the domain default when null/blank so existing clients
+// keep working without modification.
 public record CreateActionTemplateRequest(
     string ActionName,
-    ActionType ActionType = ActionType.Std,
-    List<ActionParameterDto>? ActionParameters = null);
+    ActionCategory ActionCategory = ActionCategory.Std,
+    List<ActionParameterDto>? ActionParameters = null,
+    string? ActionType = null);
 
 public record UpdateActionTemplateRequest(
     string ActionName,
-    ActionType ActionType = ActionType.Std,
-    List<ActionParameterDto>? ActionParameters = null);
+    ActionCategory ActionCategory = ActionCategory.Std,
+    List<ActionParameterDto>? ActionParameters = null,
+    string? ActionType = null);
 
 // One entry in the actionParameters array. RIOT3 sends `value` as JSON
 // (int for id/param0/param1, string for param_str, or omitted entirely

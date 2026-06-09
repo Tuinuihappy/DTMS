@@ -29,17 +29,23 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ActionType")
+                    b.Property<string>("ActionCategory")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("ActionType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("standardRobotsCustom");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<bool>("IsActive")
                         .IsRequired()
@@ -48,6 +54,10 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -107,6 +117,10 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -122,6 +136,10 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Name")
                         .IsRequired()

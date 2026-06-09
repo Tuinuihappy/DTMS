@@ -32,12 +32,13 @@ internal sealed class CreateActionTemplateCommandHandler : ICommandHandler<Creat
         {
             template = new ActionTemplate(
                 name: request.Name,
-                actionType: request.ActionType,
+                actionCategory: request.ActionCategory,
                 vendorActionId: request.VendorActionId,
                 param0: request.Param0,
                 param1: request.Param1,
                 paramStr: request.ParamStr,
-                createdBy: _currentUser.GetCurrentUserName());
+                createdBy: _currentUser.GetCurrentUserName(),
+                actionType: request.ActionType);
         }
         catch (ArgumentException ex)
         {

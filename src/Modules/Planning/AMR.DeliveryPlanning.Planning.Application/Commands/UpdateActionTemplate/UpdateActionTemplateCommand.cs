@@ -10,9 +10,10 @@ namespace AMR.DeliveryPlanning.Planning.Application.Commands.UpdateActionTemplat
 public record UpdateActionTemplateCommand(
     Guid Id,
     string ActionName,
-    ActionType ActionType,
+    ActionCategory ActionCategory,
     int VendorActionId,
     int Param0,
     int Param1,
-    string? ParamStr = null
+    string? ParamStr = null,
+    string? ActionType = null
 ) : ICommand;

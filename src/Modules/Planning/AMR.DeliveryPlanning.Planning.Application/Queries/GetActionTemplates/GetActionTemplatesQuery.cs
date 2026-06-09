@@ -20,7 +20,8 @@ public sealed record ActionParameterValueDto(
 public sealed record ActionTemplateDto(
     Guid Id,
     string ActionName,
-    ActionType ActionType,
+    ActionCategory ActionCategory,
+    string ActionType,
     IReadOnlyList<ActionParameterValueDto> ActionParameters,
     bool IsActive,
     DateTime CreatedAt,
@@ -42,7 +43,7 @@ public record GetActionTemplatesQuery(
     int Page = 1,
     int Size = 20,
     bool IncludeInactive = false,
-    ActionType? ActionType = null) : IQuery<PagedActionTemplates>;
+    ActionCategory? ActionCategory = null) : IQuery<PagedActionTemplates>;
 
 public class GetActionTemplatesQueryHandler : IQueryHandler<GetActionTemplatesQuery, PagedActionTemplates>
 {
@@ -62,7 +63,7 @@ public class GetActionTemplatesQueryHandler : IQueryHandler<GetActionTemplatesQu
         var size = request.Size < 1 ? 20 : Math.Min(request.Size, MaxPageSize);
 
         var (templates, total) = await _repo.ListPagedAsync(
-            page, size, request.IncludeInactive, request.ActionType, cancellationToken);
+            page, size, request.IncludeInactive, request.ActionCategory, cancellationToken);
 
         var records = templates.Select(ActionTemplateDtoFactory.From).ToList();
         // Mybatis-Plus convention: ceil(total/size), minimum 1 even when empty.
@@ -88,7 +89,7 @@ public static class ActionTemplateDtoFactory
             new("param_str", t.ParamStr)
         };
         return new ActionTemplateDto(
-            t.Id, t.Name, t.ActionType, parameters,
+            t.Id, t.Name, t.ActionCategory, t.ActionType, parameters,
             t.IsActive, t.CreatedAt, t.ModifiedAt, t.CreatedBy, t.ModifiedBy);
     }
 }

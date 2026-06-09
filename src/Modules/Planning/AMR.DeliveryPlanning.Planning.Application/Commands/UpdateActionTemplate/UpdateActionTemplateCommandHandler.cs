@@ -34,12 +34,13 @@ internal sealed class UpdateActionTemplateCommandHandler : ICommandHandler<Updat
         }
 
         template.Update(
-            actionType: request.ActionType,
+            actionCategory: request.ActionCategory,
             vendorActionId: request.VendorActionId,
             param0: request.Param0,
             param1: request.Param1,
             paramStr: request.ParamStr,
-            modifiedBy: modifiedBy);
+            modifiedBy: modifiedBy,
+            actionType: request.ActionType);
 
         _repository.Update(template);
         await _repository.SaveChangesAsync(cancellationToken);

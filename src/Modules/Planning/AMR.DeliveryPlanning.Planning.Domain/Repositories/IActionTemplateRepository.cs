@@ -25,7 +25,7 @@ public interface IActionTemplateRepository
         int page,
         int size,
         bool includeInactive = false,
-        ActionType? actionType = null,
+        ActionCategory? actionCategory = null,
         CancellationToken cancellationToken = default);
 
     Task AddAsync(ActionTemplate template, CancellationToken cancellationToken = default);
