@@ -341,6 +341,26 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     }
 
     /// <summary>
+    /// Mark every unbound, non-terminal item Cancelled. Used by the
+    /// trip-cancelled consumer when the order's own status is already
+    /// Cancelled / Rejected — those orders won't dispatch again, so
+    /// unbound items left at Pending would never reach a terminal state.
+    /// Delivered items (and anything else already terminal) are skipped.
+    /// </summary>
+    public int CancelUnboundItems()
+    {
+        var changed = 0;
+        foreach (var item in _items)
+        {
+            if (item.TripId is not null) continue;
+            if (item.IsTerminal) continue;
+            item.MarkCancelled();
+            changed++;
+        }
+        return changed;
+    }
+
+    /// <summary>
     /// Derive the order's terminal status from item states. No-op when
     /// the order is in an admin-overriden state (Cancelled / Rejected)
     /// or while any item is still in-flight (Pending / Picked).

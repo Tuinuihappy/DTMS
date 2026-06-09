@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Options;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
@@ -48,8 +48,10 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         {
             _logger.LogInformation("[Upstream] Order '{OrderRef}' from {SourceSystem} already exists with id {OrderId} — returning existing.",
                 request.OrderRef, request.SourceSystem, existing.Id);
+            // GetByRefAsync doesn't include Items — refetch the full graph for the DetailDto.
+            var full = await _repository.GetByIdAsNoTrackingAsync(existing.Id, cancellationToken);
             return Result<UpstreamOrderAckDto>.Success(
-                new UpstreamOrderAckDto(existing.Id, existing.OrderRef, existing.Status, existing.CreatedDate, Array.Empty<OrderQualityIssue>()));
+                new UpstreamOrderAckDto(DeliveryOrderMapper.MapToDetailDto(full!), Array.Empty<OrderQualityIssue>()));
         }
 
         Domain.Entities.DeliveryOrder order;
@@ -125,7 +127,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
                 order.Id, order.OrderRef, order.SourceSystem, warnings.Count);
 
             return Result<UpstreamOrderAckDto>.Success(
-                new UpstreamOrderAckDto(order.Id, order.OrderRef, order.Status, order.CreatedDate, warnings));
+                new UpstreamOrderAckDto(DeliveryOrderMapper.MapToDetailDto(order), warnings));
         }
         catch (InvalidOperationException ex)
         {
@@ -146,8 +148,9 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
 
             _logger.LogInformation("[Upstream] Order '{OrderRef}' raced with concurrent insert — returning existing id {OrderId}.",
                 request.OrderRef, raced.Id);
+            var racedFull = await _repository.GetByIdAsNoTrackingAsync(raced.Id, cancellationToken);
             return Result<UpstreamOrderAckDto>.Success(
-                new UpstreamOrderAckDto(raced.Id, raced.OrderRef, raced.Status, raced.CreatedDate, Array.Empty<OrderQualityIssue>()));
+                new UpstreamOrderAckDto(DeliveryOrderMapper.MapToDetailDto(racedFull!), Array.Empty<OrderQualityIssue>()));
         }
     }
 }

@@ -162,7 +162,7 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(command);
             return result.IsSuccess
-                ? Results.Created($"/api/v1/delivery-orders/{result.Value.Id}", result.Value)
+                ? Results.Created($"/api/v1/delivery-orders/{result.Value.Order.Id}", result.Value)
                 : Results.BadRequest(result.Error);
         }).RequireIdempotencyKey();
 

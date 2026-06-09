@@ -129,6 +129,26 @@ public class Item : Entity<Guid>
         }
     }
 
+    /// <summary>Follow the order to a Cancelled terminal state. Used when
+    /// the order itself is admin-cancelled (operator hit "Cancel order"
+    /// in the UI) — the cascade unbinds items from in-flight trips, but
+    /// without this they'd sit at Pending forever because the order is
+    /// admin-locked at Cancelled and won't dispatch again. Delivered
+    /// items are never touched.</summary>
+    internal void MarkCancelled()
+    {
+        if (Status is ItemStatus.Delivered or ItemStatus.Cancelled) return;
+        Status = ItemStatus.Cancelled;
+    }
+
+    /// <summary>True when the item has reached one of the irreversible
+    /// states the consumer flow stops touching.</summary>
+    internal bool IsTerminal =>
+        Status is ItemStatus.Delivered
+               or ItemStatus.Failed
+               or ItemStatus.Cancelled
+               or ItemStatus.Returned;
+
     /// <summary>Transition Pending → Picked when the vendor reports the
     /// robot finished its pickup action at the trip's pickup station.
     /// Idempotent against duplicate webhooks (Picked → Picked = no-op).

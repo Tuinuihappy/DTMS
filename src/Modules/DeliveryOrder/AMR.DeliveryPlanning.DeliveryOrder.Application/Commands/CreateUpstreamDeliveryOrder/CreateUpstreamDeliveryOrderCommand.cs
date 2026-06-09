@@ -2,6 +2,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliver
 using AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DetailDto = AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder.DeliveryOrderDetailDto;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
 
@@ -18,8 +19,5 @@ public record CreateUpstreamDeliveryOrderCommand(
 ) : ICommand<UpstreamOrderAckDto>;
 
 public record UpstreamOrderAckDto(
-    Guid Id,
-    string OrderRef,
-    OrderStatus Status,
-    DateTime AcceptedAt,
+    DetailDto Order,
     IReadOnlyList<OrderQualityIssue> Warnings);

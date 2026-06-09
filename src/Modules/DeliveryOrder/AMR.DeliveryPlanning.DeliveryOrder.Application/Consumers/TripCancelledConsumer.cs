@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
 using MassTransit;
@@ -49,12 +50,20 @@ public class TripCancelledConsumer : IConsumer<TripCancelledIntegrationEvent>
             // finalized (e.g. multi-group with no outstanding items).
             order.RecomputeStatusFromItems();
 
+            // If the order is admin-cancelled, the cascade reached here AFTER
+            // Order.Cancel() ran upstream. Items must follow the order to a
+            // terminal state — leaving them Pending strands them forever
+            // because the order won't dispatch again.
+            var cancelledItems = 0;
+            if (order.Status is OrderStatus.Cancelled or OrderStatus.Rejected)
+                cancelledItems = order.CancelUnboundItems();
+
             await _repository.SaveChangesAsync(context.CancellationToken);
 
             if (released > 0)
                 _logger.LogInformation(
-                    "DeliveryOrder {OrderId} released {Count} items from cancelled Trip {TripId}; status now {Status}",
-                    order.Id, released, evt.TripId, order.Status);
+                    "DeliveryOrder {OrderId} released {Count} items from cancelled Trip {TripId}; status now {Status} (cancelled {CancelledItems} unbound items)",
+                    order.Id, released, evt.TripId, order.Status, cancelledItems);
         }
         catch (DbUpdateConcurrencyException)
         {
