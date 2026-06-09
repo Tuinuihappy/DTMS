@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.VendorAdapter.Abstractions.Models;
 using AMR.DeliveryPlanning.VendorAdapter.Abstractions.Services;
@@ -15,6 +16,15 @@ namespace AMR.DeliveryPlanning.VendorAdapter.Riot3.Services;
 // upperKey (the envelope key) — not individual tasks.
 public class Riot3CommandService : IVehicleCommandService
 {
+    // Drop null/unset fields so the on-the-wire JSON matches the RIOT3 spec
+    // example shape (MOVE missions don't include actionType/blockingType/
+    // actionParameters fields at all, etc.). Without this, every nullable
+    // property would serialize as `"field": null` and bloat the payload.
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
     private readonly HttpClient _httpClient;
     private readonly ILogger<Riot3CommandService> _logger;
 
@@ -40,7 +50,7 @@ public class Riot3CommandService : IVehicleCommandService
         string requestJson;
         try
         {
-            requestJson = JsonSerializer.Serialize(request);
+            requestJson = JsonSerializer.Serialize(request, JsonOptions);
         }
         catch (Exception ex)
         {
@@ -80,16 +90,19 @@ public class Riot3CommandService : IVehicleCommandService
         }
     }
 
-    // Envelope-level operation (cancel / pause / resume an entire upperKey).
-    public Task<Result<Riot3OperationOutcome>> CancelEnvelopeAsync(string upperKey, CancellationToken cancellationToken = default)
-        => SendOrderOperationAsync(upperKey, Riot3OrderCommandType.Cancel, "cancel", cancellationToken);
+    // Envelope-level operation against the vendor's orderKey (Trip.VendorOrderKey).
+    // An earlier implementation routed through DTMS upperKey via ?isUpper=true,
+    // but RIOT3 silently no-ops the command in that mode — orderState stays
+    // unchanged and code "0" is returned, leaving us no signal to retry.
+    public Task<Result<Riot3OperationOutcome>> CancelEnvelopeAsync(string vendorOrderKey, CancellationToken cancellationToken = default)
+        => SendOrderOperationAsync(vendorOrderKey, Riot3OrderCommandType.Cancel, "cancel", cancellationToken);
 
-    public Task<Result<Riot3OperationOutcome>> PauseEnvelopeAsync(string upperKey, CancellationToken cancellationToken = default)
-        => SendOrderOperationAsync(upperKey, Riot3OrderCommandType.Hold, "pause", cancellationToken);
+    public Task<Result<Riot3OperationOutcome>> PauseEnvelopeAsync(string vendorOrderKey, CancellationToken cancellationToken = default)
+        => SendOrderOperationAsync(vendorOrderKey, Riot3OrderCommandType.Hold, "pause", cancellationToken);
 
-    public Task<Result<Riot3OperationOutcome>> ResumeEnvelopeAsync(string upperKey, CancellationToken cancellationToken = default)
+    public Task<Result<Riot3OperationOutcome>> ResumeEnvelopeAsync(string vendorOrderKey, CancellationToken cancellationToken = default)
         // CMD_ORDER_CONTINUE_FROM_HELD pairs with CMD_ORDER_HELD; HANG-from-* is for system-initiated hangs.
-        => SendOrderOperationAsync(upperKey, Riot3OrderCommandType.ContinueFromHeld, "resume", cancellationToken);
+        => SendOrderOperationAsync(vendorOrderKey, Riot3OrderCommandType.ContinueFromHeld, "resume", cancellationToken);
 
     public async Task<StandardRobotState?> GetVehicleStateAsync(Guid vehicleId, CancellationToken cancellationToken = default)
     {
@@ -121,13 +134,13 @@ public class Riot3CommandService : IVehicleCommandService
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private async Task<Result<Riot3OperationOutcome>> SendOrderOperationAsync(
-        string upperKey,
+        string vendorOrderKey,
         string orderCommandType,
         string operationLabel,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("RIOT3 envelope operation {Operation} ({Command}) for upperKey {UpperKey}",
-            operationLabel, orderCommandType, upperKey);
+        _logger.LogInformation("RIOT3 envelope operation {Operation} ({Command}) for vendorOrderKey {OrderKey}",
+            operationLabel, orderCommandType, vendorOrderKey);
 
         var envelope = new Riot3OrderOperationEnvelope
         {
@@ -140,8 +153,13 @@ public class Riot3CommandService : IVehicleCommandService
 
         try
         {
+            // Operate by RIOT3's own orderKey, NOT the DTMS upperKey.
+            // RIOT3 returns code "0" but silently no-ops when the operation
+            // is addressed via ?isUpper=true (verified empirically on IN_QUEUE
+            // orders: CMD_ORDER_CANCEL with upperKey leaves orderState
+            // unchanged). The orderKey path is the only reliable form.
             var response = await _httpClient.PutAsJsonAsync(
-                $"/api/v4/orders/{Uri.EscapeDataString(upperKey)}/operation?isUpper=true",
+                $"/api/v4/orders/{Uri.EscapeDataString(vendorOrderKey)}/operation",
                 envelope,
                 cancellationToken);
 
@@ -150,8 +168,8 @@ public class Riot3CommandService : IVehicleCommandService
             // pick its own policy (Cancel forgives, Pause/Resume escalate).
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                _logger.LogWarning("RIOT3 {Operation}: vendor has no record of upperKey {UpperKey} (HTTP 404)",
-                    operationLabel, upperKey);
+                _logger.LogWarning("RIOT3 {Operation}: vendor has no record of orderKey {OrderKey} (HTTP 404)",
+                    operationLabel, vendorOrderKey);
                 return Result<Riot3OperationOutcome>.Success(Riot3OperationOutcome.NoVendorRecord);
             }
             response.EnsureSuccessStatusCode();
@@ -162,24 +180,28 @@ public class Riot3CommandService : IVehicleCommandService
             // is the soft-404 equivalent of HTTP 404 and gets the same outcome.
             var payload = await response.Content.ReadFromJsonAsync<Riot3CreateOrderResponse>(cancellationToken);
             if (payload?.Code == "0")
+            {
+                _logger.LogInformation("RIOT3 {Operation} accepted for orderKey {OrderKey}",
+                    operationLabel, vendorOrderKey);
                 return Result<Riot3OperationOutcome>.Success(Riot3OperationOutcome.Accepted);
+            }
 
             if (payload?.Code == "E110014")
             {
-                _logger.LogWarning("RIOT3 {Operation}: vendor returned E110014 (order is empty) for upperKey {UpperKey}",
-                    operationLabel, upperKey);
+                _logger.LogWarning("RIOT3 {Operation}: vendor returned E110014 (order is empty) for orderKey {OrderKey}",
+                    operationLabel, vendorOrderKey);
                 return Result<Riot3OperationOutcome>.Success(Riot3OperationOutcome.NoVendorRecord);
             }
 
             var msg = payload?.Message ?? "(no message)";
-            _logger.LogWarning("RIOT3 rejected {Operation} on upperKey {UpperKey}: code={Code} message={Message}",
-                operationLabel, upperKey, payload?.Code ?? "(null)", msg);
+            _logger.LogWarning("RIOT3 rejected {Operation} on orderKey {OrderKey}: code={Code} message={Message}",
+                operationLabel, vendorOrderKey, payload?.Code ?? "(null)", msg);
             return Result<Riot3OperationOutcome>.Failure(
                 $"RIOT3 rejected {operationLabel} (code {payload?.Code ?? "null"}): {msg}");
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Failed to {Operation} RIOT3 envelope {UpperKey}", operationLabel, upperKey);
+            _logger.LogError(ex, "Failed to {Operation} RIOT3 envelope {OrderKey}", operationLabel, vendorOrderKey);
             return Result<Riot3OperationOutcome>.Failure($"RIOT3 {operationLabel} error: {ex.Message}");
         }
     }

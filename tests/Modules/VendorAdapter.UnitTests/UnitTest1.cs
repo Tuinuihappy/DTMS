@@ -44,19 +44,91 @@ public class UnitTest1
     }
 
     [Fact]
-    public async Task CancelEnvelopeAsync_PutsOperationAgainstUpperKey()
+    public async Task SendOrderAsync_MissionWireShape_MatchesRiot3SpecExactly()
     {
+        // Pin the wire shape against the RIOT3 spec example: nullable fields
+        // must drop out so MOVE missions don't carry actionType/blockingType
+        // keys and ACT missions don't carry mapId/stationId. actionName must
+        // not appear at all (RIOT3 looks it up against its catalog and an
+        // incidental name match would override our inline params).
         var handler = new CaptureHandler();
         var client = new HttpClient(handler) { BaseAddress = new Uri("http://riot3.local") };
         var service = new Riot3CommandService(client, NullLogger<Riot3CommandService>.Instance);
 
-        var result = await service.CancelEnvelopeAsync("abc123-G1");
+        var request = new Riot3OrderRequest
+        {
+            UpperKey = "G1",
+            OrderName = "wire-test",
+            OrderType = "WORK",
+            Priority = 50,
+            StructureType = "sequence",
+            Missions = new List<Riot3Mission>
+            {
+                new() { Type = "MOVE", Category = "agv", MapId = 2, StationId = 2 },
+                new()
+                {
+                    Type = "ACT", Category = "agv",
+                    ActionType = "standardRobotsCustom",
+                    BlockingType = "NONE",
+                    ActionParameters = new List<Riot3ActionParam>
+                    {
+                        new() { Key = "id", Value = 131 },
+                        new() { Key = "param0", Value = 0 },
+                        new() { Key = "param1", Value = 0 }
+                    }
+                }
+            }
+        };
+
+        await service.SendOrderAsync(request);
+
+        Assert.NotNull(handler.JsonBody);
+        using var doc = JsonDocument.Parse(handler.JsonBody!);
+
+        var move = doc.RootElement.GetProperty("missions")[0];
+        Assert.Equal("MOVE", move.GetProperty("type").GetString());
+        Assert.Equal(2, move.GetProperty("mapId").GetInt32());
+        Assert.Equal(2, move.GetProperty("stationId").GetInt32());
+        Assert.False(move.TryGetProperty("actionType", out _), "MOVE must not include actionType");
+        Assert.False(move.TryGetProperty("blockingType", out _), "MOVE must not include blockingType");
+        Assert.False(move.TryGetProperty("actionParameters", out _), "MOVE must not include actionParameters");
+        Assert.False(move.TryGetProperty("actionName", out _), "wire must never include actionName");
+        Assert.False(move.TryGetProperty("missionIndex", out _), "spec example omits missionIndex");
+
+        var act = doc.RootElement.GetProperty("missions")[1];
+        Assert.Equal("ACT", act.GetProperty("type").GetString());
+        Assert.Equal("standardRobotsCustom", act.GetProperty("actionType").GetString());
+        Assert.Equal("NONE", act.GetProperty("blockingType").GetString());
+        Assert.False(act.TryGetProperty("mapId", out _), "ACT must not include mapId");
+        Assert.False(act.TryGetProperty("stationId", out _), "ACT must not include stationId");
+        Assert.False(act.TryGetProperty("actionName", out _), "wire must never include actionName");
+
+        var firstParam = act.GetProperty("actionParameters")[0];
+        Assert.Equal("id", firstParam.GetProperty("key").GetString());
+        // CRITICAL: value must serialize as JSON number, not a string —
+        // the spec example shows `"value": 131`, not `"value": "131"`.
+        Assert.Equal(JsonValueKind.Number, firstParam.GetProperty("value").ValueKind);
+        Assert.Equal(131, firstParam.GetProperty("value").GetInt32());
+    }
+
+    [Fact]
+    public async Task CancelEnvelopeAsync_PutsOperationAgainstVendorOrderKey()
+    {
+        // Routes by RIOT3's own orderKey (NOT the DTMS upperKey via
+        // ?isUpper=true). Verified empirically: with isUpper=true RIOT3
+        // returns code "0" but silently no-ops on IN_QUEUE orders, leaving
+        // the order live. The orderKey path is the only reliable form.
+        var handler = new CaptureHandler();
+        var client = new HttpClient(handler) { BaseAddress = new Uri("http://riot3.local") };
+        var service = new Riot3CommandService(client, NullLogger<Riot3CommandService>.Instance);
+
+        var result = await service.CancelEnvelopeAsync("272");
 
         Assert.True(result.IsSuccess);
         Assert.Equal(1, handler.CallCount);
         Assert.Equal(HttpMethod.Put, handler.LastMethod);
-        Assert.Contains("/api/v4/orders/abc123-G1/operation", handler.LastUri);
-        Assert.Contains("isUpper=true", handler.LastUri);
+        Assert.Contains("/api/v4/orders/272/operation", handler.LastUri);
+        Assert.DoesNotContain("isUpper", handler.LastUri);
     }
 
     // RIOT3 returns HTTP 200 even on logical failures — the success signal

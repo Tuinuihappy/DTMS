@@ -45,19 +45,28 @@ internal sealed class Riot3OrderDispatcherAdapter : IRobotOrderDispatcher
 
     private static Riot3Mission MapMission(ResolvedMission m)
     {
+        // Field selection per RIOT3 POST /api/v4/orders spec example:
+        //   MOVE: { type, category, mapId, stationId }
+        //   ACT : { type, category, actionType, blockingType, actionParameters }
+        // Anything we don't populate stays null and is dropped by the
+        // serializer (configured with WhenWritingNull). Notably we DO NOT
+        // emit actionName — RIOT3 looks up names against its own catalog
+        // and an incidental match would override the inline params we just
+        // resolved. Likewise missionIndex is not in the spec example.
+        var isMove = string.Equals(m.Type, "MOVE", StringComparison.OrdinalIgnoreCase);
         return new Riot3Mission
         {
-            MissionIndex = m.Sequence,
             Type = m.Type,
             Category = m.Category,
-            MapId = m.MapId,
-            StationId = m.StationId,
-            ActionType = m.ActionType,
-            ActionName = m.ActionName,
-            BlockingType = m.BlockingType ?? "NONE",
-            ActionParameters = m.ActionParameters?
-                .Select(p => new Riot3ActionParam { Key = p.Key, Value = p.Value?.ToString() ?? string.Empty })
-                .ToList()
+            MapId = isMove ? m.MapId : null,
+            StationId = isMove ? m.StationId : null,
+            ActionType = isMove ? null : m.ActionType,
+            BlockingType = isMove ? null : (m.BlockingType ?? "NONE"),
+            ActionParameters = isMove
+                ? null
+                : m.ActionParameters?
+                    .Select(p => new Riot3ActionParam { Key = p.Key, Value = p.Value })
+                    .ToList()
         };
     }
 }

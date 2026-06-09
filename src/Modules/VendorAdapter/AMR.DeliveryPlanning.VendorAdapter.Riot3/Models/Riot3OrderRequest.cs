@@ -60,8 +60,12 @@ public class Riot3Mission
     [JsonPropertyName("actionType")]
     public string? ActionType { get; set; }
 
+    // Nullable because MOVE missions don't carry this field per the RIOT3
+    // spec example — only ACT missions emit "blockingType". The adapter
+    // sets "NONE" on ACT and leaves null on MOVE; the serializer
+    // (WhenWritingNull) drops it from MOVE on the wire.
     [JsonPropertyName("blockingType")]
-    public string BlockingType { get; set; } = "NONE";
+    public string? BlockingType { get; set; }
 
     [JsonPropertyName("missionKey")]
     public string? MissionKey { get; set; }
@@ -96,8 +100,10 @@ public class Riot3ActionParam
     [JsonPropertyName("key")]
     public string Key { get; set; } = string.Empty;
 
-    // Spec example shows mixed types (int, string); keep as string for
-    // serialization simplicity — callers stringify before passing in.
+    // RIOT3 spec sends mixed types: id/param0/param1 as JSON numbers, param_str
+    // as a string. Typed as `object?` so the serializer emits the actual JSON
+    // shape (`"value": 131`, not `"value": "131"`) — callers pass the raw value
+    // (int, string, etc.) and System.Text.Json picks the right token.
     [JsonPropertyName("value")]
-    public string Value { get; set; } = string.Empty;
+    public object? Value { get; set; }
 }
