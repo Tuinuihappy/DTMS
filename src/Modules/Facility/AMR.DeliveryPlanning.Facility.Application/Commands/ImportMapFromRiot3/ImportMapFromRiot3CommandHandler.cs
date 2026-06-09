@@ -29,14 +29,25 @@ internal sealed class ImportMapFromRiot3CommandHandler
             return Result<ImportMapFromRiot3Result>.Failure(
                 $"Map with RIOT3 id {request.Riot3MapId} already exists (DTMS map id: {existing.Id}).");
 
-        // 2. Fetch map info from RIOT3
-        var riot3Map = await _riot3.GetMapAsync(request.Riot3MapId, cancellationToken);
-        if (riot3Map is null)
-            return Result<ImportMapFromRiot3Result>.Failure(
-                $"Map {request.Riot3MapId} not found in RIOT3 or RIOT3 is unreachable.");
+        // 2. Fetch map info + stations from RIOT3. Null now means "map doesn't exist"
+        // and exceptions mean "RIOT3 unreachable" — surface both as Result.Failure so
+        // the caller sees a distinct error instead of a generic 500.
+        Riot3MapInfo? riot3Map;
+        List<Riot3StationInfo> riot3Stations;
+        try
+        {
+            riot3Map = await _riot3.GetMapAsync(request.Riot3MapId, cancellationToken);
+            if (riot3Map is null)
+                return Result<ImportMapFromRiot3Result>.Failure(
+                    $"Map {request.Riot3MapId} not found in RIOT3.");
 
-        // 2. Fetch stations from RIOT3
-        var riot3Stations = await _riot3.GetStationsAsync(request.Riot3MapId, cancellationToken);
+            riot3Stations = await _riot3.GetStationsAsync(request.Riot3MapId, cancellationToken);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        {
+            return Result<ImportMapFromRiot3Result>.Failure(
+                $"RIOT3 unreachable while importing map {request.Riot3MapId}: {ex.Message}");
+        }
 
         // 3. Calculate map bounds from station coordinates (+ 20% padding)
         var maxX = riot3Stations.Any() ? riot3Stations.Max(s => Math.Abs(s.PosX)) * 1.2 : 100_000;

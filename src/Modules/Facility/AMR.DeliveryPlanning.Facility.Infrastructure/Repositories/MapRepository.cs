@@ -24,6 +24,13 @@ public class MapRepository : IMapRepository
         return _dbContext.Maps.FirstOrDefaultAsync(m => m.VendorRef == vendorRef, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Map>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Maps
+            .OrderBy(m => m.Name)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Map map, CancellationToken cancellationToken = default)
     {
         await _dbContext.Maps.AddAsync(map, cancellationToken);

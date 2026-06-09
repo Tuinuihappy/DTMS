@@ -96,10 +96,10 @@ public static class ModuleServiceRegistration
         })
         .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
         .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
-        // MapStationSync runs at 15s delay; RouteEdgeSync runs at 2min delay to ensure stations are synced first
+        // MapStationSync runs at 15s delay; RouteEdgeSync runs at 2min delay to ensure stations are synced first.
+        // MapStationSync now dispatches SyncMapStationsCommand per map — same code path as the manual endpoint.
         services.AddHostedService(sp => new MapStationSyncService(
             sp.GetRequiredService<IServiceScopeFactory>(),
-            sp.GetRequiredService<AMR.DeliveryPlanning.Facility.Application.Services.IRiot3FacilityClient>(),
             sp.GetRequiredService<ILogger<MapStationSyncService>>(),
             TimeSpan.FromMinutes(syncIntervalMinutes)));
         services.AddHostedService(sp => new RouteEdgeSyncService(

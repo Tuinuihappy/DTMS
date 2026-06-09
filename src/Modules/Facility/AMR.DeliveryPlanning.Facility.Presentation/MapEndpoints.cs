@@ -8,12 +8,14 @@ using AMR.DeliveryPlanning.Facility.Application.Commands.FacilityResource;
 using AMR.DeliveryPlanning.Facility.Application.Commands.RegisterCarrierTypeProfile;
 using AMR.DeliveryPlanning.Facility.Application.Commands.ReleaseShelf;
 using AMR.DeliveryPlanning.Facility.Application.Commands.RegisterLoadUnitProfile;
+using AMR.DeliveryPlanning.Facility.Application.Commands.SyncMapStations;
 using AMR.DeliveryPlanning.Facility.Application.Commands.TopologyOverlay;
 using AMR.DeliveryPlanning.Facility.Application.Queries.GetCarrierTypeProfiles;
 using AMR.DeliveryPlanning.Facility.Application.Queries.GetLoadUnitProfiles;
 using AMR.DeliveryPlanning.Facility.Application.Queries.GetMapById;
 using AMR.DeliveryPlanning.Facility.Application.Queries.GetRouteCost;
 using AMR.DeliveryPlanning.Facility.Application.Queries.GetStations;
+using AMR.DeliveryPlanning.Facility.Application.Queries.ListMaps;
 using AMR.DeliveryPlanning.Facility.Domain.Entities;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
@@ -41,9 +43,24 @@ public static class MapEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         });
 
+        group.MapGet("/maps", async (ISender sender) =>
+        {
+            var result = await sender.Send(new ListMapsQuery());
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
         group.MapPost("/maps/import-from-riot3", async (ImportMapFromRiot3Request req, ISender sender) =>
         {
             var result = await sender.Send(new ImportMapFromRiot3Command(req.Riot3MapId));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
+        // Manual on-demand sync — same code path as the background poller, so the user
+        // can refresh a map immediately after editing it in RIOT3 instead of waiting
+        // for the next poll interval (default 30 min).
+        group.MapPost("/maps/{id:guid}/sync-stations", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new SyncMapStationsCommand(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 

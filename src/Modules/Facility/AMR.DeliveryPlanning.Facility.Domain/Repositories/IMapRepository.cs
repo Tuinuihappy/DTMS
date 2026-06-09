@@ -6,6 +6,7 @@ public interface IMapRepository
 {
     Task<Map?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Map?> GetByVendorRefAsync(string vendorRef, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Map>> ListAsync(CancellationToken cancellationToken = default);
     Task AddAsync(Map map, CancellationToken cancellationToken = default);
     void Update(Map map);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
