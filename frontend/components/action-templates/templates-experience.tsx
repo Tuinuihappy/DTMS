@@ -24,8 +24,8 @@ import {
   deactivateActionTemplate,
   deleteActionTemplate,
   listActionTemplates,
+  type ActionCategory,
   type ActionTemplateDto,
-  type ActionType,
 } from "@/lib/api/action-templates";
 import { Pagination, type PageSize } from "@/components/delivery-orders/pagination";
 import { ActionTemplateDialog } from "./create-dialog";
@@ -36,7 +36,7 @@ import {
   type SortDir,
 } from "./templates-table";
 
-type TypeFilter = "All" | ActionType;
+type CategoryFilter = "All" | ActionCategory;
 
 const KPI_TONES = {
   brand:
@@ -62,7 +62,7 @@ export function ActionTemplatesExperience() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(true);
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("All");
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("All");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 250);
   const [sortBy, setSortBy] = useState<SortColumn>("modifiedAt");
@@ -99,7 +99,7 @@ export function ActionTemplatesExperience() {
             page: 1,
             size: 500,
             includeInactive: showInactive,
-            actionType: typeFilter === "All" ? undefined : typeFilter,
+            actionCategory: categoryFilter === "All" ? undefined : categoryFilter,
           },
           signal,
         );
@@ -112,7 +112,7 @@ export function ActionTemplatesExperience() {
         setLoading(false);
       }
     },
-    [showInactive, typeFilter],
+    [showInactive, categoryFilter],
   );
 
   useEffect(() => {
@@ -144,8 +144,8 @@ export function ActionTemplatesExperience() {
       switch (sortBy) {
         case "actionName":
           return a.actionName.localeCompare(b.actionName) * dir;
-        case "actionType":
-          return a.actionType.localeCompare(b.actionType) * dir;
+        case "actionCategory":
+          return a.actionCategory.localeCompare(b.actionCategory) * dir;
         case "isActive":
           return (Number(a.isActive) - Number(b.isActive)) * dir;
         case "modifiedAt": {
@@ -162,8 +162,8 @@ export function ActionTemplatesExperience() {
 
   const stats = useMemo(() => {
     const active = records.filter((r) => r.isActive).length;
-    const std = records.filter((r) => r.actionType === "Std").length;
-    const act = records.filter((r) => r.actionType === "Act").length;
+    const std = records.filter((r) => r.actionCategory === "Std").length;
+    const act = records.filter((r) => r.actionCategory === "Act").length;
     return { total: records.length, active, inactive: records.length - active, std, act };
   }, [records]);
 
@@ -171,7 +171,7 @@ export function ActionTemplatesExperience() {
   // otherwise the user can be stranded on page 7 of a 12-row result.
   useEffect(() => {
     setPage(1);
-  }, [typeFilter, showInactive, debouncedSearch, pageSize, sortBy, sortDir]);
+  }, [categoryFilter, showInactive, debouncedSearch, pageSize, sortBy, sortDir]);
 
   const totalCount = sorted.length;
   const paged = useMemo(() => {
@@ -190,14 +190,14 @@ export function ActionTemplatesExperience() {
     if (sortBy === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
       setSortBy(col);
-      setSortDir(col === "actionName" || col === "actionType" ? "asc" : "desc");
+      setSortDir(col === "actionName" || col === "actionCategory" ? "asc" : "desc");
     }
   };
 
   const hasFilters =
-    typeFilter !== "All" || debouncedSearch.trim().length > 0 || !showInactive;
+    categoryFilter !== "All" || debouncedSearch.trim().length > 0 || !showInactive;
   const clearFilters = () => {
-    setTypeFilter("All");
+    setCategoryFilter("All");
     setSearch("");
     setShowInactive(true);
   };
@@ -321,12 +321,12 @@ export function ActionTemplatesExperience() {
 
         <div className="flex items-center gap-1 rounded-full bg-white/45 p-1 dark:bg-white/[0.04]">
           {(["All", "Std", "Act"] as const).map((opt) => {
-            const active = typeFilter === opt;
+            const active = categoryFilter === opt;
             return (
               <button
                 key={opt}
                 type="button"
-                onClick={() => setTypeFilter(opt)}
+                onClick={() => setCategoryFilter(opt)}
                 className={cn(
                   "rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] transition-all",
                   active

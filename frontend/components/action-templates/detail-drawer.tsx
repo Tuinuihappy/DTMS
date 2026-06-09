@@ -84,12 +84,15 @@ export function ActionTemplateDrawer({
                       <span
                         className={cn(
                           "rounded-full px-2 py-0.5 text-[10.5px] font-bold tracking-[0.08em]",
-                          template.actionType === "Act"
+                          template.actionCategory === "Act"
                             ? "bg-[var(--color-pastel-peach)] text-[var(--color-pastel-peach-ink)]"
                             : "bg-[var(--color-pastel-mint)] text-[var(--color-pastel-mint-ink)]",
                         )}
                       >
-                        {template.actionType.toUpperCase()}
+                        {template.actionCategory.toUpperCase()}
+                      </span>
+                      <span className="rounded-full bg-white/55 px-2 py-0.5 font-mono text-[10.5px] font-semibold tracking-[0.02em] text-[var(--color-ink-700)] dark:bg-white/[0.06]">
+                        {template.actionType}
                       </span>
                       <span className="text-[11px] text-[var(--color-ink-400)]">
                         {template.actionParameters.length} parameter

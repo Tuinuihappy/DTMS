@@ -6,16 +6,18 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   createActionTemplate,
+  DEFAULT_ACTION_TYPE,
   formFromTemplate,
   updateActionTemplate,
+  type ActionCategory,
   type ActionTemplateDto,
   type ActionTemplateFormPayload,
-  type ActionType,
 } from "@/lib/api/action-templates";
 
 const EMPTY_FORM: ActionTemplateFormPayload = {
   actionName: "",
-  actionType: "Std",
+  actionCategory: "Std",
+  actionType: DEFAULT_ACTION_TYPE,
   vendorActionId: null,
   param0: null,
   param1: null,
@@ -62,6 +64,7 @@ export function ActionTemplateDialog({
       const payload: ActionTemplateFormPayload = {
         ...form,
         actionName: form.actionName.trim(),
+        actionType: form.actionType?.trim() || DEFAULT_ACTION_TYPE,
         paramStr: form.paramStr?.trim() ? form.paramStr.trim() : null,
       };
       if (editing) {
@@ -148,31 +151,31 @@ export function ActionTemplateDialog({
 
                   <div>
                     <span className="mb-1.5 block text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-500)]">
-                      Action type
+                      Category
                     </span>
                     <div className="flex gap-1.5">
                       {(
                         [
                           {
-                            value: "Std" as ActionType,
+                            value: "Std" as ActionCategory,
                             label: "STD",
                             hint: "Standard step",
                           },
                           {
-                            value: "Act" as ActionType,
+                            value: "Act" as ActionCategory,
                             label: "ACT",
                             hint: "Vendor action",
                           },
                         ] as const
                       ).map((opt) => {
-                        const active = form.actionType === opt.value;
+                        const active = form.actionCategory === opt.value;
                         return (
                           <motion.button
                             key={opt.value}
                             type="button"
                             whileTap={{ scale: 0.96 }}
                             onClick={() =>
-                              setForm((f) => ({ ...f, actionType: opt.value }))
+                              setForm((f) => ({ ...f, actionCategory: opt.value }))
                             }
                             className={cn(
                               "flex-1 rounded-[var(--radius-sm)] px-4 py-3 text-left transition-all",
@@ -207,6 +210,26 @@ export function ActionTemplateDialog({
                       <span className="text-[var(--color-ink-400)] normal-case tracking-normal">
                         · RIOT3-compatible
                       </span>
+                    </div>
+                    <div className="mb-3">
+                      <Field
+                        label="Action type"
+                        compact
+                        hint="Wire string sent as actionType to RIOT3."
+                      >
+                        <input
+                          type="text"
+                          value={form.actionType}
+                          onChange={(e) =>
+                            setForm((f) => ({
+                              ...f,
+                              actionType: e.target.value,
+                            }))
+                          }
+                          placeholder={DEFAULT_ACTION_TYPE}
+                          className={inputCls}
+                        />
+                      </Field>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="Vendor action ID" compact>

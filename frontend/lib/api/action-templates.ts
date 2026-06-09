@@ -3,11 +3,13 @@
 // RIOT3 envelope { code, data, message } — we unwrap `data` here so the
 // UI never has to think about envelopes.
 
-export type ActionType = "Std" | "Act";
+// DTMS-local STD/ACT category. Distinct from `actionType` below, which is
+// the RIOT3 wire string.
+export type ActionCategory = "Std" | "Act";
 
 // Backend wire format is uppercase ("STD"/"ACT") via SnakeCaseUpper.
-const wireFromActionType = (t: ActionType): string => t.toUpperCase();
-const actionTypeFromWire = (s: string): ActionType =>
+const wireFromCategory = (t: ActionCategory): string => t.toUpperCase();
+const categoryFromWire = (s: string): ActionCategory =>
   s === "ACT" ? "Act" : "Std";
 
 export type ActionParameterValueDto = {
@@ -18,7 +20,11 @@ export type ActionParameterValueDto = {
 export type ActionTemplateDto = {
   id: string;
   actionName: string;
-  actionType: ActionType;
+  actionCategory: ActionCategory;
+  // Literal RIOT3 actionType string (e.g. "standardRobotsCustom") sent to the
+  // vendor at dispatch time. Field name matches the RIOT3 wire format
+  // exactly so the shape round-trips without renaming.
+  actionType: string;
   actionParameters: ActionParameterValueDto[];
   isActive: boolean;
   createdAt: string;
@@ -26,6 +32,8 @@ export type ActionTemplateDto = {
   createdBy: string | null;
   modifiedBy: string | null;
 };
+
+export const DEFAULT_ACTION_TYPE = "standardRobotsCustom";
 
 export type PagedActionTemplates = {
   current: number;
@@ -81,10 +89,11 @@ async function unwrap<T>(res: Response): Promise<T> {
 function normaliseTemplate(raw: ActionTemplateDto): ActionTemplateDto {
   return {
     ...raw,
-    actionType:
-      typeof raw.actionType === "string"
-        ? actionTypeFromWire(raw.actionType as unknown as string)
-        : raw.actionType,
+    actionCategory:
+      typeof raw.actionCategory === "string"
+        ? categoryFromWire(raw.actionCategory as unknown as string)
+        : raw.actionCategory,
+    actionType: raw.actionType ?? DEFAULT_ACTION_TYPE,
     actionParameters: raw.actionParameters ?? [],
   };
 }
@@ -93,7 +102,7 @@ export type ListActionTemplatesParams = {
   page?: number;
   size?: number;
   includeInactive?: boolean;
-  actionType?: ActionType;
+  actionCategory?: ActionCategory;
 };
 
 export async function listActionTemplates(
@@ -104,7 +113,7 @@ export async function listActionTemplates(
   if (params.page) qs.set("page", String(params.page));
   if (params.size) qs.set("size", String(params.size));
   if (params.includeInactive) qs.set("includeInactive", "true");
-  if (params.actionType) qs.set("actionType", wireFromActionType(params.actionType));
+  if (params.actionCategory) qs.set("actionCategory", wireFromCategory(params.actionCategory));
   const res = await fetch(`/api/action-templates?${qs}`, { cache: "no-store", signal });
   const paged = await unwrap<PagedActionTemplates>(res);
   return {
@@ -123,7 +132,8 @@ export async function getActionTemplate(id: string): Promise<ActionTemplateDto> 
 // shape here so the form can present nice labelled inputs.
 export type ActionTemplateFormPayload = {
   actionName: string;
-  actionType: ActionType;
+  actionCategory: ActionCategory;
+  actionType: string;
   vendorActionId: number | null;
   param0: number | null;
   param1: number | null;
@@ -158,7 +168,8 @@ export function formFromTemplate(t: ActionTemplateDto): ActionTemplateFormPayloa
   };
   return {
     actionName: t.actionName,
-    actionType: t.actionType,
+    actionCategory: t.actionCategory,
+    actionType: t.actionType || DEFAULT_ACTION_TYPE,
     vendorActionId: num("id"),
     param0: num("param0"),
     param1: num("param1"),
@@ -174,7 +185,8 @@ export async function createActionTemplate(
     headers: mutationHeaders(),
     body: JSON.stringify({
       actionName: payload.actionName,
-      actionType: wireFromActionType(payload.actionType),
+      actionCategory: wireFromCategory(payload.actionCategory),
+      actionType: payload.actionType || DEFAULT_ACTION_TYPE,
       actionParameters: toParameterArray(payload),
     }),
   });
@@ -190,7 +202,8 @@ export async function updateActionTemplate(
     headers: mutationHeaders(),
     body: JSON.stringify({
       actionName: payload.actionName,
-      actionType: wireFromActionType(payload.actionType),
+      actionCategory: wireFromCategory(payload.actionCategory),
+      actionType: payload.actionType || DEFAULT_ACTION_TYPE,
       actionParameters: toParameterArray(payload),
     }),
   });

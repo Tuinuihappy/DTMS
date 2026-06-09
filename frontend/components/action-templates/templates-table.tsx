@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import type { ActionTemplateDto } from "@/lib/api/action-templates";
 import { Highlight } from "@/components/delivery-orders/highlight";
 
-export type SortColumn = "actionName" | "actionType" | "isActive" | "modifiedAt";
+export type SortColumn = "actionName" | "actionCategory" | "isActive" | "modifiedAt";
 export type SortDir = "asc" | "desc";
 
 type RowAction = "edit" | "toggle" | "delete";
@@ -95,8 +95,8 @@ export function TemplatesTable({
               <SortableTh col="actionName" sortBy={sortBy} sortDir={sortDir} onClick={onSortChange}>
                 Template
               </SortableTh>
-              <SortableTh col="actionType" sortBy={sortBy} sortDir={sortDir} onClick={onSortChange}>
-                Type
+              <SortableTh col="actionCategory" sortBy={sortBy} sortDir={sortDir} onClick={onSortChange}>
+                Category
               </SortableTh>
               <th className="px-3 py-3.5">Parameters</th>
               <SortableTh col="isActive" sortBy={sortBy} sortDir={sortDir} onClick={onSortChange}>
@@ -138,7 +138,7 @@ export function TemplatesTable({
                     </div>
                   </td>
                   <td className="px-3 py-3.5">
-                    <TypeBadge type={t.actionType} />
+                    <CategoryBadge category={t.actionCategory} />
                   </td>
                   <td className="px-3 py-3.5">
                     <ParamChips params={paramPreview(t)} search={search} />
@@ -195,7 +195,7 @@ export function TemplatesTable({
                     <div className="font-mono text-[13px] font-semibold text-[var(--color-ink-900)] truncate">
                       <Highlight text={t.actionName} query={search} />
                     </div>
-                    <TypeBadge type={t.actionType} />
+                    <CategoryBadge category={t.actionCategory} />
                   </div>
                   <div className="mt-2">
                     <ParamChips params={paramPreview(t)} search={search} />
@@ -219,8 +219,8 @@ export function TemplatesTable({
 
 // ── Cells ──────────────────────────────────────────────────────────────
 
-function TypeBadge({ type }: { type: ActionTemplateDto["actionType"] }) {
-  const isAct = type === "Act";
+function CategoryBadge({ category }: { category: ActionTemplateDto["actionCategory"] }) {
+  const isAct = category === "Act";
   return (
     <span
       className={cn(
@@ -230,7 +230,7 @@ function TypeBadge({ type }: { type: ActionTemplateDto["actionType"] }) {
           : "bg-[var(--color-pastel-mint)] text-[var(--color-pastel-mint-ink)]",
       )}
     >
-      {type.toUpperCase()}
+      {category.toUpperCase()}
     </span>
   );
 }
