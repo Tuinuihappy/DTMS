@@ -33,11 +33,19 @@ public class ResumeTripCommandHandler : ICommandHandler<ResumeTripCommand>
         try { trip.Resume(); }
         catch (InvalidOperationException ex) { return Result.Failure(ex.Message); }
 
-        var vendorResult = await _vendorOps.ResumeAsync(trip.UpperKey, cancellationToken);
+        if (string.IsNullOrWhiteSpace(trip.VendorOrderKey))
+        {
+            _logger.LogWarning("Cannot resume Trip {TripId} — no vendorOrderKey on file (upperKey {UpperKey})",
+                trip.Id, trip.UpperKey);
+            return Result.Failure(
+                "Cannot resume — the vendor never minted an order key for this trip.");
+        }
+
+        var vendorResult = await _vendorOps.ResumeAsync(trip.VendorOrderKey, cancellationToken);
         if (vendorResult.IsFailure)
         {
-            _logger.LogWarning("Vendor resume rejected for Trip {TripId} (upperKey {UpperKey}): {Error}",
-                trip.Id, trip.UpperKey, vendorResult.Error);
+            _logger.LogWarning("Vendor resume rejected for Trip {TripId} (vendorOrderKey {OrderKey}): {Error}",
+                trip.Id, trip.VendorOrderKey, vendorResult.Error);
             return Result.Failure($"Vendor resume failed: {vendorResult.Error}");
         }
 
@@ -61,7 +69,7 @@ public class ResumeTripCommandHandler : ICommandHandler<ResumeTripCommand>
         }
 
         await _tripRepository.UpdateAsync(trip, cancellationToken);
-        _logger.LogInformation("Trip {TripId} resumed (upperKey {UpperKey})", trip.Id, trip.UpperKey);
+        _logger.LogInformation("Trip {TripId} resumed (vendorOrderKey {OrderKey})", trip.Id, trip.VendorOrderKey);
         return Result.Success();
     }
 }

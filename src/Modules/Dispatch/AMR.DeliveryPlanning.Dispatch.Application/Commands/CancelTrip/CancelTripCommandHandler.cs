@@ -36,11 +36,24 @@ public class CancelTripCommandHandler : ICommandHandler<CancelTripCommand>
         try { trip.Cancel(request.Reason); }
         catch (System.InvalidOperationException ex) { return Result.Failure(ex.Message); }
 
-        var vendorResult = await _vendorOps.CancelAsync(trip.UpperKey, cancellationToken);
+        // Skip the vendor call when there is no orderKey yet — the trip was
+        // marked Cancelled locally but the vendor never minted an id, so
+        // there is nothing to cancel on RIOT3. This mirrors the
+        // NoVendorRecord outcome (operator intent satisfied).
+        if (string.IsNullOrWhiteSpace(trip.VendorOrderKey))
+        {
+            _logger.LogInformation(
+                "Trip {TripId} cancelled locally — no vendorOrderKey on file (upperKey {UpperKey}): {Reason}",
+                trip.Id, trip.UpperKey, request.Reason);
+            await _tripRepository.UpdateAsync(trip, cancellationToken);
+            return Result.Success();
+        }
+
+        var vendorResult = await _vendorOps.CancelAsync(trip.VendorOrderKey, cancellationToken);
         if (vendorResult.IsFailure)
         {
-            _logger.LogWarning("Vendor cancel rejected for Trip {TripId} (upperKey {UpperKey}): {Error}",
-                trip.Id, trip.UpperKey, vendorResult.Error);
+            _logger.LogWarning("Vendor cancel rejected for Trip {TripId} (vendorOrderKey {OrderKey}): {Error}",
+                trip.Id, trip.VendorOrderKey, vendorResult.Error);
             return Result.Failure($"Vendor cancel failed: {vendorResult.Error}");
         }
 
@@ -49,11 +62,11 @@ public class CancelTripCommandHandler : ICommandHandler<CancelTripCommand>
         // We just label the audit event differently.
         if (vendorResult.Value == VendorOperationOutcome.NoVendorRecord)
             _logger.LogInformation(
-                "Trip {TripId} cancelled gracefully (vendor had no record of upperKey {UpperKey}): {Reason}",
-                trip.Id, trip.UpperKey, request.Reason);
+                "Trip {TripId} cancelled gracefully (vendor had no record of orderKey {OrderKey}): {Reason}",
+                trip.Id, trip.VendorOrderKey, request.Reason);
         else
-            _logger.LogInformation("Trip {TripId} cancelled (upperKey {UpperKey}): {Reason}",
-                trip.Id, trip.UpperKey, request.Reason);
+            _logger.LogInformation("Trip {TripId} cancelled (vendorOrderKey {OrderKey}): {Reason}",
+                trip.Id, trip.VendorOrderKey, request.Reason);
 
         await _tripRepository.UpdateAsync(trip, cancellationToken);
         return Result.Success();

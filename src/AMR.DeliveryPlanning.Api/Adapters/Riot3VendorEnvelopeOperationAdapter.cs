@@ -17,21 +17,21 @@ internal sealed class Riot3VendorEnvelopeOperationAdapter : IVendorEnvelopeOpera
         _riot3 = riot3;
     }
 
-    public async Task<Result<VendorOperationOutcome>> CancelAsync(string upperKey, CancellationToken cancellationToken = default)
+    public async Task<Result<VendorOperationOutcome>> CancelAsync(string vendorOrderKey, CancellationToken cancellationToken = default)
     {
-        var result = await _riot3.CancelEnvelopeAsync(upperKey, cancellationToken);
+        var result = await _riot3.CancelEnvelopeAsync(vendorOrderKey, cancellationToken);
         return MapResult(result);
     }
 
-    public async Task<Result<VendorOperationOutcome>> PauseAsync(string upperKey, CancellationToken cancellationToken = default)
+    public async Task<Result<VendorOperationOutcome>> PauseAsync(string vendorOrderKey, CancellationToken cancellationToken = default)
     {
-        var result = await _riot3.PauseEnvelopeAsync(upperKey, cancellationToken);
+        var result = await _riot3.PauseEnvelopeAsync(vendorOrderKey, cancellationToken);
         return MapResult(result);
     }
 
-    public async Task<Result<VendorOperationOutcome>> ResumeAsync(string upperKey, CancellationToken cancellationToken = default)
+    public async Task<Result<VendorOperationOutcome>> ResumeAsync(string vendorOrderKey, CancellationToken cancellationToken = default)
     {
-        var result = await _riot3.ResumeEnvelopeAsync(upperKey, cancellationToken);
+        var result = await _riot3.ResumeEnvelopeAsync(vendorOrderKey, cancellationToken);
         return MapResult(result);
     }
 

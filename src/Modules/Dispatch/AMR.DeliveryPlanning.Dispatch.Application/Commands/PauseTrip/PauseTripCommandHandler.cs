@@ -35,11 +35,21 @@ public class PauseTripCommandHandler : ICommandHandler<PauseTripCommand>
         try { trip.Pause(); }
         catch (InvalidOperationException ex) { return Result.Failure(ex.Message); }
 
-        var vendorResult = await _vendorOps.PauseAsync(trip.UpperKey, cancellationToken);
+        // No orderKey → nothing live at the vendor to freeze. Pause's
+        // intent can't be satisfied, so reject early instead of pretending.
+        if (string.IsNullOrWhiteSpace(trip.VendorOrderKey))
+        {
+            _logger.LogWarning("Cannot pause Trip {TripId} — no vendorOrderKey on file (upperKey {UpperKey})",
+                trip.Id, trip.UpperKey);
+            return Result.Failure(
+                "Cannot pause — the vendor never minted an order key for this trip.");
+        }
+
+        var vendorResult = await _vendorOps.PauseAsync(trip.VendorOrderKey, cancellationToken);
         if (vendorResult.IsFailure)
         {
-            _logger.LogWarning("Vendor pause rejected for Trip {TripId} (upperKey {UpperKey}): {Error}",
-                trip.Id, trip.UpperKey, vendorResult.Error);
+            _logger.LogWarning("Vendor pause rejected for Trip {TripId} (vendorOrderKey {OrderKey}): {Error}",
+                trip.Id, trip.VendorOrderKey, vendorResult.Error);
             return Result.Failure($"Vendor pause failed: {vendorResult.Error}");
         }
 
@@ -69,7 +79,7 @@ public class PauseTripCommandHandler : ICommandHandler<PauseTripCommand>
         }
 
         await _tripRepository.UpdateAsync(trip, cancellationToken);
-        _logger.LogInformation("Trip {TripId} paused (upperKey {UpperKey})", trip.Id, trip.UpperKey);
+        _logger.LogInformation("Trip {TripId} paused (vendorOrderKey {OrderKey})", trip.Id, trip.VendorOrderKey);
         return Result.Success();
     }
 }

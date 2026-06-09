@@ -29,18 +29,24 @@ public enum VendorOperationOutcome
 
 /// <summary>
 /// Vendor-agnostic surface for envelope-level lifecycle operations
-/// (cancel / pause / resume) against the RIOT3 upperKey. Implemented at
-/// the composition root by a vendor-specific adapter so this assembly
-/// stays free of RIOT3 references.
+/// (cancel / pause / resume) against the vendor's order key (the id the
+/// vendor minted on dispatch, persisted on Trip.VendorOrderKey).
+/// Implemented at the composition root by a vendor-specific adapter so
+/// this assembly stays free of RIOT3 references.
 ///
 /// Returns the structured <see cref="VendorOperationOutcome"/> so each
 /// handler can pick its own policy for "vendor has no record" — Cancel
 /// treats it as graceful success, Pause/Resume escalate (Trip is
 /// out-of-sync with vendor → mark Failed for compliance + clarity).
+///
+/// Note: an earlier implementation routed operations through the DTMS
+/// upperKey via RIOT3's ?isUpper=true flag, but RIOT3 silently no-ops
+/// CMD_ORDER_CANCEL in that mode (returns code "0" but doesn't change
+/// orderState). The vendor orderKey form is the only reliable channel.
 /// </summary>
 public interface IVendorEnvelopeOperationService
 {
-    Task<Result<VendorOperationOutcome>> CancelAsync(string upperKey, CancellationToken cancellationToken = default);
-    Task<Result<VendorOperationOutcome>> PauseAsync(string upperKey, CancellationToken cancellationToken = default);
-    Task<Result<VendorOperationOutcome>> ResumeAsync(string upperKey, CancellationToken cancellationToken = default);
+    Task<Result<VendorOperationOutcome>> CancelAsync(string vendorOrderKey, CancellationToken cancellationToken = default);
+    Task<Result<VendorOperationOutcome>> PauseAsync(string vendorOrderKey, CancellationToken cancellationToken = default);
+    Task<Result<VendorOperationOutcome>> ResumeAsync(string vendorOrderKey, CancellationToken cancellationToken = default);
 }

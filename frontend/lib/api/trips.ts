@@ -78,8 +78,14 @@ async function api<T>(input: string, init?: RequestInit): Promise<T> {
     }
     throw new Error(message);
   }
+  // 204 No Content has no body; treat the same as an empty 200 (the backend
+  // returns Results.Ok() for void operations like cancel/pause/resume, which
+  // is 200 + empty body). Calling res.json() on an empty body throws
+  // "Unexpected end of JSON input" — read raw text and only parse when set.
   if (res.status === 204) return undefined as unknown as T;
-  return (await res.json()) as T;
+  const text = await res.text();
+  if (text.length === 0) return undefined as unknown as T;
+  return JSON.parse(text) as T;
 }
 
 // .NET API serializes enums with JsonNamingPolicy.SnakeCaseUpper
