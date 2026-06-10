@@ -5,6 +5,7 @@ using AMR.DeliveryPlanning.Api.Auth;
 using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
 using AMR.DeliveryPlanning.Api.Middlewares;
 using AMR.DeliveryPlanning.Api.Modules;
+using AMR.DeliveryPlanning.Api.RobotPositions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -414,6 +415,10 @@ app.MapAuthEndpoints();
 
 // Map all module Minimal API endpoints (require auth)
 app.MapAllModuleEndpoints();
+
+// Map live robot positions endpoint (lives in the Api project because the
+// store + DTO are composition-root concerns, not a Facility domain concept).
+app.MapRobotPositionEndpoints();
 
 app.Run();
 

@@ -133,6 +133,13 @@ public static class ModuleServiceRegistration
         .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
         .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
 
+        // Live robot positions — singleton store fed by a 1 Hz poller against
+        // RIOT3. The map page polls the store (not RIOT3 directly) so the
+        // upstream load stays at one request per second regardless of UI fan-out.
+        services.AddSingleton<AMR.DeliveryPlanning.Api.RobotPositions.IRobotPositionStore,
+                              AMR.DeliveryPlanning.Api.RobotPositions.InMemoryRobotPositionStore>();
+        services.AddHostedService<AMR.DeliveryPlanning.Api.RobotPositions.Riot3PositionPollerService>();
+
         // ── DeliveryOrder Module ──────────────────────────────────────
         services.AddScoped<DeliveryOrderDomainEventMapper>();
         services.AddDbContext<DeliveryOrderDbContext>((sp, o) => o
