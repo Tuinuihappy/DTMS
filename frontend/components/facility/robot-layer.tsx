@@ -111,12 +111,36 @@ const STATE_META: Record<
   StateKey,
   { color: string; label: string }
 > = {
-  MOVING: { color: "var(--color-brand-500)", label: "Moving" },
-  IDLE: { color: "var(--color-ink-500)", label: "Idle" },
+  MOVING: { color: "var(--color-success)", label: "Moving" },
+  IDLE: { color: "var(--color-info)", label: "Idle" },
   CHARGING: { color: "var(--color-amber)", label: "Charging" },
   ERROR: { color: "var(--color-coral)", label: "Error" },
   OFFLINE: { color: "var(--color-ink-300)", label: "Offline" },
 };
+
+// Lucide Navigation icon polygon, transformed for our world-unit canvas:
+// centered at (0,0), tip pointing +X axis so the heading-rotation wrapper
+// behaves identically to the previous custom triangle. Source polygon
+// (24×24 viewBox): 3,11 22,2 13,21 11,13 — see lucide.dev/icons/navigation.
+function navigationArrowPoints(iconSize: number): string {
+  const s = iconSize / 24;
+  const c = Math.SQRT1_2;
+  return (
+    [
+      [3, 11],
+      [22, 2],
+      [13, 21],
+      [11, 13],
+    ] as const
+  )
+    .map(([x, y]) => {
+      const cx = (x - 12) * s;
+      const cy = (y - 12) * s;
+      return [c * (cx - cy), c * (cx + cy)] as const;
+    })
+    .map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`)
+    .join(" ");
+}
 
 /* -------------------------------------------------------------------------- */
 /* RobotLayer — rendered inside the CanvasCard's <svg>.                       */
@@ -135,11 +159,10 @@ export function RobotLayer({
   hoverId: string | null;
   onHover: (deviceKey: string | null) => void;
 }) {
-  // Triangle 14 px tall on screen, battery ring at 20 px radius.
-  const size = 14 * worldPerPx;
+  // Icon ~14 px tall on screen, battery ring at 11 px radius.
+  const iconSize = 14 * worldPerPx;
   const ringR = 11 * worldPerPx;
   const stroke = 1.4 * worldPerPx;
-  const heading = size * 0.9;
 
   return (
     <g>
@@ -149,7 +172,7 @@ export function RobotLayer({
           p={p}
           ringR={ringR}
           stroke={stroke}
-          heading={heading}
+          iconSize={iconSize}
           isHover={hoverId === p.deviceKey}
           onHover={onHover}
         />
@@ -172,14 +195,14 @@ function RobotMarker({
   p,
   ringR,
   stroke,
-  heading,
+  iconSize,
   isHover,
   onHover,
 }: {
   p: RobotPositionDto;
   ringR: number;
   stroke: number;
-  heading: number;
+  iconSize: number;
   isHover: boolean;
   onHover: (deviceKey: string | null) => void;
 }) {
@@ -282,19 +305,17 @@ function RobotMarker({
         transform="rotate(-90)"
       />
 
-      {/* Triangle pointing in heading. Natural orientation = points right
-          (+X axis), so theta=0 lines up with the robotics convention
-          (heading=0 → facing +X). RIOT3 theta is radians; SVG rotate is
-          degrees; clockwise in SVG ↔ counter-clockwise in math because the
-          SVG Y-axis is flipped vs. math, which actually lines up correctly
-          when you render the world in screen coords. */}
+      {/* Navigation arrow (Lucide). Polygon points are pre-baked so the tip
+          faces +X at rest; the triangleRef wrapper then rotates by RIOT3
+          theta (radians → degrees) to match the robot's actual heading. */}
       <g ref={triangleRef}>
-        <path
-          d={`M ${heading * 0.5} 0 L -${heading * 0.4} ${heading * 0.42} L -${heading * 0.4} -${heading * 0.42} Z`}
+        <polygon
+          points={navigationArrowPoints(iconSize)}
           fill={meta.color}
           stroke="white"
           strokeWidth={stroke * 0.6}
           strokeLinejoin="round"
+          strokeLinecap="round"
         />
       </g>
 

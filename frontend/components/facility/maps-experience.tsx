@@ -745,24 +745,14 @@ function CanvasCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map?.id]);
 
-  // Step picker for the major grid — aim for ~6 lines. Driven off the
-  // current viewport so zooming in subdivides the grid (10 m → 2 m → 500 mm).
+  // Step picker — drives the dashed map-boundary rhythm so the dash period
+  // scales with zoom level instead of pixel-locking.
   const stepBase = Math.max(view.w, view.h) / 6;
   const magnitude = Math.pow(10, Math.floor(Math.log10(stepBase)));
   const normalized = stepBase / magnitude;
   const step =
     magnitude *
     (normalized < 1.5 ? 1 : normalized < 3 ? 2 : normalized < 7 ? 5 : 10);
-
-  const gridLines = useMemo(() => {
-    const xs: number[] = [];
-    const ys: number[] = [];
-    const startX = Math.floor(view.x / step) * step;
-    const startY = Math.floor(view.y / step) * step;
-    for (let x = startX; x <= view.x + view.w + 1; x += step) xs.push(x);
-    for (let y = startY; y <= view.y + view.h + 1; y += step) ys.push(y);
-    return { xs, ys };
-  }, [view, step]);
 
   // Pointer-based gesture state — unifies mouse, touch, and stylus.
   //  • 1 pointer  → pan (translate the view)
@@ -1013,13 +1003,9 @@ function CanvasCard({
             </div>
             <div className="font-mono text-[10.5px] tracking-tight text-[var(--color-ink-500)] flex flex-wrap items-center gap-x-3">
               {map ? (
-                <>
-                  <span>
-                    extent · {Math.round(map.width).toLocaleString()} × {Math.round(map.height).toLocaleString()}
-                  </span>
-                  <span className="opacity-50">·</span>
-                  <span>grid step {Math.round(step).toLocaleString()}</span>
-                </>
+                <span>
+                  extent · {Math.round(map.width).toLocaleString()} × {Math.round(map.height).toLocaleString()}
+                </span>
               ) : (
                 <span>awaiting map</span>
               )}
@@ -1040,26 +1026,14 @@ function CanvasCard({
         </div>
       </div>
 
-      {/* Canvas height is a fraction of the viewport so the card itself never
-          overflows when the user scrolls it into view: 48svh = ~half-screen
-          canvas, clamped to 20rem floor (small phones) and 40rem ceiling
-          (giant 4K monitors). Percent-based scales predictably across screen
-          sizes; subtracting a fixed chrome budget would either undershoot on
-          tall monitors or crush short viewports. The SVG inside uses
+      {/* Canvas height fills the viewport so the map is the focal point of
+          the page: 85svh on a typical desktop, clamped to 28rem floor (small
+          phones) and 72rem ceiling (giant 4K monitors). Percent-based scales
+          predictably across screen sizes. The SVG inside uses
           preserveAspectRatio="xMidYMid meet", so the square world content
           stays centered — wider screens just get letterboxed margins, never
           a stretched cartography. */}
-      <div className="relative h-[clamp(20rem,48svh,40rem)]">
-        {/* Decorative aurora behind canvas */}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(60% 80% at 20% 20%, rgba(199,204,255,0.35), transparent 65%), radial-gradient(60% 80% at 90% 90%, rgba(253,226,209,0.3), transparent 65%)",
-          }}
-        />
-
+      <div className="relative h-[clamp(28rem,85svh,72rem)]">
         {!loading && stations.length === 0 && <CanvasEmptyState />}
 
         <svg
@@ -1093,26 +1067,6 @@ function CanvasCard({
           }}
         >
           <defs>
-            <radialGradient id="canvas-vignette" cx="50%" cy="50%" r="65%">
-              <stop offset="60%" stopColor="rgba(255,255,255,0)" />
-              <stop offset="100%" stopColor="rgba(14,21,48,0.08)" />
-            </radialGradient>
-            <pattern
-              id="canvas-grid-minor"
-              width={step / 5}
-              height={step / 5}
-              patternUnits="userSpaceOnUse"
-              x={Math.floor(view.x / (step / 5)) * (step / 5)}
-              y={Math.floor(view.y / (step / 5)) * (step / 5)}
-            >
-              <path
-                d={`M ${step / 5} 0 L 0 0 0 ${step / 5}`}
-                fill="none"
-                stroke="currentColor"
-                strokeOpacity="0.05"
-                strokeWidth={0.6 * worldPerPx}
-              />
-            </pattern>
             {Object.entries(TYPE_META).map(([key, m]) => (
               <radialGradient
                 key={key}
@@ -1137,60 +1091,6 @@ function CanvasCard({
           <g
             transform={`translate(0 ${2 * view.y + view.h}) scale(1 -1)`}
           >
-          {/* Minor grid wash */}
-          <rect
-            x={view.x}
-            y={view.y}
-            width={view.w}
-            height={view.h}
-            fill="url(#canvas-grid-minor)"
-            className="text-[var(--color-ink-900)]"
-          />
-
-          {/* Major grid lines */}
-          {gridLines.xs.map((x) => (
-            <line
-              key={`gx-${x}`}
-              x1={x}
-              y1={view.y}
-              x2={x}
-              y2={view.y + view.h}
-              stroke="currentColor"
-              strokeOpacity={x === 0 ? 0.22 : 0.08}
-              strokeWidth={sw2 * 0.8}
-              className="text-[var(--color-ink-700)]"
-            />
-          ))}
-          {gridLines.ys.map((y) => (
-            <line
-              key={`gy-${y}`}
-              x1={view.x}
-              y1={y}
-              x2={view.x + view.w}
-              y2={y}
-              stroke="currentColor"
-              strokeOpacity={y === 0 ? 0.22 : 0.08}
-              strokeWidth={sw2 * 0.8}
-              className="text-[var(--color-ink-700)]"
-            />
-          ))}
-
-          {/* Map boundary box (if known) */}
-          {map && (
-            <rect
-              x={0}
-              y={0}
-              width={map.width}
-              height={map.height}
-              fill="none"
-              stroke="currentColor"
-              strokeOpacity={0.16}
-              strokeDasharray={`${step / 10} ${step / 14}`}
-              strokeWidth={sw}
-              className="text-[var(--color-brand-500)]"
-            />
-          )}
-
           {/* Stations — pulse for active, dim for inactive, ring for offline override.
               r/ringR/haloR/sw are world-unit values computed from the measured
               screen-px target so dot size stays constant regardless of map extent. */}
@@ -1343,52 +1243,6 @@ function CanvasCard({
           />
 
           </g>{/* end Y-flip wrapper */}
-
-          {/* Axis labels — OUTSIDE the flip group so the digits don't render
-              upside-down. Y-label positions get the same flip math applied
-              so they line up with the gridlines drawn inside the flipped
-              group; their text content is the original (un-flipped) value
-              the operator wants to read. */}
-          {gridLines.xs.map((x) => (
-            <text
-              key={`tx-${x}`}
-              x={x}
-              y={view.y + view.h - 14 * worldPerPx}
-              fontSize={10 * worldPerPx}
-              fontFamily="var(--font-mono)"
-              fill="currentColor"
-              fillOpacity={0.4}
-              textAnchor="middle"
-              className="text-[var(--color-ink-700)]"
-            >
-              {Math.round(x).toLocaleString()}
-            </text>
-          ))}
-          {gridLines.ys.map((y) => (
-            <text
-              key={`ty-${y}`}
-              x={view.x + 8 * worldPerPx}
-              y={2 * view.y + view.h - y}
-              fontSize={10 * worldPerPx}
-              fontFamily="var(--font-mono)"
-              fill="currentColor"
-              fillOpacity={0.4}
-              dominantBaseline="middle"
-              className="text-[var(--color-ink-700)]"
-            >
-              {Math.round(y).toLocaleString()}
-            </text>
-          ))}
-
-          {/* Vignette */}
-          <rect
-            x={view.x}
-            y={view.y}
-            width={view.w}
-            height={view.h}
-            fill="url(#canvas-vignette)"
-            pointerEvents="none"
-          />
         </svg>
 
         {/* Robot tooltip — HTML overlay positioned in screen space from the
