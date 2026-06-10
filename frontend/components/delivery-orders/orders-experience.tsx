@@ -187,7 +187,7 @@ function ExperienceInner() {
   });
   const [pageSize, setPageSize] = useState<PageSize>(() => {
     const n = Number(searchParams.get("size")) as PageSize;
-    return PAGE_SIZE_VALUES.includes(n) ? n : 25;
+    return PAGE_SIZE_VALUES.includes(n) ? n : 10;
   });
   // Sort state — column + direction. Defaults to newest-first which is
   // the convention every other ops dashboard in the codebase uses.
@@ -318,7 +318,7 @@ function ExperienceInner() {
     if (transportMode !== "All") p.set("transport", transportMode);
     if (search) p.set("q", search);
     if (page > 1) p.set("page", String(page));
-    if (pageSize !== 25) p.set("size", String(pageSize));
+    if (pageSize !== 10) p.set("size", String(pageSize));
     if (sortBy !== "createdDate") p.set("sortBy", sortBy);
     if (sortDir !== "desc") p.set("sortDir", sortDir);
     const qs = p.toString();
