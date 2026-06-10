@@ -4,7 +4,7 @@ import { Barcode, CheckCircle2, Keyboard, PenLine, ScanLine, X } from "lucide-re
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import type { PodMethod } from "@/lib/api/delivery-orders";
+import type { PodMethod, PodScanType } from "@/lib/api/delivery-orders";
 
 /**
  * POD scan dialog. Supports four methods chosen via tab strip:
@@ -28,6 +28,7 @@ export function PodScanDialog({
   onConfirm,
   busy,
   error,
+  scanType = "Drop",
 }: {
   orderRef: string | null;
   itemId: string | null;
@@ -35,9 +36,10 @@ export function PodScanDialog({
   currentUser: string | null;
   open: boolean;
   onClose: () => void;
-  onConfirm: (input: { scannedBy: string; method: PodMethod; reference: string | null }) => Promise<void> | void;
+  onConfirm: (input: { scannedBy: string; method: PodMethod; reference: string | null; scanType: PodScanType }) => Promise<void> | void;
   busy?: boolean;
   error?: string | null;
+  scanType?: PodScanType;
 }) {
   const [method, setMethod] = useState<PodMethod>("Confirm");
   const [scannedBy, setScannedBy] = useState(currentUser ?? "");
@@ -181,6 +183,7 @@ export function PodScanDialog({
                   scannedBy: scannedBy.trim(),
                   method,
                   reference: collectReference(),
+                  scanType,
                 });
               }}
               className="space-y-4 px-5 py-4"

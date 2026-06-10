@@ -45,8 +45,10 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
 
         // Caller may override the factory default (true). Null leaves it
         // for the order/template fallback chain to decide at POD time.
-        if (request.RequiresPod.HasValue)
-            order.SetRequiresPod(request.RequiresPod.Value);
+        if (request.RequiresDropPod.HasValue)
+            order.SetRequiresDropPod(request.RequiresDropPod.Value);
+        if (request.RequiresPickupPod.HasValue)
+            order.SetRequiresPickupPod(request.RequiresPickupPod.Value);
 
         foreach (var (pkg, idx) in request.Items.Select((p, i) => (p, i + 1)))
         {

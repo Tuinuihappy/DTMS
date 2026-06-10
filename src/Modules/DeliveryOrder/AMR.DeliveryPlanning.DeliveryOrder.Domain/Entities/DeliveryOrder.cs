@@ -26,11 +26,20 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     /// <summary>
     /// When true, items DO NOT auto-Deliver on TASK_FINISHED — they sit
     /// at DroppedOff until an operator confirms via /pod-scan. Defaults
-    /// to true for new orders (POD required by default). Per-order
-    /// override; null falls back to whatever the route's
-    /// OrderTemplate.RequiresPod says.
+    /// to false (opt-in) so vendor flow auto-completes unless the order
+    /// or its template opts into POD. Per-order override; null falls
+    /// back to OrderTemplate.RequiresDropPod.
     /// </summary>
-    public bool? RequiresPod { get; private set; }
+    public bool? RequiresDropPod { get; private set; }
+
+    /// <summary>
+    /// When true, operator must scan each item at the pickup station for
+    /// chain-of-custody audit. Pickup POD is audit-only — it never blocks
+    /// the vendor flow; the only consequence of a missed scan is an
+    /// "audit gap" warning in the UI. Defaults to false (opt-in).
+    /// Per-order override; null falls back to OrderTemplate.RequiresPickupPod.
+    /// </summary>
+    public bool? RequiresPickupPod { get; private set; }
 
     private readonly List<Item> _items = new();
     public IReadOnlyCollection<Item> Items => _items.AsReadOnly();
@@ -57,7 +66,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             RequestedBy = requestedBy,
             Notes = notes,
             RequestedTransportMode = requestedTransportMode,
-            RequiresPod = true
+            RequiresDropPod = false,
+            RequiresPickupPod = false
         };
 
         order.AddDomainEvent(new DeliveryOrderDraftedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, order.Id));
@@ -85,7 +95,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             RequestedBy = requestedBy,
             Notes = notes,
             RequestedTransportMode = requestedTransportMode,
-            RequiresPod = true
+            RequiresDropPod = false,
+            RequiresPickupPod = false
         };
 
         order.AddDomainEvent(new DeliveryOrderSubmittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, order.Id));
@@ -215,8 +226,12 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     }
 
     /// <summary>Sets the per-order POD policy override. Null = fall back
-    /// to OrderTemplate.RequiresPod at TASK_FINISHED time.</summary>
-    public void SetRequiresPod(bool? requiresPod) => RequiresPod = requiresPod;
+    /// to OrderTemplate.RequiresDropPod at TASK_FINISHED time.</summary>
+    public void SetRequiresDropPod(bool? requiresDropPod) => RequiresDropPod = requiresDropPod;
+
+    /// <summary>Sets the per-order pickup POD policy override. Null = fall
+    /// back to OrderTemplate.RequiresPickupPod.</summary>
+    public void SetRequiresPickupPod(bool? requiresPickupPod) => RequiresPickupPod = requiresPickupPod;
 
     /// <summary>
     /// Mark every Picked item bound to a Trip as DroppedOff (vendor
@@ -244,21 +259,28 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     }
 
     /// <summary>
-    /// Confirm POD for a single item — Picked/DroppedOff → Delivered.
-    /// Called from the POST /pod-scan endpoint. Returns the count of
-    /// items that transitioned (0 or 1). Recompute is the caller's
-    /// responsibility so a batch scan can do one pass at the end.
+    /// Record a POD scan for a single item at the given checkpoint.
+    /// Pickup: audit-only, never changes Status. Drop: same audit row +
+    /// transitions Picked/DroppedOff → Delivered. Idempotent — a second
+    /// scan against the same (itemId, scanType) pair returns 0.
+    /// Recompute is the caller's responsibility so a batch scan can do
+    /// one pass at the end.
     /// </summary>
-    public int ConfirmItemPod(Guid itemId, string scannedBy, string method, string? reference)
+    public int RecordItemPod(Guid itemId, PodScanType scanType, string scannedBy, string method, string? reference)
     {
         var item = _items.FirstOrDefault(i => i.Id == itemId);
         if (item is null) return 0;
-        if (item.Status is ItemStatus.Delivered) return 0;
-        var before = item.Status;
-        item.ConfirmPodAndDeliver(scannedBy, method, reference);
-        if (item.Status == before) return 0;
-        AddDomainEvent(new ItemPodConfirmedDomainEvent(
-            Guid.NewGuid(), DateTime.UtcNow, Id, itemId, scannedBy, method));
+
+        var recorded = scanType switch
+        {
+            PodScanType.Pickup => item.RecordPickupPod(scannedBy, method, reference),
+            PodScanType.Drop   => item.RecordDropPod(scannedBy, method, reference),
+            _ => false
+        };
+        if (!recorded) return 0;
+
+        AddDomainEvent(new ItemPodRecordedDomainEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, itemId, scanType, scannedBy, method));
         return 1;
     }
 
@@ -269,9 +291,9 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     /// MarkTripItemsDelivered runs (Pending/Picked/DroppedOff all jump
     /// to Delivered).
     /// </summary>
-    public int MarkTripItemsDeliveredOrLeaveForPod(Guid tripId, bool templateRequiresPod)
+    public int MarkTripItemsDeliveredOrLeaveForPod(Guid tripId, bool templateRequiresDropPod)
     {
-        var effective = RequiresPod ?? templateRequiresPod;
+        var effective = RequiresDropPod ?? templateRequiresDropPod;
         if (effective) return 0;   // POD required — wait for scans
         return MarkTripItemsDelivered(tripId);
     }

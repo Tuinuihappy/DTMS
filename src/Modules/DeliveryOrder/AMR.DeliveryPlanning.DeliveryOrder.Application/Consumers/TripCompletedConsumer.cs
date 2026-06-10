@@ -49,14 +49,14 @@ public class TripCompletedConsumer : IConsumer<TripCompletedIntegrationEvent>
         {
             if (isEnvelope)
             {
-                // POD policy gate: when Order.RequiresPod is true the
+                // POD policy gate: when Order.RequiresDropPod is true the
                 // operator must scan each item via /pod-scan to land it
                 // at Delivered. Items stay at DroppedOff (or Picked, if
                 // the drop SUB_TASK_FINISHED didn't fire) — the order
                 // stays InProgress while it waits. Template-level
                 // default is wired in via a future cross-module reader
-                // (Order.RequiresPod overrides regardless).
-                // NOTE: Currently uses Order.RequiresPod only — template
+                // (Order.RequiresDropPod overrides regardless).
+                // NOTE: Currently uses Order.RequiresDropPod only — template
                 // resolution is deferred to a later iteration so this
                 // consumer stays read-only against Planning.
                 var templateDefault = false;
@@ -67,7 +67,7 @@ public class TripCompletedConsumer : IConsumer<TripCompletedIntegrationEvent>
                 // old "mark whole order" semantic only when the per-trip
                 // update affected nothing AND there's no other trip-bound
                 // item in the order (i.e. the order pre-dates retry/binding).
-                if (delivered == 0 && !order.Items.Any(i => i.TripId.HasValue) && order.RequiresPod is not true)
+                if (delivered == 0 && !order.Items.Any(i => i.TripId.HasValue) && order.RequiresDropPod is not true)
                 {
                     _logger.LogWarning(
                         "[Legacy fallback] Trip {TripId} affected no items on Order {OrderId} — pre-binding row. " +

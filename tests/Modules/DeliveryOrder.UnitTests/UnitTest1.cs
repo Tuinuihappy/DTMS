@@ -1531,7 +1531,7 @@ public class DeliveryOrderTests
         order.Status.Should().Be(OrderStatus.Confirmed);   // unchanged
     }
 
-    // ── DroppedOff + POD scan (RequiresPod flow) ───────────────────────
+    // ── DroppedOff + POD scan (RequiresDropPod flow) ───────────────────
 
     [Fact]
     public void MarkTripItemsDroppedOff_TransitionsPickedToDroppedOff()
@@ -1568,7 +1568,7 @@ public class DeliveryOrderTests
     }
 
     [Fact]
-    public void ConfirmItemPod_DroppedOffToDelivered_WithAuditFields()
+    public void RecordItemPod_Drop_DroppedOffToDelivered_WithAuditFields()
     {
         var (order, groupA, _) = MultiGroupOrder();
         var tripA = Guid.NewGuid();
@@ -1577,18 +1577,19 @@ public class DeliveryOrderTests
         order.MarkTripItemsDroppedOff(tripA);
 
         var firstItem = order.Items.First();
-        var changed = order.ConfirmItemPod(firstItem.Id, "ops-1", "Barcode", "SKU-A-CODE");
+        var changed = order.RecordItemPod(firstItem.Id, PodScanType.Drop, "ops-1", "Barcode", "SKU-A-CODE");
 
         changed.Should().Be(1);
         firstItem.Status.Should().Be(ItemStatus.Delivered);
-        firstItem.PodScannedBy.Should().Be("ops-1");
-        firstItem.PodMethod.Should().Be("Barcode");
-        firstItem.PodReference.Should().Be("SKU-A-CODE");
-        firstItem.PodScannedAt.Should().NotBeNull();
+        firstItem.DropPod.Should().NotBeNull();
+        firstItem.DropPod!.ScannedBy.Should().Be("ops-1");
+        firstItem.DropPod.Method.Should().Be("Barcode");
+        firstItem.DropPod.Reference.Should().Be("SKU-A-CODE");
+        firstItem.PickupPod.Should().BeNull();
     }
 
     [Fact]
-    public void ConfirmItemPod_FromPickedDirectly_AllowsRace()
+    public void RecordItemPod_Drop_FromPickedDirectly_AllowsRace()
     {
         // Race: operator scanned before SUB_TASK_FINISHED at drop fired,
         // so item is still Picked. Allowed — POD is the authoritative
@@ -1599,23 +1600,80 @@ public class DeliveryOrderTests
         order.MarkTripItemsPicked(tripA);
 
         var firstItem = order.Items.First();
-        var changed = order.ConfirmItemPod(firstItem.Id, "ops-1", "Confirm", null);
+        var changed = order.RecordItemPod(firstItem.Id, PodScanType.Drop, "ops-1", "Confirm", null);
 
         changed.Should().Be(1);
         firstItem.Status.Should().Be(ItemStatus.Delivered);
+        firstItem.DropPod.Should().NotBeNull();
     }
 
     [Fact]
-    public void RequiresPod_True_MarkDeliveredOrLeaveForPod_IsNoOp()
+    public void RecordItemPod_Pickup_AuditOnly_StatusUnchanged()
+    {
+        // Pickup POD is audit-only — never flips Status. The vendor's
+        // SUB_TASK_FINISHED at the pickup station already moved the item
+        // Pending → Picked; the scan only records who handed it off.
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+
+        var firstItem = order.Items.First();
+        var changed = order.RecordItemPod(firstItem.Id, PodScanType.Pickup, "ops-1", "Barcode", "SKU-A");
+
+        changed.Should().Be(1);
+        firstItem.Status.Should().Be(ItemStatus.Picked);   // unchanged
+        firstItem.PickupPod.Should().NotBeNull();
+        firstItem.PickupPod!.ScannedBy.Should().Be("ops-1");
+        firstItem.DropPod.Should().BeNull();
+    }
+
+    [Fact]
+    public void RecordItemPod_DuplicatePickup_IsIdempotent()
+    {
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+
+        var firstItem = order.Items.First();
+        order.RecordItemPod(firstItem.Id, PodScanType.Pickup, "ops-1", "Barcode", "first");
+        var second = order.RecordItemPod(firstItem.Id, PodScanType.Pickup, "ops-2", "Manual", "second");
+
+        second.Should().Be(0);
+        firstItem.PickupPod!.ScannedBy.Should().Be("ops-1");   // first scan wins
+        firstItem.PickupPod.Reference.Should().Be("first");
+    }
+
+    [Fact]
+    public void RequiresPickupPod_DefaultsToFalse_OnNewOrders()
+    {
+        // Pickup POD is opt-in — the factory default keeps the safe value
+        // so pre-pickup-POD clients see no behaviour change.
+        var (order, _, _) = MultiGroupOrder();
+        order.RequiresPickupPod.Should().Be(false);
+    }
+
+    [Fact]
+    public void RequiresDropPod_DefaultsToFalse_OnNewOrders()
+    {
+        // Drop POD is also opt-in by default — vendor flow auto-delivers
+        // unless the order/template explicitly opts in.
+        var (order, _, _) = MultiGroupOrder();
+        order.RequiresDropPod.Should().Be(false);
+    }
+
+    [Fact]
+    public void RequiresDropPod_True_MarkDeliveredOrLeaveForPod_IsNoOp()
     {
         var (order, groupA, _) = MultiGroupOrder();
         var tripA = Guid.NewGuid();
         order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
         order.MarkTripItemsPicked(tripA);
         order.MarkTripItemsDroppedOff(tripA);
-        order.SetRequiresPod(true);
+        order.SetRequiresDropPod(true);
 
-        var delivered = order.MarkTripItemsDeliveredOrLeaveForPod(tripA, templateRequiresPod: false);
+        var delivered = order.MarkTripItemsDeliveredOrLeaveForPod(tripA, templateRequiresDropPod: false);
 
         delivered.Should().Be(0);
         order.Items.Where(i => i.TripId == tripA)
@@ -1623,18 +1681,18 @@ public class DeliveryOrderTests
     }
 
     [Fact]
-    public void RequiresPod_False_MarkDeliveredOrLeaveForPod_AutoDelivers()
+    public void RequiresDropPod_False_MarkDeliveredOrLeaveForPod_AutoDelivers()
     {
         var (order, groupA, _) = MultiGroupOrder();
         var tripA = Guid.NewGuid();
         order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
         order.MarkTripItemsPicked(tripA);
         order.MarkTripItemsDroppedOff(tripA);
-        // Explicitly clear the order-level default (now true) so we
-        // exercise the null-fallback path: null + template false → false.
-        order.SetRequiresPod(null);
+        // Explicitly clear the order-level default so we exercise the
+        // null-fallback path: null + template false → false.
+        order.SetRequiresDropPod(null);
 
-        var delivered = order.MarkTripItemsDeliveredOrLeaveForPod(tripA, templateRequiresPod: false);
+        var delivered = order.MarkTripItemsDeliveredOrLeaveForPod(tripA, templateRequiresDropPod: false);
 
         delivered.Should().Be(2);
         order.Items.Where(i => i.TripId == tripA)

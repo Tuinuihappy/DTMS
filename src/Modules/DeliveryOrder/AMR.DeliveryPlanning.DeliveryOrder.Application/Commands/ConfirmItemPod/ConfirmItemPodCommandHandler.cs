@@ -45,39 +45,42 @@ public class ConfirmItemPodCommandHandler : ICommandHandler<ConfirmItemPodComman
         if (item is null)
             return Result<ConfirmItemPodResult>.Failure($"Item {request.ItemId} not part of order {request.OrderId}.");
 
-        // Idempotency: a second scan against an already-Delivered item is
-        // a no-op but still returns success so the UI doesn't have to
-        // track "was already confirmed" state separately.
-        if (item.Status == ItemStatus.Delivered)
-        {
-            return Result<ConfirmItemPodResult>.Success(new ConfirmItemPodResult(
-                Confirmed: false, ItemStatus: item.Status.ToString(),
-                OrderTerminalReached: order.Status is OrderStatus.Completed
-                    or OrderStatus.PartiallyCompleted));
-        }
-
         try
         {
-            var changed = order.ConfirmItemPod(item.Id, request.ScannedBy, request.Method, request.Reference);
-            if (changed == 0)
-                return Result<ConfirmItemPodResult>.Failure(
-                    $"Item is in {item.Status} state — POD confirmation is only valid from Picked or DroppedOff.");
+            var changed = order.RecordItemPod(
+                item.Id, request.ScanType, request.ScannedBy, request.Method, request.Reference);
 
-            // Recompute lets the order finalize when this is the last
-            // outstanding item (Completed / PartiallyCompleted).
+            // changed == 0 covers two idempotent paths:
+            //   • Same checkpoint already scanned (duplicate scan).
+            //   • Drop scan against an item already Delivered.
+            // Both are no-ops; the UI doesn't need to differentiate.
+            if (changed == 0)
+            {
+                return Result<ConfirmItemPodResult>.Success(new ConfirmItemPodResult(
+                    Confirmed: false, ItemStatus: item.Status.ToString(),
+                    OrderTerminalReached: order.Status is OrderStatus.Completed
+                        or OrderStatus.PartiallyCompleted));
+            }
+
+            // Drop scans can drive the order to a terminal state when this
+            // is the last outstanding item. Pickup scans don't change
+            // Item.Status so the recompute is a no-op but cheap.
             order.RecomputeStatusFromItems();
 
+            var auditType = request.ScanType == PodScanType.Pickup
+                ? "ItemPickupPodConfirmed"
+                : "ItemDropPodConfirmed";
             await _auditRepo.AddAsync(new OrderAuditEvent(
-                order.Id, "ItemPodConfirmed",
-                $"Item {item.ItemId} POD-confirmed by {request.ScannedBy} (method={request.Method}" +
+                order.Id, auditType,
+                $"Item {item.ItemId} {request.ScanType} POD recorded by {request.ScannedBy} (method={request.Method}" +
                 (string.IsNullOrEmpty(request.Reference) ? "" : $", ref={request.Reference}") + ")"),
                 cancellationToken);
 
             await _repository.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(
-                "[PodScan] Order {OrderId} Item {ItemId} ({ItemRef}) confirmed by {By} method={Method}",
-                order.Id, item.Id, item.ItemId, request.ScannedBy, request.Method);
+                "[PodScan] Order {OrderId} Item {ItemId} ({ItemRef}) {ScanType} POD by {By} method={Method}",
+                order.Id, item.Id, item.ItemId, request.ScanType, request.ScannedBy, request.Method);
 
             return Result<ConfirmItemPodResult>.Success(new ConfirmItemPodResult(
                 Confirmed: true,
@@ -89,11 +92,20 @@ public class ConfirmItemPodCommandHandler : ICommandHandler<ConfirmItemPodComman
         {
             return Result<ConfirmItemPodResult>.Failure(ex.Message);
         }
-        catch (DbUpdateConcurrencyException)
+        catch (DbUpdateConcurrencyException ex)
         {
-            _logger.LogWarning("[PodScan] Concurrency conflict on Order {OrderId}.", request.OrderId);
+            _logger.LogWarning(ex, "[PodScan] Concurrency conflict on Order {OrderId}. Entries: {Entries}",
+                request.OrderId,
+                string.Join("; ", ex.Entries.Select(e => $"{e.Entity.GetType().Name}={e.State}")));
             return Result<ConfirmItemPodResult>.Failure(
                 "The order was modified by another process. Please retry.");
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "[PodScan] Database update failed on Order {OrderId}. Inner: {Inner}",
+                request.OrderId, ex.InnerException?.Message);
+            return Result<ConfirmItemPodResult>.Failure(
+                $"Database error: {ex.InnerException?.Message ?? ex.Message}");
         }
     }
 }

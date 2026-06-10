@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
@@ -44,7 +45,7 @@ public record TripItemsDeliveredDomainEvent(Guid EventId, DateTime OccurredOn, G
 public record TripItemsFailedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, Guid TripId, int FailedCount, string Reason) : IDomainEvent;
 public record TripItemsPickedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, Guid TripId, int PickedCount) : IDomainEvent;
 public record TripItemsDroppedOffDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, Guid TripId, int DroppedCount) : IDomainEvent;
-public record ItemPodConfirmedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, Guid ItemId, string ScannedBy, string Method) : IDomainEvent;
+public record ItemPodRecordedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, Guid ItemId, PodScanType ScanType, string ScannedBy, string Method) : IDomainEvent;
 public record DeliveryOrderAmendedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string Reason) : IDomainEvent;
 public record DeliveryOrderCompletedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
 public record DeliveryOrderPartiallyCompletedDomainEvent(

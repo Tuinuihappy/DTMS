@@ -38,14 +38,23 @@ public class Item : Entity<Guid>
     public int? AttemptNumber { get; private set; }
 
     // ── POD (Proof of Delivery) evidence ───────────────────────────────
-    // Populated when the operator submits /pod-scan against a DroppedOff
-    // item. PodScannedAt is the audit-grade timestamp; DroppedOffAt is
-    // the SLA clock anchor.
+    // DroppedOffAt is the SLA clock anchor stamped when the vendor drop
+    // sub-task completes. Per-checkpoint POD scans live on PodEvents —
+    // at most one event per (ItemId, ScanType) pair (Pickup, Drop). UI
+    // surfaces them as two chips per item; consumers project them into
+    // pickupPod / dropPod DTOs.
     public DateTime? DroppedOffAt { get; private set; }
-    public DateTime? PodScannedAt { get; private set; }
-    public string? PodScannedBy { get; private set; }
-    public string? PodMethod { get; private set; }    // "Barcode" / "Manual" / "Signature" / "Confirm"
-    public string? PodReference { get; private set; } // scanned code / signature hash / null
+
+    private readonly List<ItemPodEvent> _podEvents = new();
+    public IReadOnlyCollection<ItemPodEvent> PodEvents => _podEvents.AsReadOnly();
+
+    /// <summary>Operator scan recorded at the pickup station, or null if
+    /// pickup POD wasn't required / hasn't been scanned yet.</summary>
+    public ItemPodEvent? PickupPod => _podEvents.FirstOrDefault(e => e.ScanType == PodScanType.Pickup);
+
+    /// <summary>Operator scan recorded at the drop dock, or null if drop
+    /// POD wasn't required / hasn't been scanned yet.</summary>
+    public ItemPodEvent? DropPod => _podEvents.FirstOrDefault(e => e.ScanType == PodScanType.Drop);
 
     private Item() { }
 
@@ -177,20 +186,32 @@ public class Item : Entity<Guid>
         DroppedOffAt = DateTime.UtcNow;
     }
 
-    /// <summary>Operator scanned POD — item is now Delivered with audit.
-    /// Accepts from both Picked and DroppedOff (DroppedOff is the common
-    /// path; Picked allows the rare race where TASK_FINISHED + POD scan
-    /// arrive before the drop-station SUB_TASK_FINISHED).</summary>
-    internal void ConfirmPodAndDeliver(string scannedBy, string method, string? reference)
+    /// <summary>Audit-only pickup POD scan. Does NOT flip Item.Status —
+    /// vendor's SUB_TASK_FINISHED at the pickup station already drove
+    /// Pending → Picked. Idempotent: a second pickup scan on an item
+    /// that already has one is a no-op (returns false).</summary>
+    internal bool RecordPickupPod(string scannedBy, string method, string? reference)
     {
-        if (Status is ItemStatus.Delivered) return;
-        if (Status is not (ItemStatus.Picked or ItemStatus.DroppedOff))
+        if (PickupPod is not null) return false;   // idempotent
+        _podEvents.Add(new ItemPodEvent(Id, PodScanType.Pickup, scannedBy, method, reference));
+        return true;
+    }
+
+    /// <summary>Operator scanned the drop POD. Records the audit row and,
+    /// if the item is in a valid pre-Delivered state, transitions to
+    /// Delivered. Accepts from Picked or DroppedOff (DroppedOff is the
+    /// common path; Picked covers the race where TASK_FINISHED + POD scan
+    /// arrive before the drop SUB_TASK_FINISHED). Idempotent: a second
+    /// drop scan returns false without mutating the event row.</summary>
+    internal bool RecordDropPod(string scannedBy, string method, string? reference)
+    {
+        if (DropPod is not null) return false;   // idempotent
+        if (Status is not (ItemStatus.Picked or ItemStatus.DroppedOff or ItemStatus.Delivered))
             throw new InvalidOperationException(
-                $"Cannot confirm POD from {Status}.");
-        Status = ItemStatus.Delivered;
-        PodScannedAt = DateTime.UtcNow;
-        PodScannedBy = scannedBy;
-        PodMethod = method;
-        PodReference = reference;
+                $"Cannot record drop POD from {Status}.");
+        _podEvents.Add(new ItemPodEvent(Id, PodScanType.Drop, scannedBy, method, reference));
+        if (Status is ItemStatus.Picked or ItemStatus.DroppedOff)
+            Status = ItemStatus.Delivered;
+        return true;
     }
 }

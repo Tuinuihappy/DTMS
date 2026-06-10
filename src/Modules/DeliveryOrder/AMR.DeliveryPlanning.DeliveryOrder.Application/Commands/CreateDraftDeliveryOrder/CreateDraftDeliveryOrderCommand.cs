@@ -35,5 +35,6 @@ public record CreateDraftDeliveryOrderCommand(
     string? RequestedBy = null,
     string? Notes = null,
     TransportMode? RequestedTransportMode = TransportMode.Amr,
-    bool? RequiresPod = null
+    bool? RequiresDropPod = null,
+    bool? RequiresPickupPod = null
 ) : ICommand<DeliveryOrderDetailDto>;

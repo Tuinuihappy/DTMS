@@ -1,12 +1,16 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ConfirmItemPod;
 
 /// <summary>
-/// POD (Proof of Delivery) confirmation for a single item on a
-/// RequiresPod order. Operator submits Method + optional Reference;
-/// the handler transitions the item DroppedOff/Picked → Delivered,
-/// stamps audit columns, and re-computes the order status.
+/// POD (Proof of Delivery) scan for a single item at a given checkpoint.
+///
+/// ScanType:
+///   • Pickup — operator at pickup station; audit-only, never flips
+///     Item.Status (vendor pickup signal already drove Pending→Picked).
+///   • Drop   — operator at drop dock; transitions Picked/DroppedOff →
+///     Delivered when the order has RequiresDropPod=true.
 ///
 /// Method values: "Barcode" / "Manual" / "Signature" / "Confirm".
 /// Reference: barcode value / signature hash / typed code; null for
@@ -15,6 +19,7 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ConfirmItemPod
 public record ConfirmItemPodCommand(
     Guid OrderId,
     Guid ItemId,
+    PodScanType ScanType,
     string ScannedBy,
     string Method,
     string? Reference) : ICommand<ConfirmItemPodResult>;

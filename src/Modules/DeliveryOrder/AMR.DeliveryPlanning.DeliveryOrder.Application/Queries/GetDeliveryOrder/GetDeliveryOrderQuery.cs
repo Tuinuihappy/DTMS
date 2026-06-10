@@ -17,6 +17,8 @@ public record HazmatDto(string ClassCode, PackingGroup? PackingGroup);
 
 public record TemperatureRangeDto(double? MinC, double? MaxC);
 
+public record PodEventDto(DateTime ScannedAt, string ScannedBy, string Method, string? Reference);
+
 public record ItemDto(
     Guid Id,
     int ItemSeq,
@@ -37,9 +39,8 @@ public record ItemDto(
     Guid? TripId,
     int? AttemptNumber,
     DateTime? DroppedOffAt,
-    DateTime? PodScannedAt,
-    string? PodScannedBy,
-    string? PodMethod);
+    PodEventDto? PickupPod,
+    PodEventDto? DropPod);
 
 public record DeliveryOrderListDto(
     Guid Id,
@@ -58,7 +59,8 @@ public record DeliveryOrderListDto(
     double TotalQuantity,
     int TotalItems,
     TransportMode? RequestedTransportMode,
-    bool? RequiresPod);
+    bool? RequiresDropPod,
+    bool? RequiresPickupPod);
 
 public record DeliveryOrderDetailDto(
     Guid Id,
@@ -77,7 +79,8 @@ public record DeliveryOrderDetailDto(
     double TotalQuantity,
     int TotalItems,
     TransportMode? RequestedTransportMode,
-    bool? RequiresPod,
+    bool? RequiresDropPod,
+    bool? RequiresPickupPod,
     IReadOnlyList<ItemDto> Items);
 
 public record GetDeliveryOrderQuery(Guid OrderId) : IQuery<DeliveryOrderDetailDto>;
@@ -236,7 +239,8 @@ internal static class DeliveryOrderMapper
             order.TotalQuantity,
             order.TotalItems,
             order.RequestedTransportMode,
-            order.RequiresPod);
+            order.RequiresDropPod,
+            order.RequiresPickupPod);
 
     public static DeliveryOrderDetailDto MapToDetailDto(Domain.Entities.DeliveryOrder order) =>
         new(
@@ -256,7 +260,8 @@ internal static class DeliveryOrderMapper
             order.TotalQuantity,
             order.TotalItems,
             order.RequestedTransportMode,
-            order.RequiresPod,
+            order.RequiresDropPod,
+            order.RequiresPickupPod,
             order.Items.Select(p => new ItemDto(
                 p.Id,
                 p.ItemSeq,
@@ -277,8 +282,7 @@ internal static class DeliveryOrderMapper
                 p.TripId,
                 p.AttemptNumber,
                 p.DroppedOffAt,
-                p.PodScannedAt,
-                p.PodScannedBy,
-                p.PodMethod
+                p.PickupPod is { } pu ? new PodEventDto(pu.ScannedAt, pu.ScannedBy, pu.Method, pu.Reference) : null,
+                p.DropPod   is { } dr ? new PodEventDto(dr.ScannedAt, dr.ScannedBy, dr.Method, dr.Reference) : null
             )).ToList());
 }

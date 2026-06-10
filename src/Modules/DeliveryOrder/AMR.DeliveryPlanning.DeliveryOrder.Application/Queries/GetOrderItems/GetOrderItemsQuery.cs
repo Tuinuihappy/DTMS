@@ -42,9 +42,8 @@ public class GetOrderItemsQueryHandler : IQueryHandler<GetOrderItemsQuery, IRead
                 p.TripId,
                 p.AttemptNumber,
                 p.DroppedOffAt,
-                p.PodScannedAt,
-                p.PodScannedBy,
-                p.PodMethod
+                p.PickupPod is { } pu ? new PodEventDto(pu.ScannedAt, pu.ScannedBy, pu.Method, pu.Reference) : null,
+                p.DropPod   is { } dr ? new PodEventDto(dr.ScannedAt, dr.ScannedBy, dr.Method, dr.Reference) : null
             ))
             .ToList();
 

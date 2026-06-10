@@ -54,7 +54,8 @@ type FormState = {
   requestedBy: string;
   notes: string;
   transport: TransportMode;
-  requiresPod: boolean;
+  requiresDropPod: boolean;
+  requiresPickupPod: boolean;
   windowEarliest: string; // datetime-local string ("YYYY-MM-DDTHH:mm")
   windowLatest: string;
   items: ItemFormState[];
@@ -102,7 +103,8 @@ function blankForm(): FormState {
     requestedBy: "",
     notes: "",
     transport: "Amr",
-    requiresPod: true,
+    requiresDropPod: false,
+    requiresPickupPod: false,
     windowEarliest: "",
     windowLatest: "",
     items: [{ ...EMPTY_ITEM }],
@@ -129,7 +131,8 @@ function formFromOrder(o: DeliveryOrderDetailDto): FormState {
     requestedBy: o.requestedBy ?? "",
     notes: o.notes ?? "",
     transport: o.requestedTransportMode ?? "Amr",
-    requiresPod: o.requiresPod ?? true,
+    requiresDropPod: o.requiresDropPod ?? false,
+    requiresPickupPod: o.requiresPickupPod ?? false,
     windowEarliest: isoToLocalInput(o.serviceWindow?.earliestUtc),
     windowLatest: isoToLocalInput(o.serviceWindow?.latestUtc),
     items: o.items.map((it) => ({
@@ -178,7 +181,8 @@ function buildPayload(form: FormState): CreateOrderPayload {
     requestedBy: form.requestedBy.trim() || undefined,
     notes: form.notes.trim() || undefined,
     requestedTransportMode: form.transport,
-    requiresPod: form.requiresPod,
+    requiresDropPod: form.requiresDropPod,
+    requiresPickupPod: form.requiresPickupPod,
     serviceWindow:
       form.windowEarliest || form.windowLatest
         ? { earliestUtc: toIso(form.windowEarliest), latestUtc: toIso(form.windowLatest) }
@@ -455,36 +459,73 @@ export function CreateOrderDialog({
                       </div>
 
                       <div>
-                        <span className="mb-1.5 block text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-500)]">
-                          Proof of delivery
-                        </span>
+                        <div className="mb-1.5 flex items-baseline justify-between">
+                          <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-500)]">
+                            POD checkpoints
+                          </span>
+                          <span className="text-[10px] text-[var(--color-ink-400)]">
+                            {form.requiresPickupPod || form.requiresDropPod
+                              ? "Operator must scan"
+                              : "Auto-deliver"}
+                          </span>
+                        </div>
                         <div className="flex gap-1.5">
                           {(
                             [
-                              { value: true, label: "Require POD scan" },
-                              { value: false, label: "Auto-deliver" },
-                            ] as const
-                          ).map((opt) => {
-                            const active = form.requiresPod === opt.value;
-                            return (
-                              <motion.button
-                                key={String(opt.value)}
-                                type="button"
-                                whileTap={{ scale: 0.96 }}
-                                onClick={() =>
-                                  setForm({ ...form, requiresPod: opt.value })
-                                }
+                              {
+                                key: "pickup" as const,
+                                label: "Pickup",
+                                active: form.requiresPickupPod,
+                                toggle: () =>
+                                  setForm({ ...form, requiresPickupPod: !form.requiresPickupPod }),
+                              },
+                              {
+                                key: "drop" as const,
+                                label: "Drop",
+                                active: form.requiresDropPod,
+                                toggle: () =>
+                                  setForm({ ...form, requiresDropPod: !form.requiresDropPod }),
+                              },
+                            ]
+                          ).map((opt) => (
+                            <motion.button
+                              key={opt.key}
+                              type="button"
+                              whileTap={{ scale: 0.96 }}
+                              onClick={opt.toggle}
+                              className={cn(
+                                "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition-all",
+                                opt.active
+                                  ? "bg-[var(--color-brand-900)] text-white shadow-[0_2px_8px_-3px_rgba(15,23,42,0.45)] dark:bg-[var(--color-brand-500)]"
+                                  : "bg-white/50 text-[var(--color-ink-600)] hover:bg-white/80 dark:bg-white/[0.05] dark:hover:bg-white/[0.1]",
+                              )}
+                            >
+                              <span
+                                aria-hidden
                                 className={cn(
-                                  "rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition-all",
-                                  active
-                                    ? "bg-[var(--color-brand-900)] text-white shadow-[0_2px_8px_-3px_rgba(15,23,42,0.45)] dark:bg-[var(--color-brand-500)]"
-                                    : "bg-white/50 text-[var(--color-ink-600)] hover:bg-white/80 dark:bg-white/[0.05] dark:hover:bg-white/[0.1]",
+                                  "inline-block h-3 w-3 rounded-[3px] border-[1.5px] transition-colors",
+                                  opt.active
+                                    ? "border-white bg-white/30"
+                                    : "border-[var(--color-ink-400)] bg-transparent",
                                 )}
                               >
-                                {opt.label}
-                              </motion.button>
-                            );
-                          })}
+                                {opt.active && (
+                                  <svg
+                                    viewBox="0 0 12 12"
+                                    className="h-full w-full text-white"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <polyline points="2.5,6.5 5,9 9.5,3.5" />
+                                  </svg>
+                                )}
+                              </span>
+                              {opt.label}
+                            </motion.button>
+                          ))}
                         </div>
                       </div>
 

@@ -34,8 +34,11 @@ public record HoldOrderRequest(string Reason, string? HeldBy = null);
 public record ReleaseOrderRequest(string? ReleasedBy = null);
 public record ReopenOrderRequest(string ReopenedBy, string Reason);
 public record RedispatchOrderRequest(string RedispatchedBy, string Reason, double WeightFallbackKg = 0);
-public record ConfirmItemPodRequest(string ScannedBy, string Method, string? Reference = null);
-public record ConfirmItemPodBatchRequest(string ScannedBy, string Method, IReadOnlyList<ConfirmItemPodBatchEntry> Scans);
+// ScanType: "Pickup" | "Drop" (case-insensitive enum binding); defaults
+// to Drop for backward-compatibility with clients on the pre-pickup-POD
+// schema. Drop semantics match the legacy /pod-scan endpoint exactly.
+public record ConfirmItemPodRequest(string ScannedBy, string Method, string? Reference = null, PodScanType ScanType = PodScanType.Drop);
+public record ConfirmItemPodBatchRequest(string ScannedBy, string Method, IReadOnlyList<ConfirmItemPodBatchEntry> Scans, PodScanType ScanType = PodScanType.Drop);
 public record ConfirmItemPodBatchEntry(Guid ItemId, string? Reference);
 
 public static class DeliveryOrderEndpoints
@@ -101,14 +104,15 @@ public static class DeliveryOrderEndpoints
         }).RequireIdempotencyKey();
 
         // POST /api/v1/delivery-orders/{id}/items/{itemId}/pod-scan —
-        // Operator submits Proof-of-Delivery for one item on a
-        // RequiresPod order. Transitions DroppedOff/Picked → Delivered,
-        // stamps audit columns. Idempotent against duplicate scans.
+        // Operator submits a POD scan for one item. Body.scanType selects
+        // the checkpoint: "Pickup" records audit only; "Drop" (default)
+        // transitions DroppedOff/Picked → Delivered on RequiresDropPod
+        // orders. Idempotent against duplicate scans at the same checkpoint.
         group.MapPost("/{id:guid}/items/{itemId:guid}/pod-scan",
             async (Guid id, Guid itemId, [FromBody] ConfirmItemPodRequest body, ISender sender) =>
         {
             var result = await sender.Send(new ConfirmItemPodCommand(
-                id, itemId, body.ScannedBy, body.Method, body.Reference));
+                id, itemId, body.ScanType, body.ScannedBy, body.Method, body.Reference));
             return result.IsSuccess
                 ? Results.Ok(result.Value)
                 : Results.BadRequest(result.Error);
@@ -126,7 +130,7 @@ public static class DeliveryOrderEndpoints
             foreach (var scan in body.Scans)
             {
                 var r = await sender.Send(new ConfirmItemPodCommand(
-                    id, scan.ItemId, body.ScannedBy, body.Method, scan.Reference));
+                    id, scan.ItemId, body.ScanType, body.ScannedBy, body.Method, scan.Reference));
                 if (r.IsSuccess)
                 {
                     if (r.Value!.Confirmed) confirmed++; else skipped++;

@@ -900,14 +900,14 @@ function ExperienceInner() {
           setPodTarget(null);
           setPodError(null);
         }}
-        onConfirm={async ({ scannedBy, method, reference }) => {
+        onConfirm={async ({ scannedBy, method, reference, scanType }) => {
           if (!podTarget) return;
           setPodBusy(true);
           setPodError(null);
           try {
             const { confirmItemPod } = await import("@/lib/api/delivery-orders");
             await confirmItemPod(podTarget.orderId, podTarget.itemId, {
-              scannedBy, method, reference,
+              scannedBy, method, reference, scanType,
             });
             toast.push({
               tone: "success",

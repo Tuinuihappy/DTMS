@@ -165,7 +165,7 @@ export function OrderDetailDrawer({
                     <StatusBadge status={data.orderStatus} size="md" />
                     <PriorityBadge priority={data.priority} />
                     <TransportModeBadge mode={data.requestedTransportMode} />
-                    <RequiresPodBadge value={data.requiresPod} />
+                    <RequiresDropPodBadge value={data.requiresDropPod} />
                   </div>
                 )}
               </div>
@@ -353,7 +353,17 @@ export function OrderDetailDrawer({
                                     attempt {it.attemptNumber}
                                   </span>
                                 )}
-                                {it.status === "DroppedOff" && (
+                                {it.pickupPod && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-pastel-sky)] px-2 py-[2px] text-[9.5px] font-semibold uppercase tracking-[0.06em] text-[var(--color-pastel-sky-ink)]">
+                                    Pickup · {it.pickupPod.method}
+                                  </span>
+                                )}
+                                {it.dropPod && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-success-soft)] px-2 py-[2px] text-[9.5px] font-semibold uppercase tracking-[0.06em] text-[var(--color-success)]">
+                                    Drop · {it.dropPod.method}
+                                  </span>
+                                )}
+                                {data.requiresDropPod === true && it.status === "DroppedOff" && !it.dropPod && (
                                   <button
                                     type="button"
                                     onClick={() => onPodScan?.(it.id, `#${it.itemSeq.toString().padStart(2,"0")} ${it.itemId}`)}
@@ -362,13 +372,8 @@ export function OrderDetailDrawer({
                                     Scan POD
                                   </button>
                                 )}
-                                {it.status === "Delivered" && it.podScannedBy && (
-                                  <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-[var(--color-success-soft)] px-2 py-[2px] text-[9.5px] font-semibold uppercase tracking-[0.06em] text-[var(--color-success)]">
-                                    POD · {it.podMethod}
-                                  </span>
-                                )}
                               </div>
-                              {it.status === "DroppedOff" && it.droppedOffAt && (
+                              {data.requiresDropPod === true && it.status === "DroppedOff" && it.droppedOffAt && (
                                 <p className="mt-0.5 text-[10.5px] text-[var(--color-pastel-peach-ink)]">
                                   ⏱ Awaiting POD · dropped {relativeFromNow(it.droppedOffAt)}
                                 </p>
@@ -706,7 +711,7 @@ function DrawerActionButton({
 // Surfaces the tri-state per-order POD policy in the drawer header so
 // operators see at a glance whether the order will auto-deliver or sit
 // at DroppedOff waiting for a scan. Null = "inherit from template".
-function RequiresPodBadge({ value }: { value: boolean | null }) {
+function RequiresDropPodBadge({ value }: { value: boolean | null }) {
   if (value === true) {
     return (
       <span

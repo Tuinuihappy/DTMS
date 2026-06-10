@@ -12,6 +12,7 @@ public class DeliveryOrderDbContext : DbContext
 
     public DbSet<Domain.Entities.DeliveryOrder> DeliveryOrders { get; set; } = null!;
     public DbSet<Item> Items { get; set; } = null!;
+    public DbSet<ItemPodEvent> ItemPodEvents { get; set; } = null!;
     public DbSet<OrderAmendment> OrderAmendments { get; set; } = null!;
     public DbSet<OrderAuditEvent> OrderAuditEvents { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
@@ -35,7 +36,8 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
             b.Property(o => o.RequestedTransportMode).HasConversion<string>().HasMaxLength(20);
-            b.Property(o => o.RequiresPod).HasColumnName("RequiresPod");
+            b.Property(o => o.RequiresDropPod).HasColumnName("RequiresDropPod");
+            b.Property(o => o.RequiresPickupPod).HasColumnName("RequiresPickupPod");
             b.Property(o => o.RequestedBy).HasMaxLength(200);
             b.Property(o => o.Notes).HasMaxLength(1000);
             b.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion().IsConcurrencyToken();
@@ -123,13 +125,34 @@ public class DeliveryOrderDbContext : DbContext
                 .HasColumnName("HandlingInstructions")
                 .IsRequired();
 
-            // POD evidence — populated when /pod-scan confirms delivery.
-            // All five fields are nullable: pre-POD orders never set them.
+            // DroppedOffAt is the SLA clock anchor stamped by vendor drop
+            // sub-task completion; per-checkpoint POD scans live on the
+            // PodEvents child collection (one row per scan type).
             b.Property(p => p.DroppedOffAt).HasColumnName("DroppedOffAt");
-            b.Property(p => p.PodScannedAt).HasColumnName("PodScannedAt");
-            b.Property(p => p.PodScannedBy).HasColumnName("PodScannedBy").HasMaxLength(200);
-            b.Property(p => p.PodMethod).HasColumnName("PodMethod").HasMaxLength(20);
-            b.Property(p => p.PodReference).HasColumnName("PodReference").HasMaxLength(500);
+
+            b.HasMany(p => p.PodEvents)
+             .WithOne()
+             .HasForeignKey(e => e.ItemId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.Navigation(p => p.PodEvents)
+             .HasField("_podEvents")
+             .UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<ItemPodEvent>(b =>
+        {
+            b.ToTable("ItemPodEvents", Schema);
+            b.HasKey(e => e.Id);
+            b.Property(e => e.ItemId).IsRequired();
+            b.Property(e => e.ScanType).HasConversion<string>().HasMaxLength(20).IsRequired();
+            b.Property(e => e.ScannedAt).IsRequired();
+            b.Property(e => e.ScannedBy).HasMaxLength(200).IsRequired();
+            b.Property(e => e.Method).HasMaxLength(20).IsRequired();
+            b.Property(e => e.Reference).HasMaxLength(500);
+            // At most one scan per (item, checkpoint) — duplicate scans
+            // are bounced at the database, not just the aggregate.
+            b.HasIndex(e => new { e.ItemId, e.ScanType }).IsUnique();
         });
 
         modelBuilder.Entity<OrderAmendment>(b =>

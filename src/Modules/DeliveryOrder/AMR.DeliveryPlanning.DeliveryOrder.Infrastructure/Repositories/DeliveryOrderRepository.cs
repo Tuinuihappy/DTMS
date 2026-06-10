@@ -13,6 +13,7 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
     public Task<Domain.Entities.DeliveryOrder?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => _context.DeliveryOrders
             .Include(o => o.Items)
+                .ThenInclude(i => i.PodEvents)
             .AsSplitQuery()
             .FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
 
@@ -20,6 +21,7 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
         => _context.DeliveryOrders
             .AsNoTracking()
             .Include(o => o.Items)
+                .ThenInclude(i => i.PodEvents)
             .AsSplitQuery()
             .FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
 
@@ -211,6 +213,20 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
         return Task.CompletedTask;
     }
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
-        => _context.SaveChangesAsync(cancellationToken);
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        // Children added through a parent's navigation while the parent
+        // is in Unchanged state are inferred as Modified by EF — which
+        // triggers an UPDATE WHERE Id=… that affects 0 rows and surfaces
+        // as DbUpdateConcurrencyException. Reclassify any such PodEvents
+        // as Added before saving. Same pattern as Dispatch's
+        // TripRepository.AddNewExecutionEventsAsync.
+        foreach (var entry in _context.ChangeTracker.Entries<Domain.Entities.ItemPodEvent>().ToList())
+        {
+            if (entry.State == EntityState.Modified)
+                entry.State = EntityState.Added;
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 }

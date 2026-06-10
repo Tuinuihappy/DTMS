@@ -53,9 +53,13 @@ export type DeliveryOrderListDto = {
   totalQuantity: number;
   totalItems: number;
   requestedTransportMode: TransportMode | null;
-  // Tri-state: true = POD scan required, false = always auto-deliver,
-  // null = fall back to the route's OrderTemplate.RequiresPod.
-  requiresPod: boolean | null;
+  // Tri-state: true = drop POD scan required, false = always auto-deliver,
+  // null = fall back to the route's OrderTemplate.RequiresDropPod.
+  requiresDropPod: boolean | null;
+  // Tri-state (default false at the API): true = operator must scan at
+  // pickup for audit, null = fall back to OrderTemplate.RequiresPickupPod.
+  // Audit-only — never blocks the vendor flow.
+  requiresPickupPod: boolean | null;
 };
 
 export type ItemDto = {
@@ -81,10 +85,18 @@ export type ItemDto = {
   tripId: string | null;
   attemptNumber: number | null;
   droppedOffAt: string | null;
-  podScannedAt: string | null;
-  podScannedBy: string | null;
-  podMethod: string | null;
+  pickupPod: PodEventDto | null;
+  dropPod: PodEventDto | null;
 };
+
+export type PodEventDto = {
+  scannedAt: string;
+  scannedBy: string;
+  method: string;
+  reference: string | null;
+};
+
+export type PodScanType = "Pickup" | "Drop";
 
 export type ItemStatus =
   | "Pending"
@@ -100,7 +112,12 @@ export type PodMethod = "Barcode" | "Manual" | "Signature" | "Confirm";
 export async function confirmItemPod(
   orderId: string,
   itemId: string,
-  body: { scannedBy: string; method: PodMethod; reference?: string | null },
+  body: {
+    scannedBy: string;
+    method: PodMethod;
+    reference?: string | null;
+    scanType?: PodScanType;   // defaults to "Drop" server-side
+  },
 ): Promise<void> {
   const res = await fetch(`/api/delivery-orders/${orderId}/items/${itemId}/pod-scan`, {
     method: "POST",
@@ -191,7 +208,8 @@ export type CreateOrderPayload = {
   requestedBy?: string;
   notes?: string;
   requestedTransportMode?: TransportMode;
-  requiresPod?: boolean | null;
+  requiresDropPod?: boolean | null;
+  requiresPickupPod?: boolean | null;
   serviceWindow?: { earliestUtc?: string; latestUtc?: string };
   items: Array<{
     itemId: string;
