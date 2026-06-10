@@ -49,7 +49,10 @@ internal sealed class ImportMapFromRiot3CommandHandler
                 $"RIOT3 unreachable while importing map {request.Riot3MapId}: {ex.Message}");
         }
 
-        // 3. Calculate map bounds from station coordinates (+ 20% padding)
+        // 3. Calculate map bounds from station coordinates (+ 20% padding).
+        // Width/Height capture the full extent — peak absolute reach on either
+        // axis — so even if stations span negative coords the map declares
+        // enough room to render them.
         var maxX = riot3Stations.Any() ? riot3Stations.Max(s => Math.Abs(s.PosX)) * 1.2 : 100_000;
         var maxY = riot3Stations.Any() ? riot3Stations.Max(s => Math.Abs(s.PosY)) * 1.2 : 100_000;
 
@@ -70,7 +73,9 @@ internal sealed class ImportMapFromRiot3CommandHandler
         var imported = new List<ImportedStationDto>();
         foreach (var s in riot3Stations)
         {
-            var coord = new Coordinate(Math.Abs(s.PosX), Math.Abs(s.PosY), s.PosYaw / 1000.0);
+            // Raw signed coords so station positions stay aligned with live
+            // robot positions (which use the same raw values).
+            var coord = new Coordinate(s.PosX, s.PosY, s.PosYaw / 1000.0);
             var station = new Station(Guid.NewGuid(), map.Id, s.Name, coord, StationType.Normal);
             station.SetVendorRef(s.Id.ToString());
             station.SetCode(s.Name);

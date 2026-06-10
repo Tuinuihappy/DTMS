@@ -82,10 +82,14 @@ internal sealed class SyncMapStationsCommandHandler
             {
                 if (dbByVendorRef.TryGetValue(vendorRef, out var existing))
                 {
+                    // Raw signed coords — RIOT3's origin can put points in any
+                    // quadrant. Mirroring with Math.Abs (older behaviour) broke
+                    // station ↔ robot spatial alignment whenever either crossed
+                    // the origin.
                     existing.UpdateFromVendor(
                         riot3Station.Name,
-                        Math.Abs(riot3Station.PosX),
-                        Math.Abs(riot3Station.PosY),
+                        riot3Station.PosX,
+                        riot3Station.PosY,
                         riot3Station.PosYaw / 1000.0);
 
                     if (!existing.IsActive) reactivated++;
@@ -94,8 +98,8 @@ internal sealed class SyncMapStationsCommandHandler
                 else
                 {
                     var coord = new Coordinate(
-                        Math.Abs(riot3Station.PosX),
-                        Math.Abs(riot3Station.PosY),
+                        riot3Station.PosX,
+                        riot3Station.PosY,
                         riot3Station.PosYaw / 1000.0);
 
                     var station = new Station(Guid.NewGuid(), map.Id, riot3Station.Name, coord, StationType.Normal);
