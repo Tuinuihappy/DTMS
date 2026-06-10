@@ -17,15 +17,28 @@ public interface IActionTemplateRepository
     Task<bool> NameExistsAsync(string name, Guid? excludeId = null, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Paged list with total count. Returns the page slice (sorted by Name)
-    /// plus the unfiltered-by-paging total so the caller can compute
-    /// page count for the RIOT3-style envelope.
+    /// Paged list with total count. Returns the page slice plus the
+    /// unfiltered-by-paging total so the caller can compute page count for
+    /// the RIOT3-style envelope. <paramref name="search"/> is a
+    /// case-insensitive substring match against Name; <paramref name="sortBy"/>
+    /// accepts "actionName" (default), "actionCategory", "modifiedAt",
+    /// "isActive" — anything else falls back to Name asc.
     /// </summary>
     Task<(IReadOnlyList<ActionTemplate> Items, long Total)> ListPagedAsync(
         int page,
         int size,
         bool includeInactive = false,
         ActionCategory? actionCategory = null,
+        string? search = null,
+        string? sortBy = null,
+        bool sortDescending = false,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Unfiltered catalog counts for the KPI strip. Total counts every row;
+    /// Active counts IsActive=true; Std/Act split by ActionCategory.
+    /// </summary>
+    Task<(int Total, int Active, int Std, int Act)> GetStatsAsync(
         CancellationToken cancellationToken = default);
 
     Task AddAsync(ActionTemplate template, CancellationToken cancellationToken = default);

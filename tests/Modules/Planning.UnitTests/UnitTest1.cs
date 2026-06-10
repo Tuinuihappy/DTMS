@@ -503,11 +503,14 @@ public class OrderTemplateResolverTests
         public Task<bool> NameExistsAsync(string name, Guid? excludeId = null, CancellationToken cancellationToken = default)
             => Task.FromResult(_byName.ContainsKey(name));
 
-        public Task<(IReadOnlyList<ActionTemplate> Items, long Total)> ListPagedAsync(int page, int size, bool includeInactive = false, ActionCategory? actionCategory = null, CancellationToken cancellationToken = default)
+        public Task<(IReadOnlyList<ActionTemplate> Items, long Total)> ListPagedAsync(int page, int size, bool includeInactive = false, ActionCategory? actionCategory = null, string? search = null, string? sortBy = null, bool sortDescending = false, CancellationToken cancellationToken = default)
         {
             var all = _byName.Values.ToList();
             return Task.FromResult<(IReadOnlyList<ActionTemplate>, long)>((all, all.Count));
         }
+
+        public Task<(int Total, int Active, int Std, int Act)> GetStatsAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult((0, 0, 0, 0));
 
         public Task AddAsync(ActionTemplate template, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public void Update(ActionTemplate template) { }
@@ -665,8 +668,10 @@ public class OrderTemplateResolverTests
             return Task.FromResult<ActionTemplate?>(string.Equals(name, _template.Name, StringComparison.OrdinalIgnoreCase) ? _template : null);
         }
         public Task<bool> NameExistsAsync(string name, Guid? excludeId = null, CancellationToken c = default) => Task.FromResult(true);
-        public Task<(IReadOnlyList<ActionTemplate> Items, long Total)> ListPagedAsync(int page, int size, bool includeInactive = false, ActionCategory? actionCategory = null, CancellationToken c = default)
+        public Task<(IReadOnlyList<ActionTemplate> Items, long Total)> ListPagedAsync(int page, int size, bool includeInactive = false, ActionCategory? actionCategory = null, string? search = null, string? sortBy = null, bool sortDescending = false, CancellationToken c = default)
             => Task.FromResult<(IReadOnlyList<ActionTemplate>, long)>((new[] { _template }, 1));
+        public Task<(int Total, int Active, int Std, int Act)> GetStatsAsync(CancellationToken c = default)
+            => Task.FromResult((1, 1, 1, 0));
         public Task AddAsync(ActionTemplate t, CancellationToken c = default) => Task.CompletedTask;
         public void Update(ActionTemplate t) { }
         public void Remove(ActionTemplate t) { }

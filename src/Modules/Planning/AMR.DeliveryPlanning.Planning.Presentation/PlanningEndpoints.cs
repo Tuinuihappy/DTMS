@@ -181,18 +181,40 @@ public static class PlanningEndpoints
         });
 
         // GET — paged list (page/size mirror RIOT3 PageRequest semantics).
-        // Default order is Name asc — no sort query params since the
-        // catalog is small enough to sort client-side after fetch.
+        // search matches actionName case-insensitively; sortBy accepts
+        // actionName (default) | actionCategory | modifiedAt | isActive.
         // bool/int query params must be nullable in minimal APIs so the
         // caller can omit them — otherwise the framework returns 400.
         actionTemplates.MapGet("/", async (
-            int? page, int? size, bool? includeInactive, ActionCategory? actionCategory, ISender sender) =>
+            int? page,
+            int? size,
+            bool? includeInactive,
+            ActionCategory? actionCategory,
+            string? search,
+            string? sortBy,
+            string? sortDir,
+            ISender sender) =>
         {
+            var descending = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase);
             var result = await sender.Send(new GetActionTemplatesQuery(
                 Page: page ?? 1,
                 Size: size ?? 20,
                 IncludeInactive: includeInactive ?? false,
-                ActionCategory: actionCategory));
+                ActionCategory: actionCategory,
+                Search: search,
+                SortBy: sortBy,
+                SortDescending: descending));
+            return result.IsSuccess
+                ? RiotEnvelope.Ok(result.Value)
+                : RiotEnvelope.BadRequest(result.Error);
+        });
+
+        // GET /stats — unfiltered catalog counters for the KPI strip.
+        // Mirrors /api/v1/delivery-orders/stats: a fixed system overview
+        // that does not narrow with the list filter.
+        actionTemplates.MapGet("/stats", async (ISender sender) =>
+        {
+            var result = await sender.Send(new GetActionTemplateStatsQuery());
             return result.IsSuccess
                 ? RiotEnvelope.Ok(result.Value)
                 : RiotEnvelope.BadRequest(result.Error);

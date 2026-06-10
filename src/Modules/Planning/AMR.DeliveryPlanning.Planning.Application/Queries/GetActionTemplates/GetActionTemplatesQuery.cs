@@ -43,7 +43,10 @@ public record GetActionTemplatesQuery(
     int Page = 1,
     int Size = 20,
     bool IncludeInactive = false,
-    ActionCategory? ActionCategory = null) : IQuery<PagedActionTemplates>;
+    ActionCategory? ActionCategory = null,
+    string? Search = null,
+    string? SortBy = null,
+    bool SortDescending = false) : IQuery<PagedActionTemplates>;
 
 public class GetActionTemplatesQueryHandler : IQueryHandler<GetActionTemplatesQuery, PagedActionTemplates>
 {
@@ -63,13 +66,53 @@ public class GetActionTemplatesQueryHandler : IQueryHandler<GetActionTemplatesQu
         var size = request.Size < 1 ? 20 : Math.Min(request.Size, MaxPageSize);
 
         var (templates, total) = await _repo.ListPagedAsync(
-            page, size, request.IncludeInactive, request.ActionCategory, cancellationToken);
+            page,
+            size,
+            request.IncludeInactive,
+            request.ActionCategory,
+            string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim(),
+            string.IsNullOrWhiteSpace(request.SortBy) ? null : request.SortBy.Trim(),
+            request.SortDescending,
+            cancellationToken);
 
         var records = templates.Select(ActionTemplateDtoFactory.From).ToList();
         // Mybatis-Plus convention: ceil(total/size), minimum 1 even when empty.
         var pages = total == 0 ? 1 : (total + size - 1) / size;
         return Result<PagedActionTemplates>.Success(
             new PagedActionTemplates(page, pages, size, total, records));
+    }
+}
+
+// System-wide catalog counters shown in the KPI strip. Always unfiltered —
+// mirrors the DeliveryOrder stats pattern where the strip is a fixed
+// overview, not a narrowed view of the current filter selection.
+public sealed record ActionTemplateStatsDto(
+    int Total,
+    int Active,
+    int Inactive,
+    int Std,
+    int Act);
+
+public record GetActionTemplateStatsQuery() : IQuery<ActionTemplateStatsDto>;
+
+public class GetActionTemplateStatsQueryHandler
+    : IQueryHandler<GetActionTemplateStatsQuery, ActionTemplateStatsDto>
+{
+    private readonly IActionTemplateRepository _repo;
+
+    public GetActionTemplateStatsQueryHandler(IActionTemplateRepository repo) => _repo = repo;
+
+    public async Task<Result<ActionTemplateStatsDto>> Handle(
+        GetActionTemplateStatsQuery request,
+        CancellationToken cancellationToken)
+    {
+        var stats = await _repo.GetStatsAsync(cancellationToken);
+        return Result<ActionTemplateStatsDto>.Success(new ActionTemplateStatsDto(
+            stats.Total,
+            stats.Active,
+            stats.Total - stats.Active,
+            stats.Std,
+            stats.Act));
     }
 }
 
