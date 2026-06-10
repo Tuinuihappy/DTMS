@@ -36,6 +36,15 @@ public interface IFacilityReadService
     Task<Guid?> ResolveStationByCodeAsync(string code, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Resolve a station by its vendor-side identifier (e.g. RIOT3 station id).
+    /// Returns the DTMS station Guid, or null if no station has the given VendorRef.
+    /// Used by vendor webhook handlers where the inbound payload carries the
+    /// vendor's numeric station id rather than the DTMS Code — IDs are
+    /// case-stable and survive vendor renames, unlike station names.
+    /// </summary>
+    Task<Guid?> ResolveStationByVendorRefAsync(string vendorRef, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Resolves a mixed list of station GUIDs and codes in at most 2 queries.
     /// Returns a case-insensitive dictionary mapping each input value to its lookup result
     /// (including IsActive + manual override state). Inputs that do not match any station

@@ -36,6 +36,18 @@ public class TripRepository : ITripRepository
             .FirstOrDefaultAsync(t => t.UpperKey == upperKey, cancellationToken);
     }
 
+    public async Task<Trip?> GetByVendorOrderKeyAsync(string vendorOrderKey, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(vendorOrderKey)) return null;
+
+        // IgnoreQueryFilters: same reasoning as GetByUpperKeyAsync — vendor
+        // webhooks have no tenant context.
+        return await _context.Trips
+            .IgnoreQueryFilters()
+            .Include(t => t.Events)
+            .FirstOrDefaultAsync(t => t.VendorOrderKey == vendorOrderKey, cancellationToken);
+    }
+
     public async Task<List<Trip>> GetActiveTripsByVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default)
     {
         return await _context.Trips

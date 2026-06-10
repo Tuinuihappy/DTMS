@@ -271,21 +271,23 @@ public static class Riot3Webhooks
             return;
         }
 
-        // Sub-task events carry the parent task's upperKey on payload.task,
-        // not payload.subTask. Need it to find the owning Trip.
+        // RIOT3 omits the parent `task` object from sub-task event frames,
+        // so payload.Task?.UpperKey is null in practice. Fall back to the
+        // vendor-side order key carried on subTask.taskKey (echoes
+        // Trip.VendorOrderKey) when the DTMS upperKey is absent.
         var upperKey = payload.Task?.UpperKey;
-        if (string.IsNullOrWhiteSpace(upperKey))
-        {
-            logger.LogDebug("RIOT3 sub-task event {Event} for {SubTaskKey} has no parent upperKey — cannot correlate to a Trip",
-                eventType, subTaskKey);
-            return;
-        }
+        var vendorOrderKey = subTask.TaskKey;
 
-        var trip = await tripRepository.GetByUpperKeyAsync(upperKey, cancellationToken);
+        Trip? trip = null;
+        if (!string.IsNullOrWhiteSpace(upperKey))
+            trip = await tripRepository.GetByUpperKeyAsync(upperKey, cancellationToken);
+        if (trip is null && !string.IsNullOrWhiteSpace(vendorOrderKey))
+            trip = await tripRepository.GetByVendorOrderKeyAsync(vendorOrderKey, cancellationToken);
+
         if (trip is null)
         {
-            logger.LogWarning("[SubTaskWebhook] No Trip found for upperKey {UpperKey} (subTask {SubTaskKey}, event {Event}) — ignored.",
-                upperKey, subTaskKey, eventType);
+            logger.LogWarning("[SubTaskWebhook] No Trip found for subTask {SubTaskKey} (upperKey {UpperKey}, vendorOrderKey {VendorOrderKey}, event {Event}) — ignored.",
+                subTaskKey, upperKey ?? "(none)", vendorOrderKey ?? "(none)", eventType);
             return;
         }
 
@@ -306,6 +308,7 @@ public static class Riot3Webhooks
         var failResult = subTask.FailResult;
         var actResult  = subTask.ActResult;
         var stationName = subTask.Station?.Station?.Name;
+        var stationId   = subTask.Station?.Station?.Id;
 
         // RIOT3 timestamps come as strings; tolerate missing or malformed.
         var changeTime = ParseRiot3Time(subTask.FinishedTime)
@@ -337,20 +340,40 @@ public static class Riot3Webhooks
                 trip.Id, subTaskKey, state);
 
         // ── Item-Picked / DroppedOff detection ─────────────────────────
-        // Once an ACT (pickup/drop action) finishes at the trip's
-        // pickup OR drop station, fire the matching domain event so the
-        // DeliveryOrder side flips item status. Ignored when:
+        // Once a pickup/drop sub-mission finishes at the trip's pickup OR
+        // drop station, fire the matching domain event so the DeliveryOrder
+        // side flips item status. Both ACT and MOVE qualify:
+        //   • ACT FINISHED  → vendor ran a pickup/drop action (e.g. lift,
+        //     load, dispense) AT the station — items physically loaded/dropped.
+        //   • MOVE FINISHED → robot arrived at the station. For
+        //     operator-confirm templates (e.g. Confirm-X-to-Y, which use
+        //     WaitingConfirm — an ACT with no stationId), the MOVE
+        //     completion is the closest available "reached pickup/drop"
+        //     signal: WaitingConfirm itself fires no station-tagged event.
+        //     Treating MOVE arrival as pickup/drop is a small semantic
+        //     stretch (robot is at the dock, operator may still be loading),
+        //     but it's the only signal RIOT3 emits before TASK_FINISHED
+        //     gaps every item straight to Delivered.
+        // Ignored when:
         //   • state != FINISHED         (only completion counts)
-        //   • mission type != ACT       (MOVE arrivals don't mean loaded)
+        //   • mission type not ACT/MOVE (other types carry no station)
         //   • duplicate webhook         (already-stored row, no event)
         //   • trip has no pickup/drop   (pre-Gap-3 trip — degrade silently)
-        //   • station code resolves to neither pickup nor drop
+        //   • station id missing        (ACT WaitingConfirm-style → no station bound)
+        //   • station resolves to neither pickup nor drop
+        //
+        // Resolves via the vendor-side station id (VendorRef) rather than
+        // station name: RIOT3 emits the name in its own casing ("Station165")
+        // which won't match the upper-cased Code DTMS stores ("STATION165"),
+        // and IDs are stable across vendor renames.
         if (state == "FINISHED" && inserted)
         {
             var missionType = string.IsNullOrWhiteSpace(subTask.SubTaskType) ? "" : subTask.SubTaskType.ToUpperInvariant();
-            if (missionType == "ACT" && !string.IsNullOrWhiteSpace(stationName))
+            if ((missionType == "ACT" || missionType == "MOVE") && stationId is > 0)
             {
-                var resolvedId = await facilityReadService.ResolveStationByCodeAsync(stationName, cancellationToken);
+                var resolvedId = await facilityReadService.ResolveStationByVendorRefAsync(
+                    stationId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    cancellationToken);
                 var pickupHit = trip.PickupStationId.HasValue && resolvedId == trip.PickupStationId.Value;
                 var dropHit   = trip.DropStationId.HasValue   && resolvedId == trip.DropStationId.Value;
                 if (pickupHit)
@@ -358,16 +381,16 @@ public static class Riot3Webhooks
                     trip.MarkVendorPickedUp();
                     await tripRepository.UpdateAsync(trip, cancellationToken);
                     logger.LogInformation(
-                        "[SubTaskWebhook] Trip {TripId} pickup completed at {Station} — items will be marked Picked",
-                        trip.Id, stationName);
+                        "[SubTaskWebhook] Trip {TripId} pickup completed at {Station} (vendorId={VendorId}) — items will be marked Picked",
+                        trip.Id, stationName ?? "(unnamed)", stationId);
                 }
                 else if (dropHit)
                 {
                     trip.MarkVendorDropCompleted();
                     await tripRepository.UpdateAsync(trip, cancellationToken);
                     logger.LogInformation(
-                        "[SubTaskWebhook] Trip {TripId} drop completed at {Station} — items will be marked DroppedOff",
-                        trip.Id, stationName);
+                        "[SubTaskWebhook] Trip {TripId} drop completed at {Station} (vendorId={VendorId}) — items will be marked DroppedOff",
+                        trip.Id, stationName ?? "(unnamed)", stationId);
                 }
             }
         }

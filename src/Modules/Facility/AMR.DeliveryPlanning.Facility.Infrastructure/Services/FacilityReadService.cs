@@ -22,6 +22,12 @@ public sealed class FacilityReadService : IFacilityReadService
             .Select(s => (Guid?)s.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public Task<Guid?> ResolveStationByVendorRefAsync(string vendorRef, CancellationToken cancellationToken = default)
+        => _db.Stations.AsNoTracking()
+            .Where(s => s.VendorRef == vendorRef)
+            .Select(s => (Guid?)s.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<StationVendorTarget?> GetStationVendorTargetAsync(
         Guid stationId,
         CancellationToken cancellationToken = default)

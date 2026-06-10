@@ -12,6 +12,15 @@ public interface ITripRepository
     /// </summary>
     Task<Trip?> GetByUpperKeyAsync(string upperKey, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Look up a trip by the vendor-side order key RIOT3 assigns at dispatch
+    /// (Trip.VendorOrderKey). RIOT3's sub-task webhooks omit the parent
+    /// `task` object — so UpperKey isn't carried — but `subTask.taskKey`
+    /// carries the vendor's order key, which lets us correlate back to the
+    /// owning Trip.
+    /// </summary>
+    Task<Trip?> GetByVendorOrderKeyAsync(string vendorOrderKey, CancellationToken cancellationToken = default);
+
     Task<List<Trip>> GetActiveTripsByVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default);
 
     /// <summary>
