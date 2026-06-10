@@ -75,6 +75,45 @@ export async function getStationOptions(): Promise<StationOption[]> {
     .sort((a, b) => a.code.localeCompare(b.code));
 }
 
+// React hook — fetches station options once on mount, then exposes the
+// list + loading + error to consumers. Multiple comboboxes on one page
+// can share a single hook instance via prop drilling so the API isn't
+// hit more than once per render.
+import { useEffect, useState } from "react";
+
+export type UseStationOptionsResult = {
+  stations: StationOption[];
+  loading: boolean;
+  error: string | null;
+};
+
+export function useStationOptions(): UseStationOptionsResult {
+  const [stations, setStations] = useState<StationOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getStationOptions()
+      .then((opts) => {
+        if (!cancelled) setStations(opts);
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setError(e.message || "Failed to load stations");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { stations, loading, error };
+}
+
 export type RobotPositionDto = {
   deviceKey: string;
   deviceName: string;

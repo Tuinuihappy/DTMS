@@ -441,10 +441,10 @@ public static class PlanningEndpoints
                 : RiotEnvelope.BadRequest(result.Error);
         });
 
-        // POST /{id}/instantiate — resolve ActionTemplate references against
+        // POST /{id}/create — resolve ActionTemplate references against
         // the catalog and POST the full envelope to RIOT3. dryRun=true skips
         // the vendor call so operators can preview the resolved missions.
-        orderTemplates.MapPost("/{id:guid}/instantiate",
+        orderTemplates.MapPost("/{id:guid}/create",
             async (Guid id, InstantiateOrderTemplateRequest? req, ISender sender) =>
             {
                 req ??= new InstantiateOrderTemplateRequest();
