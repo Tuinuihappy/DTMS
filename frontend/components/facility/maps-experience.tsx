@@ -16,15 +16,17 @@ import {
   Map as MapIcon,
   MapPin,
   Maximize2,
+  Minus,
   Navigation,
+  Plus,
   PackageOpen,
   ParkingCircle,
+  Pencil,
   RefreshCw,
   Search,
   Signal,
   Sparkles,
   X,
-  Zap,
 } from "lucide-react";
 
 import { GlassCard } from "@/components/primitives/glass-card";
@@ -33,13 +35,24 @@ import { SectionLabel } from "@/components/primitives/section-label";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { cn } from "@/lib/utils";
 import {
+  clearStationOverride,
+  forceStationOffline,
   getStations,
   listMaps,
   syncMapStations,
+  updateStation,
   type MapSummaryDto,
   type StationDto,
-  type SyncMapStationsResultDto,
 } from "@/lib/api/facility";
+import {
+  StationEditDrawer,
+  type StationOp,
+} from "@/components/facility/station-edit-drawer";
+import {
+  RobotLayer,
+  RobotTooltip,
+  useRobotPositions,
+} from "@/components/facility/robot-layer";
 
 /* -------------------------------------------------------------------------- */
 /* Station-type lexicon                                                       */
@@ -157,14 +170,15 @@ export function MapsExperience() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [lastSync, setLastSync] = useState<Date | null>(null);
-  const [lastSyncResult, setLastSyncResult] = useState<SyncMapStationsResultDto | null>(
-    null,
-  );
   const [toast, setToast] = useState<{
     kind: "ok" | "err";
     msg: string;
   } | null>(null);
+  // In-place edit drawer state. Driven by canvas clicks + table double-clicks.
+  const [editingStationId, setEditingStationId] = useState<string | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
 
   // Initial maps fetch.
   useEffect(() => {
@@ -212,6 +226,17 @@ export function MapsExperience() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
+  // Sync cooldown countdown — ticks once per second until it hits zero.
+  // Set by onSync after every attempt (success or failure) to throttle
+  // rage-clicks against the external RIOT3 vendor.
+  useEffect(() => {
+    if (cooldownRemaining <= 0) return;
+    const t = window.setInterval(() => {
+      setCooldownRemaining((n) => (n <= 1 ? 0 : n - 1));
+    }, 1000);
+    return () => window.clearInterval(t);
+  }, [cooldownRemaining]);
+
   const selectedMap = useMemo(
     () => maps.find((m) => m.id === selectedMapId) ?? null,
     [maps, selectedMapId],
@@ -225,13 +250,52 @@ export function MapsExperience() {
     return { total, active, linked, offline };
   }, [stations]);
 
+  // Drawer submit — routes intent to the right backend endpoint, then
+  // refreshes the station list so the canvas + table reflect the change.
+  // Toasts surface success / failure; the drawer stays open on error so the
+  // operator can correct the input.
+  const handleEditSubmit = useCallback(
+    async (station: StationDto, op: StationOp) => {
+      if (!selectedMapId) return;
+      setEditBusy(true);
+      try {
+        if (op.kind === "update") {
+          await updateStation(station.id, { type: op.type, code: op.code });
+          setToast({ kind: "ok", msg: `Saved ${station.name}` });
+        } else if (op.kind === "force-offline") {
+          await forceStationOffline(station.id, {
+            reason: op.reason,
+            durationMinutes: op.durationMinutes,
+          });
+          setToast({ kind: "ok", msg: `${station.name} force-offline for ${op.durationMinutes}m` });
+        } else {
+          await clearStationOverride(station.id);
+          setToast({ kind: "ok", msg: `${station.name} restored` });
+        }
+        await refreshStations(selectedMapId);
+      } catch (err) {
+        setToast({
+          kind: "err",
+          msg: err instanceof Error ? err.message : "Save failed",
+        });
+      } finally {
+        setEditBusy(false);
+      }
+    },
+    [selectedMapId, refreshStations],
+  );
+
+  const editingStation = useMemo(
+    () => stations.find((s) => s.id === editingStationId) ?? null,
+    [stations, editingStationId],
+  );
+
   const onSync = useCallback(async () => {
-    if (!selectedMapId || syncing) return;
+    if (!selectedMapId || syncing || cooldownRemaining > 0) return;
     setSyncing(true);
     try {
       const result = await syncMapStations(selectedMapId);
       setLastSync(new Date());
-      setLastSyncResult(result);
       const delta = result.added + result.updated + result.reactivated + result.deactivated;
       setToast({
         kind: "ok",
@@ -248,8 +312,9 @@ export function MapsExperience() {
       });
     } finally {
       setSyncing(false);
+      setCooldownRemaining(4);
     }
-  }, [selectedMapId, syncing, refreshStations]);
+  }, [selectedMapId, syncing, cooldownRemaining, refreshStations]);
 
   return (
     <div className="space-y-6 md:space-y-7">
@@ -258,35 +323,40 @@ export function MapsExperience() {
         onSync={onSync}
         syncing={syncing}
         canSync={!!selectedMap?.vendorRef}
+        cooldownRemaining={cooldownRemaining}
       />
 
       <KpiStrip stats={stats} lastSync={lastSync} loading={loading} />
 
-      <div className="grid grid-cols-12 gap-5 md:gap-6">
-        <div className="col-span-12 lg:col-span-8 space-y-5 md:space-y-6">
-          <MapSelectorRail
-            maps={maps}
-            selectedId={selectedMapId}
-            onSelect={setSelectedMapId}
-            loading={loading && maps.length === 0}
-          />
-          <CanvasCard map={selectedMap} stations={stations} loading={loading} />
-        </div>
-
-        <div className="col-span-12 lg:col-span-4 space-y-5 md:space-y-6">
-          <SyncCommandCard
-            map={selectedMap}
-            syncing={syncing}
-            onSync={onSync}
-            lastSync={lastSync}
-            lastResult={lastSyncResult}
-          />
-          <FacilityInfoCard map={selectedMap} stats={stats} />
-          <LegendCard stations={stations} />
-        </div>
+      <div className="space-y-5 md:space-y-6">
+        <MapSelectorRail
+          maps={maps}
+          selectedId={selectedMapId}
+          onSelect={setSelectedMapId}
+          loading={loading && maps.length === 0}
+        />
+        <CanvasCard
+          map={selectedMap}
+          stations={stations}
+          loading={loading}
+          onEditStation={setEditingStationId}
+        />
       </div>
 
-      <StationDirectory stations={stations} loading={loading} error={error} />
+      <StationDirectory
+        stations={stations}
+        loading={loading}
+        error={error}
+        onEditStation={setEditingStationId}
+      />
+
+      <StationEditDrawer
+        open={editingStationId !== null}
+        station={editingStation}
+        busy={editBusy}
+        onClose={() => setEditingStationId(null)}
+        onSubmit={handleEditSubmit}
+      />
 
       <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>
@@ -301,12 +371,15 @@ function HeaderStrip({
   onSync,
   syncing,
   canSync,
+  cooldownRemaining,
 }: {
   mapName: string | null;
   onSync: () => void;
   syncing: boolean;
   canSync: boolean;
+  cooldownRemaining: number;
 }) {
+  const cooling = cooldownRemaining > 0;
   return (
     <motion.div
       initial={{ opacity: 0, y: -10 }}
@@ -337,7 +410,7 @@ function HeaderStrip({
         <button
           type="button"
           onClick={onSync}
-          disabled={syncing || !canSync}
+          disabled={syncing || !canSync || cooling}
           className={cn(
             "group relative inline-flex items-center gap-2.5 rounded-full px-4 h-10 text-[12.5px] font-semibold tracking-tight transition-all duration-200",
             "bg-[var(--color-brand-900)] text-white",
@@ -355,7 +428,13 @@ function HeaderStrip({
               strokeWidth={2.5}
             />
           )}
-          <span>{syncing ? "Pulling RIOT3" : "Refresh from RIOT3"}</span>
+          <span>
+            {syncing
+              ? "Pulling RIOT3"
+              : cooling
+                ? `Wait ${cooldownRemaining}s…`
+                : "Refresh from RIOT3"}
+          </span>
           <ArrowUpRight
             className="h-3.5 w-3.5 -mr-0.5 opacity-70 transition-transform duration-200 group-hover:translate-x-0.5"
             strokeWidth={2.5}
@@ -572,25 +651,61 @@ function CanvasCard({
   map,
   stations,
   loading,
+  onEditStation,
 }: {
   map: MapSummaryDto | null;
   stations: StationDto[];
   loading: boolean;
+  onEditStation: (id: string) => void;
 }) {
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [pinned, setPinned] = useState<string | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
+  const [hoverRobotId, setHoverRobotId] = useState<string | null>(null);
 
-  // Compute the world bounds. Fall back to map.width/height if no stations.
-  // 8% padding so dots never sit on the frame edge.
+  // Live robot positions for this map. The hook handles polling,
+  // visibility-change pausing, and abort on map switch / unmount.
+  const { positions: robots, lastTickMs } = useRobotPositions(map?.id ?? null);
+  // Force a re-render every 30 s so the "X s ago" indicator stays current
+  // even when no robots arrive (e.g. RIOT3 is reachable but empty).
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => forceTick((n) => (n + 1) % 1_000), 30_000);
+    return () => window.clearInterval(t);
+  }, []);
+  // Measured SVG width in CSS pixels — drives the world-unit ↔ screen-px
+  // conversion so dot/halo/stroke sizes stay constant on screen no matter
+  // how big the world coordinate range is. Without this, a 72 m × 69 m map
+  // turns every dot into a 600 mm blob that hides 1–2 m aisle spacing.
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [svgWidth, setSvgWidth] = useState(800);
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const el = svgRef.current;
+    const update = () => {
+      const w = el.getBoundingClientRect().width;
+      if (w > 0) setSvgWidth(w);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Compute the world bounds across BOTH stations and live robots so a robot
+  // driving outside the station cluster doesn't disappear off-canvas. 8%
+  // padding so points never sit on the frame edge.
   const bounds = useMemo(() => {
-    if (stations.length === 0) {
+    const points: { x: number; y: number }[] = [];
+    for (const s of stations) points.push({ x: s.x, y: s.y });
+    for (const r of robots) points.push({ x: r.x, y: r.y });
+    if (points.length === 0) {
       const W = map?.width ?? 1000;
       const H = map?.height ?? 700;
       return { minX: 0, minY: 0, maxX: W, maxY: H };
     }
-    const xs = stations.map((s) => s.x);
-    const ys = stations.map((s) => s.y);
+    const xs = points.map((p) => p.x);
+    const ys = points.map((p) => p.y);
     let minX = Math.min(...xs);
     let maxX = Math.max(...xs);
     let minY = Math.min(...ys);
@@ -602,12 +717,37 @@ function CanvasCard({
     minY -= padY;
     maxY += padY;
     return { minX, minY, maxX, maxY };
-  }, [stations, map]);
+  }, [stations, robots, map]);
 
   const viewW = bounds.maxX - bounds.minX;
   const viewH = bounds.maxY - bounds.minY;
-  // Step picker for the major grid — aim for ~6 lines.
-  const stepBase = Math.max(viewW, viewH) / 6;
+
+  // Viewport — the slice of world space currently rendered. Mutated by wheel
+  // (zoom) and drag (pan); reset to fit-all on map change or "recenter" press.
+  // Card aspect ratio still uses the natural (viewW × viewH) so the card itself
+  // doesn't reflow on zoom.
+  const [view, setView] = useState({
+    x: bounds.minX,
+    y: bounds.minY,
+    w: viewW,
+    h: viewH,
+  });
+  // Reset viewport ONLY when the user switches maps. If we re-fit on every
+  // bounds change (which now flexes when robots move outside the station
+  // cluster), the view would jump every poll and the user could never zoom
+  // in on a detail. Recenter button gets you back to fit-all on demand.
+  const lastMapIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!map?.id) return;
+    if (lastMapIdRef.current === map.id) return;
+    lastMapIdRef.current = map.id;
+    setView({ x: bounds.minX, y: bounds.minY, w: viewW, h: viewH });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map?.id]);
+
+  // Step picker for the major grid — aim for ~6 lines. Driven off the
+  // current viewport so zooming in subdivides the grid (10 m → 2 m → 500 mm).
+  const stepBase = Math.max(view.w, view.h) / 6;
   const magnitude = Math.pow(10, Math.floor(Math.log10(stepBase)));
   const normalized = stepBase / magnitude;
   const step =
@@ -617,15 +757,247 @@ function CanvasCard({
   const gridLines = useMemo(() => {
     const xs: number[] = [];
     const ys: number[] = [];
-    const startX = Math.floor(bounds.minX / step) * step;
-    const startY = Math.floor(bounds.minY / step) * step;
-    for (let x = startX; x <= bounds.maxX + 1; x += step) xs.push(x);
-    for (let y = startY; y <= bounds.maxY + 1; y += step) ys.push(y);
+    const startX = Math.floor(view.x / step) * step;
+    const startY = Math.floor(view.y / step) * step;
+    for (let x = startX; x <= view.x + view.w + 1; x += step) xs.push(x);
+    for (let y = startY; y <= view.y + view.h + 1; y += step) ys.push(y);
     return { xs, ys };
-  }, [bounds, step]);
+  }, [view, step]);
+
+  // Pointer-based gesture state — unifies mouse, touch, and stylus.
+  //  • 1 pointer  → pan (translate the view)
+  //  • 2 pointers → pinch-zoom around the gesture midpoint + translate
+  // dragMoved flips true once movement exceeds CLICK_THRESHOLD so the station
+  // onClick can ignore a click that was actually the end of a pan/pinch.
+  // viewRef shadows view so the window-level pointer listener can read the
+  // latest view without re-binding on every pan-induced render.
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const panStart = useRef<{ cx: number; cy: number; vx: number; vy: number } | null>(null);
+  const pinchStart = useRef<{
+    dist: number;
+    rectW: number;
+    rectH: number;
+    midPx: number;
+    midPy: number;
+    view: { x: number; y: number; w: number; h: number };
+  } | null>(null);
+  const dragMoved = useRef(false);
+  const [isGesturing, setIsGesturing] = useState(false);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const CLICK_THRESHOLD = 6; // a bit looser than mouse to absorb finger jitter
+
+  const beginGesture = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+    // Ignore non-primary mouse buttons; touch + pen don't have buttons here.
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (!svgRef.current) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const v = viewRef.current;
+
+    if (pointers.current.size === 2) {
+      const pts = [...pointers.current.values()];
+      const rect = svgRef.current.getBoundingClientRect();
+      const dist = Math.hypot(pts[1]!.x - pts[0]!.x, pts[1]!.y - pts[0]!.y);
+      pinchStart.current = {
+        dist: Math.max(dist, 1),
+        rectW: rect.width,
+        rectH: rect.height,
+        midPx: (pts[0]!.x + pts[1]!.x) / 2 - rect.left,
+        midPy: (pts[0]!.y + pts[1]!.y) / 2 - rect.top,
+        view: { x: v.x, y: v.y, w: v.w, h: v.h },
+      };
+      panStart.current = null;
+      dragMoved.current = true; // never treat a pinch as a tap
+    } else if (pointers.current.size === 1) {
+      panStart.current = { cx: e.clientX, cy: e.clientY, vx: v.x, vy: v.y };
+      dragMoved.current = false;
+    }
+    setIsGesturing(true);
+  }, []);
+
+  // Window-level move/up listeners — keep panning alive even when the pointer
+  // leaves the SVG, and avoid setPointerCapture so synthetic click events
+  // still target station <g> nodes after a tap.
+  useEffect(() => {
+    if (!isGesturing) return;
+    const onMove = (e: PointerEvent) => {
+      if (!pointers.current.has(e.pointerId)) return;
+      pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+
+      // Pinch-zoom: rescale around the original midpoint, then shift by
+      // current midpoint so 2-finger drag pans + zooms in one motion.
+      if (pointers.current.size === 2 && pinchStart.current) {
+        const pts = [...pointers.current.values()];
+        const dist = Math.hypot(pts[1]!.x - pts[0]!.x, pts[1]!.y - pts[0]!.y);
+        const midX = (pts[0]!.x + pts[1]!.x) / 2 - rect.left;
+        const midY = (pts[0]!.y + pts[1]!.y) / 2 - rect.top;
+        const ps = pinchStart.current;
+        const scale = ps.dist / Math.max(dist, 1);
+        const newW = ps.view.w * scale;
+        const newH = ps.view.h * scale;
+        const minSize = 1000;
+        const maxSize = Math.max(viewW, viewH) * 4;
+        if (newW < minSize || newH < minSize) return;
+        if (newW > maxSize || newH > maxSize) return;
+        // Anchor the gesture midpoint in data-space so the pinch zooms
+        // around what's under the user's fingers. Y is flipped (see wheel
+        // handler for the same formula): top of screen = high data-Y.
+        const wx = ps.view.x + (ps.midPx / ps.rectW) * ps.view.w;
+        const wy = ps.view.y + (1 - ps.midPy / ps.rectH) * ps.view.h;
+        setView({
+          x: wx - (midX / rect.width) * newW,
+          y: wy - (1 - midY / rect.height) * newH,
+          w: newW,
+          h: newH,
+        });
+        return;
+      }
+
+      // Single-pointer pan.
+      const ps = panStart.current;
+      if (!ps) return;
+      const dxPx = e.clientX - ps.cx;
+      const dyPx = e.clientY - ps.cy;
+      if (Math.abs(dxPx) + Math.abs(dyPx) > CLICK_THRESHOLD) dragMoved.current = true;
+      setView((v) => ({
+        ...v,
+        x: ps.vx - (dxPx / rect.width) * v.w,
+        // Y-flip frame: view.y is the data-Y *lower* bound (visual bottom).
+        // Drag-down (Google-Maps style) should move the viewport up in data
+        // space — i.e. increase view.y — so the cursor sticks to the same
+        // world point under the finger.
+        y: ps.vy + (dyPx / rect.height) * v.h,
+      }));
+    };
+    const onUp = (e: PointerEvent) => {
+      pointers.current.delete(e.pointerId);
+      if (pointers.current.size < 2) pinchStart.current = null;
+      if (pointers.current.size === 0) {
+        panStart.current = null;
+        setIsGesturing(false);
+      } else if (pointers.current.size === 1) {
+        // Re-anchor pan to the remaining finger after a pinch lift-off so
+        // the next pointermove doesn't jump by the pinch's accumulated delta.
+        const pt = [...pointers.current.values()][0]!;
+        const v = viewRef.current;
+        panStart.current = { cx: pt.x, cy: pt.y, vx: v.x, vy: v.y };
+        dragMoved.current = true;
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [isGesturing, viewW, viewH]);
+
+  // Wheel zoom — multiplicative around the cursor. Attached natively because
+  // React's synthetic onWheel is registered as a passive listener, which
+  // would block our preventDefault() (the page would scroll behind the map).
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      setView((v) => {
+        const factor = e.deltaY > 0 ? 1.2 : 1 / 1.2;
+        const newW = v.w * factor;
+        const newH = v.h * factor;
+        const minSize = 1000;
+        const maxSize = Math.max(viewW, viewH) * 4;
+        if (newW < minSize || newH < minSize) return v;
+        if (newW > maxSize || newH > maxSize) return v;
+        // X is straightforward: wx is the data-X under the cursor.
+        // Y is Y-flipped: at cursor screen position py/rect, the visible
+        // *data* Y is view.y + (1 - py/rect)*view.h (top of screen = high Y).
+        // Anchor that data-Y under the cursor when we resize the viewport.
+        const wx = v.x + (px / rect.width) * v.w;
+        const wy = v.y + (1 - py / rect.height) * v.h;
+        return {
+          x: wx - (px / rect.width) * newW,
+          y: wy - (1 - py / rect.height) * newH,
+          w: newW,
+          h: newH,
+        };
+      });
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, [viewW, viewH]);
+
+  const zoomBy = useCallback(
+    (factor: number) => {
+      setView((v) => {
+        const newW = v.w * factor;
+        const newH = v.h * factor;
+        const minSize = 1000;
+        const maxSize = Math.max(viewW, viewH) * 4;
+        if (newW < minSize || newH < minSize) return v;
+        if (newW > maxSize || newH > maxSize) return v;
+        // Anchor at viewport center so button-driven zoom feels balanced.
+        const cx = v.x + v.w / 2;
+        const cy = v.y + v.h / 2;
+        return { x: cx - newW / 2, y: cy - newH / 2, w: newW, h: newH };
+      });
+    },
+    [viewW, viewH],
+  );
+
+  const recenter = useCallback(() => {
+    setView({ x: bounds.minX, y: bounds.minY, w: viewW, h: viewH });
+  }, [bounds.minX, bounds.minY, viewW, viewH]);
+
+  // Double-tap recenter — covers touch where native `dblclick` is unreliable.
+  // Mouse still uses `onDoubleClick` on the SVG (handled separately).
+  const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
+  const onTapEnd = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      if (e.pointerType !== "touch") return;
+      if (dragMoved.current) return;
+      const now = e.timeStamp;
+      const prev = lastTap.current;
+      if (
+        prev &&
+        now - prev.t < 350 &&
+        Math.hypot(e.clientX - prev.x, e.clientY - prev.y) < 30
+      ) {
+        recenter();
+        lastTap.current = null;
+      } else {
+        lastTap.current = { t: now, x: e.clientX, y: e.clientY };
+      }
+    },
+    [recenter],
+  );
 
   const active = pinned ?? hoverId;
   const activeStation = stations.find((s) => s.id === active) ?? null;
+
+  // World units per screen pixel. Stays valid even if pxPerWorld is small
+  // (large maps) — `r` in world space then maps back to a constant on-screen
+  // size, so adjacent stations never overlap when their real spacing > a few
+  // pixels apart. Driven off the current viewport so zoom recomputes radii.
+  const pxPerWorld = svgWidth > 0 ? svgWidth / view.w : 1;
+  const worldPerPx = 1 / pxPerWorld;
+  // Tuned for "small enough to inspect 1 m aisle spacing, big enough to click".
+  const DOT_PX = 5;
+  const RING_PX = 11;
+  const HALO_PX = 22;
+  const STROKE_PX = 1.2;
+  const r = DOT_PX * worldPerPx;
+  const ringR = RING_PX * worldPerPx;
+  const haloR = HALO_PX * worldPerPx;
+  const sw = STROKE_PX * worldPerPx;
+  const sw2 = 1.5 * worldPerPx;
 
   return (
     <GlassCard variant="strong" className="overflow-hidden">
@@ -668,10 +1040,16 @@ function CanvasCard({
         </div>
       </div>
 
-      <div
-        className="relative"
-        style={{ aspectRatio: `${Math.max(viewW / Math.max(viewH, 1), 0.5)} / 1` }}
-      >
+      {/* Canvas height is a fraction of the viewport so the card itself never
+          overflows when the user scrolls it into view: 48svh = ~half-screen
+          canvas, clamped to 20rem floor (small phones) and 40rem ceiling
+          (giant 4K monitors). Percent-based scales predictably across screen
+          sizes; subtracting a fixed chrome budget would either undershoot on
+          tall monitors or crush short viewports. The SVG inside uses
+          preserveAspectRatio="xMidYMid meet", so the square world content
+          stays centered — wider screens just get letterboxed margins, never
+          a stretched cartography. */}
+      <div className="relative h-[clamp(20rem,48svh,40rem)]">
         {/* Decorative aurora behind canvas */}
         <span
           aria-hidden
@@ -685,19 +1063,31 @@ function CanvasCard({
         {!loading && stations.length === 0 && <CanvasEmptyState />}
 
         <svg
+          ref={svgRef}
           role="img"
           aria-label="Station topology"
-          viewBox={`${bounds.minX} ${bounds.minY} ${viewW} ${viewH}`}
+          viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
           preserveAspectRatio="xMidYMid meet"
-          className="absolute inset-0 h-full w-full"
-          onMouseMove={(e) => {
+          className="absolute inset-0 h-full w-full select-none"
+          style={{ cursor: isGesturing ? "grabbing" : "grab", touchAction: "none" }}
+          onPointerDown={beginGesture}
+          onPointerUp={onTapEnd}
+          onDoubleClick={recenter}
+          onPointerMove={(e) => {
+            // Cursor read-out follows the mouse only; touch has no hover.
+            if (e.pointerType === "touch") return;
             const svg = e.currentTarget;
             const rect = svg.getBoundingClientRect();
-            const localX = ((e.clientX - rect.left) / rect.width) * viewW + bounds.minX;
-            const localY = ((e.clientY - rect.top) / rect.height) * viewH + bounds.minY;
-            setCursor({ x: localX, y: localY });
+            const localX = ((e.clientX - rect.left) / rect.width) * view.w + view.x;
+            const localY = ((e.clientY - rect.top) / rect.height) * view.h + view.y;
+            // SVG coord → data coord. The data layer is Y-flipped, so the data
+            // y under the cursor is the mirror of localY about the viewport
+            // midline (= 2*view.y + view.h - localY).
+            const dataY = 2 * view.y + view.h - localY;
+            setCursor({ x: localX, y: dataY });
           }}
-          onMouseLeave={() => {
+          onPointerLeave={(e) => {
+            if (e.pointerType === "touch") return;
             setCursor(null);
             setHoverId(null);
           }}
@@ -712,15 +1102,15 @@ function CanvasCard({
               width={step / 5}
               height={step / 5}
               patternUnits="userSpaceOnUse"
-              x={Math.floor(bounds.minX / (step / 5)) * (step / 5)}
-              y={Math.floor(bounds.minY / (step / 5)) * (step / 5)}
+              x={Math.floor(view.x / (step / 5)) * (step / 5)}
+              y={Math.floor(view.y / (step / 5)) * (step / 5)}
             >
               <path
                 d={`M ${step / 5} 0 L 0 0 0 ${step / 5}`}
                 fill="none"
                 stroke="currentColor"
                 strokeOpacity="0.05"
-                strokeWidth={Math.max(viewW, viewH) / 2000}
+                strokeWidth={0.6 * worldPerPx}
               />
             </pattern>
             {Object.entries(TYPE_META).map(([key, m]) => (
@@ -738,12 +1128,21 @@ function CanvasCard({
             ))}
           </defs>
 
+          {/* Y-flip wrapper — RIOT3 (and robotics convention) uses Y-up while
+              SVG default is Y-down. We render all spatial data inside this
+              group so a station at world y=4,000 actually appears *above*
+              a station at y=10,000 on screen. Axis text labels stay outside
+              this group so the characters don't render upside-down — their
+              y positions get the same flip math applied below. */}
+          <g
+            transform={`translate(0 ${2 * view.y + view.h}) scale(1 -1)`}
+          >
           {/* Minor grid wash */}
           <rect
-            x={bounds.minX}
-            y={bounds.minY}
-            width={viewW}
-            height={viewH}
+            x={view.x}
+            y={view.y}
+            width={view.w}
+            height={view.h}
             fill="url(#canvas-grid-minor)"
             className="text-[var(--color-ink-900)]"
           />
@@ -753,25 +1152,25 @@ function CanvasCard({
             <line
               key={`gx-${x}`}
               x1={x}
-              y1={bounds.minY}
+              y1={view.y}
               x2={x}
-              y2={bounds.maxY}
+              y2={view.y + view.h}
               stroke="currentColor"
               strokeOpacity={x === 0 ? 0.22 : 0.08}
-              strokeWidth={Math.max(viewW, viewH) / 1500}
+              strokeWidth={sw2 * 0.8}
               className="text-[var(--color-ink-700)]"
             />
           ))}
           {gridLines.ys.map((y) => (
             <line
               key={`gy-${y}`}
-              x1={bounds.minX}
+              x1={view.x}
               y1={y}
-              x2={bounds.maxX}
+              x2={view.x + view.w}
               y2={y}
               stroke="currentColor"
               strokeOpacity={y === 0 ? 0.22 : 0.08}
-              strokeWidth={Math.max(viewW, viewH) / 1500}
+              strokeWidth={sw2 * 0.8}
               className="text-[var(--color-ink-700)]"
             />
           ))}
@@ -787,18 +1186,18 @@ function CanvasCard({
               stroke="currentColor"
               strokeOpacity={0.16}
               strokeDasharray={`${step / 10} ${step / 14}`}
-              strokeWidth={Math.max(viewW, viewH) / 1100}
+              strokeWidth={sw}
               className="text-[var(--color-brand-500)]"
             />
           )}
 
-          {/* Stations — pulse for active, dim for inactive, ring for offline override */}
+          {/* Stations — pulse for active, dim for inactive, ring for offline override.
+              r/ringR/haloR/sw are world-unit values computed from the measured
+              screen-px target so dot size stays constant regardless of map extent. */}
           {stations.map((s, i) => {
             const k = typeKey(s.type);
             const meta = TYPE_META[k];
             const isActiveDot = s.id === active;
-            const r = Math.max(viewW, viewH) / 110;
-            const ringR = r * 2.6;
             return (
               <motion.g
                 key={s.id}
@@ -812,18 +1211,23 @@ function CanvasCard({
                 style={{ transformOrigin: `${s.x}px ${s.y}px` }}
                 onMouseEnter={() => setHoverId(s.id)}
                 onMouseLeave={() => setHoverId((id) => (id === s.id ? null : id))}
-                onClick={() =>
-                  setPinned((id) => (id === s.id ? null : s.id))
-                }
+                onClick={(e) => {
+                  // Ignore the click if the user just finished a pan gesture.
+                  if (dragMoved.current) return;
+                  e.stopPropagation();
+                  setPinned((id) => (id === s.id ? null : s.id));
+                }}
                 className="cursor-pointer"
               >
-                {/* Soft halo */}
+                {/* Soft halo — only on active dots, kept subtle so dense
+                    aisles don't blur into a single blob. */}
                 {s.isActive && (
                   <circle
                     cx={s.x}
                     cy={s.y}
-                    r={ringR}
+                    r={haloR}
                     fill={`url(#station-glow-${k})`}
+                    opacity={0.55}
                   />
                 )}
 
@@ -832,15 +1236,15 @@ function CanvasCard({
                   <motion.circle
                     cx={s.x}
                     cy={s.y}
-                    r={r * 1.8}
+                    r={ringR}
                     fill="none"
                     stroke={meta.swatch}
                     strokeOpacity={0.35}
-                    strokeWidth={Math.max(viewW, viewH) / 1500}
+                    strokeWidth={sw2}
                     initial={{ opacity: 0.55, scale: 0.85 }}
                     animate={{
                       opacity: [0.55, 0, 0.55],
-                      scale: [0.85, 1.6, 0.85],
+                      scale: [0.85, 1.5, 0.85],
                     }}
                     transition={{
                       duration: 2.4,
@@ -857,11 +1261,11 @@ function CanvasCard({
                   <circle
                     cx={s.x}
                     cy={s.y}
-                    r={r * 2.2}
+                    r={ringR * 1.1}
                     fill="none"
                     stroke={meta.swatch}
-                    strokeWidth={Math.max(viewW, viewH) / 900}
-                    strokeOpacity={0.9}
+                    strokeWidth={sw * 1.6}
+                    strokeOpacity={0.95}
                   />
                 )}
 
@@ -870,11 +1274,11 @@ function CanvasCard({
                   <circle
                     cx={s.x}
                     cy={s.y}
-                    r={r * 2}
+                    r={ringR}
                     fill="none"
                     stroke="var(--color-amber)"
-                    strokeWidth={Math.max(viewW, viewH) / 1200}
-                    strokeDasharray={`${r * 0.6} ${r * 0.4}`}
+                    strokeWidth={sw}
+                    strokeDasharray={`${r * 0.8} ${r * 0.6}`}
                   />
                 )}
 
@@ -887,7 +1291,7 @@ function CanvasCard({
                   fillOpacity={s.isActive ? 1 : 0.35}
                   stroke="white"
                   strokeOpacity={0.85}
-                  strokeWidth={Math.max(viewW, viewH) / 1400}
+                  strokeWidth={sw2 * 0.6}
                 />
 
                 {/* Inactive cross */}
@@ -895,7 +1299,7 @@ function CanvasCard({
                   <g
                     stroke="white"
                     strokeOpacity={0.85}
-                    strokeWidth={Math.max(viewW, viewH) / 1400}
+                    strokeWidth={sw2 * 0.6}
                     strokeLinecap="round"
                   >
                     <line
@@ -921,19 +1325,36 @@ function CanvasCard({
             <circle
               cx={0}
               cy={0}
-              r={Math.max(viewW, viewH) / 250}
+              r={3 * worldPerPx}
               fill="var(--color-ink-700)"
               fillOpacity={0.45}
             />
           </g>
 
-          {/* Axis labels — major gridline coordinates in mono */}
+          {/* Live robot layer — sits between stations and vignette so robots
+              draw on top of the topology but the corner vignette still
+              applies. Rendered in the same flipped Y space as everything
+              else, so its world coords match station coords. */}
+          <RobotLayer
+            positions={robots}
+            worldPerPx={worldPerPx}
+            hoverId={hoverRobotId}
+            onHover={setHoverRobotId}
+          />
+
+          </g>{/* end Y-flip wrapper */}
+
+          {/* Axis labels — OUTSIDE the flip group so the digits don't render
+              upside-down. Y-label positions get the same flip math applied
+              so they line up with the gridlines drawn inside the flipped
+              group; their text content is the original (un-flipped) value
+              the operator wants to read. */}
           {gridLines.xs.map((x) => (
             <text
               key={`tx-${x}`}
               x={x}
-              y={bounds.minY + Math.max(viewW, viewH) / 50}
-              fontSize={Math.max(viewW, viewH) / 60}
+              y={view.y + view.h - 14 * worldPerPx}
+              fontSize={10 * worldPerPx}
               fontFamily="var(--font-mono)"
               fill="currentColor"
               fillOpacity={0.4}
@@ -946,9 +1367,9 @@ function CanvasCard({
           {gridLines.ys.map((y) => (
             <text
               key={`ty-${y}`}
-              x={bounds.minX + Math.max(viewW, viewH) / 80}
-              y={y}
-              fontSize={Math.max(viewW, viewH) / 60}
+              x={view.x + 8 * worldPerPx}
+              y={2 * view.y + view.h - y}
+              fontSize={10 * worldPerPx}
               fontFamily="var(--font-mono)"
               fill="currentColor"
               fillOpacity={0.4}
@@ -961,14 +1382,42 @@ function CanvasCard({
 
           {/* Vignette */}
           <rect
-            x={bounds.minX}
-            y={bounds.minY}
-            width={viewW}
-            height={viewH}
+            x={view.x}
+            y={view.y}
+            width={view.w}
+            height={view.h}
             fill="url(#canvas-vignette)"
             pointerEvents="none"
           />
         </svg>
+
+        {/* Robot tooltip — HTML overlay positioned in screen space from the
+            hovered robot's world coords. The data layer is Y-flipped, so the
+            robot at data y is rendered at SVG y = 2*view.y + view.h - y;
+            screen-px conversion mirrors that. */}
+        {(() => {
+          const hovered = robots.find((r) => r.deviceKey === hoverRobotId);
+          if (!hovered) return null;
+          const rect = svgRef.current?.getBoundingClientRect();
+          if (!rect) return null;
+          const px = ((hovered.x - view.x) / view.w) * rect.width;
+          const py = ((view.y + view.h - hovered.y) / view.h) * rect.height;
+          return <RobotTooltip robot={hovered} left={px} top={py} />;
+        })()}
+
+        {/* Live indicator — top-left chip above the canvas grid. Shows tick
+            age + robot count so operators can sanity-check the stream. */}
+        <div className="pointer-events-none absolute top-4 left-4 flex items-center gap-1.5 rounded-full glass px-2.5 py-1 text-[10.5px] font-mono tracking-tight text-[var(--color-ink-700)]">
+          <StatusPulse tone={lastTickMs ? "success" : "amber"} />
+          <span>
+            {robots.length} robot{robots.length === 1 ? "" : "s"}
+          </span>
+          {lastTickMs && (
+            <span className="text-[var(--color-ink-400)]">
+              · {((performance.now() - lastTickMs) / 1000).toFixed(0)}s
+            </span>
+          )}
+        </div>
 
         {/* Floating compass + hint */}
         <div className="pointer-events-none absolute top-4 right-4 flex items-center gap-2">
@@ -979,6 +1428,47 @@ function CanvasCard({
           >
             <Navigation className="h-4 w-4" strokeWidth={2.2} />
           </motion.div>
+        </div>
+
+        {/* Zoom controls — bottom-right floating stack. Buttons round-trip
+            through the same zoomBy/recenter handlers as wheel + double-click,
+            so all three input methods stay in sync. The zoom-level chip is a
+            quick way to confirm "how zoomed am I" at a glance. */}
+        <div className="pointer-events-none absolute bottom-4 right-4 flex flex-col items-end gap-1.5">
+          <span className="pointer-events-auto inline-flex items-center gap-1 rounded-full glass px-2.5 py-1 text-[10.5px] font-mono tabular-nums tracking-tight text-[var(--color-ink-600)]">
+            {(viewW / view.w).toFixed(2)}×
+          </span>
+          <div className="pointer-events-auto flex flex-col rounded-[16px] glass-strong overflow-hidden">
+            <button
+              type="button"
+              aria-label="Zoom in"
+              onClick={() => zoomBy(1 / 1.4)}
+              className="grid h-10 w-10 place-items-center text-[var(--color-ink-700)] hover:bg-white/60 dark:hover:bg-white/[0.06] cursor-pointer transition-colors"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.4} />
+            </button>
+            <span aria-hidden className="h-px bg-[var(--color-ink-100)] dark:bg-white/[0.06]" />
+            <button
+              type="button"
+              aria-label="Zoom out"
+              onClick={() => zoomBy(1.4)}
+              className="grid h-10 w-10 place-items-center text-[var(--color-ink-700)] hover:bg-white/60 dark:hover:bg-white/[0.06] cursor-pointer transition-colors"
+            >
+              <Minus className="h-4 w-4" strokeWidth={2.4} />
+            </button>
+            <span aria-hidden className="h-px bg-[var(--color-ink-100)] dark:bg-white/[0.06]" />
+            <button
+              type="button"
+              aria-label="Recenter"
+              onClick={recenter}
+              className="grid h-10 w-10 place-items-center text-[var(--color-ink-700)] hover:bg-white/60 dark:hover:bg-white/[0.06] cursor-pointer transition-colors"
+            >
+              <Maximize2 className="h-4 w-4" strokeWidth={2.2} />
+            </button>
+          </div>
+          <span className="pointer-events-none rounded-full glass px-2.5 py-1 text-[10px] tracking-tight text-[var(--color-ink-500)] hidden md:inline-block">
+            scroll / pinch · drag · 2× tap
+          </span>
         </div>
 
         {/* Pinned station detail */}
@@ -1004,6 +1494,14 @@ function CanvasCard({
                 <X className="h-3.5 w-3.5" strokeWidth={2.2} />
               </button>
               <StationDetail station={activeStation} />
+              <button
+                type="button"
+                onClick={() => onEditStation(activeStation.id)}
+                className="mt-3 inline-flex w-full items-center justify-center gap-1.5 h-8 rounded-full bg-[var(--color-brand-900)] text-white text-[11.5px] font-semibold tracking-tight cursor-pointer hover:-translate-y-px transition-transform shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_18px_-10px_rgba(14,21,48,0.55)] dark:bg-[var(--color-brand-500)]"
+              >
+                <Pencil className="h-3 w-3" strokeWidth={2.5} />
+                Edit station
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1126,270 +1624,33 @@ function Pill({
 }
 
 /* -------------------------------------------------------------------------- */
-/* SyncCommandCard — primary action surface for pulling from RIOT3.           */
-/* -------------------------------------------------------------------------- */
-function SyncCommandCard({
-  map,
-  syncing,
-  onSync,
-  lastSync,
-  lastResult,
-}: {
-  map: MapSummaryDto | null;
-  syncing: boolean;
-  onSync: () => void;
-  lastSync: Date | null;
-  lastResult: SyncMapStationsResultDto | null;
-}) {
-  const canSync = !!map?.vendorRef;
-  const ago = useTimeAgo(lastSync);
-
-  return (
-    <GlassCard variant="ink" className="p-5 md:p-6 relative overflow-hidden">
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -top-20 -right-12 h-56 w-56 rounded-full opacity-60 blur-[80px]"
-        style={{
-          background:
-            "radial-gradient(circle, rgba(143,156,255,0.55), transparent 60%)",
-        }}
-      />
-      <div className="relative flex items-center justify-between">
-        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">
-          Command
-        </div>
-        <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[9.5px] font-mono tracking-tight text-white/70">
-          riot3 · {map?.vendorRef ?? "—"}
-        </span>
-      </div>
-      <h3 className="relative mt-2 font-display text-[1.45rem] font-semibold tracking-tight text-white leading-tight">
-        Pull live topology
-      </h3>
-      <p className="relative mt-1.5 text-[12.5px] text-white/65 max-w-[28ch]">
-        {canSync
-          ? "Match every station against RIOT3 and reconcile add, update, reactivate, and deactivate in one transaction."
-          : "This map isn't linked to a RIOT3 vendor — import it from the Facility module to enable refresh."}
-      </p>
-
-      <button
-        type="button"
-        onClick={onSync}
-        disabled={!canSync || syncing}
-        className={cn(
-          "relative mt-5 group inline-flex w-full items-center justify-between gap-3 rounded-full px-4 h-12 text-[13px] font-semibold tracking-tight transition-all duration-200 cursor-pointer",
-          "bg-white text-[var(--color-brand-900)]",
-          "shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_18px_30px_-12px_rgba(0,0,0,0.45)]",
-          "hover:-translate-y-px",
-          "disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0",
-        )}
-      >
-        <span className="flex items-center gap-2.5">
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-[var(--color-brand-900)] text-white">
-            {syncing ? (
-              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.4} />
-            ) : (
-              <Zap className="h-4 w-4" strokeWidth={2.4} />
-            )}
-          </span>
-          <span>{syncing ? "Pulling RIOT3" : "Refresh stations"}</span>
-        </span>
-        <ArrowUpRight
-          className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-          strokeWidth={2.4}
-        />
-      </button>
-
-      <div className="relative mt-4 grid grid-cols-2 gap-1.5">
-        <SyncStat label="added" value={lastResult?.added ?? null} tone="add" />
-        <SyncStat label="updated" value={lastResult?.updated ?? null} tone="upd" />
-        <SyncStat
-          label="reactivated"
-          value={lastResult?.reactivated ?? null}
-          tone="re"
-        />
-        <SyncStat
-          label="deactivated"
-          value={lastResult?.deactivated ?? null}
-          tone="off"
-        />
-      </div>
-      <div className="relative mt-4 flex items-center justify-between text-[11px] text-white/60 font-mono tracking-tight">
-        <span className="inline-flex items-center gap-1.5">
-          <span
-            className={cn(
-              "h-1.5 w-1.5 rounded-full",
-              lastSync ? "bg-[var(--color-success)]" : "bg-white/20",
-            )}
-          />
-          {lastSync ? `synced ${ago}` : "never synced"}
-        </span>
-        <span>{lastSync ? lastSync.toLocaleTimeString() : ""}</span>
-      </div>
-    </GlassCard>
-  );
-}
-
-function SyncStat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number | null;
-  tone: "add" | "upd" | "re" | "off";
-}) {
-  const toneColor = {
-    add: "text-[var(--color-success)]",
-    upd: "text-[#9aa6ff]",
-    re: "text-[var(--color-amber)]",
-    off: "text-[var(--color-coral)]",
-  }[tone];
-  return (
-    <div className="rounded-[12px] bg-white/[0.06] border border-white/[0.06] px-3 py-2">
-      <div className="text-[9.5px] uppercase tracking-[0.16em] text-white/40">
-        {label}
-      </div>
-      <div className={cn("mt-0.5 font-display text-[18px] font-semibold tabular-nums", toneColor)}>
-        {value === null ? "—" : value}
-      </div>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* FacilityInfoCard — map metadata + station ratio bar.                       */
-/* -------------------------------------------------------------------------- */
-function FacilityInfoCard({
-  map,
-  stats,
-}: {
-  map: MapSummaryDto | null;
-  stats: { total: number; active: number; linked: number; offline: number };
-}) {
-  const activePct = stats.total > 0 ? (stats.active / stats.total) * 100 : 0;
-  return (
-    <GlassCard variant="strong" className="p-5 md:p-6">
-      <div className="flex items-center justify-between">
-        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-400)]">
-          Map metadata
-        </div>
-        <span className="font-mono text-[10px] tracking-tight text-[var(--color-ink-500)]">
-          {map?.version ?? "—"}
-        </span>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <KV label="extent w" value={map ? Math.round(map.width).toLocaleString() : "—"} />
-        <KV label="extent h" value={map ? Math.round(map.height).toLocaleString() : "—"} />
-        <KV label="vendor" value={map?.vendorRef ?? "manual"} />
-        <KV label="stations" value={String(stats.total)} />
-      </div>
-
-      <div className="mt-5">
-        <div className="flex items-end justify-between text-[11.5px]">
-          <span className="font-medium text-[var(--color-ink-700)]">
-            Active ratio
-          </span>
-          <span className="font-mono tabular-nums text-[var(--color-ink-500)]">
-            {Math.round(activePct)}%
-          </span>
-        </div>
-        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-ink-100)] dark:bg-white/[0.06]">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${activePct}%` }}
-            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-            className="h-full rounded-full bg-gradient-to-r from-[var(--color-success)] to-[#7ee2c1]"
-          />
-        </div>
-      </div>
-    </GlassCard>
-  );
-}
-
-function KV({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[10px] bg-white/55 dark:bg-white/[0.04] px-2.5 py-1.5">
-      <div className="text-[9.5px] uppercase tracking-[0.14em] text-[var(--color-ink-400)]">
-        {label}
-      </div>
-      <div className="mt-0.5 font-mono text-[12px] tabular-nums tracking-tight text-[var(--color-ink-800)] truncate">
-        {value}
-      </div>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* LegendCard — station-type taxonomy with live counts.                       */
-/* -------------------------------------------------------------------------- */
-function LegendCard({ stations }: { stations: StationDto[] }) {
-  const counts = useMemo(() => {
-    const map: Partial<Record<TypeKey, number>> = {};
-    for (const s of stations) {
-      const k = typeKey(s.type);
-      map[k] = (map[k] ?? 0) + 1;
-    }
-    return map;
-  }, [stations]);
-  return (
-    <GlassCard variant="default" className="p-5 md:p-6">
-      <div className="flex items-center justify-between">
-        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-400)]">
-          Taxonomy
-        </div>
-        <span className="font-mono text-[10px] tracking-tight text-[var(--color-ink-500)]">
-          {Object.keys(counts).length} kinds
-        </span>
-      </div>
-      <ul className="mt-3 space-y-1">
-        {TYPE_KEYS.map((k) => {
-          const meta = TYPE_META[k];
-          const count = counts[k] ?? 0;
-          return (
-            <li
-              key={k}
-              className="flex items-center justify-between rounded-[10px] px-2.5 py-1.5 hover:bg-white/55 dark:hover:bg-white/[0.04] transition-colors"
-            >
-              <span className="flex items-center gap-2.5">
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ background: meta.swatch }}
-                />
-                <span className="text-[12px] font-medium tracking-tight text-[var(--color-ink-800)]">
-                  {meta.label}
-                </span>
-              </span>
-              <span
-                className={cn(
-                  "font-mono text-[11px] tabular-nums",
-                  count > 0 ? "text-[var(--color-ink-700)]" : "text-[var(--color-ink-300)]",
-                )}
-              >
-                {count}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </GlassCard>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
 /* StationDirectory — searchable, filter-pillable table of all stations.       */
 /* -------------------------------------------------------------------------- */
 function StationDirectory({
   stations,
   loading,
   error,
+  onEditStation,
 }: {
   stations: StationDto[];
   loading: boolean;
   error: string | null;
+  onEditStation: (id: string) => void;
 }) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeKey | "ALL">("ALL");
   const [activeOnly, setActiveOnly] = useState(false);
+
+  // Per-type counts feed the filter chips so the operator sees the
+  // distribution at a glance — replaces the standalone Taxonomy card.
+  const counts = useMemo(() => {
+    const m: Partial<Record<TypeKey, number>> = {};
+    for (const s of stations) {
+      const k = typeKey(s.type);
+      m[k] = (m[k] ?? 0) + 1;
+    }
+    return m;
+  }, [stations]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -1452,6 +1713,7 @@ function StationDirectory({
             active={typeFilter === "ALL"}
             onClick={() => setTypeFilter("ALL")}
             color="var(--color-ink-700)"
+            count={stations.length}
           >
             All
           </TypeChip>
@@ -1461,6 +1723,7 @@ function StationDirectory({
               active={typeFilter === k}
               onClick={() => setTypeFilter(typeFilter === k ? "ALL" : k)}
               color={TYPE_META[k].swatch}
+              count={counts[k] ?? 0}
             >
               {TYPE_META[k].label}
             </TypeChip>
@@ -1495,6 +1758,7 @@ function StationDirectory({
                   <th className="py-2.5 font-semibold">Coords</th>
                   <th className="py-2.5 font-semibold">RIOT</th>
                   <th className="py-2.5 font-semibold">Status</th>
+                  <th className="py-2.5 pr-5 font-semibold sr-only">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -1539,7 +1803,7 @@ function StationDirectory({
                       <td className="py-3 font-mono text-[11px] tabular-nums tracking-tight text-[var(--color-ink-600)]">
                         {s.vendorRef ?? <span className="text-[var(--color-ink-300)]">—</span>}
                       </td>
-                      <td className="py-3 pr-5">
+                      <td className="py-3">
                         <span className="inline-flex items-center gap-2">
                           {s.isActive ? (
                             <Pill tone="ok">active</Pill>
@@ -1550,6 +1814,17 @@ function StationDirectory({
                             <Pill tone="warn">offline</Pill>
                           )}
                         </span>
+                      </td>
+                      <td className="py-3 pr-5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => onEditStation(s.id)}
+                          className="inline-flex items-center gap-1 rounded-full bg-white/65 dark:bg-white/[0.05] px-2.5 h-7 text-[10.5px] font-semibold tracking-tight text-[var(--color-ink-800)] hover:bg-white hover:-translate-y-px transition-all cursor-pointer"
+                          aria-label={`Edit ${s.name}`}
+                        >
+                          <Pencil className="h-3 w-3" strokeWidth={2.4} />
+                          Edit
+                        </button>
                       </td>
                     </motion.tr>
                   );
@@ -1568,28 +1843,52 @@ function TypeChip({
   active,
   onClick,
   color,
+  count,
 }: {
   children: React.ReactNode;
   active: boolean;
   onClick: () => void;
   color: string;
+  count?: number;
 }) {
+  // Dim chips with zero matches so the populated kinds stay visually dominant
+  // (e.g. Waypoint 86 reads loud while the empty Charging/Pickup/… rows recede).
+  const empty = count === 0 && !active;
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 h-7 text-[11px] font-medium tracking-tight transition-colors cursor-pointer",
+        "inline-flex items-center gap-1.5 rounded-full pl-2.5 pr-2 h-7 text-[11px] font-medium tracking-tight transition-colors cursor-pointer",
         active
           ? "bg-[var(--color-ink-900)] text-white dark:bg-white/[0.12]"
-          : "bg-white/55 dark:bg-white/[0.04] text-[var(--color-ink-700)] hover:bg-white/80",
+          : empty
+            ? "bg-white/35 dark:bg-white/[0.02] text-[var(--color-ink-400)] hover:bg-white/55"
+            : "bg-white/55 dark:bg-white/[0.04] text-[var(--color-ink-700)] hover:bg-white/80",
       )}
     >
       <span
-        className="h-1.5 w-1.5 rounded-full"
+        className={cn(
+          "h-1.5 w-1.5 rounded-full transition-opacity",
+          empty && "opacity-40",
+        )}
         style={{ background: color }}
       />
-      {children}
+      <span>{children}</span>
+      {count !== undefined && (
+        <span
+          className={cn(
+            "font-mono tabular-nums text-[10px] tracking-tight rounded-full px-1.5 py-px",
+            active
+              ? "bg-white/15 text-white/80"
+              : empty
+                ? "bg-transparent text-[var(--color-ink-300)]"
+                : "bg-white/55 dark:bg-white/[0.06] text-[var(--color-ink-600)]",
+          )}
+        >
+          {count}
+        </span>
+      )}
     </button>
   );
 }

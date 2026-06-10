@@ -13,6 +13,12 @@ export type StationDto = {
   compatibleVehicleTypes: string[];
   manualOverrideOffline: boolean;
   isManualOverrideActive: boolean;
+  // Optional manual-override metadata — present when the operator force-offlined
+  // this station. Used by the edit drawer's "currently offline" panel.
+  manualOverrideReason?: string | null;
+  manualOverrideAt?: string | null;
+  manualOverrideBy?: string | null;
+  manualOverrideExpiresAt?: string | null;
 };
 
 export type StationOption = {
@@ -69,6 +75,42 @@ export async function getStationOptions(): Promise<StationOption[]> {
     .sort((a, b) => a.code.localeCompare(b.code));
 }
 
+export type RobotPositionDto = {
+  deviceKey: string;
+  deviceName: string;
+  mapId: string;
+  vendorMapId: number;
+  x: number;
+  y: number;
+  theta: number;
+  systemState: string;
+  connectionState: string;
+  emergency: boolean;
+  paused: boolean;
+  batteryPercentage: number;
+  charging: boolean;
+  orderKey: string | null;
+  orderName: string | null;
+  startToEnd: string | null;
+  stationName: string | null;
+  updatedAtUtc: string;
+};
+
+export async function getMapRobotPositions(
+  mapId: string,
+  signal?: AbortSignal,
+): Promise<RobotPositionDto[]> {
+  const res = await fetch(`/api/facility/maps/${mapId}/robot-positions`, {
+    cache: "no-store",
+    signal,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `Failed to load robot positions (${res.status})`);
+  }
+  return res.json();
+}
+
 export async function listMaps(): Promise<MapSummaryDto[]> {
   const res = await fetch("/api/facility/maps", { cache: "no-store" });
   if (!res.ok) {
@@ -76,6 +118,84 @@ export async function listMaps(): Promise<MapSummaryDto[]> {
     throw new Error(text || `Failed to load maps (${res.status})`);
   }
   return res.json();
+}
+
+export type StationTypeWire =
+  | "NORMAL"
+  | "CHARGING"
+  | "PICKUP"
+  | "DROPOFF"
+  | "PARKING"
+  | "DOCK"
+  | "CHECKPOINT";
+
+export type UpdateStationInput = {
+  type?: StationTypeWire;
+  code?: string | null;
+};
+
+export async function updateStation(
+  stationId: string,
+  input: UpdateStationInput,
+): Promise<void> {
+  const res = await fetch(`/api/facility/stations/${stationId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    let message = `Update failed (${res.status})`;
+    try {
+      const body = (await res.json()) as { message?: string };
+      if (body?.message) message = body.message;
+    } catch {
+      // body wasn't JSON
+    }
+    throw new Error(message);
+  }
+}
+
+export type ForceOfflineInput = {
+  reason: string;
+  durationMinutes: number;
+  by?: string | null;
+};
+
+export async function forceStationOffline(
+  stationId: string,
+  input: ForceOfflineInput,
+): Promise<void> {
+  const res = await fetch(`/api/facility/stations/${stationId}/force-offline`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    let message = `Force-offline failed (${res.status})`;
+    try {
+      const body = (await res.json()) as { message?: string };
+      if (body?.message) message = body.message;
+    } catch {
+      // body wasn't JSON
+    }
+    throw new Error(message);
+  }
+}
+
+export async function clearStationOverride(stationId: string): Promise<void> {
+  const res = await fetch(`/api/facility/stations/${stationId}/force-offline`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    let message = `Clear-override failed (${res.status})`;
+    try {
+      const body = (await res.json()) as { message?: string };
+      if (body?.message) message = body.message;
+    } catch {
+      // body wasn't JSON
+    }
+    throw new Error(message);
+  }
 }
 
 export async function syncMapStations(mapId: string): Promise<SyncMapStationsResultDto> {
