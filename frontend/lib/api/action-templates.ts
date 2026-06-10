@@ -98,11 +98,20 @@ function normaliseTemplate(raw: ActionTemplateDto): ActionTemplateDto {
   };
 }
 
+export type ActionTemplateSortBy =
+  | "actionName"
+  | "actionCategory"
+  | "modifiedAt"
+  | "isActive";
+
 export type ListActionTemplatesParams = {
   page?: number;
   size?: number;
   includeInactive?: boolean;
   actionCategory?: ActionCategory;
+  search?: string;
+  sortBy?: ActionTemplateSortBy;
+  sortDir?: "asc" | "desc";
 };
 
 export async function listActionTemplates(
@@ -114,12 +123,30 @@ export async function listActionTemplates(
   if (params.size) qs.set("size", String(params.size));
   if (params.includeInactive) qs.set("includeInactive", "true");
   if (params.actionCategory) qs.set("actionCategory", wireFromCategory(params.actionCategory));
+  if (params.search && params.search.trim()) qs.set("search", params.search.trim());
+  if (params.sortBy) qs.set("sortBy", params.sortBy);
+  if (params.sortDir) qs.set("sortDir", params.sortDir);
   const res = await fetch(`/api/action-templates?${qs}`, { cache: "no-store", signal });
   const paged = await unwrap<PagedActionTemplates>(res);
   return {
     ...paged,
     records: (paged.records ?? []).map(normaliseTemplate),
   };
+}
+
+export type ActionTemplateStatsDto = {
+  total: number;
+  active: number;
+  inactive: number;
+  std: number;
+  act: number;
+};
+
+export async function getActionTemplateStats(
+  signal?: AbortSignal,
+): Promise<ActionTemplateStatsDto> {
+  const res = await fetch(`/api/action-templates/stats`, { cache: "no-store", signal });
+  return unwrap<ActionTemplateStatsDto>(res);
 }
 
 export async function getActionTemplate(id: string): Promise<ActionTemplateDto> {

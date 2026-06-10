@@ -13,7 +13,7 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { NumberTicker } from "@/components/primitives/number-ticker";
 import { StatusPulse } from "@/components/primitives/status-pulse";
@@ -23,9 +23,11 @@ import {
   activateActionTemplate,
   deactivateActionTemplate,
   deleteActionTemplate,
+  getActionTemplateStats,
   listActionTemplates,
   type ActionCategory,
   type ActionTemplateDto,
+  type ActionTemplateStatsDto,
 } from "@/lib/api/action-templates";
 import { Pagination, type PageSize } from "@/components/delivery-orders/pagination";
 import { ActionTemplateDialog } from "./create-dialog";
@@ -57,8 +59,18 @@ function useDebouncedValue<T>(value: T, delay = 300): T {
   return debounced;
 }
 
+const EMPTY_STATS: ActionTemplateStatsDto = {
+  total: 0,
+  active: 0,
+  inactive: 0,
+  std: 0,
+  act: 0,
+};
+
 export function ActionTemplatesExperience() {
   const [records, setRecords] = useState<ActionTemplateDto[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [stats, setStats] = useState<ActionTemplateStatsDto>(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(true);
@@ -68,7 +80,7 @@ export function ActionTemplatesExperience() {
   const [sortBy, setSortBy] = useState<SortColumn>("modifiedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<PageSize>(25);
+  const [pageSize, setPageSize] = useState<PageSize>(10);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<ActionTemplateDto | null>(null);
@@ -86,33 +98,41 @@ export function ActionTemplatesExperience() {
     toastTimer.current = setTimeout(() => setToast(null), 3200);
   }, []);
 
+  // Reset to page 1 whenever the result set changes — otherwise the user
+  // could be stranded on page 7 of a 2-page result after narrowing.
+  useEffect(() => {
+    setPage(1);
+  }, [categoryFilter, showInactive, debouncedSearch, pageSize, sortBy, sortDir]);
+
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
       setLoading(true);
       setError(null);
       try {
-        // Fetch a large slab and paginate client-side — search/sort are
-        // client-only, so we'd otherwise show holes when filtering across
-        // server pages. 500 covers the foreseeable catalog comfortably.
         const result = await listActionTemplates(
           {
-            page: 1,
-            size: 500,
+            page,
+            size: pageSize,
             includeInactive: showInactive,
             actionCategory: categoryFilter === "All" ? undefined : categoryFilter,
+            search: debouncedSearch.trim() || undefined,
+            sortBy,
+            sortDir,
           },
           signal,
         );
         setRecords(result.records);
+        setTotalCount(Number(result.total));
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
         setError((e as Error).message || "Failed to load templates.");
         setRecords([]);
+        setTotalCount(0);
       } finally {
         setLoading(false);
       }
     },
-    [showInactive, categoryFilter],
+    [page, pageSize, showInactive, categoryFilter, debouncedSearch, sortBy, sortDir],
   );
 
   useEffect(() => {
@@ -121,66 +141,28 @@ export function ActionTemplatesExperience() {
     return () => ac.abort();
   }, [refresh]);
 
-  const filtered = useMemo(() => {
-    const q = debouncedSearch.trim().toLowerCase();
-    if (!q) return records;
-    return records.filter(
-      (r) =>
-        r.actionName.toLowerCase().includes(q) ||
-        r.actionParameters.some(
-          (p) =>
-            p.key.toLowerCase().includes(q) ||
-            String(p.value ?? "")
-              .toLowerCase()
-              .includes(q),
-        ),
-    );
-  }, [records, debouncedSearch]);
+  // Stats — KPI strip is a system-wide overview, so we refetch only on
+  // mount and after mutations (activate/deactivate/delete) re-trigger
+  // refresh below. Independent of list filters by design.
+  const refreshStats = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const s = await getActionTemplateStats(signal);
+      setStats(s);
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
+      // Non-fatal — KPI strip stays on last-known counters rather than
+      // failing the whole page.
+    }
+  }, []);
 
-  const sorted = useMemo(() => {
-    const out = [...filtered];
-    const dir = sortDir === "asc" ? 1 : -1;
-    out.sort((a, b) => {
-      switch (sortBy) {
-        case "actionName":
-          return a.actionName.localeCompare(b.actionName) * dir;
-        case "actionCategory":
-          return a.actionCategory.localeCompare(b.actionCategory) * dir;
-        case "isActive":
-          return (Number(a.isActive) - Number(b.isActive)) * dir;
-        case "modifiedAt": {
-          const aT = new Date(a.modifiedAt ?? a.createdAt).getTime();
-          const bT = new Date(b.modifiedAt ?? b.createdAt).getTime();
-          return (aT - bT) * dir;
-        }
-        default:
-          return 0;
-      }
-    });
-    return out;
-  }, [filtered, sortBy, sortDir]);
-
-  const stats = useMemo(() => {
-    const active = records.filter((r) => r.isActive).length;
-    const std = records.filter((r) => r.actionCategory === "Std").length;
-    const act = records.filter((r) => r.actionCategory === "Act").length;
-    return { total: records.length, active, inactive: records.length - active, std, act };
-  }, [records]);
-
-  // Reset to page 1 whenever the filtered/sorted result might shift —
-  // otherwise the user can be stranded on page 7 of a 12-row result.
   useEffect(() => {
-    setPage(1);
-  }, [categoryFilter, showInactive, debouncedSearch, pageSize, sortBy, sortDir]);
+    const ac = new AbortController();
+    void refreshStats(ac.signal);
+    return () => ac.abort();
+  }, [refreshStats]);
 
-  const totalCount = sorted.length;
-  const paged = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return sorted.slice(start, start + pageSize);
-  }, [sorted, page, pageSize]);
-
-  // Guard: if rows shrink (e.g. delete on last page) and current page is
-  // now empty, step back. Skip when loading or while page == 1.
+  // Guard: if rows shrink (delete on last page) and current page is now
+  // beyond the end, step back so the table isn't empty.
   useEffect(() => {
     const lastPage = Math.max(1, Math.ceil(totalCount / pageSize));
     if (page > lastPage) setPage(lastPage);
@@ -207,7 +189,7 @@ export function ActionTemplatesExperience() {
     try {
       if (t.isActive) await deactivateActionTemplate(t.id);
       else await activateActionTemplate(t.id);
-      await refresh();
+      await Promise.all([refresh(), refreshStats()]);
       setSelected((cur) => (cur?.id === t.id ? { ...cur, isActive: !t.isActive } : cur));
       flash("ok", t.isActive ? "Template deactivated." : "Template activated.");
     } catch (e) {
@@ -221,7 +203,7 @@ export function ActionTemplatesExperience() {
     setBusyId(t.id);
     try {
       await deleteActionTemplate(t.id);
-      await refresh();
+      await Promise.all([refresh(), refreshStats()]);
       setSelected((cur) => (cur?.id === t.id ? null : cur));
       flash("ok", `Deleted "${t.actionName}".`);
     } catch (e) {
@@ -304,7 +286,7 @@ export function ActionTemplatesExperience() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, key, or value…"
+            placeholder="Search by name…"
             className="w-full rounded-full bg-white/55 px-9 py-2 text-[12.5px] font-medium text-[var(--color-ink-900)] placeholder:text-[var(--color-ink-400)] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/30 dark:bg-white/[0.05] dark:focus:bg-white/[0.08]"
           />
           {search && (
@@ -380,7 +362,7 @@ export function ActionTemplatesExperience() {
           against the table, matching the orders-list layout. */}
       <div className="space-y-0">
         <TemplatesTable
-          templates={paged}
+          templates={records}
           loading={loading}
           busyId={busyId}
           sortBy={sortBy}
@@ -430,6 +412,7 @@ export function ActionTemplatesExperience() {
         onClose={() => setCreateOpen(false)}
         onSaved={() => {
           void refresh();
+          void refreshStats();
           flash("ok", editing ? "Template updated." : "Template created.");
         }}
       />
