@@ -29,7 +29,9 @@ import {
   type TimelineEntryDto,
 } from "@/lib/api/delivery-orders";
 import { getTripsByOrder, type TripSummaryDto } from "@/lib/api/trips";
+import { getJobsByOrder, type JobDto } from "@/lib/api/jobs";
 import { AttemptBadge, TripStatusBadge } from "@/components/dispatch/badges";
+import { JobStatusBadge } from "@/components/planning/badges";
 import { TripDetailDrawer } from "@/components/dispatch/trip-detail-drawer";
 import { FullAuditLog } from "./full-audit-log";
 import { OmsNotificationSection } from "./oms-notification-section";
@@ -67,6 +69,9 @@ export function OrderDetailDrawer({
   // Trips dispatched against this order (one per group × attempt). Soft-fail
   // like timeline — the rest of the drawer still works without it.
   const [trips, setTrips] = useState<TripSummaryDto[] | null>(null);
+  // Planning Jobs anchoring the order's station-pair groups. One Job per
+  // group, status mirrors Trip lifecycle (Phase b9). Soft-fail.
+  const [jobs, setJobs] = useState<JobDto[] | null>(null);
   // Currently-open Trip detail drawer (stacks above this drawer).
   const [openTripId, setOpenTripId] = useState<string | null>(null);
 
@@ -75,6 +80,7 @@ export function OrderDetailDrawer({
       setData(null);
       setTimeline(null);
       setTrips(null);
+      setJobs(null);
       setError(null);
       return;
     }
@@ -83,6 +89,7 @@ export function OrderDetailDrawer({
     setError(null);
     setTimeline(null);
     setTrips(null);
+    setJobs(null);
 
     getOrder(orderId)
       .then((d) => {
@@ -109,6 +116,15 @@ export function OrderDetailDrawer({
       })
       .catch(() => {
         // Soft-fail too — the Trips section just hides.
+      });
+
+    getJobsByOrder(orderId)
+      .then((j) => {
+        if (!cancelled) setJobs(j);
+      })
+      .catch(() => {
+        // Soft-fail. Legacy pre-b8 orders genuinely have no Jobs;
+        // hiding the section is the right behavior.
       });
 
     return () => {
@@ -263,6 +279,54 @@ export function OrderDetailDrawer({
                     </section>
                   )}
 
+                  {/* Planning Jobs anchoring this order's dispatch lineage.
+                      One Job per (pickup, drop) station-pair group; status
+                      mirrors the bound Trip's lifecycle (Phase b8/b9).
+                      Hidden for legacy pre-b8 orders where the consumer
+                      didn't create Jobs. */}
+                  {jobs && jobs.length > 0 && (
+                    <section>
+                      <SectionLabel>
+                        <span className="inline-flex items-center gap-1.5">
+                          <Hash className="h-3 w-3" strokeWidth={2.4} />
+                          Planning jobs ({jobs.length})
+                        </span>
+                      </SectionLabel>
+                      <div className="mt-3 space-y-2">
+                        {jobs.map((j, i) => (
+                          <motion.div
+                            key={j.id}
+                            initial={{ opacity: 0, x: -6 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.32, delay: i * 0.04 }}
+                            className="rounded-xl border border-[var(--color-ink-100)] bg-[var(--color-surface)] px-4 py-3 dark:border-white/[0.05] dark:bg-white/[0.02]"
+                          >
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <JobStatusBadge status={j.status} />
+                              {j.groupIndex != null && (
+                                <span className="font-mono text-[10.5px] font-semibold text-[var(--color-ink-500)]">
+                                  G{j.groupIndex}
+                                </span>
+                              )}
+                              <AttemptBadge attempt={j.attemptNumber} />
+                              <span className="font-mono text-[10.5px] text-[var(--color-ink-400)]">
+                                {j.id.slice(0, 8)}…
+                              </span>
+                            </div>
+                            {j.failureReason && (
+                              <div className="mt-2 rounded-md bg-[var(--color-ink-50)]/60 px-2.5 py-1.5 text-[11.5px] leading-relaxed text-[var(--color-ink-700)] dark:bg-white/[0.03]">
+                                <span className="font-semibold uppercase tracking-[0.06em] text-[10px] text-[var(--color-coral)]">
+                                  Reason ·
+                                </span>{" "}
+                                {j.failureReason}
+                              </div>
+                            )}
+                          </motion.div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
                   {/* Trips dispatched for this order — drilldown into vendor execution */}
                   {trips && trips.length > 0 && (
                     <section>
@@ -284,7 +348,7 @@ export function OrderDetailDrawer({
                             className="group flex w-full items-center justify-between gap-3 rounded-xl border border-[var(--color-ink-100)] bg-[var(--color-surface)] px-4 py-3 text-left transition-all hover:border-[var(--color-brand-500)]/40 hover:bg-[var(--color-surface-soft)] dark:border-white/[0.05] dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
                           >
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <TripStatusBadge status={t.status as never} />
                                 <AttemptBadge attempt={t.attemptNumber} />
                                 {t.vendorOrderKey && (
@@ -292,6 +356,16 @@ export function OrderDetailDrawer({
                                     #{t.vendorOrderKey}
                                   </span>
                                 )}
+                                {t.jobId &&
+                                  t.jobId !== "00000000-0000-0000-0000-000000000000" && (
+                                    <span
+                                      className="inline-flex items-center gap-1 rounded-md bg-[var(--color-pastel-sky)]/40 px-1.5 py-[2px] font-mono text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--color-pastel-sky-ink)]"
+                                      title={`Linked to Job ${t.jobId}`}
+                                    >
+                                      <Hash className="h-2.5 w-2.5" strokeWidth={2.6} />
+                                      Job {t.jobId.slice(0, 8)}…
+                                    </span>
+                                  )}
                               </div>
                               <div className="mt-1 font-mono text-[10.5px] text-[var(--color-ink-400)] truncate">
                                 {t.upperKey}

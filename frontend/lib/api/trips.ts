@@ -51,6 +51,10 @@ export type TripDetailsDto = {
 export type TripSummaryDto = {
   id: string;
   deliveryOrderId: string;
+  // Phase b8 — Planning Job that anchored this dispatch. Pre-b8 rows
+  // carry the all-zero Guid string here; the UI should treat that as
+  // "no Job link" and skip the chip.
+  jobId: string;
   status: TripStatus;
   upperKey: string;
   vendorOrderKey: string | null;

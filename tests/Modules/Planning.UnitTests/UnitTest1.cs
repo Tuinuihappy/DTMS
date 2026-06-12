@@ -150,6 +150,326 @@ public class JobTests
 
         job.RequiredCapability.Should().Be("Hazmat");
     }
+
+    // ── Phase b8: envelope-dispatch anchor (1:1 Job per station-pair group) ──
+
+    [Fact]
+    public void SetEnvelopeAnchor_PersistsGroupAndStations()
+    {
+        var job = new Job(Guid.NewGuid(), "Normal");
+        var pickup = Guid.NewGuid();
+        var drop = Guid.NewGuid();
+
+        job.SetEnvelopeAnchor(2, pickup, drop);
+
+        job.GroupIndex.Should().Be(2);
+        job.PickupStationId.Should().Be(pickup);
+        job.DropStationId.Should().Be(drop);
+    }
+
+    [Fact]
+    public void SetEnvelopeAnchor_RejectsZeroGroupIndex()
+    {
+        var job = new Job(Guid.NewGuid(), "Normal");
+        Action act = () => job.SetEnvelopeAnchor(0, Guid.NewGuid(), Guid.NewGuid());
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void MarkDispatched_FromCreated_FlipsStatusAndLinksTrip()
+    {
+        var job = new Job(Guid.NewGuid(), "Normal");
+        var tripId = Guid.NewGuid();
+
+        job.MarkDispatched(tripId, "RIOT-KEY-1");
+
+        job.Status.Should().Be(JobStatus.Dispatched);
+        job.TripId.Should().Be(tripId);
+        job.VendorOrderKey.Should().Be("RIOT-KEY-1");
+        job.FailureReason.Should().BeNull();
+    }
+
+    [Fact]
+    public void MarkDispatched_FromNonCreated_Throws()
+    {
+        // Once a job is past Created (Assigned/Committed/Failed/Dispatched)
+        // MarkDispatched is no longer valid — the operator path is Retry().
+        var job = new Job(Guid.NewGuid(), "Normal");
+        job.MarkFailed("template missing");
+
+        Action act = () => job.MarkDispatched(Guid.NewGuid(), "K");
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void MarkFailed_FromCreated_RecordsReason()
+    {
+        var job = new Job(Guid.NewGuid(), "Normal");
+
+        job.MarkFailed("RIOT3 returned 429");
+
+        job.Status.Should().Be(JobStatus.Failed);
+        job.FailureReason.Should().Be("RIOT3 returned 429");
+    }
+
+    [Fact]
+    public void MarkFailed_FromDispatched_AllowedPhaseB9()
+    {
+        // Phase b9 relaxed MarkFailed so the vendor-side TripFailed
+        // webhook can flip a Dispatched (not-yet-Started) Job to Failed
+        // mid-flight without forcing a Retry() round-trip.
+        var job = new Job(Guid.NewGuid(), "Normal");
+        job.MarkDispatched(Guid.NewGuid(), "K");
+
+        job.MarkFailed("vendor reported error before start");
+
+        job.Status.Should().Be(JobStatus.Failed);
+        job.FailureReason.Should().Be("vendor reported error before start");
+    }
+
+    [Fact]
+    public void Retry_FromFailed_ResetsAndBumpsAttempt()
+    {
+        var job = new Job(Guid.NewGuid(), "Normal");
+        // Simulate an orphan: MarkFailed after a TripId was set conceptually
+        // by MarkDispatched would not be valid (FromDispatched throws), so
+        // here we just go Failed-from-Created to mimic vendor reject.
+        job.MarkFailed("template missing");
+        var beforeAttempt = job.AttemptNumber;
+
+        var (previousTripId, newAttempt) = job.Retry();
+
+        job.Status.Should().Be(JobStatus.Created);
+        job.FailureReason.Should().BeNull();
+        job.TripId.Should().BeNull();
+        job.VendorOrderKey.Should().BeNull();
+        job.AttemptNumber.Should().Be(beforeAttempt + 1);
+        newAttempt.Should().Be(job.AttemptNumber);
+        previousTripId.Should().BeNull();
+    }
+
+    [Fact]
+    public void Retry_FromNonFailed_Throws()
+    {
+        var job = new Job(Guid.NewGuid(), "Normal");
+        // Created → can't retry, nothing has failed yet
+        Action act = () => job.Retry();
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Retry_AfterDispatched_Throws()
+    {
+        // Successfully dispatched jobs use Trip-level retry, not Job-level.
+        var job = new Job(Guid.NewGuid(), "Normal");
+        job.MarkDispatched(Guid.NewGuid(), "K");
+
+        Action act = () => job.Retry();
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void RetryThenMarkDispatched_LinksNewTrip()
+    {
+        // Full retry cycle: fail → retry → dispatch.
+        var job = new Job(Guid.NewGuid(), "Normal");
+        job.MarkFailed("vendor 503");
+
+        job.Retry();
+        job.AttemptNumber.Should().Be(2);
+
+        var newTrip = Guid.NewGuid();
+        job.MarkDispatched(newTrip, "K2");
+
+        job.Status.Should().Be(JobStatus.Dispatched);
+        job.TripId.Should().Be(newTrip);
+        job.VendorOrderKey.Should().Be("K2");
+        job.AttemptNumber.Should().Be(2, "AttemptNumber stays at the retry count once dispatched");
+    }
+
+    // ── Phase b9: Trip lifecycle mirrors onto Job ──
+
+    private static Job Dispatched()
+    {
+        var job = new Job(Guid.NewGuid(), "Normal");
+        job.MarkDispatched(Guid.NewGuid(), "K");
+        return job;
+    }
+
+    [Fact]
+    public void MarkExecuting_FromDispatched_FlipsStatus()
+    {
+        var job = Dispatched();
+        var tripId = Guid.NewGuid();
+        job.MarkExecuting(tripId);
+        job.Status.Should().Be(JobStatus.Executing);
+    }
+
+    [Fact]
+    public void MarkExecuting_FromCreated_Throws()
+    {
+        // Trip can't start before we've dispatched it.
+        var job = new Job(Guid.NewGuid(), "Normal");
+        Action act = () => job.MarkExecuting(Guid.NewGuid());
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void MarkExecuting_WhenAlreadyExecuting_IsNoOp()
+    {
+        // Webhook redelivery — second TripStarted shouldn't throw or
+        // produce a stale-state error.
+        var job = Dispatched();
+        job.MarkExecuting(Guid.NewGuid());
+        Action act = () => job.MarkExecuting(Guid.NewGuid());
+        act.Should().NotThrow();
+        job.Status.Should().Be(JobStatus.Executing);
+    }
+
+    [Fact]
+    public void MarkExecuting_AfterCompleted_DoesNotRegress()
+    {
+        // Out-of-order webhook: TripStarted arrives after TripCompleted.
+        // The Job has already moved to a terminal-positive state — don't
+        // drag it back into Executing.
+        var job = Dispatched();
+        job.MarkCompleted(Guid.NewGuid());
+        Action act = () => job.MarkExecuting(Guid.NewGuid());
+        act.Should().NotThrow();
+        job.Status.Should().Be(JobStatus.Completed);
+    }
+
+    [Fact]
+    public void MarkCompleted_FromDispatched_SkipsExecuting()
+    {
+        // Some vendors may deliver TripCompleted before TripStarted ever
+        // shows up. Job must accept the terminal directly.
+        var job = Dispatched();
+        var tripId = Guid.NewGuid();
+        job.MarkCompleted(tripId);
+        job.Status.Should().Be(JobStatus.Completed);
+    }
+
+    [Fact]
+    public void MarkCompleted_FromExecuting_FlipsTerminal()
+    {
+        var job = Dispatched();
+        job.MarkExecuting(Guid.NewGuid());
+        job.MarkCompleted(Guid.NewGuid());
+        job.Status.Should().Be(JobStatus.Completed);
+    }
+
+    [Fact]
+    public void MarkCompleted_WhenAlreadyCompleted_IsNoOp()
+    {
+        var job = Dispatched();
+        job.MarkCompleted(Guid.NewGuid());
+        Action act = () => job.MarkCompleted(Guid.NewGuid());
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void MarkFailed_FromExecuting_NowAllowed_PhaseB9()
+    {
+        // Phase b9 relaxes MarkFailed so the vendor-side TripFailed webhook
+        // can flip a running Job to Failed mid-flight.
+        var job = Dispatched();
+        job.MarkExecuting(Guid.NewGuid());
+        job.MarkFailed("vendor reported FAILED");
+        job.Status.Should().Be(JobStatus.Failed);
+        job.FailureReason.Should().Be("vendor reported FAILED");
+    }
+
+    [Fact]
+    public void MarkCancelled_FromDispatched_FlipsTerminal()
+    {
+        // Matches the real E2E from earlier verification: RIOT3 cancels
+        // before the trip ever started, so Job is still Dispatched.
+        var job = Dispatched();
+        var tripId = Guid.NewGuid();
+        job.MarkCancelled(tripId, "E700001");
+        job.Status.Should().Be(JobStatus.Cancelled);
+        job.FailureReason.Should().Be("E700001");
+    }
+
+    [Fact]
+    public void MarkCancelled_AfterCompleted_DoesNotRegress()
+    {
+        // Late cancellation webhook on a completed trip stays a no-op —
+        // don't let a network reordering flip a happy job negative.
+        var job = Dispatched();
+        job.MarkCompleted(Guid.NewGuid());
+        job.MarkCancelled(Guid.NewGuid(), "race");
+        job.Status.Should().Be(JobStatus.Completed);
+    }
+
+    [Fact]
+    public void MarkCancelled_WhenAlreadyCancelled_IsNoOp()
+    {
+        var job = Dispatched();
+        job.MarkCancelled(Guid.NewGuid(), "E700001");
+        Action act = () => job.MarkCancelled(Guid.NewGuid(), "again");
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Retry_FromCancelled_Throws()
+    {
+        // User decision: Cancelled is terminal-intentional. Operator must
+        // file a new DeliveryOrder to re-attempt, not /retry the Job.
+        var job = Dispatched();
+        job.MarkCancelled(Guid.NewGuid(), "operator abort");
+        Action act = () => job.Retry();
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void RebindToRetryTrip_FromFailed_BumpsAttemptAndBindsNewTrip()
+    {
+        // Phase b9 — Trip-level retry path. The Job was already marked
+        // Failed by the TripFailedJobConsumer; the new Trip arrives via
+        // PlanningTripRetryDispatcher and rebinds the Job.
+        var job = Dispatched();
+        job.MarkExecuting(Guid.NewGuid());
+        job.MarkFailed("vendor error");
+        var beforeAttempt = job.AttemptNumber;
+
+        var newTrip = Guid.NewGuid();
+        job.RebindToRetryTrip(newTrip, "RIOT-NEW");
+
+        job.Status.Should().Be(JobStatus.Dispatched);
+        job.TripId.Should().Be(newTrip);
+        job.VendorOrderKey.Should().Be("RIOT-NEW");
+        job.AttemptNumber.Should().Be(beforeAttempt + 1);
+        job.FailureReason.Should().BeNull();
+    }
+
+    [Fact]
+    public void RebindToRetryTrip_FromCancelled_Allowed()
+    {
+        // Different from Retry() — the Dispatch-side ReissueTrip command
+        // already validated operator intent, so the Job follows whether
+        // it was Failed or Cancelled.
+        var job = Dispatched();
+        job.MarkCancelled(Guid.NewGuid(), "E700001");
+
+        Action act = () => job.RebindToRetryTrip(Guid.NewGuid(), "K");
+
+        act.Should().NotThrow();
+        job.Status.Should().Be(JobStatus.Dispatched);
+    }
+
+    [Fact]
+    public void RebindToRetryTrip_FromExecuting_Throws()
+    {
+        // Trip-level retry only makes sense when the previous Trip is
+        // terminal. A running Trip can't be retried — operator should
+        // cancel it first.
+        var job = Dispatched();
+        job.MarkExecuting(Guid.NewGuid());
+        Action act = () => job.RebindToRetryTrip(Guid.NewGuid(), "K");
+        act.Should().Throw<InvalidOperationException>();
+    }
 }
 
 public class ActionTemplateTests
