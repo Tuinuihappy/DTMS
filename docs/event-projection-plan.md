@@ -14,12 +14,13 @@ captures the *how*.
 | **P0** | Foundation (idempotency, metrics, replay contract, FE primitives) | ✅ **Done** | Pragmatic subset shipped; hardening items deferred |
 | **P1** | Status History (b12) — Order/Job/Trip transitions → 3 read models + UI timelines | ✅ **Done** | End-to-end across all 3 aggregates + 3 drawer integrations |
 | **P2** | Activity Timeline — unified per-order event feed | ✅ **Done** | Transparent swap of `/audit-full` endpoint; 4-source UNION replaced with single indexed read |
-| **P3** | Dashboard read models — counters, KPIs, funnel | 🔜 **Next** | 5–15× page-load speedup |
+| **P3.1** | Order funnel hourly projection + dashboard KpiRail/DispatchFunnel real data | ✅ **Done** | Recharts installed, useProjectionPoll hook, /api/dashboard/order-funnel endpoint live |
+| **P3.2** | Fleet projections (VehicleStateHistory + utilization) + /dashboard/orders + /dashboard/robots subpages | 🔜 **Next** | Completes the original P3 scope |
 | **P4** | Search/List projection — denormalized order list view | ⏳ Planned | Adds full-text search |
 | **P5** | Reporting/BI projection — wide fact tables | ⏳ Planned | Enables analyst self-service |
 | **P6** | Compliance — immutability, tamper-evidence | ⏳ Optional | Only if regulated audit becomes a requirement |
 
-**Overall progress:** ~50% (3 of 6 active phases done)
+**Overall progress:** ~58% (3 phases done + P3.1 substep, P3.2 next)
 
 ---
 
@@ -49,6 +50,10 @@ Entries appended on every architectural choice that locks future work.
 | 2026-06-13 | Transparent swap of `/audit-full` endpoint (vs. new endpoint) | Reuses `<FullAuditLog />` UI untouched. Category → legacy `Source` string mapping in handler keeps frontend filter chips + colour palette working. |
 | 2026-06-13 | Pause/Resume/ExceptionRaised events skipped — no DeliveryOrderId | Carrying forward an OrderId from prior history rows (like Trip side does) doesn't work here because Activity projector doesn't read its own history (only inbox). Cleanest fix is enriching the events later. |
 | 2026-06-13 | OrderActivity uses category discriminator + denormalized columns instead of jsonb payload | Earlier plan called for jsonb; pragmatic MVP keeps schema flat — RelatedTripId/AttemptNumber are the only category-specific fields and they fit cleanly as nullable columns. Re-introduce jsonb only when a category needs richer payload. |
+| 2026-06-13 | P3.1 splits the original P3 scope into "Order side now, Fleet side + subpages next" | Shipping the Order funnel projection + visible dashboard wiring delivers most of the user-visible win without blocking on Fleet integration events. The split preserves momentum + lets P3.2 reuse the Recharts + useProjectionPoll infrastructure already in place. |
+| 2026-06-13 | Combine OrderStatusCounts + DispatchFunnel into a single hour-bucketed wide row | Original plan called for two separate projections; collapsing them avoids double-writes from the same set of integration events and keeps the dashboard query single-table. UI sums or reads columns as needed. |
+| 2026-06-13 | useProjectionPoll lives in `lib/hooks/` instead of a fancier global cache (SWR/Tanstack-Query) | Minimal hook fits this codebase's existing pattern of inline fetchers + simple abort-on-rerun. Promote to a global cache only when ≥3 widgets share a fetch. |
+| 2026-06-13 | Funnel poll cadence = 15s, freshness banner threshold = 5min (from P0's chip default) | Bucket data ticks at most once per hour, so 15s polling is generous. The 5-min stale threshold gives ops a clear visual cue when the projector or bus stalls. |
 
 ---
 
@@ -180,18 +185,57 @@ permanent/transient failure handling.
 
 ---
 
-## P3 — Dashboard Read Models 🔜 Next
+## P3.1 — Order Funnel Dashboard ✅ Done
 
-Pre-computed counters + hourly aggregates so `/dashboard*` pages load in < 200 ms instead of 1–3 s.
+**Verified end-to-end:** `/dashboard` page renders the KpiRail tiles and
+DispatchFunnel chart from real `deliveryorder.OrderFunnelHourly` data
+instead of the hard-coded mock data they used previously. Polling
+auto-refreshes every 15s; `<DataFreshnessChip />` shows the last update.
 
-Three projections:
-- `dashboard.order_status_counts` (hourly buckets)
-- `dashboard.fleet_utilization_snapshots`
-- `dashboard.dispatch_funnel_hourly`
+### Backend delivered
 
-Frontend: migrate 3 dashboard pages + add chart components (`<DispatchFunnelChart />`, `<OrderStatusChart />`, `<UtilizationHeatmap />`).
+| Layer | Artifact |
+|---|---|
+| Read model | `deliveryorder.OrderFunnelHourly` — hour-bucketed counter row, one column per status, UNIQUE on BucketHour |
+| Projector | `OrderFunnelProjector` subscribes to 10 Order lifecycle integration events, INCRs the matching column for the event-hour bucket |
+| Query + endpoint | `GetOrderFunnelQuery` + `GET /api/v1/dashboard/order-funnel?fromUtc=&toUtc=` (defaults to last 24h, capped at 90 days) |
+| Backfill | `scripts/backfill-p3-order-funnel-hourly.sql` — aggregates existing OrderStatusHistory into hour buckets via SUM(CASE …) pivot |
+| Tests | `OrderFunnelProjectorTests` — 7 cases covering mapping, duplicates, transient/permanent failure, and unit tests for `OrderFunnelHourlyRow.IncrementStatus` |
 
-**Effort:** ~L.
+### Frontend delivered
+
+| Layer | Artifact |
+|---|---|
+| Library | `recharts` ^3.8 installed (used in P3.2 chart components) |
+| Hook | `lib/hooks/use-projection-poll.ts` — initial fetch + interval poll + visibility-aware pause + manual refresh, with AbortController so slow responses can't overwrite newer data |
+| API client | `lib/api/dashboard.ts` + Next.js proxy at `/api/dashboard/order-funnel` |
+| `<KpiRail />` | Now 4 real KPIs: Confirmed (24h), In flight, Completed (24h), Lost (24h) — pulled from totals |
+| `<DispatchFunnel />` | Now 5 real stages mapped from totals: Confirmed → Dispatched → In progress → Completed → Lost (Failed + Cancelled + Rejected). Refresh button + freshness chip |
+
+### Frontend defaults
+
+- Window: trailing 24h, end-exclusive on the current hour
+- Poll cadence: 15s; pauses while the tab is hidden, resumes on focus
+- `<DataFreshnessChip />` shows on the first KPI tile + the DispatchFunnel
+  header
+
+---
+
+## P3.2 — Fleet projections + dashboard subpages 🔜 Next
+
+Completes the original P3 scope:
+
+1. **VehicleStateHistory projection** in `fleet` schema — same shape as
+   the P1 status-history projectors but for `VehicleStateChangedIntegrationEvent`.
+2. **FleetUtilizationHourly snapshot job** — hourly background service
+   that snapshots vehicle states into a `fleet.FleetUtilizationHourly`
+   table. Hybrid pattern: event-driven for state history, periodic
+   snapshot for utilization.
+3. **`/dashboard/orders` subpage** — extended order analysis using the
+   existing `OrderFunnelHourly` data + a Recharts stacked-area chart of
+   hourly bucket counts over the trailing 7 days.
+4. **`/dashboard/robots` subpage** — vehicle utilization chart + state
+   distribution snapshot using FleetUtilizationHourly.
 
 ---
 

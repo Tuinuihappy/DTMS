@@ -1,25 +1,72 @@
 "use client";
 
-import { Calendar, Filter } from "lucide-react";
+import { Calendar, Filter, RefreshCw } from "lucide-react";
 import { motion } from "motion/react";
+import { useCallback } from "react";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { SectionLabel } from "@/components/primitives/section-label";
-import { dispatchFunnel } from "@/lib/mock-data";
+import { DataFreshnessChip } from "@/components/projection/data-freshness-chip";
+import { getOrderFunnel } from "@/lib/api/dashboard";
+import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
 import { cn } from "@/lib/utils";
 
-const toneClass: Record<"ink" | "amber" | "coral", string> = {
+// Phase P3 — Real data from deliveryorder.OrderFunnelHourly via the
+// /api/dashboard/order-funnel endpoint. Replaces the previous mock
+// data. The 5 funnel stages map to projection columns:
+//   Confirmed → Dispatched → InProgress → Completed
+// with a 5th stage tracking terminal failures (Failed + Cancelled +
+// Rejected) so operators can spot pipeline leakage at a glance.
+
+type FunnelTone = "ink" | "amber" | "coral" | "success";
+
+type FunnelStage = {
+  label: string;
+  count: number;
+  tone: FunnelTone;
+};
+
+const toneClass: Record<FunnelTone, string> = {
   ink: "bg-[var(--color-ink-800)]",
   amber: "bg-[var(--color-amber)]",
   coral: "bg-[var(--color-coral)]",
+  success: "bg-[var(--color-success)]",
 };
-const toneText: Record<"ink" | "amber" | "coral", string> = {
+const toneText: Record<FunnelTone, string> = {
   ink: "text-[var(--color-ink-800)]",
   amber: "text-[var(--color-amber)]",
   coral: "text-[var(--color-coral)]",
+  success: "text-[var(--color-success)]",
 };
 
+// Default window: trailing 24 hours, end-exclusive on the current hour.
+function defaultWindow() {
+  const now = new Date();
+  const to = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours() + 1),
+  );
+  const from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
+  return { fromUtc: from.toISOString(), toUtc: to.toISOString() };
+}
+
 export function DispatchFunnel() {
-  const max = Math.max(...dispatchFunnel.map((f) => f.count));
+  // Pin the window across renders so the poll doesn't churn — wrap in
+  // useCallback so the fetcher itself is stable.
+  const fetcher = useCallback(
+    (signal: AbortSignal) => getOrderFunnel(defaultWindow(), signal),
+    [],
+  );
+  const { data, loading, error, refresh, lastUpdated } = useProjectionPoll(fetcher, {
+    intervalMs: 15_000,
+  });
+
+  const stages: FunnelStage[] = data
+    ? buildStages(data.totals)
+    : EMPTY_STAGES;
+  const max = Math.max(1, ...stages.map((f) => f.count));
+  const conversion = stages[0].count > 0
+    ? ((stages[3].count / stages[0].count) * 100).toFixed(1) + "%"
+    : "—";
+  const lostCount = stages[4].count;
 
   return (
     <GlassCard
@@ -31,29 +78,47 @@ export function DispatchFunnel() {
     >
       <SectionLabel
         title="Dispatch funnel"
-        subtitle="Conversion across pipeline stages — last 7 days"
+        subtitle="Pipeline conversion — last 24 hours"
         action={
           <div className="flex items-center gap-1.5">
-            <button className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-ink-100)] bg-white/70 px-3 py-1.5 text-[11.5px] font-medium text-[var(--color-ink-600)] hover:bg-white cursor-pointer dark:bg-white/[0.05] dark:hover:bg-white/[0.12]">
+            {data?.lastEventAt && <DataFreshnessChip lastEventAt={lastUpdated ?? data.lastEventAt} />}
+            <button
+              type="button"
+              onClick={refresh}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-ink-100)] bg-white/70 px-3 py-1.5 text-[11.5px] font-medium text-[var(--color-ink-600)] hover:bg-white cursor-pointer dark:bg-white/[0.05] dark:hover:bg-white/[0.12]"
+              aria-label="Refresh"
+            >
+              <RefreshCw className={cn("h-3 w-3", loading && "animate-spin")} strokeWidth={2.4} />
+              Refresh
+            </button>
+            <button
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-ink-100)] bg-white/70 px-3 py-1.5 text-[11.5px] font-medium text-[var(--color-ink-600)] hover:bg-white cursor-pointer dark:bg-white/[0.05] dark:hover:bg-white/[0.12]"
+              type="button"
+            >
               <Filter className="h-3 w-3" strokeWidth={2.4} />
               All routes
             </button>
-            <button className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-ink-100)] bg-white/70 px-3 py-1.5 text-[11.5px] font-medium text-[var(--color-ink-600)] hover:bg-white cursor-pointer dark:bg-white/[0.05] dark:hover:bg-white/[0.12]">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-ink-100)] bg-white/70 px-3 py-1.5 text-[11.5px] font-medium text-[var(--color-ink-600)] dark:bg-white/[0.05]">
               <Calendar className="h-3 w-3" strokeWidth={2.4} />
-              May 24 — 31
-            </button>
+              24h
+            </span>
           </div>
         }
       />
 
+      {error && (
+        <div className="mt-4 rounded-xl bg-[#fde0db] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)] dark:bg-[#3a1a17]">
+          Couldn&apos;t load funnel: {error}
+        </div>
+      )}
+
       {/* Bar chart */}
       <div className="mt-8 grid grid-cols-5 gap-4 md:gap-6 h-[200px] items-end">
-        {dispatchFunnel.map((f, i) => {
+        {stages.map((f, i) => {
           const ratio = f.count / max;
-          const ticks = Math.round(ratio * 26);
+          const ticks = Math.max(1, Math.round(ratio * 26));
           return (
             <div key={f.label} className="flex flex-col items-center justify-end gap-3">
-              {/* Vertical tick stack */}
               <div className="relative w-full h-full flex flex-col justify-end items-center">
                 <div className="flex flex-col items-center gap-[3px] w-full">
                   {Array.from({ length: ticks }).map((_, t) => (
@@ -63,12 +128,12 @@ export function DispatchFunnel() {
                       animate={{ scaleX: 1, opacity: 1 }}
                       transition={{
                         duration: 0.3,
-                        delay: 0.9 + i * 0.08 + t * 0.012,
+                        delay: 0.1 + i * 0.05 + t * 0.012,
                         ease: [0.22, 1, 0.36, 1],
                       }}
                       className={cn(
                         "h-[3px] w-full rounded-full origin-bottom",
-                        toneClass[f.color],
+                        toneClass[f.tone],
                       )}
                       style={{
                         opacity: 0.25 + (t / ticks) * 0.75,
@@ -78,10 +143,9 @@ export function DispatchFunnel() {
                 </div>
               </div>
 
-              {/* Number + label */}
               <div className="text-center pt-2 border-t border-[var(--color-ink-100)] w-full">
-                <div className={cn("font-mono text-[1.15rem] font-semibold leading-none", toneText[f.color])}>
-                  {f.count}
+                <div className={cn("font-mono text-[1.15rem] font-semibold leading-none tabular-nums", toneText[f.tone])}>
+                  {f.count.toLocaleString()}
                 </div>
                 <div className="mt-1.5 text-[10.5px] uppercase tracking-[0.1em] font-medium text-[var(--color-ink-500)]">
                   {f.label}
@@ -95,14 +159,36 @@ export function DispatchFunnel() {
       <div className="mt-6 inset-divider" />
       <div className="mt-4 flex items-center justify-between text-[11.5px] text-[var(--color-ink-500)]">
         <span>
-          Conversion:{" "}
-          <span className="font-mono font-semibold text-[var(--color-ink-900)]">50.6%</span>
+          Confirmed → Completed:{" "}
+          <span className="font-mono font-semibold text-[var(--color-ink-900)]">{conversion}</span>
         </span>
         <span>
-          Median time-to-dispatch:{" "}
-          <span className="font-mono font-semibold text-[var(--color-ink-900)]">2h 14m</span>
+          Lost (Failed/Cancelled/Rejected):{" "}
+          <span className="font-mono font-semibold text-[var(--color-coral)]">{lostCount.toLocaleString()}</span>
         </span>
       </div>
     </GlassCard>
   );
+}
+
+const EMPTY_STAGES: FunnelStage[] = [
+  { label: "Confirmed",  count: 0, tone: "ink" },
+  { label: "Dispatched", count: 0, tone: "amber" },
+  { label: "In progress", count: 0, tone: "amber" },
+  { label: "Completed",  count: 0, tone: "success" },
+  { label: "Lost",       count: 0, tone: "coral" },
+];
+
+function buildStages(t: {
+  confirmed: number; dispatched: number; inProgress: number;
+  completed: number; partiallyCompleted: number;
+  failed: number; cancelled: number; rejected: number;
+}): FunnelStage[] {
+  return [
+    { label: "Confirmed",   count: t.confirmed,                                                  tone: "ink" },
+    { label: "Dispatched",  count: t.dispatched,                                                 tone: "amber" },
+    { label: "In progress", count: t.inProgress,                                                 tone: "amber" },
+    { label: "Completed",   count: t.completed + t.partiallyCompleted,                           tone: "success" },
+    { label: "Lost",        count: t.failed + t.cancelled + t.rejected,                          tone: "coral" },
+  ];
 }

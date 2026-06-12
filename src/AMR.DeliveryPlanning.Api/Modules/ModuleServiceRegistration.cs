@@ -176,6 +176,11 @@ public static class ModuleServiceRegistration
                            AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderActivityReadRepository>();
         services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderActivityProjectionStore,
                            AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderActivityProjectionStore>();
+        // Phase P3 — hour-bucketed order funnel projection (dashboard).
+        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderFunnelReadRepository,
+                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderFunnelReadRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderFunnelProjectionStore,
+                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderFunnelProjectionStore>();
         services.Configure<DeliveryOrderOptions>(
             configuration.GetSection(DeliveryOrderOptions.SectionName));
         services.Configure<UomOptions>(configuration.GetSection(UomOptions.SectionName));

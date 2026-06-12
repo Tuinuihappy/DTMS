@@ -26,6 +26,9 @@ public class DeliveryOrderDbContext : DbContext
     // ── Phase P2 — Unified order activity timeline ───────────────────────
     public DbSet<OrderActivityRow> OrderActivity => Set<OrderActivityRow>();
 
+    // ── Phase P3 — Dashboard read models ────────────────────────────────
+    public DbSet<OrderFunnelHourlyRow> OrderFunnelHourly => Set<OrderFunnelHourlyRow>();
+
     public DeliveryOrderDbContext(DbContextOptions<DeliveryOrderDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -253,6 +256,20 @@ public class DeliveryOrderDbContext : DbContext
             b.HasIndex(e => new { e.OrderId, e.OccurredAt }).IsDescending(false, true);
             // Secondary — category filter (UI chips) within an order.
             b.HasIndex(e => new { e.OrderId, e.Category, e.OccurredAt });
+        });
+
+        // ── Phase P3 — OrderFunnelHourly read model ────────────────────
+        // Hour-bucketed counters incremented by OrderFunnelProjector on
+        // every Order lifecycle event. Drives both the KpiRail's "today"
+        // numbers and the DispatchFunnel chart. BucketHour is unique
+        // (one row per hour) and is the only index needed — time-range
+        // queries use it directly.
+        modelBuilder.Entity<OrderFunnelHourlyRow>(b =>
+        {
+            b.ToTable("OrderFunnelHourly", Schema);
+            b.HasKey(e => e.Id);
+            b.Property(e => e.BucketHour).IsRequired();
+            b.HasIndex(e => e.BucketHour).IsUnique();
         });
     }
 }
