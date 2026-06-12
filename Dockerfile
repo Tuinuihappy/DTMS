@@ -48,6 +48,9 @@ COPY src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Infrastructure/AMR.Deliv
 COPY src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Presentation/AMR.DeliveryPlanning.Dispatch.Presentation.csproj src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Presentation/
 COPY src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.IntegrationEvents/AMR.DeliveryPlanning.Dispatch.IntegrationEvents.csproj src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.IntegrationEvents/
 
+# OmsAdapter
+COPY src/Modules/OmsAdapter/AMR.DeliveryPlanning.OmsAdapter.csproj src/Modules/OmsAdapter/
+
 # VendorAdapter
 COPY src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Abstractions/AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Abstractions/
 COPY src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.csproj src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/

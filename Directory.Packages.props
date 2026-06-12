@@ -16,7 +16,8 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.6" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.6" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
     <!-- Validation -->
     <PackageVersion Include="FluentValidation" Version="11.9.0" />

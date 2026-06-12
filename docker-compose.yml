@@ -80,6 +80,14 @@ services:
       - RateLimit__QueueLimit=${RateLimit__QueueLimit:-5}
       - VendorAdapter__Riot3__BaseUrl=http://10.204.212.28:12000
       - VendorAdapter__Riot3__ApiKey=${VendorAdapter__Riot3__ApiKey:-}
+      # Upstream OMS shipment notification (POST /api/shipments) fired
+      # when a Trip transitions Created → InProgress. BearerToken is a
+      # long-lived JWT supplied by OMS ops — DO NOT commit; pass via
+      # shell env var or .env file.
+      - UpstreamOms__Enabled=${UpstreamOms__Enabled:-true}
+      - UpstreamOms__BaseUrl=${UpstreamOms__BaseUrl:-http://10.204.37.65:5002/}
+      - UpstreamOms__BearerToken=${UpstreamOms__BearerToken:-}
+      - UpstreamOms__TimeoutSeconds=${UpstreamOms__TimeoutSeconds:-10}
       - Dispatch__UseOrderTemplateDispatch=${Dispatch__UseOrderTemplateDispatch:-false}
       - Dispatch__Reconciliation__Enabled=${Dispatch__Reconciliation__Enabled:-false}
       - Dispatch__Reconciliation__PollIntervalSeconds=${Dispatch__Reconciliation__PollIntervalSeconds:-60}

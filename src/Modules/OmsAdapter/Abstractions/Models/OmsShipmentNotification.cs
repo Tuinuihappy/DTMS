@@ -1,0 +1,11 @@
+using System.Text.Json.Serialization;
+
+namespace AMR.DeliveryPlanning.OmsAdapter.Abstractions.Models;
+
+// Wire-shape for upstream OMS POST /api/shipments. JsonPropertyName is
+// explicit so the contract survives serializer-option drift across the
+// repo (some consumers configure camelCase globally, others don't).
+public sealed record OmsShipmentNotification(
+    [property: JsonPropertyName("shipmentId")] string ShipmentId,
+    [property: JsonPropertyName("deliveryBy")] string DeliveryBy,
+    [property: JsonPropertyName("lots")] IReadOnlyList<OmsLot> Lots);

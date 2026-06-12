@@ -39,6 +39,9 @@
     <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.IntegrationEvents/AMR.DeliveryPlanning.Planning.IntegrationEvents.csproj" />
     <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.Presentation/AMR.DeliveryPlanning.Planning.Presentation.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/OmsAdapter/">
+    <Project Path="src/Modules/OmsAdapter/AMR.DeliveryPlanning.OmsAdapter.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/VendorAdapter/">
     <Project Path="src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Abstractions/AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj" />
     <Project Path="src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Feeder/AMR.DeliveryPlanning.VendorAdapter.Feeder.csproj" />

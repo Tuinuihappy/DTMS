@@ -33,6 +33,7 @@ using AMR.DeliveryPlanning.Planning.Infrastructure.Repositories;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Services;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
+using AMR.DeliveryPlanning.OmsAdapter;
 using AMR.DeliveryPlanning.VendorAdapter.Infrastructure;
 using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Extensions;
 using MassTransit;
@@ -213,6 +214,12 @@ public static class ModuleServiceRegistration
 
         // ── VendorAdapter Module ──────────────────────────────────────
         services.AddVendorAdapterInfrastructure(configuration);
+
+        // ── OmsAdapter Module ─────────────────────────────────────────
+        // Outbound notifications to upstream OMS (POST /api/shipments).
+        // Consumer wiring lands in Phase 2; Phase 1 just registers the
+        // HTTP client so DI graph is satisfied.
+        services.AddOmsAdapter(configuration);
 
         // ── MassTransit + RabbitMQ ────────────────────────────────────
         services.AddMassTransit(bus =>
