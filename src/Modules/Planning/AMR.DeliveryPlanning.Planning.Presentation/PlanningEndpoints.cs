@@ -11,6 +11,7 @@ using AMR.DeliveryPlanning.Planning.Application.Commands.DeleteActionTemplate;
 using AMR.DeliveryPlanning.Planning.Application.Commands.DeleteOrderTemplate;
 using AMR.DeliveryPlanning.Planning.Application.Commands.InstantiateOrderTemplate;
 using AMR.DeliveryPlanning.Planning.Application.Commands.ReplanJob;
+using AMR.DeliveryPlanning.Planning.Application.Commands.RetryJob;
 using AMR.DeliveryPlanning.Planning.Application.Commands.SetActionTemplateActive;
 using AMR.DeliveryPlanning.Planning.Application.Commands.SetOrderTemplateActive;
 using AMR.DeliveryPlanning.Planning.Application.Commands.UpdateActionTemplate;
@@ -20,6 +21,7 @@ using AMR.DeliveryPlanning.Planning.Application.Queries.GetActionTemplateById;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetActionTemplates;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetCostModel;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobById;
+using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobsByOrder;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplateById;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplates;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetPendingJobs;
@@ -69,6 +71,17 @@ public static class PlanningEndpoints
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         });
 
+        // POST /api/v1/planning/jobs/{id}/retry — Re-dispatch a Failed envelope
+        // job. Increments AttemptNumber, builds a new UpperKey, calls
+        // DispatchByRouteAsync, then either MarkDispatched (new TripId) or
+        // MarkFailed (new reason). Returns 200 on either outcome — caller
+        // inspects the result body to know which.
+        group.MapPost("/{id:guid}/retry", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new RetryJobCommand(id));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
         // GET /api/v1/planning/jobs/{id} — Get job details
         group.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
         {
@@ -80,6 +93,16 @@ public static class PlanningEndpoints
         group.MapGet("/pending", async (ISender sender) =>
         {
             var result = await sender.Send(new GetPendingJobsQuery());
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
+        // GET /api/v1/planning/jobs?orderId={guid} — Phase b10 — list Jobs for an
+        // order so the operator drawer can show Job lineage alongside Trips.
+        group.MapGet("/", async (Guid? orderId, ISender sender) =>
+        {
+            if (!orderId.HasValue)
+                return Results.BadRequest("orderId query parameter is required.");
+            var result = await sender.Send(new GetJobsByOrderQuery(orderId.Value));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 

@@ -1,0 +1,82 @@
+using AMR.DeliveryPlanning.Planning.Application.Services;
+using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using AMR.DeliveryPlanning.SharedKernel;
+using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using Microsoft.Extensions.Logging;
+
+namespace AMR.DeliveryPlanning.Planning.Application.Commands.RetryJob;
+
+public class RetryJobCommandHandler : ICommandHandler<RetryJobCommand, RetryJobResult>
+{
+    private readonly IJobRepository _jobRepository;
+    private readonly IDispatchOrderTemplateService _dispatch;
+    private readonly ILogger<RetryJobCommandHandler> _logger;
+
+    public RetryJobCommandHandler(
+        IJobRepository jobRepository,
+        IDispatchOrderTemplateService dispatch,
+        ILogger<RetryJobCommandHandler> logger)
+    {
+        _jobRepository = jobRepository;
+        _dispatch = dispatch;
+        _logger = logger;
+    }
+
+    public async Task<Result<RetryJobResult>> Handle(RetryJobCommand request, CancellationToken cancellationToken)
+    {
+        var job = await _jobRepository.GetByIdAsync(request.JobId, cancellationToken);
+        if (job is null)
+            return Result<RetryJobResult>.Failure($"Job {request.JobId} not found.");
+
+        if (!job.PickupStationId.HasValue || !job.DropStationId.HasValue)
+            return Result<RetryJobResult>.Failure(
+                $"Job {request.JobId} has no envelope route anchor — cannot retry an envelope dispatch.");
+
+        Guid? previousTripId;
+        int newAttempt;
+        try
+        {
+            (previousTripId, newAttempt) = job.Retry();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result<RetryJobResult>.Failure(ex.Message);
+        }
+
+        await _jobRepository.UpdateAsync(job, cancellationToken);
+
+        var newUpperKey = EnvelopeUpperKey.Build(job.DeliveryOrderId, job.GroupIndex, newAttempt);
+        _logger.LogInformation(
+            "[RetryJob] Job {JobId} retry attempt {Attempt} (upperKey={UpperKey}, previousTrip={PrevTrip})",
+            job.Id, newAttempt, newUpperKey, previousTripId?.ToString() ?? "(none)");
+
+        var dispatchResult = await _dispatch.DispatchByRouteAsync(
+            job.DeliveryOrderId,
+            job.PickupStationId!.Value,
+            job.DropStationId!.Value,
+            newUpperKey,
+            attemptNumber: newAttempt,
+            previousAttemptId: previousTripId,
+            jobId: job.Id,
+            cancellationToken: cancellationToken);
+
+        if (dispatchResult.IsSuccess && dispatchResult.Value.TripId != Guid.Empty)
+        {
+            job.MarkDispatched(dispatchResult.Value.TripId, dispatchResult.Value.VendorOrderKey);
+            await _jobRepository.UpdateAsync(job, cancellationToken);
+            return Result<RetryJobResult>.Success(new RetryJobResult(
+                job.Id, newAttempt, Dispatched: true,
+                dispatchResult.Value.TripId, dispatchResult.Value.VendorOrderKey, null));
+        }
+
+        var reason = dispatchResult.IsSuccess
+            ? $"vendor accepted (key={dispatchResult.Value.VendorOrderKey}) but trip persistence failed — reconciliation required"
+            : (dispatchResult.Error ?? "dispatch failed");
+
+        job.MarkFailed(reason);
+        await _jobRepository.UpdateAsync(job, cancellationToken);
+
+        return Result<RetryJobResult>.Success(new RetryJobResult(
+            job.Id, newAttempt, Dispatched: false, null, null, reason));
+    }
+}
