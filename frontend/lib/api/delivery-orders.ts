@@ -516,3 +516,48 @@ export async function redispatchOrder(
   });
   if (!res.ok && res.status !== 204) await unwrap(res);
 }
+
+export type ResendOmsNotificationResult = {
+  shipmentId: string;
+  deliveryBy: string;
+  lotCount: number;
+  latencyMs: number;
+};
+
+// Manual resend of the upstream-OMS shipment notification for a specific
+// trip. Backend gates: order has OrderRef + trip belongs to order +
+// items are bound. Upstream dedupes by shipmentId, so re-firing on a row
+// that previously succeeded is safe.
+export async function resendOmsNotification(
+  orderId: string,
+  tripId: string,
+  requestedBy?: string,
+): Promise<ResendOmsNotificationResult> {
+  const res = await fetch(`/api/delivery-orders/${orderId}/trips/${tripId}/notify-oms`, {
+    method: "POST",
+    headers: mutationHeaders(),
+    body: JSON.stringify({ requestedBy: requestedBy ?? null }),
+  });
+  return unwrap<ResendOmsNotificationResult>(res);
+}
+
+export type ResendOmsArrivedNotificationResult = {
+  shipmentId: string;
+  lotCount: number;
+  latencyMs: number;
+};
+
+// Manual resend of the OMS "arrived" (drop completed) notification.
+// Mirrors resendOmsNotification but hits the /arrived endpoint family.
+export async function resendOmsArrivedNotification(
+  orderId: string,
+  tripId: string,
+  requestedBy?: string,
+): Promise<ResendOmsArrivedNotificationResult> {
+  const res = await fetch(`/api/delivery-orders/${orderId}/trips/${tripId}/notify-oms-arrived`, {
+    method: "POST",
+    headers: mutationHeaders(),
+    body: JSON.stringify({ requestedBy: requestedBy ?? null }),
+  });
+  return unwrap<ResendOmsArrivedNotificationResult>(res);
+}
