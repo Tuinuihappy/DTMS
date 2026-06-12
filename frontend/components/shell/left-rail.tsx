@@ -51,7 +51,7 @@ type RailAction = {
 };
 
 const actions: RailAction[] = [
-  { icon: <Home className="h-4 w-4" strokeWidth={2} />, label: "Home" },
+  { icon: <Home className="h-4 w-4" strokeWidth={2} />, label: "Home", href: "/home" },
   {
     icon: <LayoutDashboard className="h-4 w-4" strokeWidth={2} />,
     label: "Dashboard",
