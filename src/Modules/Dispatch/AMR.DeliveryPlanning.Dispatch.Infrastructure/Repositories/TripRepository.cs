@@ -68,6 +68,33 @@ public class TripRepository : ITripRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<Guid> GetRootTripIdAsync(Guid tripId, CancellationToken cancellationToken = default)
+    {
+        // Recursive CTE — single round trip. Chain depth = AttemptNumber
+        // (operator-driven; never deep). IgnoreQueryFilters because vendor
+        // webhooks fire without tenant context.
+        var rootIds = await _context.Database
+            .SqlQuery<Guid>($@"
+                WITH RECURSIVE chain AS (
+                    SELECT ""Id"", ""PreviousAttemptId""
+                    FROM dispatch.""Trips""
+                    WHERE ""Id"" = {tripId}
+                  UNION ALL
+                    SELECT t.""Id"", t.""PreviousAttemptId""
+                    FROM dispatch.""Trips"" t
+                    JOIN chain c ON t.""Id"" = c.""PreviousAttemptId""
+                )
+                SELECT ""Id"" AS ""Value""
+                FROM chain
+                WHERE ""PreviousAttemptId"" IS NULL
+                LIMIT 1")
+            .ToListAsync(cancellationToken);
+
+        // Fallback to the input tripId on broken-chain data so the caller
+        // (OMS consumer) still has a usable shipmentId rather than failing.
+        return rootIds.Count > 0 ? rootIds[0] : tripId;
+    }
+
     public async Task<List<Trip>> GetByDeliveryOrderIdAsync(Guid deliveryOrderId, CancellationToken cancellationToken = default)
     {
         // Include Events so the order-level full-audit query (Phase 4.2)

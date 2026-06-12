@@ -41,4 +41,13 @@ public interface ITripRepository
 
     Task AddAsync(Trip trip, CancellationToken cancellationToken = default);
     Task UpdateAsync(Trip trip, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Walk back PreviousAttemptId chain to find the first attempt's Id.
+    /// Used as the stable shipmentId for upstream OMS notifications so
+    /// retries don't appear as new shipments to OMS. Returns the input
+    /// tripId itself if the chain root isn't found (broken data) — safer
+    /// than throwing for an observability-only feature.
+    /// </summary>
+    Task<Guid> GetRootTripIdAsync(Guid tripId, CancellationToken cancellationToken = default);
 }
