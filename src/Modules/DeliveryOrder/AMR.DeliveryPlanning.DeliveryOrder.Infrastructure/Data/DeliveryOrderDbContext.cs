@@ -23,6 +23,9 @@ public class DeliveryOrderDbContext : DbContext
     public DbSet<OrderStatusHistoryRow> OrderStatusHistory => Set<OrderStatusHistoryRow>();
     public DbSet<InboxMessage> ProjectionInbox => Set<InboxMessage>();
 
+    // ── Phase P2 — Unified order activity timeline ───────────────────────
+    public DbSet<OrderActivityRow> OrderActivity => Set<OrderActivityRow>();
+
     public DeliveryOrderDbContext(DbContextOptions<DeliveryOrderDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -222,6 +225,34 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(e => e.Reason).HasMaxLength(2000);
             b.HasIndex(e => new { e.OrderId, e.OccurredAt }).IsDescending(false, true);
             b.HasIndex(e => new { e.ToStatus, e.OccurredAt });
+        });
+
+        // ── Phase P2 — OrderActivity read model ────────────────────────
+        // Unified per-order activity timeline. Written by:
+        //   - OrderActivityProjector (Order + Trip integration events going
+        //     forward)
+        //   - One-time backfill SQL seed from the 4 legacy sources
+        //     (OrderAuditEvents, OrderAmendments, Trip ExecutionEvents,
+        //     TripRetryEvents)
+        // Read by the swapped GetFullOrderAuditQueryHandler — replaces the
+        // runtime 4-source UNION with a single indexed lookup.
+        modelBuilder.Entity<OrderActivityRow>(b =>
+        {
+            b.ToTable("OrderActivity", Schema);
+            b.HasKey(e => e.Id);
+            b.Property(e => e.EventId).IsRequired();
+            b.Property(e => e.OrderId).IsRequired();
+            b.Property(e => e.Category).HasMaxLength(30).IsRequired();
+            b.Property(e => e.EventType).HasMaxLength(100).IsRequired();
+            b.Property(e => e.Details).HasMaxLength(2000);
+            b.Property(e => e.ActorId).HasMaxLength(200);
+            b.Property(e => e.OccurredAt).IsRequired();
+            b.Property(e => e.RelatedTripId);
+            b.Property(e => e.AttemptNumber);
+            // Primary lookup — timeline-by-order, newest first.
+            b.HasIndex(e => new { e.OrderId, e.OccurredAt }).IsDescending(false, true);
+            // Secondary — category filter (UI chips) within an order.
+            b.HasIndex(e => new { e.OrderId, e.Category, e.OccurredAt });
         });
     }
 }

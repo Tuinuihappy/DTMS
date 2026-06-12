@@ -13,13 +13,13 @@ captures the *how*.
 |---|---|---|---|
 | **P0** | Foundation (idempotency, metrics, replay contract, FE primitives) | ✅ **Done** | Pragmatic subset shipped; hardening items deferred |
 | **P1** | Status History (b12) — Order/Job/Trip transitions → 3 read models + UI timelines | ✅ **Done** | End-to-end across all 3 aggregates + 3 drawer integrations |
-| **P2** | Activity Timeline — unified per-order event feed | 🔜 **Next** | Replaces existing `FullAuditLog` UNION query |
-| **P3** | Dashboard read models — counters, KPIs, funnel | ⏳ Planned | 5–15× page-load speedup |
+| **P2** | Activity Timeline — unified per-order event feed | ✅ **Done** | Transparent swap of `/audit-full` endpoint; 4-source UNION replaced with single indexed read |
+| **P3** | Dashboard read models — counters, KPIs, funnel | 🔜 **Next** | 5–15× page-load speedup |
 | **P4** | Search/List projection — denormalized order list view | ⏳ Planned | Adds full-text search |
 | **P5** | Reporting/BI projection — wide fact tables | ⏳ Planned | Enables analyst self-service |
 | **P6** | Compliance — immutability, tamper-evidence | ⏳ Optional | Only if regulated audit becomes a requirement |
 
-**Overall progress:** ~33% (2 of 6 active phases done)
+**Overall progress:** ~50% (3 of 6 active phases done)
 
 ---
 
@@ -45,6 +45,10 @@ Entries appended on every architectural choice that locks future work.
 | 2026-06-12 | Trip side: added TripPausedV1 + TripResumedV1 + carry-forward order/job ids | Domain payload for pause/resume doesn't include order/job ids; projector reads from latest history row instead of write side |
 | 2026-06-12 | Trip read model has nullable DeliveryOrderId/JobId | Pause/Resume events have only TripId; nullable is honest about the boundary |
 | 2026-06-12 | StatusTimelineSection self-hides on empty + soft-fails on error | Legacy pre-backfill entities shouldn't show empty UI; fetch errors should be visible so ops investigates |
+| 2026-06-13 | P2 scope = MVP coverage (project available integration events + backfill historical) | User chose MVP path over "Full" which would require adding 5+ new integration events. Coverage gap for POD/OMS/TripRetry/admin going forward is documented; can be closed in P2.5. |
+| 2026-06-13 | Transparent swap of `/audit-full` endpoint (vs. new endpoint) | Reuses `<FullAuditLog />` UI untouched. Category → legacy `Source` string mapping in handler keeps frontend filter chips + colour palette working. |
+| 2026-06-13 | Pause/Resume/ExceptionRaised events skipped — no DeliveryOrderId | Carrying forward an OrderId from prior history rows (like Trip side does) doesn't work here because Activity projector doesn't read its own history (only inbox). Cleanest fix is enriching the events later. |
+| 2026-06-13 | OrderActivity uses category discriminator + denormalized columns instead of jsonb payload | Earlier plan called for jsonb; pragmatic MVP keeps schema flat — RelatedTripId/AttemptNumber are the only category-specific fields and they fit cleanly as nullable columns. Re-introduce jsonb only when a category needs richer payload. |
 
 ---
 
@@ -124,29 +128,59 @@ Each suite covers: first event mapping, derived-FromStatus chaining, duplicate d
 
 ---
 
-## P2 — Activity Timeline 🔜 Next
+## P2 — Activity Timeline ✅ Done
 
-Unified per-order event feed that consolidates:
-- Order lifecycle (already projected in P1; this re-projects with a different denormalization)
-- Trip events (started/picked/dropped/completed/failed/cancelled)
-- OMS notify outcomes
-- POD scans
-- Amendments
+**Verified end-to-end:** the legacy `GET /delivery-orders/{id}/audit-full`
+endpoint now reads from a single indexed `deliveryorder.OrderActivity`
+projection instead of unioning 4 source tables at query time. API contract
+unchanged (FullOrderAuditDto / FullAuditEntryDto) so the existing
+`<FullAuditLog />` frontend component works untouched. Live event flow
+tested: Hold order → `DeliveryOrderHeldIntegrationEventV1` → projector
+appends `OrderHeld` row → endpoint returns updated entries within seconds.
 
-Replaces the existing `FullAuditLog` UNION query (currently 5 tables runtime-joined) with a single indexed read.
+### Backend delivered
 
-**Read model:** `deliveryorder.OrderActivityTimeline` — single table per order, multiple categories (StatusChange / TripEvent / OmsNotify / Pod / Amendment), category-tagged via a discriminator column, payload-flexible via `jsonb`.
+| Layer | Artifact |
+|---|---|
+| Read model | `deliveryorder.OrderActivity` table + `Migrations/20260612181438_AddOrderActivityProjection.cs` |
+| Store + read repo | `IOrderActivityProjectionStore` / `IOrderActivityReadRepository` + Infrastructure impls |
+| Projector | `OrderActivityProjector` subscribes to 11 Order + 8 Trip integration events |
+| Swapped query | `GetFullOrderAuditQueryHandler` now reads from projection; category → legacy `Source` mapping preserves taxonomy |
+| Backfill | `scripts/backfill-p2-order-activity.sql` seeds historical rows from the 4 legacy sources (OrderAuditEvents, OrderAmendments, ExecutionEvents, TripRetryEvents) |
+| DI | `IOrderActivityReadRepository` + `IOrderActivityProjectionStore` registered alongside the P1 status-history pair |
 
-**Effort:** ~S–M. Reuses `<TimelineView />` + `<DataFreshnessChip />` from P0 and the projector pattern proven in P1.
+### Coverage matrix (MVP scope)
 
-**Decision still to make before build:**
-1. **Same DbContext as Order**, or **dedicated `activity` schema**? — recommend same DbContext (deliveryorder) since the read model is order-scoped and shares transactional boundary with order writes.
-2. **Migrate `FullAuditLog` API to new endpoint, or keep both** during transition? — recommend transparent swap of the existing endpoint to read from projection.
-3. **Filter chips in UI** (Status / Trip / OMS / POD / Amendment) — keep MVP without if scope is tight, add on a fast-follow PR.
+| Source | Going forward | Historical |
+|---|---|---|
+| Order lifecycle events (11) | ✅ Projected from integration events | ✅ Seeded from OrderAuditEvents |
+| Order amendments | ✅ Projected | ✅ Seeded from OrderAmendments |
+| Trip lifecycle events (Started/Pickup/Drop/Completed/Failed/Cancelled) | ✅ Projected | ✅ Seeded from ExecutionEvents |
+| Trip Pause/Resume/ExceptionRaised | ❌ (events don't carry DeliveryOrderId) | ✅ Seeded |
+| Item POD scans | ❌ (no integration event yet) | ✅ Seeded from OrderAuditEvents bucket |
+| Upstream OMS notify outcomes | ❌ (no integration event yet) | ✅ Seeded from OrderAuditEvents bucket |
+| Trip retry triggers | ❌ (no integration event) | ✅ Seeded from TripRetryEvents |
+| Admin actions (OrderReopened / OrderAbandoned) | ❌ (audit-only writes) | ✅ Seeded |
+
+**P2.5 hardening (deferred — track when ops needs it):**
+- Add integration events for POD scans, OMS notify outcomes, TripRetry triggers, admin actions so the "going forward" gaps close without backfill.
+- Add `DeliveryOrderId` to TripPaused/Resumed/ExceptionRaised payloads so the projector can attach them to the order timeline.
+
+### Frontend
+
+No changes — `<FullAuditLog />` component reads the same endpoint contract.
+A future P2.5 work item can add category filter chips + `<DataFreshnessChip />`.
+
+### Tests
+
+9 new unit tests in `OrderActivityProjectorTests.cs` covering Order
+lifecycle / Amendment / Trip lifecycle mapping + idempotency + skip rules
+(empty OrderId, Pause/Resume/ExceptionRaised lacking order context) +
+permanent/transient failure handling.
 
 ---
 
-## P3 — Dashboard Read Models ⏳ Planned
+## P3 — Dashboard Read Models 🔜 Next
 
 Pre-computed counters + hourly aggregates so `/dashboard*` pages load in < 200 ms instead of 1–3 s.
 

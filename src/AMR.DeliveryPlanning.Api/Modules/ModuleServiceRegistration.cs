@@ -171,6 +171,11 @@ public static class ModuleServiceRegistration
                            AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderStatusHistoryReadRepository>();
         services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderStatusHistoryProjectionStore,
                            AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderStatusHistoryProjectionStore>();
+        // Phase P2 — unified order activity timeline projection.
+        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderActivityReadRepository,
+                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderActivityReadRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderActivityProjectionStore,
+                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderActivityProjectionStore>();
         services.Configure<DeliveryOrderOptions>(
             configuration.GetSection(DeliveryOrderOptions.SectionName));
         services.Configure<UomOptions>(configuration.GetSection(UomOptions.SectionName));
