@@ -210,6 +210,9 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.HasIndex("UpperKey")
                         .IsUnique();
 
+                    b.HasIndex("JobId")
+                        .HasFilter("\"JobId\" != '00000000-0000-0000-0000-000000000000'");
+
                     b.HasIndex("PreviousAttemptId")
                         .HasFilter("\"PreviousAttemptId\" IS NOT NULL");
 

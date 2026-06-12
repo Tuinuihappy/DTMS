@@ -17,5 +17,6 @@ public interface ITripRetryDispatcher
         string newUpperKey,
         int attemptNumber,
         Guid previousAttemptId,
+        Guid? jobId,
         CancellationToken cancellationToken = default);
 }

@@ -21,6 +21,7 @@ public class GetTripsByOrderQueryHandler : IQueryHandler<GetTripsByOrderQuery, L
             .Select(t => new TripSummaryDto(
                 t.Id,
                 t.DeliveryOrderId,
+                t.JobId,
                 t.Status.ToString(),
                 t.UpperKey,
                 t.VendorOrderKey,

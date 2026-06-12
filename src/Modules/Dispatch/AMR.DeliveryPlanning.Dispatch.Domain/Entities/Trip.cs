@@ -9,9 +9,9 @@ namespace AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 // (Legacy per-task scheduling was removed in Phase b7.)
 public class Trip : AggregateRoot<Guid>
 {
-    // JobId is kept as a column for backward compatibility with existing
-    // rows. New envelope trips set Guid.Empty since no Planning Job is
-    // created in that path.
+    // Phase b8 — Planning creates a 1:1 Job anchor per station-pair group
+    // and passes its Id through. Pre-b8 envelope rows have Guid.Empty
+    // (filtered out of the IX_Trips_JobId index).
     public Guid JobId { get; private set; }
     public Guid DeliveryOrderId { get; private set; }
     public Guid? VehicleId { get; private set; }
@@ -90,7 +90,8 @@ public class Trip : AggregateRoot<Guid>
         Guid? previousAttemptId = null,
         string? templateNameAtDispatch = null,
         int? priorityAtDispatch = null,
-        string? vendorRequestSnapshot = null)
+        string? vendorRequestSnapshot = null,
+        Guid? jobId = null)
     {
         if (string.IsNullOrWhiteSpace(upperKey))
             throw new ArgumentException("UpperKey must not be empty.", nameof(upperKey));
@@ -105,7 +106,7 @@ public class Trip : AggregateRoot<Guid>
         var trip = new Trip
         {
             Id = Guid.NewGuid(),
-            JobId = Guid.Empty,
+            JobId = jobId ?? Guid.Empty,
             DeliveryOrderId = deliveryOrderId,
             VehicleId = null,
             Status = TripStatus.Created,

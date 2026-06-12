@@ -702,6 +702,7 @@ internal sealed class StubRetryDispatcher : ITripRetryDispatcher
     public Task<Result<Guid>> ReissueAsync(
         Guid deliveryOrderId, Guid pickupStationId, Guid dropStationId,
         string newUpperKey, int attemptNumber, Guid previousAttemptId,
+        Guid? jobId,
         CancellationToken ct = default)
         => Task.FromResult(Result<Guid>.Success(Guid.NewGuid()));
 }

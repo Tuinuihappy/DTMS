@@ -118,6 +118,11 @@ public class ReissueTripCommandHandler : ICommandHandler<ReissueTripCommand, Gui
             "[ReissueTrip] Retrying Trip {OriginalTripId} as attempt {Attempt} (UpperKey {UpperKey}, source={Source}, by={By})",
             original.Id, nextAttempt, newUpperKey, request.RetrySource, request.RetriedBy ?? "(unknown)");
 
+        // Phase b9 — preserve the Job link on the retry Trip. Pre-b8 trips
+        // have JobId = Guid.Empty; pass null in that case so the new Trip
+        // is also unbound (rather than carrying an empty-Guid sentinel).
+        var jobIdToPreserve = original.JobId == Guid.Empty ? (Guid?)null : original.JobId;
+
         var dispatchResult = await _retryDispatcher.ReissueAsync(
             original.DeliveryOrderId,
             original.PickupStationId.Value,
@@ -125,6 +130,7 @@ public class ReissueTripCommandHandler : ICommandHandler<ReissueTripCommand, Gui
             newUpperKey,
             nextAttempt,
             previousAttemptId: original.Id,
+            jobId: jobIdToPreserve,
             cancellationToken);
 
         if (dispatchResult.IsFailure)

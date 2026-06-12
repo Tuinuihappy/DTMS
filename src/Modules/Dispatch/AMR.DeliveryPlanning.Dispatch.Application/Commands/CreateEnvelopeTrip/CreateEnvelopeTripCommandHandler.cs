@@ -44,7 +44,8 @@ public class CreateEnvelopeTripCommandHandler : ICommandHandler<CreateEnvelopeTr
                 request.PreviousAttemptId,
                 request.TemplateNameAtDispatch,
                 request.PriorityAtDispatch,
-                request.VendorRequestSnapshot);
+                request.VendorRequestSnapshot,
+                request.JobId);
         }
         catch (ArgumentException ex)
         {

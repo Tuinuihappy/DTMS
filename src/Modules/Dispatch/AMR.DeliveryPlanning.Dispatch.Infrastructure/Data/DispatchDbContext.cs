@@ -45,6 +45,11 @@ public class DispatchDbContext : DbContext
             // job/task trips (which had null UpperKey) were dropped in
             // Phase b7 — all surviving rows are envelope-dispatched.
             builder.HasIndex(t => t.UpperKey).IsUnique();
+            // Phase b8 — reverse lookup Job → Trip(s). Filter out the
+            // sentinel empty Guid used by pre-b8 envelope rows so the
+            // index stays small.
+            builder.HasIndex(t => t.JobId)
+                .HasFilter("\"JobId\" != '00000000-0000-0000-0000-000000000000'");
             builder.Ignore(t => t.DomainEvents);
 
             builder.HasMany(t => t.Events)
