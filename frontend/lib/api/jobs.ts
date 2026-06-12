@@ -79,3 +79,39 @@ export async function getJobsByOrder(orderId: string): Promise<JobDto[]> {
   );
   return raw ?? [];
 }
+
+export type JobsQueueResult = {
+  items: JobDto[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+};
+
+// Phase b10-frontend.2 — paginated cross-order queue for the operator
+// /delivery-orders/jobs page. `statuses` becomes a repeating `statuses=`
+// query param so the backend can parse an arbitrary status set.
+export async function getJobsQueue(opts: {
+  statuses?: JobStatus[];
+  page: number;
+  pageSize: number;
+}): Promise<JobsQueueResult> {
+  const qs = new URLSearchParams();
+  qs.set("page", String(opts.page));
+  qs.set("pageSize", String(opts.pageSize));
+  for (const s of opts.statuses ?? []) qs.append("statuses", s);
+  return await api<JobsQueueResult>(`/api/planning/jobs/queue?${qs.toString()}`);
+}
+
+export async function getJobById(id: string): Promise<JobDto> {
+  return await api<JobDto>(`/api/planning/jobs/${encodeURIComponent(id)}`);
+}
+
+// Phase b8 retry — POST returns updated JobDto envelope on either outcome
+// (success → re-dispatched, or new Failed reason). Caller inspects the
+// returned `status` + `failureReason` to know what happened.
+export async function retryJob(id: string): Promise<JobDto> {
+  return await api<JobDto>(`/api/planning/jobs/${encodeURIComponent(id)}/retry`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+}

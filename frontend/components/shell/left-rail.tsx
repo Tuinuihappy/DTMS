@@ -20,6 +20,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Map,
+  RotateCcw,
   Send,
   Smartphone,
   Truck,
@@ -85,6 +86,12 @@ const actions: RailAction[] = [
         label: "Order list",
         href: "/delivery-orders/list",
         hint: "All active & past orders",
+      },
+      {
+        icon: <RotateCcw className="h-3.5 w-3.5" strokeWidth={2.1} />,
+        label: "Jobs queue",
+        href: "/delivery-orders/jobs",
+        hint: "Failed + stuck Planning Jobs",
       },
       {
         icon: <FileStack className="h-3.5 w-3.5" strokeWidth={2.1} />,

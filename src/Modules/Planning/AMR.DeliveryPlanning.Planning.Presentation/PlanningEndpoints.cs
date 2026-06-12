@@ -22,9 +22,9 @@ using AMR.DeliveryPlanning.Planning.Application.Queries.GetActionTemplates;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetCostModel;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobById;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobsByOrder;
+using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobsQueue;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplateById;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplates;
-using AMR.DeliveryPlanning.Planning.Application.Queries.GetPendingJobs;
 using AMR.DeliveryPlanning.Planning.Domain.Entities;
 using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using MediatR;
@@ -89,10 +89,25 @@ public static class PlanningEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         });
 
-        // GET /api/v1/planning/jobs/pending — Get all pending jobs
-        group.MapGet("/pending", async (ISender sender) =>
+        // GET /api/v1/planning/jobs/queue?statuses=Failed&statuses=Created&page=1&pageSize=20
+        // — Phase b10-frontend.2 — paginated operator queue across every
+        // order. `statuses` is a repeating param; empty = no filter.
+        // Sorted newest-first. Returns { items, totalCount, page, pageSize }.
+        group.MapGet("/queue", async (HttpRequest req, ISender sender) =>
         {
-            var result = await sender.Send(new GetPendingJobsQuery());
+            var rawStatuses = req.Query["statuses"];
+            var statuses = new List<JobStatus>(rawStatuses.Count);
+            foreach (var token in rawStatuses)
+            {
+                if (string.IsNullOrWhiteSpace(token)) continue;
+                if (!Enum.TryParse<JobStatus>(token, ignoreCase: true, out var parsed))
+                    return Results.BadRequest($"Unknown JobStatus '{token}'.");
+                statuses.Add(parsed);
+            }
+            var page = int.TryParse(req.Query["page"], out var p) && p > 0 ? p : 1;
+            var pageSize = int.TryParse(req.Query["pageSize"], out var s) && s > 0 ? s : 20;
+
+            var result = await sender.Send(new GetJobsQueueQuery(statuses, page, pageSize));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 

@@ -22,14 +22,6 @@ public class JobRepository : IJobRepository
             .FirstOrDefaultAsync(j => j.Id == id, cancellationToken);
     }
 
-    public async Task<List<Job>> GetPendingJobsAsync(CancellationToken cancellationToken = default)
-    {
-        return await _context.Jobs
-            .Where(j => j.Status == JobStatus.Created)
-            .Include(j => j.Legs)
-            .ToListAsync(cancellationToken);
-    }
-
     public async Task<List<Job>> GetByDeliveryOrderIdAsync(Guid deliveryOrderId, CancellationToken cancellationToken = default)
     {
         return await _context.Jobs
@@ -80,5 +72,25 @@ public class JobRepository : IJobRepository
                      && j.SlaDeadline.Value <= cutoffTime)
             .Include(j => j.Legs)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<(List<Job> Items, int TotalCount)> SearchQueueAsync(
+        IReadOnlyList<JobStatus> statuses,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.Jobs.AsQueryable();
+        if (statuses.Count > 0)
+            query = query.Where(j => statuses.Contains(j.Status));
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderByDescending(j => j.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Include(j => j.Legs)
+            .ToListAsync(cancellationToken);
+        return (items, total);
     }
 }

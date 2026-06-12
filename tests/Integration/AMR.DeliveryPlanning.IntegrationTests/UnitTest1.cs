@@ -53,7 +53,7 @@ public class EndToEndFlowTests : IClassFixture<DtmsWebApplicationFactory>
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/api/v1/planning/jobs/pending");
+        var response = await client.GetAsync("/api/v1/planning/jobs/queue");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
