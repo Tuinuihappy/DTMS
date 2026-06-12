@@ -517,6 +517,21 @@ export async function redispatchOrder(
   if (!res.ok && res.status !== 204) await unwrap(res);
 }
 
+// Phase b11 — operator close-out for orders stranded at an in-flight
+// status with 0 active trips. Backend rejects if either precondition
+// (order in-flight, trips empty) doesn't hold.
+export async function abandonStuckOrder(
+  id: string,
+  body: { abandonedBy: string; reason: string },
+): Promise<void> {
+  const res = await fetch(`/api/delivery-orders/${id}/abandon-after-trip-cancel`, {
+    method: "POST",
+    headers: mutationHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok && res.status !== 204) await unwrap(res);
+}
+
 export type ResendOmsNotificationResult = {
   shipmentId: string;
   deliveryBy: string;

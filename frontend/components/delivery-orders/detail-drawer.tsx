@@ -46,7 +46,17 @@ type Action =
   | "redispatch"
   | "hold"
   | "release"
-  | "reject";
+  | "reject"
+  | "abandon";
+
+const ORDER_IN_FLIGHT_STATES = [
+  "Confirmed",
+  "Planning",
+  "Planned",
+  "Dispatched",
+  "InProgress",
+];
+const ACTIVE_TRIP_STATES = ["Created", "InProgress", "Paused"];
 
 export function OrderDetailDrawer({
   orderId,
@@ -610,6 +620,25 @@ export function OrderDetailDrawer({
                       Redispatch
                     </DrawerActionButton>
                   )}
+                  {/* Phase b11 escape hatch — visible only when the order
+                      is stranded at an in-flight status with no active
+                      Trip remaining (every Trip terminal, typically all
+                      Cancelled). New orders never need this — the
+                      TripCancelledConsumer cascades automatically; this
+                      button is for legacy pre-b11 rows + edge cases
+                      where the cascade didn't fire. */}
+                  {ORDER_IN_FLIGHT_STATES.includes(data.orderStatus) &&
+                    trips !== null &&
+                    trips.length > 0 &&
+                    !trips.some((t) => ACTIVE_TRIP_STATES.includes(t.status)) && (
+                      <DrawerActionButton
+                        tone="amber"
+                        icon={<Ban className="h-3.5 w-3.5" strokeWidth={2.4} />}
+                        onClick={() => onAction("abandon", data.id)}
+                      >
+                        Abandon (no active trips)
+                      </DrawerActionButton>
+                    )}
                   <button
                     type="button"
                     onClick={onClose}

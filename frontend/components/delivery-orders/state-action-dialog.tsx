@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 // One component, three variants keeps the dialog visuals consistent
 // and avoids three near-identical files.
 
-export type StateActionVariant = "hold" | "release" | "reject";
+export type StateActionVariant = "hold" | "release" | "reject" | "abandon";
 
 type VariantConfig = {
   title: string;
@@ -73,6 +73,25 @@ const CONFIG: Record<StateActionVariant, VariantConfig> = {
     bubbleClass: "bg-[#fde0db] text-[var(--color-coral)] dark:bg-[#3a1a17]",
     submitClass:
       "bg-[#fde0db] text-[var(--color-coral)] hover:bg-[#fbc7be] dark:bg-[#3a1a17] dark:hover:bg-[#4a2520]",
+  },
+  // Phase b11 escape hatch — close out an order stranded at an in-flight
+  // status with no active Trip remaining. Backend validates BOTH (in-flight,
+  // 0 active trips); UI only surfaces the action when both hold.
+  abandon: {
+    title: "Abandon stuck order",
+    blurb:
+      "Marks a stranded order Cancelled when every Trip has ended (typically all Cancelled). Items follow the order to a terminal state. Use this when the auto-cascade didn't fire — e.g. legacy data from before the cascade was added.",
+    actorLabel: "Abandoned by",
+    actorRequired: true,
+    reasonLabel: "Reason",
+    reasonRequired: true,
+    reasonPlaceholder: "e.g. cleanup of legacy stuck Dispatched orders",
+    submitLabel: "Abandon",
+    icon: <Ban className="h-4 w-4" strokeWidth={2.4} />,
+    bubbleClass:
+      "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
+    submitClass:
+      "bg-[var(--color-amber-soft)] text-[var(--color-amber)] hover:bg-[var(--color-amber-soft)]/80",
   },
 };
 

@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AbandonStuckDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AmendDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkSubmitDeliveryOrders;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CancelDeliveryOrder;
@@ -35,6 +36,7 @@ public record RejectOrderRequest(string Reason, string? RejectedBy = null);
 public record HoldOrderRequest(string Reason, string? HeldBy = null);
 public record ReleaseOrderRequest(string? ReleasedBy = null);
 public record ReopenOrderRequest(string ReopenedBy, string Reason);
+public record AbandonOrderRequest(string AbandonedBy, string Reason);
 public record RedispatchOrderRequest(string RedispatchedBy, string Reason, double WeightFallbackKg = 0);
 public record ResendOmsNotificationRequest(string? RequestedBy = null);
 // ScanType: "Pickup" | "Drop" (case-insensitive enum binding); defaults
@@ -103,6 +105,19 @@ public static class DeliveryOrderEndpoints
         group.MapPost("/{id:guid}/reopen", async (Guid id, [FromBody] ReopenOrderRequest body, ISender sender) =>
         {
             var result = await sender.Send(new ReopenDeliveryOrderCommand(id, body.ReopenedBy, body.Reason));
+            return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+        }).RequireIdempotencyKey();
+
+        // POST /api/v1/delivery-orders/{id}/abandon-after-trip-cancel —
+        // Phase b11 escape hatch (Option B). Operator-driven close-out
+        // for orders stranded at an in-flight status (typically Dispatched)
+        // with zero active trips. Pre-b11 legacy data + edge cases where
+        // the TripCancelledConsumer cascade didn't fire. Validates BOTH
+        // preconditions in the handler — rejects with 400 otherwise.
+        group.MapPost("/{id:guid}/abandon-after-trip-cancel",
+            async (Guid id, [FromBody] AbandonOrderRequest body, ISender sender) =>
+        {
+            var result = await sender.Send(new AbandonStuckDeliveryOrderCommand(id, body.AbandonedBy, body.Reason));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
         }).RequireIdempotencyKey();
 

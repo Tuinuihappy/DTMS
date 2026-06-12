@@ -10,7 +10,10 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="MassTransit" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
@@ -20,8 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Application\AMR.DeliveryPlanning.DeliveryOrder.Application.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Domain\AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Presentation\AMR.DeliveryPlanning.DeliveryOrder.Presentation.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Dispatch\AMR.DeliveryPlanning.Dispatch.Domain\AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
   </ItemGroup>
 
 </Project>

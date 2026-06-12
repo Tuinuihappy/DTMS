@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SectionLabel } from "@/components/primitives/section-label";
 import {
+  abandonStuckOrder,
   confirmOrder,
   deleteOrder,
   getOrder,
@@ -281,7 +282,8 @@ function ExperienceInner() {
           | "redispatch"
           | "hold"
           | "release"
-          | "reject",
+          | "reject"
+          | "abandon",
         id: string,
         reason?: string,
       ) => Promise<void>)
@@ -562,7 +564,8 @@ function ExperienceInner() {
         | "redispatch"
         | "hold"
         | "release"
-        | "reject",
+        | "reject"
+        | "abandon",
       id: string,
       reason?: string,
     ) => {
@@ -574,9 +577,15 @@ function ExperienceInner() {
         return;
       }
 
-      // Hold / Release / Reject — open the shared dialog to capture
-      // actor + reason. The dialog calls the API itself.
-      if (action === "hold" || action === "release" || action === "reject") {
+      // Hold / Release / Reject / Abandon — share the StateActionDialog
+      // for actor + reason capture. The dialog routes to the right API
+      // by variant in its onConfirm handler.
+      if (
+        action === "hold" ||
+        action === "release" ||
+        action === "reject" ||
+        action === "abandon"
+      ) {
         setStateActionTarget({ variant: action, order: target });
         return;
       }
@@ -1102,7 +1111,7 @@ function ExperienceInner() {
                 tone: "success",
                 message: `${order.orderRef} released — Planning will re-run`,
               });
-            } else {
+            } else if (variant === "reject") {
               await rejectOrder(order.id, { reason, rejectedBy: actor || undefined });
               setOrders((prev) =>
                 prev.map((o) =>
@@ -1110,6 +1119,19 @@ function ExperienceInner() {
                 ),
               );
               toast.push({ tone: "info", message: `${order.orderRef} rejected` });
+            } else {
+              // variant === "abandon" — Phase b11 stuck-order close-out.
+              await abandonStuckOrder(order.id, { abandonedBy: actor, reason });
+              setOrders((prev) =>
+                prev.map((o) =>
+                  o.id === order.id ? { ...o, orderStatus: "Cancelled" } : o,
+                ),
+              );
+              if (detailId === order.id) setDetailId(null);
+              toast.push({
+                tone: "info",
+                message: `${order.orderRef} abandoned — items terminated`,
+              });
             }
             setStateActionTarget(null);
             setTimeout(() => {
