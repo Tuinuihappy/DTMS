@@ -185,6 +185,11 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                     b.Property<Guid?>("AssignedVehicleId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("AttemptNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -195,11 +200,23 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("jsonb");
 
+                    b.Property<Guid?>("DropStationId")
+                        .HasColumnType("uuid");
+
                     b.Property<double>("EstimatedDistance")
                         .HasColumnType("double precision");
 
                     b.Property<double>("EstimatedDuration")
                         .HasColumnType("double precision");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("GroupIndex")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<string>("PackageBarcodes")
                         .IsRequired()
@@ -209,6 +226,9 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<Guid?>("PickupStationId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("PlanningTrace")
                         .HasColumnType("text");
@@ -237,7 +257,17 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<Guid?>("TripId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VendorOrderKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("TripId")
+                        .HasFilter("\"TripId\" IS NOT NULL");
 
                     b.ToTable("Jobs", "planning");
                 });

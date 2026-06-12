@@ -23,6 +23,7 @@ public interface IDispatchOrderTemplateService
         string? appointVehicleGroupKeyOverride = null,
         string? appointVehicleGroupNameOverride = null,
         string? appointQueueWaitAreaOverride = null,
+        Guid? jobId = null,
         CancellationToken cancellationToken = default);
 }
 

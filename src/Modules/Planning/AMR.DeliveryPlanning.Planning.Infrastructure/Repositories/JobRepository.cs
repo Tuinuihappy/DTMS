@@ -30,6 +30,16 @@ public class JobRepository : IJobRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<List<Job>> GetByDeliveryOrderIdAsync(Guid deliveryOrderId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Jobs
+            .Where(j => j.DeliveryOrderId == deliveryOrderId)
+            .Include(j => j.Legs)
+            .OrderBy(j => j.GroupIndex)
+            .ThenBy(j => j.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Job job, CancellationToken cancellationToken = default)
     {
         await _context.Jobs.AddAsync(job, cancellationToken);

@@ -4,6 +4,9 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.MarkOrderPlanned;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.MarkOrderPlanning;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.RecomputeOrderStatus;
 using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
+using AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobAnchor;
+using AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobDispatched;
+using AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobFailed;
 using AMR.DeliveryPlanning.Planning.Application.Services;
 using AMR.DeliveryPlanning.SharedKernel;
 using MassTransit;
@@ -59,6 +62,31 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         // surfaces in audit + lets RabbitMQ redeliveries be idempotent.
         await _sender.Send(new MarkOrderPlanningCommand(evt.DeliveryOrderId), ct);
 
+        // Phase 1b (b8): Create a 1:1 Job anchor per group before the order
+        // is marked Planned. Best-effort — a failed anchor logs a warning
+        // and proceeds without a JobId; the group still dispatches normally
+        // but won't be retriable via /jobs/{id}/retry.
+        var jobIdByGroup = new Dictionary<int, Guid>();
+        foreach (var (groupIndex, stationGroup) in stationGroups.Index())
+        {
+            var jobResult = await _sender.Send(new CreateJobAnchorCommand(
+                evt.DeliveryOrderId,
+                GroupIndex: groupIndex + 1,
+                stationGroup.Key.PickupStationId,
+                stationGroup.Key.DropStationId,
+                Priority: "Normal",
+                RequestedTransportMode: evt.RequestedTransportMode,
+                SlaDeadline: evt.LatestUtc), ct);
+
+            if (jobResult.IsSuccess)
+                jobIdByGroup[groupIndex] = jobResult.Value;
+            else
+                _logger.LogWarning(
+                    "[AutoPlan] Job anchor failed for group {G} ({Pickup} → {Drop}): {Err}",
+                    groupIndex + 1, stationGroup.Key.PickupStationId,
+                    stationGroup.Key.DropStationId, jobResult.Error);
+        }
+
         // Phase 2: Planning → Planned. Group + template resolution happen
         // inside DispatchByRouteAsync per group; the explicit Planned mark
         // serves as the "no more pre-vendor work needed" boundary.
@@ -77,6 +105,7 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                 stationGroup.Key.PickupStationId, stationGroup.Key.DropStationId);
 
             var upperKey = EnvelopeUpperKey.Build(evt.DeliveryOrderId, groupIndex + 1);
+            var jobId = jobIdByGroup.GetValueOrDefault(groupIndex);
 
             var envelopeResult = await _envelopeDispatch.DispatchByRouteAsync(
                 evt.DeliveryOrderId,
@@ -84,9 +113,10 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                 stationGroup.Key.DropStationId,
                 upperKey,
                 appointVehicleKeyOverride: null,
+                jobId: jobId == Guid.Empty ? null : jobId,
                 cancellationToken: ct);
 
-            if (envelopeResult.IsSuccess)
+            if (envelopeResult.IsSuccess && envelopeResult.Value.TripId != Guid.Empty)
             {
                 successCount++;
                 _logger.LogInformation(
@@ -94,6 +124,28 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                     "(upperKey {UpperKey} → vendorOrderKey {VendorKey}, tripId {TripId})",
                     groupIndex + 1, envelopeResult.Value.TemplateName, upperKey,
                     envelopeResult.Value.VendorOrderKey, envelopeResult.Value.TripId);
+
+                if (jobId != Guid.Empty)
+                    await _sender.Send(new MarkJobDispatchedCommand(
+                        jobId, envelopeResult.Value.TripId, envelopeResult.Value.VendorOrderKey), ct);
+            }
+            else if (envelopeResult.IsSuccess && envelopeResult.Value.TripId == Guid.Empty)
+            {
+                // Orphan: vendor accepted but Trip persistence failed.
+                // Items stay Pending (physically on vendor) and order
+                // proceeds to Dispatched, but the Job is marked Failed
+                // so ops can run reconciliation.
+                successCount++;
+                var orphanReason =
+                    $"vendor accepted (key={envelopeResult.Value.VendorOrderKey}) " +
+                    "but trip persistence failed — reconciliation required";
+                _logger.LogError(
+                    "[AutoPlan] ⚠ Group {G} ({Pickup} → {Drop}) orphan: {Reason}",
+                    groupIndex + 1, stationGroup.Key.PickupStationId,
+                    stationGroup.Key.DropStationId, orphanReason);
+
+                if (jobId != Guid.Empty)
+                    await _sender.Send(new MarkJobFailedCommand(jobId, orphanReason), ct);
             }
             else
             {
@@ -101,6 +153,10 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                     "[AutoPlan] ✗ Group {G} ({Pickup} → {Drop}) failed: {Reason}",
                     groupIndex + 1, stationGroup.Key.PickupStationId,
                     stationGroup.Key.DropStationId, envelopeResult.Error);
+
+                if (jobId != Guid.Empty)
+                    await _sender.Send(new MarkJobFailedCommand(
+                        jobId, envelopeResult.Error ?? "vendor rejected dispatch"), ct);
 
                 // Mark this group's items Failed so the order's eventual
                 // RecomputeStatusFromItems isn't blocked on them.

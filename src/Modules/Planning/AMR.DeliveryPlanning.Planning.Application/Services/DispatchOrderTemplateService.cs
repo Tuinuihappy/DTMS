@@ -41,6 +41,7 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
         string? appointVehicleGroupKeyOverride = null,
         string? appointVehicleGroupNameOverride = null,
         string? appointQueueWaitAreaOverride = null,
+        Guid? jobId = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(upperKey))
@@ -114,7 +115,8 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
                 previousAttemptId,
                 TemplateNameAtDispatch: template.Name,
                 PriorityAtDispatch: resolved.Priority,
-                VendorRequestSnapshot: requestJson),
+                VendorRequestSnapshot: requestJson,
+                JobId: jobId),
             cancellationToken);
         var tripId = tripCreate.IsSuccess ? tripCreate.Value : Guid.Empty;
         if (!tripCreate.IsSuccess)

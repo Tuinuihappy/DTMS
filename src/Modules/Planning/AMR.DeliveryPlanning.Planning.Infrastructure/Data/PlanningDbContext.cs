@@ -37,6 +37,16 @@ public class PlanningDbContext : DbContext
             builder.Property(j => j.SlaDeadline);
             builder.Property(j => j.TransportMode).HasMaxLength(20);
             builder.Property(j => j.PlanningTrace).HasColumnType("text");
+            // Phase b8 — envelope-dispatch anchor fields.
+            builder.Property(j => j.TripId);
+            builder.Property(j => j.VendorOrderKey).HasMaxLength(100);
+            builder.Property(j => j.FailureReason).HasMaxLength(1000);
+            builder.Property(j => j.AttemptNumber).HasDefaultValue(1);
+            builder.Property(j => j.GroupIndex).HasDefaultValue(1);
+            builder.Property(j => j.PickupStationId);
+            builder.Property(j => j.DropStationId);
+            // Reverse lookup Trip → Job (rare, but useful for compliance).
+            builder.HasIndex(j => j.TripId).HasFilter("\"TripId\" IS NOT NULL");
             builder.Ignore(j => j.DomainEvents);
 
             builder.Property(j => j.DerivedFromOrders)
