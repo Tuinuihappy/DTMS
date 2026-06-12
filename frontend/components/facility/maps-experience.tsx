@@ -10,19 +10,25 @@ import {
   CheckCircle2,
   Compass,
   Crosshair,
+  Hand,
+  HelpCircle,
   Hexagon,
   Layers,
   Loader2,
   Map as MapIcon,
   MapPin,
+  Maximize,
   Maximize2,
+  Minimize,
   Minus,
+  Mouse,
   Navigation,
   Plus,
   PackageOpen,
   ParkingCircle,
   Pencil,
   RefreshCw,
+  RotateCw,
   Search,
   Signal,
   Sparkles,
@@ -130,6 +136,51 @@ const TYPE_META: Record<
     icon: Crosshair,
   },
 };
+
+/* -------------------------------------------------------------------------- */
+/* Rotation math — the SVG is CSS-rotated, but gesture handlers think in the  */
+/* un-rotated frame (because viewBox + world coords don't know about it). We  */
+/* convert pointer events / deltas / world-derived overlay positions in/out   */
+/* of the rotated frame via plain 2D rotation matrices around the SVG center. */
+/* -------------------------------------------------------------------------- */
+
+// screen cursor → un-rotated SVG pixel position
+function screenToSvg(clientX: number, clientY: number, rect: DOMRect, rotation: number) {
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+  if (rotation === 0) return { x, y };
+  const cx = rect.width / 2;
+  const cy = rect.height / 2;
+  const dx = x - cx;
+  const dy = y - cy;
+  const rad = (-rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return { x: dx * cos - dy * sin + cx, y: dx * sin + dy * cos + cy };
+}
+
+// screen-space delta → un-rotated delta (so drag direction follows the finger)
+function rotateDelta(dxPx: number, dyPx: number, rotation: number) {
+  if (rotation === 0) return { dx: dxPx, dy: dyPx };
+  const rad = (-rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return { dx: dxPx * cos - dyPx * sin, dy: dxPx * sin + dyPx * cos };
+}
+
+// un-rotated SVG pixel position → screen position (forward rotation, for
+// HTML overlays that mirror a world-space anchor, e.g. the robot tooltip)
+function svgToScreen(svgX: number, svgY: number, rect: DOMRect, rotation: number) {
+  if (rotation === 0) return { x: svgX, y: svgY };
+  const cx = rect.width / 2;
+  const cy = rect.height / 2;
+  const dx = svgX - cx;
+  const dy = svgY - cy;
+  const rad = (rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return { x: dx * cos - dy * sin + cx, y: dx * sin + dy * cos + cy };
+}
 
 function typeKey(raw: string | undefined | null): TypeKey {
   const t = (raw ?? "NORMAL").toString().toUpperCase();
@@ -328,20 +379,16 @@ export function MapsExperience() {
 
       <KpiStrip stats={stats} lastSync={lastSync} loading={loading} />
 
-      <div className="space-y-5 md:space-y-6">
-        <MapSelectorRail
-          maps={maps}
-          selectedId={selectedMapId}
-          onSelect={setSelectedMapId}
-          loading={loading && maps.length === 0}
-        />
-        <CanvasCard
-          map={selectedMap}
-          stations={stations}
-          loading={loading}
-          onEditStation={setEditingStationId}
-        />
-      </div>
+      {/* /facility/maps is now the station-management surface — the live
+          cartography lives on /home (see HeroLiveMap → CanvasCard). The
+          map selector still scopes which map's stations the directory and
+          KPI strip show, so it stays. */}
+      <MapSelectorRail
+        maps={maps}
+        selectedId={selectedMapId}
+        onSelect={setSelectedMapId}
+        loading={loading && maps.length === 0}
+      />
 
       <StationDirectory
         stations={stations}
@@ -646,22 +693,89 @@ function MapSelectorRail({
 /* -------------------------------------------------------------------------- */
 /* CanvasCard — the centerpiece. A SVG cartography of stations laid out by    */
 /* their world coordinates, with grid, axes, pulse, and hover tooltips.       */
+/* Exported so other surfaces (e.g. /home) can render the same map without    */
+/* duplicating the SVG / gesture / robot-layer pipeline.                      */
+/*  - `className`       — extra classes for the GlassCard wrapper             */
+/*  - `canvasClassName` — overrides the default canvas-height clamp           */
+/*  - `onEditStation`   — when omitted, the "Edit station" CTA is hidden so   */
+/*                        the card is fully read-only                         */
 /* -------------------------------------------------------------------------- */
-function CanvasCard({
+export function CanvasCard({
   map,
   stations,
   loading,
   onEditStation,
+  className,
+  canvasClassName,
 }: {
   map: MapSummaryDto | null;
   stations: StationDto[];
   loading: boolean;
-  onEditStation: (id: string) => void;
+  onEditStation?: (id: string) => void;
+  className?: string;
+  canvasClassName?: string;
 }) {
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [pinned, setPinned] = useState<string | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [hoverRobotId, setHoverRobotId] = useState<string | null>(null);
+  // True browser fullscreen via the Fullscreen API — covers browser chrome
+  // (tabs, address bar) too, not just an in-page overlay. The card ref is
+  // the element we request fullscreen on; `fullscreenchange` is the source
+  // of truth for the boolean so ESC / F11 / browser UI all stay in sync.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    const onChange = () => {
+      setIsFullscreen(document.fullscreenElement === cardRef.current);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  const toggleFullscreen = useCallback(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      el.requestFullscreen().catch(() => {});
+    }
+  }, []);
+  // Rotation — clockwise in 45° steps, cycles 0→45→…→315→0. Applied as a CSS
+  // transform on the SVG; gesture handlers convert in/out of the rotated
+  // frame via the screenToSvg / rotateDelta / svgToScreen helpers above.
+  // The ref keeps stable callbacks (beginGesture is useCallback([])) from
+  // reading a stale rotation between gesture frames.
+  const [rotation, setRotation] = useState(0);
+  const rotationRef = useRef(rotation);
+  rotationRef.current = rotation;
+  const rotateCw = useCallback(() => setRotation((r) => (r + 45) % 360), []);
+  // Container ref — the wrapper div that holds the SVG. The container is
+  // NEVER rotated, so its getBoundingClientRect() is the stable rectangle we
+  // do all px↔world math against (the SVG's own rect is the rotated bbox).
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  // Operation-instructions popup. Click outside or press ESC to dismiss.
+  // The wrapper ref is the trigger button + popup pair so we can ignore
+  // clicks that originated inside either of them.
+  const [showInstructions, setShowInstructions] = useState(false);
+  const helpRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showInstructions) return;
+    const onClick = (e: MouseEvent) => {
+      if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
+        setShowInstructions(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowInstructions(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [showInstructions]);
 
   // Live robot positions for this map. The hook handles polling,
   // visibility-change pausing, and abort on map switch / unmount.
@@ -683,7 +797,10 @@ function CanvasCard({
     if (!svgRef.current) return;
     const el = svgRef.current;
     const update = () => {
-      const w = el.getBoundingClientRect().width;
+      // clientWidth is the un-transformed layout width; getBoundingClientRect()
+      // would return the rotated bbox (larger when rotation isn't a multiple
+      // of 90°) and skew the px↔world ratio that drives dot sizing.
+      const w = el.clientWidth;
       if (w > 0) setSvgWidth(w);
     };
     update();
@@ -780,20 +897,27 @@ function CanvasCard({
   const beginGesture = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     // Ignore non-primary mouse buttons; touch + pen don't have buttons here.
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    if (!svgRef.current) return;
+    const container = canvasContainerRef.current;
+    if (!container) return;
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const v = viewRef.current;
 
     if (pointers.current.size === 2) {
       const pts = [...pointers.current.values()];
-      const rect = svgRef.current.getBoundingClientRect();
+      const rect = container.getBoundingClientRect();
+      const rot = rotationRef.current;
       const dist = Math.hypot(pts[1]!.x - pts[0]!.x, pts[1]!.y - pts[0]!.y);
+      // Snapshot the midpoint in un-rotated SVG space so the world-anchor
+      // math below sees a stable, rotation-agnostic position.
+      const midScreenX = (pts[0]!.x + pts[1]!.x) / 2;
+      const midScreenY = (pts[0]!.y + pts[1]!.y) / 2;
+      const mid = screenToSvg(midScreenX, midScreenY, rect, rot);
       pinchStart.current = {
         dist: Math.max(dist, 1),
         rectW: rect.width,
         rectH: rect.height,
-        midPx: (pts[0]!.x + pts[1]!.x) / 2 - rect.left,
-        midPy: (pts[0]!.y + pts[1]!.y) / 2 - rect.top,
+        midPx: mid.x,
+        midPy: mid.y,
         view: { x: v.x, y: v.y, w: v.w, h: v.h },
       };
       panStart.current = null;
@@ -813,17 +937,24 @@ function CanvasCard({
     const onMove = (e: PointerEvent) => {
       if (!pointers.current.has(e.pointerId)) return;
       pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      const svg = svgRef.current;
-      if (!svg) return;
-      const rect = svg.getBoundingClientRect();
+      const container = canvasContainerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const rot = rotationRef.current;
 
       // Pinch-zoom: rescale around the original midpoint, then shift by
       // current midpoint so 2-finger drag pans + zooms in one motion.
       if (pointers.current.size === 2 && pinchStart.current) {
         const pts = [...pointers.current.values()];
         const dist = Math.hypot(pts[1]!.x - pts[0]!.x, pts[1]!.y - pts[0]!.y);
-        const midX = (pts[0]!.x + pts[1]!.x) / 2 - rect.left;
-        const midY = (pts[0]!.y + pts[1]!.y) / 2 - rect.top;
+        // Convert current midpoint to un-rotated SVG space so it can be
+        // compared apples-to-apples against pinchStart.midPx/Py.
+        const mid = screenToSvg(
+          (pts[0]!.x + pts[1]!.x) / 2,
+          (pts[0]!.y + pts[1]!.y) / 2,
+          rect,
+          rot,
+        );
         const ps = pinchStart.current;
         const scale = ps.dist / Math.max(dist, 1);
         const newW = ps.view.w * scale;
@@ -838,8 +969,8 @@ function CanvasCard({
         const wx = ps.view.x + (ps.midPx / ps.rectW) * ps.view.w;
         const wy = ps.view.y + (1 - ps.midPy / ps.rectH) * ps.view.h;
         setView({
-          x: wx - (midX / rect.width) * newW,
-          y: wy - (1 - midY / rect.height) * newH,
+          x: wx - (mid.x / rect.width) * newW,
+          y: wy - (1 - mid.y / rect.height) * newH,
           w: newW,
           h: newH,
         });
@@ -849,9 +980,13 @@ function CanvasCard({
       // Single-pointer pan.
       const ps = panStart.current;
       if (!ps) return;
-      const dxPx = e.clientX - ps.cx;
-      const dyPx = e.clientY - ps.cy;
-      if (Math.abs(dxPx) + Math.abs(dyPx) > CLICK_THRESHOLD) dragMoved.current = true;
+      const dxScreen = e.clientX - ps.cx;
+      const dyScreen = e.clientY - ps.cy;
+      if (Math.abs(dxScreen) + Math.abs(dyScreen) > CLICK_THRESHOLD) dragMoved.current = true;
+      // Rotate the screen delta into the un-rotated SVG frame so dragging
+      // a finger right moves the viewport "screen-right" regardless of
+      // the current rotation step.
+      const { dx: dxPx, dy: dyPx } = rotateDelta(dxScreen, dyScreen, rot);
       setView((v) => ({
         ...v,
         x: ps.vx - (dxPx / rect.width) * v.w,
@@ -895,9 +1030,12 @@ function CanvasCard({
     if (!el) return;
     const handler = (e: WheelEvent) => {
       e.preventDefault();
-      const rect = el.getBoundingClientRect();
-      const px = e.clientX - rect.left;
-      const py = e.clientY - rect.top;
+      const container = canvasContainerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      // Convert cursor into un-rotated SVG space so the zoom anchors on
+      // whatever's visually under the wheel pointer, even when rotated.
+      const { x: px, y: py } = screenToSvg(e.clientX, e.clientY, rect, rotationRef.current);
       setView((v) => {
         const factor = e.deltaY > 0 ? 1.2 : 1 / 1.2;
         const newW = v.w * factor;
@@ -990,7 +1128,19 @@ function CanvasCard({
   const sw2 = 1.5 * worldPerPx;
 
   return (
-    <GlassCard variant="strong" className="overflow-hidden">
+    <GlassCard
+      ref={cardRef}
+      variant="strong"
+      className={cn(
+        "overflow-hidden",
+        // In browser fullscreen the UA stylesheet sizes the element to the
+        // whole screen — we just need flex layout + a solid bg (the default
+        // :fullscreen bg is black, which would bleed around the glass).
+        isFullscreen
+          ? "flex flex-col rounded-none !bg-[var(--color-canvas)]"
+          : className,
+      )}
+    >
       {/* Top bar — map identity, dimensions, live indicator */}
       <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-white/40 dark:border-white/[0.06]">
         <div className="min-w-0 flex items-center gap-3">
@@ -1033,7 +1183,15 @@ function CanvasCard({
           preserveAspectRatio="xMidYMid meet", so the square world content
           stays centered — wider screens just get letterboxed margins, never
           a stretched cartography. */}
-      <div className="relative h-[clamp(28rem,85svh,72rem)]">
+      <div
+        ref={canvasContainerRef}
+        className={cn(
+          "relative",
+          isFullscreen
+            ? "flex-1 min-h-0"
+            : canvasClassName ?? "h-[clamp(28rem,85svh,72rem)]",
+        )}
+      >
         {!loading && stations.length === 0 && <CanvasEmptyState />}
 
         <svg
@@ -1043,17 +1201,27 @@ function CanvasCard({
           viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
           preserveAspectRatio="xMidYMid meet"
           className="absolute inset-0 h-full w-full select-none"
-          style={{ cursor: isGesturing ? "grabbing" : "grab", touchAction: "none" }}
+          style={{
+            cursor: isGesturing ? "grabbing" : "grab",
+            touchAction: "none",
+            transform: `rotate(${rotation}deg)`,
+            transformOrigin: "center center",
+            transition: "transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)",
+          }}
           onPointerDown={beginGesture}
           onPointerUp={onTapEnd}
           onDoubleClick={recenter}
           onPointerMove={(e) => {
             // Cursor read-out follows the mouse only; touch has no hover.
             if (e.pointerType === "touch") return;
-            const svg = e.currentTarget;
-            const rect = svg.getBoundingClientRect();
-            const localX = ((e.clientX - rect.left) / rect.width) * view.w + view.x;
-            const localY = ((e.clientY - rect.top) / rect.height) * view.h + view.y;
+            const container = canvasContainerRef.current;
+            if (!container) return;
+            const rect = container.getBoundingClientRect();
+            // Convert into un-rotated SVG px first so the world-coord mapping
+            // below sees the same position regardless of rotation step.
+            const { x: sx, y: sy } = screenToSvg(e.clientX, e.clientY, rect, rotation);
+            const localX = (sx / rect.width) * view.w + view.x;
+            const localY = (sy / rect.height) * view.h + view.y;
             // SVG coord → data coord. The data layer is Y-flipped, so the data
             // y under the cursor is the mirror of localY about the viewport
             // midline (= 2*view.y + view.h - localY).
@@ -1252,11 +1420,16 @@ function CanvasCard({
         {(() => {
           const hovered = robots.find((r) => r.deviceKey === hoverRobotId);
           if (!hovered) return null;
-          const rect = svgRef.current?.getBoundingClientRect();
-          if (!rect) return null;
-          const px = ((hovered.x - view.x) / view.w) * rect.width;
-          const py = ((view.y + view.h - hovered.y) / view.h) * rect.height;
-          return <RobotTooltip robot={hovered} left={px} top={py} />;
+          const container = canvasContainerRef.current;
+          if (!container) return null;
+          const rect = container.getBoundingClientRect();
+          // Robot world coord → un-rotated SVG px → screen px (forward rotation).
+          // The tooltip is absolutely positioned inside the container, so left/top
+          // are relative to it (not the page).
+          const svgPx = ((hovered.x - view.x) / view.w) * rect.width;
+          const svgPy = ((view.y + view.h - hovered.y) / view.h) * rect.height;
+          const { x: left, y: top } = svgToScreen(svgPx, svgPy, rect, rotation);
+          return <RobotTooltip robot={hovered} left={left} top={top} />;
         })()}
 
         {/* Live indicator — top-left chip above the canvas grid. Shows tick
@@ -1292,7 +1465,12 @@ function CanvasCard({
           <span className="pointer-events-auto inline-flex items-center gap-1 rounded-full glass px-2.5 py-1 text-[10.5px] font-mono tabular-nums tracking-tight text-[var(--color-ink-600)]">
             {(viewW / view.w).toFixed(2)}×
           </span>
-          <div className="pointer-events-auto flex flex-col rounded-[16px] glass-strong overflow-hidden">
+          {/* helpRef wraps the stack + the popup so clicks on either count as
+              "inside" — the click-outside listener only dismisses on clicks
+              outside this wrapper. The popup is a sibling of the stack so it
+              escapes the stack's overflow-hidden clipping. */}
+          <div ref={helpRef} className="pointer-events-auto relative">
+          <div className="flex flex-col rounded-[16px] glass-strong overflow-hidden">
             <button
               type="button"
               aria-label="Zoom in"
@@ -1319,6 +1497,89 @@ function CanvasCard({
             >
               <Maximize2 className="h-4 w-4" strokeWidth={2.2} />
             </button>
+            <span aria-hidden className="h-px bg-[var(--color-ink-100)] dark:bg-white/[0.06]" />
+            {/* Rotate map — clockwise 45° per click. Shows the current angle as
+                a tiny readout inside the tooltip so the user can tell where in
+                the 8-step cycle they are without counting clicks. */}
+            <button
+              type="button"
+              aria-label={`Rotate map clockwise (currently ${rotation}°)`}
+              onClick={rotateCw}
+              className="group/rt relative grid h-10 w-10 place-items-center text-[var(--color-ink-700)] hover:bg-white/60 dark:hover:bg-white/[0.06] cursor-pointer transition-colors"
+            >
+              <RotateCw className="h-4 w-4" strokeWidth={2.4} />
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute right-full mr-2 whitespace-nowrap rounded-md bg-[var(--color-brand-900)] px-2 py-1 text-[11px] font-medium text-white opacity-0 translate-x-1 transition-all duration-200 group-hover/rt:opacity-100 group-hover/rt:translate-x-0"
+              >
+                Rotate{rotation > 0 ? ` · ${rotation}°` : ""}
+              </span>
+            </button>
+            <span aria-hidden className="h-px bg-[var(--color-ink-100)] dark:bg-white/[0.06]" />
+            {/* Full-screen toggle — Maximize icon to enter, Minimize to exit.
+                Hover tooltip pins to the LEFT so it doesn't get clipped by the
+                viewport edge (stack sits at bottom-right of the canvas). */}
+            <button
+              type="button"
+              aria-label={isFullscreen ? "Exit full-screen" : "Enter full-screen"}
+              aria-pressed={isFullscreen}
+              onClick={toggleFullscreen}
+              className="group/fs relative grid h-10 w-10 place-items-center text-[var(--color-ink-700)] hover:bg-white/60 dark:hover:bg-white/[0.06] cursor-pointer transition-colors"
+            >
+              {isFullscreen ? (
+                <Minimize className="h-4 w-4" strokeWidth={2.4} />
+              ) : (
+                <Maximize className="h-4 w-4" strokeWidth={2.4} />
+              )}
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute right-full mr-2 whitespace-nowrap rounded-md bg-[var(--color-brand-900)] px-2 py-1 text-[11px] font-medium text-white opacity-0 translate-x-1 transition-all duration-200 group-hover/fs:opacity-100 group-hover/fs:translate-x-0"
+              >
+                {isFullscreen ? "Exit full-screen" : "Full-screen"}
+              </span>
+            </button>
+            <span aria-hidden className="h-px bg-[var(--color-ink-100)] dark:bg-white/[0.06]" />
+            {/* Operation instructions — click toggle. Tooltip hides while the
+                popup is open so the two never overlap. */}
+            <button
+              type="button"
+              aria-label={showInstructions ? "Hide operation instructions" : "Show operation instructions"}
+              aria-pressed={showInstructions}
+              onClick={() => setShowInstructions((v) => !v)}
+              className="group/hp relative grid h-10 w-10 place-items-center text-[var(--color-ink-700)] hover:bg-white/60 dark:hover:bg-white/[0.06] cursor-pointer transition-colors"
+            >
+              <HelpCircle className="h-4 w-4" strokeWidth={2.2} />
+              {!showInstructions && (
+                <span
+                  role="tooltip"
+                  className="pointer-events-none absolute right-full mr-2 whitespace-nowrap rounded-md bg-[var(--color-brand-900)] px-2 py-1 text-[11px] font-medium text-white opacity-0 translate-x-1 transition-all duration-200 group-hover/hp:opacity-100 group-hover/hp:translate-x-0"
+                >
+                  Operation instructions
+                </span>
+              )}
+            </button>
+          </div>
+          {/* Operation-instructions popup — sibling of the stack so the stack's
+              overflow-hidden doesn't clip it. Anchors to the bottom-right of
+              the wrapper so the corners line up with the help button. */}
+          <AnimatePresence>
+            {showInstructions && (
+              <motion.div
+                key="ops-popover"
+                initial={{ opacity: 0, scale: 0.96, x: 8 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.96, x: 8 }}
+                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                role="dialog"
+                aria-label="Operation instructions"
+                className="absolute bottom-0 right-full mr-2 w-[320px] rounded-[18px] glass-strong p-4 shadow-[0_30px_60px_-20px_rgba(15,23,42,0.45)]"
+              >
+                <OperationInstructions
+                  onClose={() => setShowInstructions(false)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
           </div>
           <span className="pointer-events-none rounded-full glass px-2.5 py-1 text-[10px] tracking-tight text-[var(--color-ink-500)] hidden md:inline-block">
             scroll / pinch · drag · 2× tap
@@ -1348,19 +1609,112 @@ function CanvasCard({
                 <X className="h-3.5 w-3.5" strokeWidth={2.2} />
               </button>
               <StationDetail station={activeStation} />
-              <button
-                type="button"
-                onClick={() => onEditStation(activeStation.id)}
-                className="mt-3 inline-flex w-full items-center justify-center gap-1.5 h-8 rounded-full bg-[var(--color-brand-900)] text-white text-[11.5px] font-semibold tracking-tight cursor-pointer hover:-translate-y-px transition-transform shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_18px_-10px_rgba(14,21,48,0.55)] dark:bg-[var(--color-brand-500)]"
-              >
-                <Pencil className="h-3 w-3" strokeWidth={2.5} />
-                Edit station
-              </button>
+              {onEditStation && (
+                <button
+                  type="button"
+                  onClick={() => onEditStation(activeStation.id)}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-1.5 h-8 rounded-full bg-[var(--color-brand-900)] text-white text-[11.5px] font-semibold tracking-tight cursor-pointer hover:-translate-y-px transition-transform shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_18px_-10px_rgba(14,21,48,0.55)] dark:bg-[var(--color-brand-500)]"
+                >
+                  <Pencil className="h-3 w-3" strokeWidth={2.5} />
+                  Edit station
+                </button>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
       </div>
     </GlassCard>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* OperationInstructions — popover content explaining mouse + touch gestures. */
+/* Two columns side-by-side (mouse / touch) for the gesture-driven actions,   */
+/* a separator, then a short list of button-only actions. Click-outside /     */
+/* ESC dismissal lives in the parent (CanvasCard) so this body can stay pure. */
+/* -------------------------------------------------------------------------- */
+function OperationInstructions({ onClose }: { onClose: () => void }) {
+  return (
+    <>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="grid h-7 w-7 place-items-center rounded-[10px] bg-[var(--color-pastel-sky)] text-[var(--color-pastel-sky-ink)]">
+            <HelpCircle className="h-3.5 w-3.5" strokeWidth={2.2} />
+          </span>
+          <h3 className="font-display text-[13px] font-semibold tracking-tight text-[var(--color-ink-900)]">
+            Operation instructions
+          </h3>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="grid h-6 w-6 place-items-center rounded-full text-[var(--color-ink-500)] hover:bg-white/60 dark:hover:bg-white/[0.06] cursor-pointer"
+        >
+          <X className="h-3 w-3" strokeWidth={2.4} />
+        </button>
+      </div>
+
+      {/* Column headers — Mouse vs Touch */}
+      <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1.5 items-center">
+        <span />
+        <span className="flex items-center justify-end gap-1 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--color-ink-500)]">
+          <Mouse className="h-3 w-3" strokeWidth={2.2} />
+          Mouse
+        </span>
+        <span className="flex items-center justify-end gap-1 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--color-ink-500)]">
+          <Hand className="h-3 w-3" strokeWidth={2.2} />
+          Touch
+        </span>
+
+        <span className="col-span-3 h-px bg-[var(--color-ink-100)] dark:bg-white/[0.06] my-1" />
+
+        <span className="text-[12px] font-medium text-[var(--color-ink-800)]">Move</span>
+        <Kbd>Drag</Kbd>
+        <Kbd>Drag</Kbd>
+
+        <span className="text-[12px] font-medium text-[var(--color-ink-800)]">Zoom</span>
+        <span className="flex items-center justify-end gap-1">
+          <Kbd>Ctrl</Kbd>
+          <span className="text-[10px] text-[var(--color-ink-500)]">+</span>
+          <Kbd>Scroll</Kbd>
+        </span>
+        <Kbd>Pinch</Kbd>
+
+        <span className="text-[12px] font-medium text-[var(--color-ink-800)]">Back to origin</span>
+        <Kbd>Double click</Kbd>
+        <Kbd>Double tap</Kbd>
+      </div>
+
+      {/* Button-only actions — single shared instruction, full-width row */}
+      <div className="mt-3 pt-3 border-t border-[var(--color-ink-100)] dark:border-white/[0.06] space-y-2">
+        <ButtonRow icon={<RotateCw className="h-3 w-3" strokeWidth={2.4} />} label="Rotate" />
+        <ButtonRow icon={<Maximize className="h-3 w-3" strokeWidth={2.4} />} label="Full-screen" />
+      </div>
+    </>
+  );
+}
+
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="inline-flex items-center justify-center rounded-md border border-[var(--color-ink-200)] bg-white px-1.5 py-0.5 text-[10px] font-mono font-semibold tracking-tight text-[var(--color-ink-700)] shadow-[0_1px_0_rgba(15,23,42,0.04)] dark:border-white/[0.08] dark:bg-white/[0.06] dark:text-[var(--color-ink-700)] whitespace-nowrap">
+      {children}
+    </kbd>
+  );
+}
+
+function ButtonRow({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <div className="flex items-center justify-between text-[11.5px]">
+      <span className="font-medium text-[var(--color-ink-800)]">{label}</span>
+      <span className="flex items-center gap-1.5 text-[var(--color-ink-500)]">
+        Click
+        <span className="grid h-5 w-5 place-items-center rounded-md bg-[var(--color-ink-100)] text-[var(--color-ink-700)] dark:bg-white/[0.08]">
+          {icon}
+        </span>
+        button
+      </span>
+    </div>
   );
 }
 
