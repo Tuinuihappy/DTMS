@@ -14,6 +14,8 @@ import {
   type JobsQueueResult,
 } from "@/lib/api/jobs";
 import { ToastProvider, useToast } from "@/components/delivery-orders/toast";
+import { StatusTimelineSection } from "@/components/projection/status-timeline-section";
+import { getJobStatusHistory } from "@/lib/api/status-history";
 import { JobStatusBadge } from "./badges";
 import { cn } from "@/lib/utils";
 
@@ -538,6 +540,12 @@ function JobDetailDrawer({
                   )}
                   <Field label="Transport mode">{data.transportMode ?? "—"}</Field>
                   <Field label="Required capability">{data.requiredCapability ?? "—"}</Field>
+
+                  {/* Phase P1 — structured status-history timeline. */}
+                  <StatusTimelineSection
+                    entityId={data.id}
+                    fetcher={getJobStatusHistory}
+                  />
                 </div>
               )}
             </div>

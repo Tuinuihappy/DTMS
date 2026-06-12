@@ -1,7 +1,9 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
+using AMR.DeliveryPlanning.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
@@ -16,6 +18,10 @@ public class DeliveryOrderDbContext : DbContext
     public DbSet<OrderAmendment> OrderAmendments { get; set; } = null!;
     public DbSet<OrderAuditEvent> OrderAuditEvents { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    // ── Phase P1 — Event Projection read models ──────────────────────────
+    public DbSet<OrderStatusHistoryRow> OrderStatusHistory => Set<OrderStatusHistoryRow>();
+    public DbSet<InboxMessage> ProjectionInbox => Set<InboxMessage>();
 
     public DeliveryOrderDbContext(DbContextOptions<DeliveryOrderDbContext> options) : base(options) { }
 
@@ -185,6 +191,37 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(e => e.RetryCount).HasDefaultValue(0);
             b.HasIndex(e => e.ProcessedOnUtc);
             b.HasIndex(e => e.NextRetryAtUtc);
+        });
+
+        // ── Phase P1 — projection_inbox (idempotency bookkeeping) ──────
+        // Owned by every projector in this module via IdempotentProjector.
+        // UNIQUE(ProjectorName, EventId) is what enforces effectively-once.
+        modelBuilder.Entity<InboxMessage>(b =>
+        {
+            b.ToTable("ProjectionInbox", Schema);
+            b.HasKey(e => e.Id);
+            b.Property(e => e.ProjectorName).HasMaxLength(200).IsRequired();
+            b.Property(e => e.EventId).IsRequired();
+            b.Property(e => e.ProcessedAtUtc).IsRequired();
+            b.HasIndex(e => new { e.ProjectorName, e.EventId }).IsUnique();
+        });
+
+        // ── Phase P1 — OrderStatusHistory read model ───────────────────
+        // Written exclusively by OrderStatusHistoryProjector. Read by the
+        // status-history query handler. Index supports the only two query
+        // patterns: timeline-by-order, and "when did X enter status Y".
+        modelBuilder.Entity<OrderStatusHistoryRow>(b =>
+        {
+            b.ToTable("OrderStatusHistory", Schema);
+            b.HasKey(e => e.Id);
+            b.Property(e => e.EventId).IsRequired();
+            b.Property(e => e.OrderId).IsRequired();
+            b.Property(e => e.FromStatus).HasMaxLength(30);
+            b.Property(e => e.ToStatus).HasMaxLength(30).IsRequired();
+            b.Property(e => e.OccurredAt).IsRequired();
+            b.Property(e => e.Reason).HasMaxLength(2000);
+            b.HasIndex(e => new { e.OrderId, e.OccurredAt }).IsDescending(false, true);
+            b.HasIndex(e => new { e.ToStatus, e.OccurredAt });
         });
     }
 }

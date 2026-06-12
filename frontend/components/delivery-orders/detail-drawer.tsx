@@ -34,6 +34,8 @@ import { AttemptBadge, TripStatusBadge } from "@/components/dispatch/badges";
 import { JobStatusBadge } from "@/components/planning/badges";
 import { TripDetailDrawer } from "@/components/dispatch/trip-detail-drawer";
 import { FullAuditLog } from "./full-audit-log";
+import { StatusTimelineSection } from "@/components/projection/status-timeline-section";
+import { getOrderStatusHistory } from "@/lib/api/status-history";
 import { OmsNotificationSection } from "./oms-notification-section";
 import { cn } from "@/lib/utils";
 import { PriorityBadge, StatusBadge, TransportModeBadge } from "./badges";
@@ -278,6 +280,14 @@ export function OrderDetailDrawer({
                       tone="amber"
                     />
                   </section>
+
+                  {/* Phase P1 — structured status-history timeline from
+                      the projection read model. Self-hides when the
+                      projection has no rows (legacy / pre-backfill). */}
+                  <StatusTimelineSection
+                    entityId={data.id}
+                    fetcher={getOrderStatusHistory}
+                  />
 
                   {/* Notes */}
                   {data.notes && (

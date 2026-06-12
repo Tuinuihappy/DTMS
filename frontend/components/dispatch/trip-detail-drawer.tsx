@@ -17,6 +17,8 @@ import {
   type TripDetailsDto,
 } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
+import { StatusTimelineSection } from "@/components/projection/status-timeline-section";
+import { getTripStatusHistory } from "@/lib/api/status-history";
 import { AttemptBadge, RetryChainNav, TripStatusBadge } from "./badges";
 import { MissionTimeline } from "./mission-timeline";
 import { RetryHistoryPanel } from "./retry-history-panel";
@@ -174,6 +176,12 @@ export function TripDetailDrawer({
                       <div className="mt-1">{data.failureReason}</div>
                     </div>
                   )}
+
+                  {/* Phase P1 — structured status-history timeline. */}
+                  <StatusTimelineSection
+                    entityId={data.id}
+                    fetcher={getTripStatusHistory}
+                  />
 
                   <section className="grid grid-cols-2 gap-3">
                     <MetaCell

@@ -1,5 +1,7 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
+using AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
+using AMR.DeliveryPlanning.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
@@ -16,6 +18,10 @@ public class DispatchDbContext : DbContext
     public DbSet<TripRetryEvent> TripRetryEvents { get; set; } = null!;
     public DbSet<TripMissionEvent> TripMissionEvents { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    // ── Phase P1 — Event Projection read models ──────────────────────────
+    public DbSet<TripStatusHistoryRow> TripStatusHistory => Set<TripStatusHistoryRow>();
+    public DbSet<InboxMessage> ProjectionInbox => Set<InboxMessage>();
 
     public DispatchDbContext(DbContextOptions<DispatchDbContext> options) : base(options) { }
 
@@ -155,6 +161,38 @@ public class DispatchDbContext : DbContext
             builder.Property(e => e.RetryCount).HasDefaultValue(0);
             builder.HasIndex(e => e.ProcessedOnUtc);
             builder.HasIndex(e => e.NextRetryAtUtc);
+        });
+
+        // ── Phase P1 — projection_inbox (idempotency bookkeeping) ──────
+        modelBuilder.Entity<InboxMessage>(b =>
+        {
+            b.ToTable("ProjectionInbox", Schema);
+            b.HasKey(e => e.Id);
+            b.Property(e => e.ProjectorName).HasMaxLength(200).IsRequired();
+            b.Property(e => e.EventId).IsRequired();
+            b.Property(e => e.ProcessedAtUtc).IsRequired();
+            b.HasIndex(e => new { e.ProjectorName, e.EventId }).IsUnique();
+        });
+
+        // ── Phase P1 — TripStatusHistory read model ────────────────────
+        // Written exclusively by TripStatusHistoryProjector. DeliveryOrderId
+        // + JobId are nullable to accommodate TripPaused/TripResumed events
+        // whose domain payload doesn't carry them.
+        modelBuilder.Entity<TripStatusHistoryRow>(b =>
+        {
+            b.ToTable("TripStatusHistory", Schema);
+            b.HasKey(e => e.Id);
+            b.Property(e => e.EventId).IsRequired();
+            b.Property(e => e.TripId).IsRequired();
+            b.Property(e => e.DeliveryOrderId);
+            b.Property(e => e.JobId);
+            b.Property(e => e.FromStatus).HasMaxLength(30);
+            b.Property(e => e.ToStatus).HasMaxLength(30).IsRequired();
+            b.Property(e => e.OccurredAt).IsRequired();
+            b.Property(e => e.Reason).HasMaxLength(2000);
+            b.HasIndex(e => new { e.TripId, e.OccurredAt }).IsDescending(false, true);
+            b.HasIndex(e => new { e.DeliveryOrderId, e.OccurredAt });
+            b.HasIndex(e => new { e.ToStatus, e.OccurredAt });
         });
     }
 }

@@ -19,6 +19,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetFullOrderAudit;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetItem;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderItems;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderStatusHistory;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderTimeline;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Presentation.Idempotency;
@@ -307,6 +308,17 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new GetOrderTimelineQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
+        });
+
+        // GET /api/v1/delivery-orders/{id}/status-history — Phase P1 (b12)
+        // Structured status-transition timeline materialized by
+        // OrderStatusHistoryProjector. Backs the <StatusTimelineSection /> in
+        // the operator drawer. Returns 200 with empty array when the order
+        // exists but no projection rows have arrived yet (legacy / unconfirmed).
+        group.MapGet("/{id:guid}/status-history", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new GetOrderStatusHistoryQuery(id));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
         // GET /api/v1/delivery-orders/{id}/audit-full — consolidated

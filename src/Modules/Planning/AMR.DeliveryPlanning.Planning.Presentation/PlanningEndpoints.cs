@@ -23,6 +23,7 @@ using AMR.DeliveryPlanning.Planning.Application.Queries.GetCostModel;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobById;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobsByOrder;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobsQueue;
+using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobStatusHistory;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplateById;
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplates;
 using AMR.DeliveryPlanning.Planning.Domain.Entities;
@@ -87,6 +88,17 @@ public static class PlanningEndpoints
         {
             var result = await sender.Send(new GetJobByIdQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
+        });
+
+        // GET /api/v1/planning/jobs/{id}/status-history — Phase P1 (b12)
+        // Structured status-transition timeline materialized by
+        // JobStatusHistoryProjector. Mirror of the DeliveryOrder endpoint
+        // shape so the operator drawer can wire to either with the same
+        // <StatusTimelineSection /> component.
+        group.MapGet("/{id:guid}/status-history", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new GetJobStatusHistoryQuery(id));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
         // GET /api/v1/planning/jobs/queue?statuses=Failed&statuses=Created&page=1&pageSize=20

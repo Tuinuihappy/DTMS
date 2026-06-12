@@ -36,6 +36,7 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
 
                     b.Property<string>("ActionType")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasDefaultValue("standardRobotsCustom");
@@ -48,9 +49,9 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                         .HasColumnType("character varying(100)");
 
                     b.Property<bool>("IsActive")
-                        .IsRequired()
-                        .HasDefaultValue(true)
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
@@ -86,94 +87,6 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                         .HasDatabaseName("IX_ActionTemplates_Name_Unique");
 
                     b.ToTable("ActionTemplates", "planning");
-                });
-
-            modelBuilder.Entity("AMR.DeliveryPlanning.Planning.Domain.Entities.OrderTemplate", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("AppointQueueWaitArea")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("AppointVehicleGroupKey")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("AppointVehicleGroupName")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("AppointVehicleKey")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("AppointVehicleName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<bool>("IsActive")
-                        .IsRequired()
-                        .HasDefaultValue(true)
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Missions")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ModifiedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("Priority")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("PickupStationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("DropStationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("StructureType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<int>("TransportOrderPriority")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IsActive");
-
-                    b.HasIndex("Name")
-                        .IsUnique()
-                        .HasDatabaseName("IX_OrderTemplates_Name_Unique");
-
-                    b.HasIndex("PickupStationId", "DropStationId", "IsActive");
-
-                    b.ToTable("OrderTemplates", "planning");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.Planning.Domain.Entities.Job", b =>
@@ -387,6 +300,94 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                     b.ToTable("MilkRunTemplates", "planning");
                 });
 
+            modelBuilder.Entity("AMR.DeliveryPlanning.Planning.Domain.Entities.OrderTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AppointQueueWaitArea")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("AppointVehicleGroupKey")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("AppointVehicleGroupName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("AppointVehicleKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("AppointVehicleName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("DropStationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Missions")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("PickupStationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StructureType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("TransportOrderPriority")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_OrderTemplates_Name_Unique");
+
+                    b.HasIndex("PickupStationId", "DropStationId", "IsActive");
+
+                    b.ToTable("OrderTemplates", "planning");
+                });
+
             modelBuilder.Entity("AMR.DeliveryPlanning.Planning.Infrastructure.Data.Records.CostModelConfigRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -418,6 +419,49 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                         .HasFilter("\"VehicleTypeKey\" IS NOT NULL");
 
                     b.ToTable("CostModelConfigs", "planning");
+                });
+
+            modelBuilder.Entity("AMR.DeliveryPlanning.Planning.Infrastructure.Projections.JobStatusHistoryRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DeliveryOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FromStatus")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeliveryOrderId", "OccurredAt");
+
+                    b.HasIndex("JobId", "OccurredAt")
+                        .IsDescending(false, true);
+
+                    b.HasIndex("ToStatus", "OccurredAt");
+
+                    b.ToTable("JobStatusHistory", "planning");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.SharedKernel.Outbox.OutboxMessage", b =>
@@ -459,6 +503,31 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                     b.HasIndex("ProcessedOnUtc");
 
                     b.ToTable("OutboxMessages", "planning");
+                });
+
+            modelBuilder.Entity("AMR.DeliveryPlanning.SharedKernel.Projection.InboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ProjectorName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectorName", "EventId")
+                        .IsUnique();
+
+                    b.ToTable("ProjectionInbox", "planning");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.Planning.Domain.Entities.Leg", b =>

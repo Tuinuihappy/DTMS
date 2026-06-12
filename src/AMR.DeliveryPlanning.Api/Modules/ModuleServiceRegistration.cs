@@ -161,6 +161,16 @@ public static class ModuleServiceRegistration
         services.AddScoped<IStationValidationService, StationValidationService>();
         services.AddScoped<IOrderAmendmentRepository, OrderAmendmentRepository>();
         services.AddScoped<IOrderAuditEventRepository, OrderAuditEventRepository>();
+        // Phase P1 — projection infrastructure for the DeliveryOrder module.
+        // Read repo serves the status-history query endpoint.
+        // Projection store backs OrderStatusHistoryProjector: combines inbox
+        // dedup + history write + SaveChanges into a single transaction.
+        // Both are concrete-typed per module so adding the Planning + Dispatch
+        // analogs in upcoming P1 work won't conflict in DI.
+        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderStatusHistoryReadRepository,
+                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderStatusHistoryReadRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderStatusHistoryProjectionStore,
+                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderStatusHistoryProjectionStore>();
         services.Configure<DeliveryOrderOptions>(
             configuration.GetSection(DeliveryOrderOptions.SectionName));
         services.Configure<UomOptions>(configuration.GetSection(UomOptions.SectionName));
@@ -173,6 +183,12 @@ public static class ModuleServiceRegistration
             .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
                 sp.GetRequiredService<PlanningDomainEventMapper>())));
         services.AddScoped<IJobRepository, JobRepository>();
+        // Phase P1 — projection infrastructure for the Planning module.
+        // Same shape as DeliveryOrder's wiring: store + read repo per module.
+        services.AddScoped<AMR.DeliveryPlanning.Planning.Application.Projections.IJobStatusHistoryReadRepository,
+                           AMR.DeliveryPlanning.Planning.Infrastructure.Projections.JobStatusHistoryReadRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.Planning.Application.Projections.IJobStatusHistoryProjectionStore,
+                           AMR.DeliveryPlanning.Planning.Infrastructure.Projections.JobStatusHistoryProjectionStore>();
         services.AddScoped<IActionTemplateRepository, ActionTemplateRepository>();
         services.AddScoped<IOrderTemplateRepository, OrderTemplateRepository>();
         services.AddScoped<IOrderTemplateResolver, OrderTemplateResolver>();
@@ -198,6 +214,11 @@ public static class ModuleServiceRegistration
             .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
                 sp.GetRequiredService<DispatchDomainEventMapper>())));
         services.AddScoped<ITripRepository, TripRepository>();
+        // Phase P1 — projection infrastructure for the Dispatch module.
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripStatusHistoryReadRepository,
+                           AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripStatusHistoryReadRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripStatusHistoryProjectionStore,
+                           AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripStatusHistoryProjectionStore>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Repositories.ITripRetryEventRepository,
             AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories.TripRetryEventRepository>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Repositories.ITripMissionEventRepository,

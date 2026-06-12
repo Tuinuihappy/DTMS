@@ -36,3 +36,15 @@ public record PodCapturedIntegrationEvent(
     Guid StopId,
     IReadOnlyList<string> ScannedIds) : IIntegrationEvent;
 
+// Phase P1 (b12) — pause/resume transitions surface to the projector so
+// the Trip status timeline covers every state in the TripStatus enum
+// (Created/InProgress/Paused/Completed/Failed/Cancelled). No existing
+// consumer reacts to these — only TripStatusHistoryProjector does today.
+public record TripPausedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid TripId,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
+
+public record TripResumedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid TripId,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
+

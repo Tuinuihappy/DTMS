@@ -1,7 +1,9 @@
 using AMR.DeliveryPlanning.Planning.Domain.Entities;
 using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data.Records;
+using AMR.DeliveryPlanning.Planning.Infrastructure.Projections;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
+using AMR.DeliveryPlanning.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.Planning.Infrastructure.Data;
@@ -19,6 +21,10 @@ public class PlanningDbContext : DbContext
     public DbSet<OrderTemplate> OrderTemplates { get; set; } = null!;
     public DbSet<CostModelConfigRecord> CostModelConfigs { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    // ── Phase P1 — Event Projection read models ──────────────────────────
+    public DbSet<JobStatusHistoryRow> JobStatusHistory => Set<JobStatusHistoryRow>();
+    public DbSet<InboxMessage> ProjectionInbox => Set<InboxMessage>();
 
     public PlanningDbContext(DbContextOptions<PlanningDbContext> options) : base(options) { }
 
@@ -195,6 +201,40 @@ public class PlanningDbContext : DbContext
             b.Property(e => e.RetryCount).HasDefaultValue(0);
             b.HasIndex(e => e.ProcessedOnUtc);
             b.HasIndex(e => e.NextRetryAtUtc);
+        });
+
+        // ── Phase P1 — projection_inbox (idempotency bookkeeping) ──────
+        // Same shape as the DeliveryOrder module's inbox; required by every
+        // projector that lives in the Planning module.
+        modelBuilder.Entity<InboxMessage>(b =>
+        {
+            b.ToTable("ProjectionInbox", Schema);
+            b.HasKey(e => e.Id);
+            b.Property(e => e.ProjectorName).HasMaxLength(200).IsRequired();
+            b.Property(e => e.EventId).IsRequired();
+            b.Property(e => e.ProcessedAtUtc).IsRequired();
+            b.HasIndex(e => new { e.ProjectorName, e.EventId }).IsUnique();
+        });
+
+        // ── Phase P1 — JobStatusHistory read model ─────────────────────
+        // Written exclusively by JobStatusHistoryProjector. DeliveryOrderId
+        // is denormalized onto every row so a single index can power both
+        // per-job and per-order timeline queries (the latter unions across
+        // multi-group orders).
+        modelBuilder.Entity<JobStatusHistoryRow>(b =>
+        {
+            b.ToTable("JobStatusHistory", Schema);
+            b.HasKey(e => e.Id);
+            b.Property(e => e.EventId).IsRequired();
+            b.Property(e => e.JobId).IsRequired();
+            b.Property(e => e.DeliveryOrderId).IsRequired();
+            b.Property(e => e.FromStatus).HasMaxLength(30);
+            b.Property(e => e.ToStatus).HasMaxLength(30).IsRequired();
+            b.Property(e => e.OccurredAt).IsRequired();
+            b.Property(e => e.Reason).HasMaxLength(2000);
+            b.HasIndex(e => new { e.JobId, e.OccurredAt }).IsDescending(false, true);
+            b.HasIndex(e => new { e.DeliveryOrderId, e.OccurredAt });
+            b.HasIndex(e => new { e.ToStatus, e.OccurredAt });
         });
     }
 }

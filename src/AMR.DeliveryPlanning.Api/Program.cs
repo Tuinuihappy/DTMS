@@ -6,6 +6,7 @@ using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
 using AMR.DeliveryPlanning.Api.Middlewares;
 using AMR.DeliveryPlanning.Api.Modules;
 using AMR.DeliveryPlanning.Api.RobotPositions;
+using AMR.DeliveryPlanning.SharedKernel.Projection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -14,6 +15,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
+using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
@@ -98,7 +100,17 @@ builder.Services.AddOpenTelemetry()
     .WithTracing(tracing => tracing
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
+        .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)))
+    // P0.3 — projection metrics (lag, throughput, dedup) — Meter name
+    // matches AMR.DeliveryPlanning.SharedKernel.Projection.ProjectionMetrics.MeterName.
+    .WithMetrics(metrics => metrics
+        .AddMeter("DTMS.Projection")
         .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)));
+
+// P0 — projection foundation (idempotency, replay stub, metrics singleton).
+// Per-module IProjectionInboxRepository implementations register inside
+// each module's own infrastructure registration (next to its DbContext).
+builder.Services.AddProjectionFoundation();
 
 // Health checks — /health (liveness), /health/ready (readiness), /health/vendors (external vendors)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;

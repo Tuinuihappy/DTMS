@@ -9,6 +9,7 @@ using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripById;
 using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripDetails;
 using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripRetryHistory;
 using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripsByOrder;
+using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripStatusHistory;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -27,6 +28,16 @@ public static class DispatchEndpoints
         {
             var result = await sender.Send(new GetTripByIdQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
+        });
+
+        // GET /api/v1/dispatch/trips/{id}/status-history — Phase P1 (b12)
+        // Structured status-transition timeline from TripStatusHistoryProjector.
+        // Same shape as Order/Job endpoints — operator drawer wires to all
+        // three through one shared <StatusTimelineSection /> component.
+        group.MapGet("/trips/{id:guid}/status-history", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new GetTripStatusHistoryQuery(id));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
         // GET /api/v1/dispatch/trips/{id}/details — Full operator view: trip

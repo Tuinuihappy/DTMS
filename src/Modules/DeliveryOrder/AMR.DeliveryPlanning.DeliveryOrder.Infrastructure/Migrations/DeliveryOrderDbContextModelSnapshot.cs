@@ -57,6 +57,14 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<bool?>("RequiresDropPod")
+                        .HasColumnType("boolean")
+                        .HasColumnName("RequiresDropPod");
+
+                    b.Property<bool?>("RequiresPickupPod")
+                        .HasColumnType("boolean")
+                        .HasColumnName("RequiresPickupPod");
+
                     b.Property<string>("SourceSystem")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -106,6 +114,9 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("AttemptNumber")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("DeliveryOrderId")
                         .HasColumnType("uuid");
 
@@ -120,6 +131,10 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
 
                     b.Property<Guid?>("DropStationId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DroppedOffAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DroppedOffAt");
 
                     b.Property<string[]>("HandlingInstructions")
                         .IsRequired()
@@ -152,16 +167,16 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<double?>("WeightKg")
-                        .HasColumnType("double precision");
-
                     b.Property<Guid?>("TripId")
                         .HasColumnType("uuid");
 
-                    b.Property<int?>("AttemptNumber")
-                        .HasColumnType("integer");
+                    b.Property<double?>("WeightKg")
+                        .HasColumnType("double precision");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TripId")
+                        .HasFilter("\"TripId\" IS NOT NULL");
 
                     b.HasIndex("DeliveryOrderId", "ItemId")
                         .IsUnique();
@@ -169,10 +184,46 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.HasIndex("DeliveryOrderId", "ItemSeq")
                         .IsUnique();
 
-                    b.HasIndex("TripId")
-                        .HasFilter("\"TripId\" IS NOT NULL");
-
                     b.ToTable("Items", "deliveryorder");
+                });
+
+            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.ItemPodEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ScanType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("ScannedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ScannedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId", "ScanType")
+                        .IsUnique();
+
+                    b.ToTable("ItemPodEvents", "deliveryorder");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.OrderAmendment", b =>
@@ -249,6 +300,44 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.ToTable("OrderAuditEvents", "deliveryorder");
                 });
 
+            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderStatusHistoryRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FromStatus")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId", "OccurredAt")
+                        .IsDescending(false, true);
+
+                    b.HasIndex("ToStatus", "OccurredAt");
+
+                    b.ToTable("OrderStatusHistory", "deliveryorder");
+                });
+
             modelBuilder.Entity("AMR.DeliveryPlanning.SharedKernel.Outbox.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -288,6 +377,31 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.HasIndex("ProcessedOnUtc");
 
                     b.ToTable("OutboxMessages", "deliveryorder");
+                });
+
+            modelBuilder.Entity("AMR.DeliveryPlanning.SharedKernel.Projection.InboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ProjectorName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectorName", "EventId")
+                        .IsUnique();
+
+                    b.ToTable("ProjectionInbox", "deliveryorder");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder", b =>
@@ -427,9 +541,23 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.Navigation("Temperature");
                 });
 
+            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.ItemPodEvent", b =>
+                {
+                    b.HasOne("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.Item", null)
+                        .WithMany("PodEvents")
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.Item", b =>
+                {
+                    b.Navigation("PodEvents");
                 });
 #pragma warning restore 612, 618
         }

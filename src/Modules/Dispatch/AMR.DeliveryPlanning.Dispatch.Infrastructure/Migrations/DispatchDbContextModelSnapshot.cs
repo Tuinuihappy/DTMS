@@ -135,6 +135,11 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("AttemptNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -144,12 +149,24 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.Property<Guid>("DeliveryOrderId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("DropStationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("FailureReason")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
                     b.Property<Guid>("JobId")
                         .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PickupStationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PreviousAttemptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("PriorityAtDispatch")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
@@ -159,6 +176,10 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("TemplateNameAtDispatch")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("UpperKey")
                         .IsRequired()
                         .HasMaxLength(80)
@@ -167,48 +188,24 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.Property<Guid?>("VehicleId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("VendorExpectedCompletionAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VendorFinalSnapshot")
+                        .HasColumnType("jsonb");
+
                     b.Property<string>("VendorOrderKey")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("VendorRequestSnapshot")
+                        .HasColumnType("jsonb");
 
                     b.Property<string>("VendorVehicleKey")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<Guid?>("PickupStationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("DropStationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("AttemptNumber")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1);
-
-                    b.Property<Guid?>("PreviousAttemptId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("TemplateNameAtDispatch")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<int?>("PriorityAtDispatch")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("VendorExpectedCompletionAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("VendorRequestSnapshot")
-                        .HasColumnType("jsonb");
-
-                    b.Property<string>("VendorFinalSnapshot")
-                        .HasColumnType("jsonb");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("UpperKey")
-                        .IsUnique();
 
                     b.HasIndex("JobId")
                         .HasFilter("\"JobId\" != '00000000-0000-0000-0000-000000000000'");
@@ -216,7 +213,55 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.HasIndex("PreviousAttemptId")
                         .HasFilter("\"PreviousAttemptId\" IS NOT NULL");
 
+                    b.HasIndex("UpperKey")
+                        .IsUnique();
+
                     b.ToTable("Trips", "dispatch");
+                });
+
+            modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.TripException", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("RaisedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Resolution")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ResolvedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("TripId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TripId");
+
+                    b.ToTable("TripExceptions", "dispatch");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.TripMissionEvent", b =>
@@ -302,13 +347,13 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.Property<DateTime>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("OriginalTripId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("OriginalStatus")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("OriginalTripId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("RetriedBy")
                         .HasMaxLength(100)
@@ -334,49 +379,50 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.ToTable("TripRetryEvents", "dispatch");
                 });
 
-            modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.TripException", b =>
+            modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripStatusHistoryRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                    b.Property<Guid?>("DeliveryOrderId")
+                        .HasColumnType("uuid");
 
-                    b.Property<string>("Detail")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
 
-                    b.Property<DateTime>("RaisedAt")
+                    b.Property<string>("FromStatus")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid?>("JobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Resolution")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                    b.Property<string>("Reason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
 
-                    b.Property<DateTime?>("ResolvedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ResolvedBy")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Severity")
+                    b.Property<string>("ToStatus")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<Guid>("TripId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TripId");
+                    b.HasIndex("DeliveryOrderId", "OccurredAt");
 
-                    b.ToTable("TripExceptions", "dispatch");
+                    b.HasIndex("ToStatus", "OccurredAt");
+
+                    b.HasIndex("TripId", "OccurredAt")
+                        .IsDescending(false, true);
+
+                    b.ToTable("TripStatusHistory", "dispatch");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.SharedKernel.Outbox.OutboxMessage", b =>
@@ -418,6 +464,31 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.HasIndex("ProcessedOnUtc");
 
                     b.ToTable("OutboxMessages", "dispatch");
+                });
+
+            modelBuilder.Entity("AMR.DeliveryPlanning.SharedKernel.Projection.InboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ProjectorName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectorName", "EventId")
+                        .IsUnique();
+
+                    b.ToTable("ProjectionInbox", "dispatch");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.ExecutionEvent", b =>
