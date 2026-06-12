@@ -10,6 +10,8 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.RedispatchDelivery
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.RejectDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReleaseDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReopenDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ResendOmsArrivedNotification;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ResendOmsNotification;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.UpdateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
@@ -34,6 +36,7 @@ public record HoldOrderRequest(string Reason, string? HeldBy = null);
 public record ReleaseOrderRequest(string? ReleasedBy = null);
 public record ReopenOrderRequest(string ReopenedBy, string Reason);
 public record RedispatchOrderRequest(string RedispatchedBy, string Reason, double WeightFallbackKg = 0);
+public record ResendOmsNotificationRequest(string? RequestedBy = null);
 // ScanType: "Pickup" | "Drop" (case-insensitive enum binding); defaults
 // to Drop for backward-compatibility with clients on the pre-pickup-POD
 // schema. Drop semantics match the legacy /pod-scan endpoint exactly.
@@ -156,6 +159,31 @@ public static class DeliveryOrderEndpoints
             var result = await sender.Send(new RedispatchDeliveryOrderCommand(
                 id, body.RedispatchedBy, body.Reason, body.WeightFallbackKg));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+        }).RequireIdempotencyKey();
+
+        // POST /api/v1/delivery-orders/{id}/trips/{tripId}/notify-oms —
+        // Operator-driven manual resend of the upstream-OMS shipment
+        // notification for a specific trip. Use when the automatic
+        // consumer dead-lettered (UpstreamOmsNotifyFailed audit) and
+        // the upstream OMS issue has since been fixed. Calls the OMS
+        // client synchronously so the operator sees immediate feedback;
+        // upstream is expected to dedupe by shipmentId.
+        group.MapPost("/{id:guid}/trips/{tripId:guid}/notify-oms",
+            async (Guid id, Guid tripId, [FromBody] ResendOmsNotificationRequest? body, ISender sender) =>
+        {
+            var result = await sender.Send(new ResendOmsNotificationCommand(id, tripId, body?.RequestedBy));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        }).RequireIdempotencyKey();
+
+        // POST /api/v1/delivery-orders/{id}/trips/{tripId}/notify-oms-arrived —
+        // Mirror of /notify-oms but for the /arrived (drop completed)
+        // endpoint. Surfaces a separate Resend button on the UI for
+        // when the auto consumer dead-lettered the drop notification.
+        group.MapPost("/{id:guid}/trips/{tripId:guid}/notify-oms-arrived",
+            async (Guid id, Guid tripId, [FromBody] ResendOmsNotificationRequest? body, ISender sender) =>
+        {
+            var result = await sender.Send(new ResendOmsArrivedNotificationCommand(id, tripId, body?.RequestedBy));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequireIdempotencyKey();
 
         // POST /api/v1/delivery-orders/upstream — auto pipeline for upstream sources (SAP/ERP/OMS)
