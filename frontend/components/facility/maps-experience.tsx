@@ -838,6 +838,12 @@ export function CanvasCard({
 
   const viewW = bounds.maxX - bounds.minX;
   const viewH = bounds.maxY - bounds.minY;
+  // Zoom limits as factors of the natural span so they're invariant to whatever
+  // unit (mm/cm/m/grid) the world coords happen to use. Shared by button,
+  // wheel, and pinch gates — keep these in sync with the chip readout, which
+  // displays viewW / view.w as the current factor.
+  const MAX_ZOOM_IN = 50;
+  const MAX_ZOOM_OUT = 4;
 
   // Viewport — the slice of world space currently rendered. Mutated by wheel
   // (zoom) and drag (pan); reset to fit-all on map change or "recenter" press.
@@ -849,18 +855,26 @@ export function CanvasCard({
     w: viewW,
     h: viewH,
   });
-  // Reset viewport ONLY when the user switches maps. If we re-fit on every
-  // bounds change (which now flexes when robots move outside the station
-  // cluster), the view would jump every poll and the user could never zoom
-  // in on a detail. Recenter button gets you back to fit-all on demand.
+  // View-fit policy:
+  //  • Before the user touches the canvas, track bounds — covers the
+  //    common case where stations load *after* the map prop arrives, so
+  //    the initial fallback bounds (1000×700) don't strand `view` at the
+  //    zoom-out cap once real station coords show up.
+  //  • Once the user has panned/pinched/zoomed/wheeled, freeze against
+  //    bounds shifts so a robot driving outside the cluster (which
+  //    expands bounds) doesn't yank the camera mid-inspection.
+  // Recenter / map switch both clear the lock so fit-all resumes.
   const lastMapIdRef = useRef<string | null>(null);
+  const hasInteractedRef = useRef(false);
   useEffect(() => {
     if (!map?.id) return;
-    if (lastMapIdRef.current === map.id) return;
-    lastMapIdRef.current = map.id;
+    if (lastMapIdRef.current !== map.id) {
+      lastMapIdRef.current = map.id;
+      hasInteractedRef.current = false;
+    }
+    if (hasInteractedRef.current) return;
     setView({ x: bounds.minX, y: bounds.minY, w: viewW, h: viewH });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map?.id]);
+  }, [map?.id, bounds.minX, bounds.minY, viewW, viewH]);
 
   // Step picker — drives the dashed map-boundary rhythm so the dash period
   // scales with zoom level instead of pixel-locking.
@@ -922,6 +936,7 @@ export function CanvasCard({
       };
       panStart.current = null;
       dragMoved.current = true; // never treat a pinch as a tap
+      hasInteractedRef.current = true;
     } else if (pointers.current.size === 1) {
       panStart.current = { cx: e.clientX, cy: e.clientY, vx: v.x, vy: v.y };
       dragMoved.current = false;
@@ -959,10 +974,8 @@ export function CanvasCard({
         const scale = ps.dist / Math.max(dist, 1);
         const newW = ps.view.w * scale;
         const newH = ps.view.h * scale;
-        const minSize = 1000;
-        const maxSize = Math.max(viewW, viewH) * 4;
-        if (newW < minSize || newH < minSize) return;
-        if (newW > maxSize || newH > maxSize) return;
+        if (newW < viewW / MAX_ZOOM_IN || newH < viewH / MAX_ZOOM_IN) return;
+        if (newW > viewW * MAX_ZOOM_OUT || newH > viewH * MAX_ZOOM_OUT) return;
         // Anchor the gesture midpoint in data-space so the pinch zooms
         // around what's under the user's fingers. Y is flipped (see wheel
         // handler for the same formula): top of screen = high data-Y.
@@ -982,7 +995,10 @@ export function CanvasCard({
       if (!ps) return;
       const dxScreen = e.clientX - ps.cx;
       const dyScreen = e.clientY - ps.cy;
-      if (Math.abs(dxScreen) + Math.abs(dyScreen) > CLICK_THRESHOLD) dragMoved.current = true;
+      if (Math.abs(dxScreen) + Math.abs(dyScreen) > CLICK_THRESHOLD) {
+        dragMoved.current = true;
+        hasInteractedRef.current = true;
+      }
       // Rotate the screen delta into the un-rotated SVG frame so dragging
       // a finger right moves the viewport "screen-right" regardless of
       // the current rotation step.
@@ -1032,6 +1048,7 @@ export function CanvasCard({
       e.preventDefault();
       const container = canvasContainerRef.current;
       if (!container) return;
+      hasInteractedRef.current = true;
       const rect = container.getBoundingClientRect();
       // Convert cursor into un-rotated SVG space so the zoom anchors on
       // whatever's visually under the wheel pointer, even when rotated.
@@ -1040,10 +1057,8 @@ export function CanvasCard({
         const factor = e.deltaY > 0 ? 1.2 : 1 / 1.2;
         const newW = v.w * factor;
         const newH = v.h * factor;
-        const minSize = 1000;
-        const maxSize = Math.max(viewW, viewH) * 4;
-        if (newW < minSize || newH < minSize) return v;
-        if (newW > maxSize || newH > maxSize) return v;
+        if (newW < viewW / MAX_ZOOM_IN || newH < viewH / MAX_ZOOM_IN) return v;
+        if (newW > viewW * MAX_ZOOM_OUT || newH > viewH * MAX_ZOOM_OUT) return v;
         // X is straightforward: wx is the data-X under the cursor.
         // Y is Y-flipped: at cursor screen position py/rect, the visible
         // *data* Y is view.y + (1 - py/rect)*view.h (top of screen = high Y).
@@ -1064,13 +1079,12 @@ export function CanvasCard({
 
   const zoomBy = useCallback(
     (factor: number) => {
+      hasInteractedRef.current = true;
       setView((v) => {
         const newW = v.w * factor;
         const newH = v.h * factor;
-        const minSize = 1000;
-        const maxSize = Math.max(viewW, viewH) * 4;
-        if (newW < minSize || newH < minSize) return v;
-        if (newW > maxSize || newH > maxSize) return v;
+        if (newW < viewW / MAX_ZOOM_IN || newH < viewH / MAX_ZOOM_IN) return v;
+        if (newW > viewW * MAX_ZOOM_OUT || newH > viewH * MAX_ZOOM_OUT) return v;
         // Anchor at viewport center so button-driven zoom feels balanced.
         const cx = v.x + v.w / 2;
         const cy = v.y + v.h / 2;
@@ -1081,6 +1095,7 @@ export function CanvasCard({
   );
 
   const recenter = useCallback(() => {
+    hasInteractedRef.current = false;
     setView({ x: bounds.minX, y: bounds.minY, w: viewW, h: viewH });
   }, [bounds.minX, bounds.minY, viewW, viewH]);
 
@@ -1126,6 +1141,12 @@ export function CanvasCard({
   const haloR = HALO_PX * worldPerPx;
   const sw = STROKE_PX * worldPerPx;
   const sw2 = 1.5 * worldPerPx;
+  // Zoom feedback signals — used by LOD label visibility and could drive
+  // any future zoom-tiered overlays (footprints, labels, etc).
+  //   labelOpacity: hidden at fit-all, fades in 2×→4× so dense clusters
+  //   don't bloom into a wall of text the moment the user starts zooming.
+  const zoomFactor = view.w > 0 ? viewW / view.w : 1;
+  const labelOpacity = Math.max(0, Math.min(1, (zoomFactor - 2) / 2));
 
   return (
     <GlassCard
@@ -1259,6 +1280,38 @@ export function CanvasCard({
           <g
             transform={`translate(0 ${2 * view.y + view.h}) scale(1 -1)`}
           >
+          {/* World-unit grid — lines spaced at `step` (same rhythm as the
+              dashed boundary) so the grid spreads visibly when the user
+              zooms. Pixel-locked station markers stay constant on screen,
+              and this layer carries the "I am zooming" feedback that
+              cartographic best practice asks of map content (not the
+              markers themselves). Subtle ink — should register motion
+              without competing with stations or robots. */}
+          <g
+            stroke="var(--color-ink-200)"
+            strokeWidth={1 * worldPerPx}
+            opacity={0.4}
+            pointerEvents="none"
+          >
+            {(() => {
+              const lines: React.ReactElement[] = [];
+              const x0 = Math.ceil(view.x / step) * step;
+              const x1 = view.x + view.w;
+              const y0 = Math.ceil(view.y / step) * step;
+              const y1 = view.y + view.h;
+              for (let x = x0; x <= x1; x += step) {
+                lines.push(
+                  <line key={`gv-${x}`} x1={x} y1={view.y} x2={x} y2={y1} />,
+                );
+              }
+              for (let y = y0; y <= y1; y += step) {
+                lines.push(
+                  <line key={`gh-${y}`} x1={view.x} y1={y} x2={x1} y2={y} />,
+                );
+              }
+              return lines;
+            })()}
+          </g>
           {/* Stations — pulse for active, dim for inactive, ring for offline override.
               r/ringR/haloR/sw are world-unit values computed from the measured
               screen-px target so dot size stays constant regardless of map extent. */}
@@ -1382,6 +1435,37 @@ export function CanvasCard({
                       x2={s.x + r * 0.5}
                       y2={s.y - r * 0.5}
                     />
+                  </g>
+                )}
+
+                {/* LOD label — station code below the dot, fades in once
+                    the user has zoomed past 2× so dense fit-all clusters
+                    aren't drowned in text. Baseline sits BELOW the halo
+                    (haloR = 22 px) plus a breathing-room margin so glyphs
+                    don't render on top of the soft glow. Inner scale(1 -1)
+                    undoes the parent Y-flip so glyphs render upright;
+                    pixel-locked fontSize keeps the label the same screen
+                    size at every zoom. */}
+                {labelOpacity > 0 && s.code && (
+                  <g
+                    transform={`translate(${s.x} ${s.y}) scale(1 -1)`}
+                    pointerEvents="none"
+                  >
+                    <text
+                      x={0}
+                      y={haloR + 10 * worldPerPx}
+                      fontSize={11 * worldPerPx}
+                      textAnchor="middle"
+                      fill="var(--color-ink-700)"
+                      stroke="white"
+                      strokeWidth={3 * worldPerPx}
+                      strokeOpacity={0.85}
+                      paintOrder="stroke"
+                      opacity={labelOpacity}
+                      style={{ fontWeight: 600 }}
+                    >
+                      {s.code}
+                    </text>
                   </g>
                 )}
               </motion.g>
