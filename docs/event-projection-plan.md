@@ -16,11 +16,13 @@ captures the *how*.
 | **P2** | Activity Timeline — unified per-order event feed | ✅ **Done** | Transparent swap of `/audit-full` endpoint; 4-source UNION replaced with single indexed read |
 | **P3.1** | Order funnel hourly projection + dashboard KpiRail/DispatchFunnel real data | ✅ **Done** | Recharts installed, useProjectionPoll hook, /api/dashboard/order-funnel endpoint live |
 | **P3.2** | Fleet projections (VehicleStateHistory + utilization) + /dashboard/orders + /dashboard/robots subpages | ✅ **Done** | Background snapshot service ticks every minute; both subpages live |
-| **P4** | Search/List projection — denormalized order list view | ⏳ Planned | Adds full-text search |
-| **P5** | Reporting/BI projection — wide fact tables | ⏳ Planned | Enables analyst self-service |
+| **P4** | Search/List projection — denormalized order list view + tsvector full-text search | ✅ **Done** | OrderListView projection live; GET /api/v1/delivery-orders now reads the projection with `search` / `hasFailedTrip` / `hasActiveJob` filters |
+| **P5.1** | BI fact table for orders + first report (Orders by Priority/Status) | ✅ **Done** | bi.OrderFacts + 5 GENERATED STORED KPIs (TimeTo*/Sla*Breached); /reports landing page + CSV export |
+| **P5.2** | BI fact tables for trips + jobs | ✅ **Done** | bi.TripFacts (Dispatch) + bi.JobFacts (Planning); module ownership preserved |
+| **P5.3** | 4 additional pre-built reports + tabbed UI | ✅ **Done** | SLA breach / Top failures / Vendor performance / Lead-time distribution; verified end-to-end via Playwright |
 | **P6** | Compliance — immutability, tamper-evidence | ⏳ Optional | Only if regulated audit becomes a requirement |
 
-**Overall progress:** ~67% (4 phases done — P0/P1/P2/P3)
+**Overall progress:** ~95% — every planned phase shipped. Only P6 remains and is gated on a regulatory trigger.
 
 ---
 
@@ -54,6 +56,12 @@ Entries appended on every architectural choice that locks future work.
 | 2026-06-13 | Combine OrderStatusCounts + DispatchFunnel into a single hour-bucketed wide row | Original plan called for two separate projections; collapsing them avoids double-writes from the same set of integration events and keeps the dashboard query single-table. UI sums or reads columns as needed. |
 | 2026-06-13 | useProjectionPoll lives in `lib/hooks/` instead of a fancier global cache (SWR/Tanstack-Query) | Minimal hook fits this codebase's existing pattern of inline fetchers + simple abort-on-rerun. Promote to a global cache only when ≥3 widgets share a fetch. |
 | 2026-06-13 | Funnel poll cadence = 15s, freshness banner threshold = 5min (from P0's chip default) | Bucket data ticks at most once per hour, so 15s polling is generous. The 5-min stale threshold gives ops a clear visual cue when the projector or bus stalls. |
+| 2026-06-13 | P4 OrderListView search uses Postgres `tsvector` GENERATED STORED column + GIN index | EF Core can't model tsvector as a first-class type, so the projector writes plain `SearchText` and the DB derives `SearchVector`. Migration owns the raw SQL; index probe stays sub-ms regardless of row count. |
+| 2026-06-13 | P4 derived booleans (HasFailedTrip / HasActiveJob) are "ever-true" not "currently-true" | MVP keeps the projector self-contained — flipping the boolean would require cross-projection reads. P4.5 can add the "currently" semantic if ops needs it. |
+| 2026-06-13 | Module ownership of BI fact tables — bi.OrderFacts in DeliveryOrder, bi.TripFacts in Dispatch, bi.JobFacts in Planning | User chose this over a new Monitoring/Reporting module. Schema name `bi` is cross-cutting but the projector + DI + migration stay with the aggregate's owning module — preserves DDD boundaries until a true cross-cutting projection appears (P6 candidate). |
+| 2026-06-13 | Derived KPIs (TimeTo*Sec, Sla*Breached) live as Postgres GENERATED ALWAYS AS … STORED columns | Single source of truth in the schema; EF reads them via `PropertySaveBehavior.Ignore` so the projector can't drift. Re-running the projector or backfilling never touches the math. |
+| 2026-06-13 | P5 frontend = pre-built reports (not query builder) | User chose this over the Looker-mini option. 80% of ops questions hit one of 5 templates; extending = adding a 30-LOC component file. Query builder would have added a registry to sync with every schema change. |
+| 2026-06-13 | Reports CSV export shape = raw fact-table rows, not aggregated cells | Analyst follow-up in Excel is more flexible than re-pivoting cells. 4 of 5 tabs reuse `/orders-export`; only Vendor performance hits `/trips-export`. |
 
 ---
 
@@ -255,23 +263,78 @@ auto-refreshes every 15s; `<DataFreshnessChip />` shows the last update.
 
 ---
 
-## P4 — Search/List Projection ⏳ Planned
+## P4 — Search/List Projection ✅ Done
 
-Denormalized `search.order_list_view` table with Postgres `tsvector` for full-text search. Enables instant list filtering at any scale.
+**Verified end-to-end:** `GET /api/v1/delivery-orders` now reads from
+`deliveryorder.OrderListView` instead of joining DeliveryOrders ↔ Trips ↔
+Jobs ↔ Items at query time. Full-text search ("WO" → 3 hits),
+derived-flag filters (`hasActiveJob=true` → 2 hits) verified via curl.
 
-Frontend: full-text search box, faceted filters, infinite scroll mode.
+### Backend delivered
 
-**Effort:** ~M.
+| Layer | Artifact |
+|---|---|
+| Read model | `deliveryorder.OrderListView` — 1 row per order, denormalized filter cols + display cols + `SearchText` |
+| Search column | Postgres `GENERATED ALWAYS AS to_tsvector('simple', SearchText) STORED` + GIN index; sanitized prefix-AND tsquery in the read repo |
+| Projector | `OrderListViewProjector` subscribes to 20 events across DeliveryOrder (10) + Trip (4) + Job (6) lifecycles |
+| Derived booleans | `HasFailedTrip` / `HasActiveJob` + `LatestTripId` / `LatestJobStatus` recomputed from each Trip/Job event |
+| Endpoint swap | GET `/api/v1/delivery-orders` now uses the projection + adds `hasFailedTrip` / `hasActiveJob` query params |
+| Backfill | `scripts/backfill-p4-order-list-view.sql` — 3 LATERAL JOINs seed item-level SearchText + Trip/Job derived flags in one pass |
+| Tests | 9 unit tests for OrderListViewProjector |
+
+### Frontend delivered
+
+- Filter chips for `Failed trip` + `Active job` (URL-persisted)
+- Pagination mode toggle: Pages ↔ Scroll (localStorage-persisted); Scroll mode appends rows on "Load more" instead of swapping
+- Saved-filter snapshots — name + restore named filter sets from localStorage
 
 ---
 
-## P5 — Reporting/BI Projection ⏳ Planned
+## P5 — Reporting/BI Projection ✅ Done
 
-Wide `bi.order_facts` / `bi.trip_facts` / `bi.job_facts` tables with denormalized timestamps for every status. Enables analyst self-service without touching the write side.
+Shipped as 3 incremental commits (P5.1 → P5.2 → P5.3). End-to-end
+verified in browser via Playwright after P5.3 — all 5 report tabs
+render, window toggle refetches, CSV `href`s point at the correct
+backend route.
 
-Optional: in-app `/reports` page with template builder + CSV/Excel/PDF export.
+### P5.1 — bi.OrderFacts + Orders by Priority/Status report
 
-**Effort:** ~L.
+| Layer | Artifact |
+|---|---|
+| Read model | `bi.OrderFacts` — 1 row per order; dimensions (Priority/TransportMode/SourceSystem/RequestedBy/FinalStatus) + measures + 11 lifecycle timestamps |
+| GENERATED columns | `TimeToConfirmSec` / `TimeToDispatchSec` / `TimeToCompleteSec` / `SlaConfirmBreached >4h` / `SlaCompleteBreached >24h` — computed by Postgres, EF reads only |
+| Projector | `OrderFactsProjector` subscribes to 11 Order lifecycle events; UPDATEs the matching timestamp column |
+| Endpoints | GET `/api/v1/reports/orders-summary` (JSON pivot) + GET `/orders-export` (CSV stream, 50k cap, RFC 4180) |
+| Backfill | `scripts/backfill-p5-order-facts.sql` — pivots `OrderStatusHistory` (P1) → no event replay needed |
+| Frontend | `/reports` page skeleton + Orders by Priority × FinalStatus pivot template + CSV button + Reports entry in left rail |
+| Tests | 10 unit tests for OrderFactsProjector |
+
+### P5.2 — bi.TripFacts + bi.JobFacts
+
+| Layer | Artifact |
+|---|---|
+| Trip read model | `bi.TripFacts` (Dispatch module) — `VendorUpperKey` dimension powers Vendor performance report; KPIs `TimeToStartSec` / `TimeToCompleteSec` / `SlaCompleteBreached >2h` |
+| Trip projector | `TripFactsProjector` subscribes to 6 Trip events; `EnsureRowAsync` handles missing TripCreated event |
+| Job read model | `bi.JobFacts` (Planning module) — `AttemptNumber` + `FailureReason` + `LatestTripId`; KPIs `TimeToDispatchSec` / `TimeToCompleteSec` / `SlaDispatchBreached >30min` |
+| Job projector | `JobFactsProjector` subscribes to 8 Job lifecycle events |
+| Backfills | 2 SQL scripts pivoting `TripStatusHistory` / `JobStatusHistory` + base aggregate tables |
+| Tests | 10 unit tests for TripFactsProjector + 11 for JobFactsProjector |
+
+### P5.3 — 4 additional reports + tabbed /reports UI
+
+| Layer | Artifact |
+|---|---|
+| SLA breach handler | `GetSlaBreachReportQuery` — groups by Priority, returns confirm/complete breach counts + rates |
+| Top failures handler | `GetTopFailuresReportQuery` — top-N FailureReason counts across terminal orders |
+| Lead-time handler | `GetLeadTimeReportQuery` — 6-bucket histogram + avg/p50/p95 |
+| Vendor perf handler | `GetVendorPerformanceReportQuery` (Dispatch module) — throughput + success rate (terminal only) + avg/p95 + SLA breach |
+| Endpoints | 4 new under `/api/v1/reports` + `/trips-export` CSV mirror |
+| Frontend | Tab strip on `/reports` (Orders / SLA / Failures / Vendors / Lead-time); shared window picker (24h/7d/30d/90d); each tab = own component with Recharts chart + table + CSV button |
+
+### Coverage gaps (acknowledged)
+
+- ⚠️ Recharts `width(-1) height(-1)` warning on tab switch — cosmetic only, charts render after layout settles. Fix when convenient (explicit dimensions or `useEffect`-gated mount).
+- Default 7d window shows empty state on dev DB because all seeded orders are >7d old; first thing a fresh demo user does is switch to 90d. Consider adding "no data — try a larger window" prompt when response is empty.
 
 ---
 

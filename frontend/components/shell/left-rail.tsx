@@ -155,6 +155,11 @@ const actions: RailAction[] = [
     label: "Reports",
     href: "/reports",
   },
+  {
+    icon: <Activity className="h-4 w-4" strokeWidth={2} />,
+    label: "Projection health",
+    href: "/admin/projections",
+  },
   { icon: <Smartphone className="h-4 w-4" strokeWidth={2} />, label: "Driver app" },
   { icon: <Database className="h-4 w-4" strokeWidth={2} />, label: "Records" },
   { icon: <Calendar className="h-4 w-4" strokeWidth={2} />, label: "Schedule" },
