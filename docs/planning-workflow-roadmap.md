@@ -1,131 +1,53 @@
 # Planning Workflow Roadmap — Remaining Options
 
-ภาพรวมงานที่เหลือหลัง Phase b8 → b9 → b10-frontend.1 land แล้ว
+ภาพรวมงานที่เหลือหลัง Phase b8 → b9 → b10/b11/b12/b13 land แล้ว
 จัดลำดับตาม priority × effort × impact เพื่อช่วยเลือก phase ถัดไป
 
-อ้างอิงการ review แบบเต็มในเซสชั่นวันที่ 2026-06-11
+อ้างอิงการ review แบบเต็มในเซสชั่นวันที่ 2026-06-11 (initial) +
+update 2026-06-14 หลัง P5 ของ Event Projection plan ปิด
 
 ---
 
 ## ที่ทำเสร็จแล้ว (ของจริงใน main)
 
-| Phase | Scope | ผลลัพธ์ |
-|---|---|---|
-| **b8** | Job 1:1 envelope anchor + retry endpoint | `planning.Jobs` ทำงาน, `POST /jobs/{id}/retry` พร้อมใช้ |
-| **b9** | Job mirrors Trip lifecycle (4 events) + Trip retry preserves JobId | Job.Status ตาม Trip จริง webhook กลับมา → verified E2E |
-| **b10-frontend.1** | Job badge + Trip JobId chip ใน Order detail drawer | ops เห็น Job status + reason ใน UI |
+| Phase | Scope | Commit | ผลลัพธ์ |
+|---|---|---|---|
+| **b8** | Job 1:1 envelope anchor + retry endpoint | (earlier) | `planning.Jobs` ทำงาน, `POST /jobs/{id}/retry` พร้อมใช้ |
+| **b9** | Job mirrors Trip lifecycle (4 events) + Trip retry preserves JobId | (earlier) | Job.Status ตาม Trip จริง webhook กลับมา → verified E2E |
+| **b10-frontend.1** | Job badge + Trip JobId chip ใน Order detail drawer | `de38acc6` | ops เห็น Job status + reason ใน UI |
+| **b10-frontend.2** | Jobs queue page (/delivery-orders/jobs) + queue endpoint | `fe9affae` | ops จัดการ failed/stuck jobs จาก UI ได้ |
+| **b11** | Order ตาม Trip cancellation — cascade + operator abandon endpoint | `748dea45` | แก้ stuck-Dispatched bug ที่ลูกค้าเห็น |
+| **b12** | StatusHistory tables (Order / Job / Trip) — shipped as P0/P1 of Event Projection plan | `cb8a4f29` | Structured timeline + drawer integration + 23 unit tests |
+| **b13** | Job.FailureCategory enum (8 values) + breaking signature change | `bf960c17` | Reports group by structured category, ไม่ต้อง LIKE 'Too Many Requests%' |
+| **Event Projection P2** | Activity Timeline — transparent swap of /audit-full | `f23b54d8` | Single indexed read แทน 4-source UNION |
+| **Event Projection P3.1+P3.2** | Order funnel + Fleet projections + dashboard subpages | `f2dbc140` / `2daea413` | /dashboard, /dashboard/orders, /dashboard/robots ใช้ real projection data |
+| **Event Projection P4** | OrderListView projection + tsvector full-text search | `ee5b7434` | `GET /api/v1/delivery-orders` ใช้ projection + filter `hasFailedTrip` / `hasActiveJob` |
+| **Event Projection P5** | BI fact tables (Order / Trip / Job) + pre-built /reports page | `8feb38cf` → `9b984cfc` | 5 report tabs + CSV export |
+| **Observability CC4** | /admin/projections health dashboard | `8528a077` | Per-projector lag + processed count + status badge |
+| **Cleanup (partial #8)** | Remove `OrderStatus.Amended` enum value | `bf960c17` | Amendment flow ยังทำงาน (string literal in projector); enum value ตายแล้วลบทิ้ง |
+| **Demo polish** | 30-order 7d seed + ChartMount wrapper for /reports | `cb20d046` | /reports ทุก tab เห็น chart จริง |
 
 ---
 
 ## งานที่เหลือ — เรียงตาม priority
 
-### 🔴 P0 — แก้ pain point ที่เจอใน production data
+### 🟠 P2 — Lifecycle completeness (backlog, do-when-needed)
 
-#### 1. Order ไม่ตาม Trip cancellation (stuck Dispatched bug)
+#### 1. TripPaused/Resumed → Job (mirror pause state)
 
-**ปัญหา:** จาก data จริงตอนนี้ 3 orders ทุกตัวมี `Order=Dispatched + Trip=Cancelled`
-Order ค้างใน "Dispatched" ตลอดกาลถึงแม้ Trip ตายไปแล้ว
-
-**สาเหตุ:** [TripCancelledConsumer.cs](../src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Application/Consumers/TripCancelledConsumer.cs)
-รีลีส items กลับเป็น Pending เพื่อรอ retry แต่ไม่มีใคร "ปิด" Order
-ถ้าไม่ retry → Order อยู่ Dispatched ไปเรื่อย ๆ
+**ปัญหา:** Trip.Pause/Resume มีอยู่ + integration events ขึ้นมาแล้วใน P1 (TripPausedIntegrationEventV1 / TripResumedIntegrationEventV1) แต่ Job ไม่ตาม. ถ้า Trip pause → Job ยัง Executing → confusing
 
 **แนวทาง:**
-- **Option A** Background service detect "Order=Dispatched + 0 active Trips + items Pending > 1h" → escalate `Held`
-- **Option B** Operator endpoint `POST /orders/{id}/abandon-after-trip-cancel` ให้กดเอง
-- **Option C** Cascade tinggi: เมื่อ Trip Cancel ทุก Trip ใน group → Order ก็ Cancel ด้วย
-
-**Effort:** M (1-2 วัน) | **Impact:** สูง (ลูกค้าเห็น UI ผิดจริง)
-
----
-
-#### 2. StatusHistory tables — audit ที่ debug ได้
-
-**ปัญหา:** ตอนนี้ตอบ "Order นี้ entered Planning ตอนไหน" → ต้อง parse text จาก `OrderAuditEvent.EventType`
-ไม่มี structured status transition log → query เป็น `LIKE` เปราะ
-
-**แนวทาง:**
-```sql
-CREATE TABLE deliveryorder."OrderStatusHistory" (
-  Id uuid PRIMARY KEY,
-  OrderId uuid NOT NULL,
-  FromStatus varchar(20) NULL,  -- null = initial state
-  ToStatus varchar(20) NOT NULL,
-  OccurredAt timestamptz NOT NULL,
-  TriggeredBy varchar(100) NULL,  -- user id / "system" / "vendor-webhook"
-  Reason text NULL,
-  CONSTRAINT IX UNIQUE (OrderId, OccurredAt)
-);
-```
-
-ทำซ้ำกับ `planning.JobStatusHistory` + `dispatch.TripStatusHistory`
-
-Aggregate write entry ทุกครั้ง state เปลี่ยน — หรือใช้ EF interceptor
-
-**Effort:** L (2-3 วัน) | **Impact:** สูง (debug E2E ใหม่ง่ายขึ้นมาก)
-
----
-
-### 🟡 P1 — Ops productivity
-
-#### 3. b10-frontend.2 — Jobs queue page
-
-**ขอบเขต:**
-- `/delivery-orders/jobs` — list Pending + Failed jobs (filter tab)
-- Job detail drawer (วินาทีเดียว: ใช้ JobDto ที่มีอยู่)
-- Retry button (POST `/api/v1/planning/jobs/{id}/retry` — endpoint b8 พร้อมอยู่)
-- Proxy routes: `frontend/app/api/planning/jobs/[id]/{,retry}/route.ts`
-
-**Effort:** M (1-2 วัน) | **Impact:** สูง
-
-**ทำไมยังไม่ทำใน b10-frontend.1:**
-b10-frontend.1 ตั้งเป้าให้ ops "เห็นว่ามี Job" ก่อน b10-frontend.2 จะให้ "ทำงานกับ Job" ได้
-
----
-
-#### 4. Job.FailureCategory enum
-
-**ปัญหา:** ตอนนี้ Job.FailureReason เป็น text รวม 6 categories
-ทำให้ query "ทุก Job ที่ vendor 429" ต้อง `LIKE 'Too Many Requests%'` — fragile
-
-**แนวทาง:**
-```csharp
-public enum JobFailureCategory {
-  None,                    // success path
-  TemplateMissing,
-  TemplateResolveFailed,
-  VendorRejected,          // 4xx/5xx
-  VendorRateLimited,       // 429
-  VendorExecutionFailed,   // Phase b9 — TripFailed webhook
-  TripPersistenceFailed,   // orphan
-  OperatorCancelled,       // Phase b9 — TripCancelled webhook
-}
-```
-
-เพิ่ม column `FailureCategory` + migration + อัพเดต MarkFailed/MarkCancelled ให้รับ category
-
-**Effort:** S (4-6 ชม) | **Impact:** กลาง (improvability)
-
----
-
-### 🟠 P2 — Lifecycle completeness
-
-#### 5. TripPaused/Resumed → Job (mirror pause state)
-
-**ปัญหา:** Trip.Pause/Resume มีอยู่ แต่ Job ไม่ตาม
-ถ้า Trip pause → Job ยัง Executing → confusing
-
-**แนวทาง:** เพิ่ม `TripPausedIntegrationEvent` + `TripResumedIntegrationEvent` (ตอนนี้มีแค่ DomainEvent) → consumer ใน Planning → `Job.MarkPaused/MarkResumed`
-
-หรือยอมรับว่า Job ไม่ track pause + ใส่ comment ใน Job.cs
+- เพิ่ม Planning consumer ที่ subscribe `TripPausedIntegrationEventV1` / `TripResumedIntegrationEventV1` → `Job.MarkPaused()` / `Job.MarkResumed()`
+- หรือยอมรับว่า Job ไม่ track pause + ใส่ comment ใน Job.cs explicit
 
 **Effort:** S | **Impact:** ต่ำ-กลาง
 
 ---
 
-#### 6. Pickup/Drop mid-trip visibility ใน Job
+#### 2. Pickup/Drop mid-trip visibility ใน Job
 
-**ปัจจุบัน:** Phase b9 ตัดสินใจ skip TripPickup/TripDrop events เพราะเป็น item-level (DeliveryOrder.Items handle)
+**ปัจจุบัน:** Phase b9 ตัดสินใจ skip TripPickup/TripDrop events เพราะเป็น item-level (DeliveryOrder.Items handle อยู่แล้ว)
 
 **ถ้าจะทำ:**
 - เพิ่ม JobId ใน TripPickupCompletedIntegrationEvent + TripDropCompletedIntegrationEvent (breaking event contract)
@@ -136,42 +58,35 @@ public enum JobFailureCategory {
 
 ---
 
-#### 7. ExceptionRaised audit on Job
+#### 3. ExceptionRaised audit on Job
 
-**Phase b9 ตัดสินใจ defer:** เพิ่ม `JobExceptions` collection
-ใช้ตอน reconciliation tooling ต้องการ trace exception lineage
+**Phase b9 ตัดสินใจ defer:** เพิ่ม `JobExceptions` collection ใช้ตอน reconciliation tooling ต้องการ trace exception lineage
 
 **Effort:** M | **Impact:** ต่ำ
 
 ---
 
-### 🟢 P3 — Cleanup
+### 🟢 P3 — Cleanup / DX
 
-#### 8. ลบ dead code
+#### 4. ItemStatus.Returned — decide implement vs delete
 
-**OrderStatus.Amended** — declared แต่ไม่เคย write
-- เลือก: implement amendment flow OR ลบ enum value + `DeliveryOrderAmendedIntegrationEvent`
+**ปัจจุบัน:** declared แต่ไม่เคย write. อ่าน 2 ที่ (`IsTerminalUnsuccessful()` + rebind reset). เก็บไว้ตามคำตัดสินใน b13 cleanup เพราะ "returned to sender" flow น่าจะมีอนาคต
 
-**ItemStatus.Returned** — declared แต่ไม่เคย write
-- เลือก: implement returned-to-sender flow OR ลบ
-
-**Effort:** S (1-2 ชม) | **Impact:** ต่ำ (technical debt)
+**Effort:** S (ถ้าลบ) / M (ถ้า implement) | **Impact:** ต่ำ
 
 ---
 
-#### 9. Backfill script — pre-b8 Trips ที่ JobId = Guid.Empty
+#### 5. Backfill script — pre-b8 Trips ที่ JobId = Guid.Empty
 
-**ปัญหา:** Trips เก่าก่อน Phase b8 ไม่มี Job link → consumer Phase b9 skip
-ทำให้ historical orders ไม่มี Job tracking
+**ปัญหา:** Trips เก่าก่อน Phase b8 ไม่มี Job link → consumer Phase b9 skip ทำให้ historical orders ไม่มี Job tracking
 
-**แนวทาง:** script สร้าง Job rows สำหรับ Trip เก่าโดย derive จาก DeliveryOrder + UpperKey
-ผูก JobId กลับเข้า Trip rows
+**แนวทาง:** script สร้าง Job rows สำหรับ Trip เก่าโดย derive จาก DeliveryOrder + UpperKey ผูก JobId กลับเข้า Trip rows
 
-**Effort:** S | **Impact:** ต่ำ (legacy data only)
+**Effort:** S | **Impact:** ต่ำ (legacy data only — dev DB ไม่มี trips เก่าแบบนี้แล้ว)
 
 ---
 
-#### 10. Naming consistency refactor
+#### 6. Naming consistency refactor
 
 | Aggregate | Method pattern |
 |---|---|
@@ -186,42 +101,110 @@ public enum JobFailureCategory {
 
 ---
 
-#### 11. Formal state machine library
+#### 7. Formal state machine library
 
 ตอนนี้ scattered `if (Status != X) throw` ใน method
-ลอง [Stateless](https://github.com/dotnet-state-machine/stateless) ใน aggregate ใหม่ตอน b10+
+ลอง [Stateless](https://github.com/dotnet-state-machine/stateless) ใน aggregate ใหม่
 
 **Effort:** L | **Impact:** ต่ำ (DX)
+
+---
+
+### 🟣 P4 — Polish จากงานที่เพิ่งทำ (deferred from C)
+
+#### 8. Recharts `width(-1) height(-1)` warning — kill จริงๆ
+
+**ปัจจุบัน:** `<ChartMount>` กั้น render จนกว่า ResizeObserver จะ fire — แต่ Recharts log warning จาก internal first measurement ของตัวเอง ไม่สามารถ suppress จากนอกได้
+
+**แนวทาง:**
+- เปลี่ยน `<ResponsiveContainer>` เป็น `<BarChart width={W} height={H}>` แบบ fixed-px + ResizeObserver hook เอง per chart
+- หรือ patch Recharts (ไม่คุ้ม)
+- หรือ filter console.warn override (hacky)
+
+**Effort:** M | **Impact:** ต่ำ (cosmetic)
+
+---
+
+#### 9. JobFacts.FailureCategory column + Top failures report grouping
+
+**ปัญหา:** b13 เพิ่ม `Job.FailureCategory` ใน write side แล้ว แต่ `bi.JobFacts` ยังไม่ carry column นี้ → P5.3 Top failures report ยัง group by free-text `FailureReason` เหมือนเดิม
+
+**แนวทาง:**
+- เพิ่ม `FailureCategory` column ใน `bi.JobFacts` + migration
+- อัพเดต `JobFactsProjector.SetFailedAtAsync` / `SetCancelledAtAsync` ให้ carry category
+- ขยาย Top failures report ให้ group by category (พร้อมแสดง reason เป็น sub-row)
+
+**Effort:** S-M | **Impact:** กลาง (Reports ใช้ structured data จริง)
+
+---
+
+#### 10. Vendor performance report — vendor identity vs envelope key
+
+**ปัญหา:** `bi.TripFacts.VendorUpperKey` = `dispatch.Trips.UpperKey` ซึ่งเป็น per-order envelope key (เช่น `<orderId32hex>-G1`) ไม่ใช่ vendor identifier. ผลคือ Vendor performance chart มี 1 vendor bucket ต่อ trip — ใช้ไม่ได้
+
+**แนวทาง:**
+- เพิ่ม `VendorName` / `VendorCode` column ที่ trip emit (RIOT3 พอจะรู้ vendor identity?)
+- หรือสกัด vendor prefix จาก `VendorOrderKey` (e.g. `VOK-AAA-...` → `RIOT3-AAA`)
+- อัพเดต TripFacts + projector + report
+
+**Effort:** M | **Impact:** สูง (report ปัจจุบันใช้งานไม่ได้จริง — แค่ render OK)
+
+---
+
+### 🔵 P5 — Optional, gated on triggers
+
+#### 11. Event Projection P6 — Compliance
+
+จาก [event-projection-plan.md](event-projection-plan.md):
+- Event archival to cold storage
+- Tamper-evident row chaining (Merkle hash)
+- Event versioning + upcasting framework
+- Compliance reports (signed PDF per aggregate)
+
+**Effort:** L | **Trigger:** เฉพาะถ้าเข้า regulated context
+
+---
+
+#### 12. Monitoring/Reporting bounded context extraction
+
+ตอนนี้ projection (bi.*, dashboards) กระจายอยู่ใน owning modules. ถ้าวันหนึ่งมี cross-cutting aggregate (e.g. "SLA breach rate" join Order × Trip × Fleet ที่ไม่มี natural module owner) → พิจารณา extract Monitoring module
+
+**Effort:** L | **Trigger:** เมื่อมี cross-module aggregate ตัวที่ 1-2 ตัว
 
 ---
 
 ## ลำดับที่แนะนำสำหรับ phase ต่อไป
 
 ```
-Sprint ถัดไป (1-2 weeks):
-  ├─ b11: Order ตาม Trip cancel              (P0 / M / สูง)
-  └─ b10-frontend.2: Jobs queue page          (P1 / M / สูง)
+Top of mind (impact-driven):
+  └─ #10: Vendor performance — vendor identity fix    (P4 / M / สูง)
+     (report นี้ตอนนี้ render OK แต่ใช้งานไม่ได้จริง)
 
-Sprint ถัดไปอีกหน่อย:
-  ├─ b12: StatusHistory tables                (P0 / L / สูง)
-  └─ b13: Job.FailureCategory enum            (P1 / S / กลาง)
+ถ้ามีเวลาเหลือ (small wins):
+  ├─ #9:  JobFacts.FailureCategory + report grouping  (P4 / S-M / กลาง)
+  └─ #1:  TripPaused/Resumed → Job mirror             (P2 / S / ต่ำ-กลาง)
 
-Backlog (do-when-needed):
-  - TripPaused→Job mirror
-  - Pickup/Drop visibility
-  - ExceptionRaised audit
-  - Backfill script
-  - Dead code cleanup
-  - Naming refactor
-  - State machine library
+Deep backlog (do-when-needed):
+  - #2 Pickup/Drop visibility
+  - #3 ExceptionRaised audit
+  - #4 ItemStatus.Returned (delete or implement)
+  - #5 Pre-b8 Trips backfill
+  - #6 Naming refactor
+  - #7 State machine library
+  - #8 Recharts warning kill
+
+Gated:
+  - #11 P6 Compliance — regulatory trigger
+  - #12 Monitoring context — cross-module aggregate trigger
 ```
 
 ---
 
 ## Cross-reference
 
-- Phase b8 design notes → `~/.claude/projects/d--DTMS/memory/project_planning_phase_b8.md`
-- Phase b9 design notes → `~/.claude/projects/d--DTMS/memory/project_planning_phase_b9.md`
-- Full review session log → conversation 2026-06-11
+- [event-projection-plan.md](event-projection-plan.md) — Event Projection phase doc (~95% done)
+- [projection-conventions.md](projection-conventions.md) — Projection coding conventions
+- Phase b8/b9 design notes → `~/.claude/projects/d--DTMS/memory/`
+- Full review session log → conversation 2026-06-11 + 2026-06-13/14
 
 อัพเดตไฟล์นี้เมื่อ phase ใดเข้า main แล้ว — เพื่อให้เป็น single source of truth ของงาน Planning module
