@@ -32,6 +32,9 @@ public class DeliveryOrderDbContext : DbContext
     // ── Phase P4 — Denormalized list/search view ───────────────────────
     public DbSet<OrderListViewRow> OrderListView => Set<OrderListViewRow>();
 
+    // ── Phase P5 — BI fact table (cross-cutting bi schema, owned here) ──
+    public DbSet<OrderFactsRow> OrderFacts => Set<OrderFactsRow>();
+
     public DeliveryOrderDbContext(DbContextOptions<DeliveryOrderDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -303,6 +306,62 @@ public class DeliveryOrderDbContext : DbContext
                 .HasFilter("\"HasFailedTrip\" = true");
             b.HasIndex(e => e.HasActiveJob)
                 .HasFilter("\"HasActiveJob\" = true");
+        });
+
+        // ── Phase P5 — bi.OrderFacts BI fact table ─────────────────────
+        // Wide row-per-order. One column per status timestamp + dimensional
+        // fields + measures. Lives in the `bi` schema (cross-cutting BI
+        // prefix) but owned by the DeliveryOrder module — projector + DI
+        // + migration all live here. Derived KPI columns (TimeTo... +
+        // Sla...) are PostgreSQL GENERATED ALWAYS AS STORED in the
+        // migration; EF only reads them.
+        modelBuilder.Entity<OrderFactsRow>(b =>
+        {
+            b.ToTable("OrderFacts", "bi");
+            b.HasKey(e => e.OrderId);
+            b.Property(e => e.OrderRef).HasMaxLength(200).IsRequired();
+            b.Property(e => e.SourceSystem).HasMaxLength(20).IsRequired();
+            b.Property(e => e.Priority).HasMaxLength(20).IsRequired();
+            b.Property(e => e.TransportMode).HasMaxLength(20);
+            b.Property(e => e.RequestedBy).HasMaxLength(200);
+            b.Property(e => e.FinalStatus).HasMaxLength(30).IsRequired();
+            b.Property(e => e.FailureReason).HasMaxLength(2000);
+
+            // Generated columns — EF must never write them.
+            b.Property(e => e.TimeToConfirmSec)
+                .HasColumnType("integer")
+                .ValueGeneratedOnAddOrUpdate()
+                .Metadata.SetAfterSaveBehavior(
+                    Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Ignore);
+            b.Property(e => e.TimeToDispatchSec)
+                .HasColumnType("integer")
+                .ValueGeneratedOnAddOrUpdate()
+                .Metadata.SetAfterSaveBehavior(
+                    Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Ignore);
+            b.Property(e => e.TimeToCompleteSec)
+                .HasColumnType("integer")
+                .ValueGeneratedOnAddOrUpdate()
+                .Metadata.SetAfterSaveBehavior(
+                    Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Ignore);
+            b.Property(e => e.SlaConfirmBreached)
+                .HasColumnType("boolean")
+                .ValueGeneratedOnAddOrUpdate()
+                .Metadata.SetAfterSaveBehavior(
+                    Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Ignore);
+            b.Property(e => e.SlaCompleteBreached)
+                .HasColumnType("boolean")
+                .ValueGeneratedOnAddOrUpdate()
+                .Metadata.SetAfterSaveBehavior(
+                    Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Ignore);
+
+            // Hot query paths.
+            b.HasIndex(e => e.CreatedAt).IsDescending(true);
+            b.HasIndex(e => new { e.Priority, e.CreatedAt }).IsDescending(false, true);
+            b.HasIndex(e => new { e.FinalStatus, e.CreatedAt }).IsDescending(false, true);
+            b.HasIndex(e => new { e.SourceSystem, e.CreatedAt }).IsDescending(false, true);
+            // Partial index — most "SLA breach rate" queries filter to true.
+            b.HasIndex(e => e.SlaConfirmBreached)
+                .HasFilter("\"SlaConfirmBreached\" = true");
         });
     }
 }

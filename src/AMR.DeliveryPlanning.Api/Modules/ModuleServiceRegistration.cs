@@ -193,6 +193,11 @@ public static class ModuleServiceRegistration
                            AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderListViewReadRepository>();
         services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderListViewProjectionStore,
                            AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderListViewProjectionStore>();
+        // Phase P5 — BI fact table for reports (bi.OrderFacts).
+        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderFactsReadRepository,
+                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderFactsReadRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderFactsProjectionStore,
+                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderFactsProjectionStore>();
         services.Configure<DeliveryOrderOptions>(
             configuration.GetSection(DeliveryOrderOptions.SectionName));
         services.Configure<UomOptions>(configuration.GetSection(UomOptions.SectionName));
