@@ -1,5 +1,7 @@
 using AMR.DeliveryPlanning.Fleet.Domain.Entities;
+using AMR.DeliveryPlanning.Fleet.Infrastructure.Projections;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
+using AMR.DeliveryPlanning.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
@@ -15,6 +17,11 @@ public class FleetDbContext : DbContext
     public DbSet<VehicleGroup> VehicleGroups { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     internal DbSet<VehicleGroupMember> VehicleGroupMembers { get; set; } = null!;
+
+    // ── Phase P3.2 — Fleet projections ───────────────────────────────────
+    public DbSet<VehicleStateHistoryRow> VehicleStateHistory => Set<VehicleStateHistoryRow>();
+    public DbSet<FleetUtilizationHourlyRow> FleetUtilizationHourly => Set<FleetUtilizationHourlyRow>();
+    public DbSet<InboxMessage> ProjectionInbox => Set<InboxMessage>();
 
     public FleetDbContext(DbContextOptions<FleetDbContext> options) : base(options) { }
 
@@ -111,6 +118,40 @@ public class FleetDbContext : DbContext
             b.Property(e => e.RetryCount).HasDefaultValue(0);
             b.HasIndex(e => e.ProcessedOnUtc);
             b.HasIndex(e => e.NextRetryAtUtc);
+        });
+
+        // ── Phase P3.2 — projection_inbox + read models ────────────────
+        modelBuilder.Entity<InboxMessage>(b =>
+        {
+            b.ToTable("ProjectionInbox", Schema);
+            b.HasKey(e => e.Id);
+            b.Property(e => e.ProjectorName).HasMaxLength(200).IsRequired();
+            b.Property(e => e.EventId).IsRequired();
+            b.Property(e => e.ProcessedAtUtc).IsRequired();
+            b.HasIndex(e => new { e.ProjectorName, e.EventId }).IsUnique();
+        });
+
+        modelBuilder.Entity<VehicleStateHistoryRow>(b =>
+        {
+            b.ToTable("VehicleStateHistory", Schema);
+            b.HasKey(e => e.Id);
+            b.Property(e => e.EventId).IsRequired();
+            b.Property(e => e.VehicleId).IsRequired();
+            b.Property(e => e.FromState).HasMaxLength(30);
+            b.Property(e => e.ToState).HasMaxLength(30).IsRequired();
+            b.Property(e => e.BatteryLevel);
+            b.Property(e => e.CurrentNodeId);
+            b.Property(e => e.OccurredAt).IsRequired();
+            b.HasIndex(e => new { e.VehicleId, e.OccurredAt }).IsDescending(false, true);
+            b.HasIndex(e => new { e.ToState, e.OccurredAt });
+        });
+
+        modelBuilder.Entity<FleetUtilizationHourlyRow>(b =>
+        {
+            b.ToTable("FleetUtilizationHourly", Schema);
+            b.HasKey(e => e.Id);
+            b.Property(e => e.BucketHour).IsRequired();
+            b.HasIndex(e => e.BucketHour).IsUnique();
         });
 
         base.OnModelCreating(modelBuilder);

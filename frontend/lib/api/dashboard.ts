@@ -71,3 +71,38 @@ export async function getOrderFunnel(
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return fetchJson<OrderFunnelResponse>(`/api/dashboard/order-funnel${suffix}`, signal);
 }
+
+// ── Fleet utilization (P3.2) ────────────────────────────────────────────
+
+export type FleetUtilizationBucket = {
+  bucketHour: string;
+  active: number;
+  busy: number;
+  idle: number;
+  charging: number;
+  maintenance: number;
+  lowBattery: number;
+  offline: number;
+  total: number;
+};
+
+export type FleetUtilizationResponse = {
+  fromUtc: string;
+  toUtc: string;
+  buckets: FleetUtilizationBucket[];
+  /** Most recent snapshot row regardless of the window — drives the
+   *  current-state strip on /dashboard/robots. */
+  latest: FleetUtilizationBucket | null;
+  lastEventAt: string | null;
+};
+
+export async function getFleetUtilization(
+  opts: { fromUtc?: string; toUtc?: string } = {},
+  signal?: AbortSignal,
+): Promise<FleetUtilizationResponse> {
+  const qs = new URLSearchParams();
+  if (opts.fromUtc) qs.set("fromUtc", opts.fromUtc);
+  if (opts.toUtc) qs.set("toUtc", opts.toUtc);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return fetchJson<FleetUtilizationResponse>(`/api/dashboard/fleet-utilization${suffix}`, signal);
+}

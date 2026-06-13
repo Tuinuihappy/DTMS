@@ -15,12 +15,12 @@ captures the *how*.
 | **P1** | Status History (b12) — Order/Job/Trip transitions → 3 read models + UI timelines | ✅ **Done** | End-to-end across all 3 aggregates + 3 drawer integrations |
 | **P2** | Activity Timeline — unified per-order event feed | ✅ **Done** | Transparent swap of `/audit-full` endpoint; 4-source UNION replaced with single indexed read |
 | **P3.1** | Order funnel hourly projection + dashboard KpiRail/DispatchFunnel real data | ✅ **Done** | Recharts installed, useProjectionPoll hook, /api/dashboard/order-funnel endpoint live |
-| **P3.2** | Fleet projections (VehicleStateHistory + utilization) + /dashboard/orders + /dashboard/robots subpages | 🔜 **Next** | Completes the original P3 scope |
+| **P3.2** | Fleet projections (VehicleStateHistory + utilization) + /dashboard/orders + /dashboard/robots subpages | ✅ **Done** | Background snapshot service ticks every minute; both subpages live |
 | **P4** | Search/List projection — denormalized order list view | ⏳ Planned | Adds full-text search |
 | **P5** | Reporting/BI projection — wide fact tables | ⏳ Planned | Enables analyst self-service |
 | **P6** | Compliance — immutability, tamper-evidence | ⏳ Optional | Only if regulated audit becomes a requirement |
 
-**Overall progress:** ~58% (3 phases done + P3.1 substep, P3.2 next)
+**Overall progress:** ~67% (4 phases done — P0/P1/P2/P3)
 
 ---
 
@@ -221,21 +221,37 @@ auto-refreshes every 15s; `<DataFreshnessChip />` shows the last update.
 
 ---
 
-## P3.2 — Fleet projections + dashboard subpages 🔜 Next
+## P3.2 — Fleet projections + dashboard subpages ✅ Done
 
-Completes the original P3 scope:
+### Backend delivered
 
-1. **VehicleStateHistory projection** in `fleet` schema — same shape as
-   the P1 status-history projectors but for `VehicleStateChangedIntegrationEvent`.
-2. **FleetUtilizationHourly snapshot job** — hourly background service
-   that snapshots vehicle states into a `fleet.FleetUtilizationHourly`
-   table. Hybrid pattern: event-driven for state history, periodic
-   snapshot for utilization.
-3. **`/dashboard/orders` subpage** — extended order analysis using the
-   existing `OrderFunnelHourly` data + a Recharts stacked-area chart of
-   hourly bucket counts over the trailing 7 days.
-4. **`/dashboard/robots` subpage** — vehicle utilization chart + state
-   distribution snapshot using FleetUtilizationHourly.
+| Layer | Artifact |
+|---|---|
+| Read model: state history | `fleet.VehicleStateHistory` — one row per VehicleState transition + a `fleet.ProjectionInbox` for the projector |
+| Read model: utilization snapshot | `fleet.FleetUtilizationHourly` — one row per hour bucket aggregating Vehicle state distribution |
+| Projector | `VehicleStateHistoryProjector` subscribes to `VehicleStateChangedIntegrationEvent`, derives FromState from the prior row, idempotent + out-of-order safe |
+| Snapshot writer | `FleetUtilizationSnapshotWriter` — counts vehicles by state, UPSERTs the current hour's bucket row |
+| Hosted service | `FleetUtilizationSnapshotService` — background tick every minute, calls the writer; 20s warmup delay so DI is ready first |
+| Query + endpoint | `GetFleetUtilizationQuery` + `GET /api/v1/dashboard/fleet-utilization` returning per-bucket rows + the latest snapshot for current-state strips |
+| Migration | `20260613051621_AddFleetProjections.cs` adds 3 tables + 4 indices in the `fleet` schema |
+| Tests | `VehicleStateHistoryProjectorTests` — 6 cases covering mapping, dedup, out-of-order skip, transient/permanent failure |
+
+### Frontend delivered
+
+| Layer | Artifact |
+|---|---|
+| API client | `getFleetUtilization` added to `lib/api/dashboard.ts` + Next.js proxy at `/api/dashboard/fleet-utilization` |
+| `<OrderStatusChart />` | Stacked-area Recharts chart of hourly bucket counts per status, used on `/dashboard/orders` |
+| `<FleetUtilizationChart />` | Stacked-area Recharts chart of vehicle states per hour, used on `/dashboard/robots` |
+| `/dashboard/orders` | Summary tiles + window toggle (24h/7d/30d) + hourly chart + freshness chip + refresh button |
+| `/dashboard/robots` | Current-state strip (5 tiles) + window toggle + hourly chart + total fleet readout |
+
+### Defaults
+
+- Snapshot tick: 60s
+- Page poll: 30s
+- Window options: 24h / 7d / 30d (handler caps at 90d)
+- LowBattery threshold: 20%
 
 ---
 

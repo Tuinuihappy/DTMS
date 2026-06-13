@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -9,13 +9,22 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="MassTransit" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Modules\Fleet\AMR.DeliveryPlanning.Fleet.Application\AMR.DeliveryPlanning.Fleet.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Fleet\AMR.DeliveryPlanning.Fleet.Domain\AMR.DeliveryPlanning.Fleet.Domain.csproj" />
   </ItemGroup>
 
 </Project>

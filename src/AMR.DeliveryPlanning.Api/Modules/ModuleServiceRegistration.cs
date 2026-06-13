@@ -118,6 +118,13 @@ public static class ModuleServiceRegistration
             .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
                 sp.GetRequiredService<FleetDomainEventMapper>())));
         services.AddScoped<IVehicleRepository, VehicleRepository>();
+        // Phase P3.2 — Fleet projections (vehicle state history + utilization snapshots).
+        services.AddScoped<AMR.DeliveryPlanning.Fleet.Application.Projections.IVehicleStateHistoryProjectionStore,
+                           AMR.DeliveryPlanning.Fleet.Infrastructure.Projections.VehicleStateHistoryProjectionStore>();
+        services.AddScoped<AMR.DeliveryPlanning.Fleet.Application.Projections.IFleetUtilizationReadRepository,
+                           AMR.DeliveryPlanning.Fleet.Infrastructure.Projections.FleetUtilizationReadRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.Fleet.Application.Projections.IFleetUtilizationSnapshotWriter,
+                           AMR.DeliveryPlanning.Fleet.Infrastructure.Projections.FleetUtilizationSnapshotWriter>();
         services.AddScoped<IVehicleTypeRepository, VehicleTypeRepository>();
         services.AddScoped<IChargingPolicyRepository, ChargingPolicyRepository>();
         services.AddScoped<IMaintenanceRecordRepository, MaintenanceRecordRepository>();
@@ -216,6 +223,9 @@ public static class ModuleServiceRegistration
         services.AddScoped<IRouteSolver, NearestNeighborTspSolver>();
         services.AddScoped<IFleetVehicleProvider, FleetVehicleProvider>();
         services.AddHostedService<SlaRiskBackgroundService>();
+        // Phase P3.2 — hourly fleet utilization snapshot (ticks every minute,
+        // writes to FleetUtilizationHourly).
+        services.AddHostedService<AMR.DeliveryPlanning.Api.Infrastructure.FleetUtilizationSnapshotService>();
 
         // ── Dispatch Module ───────────────────────────────────────────
         services.AddScoped<DispatchDomainEventMapper>();
