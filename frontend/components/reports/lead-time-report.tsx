@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { ChartMount } from "@/components/primitives/chart-mount";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { SectionLabel } from "@/components/primitives/section-label";
 import {
@@ -78,6 +79,7 @@ export function LeadTimeReport({ window }: { window: Window }) {
         )}
 
         <div className="mt-4 h-64">
+          <ChartMount>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-ink-100)" />
@@ -87,6 +89,7 @@ export function LeadTimeReport({ window }: { window: Window }) {
               <Bar dataKey="count" name="Orders" fill="var(--color-brand-500, #6366f1)" />
             </BarChart>
           </ResponsiveContainer>
+          </ChartMount>
         </div>
 
         <div className="mt-4 overflow-x-auto">
