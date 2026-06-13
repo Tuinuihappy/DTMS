@@ -8,6 +8,7 @@ using AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobAnchor;
 using AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobDispatched;
 using AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobFailed;
 using AMR.DeliveryPlanning.Planning.Application.Services;
+using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.SharedKernel;
 using MassTransit;
 using MediatR;
@@ -145,7 +146,8 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                     stationGroup.Key.DropStationId, orphanReason);
 
                 if (jobId != Guid.Empty)
-                    await _sender.Send(new MarkJobFailedCommand(jobId, orphanReason), ct);
+                    await _sender.Send(new MarkJobFailedCommand(
+                        jobId, orphanReason, JobFailureCategory.TripPersistenceFailed), ct);
             }
             else
             {
@@ -156,7 +158,8 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
 
                 if (jobId != Guid.Empty)
                     await _sender.Send(new MarkJobFailedCommand(
-                        jobId, envelopeResult.Error ?? "vendor rejected dispatch"), ct);
+                        jobId, envelopeResult.Error ?? "vendor rejected dispatch",
+                        JobFailureCategory.VendorRejected), ct);
 
                 // Mark this group's items Failed so the order's eventual
                 // RecomputeStatusFromItems isn't blocked on them.

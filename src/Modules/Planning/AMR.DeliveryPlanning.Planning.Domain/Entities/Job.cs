@@ -39,6 +39,11 @@ public class Job : AggregateRoot<Guid>
     public Guid? TripId { get; private set; }
     public string? VendorOrderKey { get; private set; }
     public string? FailureReason { get; private set; }
+    // Phase b13 — Structured classification of the failure. Co-exists with
+    // the free-text FailureReason: category answers "which bucket" without
+    // pattern-matching on the upstream error string. Defaults to None for
+    // pre-b13 rows (the migration sets every existing row to None too).
+    public JobFailureCategory FailureCategory { get; private set; } = JobFailureCategory.None;
     public int AttemptNumber { get; private set; } = 1;
     // 1-based group index within the original order's station-pair grouping.
     // Required so Retry() can rebuild the EnvelopeUpperKey with a bumped
@@ -191,9 +196,12 @@ public class Job : AggregateRoot<Guid>
     /// (2) vendor-time (Phase b9) — Dispatched/Executing → Failed via
     ///     TripFailedIntegrationEvent.
     /// Idempotent: a duplicate webhook for an already-Failed job is a no-op.
-    /// Distinguish the two sources by the FailureReason text, not status.
+    /// <para>Phase b13 — Callers MUST classify the failure via
+    /// <see cref="JobFailureCategory"/> so downstream queries can
+    /// aggregate by category without text-pattern matching. The free-text
+    /// reason still travels alongside for human display.</para>
     /// </summary>
-    public void MarkFailed(string reason)
+    public void MarkFailed(string reason, JobFailureCategory category)
     {
         if (Status == JobStatus.Failed) return;  // webhook redelivery
         if (Status is not (JobStatus.Created or JobStatus.Dispatched or JobStatus.Executing))
@@ -201,6 +209,7 @@ public class Job : AggregateRoot<Guid>
 
         Status = JobStatus.Failed;
         FailureReason = reason;
+        FailureCategory = category;
 
         AddDomainEvent(new JobFailedDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, reason, AttemptNumber));
@@ -257,6 +266,10 @@ public class Job : AggregateRoot<Guid>
 
         Status = JobStatus.Cancelled;
         FailureReason = reason;
+        // All MarkCancelled paths today are vendor/operator initiated via
+        // TripCancelled webhook — category is fixed. If a future
+        // dispatch-time cancellation pathway lands, add an overload.
+        FailureCategory = JobFailureCategory.OperatorCancelled;
         AddDomainEvent(new JobCancelledDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, tripId, reason));
     }

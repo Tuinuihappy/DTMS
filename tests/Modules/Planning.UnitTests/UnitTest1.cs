@@ -195,7 +195,7 @@ public class JobTests
         // Once a job is past Created (Assigned/Committed/Failed/Dispatched)
         // MarkDispatched is no longer valid — the operator path is Retry().
         var job = new Job(Guid.NewGuid(), "Normal");
-        job.MarkFailed("template missing");
+        job.MarkFailed("template missing", JobFailureCategory.TemplateMissing);
 
         Action act = () => job.MarkDispatched(Guid.NewGuid(), "K");
         act.Should().Throw<InvalidOperationException>();
@@ -206,10 +206,11 @@ public class JobTests
     {
         var job = new Job(Guid.NewGuid(), "Normal");
 
-        job.MarkFailed("RIOT3 returned 429");
+        job.MarkFailed("RIOT3 returned 429", JobFailureCategory.VendorRateLimited);
 
         job.Status.Should().Be(JobStatus.Failed);
         job.FailureReason.Should().Be("RIOT3 returned 429");
+        job.FailureCategory.Should().Be(JobFailureCategory.VendorRateLimited);
     }
 
     [Fact]
@@ -221,7 +222,7 @@ public class JobTests
         var job = new Job(Guid.NewGuid(), "Normal");
         job.MarkDispatched(Guid.NewGuid(), "K");
 
-        job.MarkFailed("vendor reported error before start");
+        job.MarkFailed("vendor reported error before start", JobFailureCategory.VendorExecutionFailed);
 
         job.Status.Should().Be(JobStatus.Failed);
         job.FailureReason.Should().Be("vendor reported error before start");
@@ -234,7 +235,7 @@ public class JobTests
         // Simulate an orphan: MarkFailed after a TripId was set conceptually
         // by MarkDispatched would not be valid (FromDispatched throws), so
         // here we just go Failed-from-Created to mimic vendor reject.
-        job.MarkFailed("template missing");
+        job.MarkFailed("template missing", JobFailureCategory.TemplateMissing);
         var beforeAttempt = job.AttemptNumber;
 
         var (previousTripId, newAttempt) = job.Retry();
@@ -273,7 +274,7 @@ public class JobTests
     {
         // Full retry cycle: fail → retry → dispatch.
         var job = new Job(Guid.NewGuid(), "Normal");
-        job.MarkFailed("vendor 503");
+        job.MarkFailed("vendor 503", JobFailureCategory.VendorRejected);
 
         job.Retry();
         job.AttemptNumber.Should().Be(2);
@@ -375,7 +376,7 @@ public class JobTests
         // can flip a running Job to Failed mid-flight.
         var job = Dispatched();
         job.MarkExecuting(Guid.NewGuid());
-        job.MarkFailed("vendor reported FAILED");
+        job.MarkFailed("vendor reported FAILED", JobFailureCategory.VendorExecutionFailed);
         job.Status.Should().Be(JobStatus.Failed);
         job.FailureReason.Should().Be("vendor reported FAILED");
     }
@@ -390,6 +391,19 @@ public class JobTests
         job.MarkCancelled(tripId, "E700001");
         job.Status.Should().Be(JobStatus.Cancelled);
         job.FailureReason.Should().Be("E700001");
+        // Phase b13 — cancellation is fixed-category (operator-initiated).
+        job.FailureCategory.Should().Be(JobFailureCategory.OperatorCancelled);
+    }
+
+    [Fact]
+    public void NewJob_FailureCategory_DefaultsToNone()
+    {
+        // Phase b13 — fresh job before any MarkFailed/MarkCancelled
+        // call must report None so the BI fact table's pre-b13 rows
+        // (defaulted via migration) round-trip cleanly through the
+        // domain mapper.
+        var job = new Job(Guid.NewGuid(), "Normal");
+        job.FailureCategory.Should().Be(JobFailureCategory.None);
     }
 
     [Fact]
@@ -431,7 +445,7 @@ public class JobTests
         // PlanningTripRetryDispatcher and rebinds the Job.
         var job = Dispatched();
         job.MarkExecuting(Guid.NewGuid());
-        job.MarkFailed("vendor error");
+        job.MarkFailed("vendor error", JobFailureCategory.VendorExecutionFailed);
         var beforeAttempt = job.AttemptNumber;
 
         var newTrip = Guid.NewGuid();

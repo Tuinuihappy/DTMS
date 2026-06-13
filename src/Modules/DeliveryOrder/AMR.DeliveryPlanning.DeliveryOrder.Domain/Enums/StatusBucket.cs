@@ -44,7 +44,6 @@ public static class OrderStatusBuckets
     {
         OrderStatus.Held,
         OrderStatus.Failed,
-        OrderStatus.Amended,
         OrderStatus.Cancelled,
         OrderStatus.Rejected,
     };

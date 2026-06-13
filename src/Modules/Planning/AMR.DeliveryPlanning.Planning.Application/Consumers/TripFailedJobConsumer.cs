@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
+using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using MassTransit;
 using Microsoft.Extensions.Logging;
@@ -36,7 +37,9 @@ public class TripFailedJobConsumer : IConsumer<TripFailedIntegrationEvent>
 
         try
         {
-            job.MarkFailed($"vendor execution failed: {evt.Reason}");
+            job.MarkFailed(
+                $"vendor execution failed: {evt.Reason}",
+                JobFailureCategory.VendorExecutionFailed);
             await _jobRepository.UpdateAsync(job, context.CancellationToken);
             _logger.LogInformation("[JobSync] Job {JobId} → Failed (Trip {TripId}, reason {Reason})",
                 job.Id, evt.TripId, evt.Reason);

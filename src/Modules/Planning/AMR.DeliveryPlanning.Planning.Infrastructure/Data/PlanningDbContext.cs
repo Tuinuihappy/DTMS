@@ -50,6 +50,13 @@ public class PlanningDbContext : DbContext
             builder.Property(j => j.TripId);
             builder.Property(j => j.VendorOrderKey).HasMaxLength(100);
             builder.Property(j => j.FailureReason).HasMaxLength(1000);
+            // Phase b13 — structured failure classification. Stored as
+            // the enum string so it stays human-readable in pgAdmin and
+            // new enum values are additive (no integer-renumbering risk).
+            builder.Property(j => j.FailureCategory)
+                .HasConversion<string>()
+                .HasMaxLength(40)
+                .HasDefaultValue(Domain.Enums.JobFailureCategory.None);
             builder.Property(j => j.AttemptNumber).HasDefaultValue(1);
             builder.Property(j => j.GroupIndex).HasDefaultValue(1);
             builder.Property(j => j.PickupStationId);

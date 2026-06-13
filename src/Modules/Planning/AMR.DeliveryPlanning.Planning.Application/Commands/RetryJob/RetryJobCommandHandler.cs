@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.Planning.Application.Services;
+using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
@@ -69,11 +70,18 @@ public class RetryJobCommandHandler : ICommandHandler<RetryJobCommand, RetryJobR
                 dispatchResult.Value.TripId, dispatchResult.Value.VendorOrderKey, null));
         }
 
+        // Two failure shapes here: dispatch IsSuccess but TripId empty
+        // means RIOT3 accepted the order but we couldn't persist the Trip
+        // (orphan — reconciliation required). Otherwise the vendor outright
+        // rejected the dispatch (4xx/5xx — RIOT3-side decision).
         var reason = dispatchResult.IsSuccess
             ? $"vendor accepted (key={dispatchResult.Value.VendorOrderKey}) but trip persistence failed — reconciliation required"
             : (dispatchResult.Error ?? "dispatch failed");
+        var category = dispatchResult.IsSuccess
+            ? JobFailureCategory.TripPersistenceFailed
+            : JobFailureCategory.VendorRejected;
 
-        job.MarkFailed(reason);
+        job.MarkFailed(reason, category);
         await _jobRepository.UpdateAsync(job, cancellationToken);
 
         return Result<RetryJobResult>.Success(new RetryJobResult(

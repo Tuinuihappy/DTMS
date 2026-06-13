@@ -24,7 +24,7 @@ public class MarkJobFailedCommandHandler : ICommandHandler<MarkJobFailedCommand>
 
         try
         {
-            job.MarkFailed(request.Reason);
+            job.MarkFailed(request.Reason, request.Category);
             await _jobRepository.UpdateAsync(job, cancellationToken);
             return Result.Success();
         }

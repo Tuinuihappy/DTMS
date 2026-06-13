@@ -14,8 +14,12 @@ public enum OrderStatus
     PartiallyCompleted,   // ≥1 item Delivered AND ≥1 item not-Delivered when trip finalized — terminal
     Held,
     Failed,
-    Amended,     // reserved: set when order is amended after entering planning pipeline (Confirmed→Dispatched)
-                 // requires Planning module consumer for DeliveryOrderAmendedIntegrationEvent + re-plan mechanism
+    // NB: there's no `Amended` status value — amendments don't change
+    // an order's headline state. Amendment flow emits
+    // DeliveryOrderAmendedIntegrationEvent + writes an OrderAmendment
+    // history row + projects an "Amended" string entry on the activity
+    // timeline; the order's Status stays whatever it was (Confirmed /
+    // Dispatched / etc.). Removed in Phase b13 cleanup.
     Cancelled,
     Rejected     // terminal: reject after Submitted/Validated/Confirmed (distinct from user-driven Cancelled)
 }
