@@ -105,6 +105,8 @@ public record GetDeliveryOrdersQuery(
     Priority? Priority = null,
     TransportMode? TransportMode = null,
     string? Search = null,
+    bool? HasFailedTrip = null,
+    bool? HasActiveJob = null,
     string? SortBy = null,
     bool SortDescending = true,
     int Page = 1,
@@ -113,29 +115,65 @@ public record GetDeliveryOrdersQuery(
 
 public class GetDeliveryOrdersQueryHandler : IQueryHandler<GetDeliveryOrdersQuery, PagedResult<DeliveryOrderListDto>>
 {
-    private readonly IDeliveryOrderRepository _repo;
-    public GetDeliveryOrdersQueryHandler(IDeliveryOrderRepository repo) => _repo = repo;
+    private readonly AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderListViewReadRepository _listRepo;
+
+    public GetDeliveryOrdersQueryHandler(
+        AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderListViewReadRepository listRepo)
+        => _listRepo = listRepo;
 
     public async Task<Result<PagedResult<DeliveryOrderListDto>>> Handle(GetDeliveryOrdersQuery request, CancellationToken cancellationToken)
     {
-        var filters = new DeliveryOrderSearchFilters(
+        // Phase P4 — read from the OrderListView projection instead of
+        // joining the write-side aggregate. Contract (input → DTO) is
+        // unchanged so callers don't notice the swap; new optional
+        // filters (HasFailedTrip / HasActiveJob) light up automatically
+        // when the caller passes them.
+        var filters = new AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.OrderListViewFilters(
             request.Status,
             request.Bucket,
             request.Priority,
             request.TransportMode,
             request.Search,
+            request.HasFailedTrip,
+            request.HasActiveJob,
             request.SortBy,
             request.SortDescending);
 
-        var (data, count) = await _repo.SearchAsync(filters, request.Page, request.PageSize, cancellationToken);
+        var (entries, count) = await _listRepo.SearchAsync(filters, request.Page, request.PageSize, cancellationToken);
 
         var paged = new PagedResult<DeliveryOrderListDto>(
-            data.Select(DeliveryOrderMapper.MapToListDto).ToList(),
+            entries.Select(MapEntryToListDto).ToList(),
             count,
             request.Page,
             request.PageSize);
 
         return Result<PagedResult<DeliveryOrderListDto>>.Success(paged);
+    }
+
+    private static DeliveryOrderListDto MapEntryToListDto(
+        AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.OrderListViewEntry e)
+    {
+        return new DeliveryOrderListDto(
+            Id: e.OrderId,
+            OrderRef: e.OrderRef,
+            SourceSystem: Enum.TryParse<SourceSystem>(e.SourceSystem, out var src) ? src : SourceSystem.Manual,
+            Priority: Enum.TryParse<Priority>(e.Priority, out var pri) ? pri : Domain.Enums.Priority.Normal,
+            OrderStatus: Enum.TryParse<OrderStatus>(e.Status, out var st) ? st : OrderStatus.Draft,
+            ServiceWindow: e.ServiceWindowLatestUtc.HasValue || e.ServiceWindowEarliestUtc.HasValue
+                ? new ServiceWindowDto(e.ServiceWindowEarliestUtc, e.ServiceWindowLatestUtc)
+                : null,
+            SubmittedAt: e.SubmittedAt,
+            CreatedBy: e.CreatedBy,
+            RequestedBy: e.RequestedBy,
+            Notes: e.Notes,
+            CreatedDate: e.CreatedAt,
+            UpdatedDate: e.UpdatedAt,
+            TotalWeightKg: e.TotalWeightKg,
+            TotalQuantity: e.TotalQuantity,
+            TotalItems: e.TotalItems,
+            RequestedTransportMode: Enum.TryParse<TransportMode>(e.TransportMode, out var tm) ? tm : null,
+            RequiresDropPod: e.RequiresDropPod,
+            RequiresPickupPod: e.RequiresPickupPod);
     }
 }
 

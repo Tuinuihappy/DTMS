@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import type { OrderStatus, Priority, TransportMode } from "@/lib/api/delivery-orders";
 import { cn } from "@/lib/utils";
 import { FilterChip } from "./badges";
+import { SavedFiltersMenu, type FilterSnapshot } from "./saved-filters";
 
 export type StatusFilter = "All" | "Active" | "Completed" | "Terminal" | OrderStatus;
 
@@ -48,6 +49,12 @@ export function FilterBar({
   onPriorityChange,
   transportMode,
   onTransportModeChange,
+  hasFailedTrip,
+  onHasFailedTripChange,
+  hasActiveJob,
+  onHasActiveJobChange,
+  savedFilterSnapshot,
+  onApplySavedFilter,
   onCreate,
   onExport,
   onRefresh,
@@ -62,6 +69,12 @@ export function FilterBar({
   onPriorityChange: (p: Priority | "All") => void;
   transportMode: TransportMode | "All";
   onTransportModeChange: (m: TransportMode | "All") => void;
+  hasFailedTrip: boolean;
+  onHasFailedTripChange: (v: boolean) => void;
+  hasActiveJob: boolean;
+  onHasActiveJobChange: (v: boolean) => void;
+  savedFilterSnapshot: FilterSnapshot;
+  onApplySavedFilter: (snap: FilterSnapshot) => void;
   onCreate: () => void;
   onExport: () => void;
   onRefresh: () => void;
@@ -102,6 +115,10 @@ export function FilterBar({
         </div>
 
         <div className="flex items-center gap-2">
+          <SavedFiltersMenu
+            currentSnapshot={savedFilterSnapshot}
+            onApply={onApplySavedFilter}
+          />
           <ToolbarButton onClick={onRefresh} title="Refresh" disabled={refreshing}>
             <RefreshCw
               className={cn("h-3.5 w-3.5", refreshing && "animate-spin")}
@@ -166,6 +183,23 @@ export function FilterBar({
             {m === "All" ? "Any transport" : m === "Amr" ? "AMR" : m}
           </FilterChip>
         ))}
+        {/* Phase P4 — projection-backed derived filter toggles. Click to
+            include only orders matching the predicate; click again to drop. */}
+        <div className="mx-1 self-center h-5 w-px bg-[var(--color-ink-200)]/60 dark:bg-white/10" />
+        <FilterChip
+          active={hasFailedTrip}
+          tone="coral"
+          onClick={() => onHasFailedTripChange(!hasFailedTrip)}
+        >
+          Failed trip
+        </FilterChip>
+        <FilterChip
+          active={hasActiveJob}
+          tone="amber"
+          onClick={() => onHasActiveJobChange(!hasActiveJob)}
+        >
+          Active job
+        </FilterChip>
       </div>
     </div>
   );

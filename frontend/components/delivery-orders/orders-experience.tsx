@@ -31,7 +31,7 @@ import { OrderDetailDrawer } from "./detail-drawer";
 import { FilterBar, type StatusFilter } from "./filter-bar";
 import { OrdersKpiStrip } from "./kpi-strip";
 import { OrdersTable, type SortColumn, type SortDir } from "./orders-table";
-import { Pagination, type PageSize } from "./pagination";
+import { InfiniteFooter, Pagination, type PageSize } from "./pagination";
 import { PodScanDialog } from "./pod-scan-dialog";
 import { RedispatchDialog } from "./redispatch-dialog";
 import { ReopenDialog } from "./reopen-dialog";
@@ -180,6 +180,21 @@ function ExperienceInner() {
   });
   const [searchInput, setSearchInput] = useState(() => searchParams.get("q") ?? "");
   const search = useDebouncedValue(searchInput, 350);
+  // Phase P4 — projection-backed derived filter chips. URL-persisted so
+  // a teammate can share a "show only orders with failed trips" link.
+  const [hasFailedTrip, setHasFailedTrip] = useState<boolean>(
+    () => searchParams.get("hasFailedTrip") === "true",
+  );
+  const [hasActiveJob, setHasActiveJob] = useState<boolean>(
+    () => searchParams.get("hasActiveJob") === "true",
+  );
+  // Phase P4 — pagination mode toggle (persisted in localStorage so the
+  // operator keeps their preference across visits).
+  const [paginationMode, setPaginationMode] = useState<"paged" | "infinite">(() => {
+    if (typeof window === "undefined") return "paged";
+    const stored = window.localStorage.getItem("orders:pagination-mode");
+    return stored === "infinite" ? "infinite" : "paged";
+  });
 
   // Pagination state
   const [page, setPage] = useState(() => {
@@ -217,6 +232,34 @@ function ExperienceInner() {
     },
     [sortBy],
   );
+
+  // Saved-filter snapshot: bundles every user-tunable list filter so a
+  // "Save" persists the exact view, and "Apply" restores it in one shot.
+  const savedFilterSnapshot = useMemo(
+    () => ({
+      statusFilter,
+      priority,
+      transportMode,
+      search,
+      hasFailedTrip,
+      hasActiveJob,
+      sortBy,
+      sortDir,
+    }),
+    [statusFilter, priority, transportMode, search, hasFailedTrip, hasActiveJob, sortBy, sortDir],
+  );
+
+  const applySavedFilter = useCallback((snap: Record<string, unknown>) => {
+    if (typeof snap.statusFilter === "string") setStatusFilter(snap.statusFilter as StatusFilter);
+    if (typeof snap.priority === "string") setPriority(snap.priority as Priority | "All");
+    if (typeof snap.transportMode === "string")
+      setTransportMode(snap.transportMode as TransportMode | "All");
+    if (typeof snap.search === "string") setSearchInput(snap.search);
+    if (typeof snap.hasFailedTrip === "boolean") setHasFailedTrip(snap.hasFailedTrip);
+    if (typeof snap.hasActiveJob === "boolean") setHasActiveJob(snap.hasActiveJob);
+    if (typeof snap.sortBy === "string") setSortBy(snap.sortBy as SortColumn);
+    if (snap.sortDir === "asc" || snap.sortDir === "desc") setSortDir(snap.sortDir);
+  }, []);
 
   // Data state
   const [orders, setOrders] = useState<DeliveryOrderListDto[]>([]);
@@ -308,7 +351,7 @@ function ExperienceInner() {
   // be stranded on page 7 of a 12-row result.
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, priority, transportMode, search, pageSize]);
+  }, [statusFilter, priority, transportMode, search, hasFailedTrip, hasActiveJob, pageSize]);
 
   // Mirror state back to the URL so refresh/back/forward and share links
   // restore the view. router.replace (not push) keeps history clean.
@@ -319,13 +362,21 @@ function ExperienceInner() {
     if (priority !== "All") p.set("priority", priority);
     if (transportMode !== "All") p.set("transport", transportMode);
     if (search) p.set("q", search);
+    if (hasFailedTrip) p.set("hasFailedTrip", "true");
+    if (hasActiveJob) p.set("hasActiveJob", "true");
     if (page > 1) p.set("page", String(page));
     if (pageSize !== 10) p.set("size", String(pageSize));
     if (sortBy !== "createdDate") p.set("sortBy", sortBy);
     if (sortDir !== "desc") p.set("sortDir", sortDir);
     const qs = p.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [statusFilter, priority, transportMode, search, page, pageSize, sortBy, sortDir, router, pathname]);
+  }, [statusFilter, priority, transportMode, search, hasFailedTrip, hasActiveJob, page, pageSize, sortBy, sortDir, router, pathname]);
+
+  // Persist pagination mode preference across visits.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("orders:pagination-mode", paginationMode);
+  }, [paginationMode]);
 
   const fetchOrders = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -346,6 +397,8 @@ function ExperienceInner() {
             priority: priority === "All" ? undefined : priority,
             transportMode: transportMode === "All" ? undefined : transportMode,
             search: search.trim() || undefined,
+            hasFailedTrip: hasFailedTrip || undefined,
+            hasActiveJob: hasActiveJob || undefined,
             page,
             pageSize,
             sortBy,
@@ -356,7 +409,16 @@ function ExperienceInner() {
         // Server now handles Active/Completed buckets via WHERE Status IN
         // (...). totalCount is authoritative for pagination — no more
         // client-side post-filter or upper-bound counts.
-        setOrders(res.items);
+        // In infinite-scroll mode, page>1 appends rather than replaces so
+        // a "Load more" tap extends the list instead of swapping it.
+        if (paginationMode === "infinite" && page > 1) {
+          setOrders((prev) => {
+            const seen = new Set(prev.map((o) => o.id));
+            return [...prev, ...res.items.filter((o) => !seen.has(o.id))];
+          });
+        } else {
+          setOrders(res.items);
+        }
         setTotalCount(res.totalCount);
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
@@ -368,7 +430,7 @@ function ExperienceInner() {
         }
       }
     },
-    [statusFilter, priority, transportMode, search, page, pageSize, sortBy, sortDir],
+    [statusFilter, priority, transportMode, search, hasFailedTrip, hasActiveJob, page, pageSize, sortBy, sortDir, paginationMode],
   );
 
   // Stats refetch — runs less often than the table fetch and ignores
@@ -813,6 +875,12 @@ function ExperienceInner() {
         onPriorityChange={setPriority}
         transportMode={transportMode}
         onTransportModeChange={setTransportMode}
+        hasFailedTrip={hasFailedTrip}
+        onHasFailedTripChange={setHasFailedTrip}
+        hasActiveJob={hasActiveJob}
+        onHasActiveJobChange={setHasActiveJob}
+        savedFilterSnapshot={savedFilterSnapshot}
+        onApplySavedFilter={applySavedFilter}
         onCreate={() => setCreateOpen(true)}
         onExport={() => {
           if (orders.length === 0) {
@@ -865,13 +933,26 @@ function ExperienceInner() {
             transition={{ duration: 0.4, delay: 0.15 }}
             className="mt-2 rounded-[var(--radius-xl)] glass"
           >
-            <Pagination
-              total={totalCount}
-              page={page}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-            />
+            {paginationMode === "paged" ? (
+              <Pagination
+                total={totalCount}
+                page={page}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                mode={paginationMode}
+                onModeChange={setPaginationMode}
+              />
+            ) : (
+              <InfiniteFooter
+                shown={orders.length}
+                total={totalCount}
+                loading={refreshing}
+                onLoadMore={() => setPage((p) => p + 1)}
+                mode={paginationMode}
+                onModeChange={setPaginationMode}
+              />
+            )}
           </motion.div>
         )}
       </div>

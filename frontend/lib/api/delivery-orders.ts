@@ -295,7 +295,10 @@ export type ListOrdersParams = {
   priority?: Priority;
   transportMode?: TransportMode;
   search?: string;
-  sortBy?: "createdDate" | "orderRef" | "priority" | "status" | "totalWeightKg";
+  /** Phase P4 — derived projection filters. */
+  hasFailedTrip?: boolean;
+  hasActiveJob?: boolean;
+  sortBy?: "createdDate" | "orderRef" | "priority" | "status" | "totalWeightKg" | "updatedAt";
   sortDir?: "asc" | "desc";
   page?: number;
   pageSize?: number;
@@ -312,6 +315,8 @@ export async function listOrders(
   if (params.transportMode)
     qs.set("transportMode", upperSnakeFromPascal(params.transportMode));
   if (params.search) qs.set("search", params.search);
+  if (params.hasFailedTrip != null) qs.set("hasFailedTrip", String(params.hasFailedTrip));
+  if (params.hasActiveJob != null) qs.set("hasActiveJob", String(params.hasActiveJob));
   if (params.sortBy) qs.set("sortBy", params.sortBy);
   if (params.sortDir) qs.set("sortDir", params.sortDir);
   if (params.page) qs.set("page", String(params.page));

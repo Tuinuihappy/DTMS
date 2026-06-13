@@ -1,11 +1,12 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZES = [10, 25, 50, 100] as const;
 export type PageSize = (typeof PAGE_SIZES)[number];
+export type PaginationMode = "paged" | "infinite";
 
 export function Pagination({
   total,
@@ -13,12 +14,16 @@ export function Pagination({
   pageSize,
   onPageChange,
   onPageSizeChange,
+  mode,
+  onModeChange,
 }: {
   total: number;
   page: number;
   pageSize: PageSize;
   onPageChange: (p: number) => void;
   onPageSizeChange: (s: PageSize) => void;
+  mode?: PaginationMode;
+  onModeChange?: (m: PaginationMode) => void;
 }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const startIdx = total === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -57,6 +62,12 @@ export function Pagination({
             ))}
           </select>
         </label>
+        {mode && onModeChange && (
+          <>
+            <span className="hidden sm:inline h-3 w-px bg-[var(--color-ink-200)]/60 dark:bg-white/10" />
+            <ModeToggle mode={mode} onModeChange={onModeChange} />
+          </>
+        )}
       </div>
 
       <div className="flex items-center gap-1">
@@ -136,6 +147,89 @@ function PagerBtn({
     >
       {children}
     </motion.button>
+  );
+}
+
+export function InfiniteFooter({
+  shown,
+  total,
+  loading,
+  onLoadMore,
+  mode,
+  onModeChange,
+}: {
+  shown: number;
+  total: number;
+  loading: boolean;
+  onLoadMore: () => void;
+  mode: PaginationMode;
+  onModeChange: (m: PaginationMode) => void;
+}) {
+  const canLoadMore = shown < total && !loading;
+  return (
+    <div className="flex flex-col items-center justify-between gap-3 px-4 py-3 sm:flex-row">
+      <div className="flex items-center gap-3 text-[11.5px] text-[var(--color-ink-500)]">
+        <span className="font-mono tabular-nums">
+          <span className="text-[var(--color-ink-900)] font-semibold">
+            {shown.toLocaleString()}
+          </span>{" "}
+          of {total.toLocaleString()}
+        </span>
+        <span className="hidden sm:inline h-3 w-px bg-[var(--color-ink-200)]/60 dark:bg-white/10" />
+        <ModeToggle mode={mode} onModeChange={onModeChange} />
+      </div>
+
+      <motion.button
+        type="button"
+        onClick={onLoadMore}
+        disabled={!canLoadMore}
+        whileTap={canLoadMore ? { scale: 0.96 } : {}}
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-semibold",
+          "bg-[var(--color-brand-900)] text-white shadow-[0_10px_28px_-12px_rgba(15,23,42,0.45)]",
+          "transition-all hover:shadow-[0_14px_36px_-12px_rgba(15,23,42,0.6)]",
+          "dark:bg-[var(--color-brand-500)] dark:text-[var(--color-ink-50)]",
+          "disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none",
+        )}
+      >
+        {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2.4} />}
+        {shown >= total ? "All loaded" : loading ? "Loading…" : "Load more"}
+      </motion.button>
+    </div>
+  );
+}
+
+function ModeToggle({
+  mode,
+  onModeChange,
+}: {
+  mode: PaginationMode;
+  onModeChange: (m: PaginationMode) => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "inline-flex rounded-md p-0.5 text-[10.5px] font-semibold uppercase tracking-[0.08em]",
+        "bg-white/60 border border-white/70 backdrop-blur-md",
+        "dark:bg-white/[0.05] dark:border-white/10",
+      )}
+    >
+      {(["paged", "infinite"] as const).map((m) => (
+        <button
+          key={m}
+          type="button"
+          onClick={() => onModeChange(m)}
+          className={cn(
+            "rounded-[3px] px-2 py-0.5 transition-all",
+            mode === m
+              ? "bg-[var(--color-brand-900)] text-white dark:bg-[var(--color-brand-500)]"
+              : "text-[var(--color-ink-500)] hover:text-[var(--color-ink-900)]",
+          )}
+        >
+          {m === "paged" ? "Pages" : "Scroll"}
+        </button>
+      ))}
+    </div>
   );
 }
 

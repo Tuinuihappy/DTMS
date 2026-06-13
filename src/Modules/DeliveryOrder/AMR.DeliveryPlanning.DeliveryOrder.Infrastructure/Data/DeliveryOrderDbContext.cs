@@ -29,6 +29,9 @@ public class DeliveryOrderDbContext : DbContext
     // ── Phase P3 — Dashboard read models ────────────────────────────────
     public DbSet<OrderFunnelHourlyRow> OrderFunnelHourly => Set<OrderFunnelHourlyRow>();
 
+    // ── Phase P4 — Denormalized list/search view ───────────────────────
+    public DbSet<OrderListViewRow> OrderListView => Set<OrderListViewRow>();
+
     public DeliveryOrderDbContext(DbContextOptions<DeliveryOrderDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -270,6 +273,36 @@ public class DeliveryOrderDbContext : DbContext
             b.HasKey(e => e.Id);
             b.Property(e => e.BucketHour).IsRequired();
             b.HasIndex(e => e.BucketHour).IsUnique();
+        });
+
+        // ── Phase P4 — OrderListView denormalized search/list table ────
+        // Owned by OrderListViewProjector. Writers MUST NOT touch the
+        // row from anywhere else. EF maps the SearchText column; the
+        // accompanying GENERATED tsvector + GIN index live in the
+        // migration's raw-SQL section (EF Core doesn't model tsvector
+        // first-class).
+        modelBuilder.Entity<OrderListViewRow>(b =>
+        {
+            b.ToTable("OrderListView", Schema);
+            b.HasKey(e => e.OrderId);
+            b.Property(e => e.OrderRef).HasMaxLength(200).IsRequired();
+            b.Property(e => e.Status).HasMaxLength(30).IsRequired();
+            b.Property(e => e.SourceSystem).HasMaxLength(20).IsRequired();
+            b.Property(e => e.Priority).HasMaxLength(20).IsRequired();
+            b.Property(e => e.TransportMode).HasMaxLength(20);
+            b.Property(e => e.RequestedBy).HasMaxLength(200);
+            b.Property(e => e.CreatedBy).HasMaxLength(200);
+            b.Property(e => e.Notes).HasMaxLength(1000);
+            b.Property(e => e.LatestJobStatus).HasMaxLength(20);
+            b.Property(e => e.SearchText).HasColumnType("text").IsRequired();
+            // Filter indices for hot query paths
+            b.HasIndex(e => new { e.Status, e.CreatedAt }).IsDescending(false, true);
+            b.HasIndex(e => new { e.Priority, e.CreatedAt }).IsDescending(false, true);
+            b.HasIndex(e => e.OrderRef);
+            b.HasIndex(e => e.HasFailedTrip)
+                .HasFilter("\"HasFailedTrip\" = true");
+            b.HasIndex(e => e.HasActiveJob)
+                .HasFilter("\"HasActiveJob\" = true");
         });
     }
 }

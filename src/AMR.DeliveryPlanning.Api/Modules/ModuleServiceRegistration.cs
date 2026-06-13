@@ -188,6 +188,11 @@ public static class ModuleServiceRegistration
                            AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderFunnelReadRepository>();
         services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderFunnelProjectionStore,
                            AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderFunnelProjectionStore>();
+        // Phase P4 — denormalized order list/search view projection.
+        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderListViewReadRepository,
+                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderListViewReadRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderListViewProjectionStore,
+                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderListViewProjectionStore>();
         services.Configure<DeliveryOrderOptions>(
             configuration.GetSection(DeliveryOrderOptions.SectionName));
         services.Configure<UomOptions>(configuration.GetSection(UomOptions.SectionName));

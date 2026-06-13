@@ -8,6 +8,9 @@
          (cross-module) so we need Dispatch.Application + Dispatch.Domain refs. -->
     <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.Application\AMR.DeliveryPlanning.Dispatch.Application.csproj" />
     <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.Domain\AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
+    <!-- Phase P4 OrderListView projector subscribes to Job lifecycle events
+         to recompute the order's "has active job" derived flag. -->
+    <ProjectReference Include="..\..\Planning\AMR.DeliveryPlanning.Planning.IntegrationEvents\AMR.DeliveryPlanning.Planning.IntegrationEvents.csproj" />
     <ProjectReference Include="..\AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents\AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.csproj" />
     <!-- TripStartedOmsNotifyConsumer dispatches POST to upstream OMS via IOmsShipmentClient. -->
     <ProjectReference Include="..\..\OmsAdapter\AMR.DeliveryPlanning.OmsAdapter.csproj" />
