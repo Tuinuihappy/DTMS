@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrdersReport;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetReports;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -33,6 +34,36 @@ public static class ReportsEndpoints
             var (from, to) = ResolveWindow(fromUtc, toUtc, defaultDays: 7);
             var result = await sender.Send(new GetOrdersReportQuery(
                 from, to, priority, finalStatus, sourceSystem));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
+        // ── P5.3 — 3 OrderFacts-backed reports + lead-time histogram ───
+        //
+        // All three share the same window resolver + 90d cap as the
+        // orders-summary endpoint above. Aggregation lives in the
+        // handlers; this group only marshalls query params + DTOs.
+
+        group.MapGet("/sla-breach", async (
+            DateTime? fromUtc, DateTime? toUtc, ISender sender) =>
+        {
+            var (from, to) = ResolveWindow(fromUtc, toUtc, defaultDays: 7);
+            var result = await sender.Send(new GetSlaBreachReportQuery(from, to));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
+        group.MapGet("/top-failures", async (
+            DateTime? fromUtc, DateTime? toUtc, int? limit, ISender sender) =>
+        {
+            var (from, to) = ResolveWindow(fromUtc, toUtc, defaultDays: 7);
+            var result = await sender.Send(new GetTopFailuresReportQuery(from, to, limit ?? 20));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
+        group.MapGet("/lead-time", async (
+            DateTime? fromUtc, DateTime? toUtc, ISender sender) =>
+        {
+            var (from, to) = ResolveWindow(fromUtc, toUtc, defaultDays: 7);
+            var result = await sender.Send(new GetLeadTimeReportQuery(from, to));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 

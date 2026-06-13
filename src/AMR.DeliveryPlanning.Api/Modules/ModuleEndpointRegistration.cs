@@ -21,6 +21,7 @@ public static class ModuleEndpointRegistration
         app.MapDashboardEndpoints();
         app.MapFleetDashboardEndpoints();
         app.MapReportsEndpoints();
+        app.MapDispatchReportsEndpoints();
         app.MapPlanningEndpoints();
         app.MapDispatchEndpoints();
         app.MapRiot3Webhooks();
