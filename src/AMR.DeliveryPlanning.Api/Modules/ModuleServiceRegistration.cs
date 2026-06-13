@@ -216,6 +216,11 @@ public static class ModuleServiceRegistration
                            AMR.DeliveryPlanning.Planning.Infrastructure.Projections.JobStatusHistoryReadRepository>();
         services.AddScoped<AMR.DeliveryPlanning.Planning.Application.Projections.IJobStatusHistoryProjectionStore,
                            AMR.DeliveryPlanning.Planning.Infrastructure.Projections.JobStatusHistoryProjectionStore>();
+        // Phase P5.2 — BI fact table for jobs (bi.JobFacts).
+        services.AddScoped<AMR.DeliveryPlanning.Planning.Application.Projections.IJobFactsReadRepository,
+                           AMR.DeliveryPlanning.Planning.Infrastructure.Projections.JobFactsReadRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.Planning.Application.Projections.IJobFactsProjectionStore,
+                           AMR.DeliveryPlanning.Planning.Infrastructure.Projections.JobFactsProjectionStore>();
         services.AddScoped<IActionTemplateRepository, ActionTemplateRepository>();
         services.AddScoped<IOrderTemplateRepository, OrderTemplateRepository>();
         services.AddScoped<IOrderTemplateResolver, OrderTemplateResolver>();
@@ -249,6 +254,11 @@ public static class ModuleServiceRegistration
                            AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripStatusHistoryReadRepository>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripStatusHistoryProjectionStore,
                            AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripStatusHistoryProjectionStore>();
+        // Phase P5.2 — BI fact table for trips (bi.TripFacts).
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripFactsReadRepository,
+                           AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripFactsReadRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripFactsProjectionStore,
+                           AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripFactsProjectionStore>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Repositories.ITripRetryEventRepository,
             AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories.TripRetryEventRepository>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Repositories.ITripMissionEventRepository,

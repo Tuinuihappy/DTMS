@@ -23,6 +23,9 @@ public class DispatchDbContext : DbContext
     public DbSet<TripStatusHistoryRow> TripStatusHistory => Set<TripStatusHistoryRow>();
     public DbSet<InboxMessage> ProjectionInbox => Set<InboxMessage>();
 
+    // ── Phase P5.2 — BI fact table (cross-cutting bi schema, owned here) ──
+    public DbSet<TripFactsRow> TripFacts => Set<TripFactsRow>();
+
     public DispatchDbContext(DbContextOptions<DispatchDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -193,6 +196,42 @@ public class DispatchDbContext : DbContext
             b.HasIndex(e => new { e.TripId, e.OccurredAt }).IsDescending(false, true);
             b.HasIndex(e => new { e.DeliveryOrderId, e.OccurredAt });
             b.HasIndex(e => new { e.ToStatus, e.OccurredAt });
+        });
+
+        // ── Phase P5.2 — bi.TripFacts BI fact table ────────────────────
+        // Mirror of OrderFacts shape. Generated KPI columns
+        // (TimeToStartSec, TimeToCompleteSec, SlaCompleteBreached) live
+        // in the migration as STORED columns; EF reads them only.
+        modelBuilder.Entity<TripFactsRow>(b =>
+        {
+            b.ToTable("TripFacts", "bi");
+            b.HasKey(e => e.TripId);
+            b.Property(e => e.VendorUpperKey).HasMaxLength(100);
+            b.Property(e => e.FinalStatus).HasMaxLength(30).IsRequired();
+            b.Property(e => e.FailureReason).HasMaxLength(2000);
+
+            b.Property(e => e.TimeToStartSec)
+                .HasColumnType("integer")
+                .ValueGeneratedOnAddOrUpdate()
+                .Metadata.SetAfterSaveBehavior(
+                    Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Ignore);
+            b.Property(e => e.TimeToCompleteSec)
+                .HasColumnType("integer")
+                .ValueGeneratedOnAddOrUpdate()
+                .Metadata.SetAfterSaveBehavior(
+                    Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Ignore);
+            b.Property(e => e.SlaCompleteBreached)
+                .HasColumnType("boolean")
+                .ValueGeneratedOnAddOrUpdate()
+                .Metadata.SetAfterSaveBehavior(
+                    Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Ignore);
+
+            b.HasIndex(e => e.CreatedAt).IsDescending(true);
+            b.HasIndex(e => new { e.VendorUpperKey, e.CreatedAt }).IsDescending(false, true);
+            b.HasIndex(e => new { e.FinalStatus, e.CreatedAt }).IsDescending(false, true);
+            b.HasIndex(e => e.DeliveryOrderId);
+            b.HasIndex(e => e.SlaCompleteBreached)
+                .HasFilter("\"SlaCompleteBreached\" = true");
         });
     }
 }

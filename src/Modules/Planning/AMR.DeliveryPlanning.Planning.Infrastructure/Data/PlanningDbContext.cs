@@ -26,6 +26,9 @@ public class PlanningDbContext : DbContext
     public DbSet<JobStatusHistoryRow> JobStatusHistory => Set<JobStatusHistoryRow>();
     public DbSet<InboxMessage> ProjectionInbox => Set<InboxMessage>();
 
+    // ── Phase P5.2 — BI fact table (cross-cutting bi schema, owned here) ──
+    public DbSet<JobFactsRow> JobFacts => Set<JobFactsRow>();
+
     public PlanningDbContext(DbContextOptions<PlanningDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -235,6 +238,40 @@ public class PlanningDbContext : DbContext
             b.HasIndex(e => new { e.JobId, e.OccurredAt }).IsDescending(false, true);
             b.HasIndex(e => new { e.DeliveryOrderId, e.OccurredAt });
             b.HasIndex(e => new { e.ToStatus, e.OccurredAt });
+        });
+
+        // ── Phase P5.2 — bi.JobFacts BI fact table ─────────────────────
+        modelBuilder.Entity<JobFactsRow>(b =>
+        {
+            b.ToTable("JobFacts", "bi");
+            b.HasKey(e => e.JobId);
+            b.Property(e => e.VendorOrderKey).HasMaxLength(100);
+            b.Property(e => e.FinalStatus).HasMaxLength(30).IsRequired();
+            b.Property(e => e.FailureReason).HasMaxLength(2000);
+
+            b.Property(e => e.TimeToDispatchSec)
+                .HasColumnType("integer")
+                .ValueGeneratedOnAddOrUpdate()
+                .Metadata.SetAfterSaveBehavior(
+                    Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Ignore);
+            b.Property(e => e.TimeToCompleteSec)
+                .HasColumnType("integer")
+                .ValueGeneratedOnAddOrUpdate()
+                .Metadata.SetAfterSaveBehavior(
+                    Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Ignore);
+            b.Property(e => e.SlaDispatchBreached)
+                .HasColumnType("boolean")
+                .ValueGeneratedOnAddOrUpdate()
+                .Metadata.SetAfterSaveBehavior(
+                    Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Ignore);
+
+            b.HasIndex(e => e.CreatedAt).IsDescending(true);
+            b.HasIndex(e => new { e.FinalStatus, e.CreatedAt }).IsDescending(false, true);
+            b.HasIndex(e => e.DeliveryOrderId);
+            b.HasIndex(e => new { e.AttemptNumber, e.CreatedAt })
+                .HasFilter("\"AttemptNumber\" > 1");
+            b.HasIndex(e => e.SlaDispatchBreached)
+                .HasFilter("\"SlaDispatchBreached\" = true");
         });
     }
 }
