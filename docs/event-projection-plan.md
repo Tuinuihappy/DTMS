@@ -175,9 +175,14 @@ appends `OrderHeld` row → endpoint returns updated entries within seconds.
 | Trip retry triggers | ❌ (no integration event) | ✅ Seeded from TripRetryEvents |
 | Admin actions (OrderReopened / OrderAbandoned) | ❌ (audit-only writes) | ✅ Seeded |
 
-**P2.5 hardening (deferred — track when ops needs it):**
+**P2.5 hardening 🚫 Deferred** — see "What's left" table below for the
+full rationale. Historical backfill already covers every gap; ship
+the live-event piece only when ops reports a missing entry on the
+order activity timeline.
+
+Two concrete sub-items if/when triggered:
 - Add integration events for POD scans, OMS notify outcomes, TripRetry triggers, admin actions so the "going forward" gaps close without backfill.
-- Add `DeliveryOrderId` to TripPaused/Resumed/ExceptionRaised payloads so the projector can attach them to the order timeline.
+- Add `DeliveryOrderId` to TripPaused/Resumed/ExceptionRaised payloads so the projector can attach them to the order timeline. (Trip→Job mirror already shipped in Phase #1 — order timeline linkage is the remaining piece.)
 
 ### Frontend
 
@@ -338,55 +343,130 @@ backend route.
 
 ---
 
-## P6 — Compliance ⏳ Optional
+## P6 — Compliance 🚫 Deferred (gated on regulatory trigger)
 
-Triggered only by a regulatory requirement:
-- Event archival to cold storage
-- Tamper-evident row chaining (Merkle hash)
-- Event versioning + upcasting framework
-- Compliance reports (signed PDF per aggregate)
+**Status:** Not started. Skipped unless DTMS enters a regulated context
+(audit, finance, healthcare, etc.).
 
-**Effort:** ~L. Skip unless DTMS enters a regulated context.
+**Scope when triggered:**
+- Event archival to cold storage (e.g. S3 Glacier with retention policy)
+- Tamper-evident row chaining (Merkle hash per aggregate)
+- Event versioning + upcasting framework (replay-safe schema evolution)
+- Compliance reports (signed PDF per aggregate, attestable chain of custody)
+
+**Why deferred:**
+1. None of the four items deliver user-visible value today — they only
+   matter to a future auditor or regulator.
+2. Implementing speculatively means the design won't match the actual
+   regulation's specifics (every compliance regime is bespoke — SOX
+   ≠ HIPAA ≠ PDPA).
+3. The current Event Projection foundation already gives 80% of what
+   most regulators want (immutable per-projector inbox, ordered status
+   history, audit timeline) — gap is the cryptographic + archival
+   layer.
+
+**Revisit when:** a stakeholder names a specific regulation that
+applies. At that point read the regulation, then come back here.
+
+**Effort estimate when triggered:** ~L (1–2 weeks).
 
 ---
 
 ## Cross-Cutting Workstreams
 
+Sections marked **🚫 Deferred** are intentionally not started. Each
+deferred item lists the trigger condition that should bring it back
+on the table; building them on speculation would waste effort + risk
+landing the wrong shape.
+
 ### CC1 — Documentation
-- `docs/projection-conventions.md` ✅ shipped in P0
-- `docs/event-projection-plan.md` ✅ this doc (living)
-- [`docs/projector-catalog.md`](projector-catalog.md) ✅ shipped 2026-06-14 — catalog of all 11 projectors with read models, events subscribed, downstream endpoints, backfill scripts, tests
-- `docs/replay-runbook.md` — created when replay impl lands
-- `docs/projection-failure-runbook.md` — created on first DLQ incident
+
+- ✅ `docs/projection-conventions.md` — shipped in P0
+- ✅ `docs/event-projection-plan.md` — this doc (living)
+- ✅ [`docs/projector-catalog.md`](projector-catalog.md) — shipped 2026-06-14
+  (catalog of all 11 projectors with read models, events subscribed,
+  downstream endpoints, backfill scripts, tests)
+- 🚫 `docs/replay-runbook.md` — **deferred until replay impl lands**
+  - *Why:* the runbook documents `dotnet run --replay` steps, log
+    locations, expected throughput. None of those exist yet — there's
+    only a contract in P0. Writing the runbook now = guessing what
+    the impl will look like.
+  - *Trigger:* first projector that needs a re-derivation (schema
+    change, projector bug, or backfill miss). At that point we'll
+    build the replay tool and document it together.
+- 🚫 `docs/projection-failure-runbook.md` — **deferred until first DLQ incident**
+  - *Why:* the runbook lists symptoms → diagnostic queries → recovery
+    steps. We've had zero DLQ incidents — anything written now would
+    be theoretical and likely wrong when the real first incident
+    happens.
+  - *Trigger:* first time a permanent-failure metric increments in
+    production. Capture the actual triage path during the incident,
+    then formalize it into the runbook.
 
 ### CC2 — Testing patterns
-- Idempotency test ✅ pattern established in P0
-- Per-projector unit tests ✅ pattern established in P1 (8/7/8 tests per aggregate)
-- Integration tests (real Postgres + RabbitMQ) — add when projector cross-cuts more than one DbContext
+
+- ✅ Idempotency test — pattern established in P0 (`IdempotentProjectorTests`)
+- ✅ Per-projector unit tests — pattern established in P1; **every projector ships with one** (8/7/8/9/9/9/10/10 tests across the suite)
+- 🚫 Integration tests with real Postgres + RabbitMQ — **deferred until a projector cross-cuts two DbContexts**
+  - *Why:* every projector today writes a single DbContext that's
+    fully covered by unit tests with `NSubstitute`. Adding
+    Testcontainers / WebApplicationFactory wiring just to re-test the
+    happy path = ceremony with no new bugs caught.
+  - *Trigger:* a projector needs to write to (or coordinate across)
+    multiple modules' DbContexts in the same transaction. Today no
+    such case exists — backfill scripts handle cross-aggregate
+    seeding via SQL.
 
 ### CC3 — Observability
-- `dtms.projection.*` metrics ✅ wired in P0; emitted by every projector built in P1
-- Grafana dashboard JSON committed under `ops/dashboards/` — TODO after first projector lives long enough to need lag visibility
-- Alert rules for lag > 60s, DLQ depth > 0 — TODO
+
+- ✅ `dtms.projection.*` OTel metrics — wired in P0; emitted by every projector
+- ✅ In-app health view — [/admin/projections](../frontend/app/admin/projections/page.tsx) (CC4 — shipped 2026-06-13, commit `8528a077`)
+- 🚫 Grafana dashboard JSON under `ops/dashboards/` — **deferred until a Prometheus/Grafana stack is actually running**
+  - *Why:* JSON dashboards are scrape-target specific (Prometheus
+    label names, retention windows, alert routing). Writing them
+    without a real metrics backend = template that won't import
+    cleanly into whichever stack lands.
+  - *Trigger:* infra spins up Prometheus + Grafana + scrapes the API
+    pod's OTel exporter. The `/admin/projections` page covers ops
+    use cases until then.
+- 🚫 Alert rules for `lag > 60s` / `DLQ depth > 0` — **deferred together with the Grafana stack**
+  - *Why:* same reason — alertmanager rules + routing live in the
+    same world as the dashboard JSON.
 
 ### CC4 — Frontend patterns
-- `<DataFreshnessChip />` ✅ shipped in P0
-- `<TimelineView />` ✅ shipped in P0
-- `<StatusTimelineSection />` ✅ shipped in P1 (composes P0 primitives)
-- `<ProjectionLagBanner />` — defer until lag is a real concern
-- `useProjectionPoll` hook — defer until P3 (dashboards need it)
-- `/admin/projections` page — schedulable now that there are 3 projectors worth monitoring
+
+- ✅ `<DataFreshnessChip />` — shipped in P0 (per-widget age indicator)
+- ✅ `<TimelineView />` — shipped in P0
+- ✅ `<StatusTimelineSection />` — shipped in P1 (composes P0 primitives)
+- ✅ `useProjectionPoll` hook — shipped in P3.1
+- ✅ `/admin/projections` page — shipped 2026-06-13 (CC4, commit `8528a077`)
+- 🚫 `<ProjectionLagBanner />` — **deferred until alert fatigue cost > visibility benefit**
+  - *Why:* `<DataFreshnessChip />` already shows staleness per widget
+    where the user is actually looking; `/admin/projections` gives
+    ops the system-wide view. A sticky banner is escalation — only
+    worth shipping after a real incident proves users miss the chip.
+  - *Trigger:* a multi-user complaint about acting on stale dashboard
+    data, or an SLA commitment that requires explicit user
+    notification when lag > N.
 
 ---
 
-## What to do next (after P1)
+## What's left, why deferred, and what would change that
 
-**Recommended sequencing:**
+| Item | Status | Why deferred | What would unblock it |
+|---|---|---|---|
+| P6 Compliance | 🚫 | No regulation in scope; designs would be wrong without the spec | Stakeholder names a regulation (SOX/HIPAA/PDPA/…) |
+| P2.5 — Activity Timeline gaps (POD scans, OMS notify, TripRetry, admin actions, Pause/Resume order linkage) | 🚫 | Historical backfill covers every gap; "going forward" only matters when ops asks about live coverage | Ops files a ticket that a recent event didn't appear in the order activity timeline |
+| Replay runbook | 🚫 | No replay impl exists yet | First projector needs re-derivation |
+| Projection failure runbook | 🚫 | Zero DLQ incidents to date | First permanent-failure metric increment in prod |
+| CC2 integration tests | 🚫 | No cross-context projector exists | Projector that writes 2+ module DbContexts |
+| CC3 Grafana dashboards + alerts | 🚫 | No Prometheus stack running | Infra deploys Prom + Grafana + OTel scrape |
+| CC4 `<ProjectionLagBanner />` | 🚫 | Chip + /admin page cover today's need | User complaint about acting on stale data |
 
-1. **Commit P0 + P1 work** to Git as a coherent series:
-   - One commit per phase (P0 foundation; P1 Order/Job/Trip — possibly 3 sub-commits)
-   - Reference `docs/event-projection-plan.md` from each commit message
-2. **Pick P2 (Activity Timeline) as next phase** — completes the "operator timeline" story by unifying everything into one view, retires the `FullAuditLog` UNION query.
+**Everything else from the original plan is shipped.** When in doubt:
+don't pull a deferred item forward without its trigger — the design
+will be wrong, the implementation will rot before it's used, and the
+opportunity cost is real feature work.
 3. **Alternatively, ship P3 (Dashboard) for user-visible speed wins** if performance complaints from dashboard usage are coming in.
 
 ---

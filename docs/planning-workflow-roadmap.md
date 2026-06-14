@@ -1,10 +1,15 @@
 # Planning Workflow Roadmap — Remaining Options
 
-ภาพรวมงานที่เหลือหลัง Phase b8 → b9 → b10/b11/b12/b13 land แล้ว
+ภาพรวมงานที่เหลือหลัง Phase b8 → b9 → b10/b11/b12/b13 + #1/#9/#10 land แล้ว
 จัดลำดับตาม priority × effort × impact เพื่อช่วยเลือก phase ถัดไป
 
 อ้างอิงการ review แบบเต็มในเซสชั่นวันที่ 2026-06-11 (initial) +
-update 2026-06-14 หลัง P5 ของ Event Projection plan ปิด
+update 2026-06-14 หลัง CC1 + ทุก top-priority items ปิด
+
+**สถานะปัจจุบัน (2026-06-14):** Top-priority backlog ปิดหมดแล้ว. ที่
+เหลือทั้งหมดเป็น 🚫 **Deferred** — แต่ละตัวมีเหตุผลชัดและ trigger
+ที่จะปลด defer. ดู [event-projection-plan.md](event-projection-plan.md)
+สำหรับด้าน projection ที่อยู่ในสภาพเดียวกัน (~95% done).
 
 ---
 
@@ -19,184 +24,243 @@ update 2026-06-14 หลัง P5 ของ Event Projection plan ปิด
 | **b11** | Order ตาม Trip cancellation — cascade + operator abandon endpoint | `748dea45` | แก้ stuck-Dispatched bug ที่ลูกค้าเห็น |
 | **b12** | StatusHistory tables (Order / Job / Trip) — shipped as P0/P1 of Event Projection plan | `cb8a4f29` | Structured timeline + drawer integration + 23 unit tests |
 | **b13** | Job.FailureCategory enum (8 values) + breaking signature change | `bf960c17` | Reports group by structured category, ไม่ต้อง LIKE 'Too Many Requests%' |
+| **#1** | Trip Pause/Resume → Job mirror (JobStatus.Paused) | `68750a9d` | Jobs queue badge ตรงกับสถานะจริงตอน pause; status timeline เห็น Paused row |
+| **#9** | `JobFacts.FailureCategory` column + "Job failures" report tab | `94103e39` | /reports tab ใหม่ group by structured category แทน text |
+| **#10** | Vehicle performance — group by `VendorVehicleKey` (was envelope key) | `fa6fc3a4` | /reports tab ที่เคยใช้งานไม่ได้ตอนนี้แสดง 5 vehicle bars จริง |
 | **Event Projection P2** | Activity Timeline — transparent swap of /audit-full | `f23b54d8` | Single indexed read แทน 4-source UNION |
 | **Event Projection P3.1+P3.2** | Order funnel + Fleet projections + dashboard subpages | `f2dbc140` / `2daea413` | /dashboard, /dashboard/orders, /dashboard/robots ใช้ real projection data |
 | **Event Projection P4** | OrderListView projection + tsvector full-text search | `ee5b7434` | `GET /api/v1/delivery-orders` ใช้ projection + filter `hasFailedTrip` / `hasActiveJob` |
-| **Event Projection P5** | BI fact tables (Order / Trip / Job) + pre-built /reports page | `8feb38cf` → `9b984cfc` | 5 report tabs + CSV export |
+| **Event Projection P5** | BI fact tables (Order / Trip / Job) + pre-built /reports page | `8feb38cf` → `9b984cfc` | 6 report tabs + CSV export |
 | **Observability CC4** | /admin/projections health dashboard | `8528a077` | Per-projector lag + processed count + status badge |
+| **CC1 Documentation** | `docs/projector-catalog.md` — 11-projector registry | `de32c493` | Single source for "which projector writes X / consumes Y / powers endpoint Z" |
 | **Cleanup (partial #8)** | Remove `OrderStatus.Amended` enum value | `bf960c17` | Amendment flow ยังทำงาน (string literal in projector); enum value ตายแล้วลบทิ้ง |
 | **Demo polish** | 30-order 7d seed + ChartMount wrapper for /reports | `cb20d046` | /reports ทุก tab เห็น chart จริง |
 
 ---
 
-## งานที่เหลือ — เรียงตาม priority
+## งานที่เหลือ — ทั้งหมด 🚫 Deferred
 
-### 🟠 P2 — Lifecycle completeness (backlog, do-when-needed)
-
-#### 1. TripPaused/Resumed → Job (mirror pause state)
-
-**ปัญหา:** Trip.Pause/Resume มีอยู่ + integration events ขึ้นมาแล้วใน P1 (TripPausedIntegrationEventV1 / TripResumedIntegrationEventV1) แต่ Job ไม่ตาม. ถ้า Trip pause → Job ยัง Executing → confusing
-
-**แนวทาง:**
-- เพิ่ม Planning consumer ที่ subscribe `TripPausedIntegrationEventV1` / `TripResumedIntegrationEventV1` → `Job.MarkPaused()` / `Job.MarkResumed()`
-- หรือยอมรับว่า Job ไม่ track pause + ใส่ comment ใน Job.cs explicit
-
-**Effort:** S | **Impact:** ต่ำ-กลาง
+ทุกตัวด้านล่างเป็น deferred โดยตั้งใจ ไม่ใช่ "ลืม" หรือ "ยังไม่มีเวลา" —
+มีเหตุผลชัดเจนว่าทำไมเลื่อน + trigger ที่จะปลด defer. การหยิบขึ้นมาทำ
+โดยไม่มี trigger จริง = premature work ที่จะ design ผิด, rot ก่อนใช้,
+และมี opportunity cost เทียบกับ feature ที่ user ขอจริง
 
 ---
 
-#### 2. Pickup/Drop mid-trip visibility ใน Job
+### 🟠 Lifecycle completeness (low-impact)
 
-**ปัจจุบัน:** Phase b9 ตัดสินใจ skip TripPickup/TripDrop events เพราะเป็น item-level (DeliveryOrder.Items handle อยู่แล้ว)
+#### #2. Pickup/Drop mid-trip visibility ใน Job 🚫 Deferred
 
-**ถ้าจะทำ:**
-- เพิ่ม JobId ใน TripPickupCompletedIntegrationEvent + TripDropCompletedIntegrationEvent (breaking event contract)
-- หรือ consumer ใน Planning ทำ Trip→Job lookup
-- เพิ่ม sub-status `Picked` / `Delivered` ใน JobStatus หรือ field แยก
+**Status:** ครอบโดย DeliveryOrder.Items แล้ว — ไม่ต้องทำซ้ำใน Job
 
-**Effort:** M | **Impact:** ต่ำ (ของ DeliveryOrder.Items ครอบอยู่แล้ว)
+**Why deferred:**
+Phase b9 ตัดสินใจ skip TripPickup/TripDrop events เพราะเป็น item-level
+event. DeliveryOrder.Items อัพเดต `Status` (Picked/DroppedOff/Delivered)
+อยู่แล้ว → operator เห็น item lifecycle ใน order drawer. การเพิ่ม
+sub-status ใน Job = duplicate ของข้อมูลที่มีอยู่
 
----
+**Trigger to revisit:**
+ops file ticket ว่าต้องการดู mid-trip progress ที่ Job level
+(เช่น "Job 50% สำเร็จ — pick แล้วยัง drop ไม่ได้"). ถ้าวันนั้นมา
+ต้องเลือก: (a) เพิ่ม `JobId` ใน TripPickup/Drop events (breaking
+contract — 1 deployment needed), (b) consumer ใน Planning ทำ Trip→Job
+lookup, หรือ (c) field แยก ไม่ใช่ status (e.g. `PickedCount` /
+`DroppedCount`)
 
-#### 3. ExceptionRaised audit on Job
-
-**Phase b9 ตัดสินใจ defer:** เพิ่ม `JobExceptions` collection ใช้ตอน reconciliation tooling ต้องการ trace exception lineage
-
-**Effort:** M | **Impact:** ต่ำ
-
----
-
-### 🟢 P3 — Cleanup / DX
-
-#### 4. ItemStatus.Returned — decide implement vs delete
-
-**ปัจจุบัน:** declared แต่ไม่เคย write. อ่าน 2 ที่ (`IsTerminalUnsuccessful()` + rebind reset). เก็บไว้ตามคำตัดสินใน b13 cleanup เพราะ "returned to sender" flow น่าจะมีอนาคต
-
-**Effort:** S (ถ้าลบ) / M (ถ้า implement) | **Impact:** ต่ำ
+**Effort เมื่อ trigger:** M (1-2 วัน)
 
 ---
 
-#### 5. Backfill script — pre-b8 Trips ที่ JobId = Guid.Empty
+#### #3. ExceptionRaised audit on Job 🚫 Deferred
 
-**ปัญหา:** Trips เก่าก่อน Phase b8 ไม่มี Job link → consumer Phase b9 skip ทำให้ historical orders ไม่มี Job tracking
+**Status:** Phase b9 defer — ตอนนี้ใช้ `OrderActivity` projection ดู exception lineage ผ่าน Order timeline ได้
 
-**แนวทาง:** script สร้าง Job rows สำหรับ Trip เก่าโดย derive จาก DeliveryOrder + UpperKey ผูก JobId กลับเข้า Trip rows
+**Why deferred:**
+`JobExceptions` collection จะซ้ำกับ `dispatch.TripExceptions` table
++ `OrderActivity` projection ที่ project `ExceptionRaisedIntegrationEvent`
+อยู่แล้ว. operator/oncall ดู exception ผ่าน 2 surface นี้ได้ — ไม่
+ต้อง denormalize ลง Job
 
-**Effort:** S | **Impact:** ต่ำ (legacy data only — dev DB ไม่มี trips เก่าแบบนี้แล้ว)
+**Trigger to revisit:**
+reconciliation tooling ต้องการ trace exception lineage จาก Job
+viewpoint (e.g. "show me all exceptions on this Job across retries").
+ตอนนี้ไม่มี tool แบบนี้
 
----
-
-#### 6. Naming consistency refactor
-
-| Aggregate | Method pattern |
-|---|---|
-| Trip | `MarkVendorStarted`, `MarkVendorCompleted`, `MarkVendorFailed` |
-| Job | `MarkExecuting`, `MarkCompleted`, `MarkFailed` |
-| Item | `MarkPicked`, `MarkDroppedOff`, `ConfirmDelivered` |
-| Order | `MarkAsValidated`, `MarkPlanned`, `MarkDispatched` |
-
-อ่านโค้ดข้าม aggregate งง — unify เป็น `Mark{Status}` ใน refactor cycle ถัดไป
-
-**Effort:** L (ต้อง update test ทุก suite) | **Impact:** ต่ำ (DX)
+**Effort เมื่อ trigger:** M (~1 วัน)
 
 ---
 
-#### 7. Formal state machine library
+### 🟢 Cleanup / DX (zero impact ต่อ user)
 
-ตอนนี้ scattered `if (Status != X) throw` ใน method
-ลอง [Stateless](https://github.com/dotnet-state-machine/stateless) ใน aggregate ใหม่
+#### #4. ItemStatus.Returned — decide implement vs delete 🚫 Deferred
 
-**Effort:** L | **Impact:** ต่ำ (DX)
+**Status:** เก็บไว้ตามคำตัดสินใน b13 cleanup (commit `bf960c17`)
 
----
+**Why deferred:**
+- Enum declared, อ่าน 2 ที่ (`IsTerminalUnsuccessful()` + rebind reset),
+  **ไม่เคย write** ที่ไหน
+- ตัดสินใจ b13: เก็บไว้เพราะ "returned-to-sender flow น่าจะมีอนาคต"
+- เลือกลบตอนนี้ = อาจต้อง re-add ทีหลังพร้อม migration; เลือก
+  implement ตอนนี้ = guessing business flow ที่ยังไม่เคย design
 
-### 🟣 P4 — Polish จากงานที่เพิ่งทำ (deferred from C)
+**Trigger to revisit:**
+PM/ops design "returned to sender" flow ของจริง. ถ้าตัดสินใจไม่ทำ
+ตลอดกาล → ลบ enum (1-2 ชม).
 
-#### 8. Recharts `width(-1) height(-1)` warning — kill จริงๆ
-
-**ปัจจุบัน:** `<ChartMount>` กั้น render จนกว่า ResizeObserver จะ fire — แต่ Recharts log warning จาก internal first measurement ของตัวเอง ไม่สามารถ suppress จากนอกได้
-
-**แนวทาง:**
-- เปลี่ยน `<ResponsiveContainer>` เป็น `<BarChart width={W} height={H}>` แบบ fixed-px + ResizeObserver hook เอง per chart
-- หรือ patch Recharts (ไม่คุ้ม)
-- หรือ filter console.warn override (hacky)
-
-**Effort:** M | **Impact:** ต่ำ (cosmetic)
+**Effort เมื่อ trigger:** S (ลบ) / M (implement full flow)
 
 ---
 
-#### 9. JobFacts.FailureCategory column + Top failures report grouping
+#### #5. Backfill script — pre-b8 Trips ที่ JobId = Guid.Empty 🚫 Deferred
 
-**ปัญหา:** b13 เพิ่ม `Job.FailureCategory` ใน write side แล้ว แต่ `bi.JobFacts` ยังไม่ carry column นี้ → P5.3 Top failures report ยัง group by free-text `FailureReason` เหมือนเดิม
+**Status:** legacy data only — dev/staging DB ไม่มี trips เก่าแบบนี้แล้ว
 
-**แนวทาง:**
-- เพิ่ม `FailureCategory` column ใน `bi.JobFacts` + migration
-- อัพเดต `JobFactsProjector.SetFailedAtAsync` / `SetCancelledAtAsync` ให้ carry category
-- ขยาย Top failures report ให้ group by category (พร้อมแสดง reason เป็น sub-row)
+**Why deferred:**
+ปัญหา Trip ก่อน Phase b8 ที่ไม่มี Job link มีผลแค่กับ historical data
+ใน production DB ที่เคย run ระบบเดิมอยู่. dev DB ปัจจุบันถูก reseed
+หลัง b8 ลง — ไม่มี orphan trips เหลือแล้ว
 
-**Effort:** S-M | **Impact:** กลาง (Reports ใช้ structured data จริง)
+**Trigger to revisit:**
+deploy ครั้งแรกขึ้น production DB ที่มี trips เก่าก่อน b8 + ops
+complain ว่าหา Job ของ historical orders ไม่เจอ. ถ้า production
+fresh-start (ไม่มี legacy data) = skip ตลอดกาล
 
----
-
-#### 10. Vendor performance report — vendor identity vs envelope key
-
-**ปัญหา:** `bi.TripFacts.VendorUpperKey` = `dispatch.Trips.UpperKey` ซึ่งเป็น per-order envelope key (เช่น `<orderId32hex>-G1`) ไม่ใช่ vendor identifier. ผลคือ Vendor performance chart มี 1 vendor bucket ต่อ trip — ใช้ไม่ได้
-
-**แนวทาง:**
-- เพิ่ม `VendorName` / `VendorCode` column ที่ trip emit (RIOT3 พอจะรู้ vendor identity?)
-- หรือสกัด vendor prefix จาก `VendorOrderKey` (e.g. `VOK-AAA-...` → `RIOT3-AAA`)
-- อัพเดต TripFacts + projector + report
-
-**Effort:** M | **Impact:** สูง (report ปัจจุบันใช้งานไม่ได้จริง — แค่ render OK)
+**Effort เมื่อ trigger:** S (~3-4 ชม)
 
 ---
 
-### 🔵 P5 — Optional, gated on triggers
+#### #6. Naming consistency refactor (`MarkXxx` → `Mark{Status}`) 🚫 Deferred
 
-#### 11. Event Projection P6 — Compliance
+**Status:** DX-only — ไม่กระทบ user, ไม่กระทบ correctness
 
-จาก [event-projection-plan.md](event-projection-plan.md):
-- Event archival to cold storage
-- Tamper-evident row chaining (Merkle hash)
-- Event versioning + upcasting framework
-- Compliance reports (signed PDF per aggregate)
+**Why deferred:**
+ตอนนี้ method naming ข้าม aggregate ไม่ตรงกัน:
+- Trip: `MarkVendorStarted`, `MarkVendorCompleted`, `MarkVendorFailed`
+- Job: `MarkExecuting`, `MarkCompleted`, `MarkFailed`
+- Item: `MarkPicked`, `MarkDroppedOff`, `ConfirmDelivered`
+- Order: `MarkAsValidated`, `MarkPlanned`, `MarkDispatched`
 
-**Effort:** L | **Trigger:** เฉพาะถ้าเข้า regulated context
+Refactor เป็น `Mark{Status}` ทั้งหมด = touch ทุก test suite + consumer
++ command handler. Cost สูง, payoff ต่ำ (engineer อ่านโค้ดสะดวกขึ้น
+นิดหน่อย — user ไม่เห็น)
+
+**Trigger to revisit:**
+ทำพร้อมกับ refactor ใหญ่อื่นๆ (เช่น Stateless library #7 ลง พร้อมกัน
+จะคุ้มกว่าทำคู่). ถ้าไม่มี refactor ใหญ่มาคู่ — defer ตลอดกาล
+
+**Effort:** L (~1 สัปดาห์ — ต้อง update test ทุก suite)
 
 ---
 
-#### 12. Monitoring/Reporting bounded context extraction
+#### #7. Formal state machine library (Stateless) 🚫 Deferred
 
-ตอนนี้ projection (bi.*, dashboards) กระจายอยู่ใน owning modules. ถ้าวันหนึ่งมี cross-cutting aggregate (e.g. "SLA breach rate" join Order × Trip × Fleet ที่ไม่มี natural module owner) → พิจารณา extract Monitoring module
+**Status:** scattered `if (Status != X) throw` ตอนนี้ทำงานได้ + ทดสอบครอบทุก case
 
-**Effort:** L | **Trigger:** เมื่อมี cross-module aggregate ตัวที่ 1-2 ตัว
+**Why deferred:**
+- Aggregates ปัจจุบัน (Order/Job/Trip/Item) มี state machine ที่กระจาย
+  ใน method แต่ทดสอบครอบครบ — ไม่ buggy
+- ใช้ [Stateless](https://github.com/dotnet-state-machine/stateless) = library dependency ใหม่ + เรียนรู้ DSL ใหม่
+- Payoff = aggregate ใหม่ในอนาคตเขียน state machine ได้สะอาดกว่า
+  แต่ตอนนี้ไม่มี aggregate ใหม่จะเขียน
+
+**Trigger to revisit:**
+- เริ่ม aggregate ใหม่ที่มี > 6 transitions (state explosion จริง) →
+  ลองใช้ Stateless กับ aggregate นั้นก่อน
+- หรือมี bug การ transition ที่ unit test ไม่จับ → indication ว่า
+  scattered guards ไม่เพียงพอ
+
+**Effort:** L (~1 สัปดาห์ — pilot 1 aggregate + decide rollout)
+
+---
+
+### 🟣 Polish จากงานที่เพิ่งทำ
+
+#### #8. Recharts `width(-1) height(-1)` warning — kill จริงๆ 🚫 Deferred
+
+**Status:** Charts render ถูกต้อง — warning เป็น cosmetic ของ Recharts internal first paint
+
+**Why deferred:**
+- `<ChartMount>` (commit `cb20d046`) กั้น render จนกว่า ResizeObserver
+  จะ fire → ป้องกัน real layout race แล้ว
+- Warning ที่เหลือมาจาก **Recharts ResponsiveContainer ภายใน** —
+  log จากการ measure ครั้งแรกของตัวเอง ก่อน parent ส่ง dimensions มา
+- 3 ทางแก้: เปลี่ยน ResponsiveContainer → fixed-px BarChart (per-chart
+  refactor, M effort), patch Recharts (ไม่คุ้ม), console.warn override
+  filter (hacky + อาจ hide warning อื่นที่สำคัญ)
+
+**Trigger to revisit:**
+- Recharts release upstream fix (track [recharts/recharts#xxx](https://github.com/recharts/recharts))
+- หรือ user complaint ว่า console พอง (= dev experience issue ที่ user
+  มอง F12) — มีโอกาสน้อย
+
+**Effort เมื่อ trigger:** M (~half day per chart × 6 charts)
+
+---
+
+### 🔵 Gated on external triggers
+
+#### #11. Event Projection P6 — Compliance 🚫 Deferred
+
+ดูรายละเอียดเต็มใน [event-projection-plan.md](event-projection-plan.md)
+section "P6 — Compliance"
+
+**Why deferred:**
+- ไม่มี regulatory requirement ใน scope ปัจจุบัน
+- design ของ compliance flow specific ต่อ regulation (SOX ≠ HIPAA ≠
+  PDPA) — สร้างเก็งล่วงหน้า = ผิด spec ตอนใช้จริง
+- Event Projection foundation ปัจจุบันให้ 80% ของสิ่งที่ regulator
+  ส่วนใหญ่อยาก (immutable inbox, ordered status history, audit timeline)
+  — เหลือแค่ crypto + archival layer
+
+**Trigger:** stakeholder ตั้งชื่อ regulation จริง
+
+**Effort:** L (1-2 สัปดาห์)
+
+---
+
+#### #12. Monitoring/Reporting bounded context extraction 🚫 Deferred
+
+**Status:** projection (bi.*, dashboards) อยู่ใน owning modules ตาม
+aggregate — boundary ปัจจุบันถูกต้องตาม DDD
+
+**Why deferred:**
+- ทุก projection ปัจจุบันมี **natural module owner** (OrderFacts → DeliveryOrder, TripFacts → Dispatch, JobFacts → Planning)
+- การสร้าง Monitoring module ตอนนี้ = +4 csproj (Domain/App/Infra/Presentation) + DI wiring + migration ที่ "moving rearranging only" — ไม่ได้ feature ใหม่
+- ถ้าจะคุ้มต้องมี **cross-cutting aggregate ≥ 2 ตัว** ที่ไม่มี natural module owner (e.g. "SLA breach rate" join Order × Trip × Fleet)
+
+**Trigger:** projection ที่ 12-13 (ตัวต่อไป) ต้อง JOIN ข้าม 2+ modules
+แบบ first-class. Plus discussion ในเซสชั่นวันที่ 2026-06-13 — ตัดสินใจ
+ใช้ per-aggregate ownership ไปก่อน
+
+**Effort:** L (~1 สัปดาห์ — extract + migrate existing projections)
 
 ---
 
 ## ลำดับที่แนะนำสำหรับ phase ต่อไป
 
+**ปัจจุบัน:** ไม่มีงานในรายการนี้ที่ควรทำตอนนี้.
+
 ```
-Top of mind (impact-driven):
-  └─ #10: Vendor performance — vendor identity fix    (P4 / M / สูง)
-     (report นี้ตอนนี้ render OK แต่ใช้งานไม่ได้จริง)
+ทุก backlog item = 🚫 Deferred (มีเหตุผล + trigger ระบุไว้ในแต่ละ section ด้านบน)
 
-ถ้ามีเวลาเหลือ (small wins):
-  ├─ #9:  JobFacts.FailureCategory + report grouping  (P4 / S-M / กลาง)
-  └─ #1:  TripPaused/Resumed → Job mirror             (P2 / S / ต่ำ-กลาง)
-
-Deep backlog (do-when-needed):
-  - #2 Pickup/Drop visibility
-  - #3 ExceptionRaised audit
-  - #4 ItemStatus.Returned (delete or implement)
-  - #5 Pre-b8 Trips backfill
-  - #6 Naming refactor
-  - #7 State machine library
-  - #8 Recharts warning kill
-
-Gated:
-  - #11 P6 Compliance — regulatory trigger
-  - #12 Monitoring context — cross-module aggregate trigger
+ทางเลือกที่ดีกว่าการ mine backlog:
+  └─ Deploy ขึ้น staging → ใช้งาน 1-2 สัปดาห์ → กลับมาเลือก batch
+     ถัดไปจาก concrete pain points แทน guessing
 ```
+
+---
+
+## วิธีปลด defer ของแต่ละ item
+
+หลักการ: **อย่าพลิก defer status ของ item ใดโดยไม่มี trigger ของ
+item นั้น** (ลิสต์ใน "Trigger to revisit" ของแต่ละ section)
+
+ถ้า trigger เกิดขึ้น:
+1. อ่าน "Why deferred" + "Trigger to revisit" ของ item นั้นซ้ำ — ยัง
+   ตรงกับสถานการณ์จริงไหม
+2. ถ้ายังตรง → เริ่ม implement ตาม "Effort เมื่อ trigger"
+3. ถ้าไม่ตรง (e.g. user request ต่างจากที่คาด) → re-scope ก่อน
+4. **อัพเดตไฟล์นี้** — ย้าย item ขึ้นไป "ที่ทำเสร็จแล้ว" table
 
 ---
 
