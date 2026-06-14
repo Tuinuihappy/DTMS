@@ -355,7 +355,7 @@ Triggered only by a regulatory requirement:
 ### CC1 — Documentation
 - `docs/projection-conventions.md` ✅ shipped in P0
 - `docs/event-projection-plan.md` ✅ this doc (living)
-- `docs/projector-catalog.md` — TODO: list of projector classes + read models they own + events they subscribe
+- [`docs/projector-catalog.md`](projector-catalog.md) ✅ shipped 2026-06-14 — catalog of all 11 projectors with read models, events subscribed, downstream endpoints, backfill scripts, tests
 - `docs/replay-runbook.md` — created when replay impl lands
 - `docs/projection-failure-runbook.md` — created on first DLQ incident
 
