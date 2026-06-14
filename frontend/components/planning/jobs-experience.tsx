@@ -15,7 +15,9 @@ import {
 } from "@/lib/api/jobs";
 import { ToastProvider, useToast } from "@/components/delivery-orders/toast";
 import { StatusTimelineSection } from "@/components/projection/status-timeline-section";
+import type { StatusHistoryEntry } from "@/lib/api/status-history";
 import { getJobStatusHistory } from "@/lib/api/status-history";
+import { useJobSubscription } from "@/lib/realtime/hubs/job-hub";
 import { JobStatusBadge } from "./badges";
 import { cn } from "@/lib/utils";
 
@@ -418,7 +420,13 @@ function JobDetailDrawer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [liveTimelineEntry, setLiveTimelineEntry] = useState<StatusHistoryEntry | null>(null);
   const toast = useToast();
+
+  // Phase P1 — JobHub live timeline updates while the drawer is open.
+  useJobSubscription(jobId, {
+    TimelineUpdated: (entry) => setLiveTimelineEntry(entry as StatusHistoryEntry),
+  });
 
   useEffect(() => {
     if (!jobId) {
@@ -541,10 +549,12 @@ function JobDetailDrawer({
                   <Field label="Transport mode">{data.transportMode ?? "—"}</Field>
                   <Field label="Required capability">{data.requiredCapability ?? "—"}</Field>
 
-                  {/* Phase P1 — structured status-history timeline. */}
+                  {/* Phase P1 — structured status-history timeline with
+                      realtime JobHub updates. */}
                   <StatusTimelineSection
                     entityId={data.id}
                     fetcher={getJobStatusHistory}
+                    liveEntry={liveTimelineEntry}
                   />
                 </div>
               )}

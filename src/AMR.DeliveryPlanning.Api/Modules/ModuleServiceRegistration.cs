@@ -178,6 +178,10 @@ public static class ModuleServiceRegistration
                            AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderStatusHistoryReadRepository>();
         services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderStatusHistoryProjectionStore,
                            AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderStatusHistoryProjectionStore>();
+        // Phase P1 — SignalR-backed realtime publisher. Projector pushes to
+        // OrderHub's "order:{id:N}" group after each successful timeline row.
+        services.AddSingleton<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderRealtimePublisher,
+                              AMR.DeliveryPlanning.Api.Realtime.Publishers.SignalROrderRealtimePublisher>();
         // Phase P2 — unified order activity timeline projection.
         services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderActivityReadRepository,
                            AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderActivityReadRepository>();
@@ -212,6 +216,8 @@ public static class ModuleServiceRegistration
         services.AddScoped<IJobRepository, JobRepository>();
         // Phase P1 — projection infrastructure for the Planning module.
         // Same shape as DeliveryOrder's wiring: store + read repo per module.
+        services.AddSingleton<AMR.DeliveryPlanning.Planning.Application.Projections.IJobRealtimePublisher,
+                              AMR.DeliveryPlanning.Api.Realtime.Publishers.SignalRJobRealtimePublisher>();
         services.AddScoped<AMR.DeliveryPlanning.Planning.Application.Projections.IJobStatusHistoryReadRepository,
                            AMR.DeliveryPlanning.Planning.Infrastructure.Projections.JobStatusHistoryReadRepository>();
         services.AddScoped<AMR.DeliveryPlanning.Planning.Application.Projections.IJobStatusHistoryProjectionStore,
@@ -250,6 +256,8 @@ public static class ModuleServiceRegistration
                 sp.GetRequiredService<DispatchDomainEventMapper>())));
         services.AddScoped<ITripRepository, TripRepository>();
         // Phase P1 — projection infrastructure for the Dispatch module.
+        services.AddSingleton<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripRealtimePublisher,
+                              AMR.DeliveryPlanning.Api.Realtime.Publishers.SignalRTripRealtimePublisher>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripStatusHistoryReadRepository,
                            AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripStatusHistoryReadRepository>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripStatusHistoryProjectionStore,

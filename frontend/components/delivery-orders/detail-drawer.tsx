@@ -35,6 +35,8 @@ import { JobStatusBadge } from "@/components/planning/badges";
 import { TripDetailDrawer } from "@/components/dispatch/trip-detail-drawer";
 import { FullAuditLog } from "./full-audit-log";
 import { StatusTimelineSection } from "@/components/projection/status-timeline-section";
+import type { StatusHistoryEntry } from "@/lib/api/status-history";
+import { useOrderHubSubscription } from "@/lib/realtime/hubs/order-hub";
 import { getOrderStatusHistory } from "@/lib/api/status-history";
 import { OmsNotificationSection } from "./oms-notification-section";
 import { cn } from "@/lib/utils";
@@ -86,6 +88,16 @@ export function OrderDetailDrawer({
   const [jobs, setJobs] = useState<JobDto[] | null>(null);
   // Currently-open Trip detail drawer (stacks above this drawer).
   const [openTripId, setOpenTripId] = useState<string | null>(null);
+  // Phase P1 — latest entry pushed by OrderHub. StatusTimelineSection
+  // merges this into its entries set whenever it changes.
+  const [liveTimelineEntry, setLiveTimelineEntry] = useState<StatusHistoryEntry | null>(null);
+
+  // SignalR subscription — enabled while the drawer is open. The hook
+  // is no-op when orderId is null (between drawer closes), so reopening
+  // the same order picks up the same connection without reconnect cost.
+  useOrderHubSubscription(orderId, {
+    TimelineUpdated: (entry) => setLiveTimelineEntry(entry as StatusHistoryEntry),
+  });
 
   useEffect(() => {
     if (!orderId) {
@@ -287,6 +299,7 @@ export function OrderDetailDrawer({
                   <StatusTimelineSection
                     entityId={data.id}
                     fetcher={getOrderStatusHistory}
+                    liveEntry={liveTimelineEntry}
                   />
 
                   {/* Notes */}

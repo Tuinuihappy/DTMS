@@ -1,7 +1,7 @@
 "use client";
 
-import { Activity, AlertCircle, CircleCheck, Clock, Pause, RefreshCw } from "lucide-react";
-import { useCallback } from "react";
+import { Activity, AlertCircle, CircleCheck, Clock, Pause, RefreshCw, RotateCcw } from "lucide-react";
+import { useCallback, useState } from "react";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { SectionLabel } from "@/components/primitives/section-label";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@/lib/api/admin-projections";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
 import { cn } from "@/lib/utils";
+import { ReplayDialog } from "./replay-dialog";
 
 // CC4 — Projection health dashboard. Cross-module aggregate of
 // per-projector ProjectionInbox stats: last processed event, lag,
@@ -25,6 +26,11 @@ export function AdminProjectionsExperience() {
   const { data, loading, error, refresh, lastUpdated } = useProjectionPoll(fetcher, {
     intervalMs: 30_000,
   });
+
+  // Replay state lifted to the page so a single dialog instance covers
+  // every projector row — clicking Replay on any row opens it with that
+  // row's name preset.
+  const [replayTarget, setReplayTarget] = useState<string | null>(null);
 
   return (
     <div className="space-y-6">
@@ -95,7 +101,11 @@ export function AdminProjectionsExperience() {
                 </div>
               )}
               {m.projectors.map((p) => (
-                <ProjectorRowCard key={p.name} projector={p} />
+                <ProjectorRowCard
+                  key={p.name}
+                  projector={p}
+                  onReplay={() => setReplayTarget(p.name)}
+                />
               ))}
             </div>
           </GlassCard>
@@ -112,11 +122,28 @@ export function AdminProjectionsExperience() {
         {" · "}auto-refresh every 30s
         {" · "}thresholds: stale &gt; 5 min · idle &gt; 1 hr
       </footer>
+
+      <ReplayDialog
+        open={replayTarget !== null}
+        projectorName={replayTarget}
+        onClose={() => setReplayTarget(null)}
+        onReplayed={() => {
+          setReplayTarget(null);
+          // Pull fresh inbox stats so the lag drops back to ~0 in the UI.
+          void refresh();
+        }}
+      />
     </div>
   );
 }
 
-function ProjectorRowCard({ projector }: { projector: ProjectorRow }) {
+function ProjectorRowCard({
+  projector,
+  onReplay,
+}: {
+  projector: ProjectorRow;
+  onReplay: () => void;
+}) {
   return (
     <div className="flex items-center justify-between py-2.5 gap-3">
       <div className="min-w-0 flex-1">
@@ -132,7 +159,18 @@ function ProjectorRowCard({ projector }: { projector: ProjectorRow }) {
           </span>
         </div>
       </div>
-      <StatusBadge status={projector.status} />
+      <div className="flex items-center gap-2">
+        <StatusBadge status={projector.status} />
+        <button
+          type="button"
+          onClick={onReplay}
+          title="Replay this projector"
+          className="inline-flex items-center gap-1 rounded-full bg-[var(--color-pastel-lavender)] px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--color-pastel-lavender-ink)] hover:bg-[var(--color-pastel-lavender)]/80"
+        >
+          <RotateCcw className="h-3 w-3" strokeWidth={2.4} />
+          Replay
+        </button>
+      </div>
     </div>
   );
 }

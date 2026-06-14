@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@microsoft/signalr": "^10.0.0",
+    "@microsoft/signalr-protocol-msgpack": "^10.0.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.460.0",
     "motion": "^11.13.1",

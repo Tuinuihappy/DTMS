@@ -1,12 +1,17 @@
 # Upstream OMS Notification — Implementation Plan
 
+> **Status (2026-06-14)**: Phase 1–4 ทั้งหมด **เสร็จและ wire เข้า production code แล้ว** + ขยาย scope เพิ่ม Arrived (drop completed) notification ด้วย
+> เหลือเฉพาะ (a) เปิด kill switch `UpstreamOms.Enabled` ใน prod, (b) งานในกล่อง "Defer" — ดูตาราง **Status snapshot** ท้ายเอกสาร
+
 ## Overview
 
 ส่ง notification ไปยัง upstream OMS เมื่อ Trip เริ่มทำงาน (RIOT3 ส่ง `TASK_PROCESSING` → Trip status: Created → InProgress) เพื่อให้ OMS รับรู้ว่า shipment ถูกรับงานโดย robot ตัวไหน
 
-**Endpoint**: `POST http://10.204.37.65:5002/api/shipments`
+**Endpoints**:
+- `POST /api/shipments` — Started (Trip Created→InProgress)
+- `POST /api/shipments/{shipmentId}/arrived` — Arrived (Trip drop completed) ◀ added beyond original plan
 
-**Trigger event**: `TripStartedIntegrationEvent`
+**Trigger events**: `TripStartedIntegrationEvent`, `TripDropCompletedIntegrationEvent`
 
 ---
 
@@ -53,9 +58,12 @@ Content-Type: application/json
 
 ---
 
-## Phase 1 — OmsAdapter module
+## Phase 1 — OmsAdapter module ✅ DONE
 
 สร้าง infrastructure layer สำหรับคุยกับ OMS (ยังไม่ wire เข้า business flow)
+
+> **Done as planned** — files ครบทุกตัว wired ผ่าน `AddOmsAdapter` ใน `ModuleServiceRegistration.cs`
+> **Extras นอกแผน**: เพิ่ม `NotifyShipmentArrivedAsync` + `OmsArrivedNotification` model สำหรับรองรับ Arrived flow (Phase 2 ขยาย)
 
 ### Files
 
@@ -101,9 +109,17 @@ src/Modules/OmsAdapter/
 
 ---
 
-## Phase 2 — Consumer + gate + audit (core flow)
+## Phase 2 — Consumer + gate + audit (core flow) ✅ DONE (+ Arrived extension)
 
 ฟัง `TripStartedIntegrationEvent` → POST OMS
+
+> **Done**: `TripStartedOmsNotifyConsumer` + `TripStartedOmsNotifyFaultConsumer` ทำงานตามแผน
+> **Extras นอกแผน**:
+> 1. `TripDropCompletedOmsNotifyConsumer` + Fault consumer (POST `/api/shipments/{id}/arrived`)
+> 2. **Option A — stable shipmentId across retry chain**: walk `PreviousAttemptId` กลับไปยัง root trip ใช้ `rootTripId.ToString()` เป็น shipmentId แทน `trip.Id` ตรง ๆ ทำให้ retry attempts มอง OMS เป็น shipment เดียวกัน
+> 3. **409 Conflict treated as no-op success** — ป้องกัน dead-letter เมื่อ OMS dedupe
+> 4. **Throw แทนส่ง `"(unknown)"`** เมื่อ `VendorVehicleKey` ยังไม่พร้อม — แก้ race กับ `MarkVendorStarted` save (MassTransit retry จะอ่านใหม่)
+> 5. ตอน Phase 2 commit registered ด้วย `Enabled=false` แล้ว — kill switch ยังปิดใน `appsettings.json` รอ rollout
 
 ### Files
 
@@ -191,9 +207,11 @@ public class TripStartedOmsNotifyFaultConsumer
 
 ---
 
-## Phase 3 — Frontend visibility
+## Phase 3 — Frontend visibility ✅ DONE
 
 แสดงสถานะ OMS notification ใน detail-drawer
+
+> **Done**: [frontend/components/delivery-orders/oms-notification-section.tsx](frontend/components/delivery-orders/oms-notification-section.tsx) แสดงทั้ง Started + Arrived stage แยกกัน — latest-wins logic, ปุ่ม Resend independent ต่อ stage, status badges (Notified / Failed / Stale / Awaiting)
 
 ### Backend
 
@@ -220,9 +238,14 @@ Section "OMS Notification" — แสดงเฉพาะ order ที่ `orde
 
 ---
 
-## Phase 4 — Manual re-notify (defer until needed)
+## Phase 4 — Manual re-notify ✅ DONE (ไม่ defer แล้ว)
 
 ให้ operator แก้ stuck flow เองได้
+
+> **Done**:
+> - Backend: `POST /api/v1/delivery-orders/{id}/trips/{tripId}/notify-oms` + `ResendOmsNotificationCommand` (`UpstreamOmsManuallyResent` audit)
+> - Backend extra: `POST .../notify-oms-arrived` + `ResendOmsArrivedNotificationCommand` (`UpstreamOmsArrivedManuallyResent` audit)
+> - Frontend: ปุ่ม "Resend started" + "Resend arrived" ใน `oms-notification-section.tsx`
 
 ### Backend
 
@@ -246,25 +269,40 @@ Confirm dialog → POST → refresh order
 
 ## Build & rollout order
 
-| Step | Output                                                    | Risk   |
-| ---- | --------------------------------------------------------- | ------ |
-| 1    | Phase 1 commit (module + options + client + Bearer auth)  | ต่ำ    |
-| 2    | Manual test: curl ผ่าน client → mock listener              | —      |
-| 3    | Phase 2 commit (consumer + gate + audit) — `Enabled=false` | ต่ำ    |
-| 4    | Dev: toggle `Enabled=true` → trigger TASK_PROCESSING → verify | กลาง |
-| 5    | Phase 3 commit (frontend section)                         | ต่ำ    |
-| 6    | Prod rollout (env var token พร้อม)                          | กลาง |
-| 7    | Phase 4 เมื่อ operator ขอ                                  | ต่ำ    |
+| Step | Output                                                    | Risk   | Status |
+| ---- | --------------------------------------------------------- | ------ | ------ |
+| 1    | Phase 1 commit (module + options + client + Bearer auth)  | ต่ำ    | ✅ DONE |
+| 2    | Manual test: curl ผ่าน client → mock listener              | —      | ✅ DONE |
+| 3    | Phase 2 commit (consumer + gate + audit) — `Enabled=false` | ต่ำ    | ✅ DONE |
+| 4    | Dev: toggle `Enabled=true` → trigger TASK_PROCESSING → verify | กลาง | ⬜ TODO — `appsettings.json` ยัง `Enabled=false` |
+| 5    | Phase 3 commit (frontend section)                         | ต่ำ    | ✅ DONE |
+| 6    | Prod rollout (env var token พร้อม)                          | กลาง | ⬜ TODO — ต้องตั้ง `UpstreamOms__BearerToken` + เปิด `Enabled=true` ใน prod env |
+| 7    | Phase 4 เมื่อ operator ขอ                                  | ต่ำ    | ✅ DONE (ทำพร้อมไปเลย) |
 
 ---
 
-## Defer (ไม่ทำตอนนี้)
+## Status snapshot (2026-06-14)
 
-- Token refresh (JWT exp ~9 เดือน — มีเวลาเตรียม)
-- Metrics counters (`oms_notify_total`, `oms_notify_latency_ms`)
-- Integration test ด้วย WireMock.Net
-- ขยาย `IOmsShipmentClient` รองรับ TripFailed/Canceled/PodCompleted/DropCompleted
-- Backfill tool (replay missed notifications)
+### ✅ Completed
+- Phase 1, 2, 3, 4 ครบทุก acceptance criteria
+- Arrived (drop completed) notification flow — **ขยายเกินแผนเดิม**
+- Stable shipmentId across retry chain (Option A)
+- 409 Conflict handling
+- Manual resend สำหรับทั้ง Started + Arrived
+- MassTransit consumers + Fault consumers registered
+
+### ⬜ Remaining work
+
+1. **Flip kill switch** — `appsettings.json` ยัง `UpstreamOms.Enabled=false`
+   - Dev: toggle เปิดเพื่อทดสอบ end-to-end กับ TASK_PROCESSING / SUB_TASK_FINISHED จริง
+   - Prod: set env var `UpstreamOms__Enabled=true` + `UpstreamOms__BearerToken=<token>` ผ่าน deployment config (ไม่ commit token)
+
+2. **ยังคง defer (จากแผนเดิม)**
+   - Token refresh (JWT exp ~2027-09 — ยังมีเวลา)
+   - Metrics counters (`oms_notify_total`, `oms_notify_latency_ms`)
+   - Integration test ด้วย WireMock.Net
+   - ขยาย `IOmsShipmentClient` รองรับ **TripFailed / Canceled / PodCompleted** (DropCompleted/Arrived เสร็จแล้ว)
+   - Backfill tool (replay missed notifications)
 
 ---
 

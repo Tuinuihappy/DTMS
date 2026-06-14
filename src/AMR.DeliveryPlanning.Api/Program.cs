@@ -6,10 +6,12 @@ using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
 using AMR.DeliveryPlanning.Api.Middlewares;
 using AMR.DeliveryPlanning.Api.Modules;
 using AMR.DeliveryPlanning.Api.RobotPositions;
+using AMR.DeliveryPlanning.SharedKernel.Auth;
 using AMR.DeliveryPlanning.SharedKernel.Projection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -72,6 +74,23 @@ else
                     jwtSettings?.Secret
                     ?? throw new InvalidOperationException("Jwt:Secret is not configured. Set it via environment variable or dotnet user-secrets.")))
         };
+        // SignalR cannot send custom Authorization headers on the
+        // WebSocket upgrade. Browsers pass the JWT via ?access_token=...
+        // on the negotiate + connection URLs, so re-hydrate the token
+        // into ctx.Token when the request targets a /hubs/* path.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = ctx =>
+            {
+                var accessToken = ctx.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken) &&
+                    ctx.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                {
+                    ctx.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
+        };
     });
 }
 
@@ -103,8 +122,11 @@ builder.Services.AddOpenTelemetry()
         .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)))
     // P0.3 — projection metrics (lag, throughput, dedup) — Meter name
     // matches AMR.DeliveryPlanning.SharedKernel.Projection.ProjectionMetrics.MeterName.
+    // P0 Day 4 — DTMS.SignalR meter for hub invocations / connections /
+    // rate-limit drops (HubMetrics class).
     .WithMetrics(metrics => metrics
         .AddMeter("DTMS.Projection")
+        .AddMeter("DTMS.SignalR")
         .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)));
 
 // P0 — projection foundation (idempotency, replay stub, metrics singleton).
@@ -112,9 +134,99 @@ builder.Services.AddOpenTelemetry()
 // each module's own infrastructure registration (next to its DbContext).
 builder.Services.AddProjectionFoundation();
 
+// P0 — ICurrentActorContext: resolves "who triggered this transition" so
+// projectors can stamp TriggeredBy on history rows. HTTP path reads the
+// JWT name claim; MassTransit consumers + background services push an
+// explicit ActorContext via BeginScope (wired in P0.B7 / consumer filter).
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddActorContext(sp =>
+{
+    var http = sp.GetRequiredService<IHttpContextAccessor>();
+    return () =>
+    {
+        var ctx = http.HttpContext;
+        if (ctx is null) return null;
+        var userId = ctx.User.Identity?.Name;
+        var traceId = ctx.TraceIdentifier;
+        return new ActorContext(
+            UserId: string.IsNullOrWhiteSpace(userId) ? null : userId,
+            Source: "http",
+            CorrelationId: Guid.TryParse(traceId, out var g) ? g : null);
+    };
+});
+
 // Health checks — /health (liveness), /health/ready (readiness), /health/vendors (external vendors)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
 var redisConn = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+
+// ── P0 Day 3 — SignalR realtime hub stack ──────────────────────────────
+// Hubs: 5 focused hubs map to bounded contexts (OrderHub, JobHub, TripHub,
+// DashboardHub, FleetHub). Hot-path optimisations:
+//   - MessagePack + LZ4: 30-60% smaller payloads, 3-5× faster parse vs JSON.
+//   - Redis backplane (env-var gated): enables multi-instance scale-out
+//     without per-instance sticky sessions. Defaults to in-memory for the
+//     single-container Docker layout. Flip via SignalR__UseRedisBackplane=true.
+//   - JWT in ?access_token=: handled in the JwtBearer.OnMessageReceived
+//     event above — browsers can't send Authorization headers on
+//     WebSocket upgrades.
+// P0 Day 4 — observability singletons + throttling background services
+// must register BEFORE AddSignalR so the filter types can resolve
+// HubMetrics from DI.
+builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Observability.HubMetrics>();
+builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Filters.TracingHubFilter>();
+builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Filters.RateLimitedHubFilter>();
+// Batchers register as both singleton (so projectors can inject and
+// enqueue) AND as a hosted service (so the drain loop runs).
+builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Pipeline.DashboardCounterBatcher>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AMR.DeliveryPlanning.Api.Realtime.Pipeline.DashboardCounterBatcher>());
+builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Pipeline.FleetPositionThrottler>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AMR.DeliveryPlanning.Api.Realtime.Pipeline.FleetPositionThrottler>());
+
+// CORS for browser→hub direct connection. Same-origin reverse-proxy setups
+// (Nginx fronting both frontend + backend) wouldn't need this — but the
+// docker-compose dev layout has the frontend on :3000 and API on :5219,
+// so SignalR's WebSocket upgrade needs an explicit allowlist + credentials.
+// Origins come from the env var Cors__HubsAllowedOrigins (comma-separated).
+const string HubsCorsPolicy = "HubsCorsPolicy";
+var hubsAllowedOrigins = (builder.Configuration["Cors:HubsAllowedOrigins"]
+    ?? "http://localhost:3000,http://localhost:3001")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(HubsCorsPolicy, policy => policy
+        .WithOrigins(hubsAllowedOrigins)
+        .AllowCredentials()
+        .AllowAnyHeader()
+        .AllowAnyMethod());
+});
+
+var signalRBuilder = builder.Services.AddSignalR(options =>
+    {
+        options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+        options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+        // 16 KB cap — DTMS hub methods are subscription-only, no large
+        // client → server payloads should reach this limit. Acts as a
+        // belt-and-suspenders guard against accidental misuse.
+        options.MaximumReceiveMessageSize = 16 * 1024;
+        options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+        // Filters run in registration order. Tracing wraps everything
+        // (records duration including time inside rate-limit check).
+        // Rate limit is innermost so a rejected call never reaches the
+        // hub method body — and only counts once in the metrics.
+        options.AddFilter<AMR.DeliveryPlanning.Api.Realtime.Filters.TracingHubFilter>();
+        options.AddFilter<AMR.DeliveryPlanning.Api.Realtime.Filters.RateLimitedHubFilter>();
+    })
+    .AddMessagePackProtocol();
+
+var useRedisBackplane = builder.Configuration.GetValue<bool>("SignalR:UseRedisBackplane");
+if (useRedisBackplane)
+{
+    signalRBuilder.AddStackExchangeRedis(redisConn, options =>
+    {
+        options.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("dtms:sr");
+        options.Configuration.AbortOnConnectFail = false;
+    });
+}
 var rabbitConfig = builder.Configuration.GetSection("RabbitMq");
 var rabbitHost = rabbitConfig["Host"] ?? "localhost";
 var rabbitUser = rabbitConfig["Username"] ?? "guest";
@@ -370,6 +482,10 @@ app.UseHttpsRedirection();
 
 app.UseRateLimiter();
 
+// CORS must run BEFORE auth so the preflight OPTIONS request gets the
+// allow headers even on unauthenticated origins.
+app.UseCors(HubsCorsPolicy);
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -431,6 +547,17 @@ app.MapAllModuleEndpoints();
 // Map live robot positions endpoint (lives in the Api project because the
 // store + DTO are composition-root concerns, not a Facility domain concept).
 app.MapRobotPositionEndpoints();
+
+// ── P0 Day 3 — SignalR hub endpoints ──────────────────────────────────
+// Five focused hubs (one per bounded context). Browser pages connect only
+// to the hub their UI subscribes to — lazy connection keeps idle WS count
+// low. Auth enforced via [Authorize] on the hub classes; JWT comes in on
+// the access_token query param (see OnMessageReceived in JwtBearer setup).
+app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.OrderHub>("/hubs/orders");
+app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.JobHub>("/hubs/jobs");
+app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.TripHub>("/hubs/trips");
+app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.DashboardHub>("/hubs/dashboard");
+app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.FleetHub>("/hubs/fleet");
 
 app.Run();
 

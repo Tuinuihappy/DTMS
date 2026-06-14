@@ -1,14 +1,31 @@
 using AMR.DeliveryPlanning.Planning.Domain.Events;
 using AMR.DeliveryPlanning.Planning.IntegrationEvents;
+using AMR.DeliveryPlanning.SharedKernel.Auth;
 using AMR.DeliveryPlanning.SharedKernel.Domain;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
 
 namespace AMR.DeliveryPlanning.Planning.Infrastructure.Services;
 
+// Phase P0 (2026-06-14) — Job lifecycle integration events get enriched
+// with TriggeredBy + CorrelationId. Most Job transitions are
+// system-triggered (consumer → MarkExecuting, vendor webhook → MarkCompleted),
+// but operator actions (RetryJob, CancelJob) flow through the same
+// ambient context so audits stay accurate.
+
 public class PlanningDomainEventMapper : IDomainEventToIntegrationEventMapper
 {
+    private readonly ICurrentActorContext _actor;
+
+    public PlanningDomainEventMapper(ICurrentActorContext actor)
+    {
+        _actor = actor;
+    }
+
     public IReadOnlyCollection<IIntegrationEvent> Map(IDomainEvent domainEvent)
     {
+        var triggeredBy = _actor.Current.TriggeredBy;
+        var correlationId = _actor.Current.CorrelationId;
+
         return domainEvent switch
         {
             // Existing — PlanCommitted carries the leg payload for the
@@ -26,7 +43,9 @@ public class PlanningDomainEventMapper : IDomainEventToIntegrationEventMapper
                     evt.Legs
                         .Where(l => l.FromStationId != Guid.Empty && l.ToStationId != Guid.Empty)
                         .Select(l => new PlannedLegDto(l.FromStationId, l.ToStationId, l.SequenceOrder))
-                        .ToList())
+                        .ToList(),
+                    TriggeredBy: triggeredBy,
+                    CorrelationId: correlationId)
             ],
 
             // Phase P1 (b12) — the rest of the Job lifecycle. Each domain
@@ -35,26 +54,30 @@ public class PlanningDomainEventMapper : IDomainEventToIntegrationEventMapper
             JobCreatedDomainEvent evt =>
             [
                 new JobCreatedIntegrationEventV1(
-                    evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId)
+                    evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId,
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
             ],
 
             JobDispatchedDomainEvent evt =>
             [
                 new JobDispatchedIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId,
-                    evt.TripId, evt.VendorOrderKey, evt.AttemptNumber)
+                    evt.TripId, evt.VendorOrderKey, evt.AttemptNumber,
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
             ],
 
             JobExecutingDomainEvent evt =>
             [
                 new JobExecutingIntegrationEventV1(
-                    evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId, evt.TripId)
+                    evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId, evt.TripId,
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
             ],
 
             JobCompletedDomainEvent evt =>
             [
                 new JobCompletedIntegrationEventV1(
-                    evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId, evt.TripId)
+                    evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId, evt.TripId,
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
             ],
 
             JobFailedDomainEvent evt =>
@@ -64,7 +87,8 @@ public class PlanningDomainEventMapper : IDomainEventToIntegrationEventMapper
                     evt.Reason, evt.AttemptNumber,
                     // Cross-module wire format = string, not enum, so consumers
                     // in other modules don't take a ref on Planning.Domain.
-                    FailureCategory: evt.Category.ToString())
+                    FailureCategory: evt.Category.ToString(),
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
             ],
 
             JobCancelledDomainEvent evt =>
@@ -72,19 +96,22 @@ public class PlanningDomainEventMapper : IDomainEventToIntegrationEventMapper
                 new JobCancelledIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId,
                     evt.TripId, evt.Reason,
-                    FailureCategory: evt.Category.ToString())
+                    FailureCategory: evt.Category.ToString(),
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
             ],
 
             JobPausedDomainEvent evt =>
             [
                 new JobPausedIntegrationEventV1(
-                    evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId, evt.TripId)
+                    evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId, evt.TripId,
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
             ],
 
             JobResumedDomainEvent evt =>
             [
                 new JobResumedIntegrationEventV1(
-                    evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId, evt.TripId)
+                    evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId, evt.TripId,
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
             ],
 
             // JobAssignedDomainEvent is also a status transition (→ Assigned),

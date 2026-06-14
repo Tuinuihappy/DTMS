@@ -31,15 +31,18 @@ public class TripStatusHistoryProjector :
 
     private readonly ITripStatusHistoryProjectionStore _store;
     private readonly ProjectionMetrics _metrics;
+    private readonly ITripRealtimePublisher _realtime;
     private readonly ILogger<TripStatusHistoryProjector> _logger;
 
     public TripStatusHistoryProjector(
         ITripStatusHistoryProjectionStore store,
         ProjectionMetrics metrics,
+        ITripRealtimePublisher realtime,
         ILogger<TripStatusHistoryProjector> logger)
     {
         _store = store;
         _metrics = metrics;
+        _realtime = realtime;
         _logger = logger;
     }
 
@@ -125,6 +128,20 @@ public class TripStatusHistoryProjector :
 
             _metrics.RecordProjected(Name, typeof(TEvent).Name);
             _metrics.RecordLag(Name, evt.OccurredOn);
+
+            // Phase P1 — push to trip:{id:N} SignalR group after durable write.
+            _ = _realtime.PublishTimelineUpdatedAsync(
+                tripId,
+                new TripTimelineEntryDto(
+                    EventId: evt.EventId,
+                    TripId: tripId,
+                    DeliveryOrderId: effectiveOrderId,
+                    JobId: effectiveJobId,
+                    FromStatus: fromStatus,
+                    ToStatus: toStatus,
+                    OccurredAt: evt.OccurredOn,
+                    Reason: reason),
+                ct);
 
             _logger.LogInformation(
                 "Projected {EventType} for Trip {TripId}: {From}→{To}",

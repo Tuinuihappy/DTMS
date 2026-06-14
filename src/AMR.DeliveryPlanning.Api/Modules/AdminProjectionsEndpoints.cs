@@ -2,8 +2,10 @@ using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
+using AMR.DeliveryPlanning.SharedKernel.Projection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 
@@ -73,7 +75,54 @@ public static class AdminProjectionsEndpoints
                 modules,
             });
         });
+
+        // POST /api/v1/admin/projections/{name}/replay — trigger replay
+        // through IProjectionReplayService. Today this resolves the
+        // NotImplementedReplayService stub from P0.B1 — call it anyway so
+        // the UI contract + auth + audit path is exercised. When the real
+        // replay service lands, the only thing that changes is the DI
+        // registration; the route stays identical.
+        group.MapPost("/projections/{name}/replay", async (
+            string name,
+            [FromBody] ReplayRequest body,
+            IProjectionReplayService replayService,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return Results.BadRequest("Projector name is required.");
+            if (body.FromUtc == default)
+                return Results.BadRequest("FromUtc is required.");
+            if (body.ToUtc.HasValue && body.ToUtc.Value <= body.FromUtc)
+                return Results.BadRequest("ToUtc must be after FromUtc.");
+
+            try
+            {
+                var summary = await replayService.ReplayAsync(
+                    name, body.FromUtc, body.ToUtc, body.AggregateId, ct);
+                return Results.Ok(summary);
+            }
+            catch (NotImplementedException ex)
+            {
+                // Stub still in place — return 501 so the dialog can
+                // surface a clear "not yet wired" message instead of
+                // pretending success.
+                return Results.Json(
+                    new { message = ex.Message },
+                    statusCode: StatusCodes.Status501NotImplemented);
+            }
+        });
     }
+
+    /// <summary>
+    /// POST body for the replay endpoint. <c>FromUtc</c> required;
+    /// <c>ToUtc</c> defaults to "now" when omitted; <c>AggregateId</c>
+    /// scopes the replay to a single aggregate (targeted fix vs full
+    /// rebuild).
+    /// </summary>
+    public record ReplayRequest(
+        DateTime FromUtc,
+        DateTime? ToUtc = null,
+        Guid? AggregateId = null);
 
     private static async Task<ModuleStatus> BuildModuleAsync<TContext>(
         TContext db, string moduleName, string schema, DateTime now, CancellationToken ct)

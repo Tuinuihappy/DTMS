@@ -27,14 +27,44 @@ export function StatusTimelineSection({
   entityId,
   title = "Status timeline",
   fetcher,
+  liveEntry,
 }: {
   entityId: string | null;
   title?: string;
   fetcher: (id: string) => Promise<FetchResult>;
+  /**
+   * Phase P1 — most recent entry received over SignalR. Caller owns the
+   * hub subscription (so the same section component works regardless of
+   * which hub: Order / Job / Trip). When this changes, the section
+   * dedup-merges it into <c>entries</c> so the new row animates in
+   * without a refetch.
+   */
+  liveEntry?: StatusHistoryEntry | null;
 }) {
   const [data, setData] = useState<FetchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Phase P1 — fold the latest hub-pushed entry into the data set whenever
+  // the parent supplies a new one. Dedup by eventId so a fast refetch+push
+  // race doesn't display the same row twice.
+  useEffect(() => {
+    if (!liveEntry) return;
+    setData((prev) => {
+      if (!prev) {
+        return { entries: [liveEntry], lastEventAt: liveEntry.occurredAt };
+      }
+      if (prev.entries.some((e) => e.eventId === liveEntry.eventId)) {
+        return prev; // already have this event
+      }
+      const merged = [liveEntry, ...prev.entries];
+      const lastEventAt =
+        !prev.lastEventAt || liveEntry.occurredAt > prev.lastEventAt
+          ? liveEntry.occurredAt
+          : prev.lastEventAt;
+      return { entries: merged, lastEventAt };
+    });
+  }, [liveEntry]);
 
   useEffect(() => {
     if (!entityId) {

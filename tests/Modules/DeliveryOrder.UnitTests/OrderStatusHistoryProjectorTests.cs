@@ -188,7 +188,7 @@ public class OrderStatusHistoryProjectorTests
             .Returns(((string, DateTime)?)null);
         var metrics = new ProjectionMetrics();
         var projector = new OrderStatusHistoryProjector(
-            store, metrics, NullLogger<OrderStatusHistoryProjector>.Instance);
+            store, metrics, new NoopOrderRealtimePublisher(), NullLogger<OrderStatusHistoryProjector>.Instance);
         return (projector, store);
     }
 

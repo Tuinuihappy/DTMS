@@ -9,7 +9,9 @@ public record JobAssignedIntegrationEvent(
     Guid DeliveryOrderId,
     Guid VehicleId,
     Guid PickupStationId,
-    Guid DropStationId) : IIntegrationEvent;
+    Guid DropStationId,
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null) : IIntegrationEvent;
 
 public record PlannedLegDto(
     Guid FromStationId,
@@ -22,7 +24,9 @@ public record PlanCommittedIntegrationEvent(
     Guid JobId,
     Guid DeliveryOrderId,
     Guid? VehicleId,
-    List<PlannedLegDto> Legs) : IIntegrationEvent;
+    List<PlannedLegDto> Legs,
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null) : IIntegrationEvent;
 
 // ── Phase P1 (b12) — Job status lifecycle integration events ───────────
 // These bridge the existing JobXxxDomainEvent stream to anything that
@@ -30,25 +34,36 @@ public record PlanCommittedIntegrationEvent(
 // domain assembly. The projector under Phase P1 is the first consumer.
 // SchemaVersion follows the same convention as DeliveryOrder events:
 // additive fields bump minor; breaking changes bump the class name.
+//
+// Schema 1.1 (Phase P0, 2026-06-14) — adds TriggeredBy + CorrelationId
+// populated from ambient ICurrentActorContext at outbox-emit time.
 
 public record JobCreatedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid JobId, Guid DeliveryOrderId,
-    string SchemaVersion = "1.0") : IIntegrationEvent;
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.1") : IIntegrationEvent;
 
 public record JobDispatchedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid JobId, Guid DeliveryOrderId,
     Guid TripId, string? VendorOrderKey, int AttemptNumber,
-    string SchemaVersion = "1.0") : IIntegrationEvent;
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.1") : IIntegrationEvent;
 
 public record JobExecutingIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid JobId, Guid DeliveryOrderId,
     Guid TripId,
-    string SchemaVersion = "1.0") : IIntegrationEvent;
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.1") : IIntegrationEvent;
 
 public record JobCompletedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid JobId, Guid DeliveryOrderId,
     Guid TripId,
-    string SchemaVersion = "1.0") : IIntegrationEvent;
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.1") : IIntegrationEvent;
 
 // FailureCategory added in V1.1 (Phase #9 — surfaces b13's structured
 // classification on the BI side). String, not enum, to keep cross-module
@@ -58,7 +73,9 @@ public record JobFailedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid JobId, Guid DeliveryOrderId,
     string Reason, int AttemptNumber,
     string? FailureCategory = null,
-    string SchemaVersion = "1.0") : IIntegrationEvent;
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.1") : IIntegrationEvent;
 
 public record JobCancelledIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid JobId, Guid DeliveryOrderId,
@@ -67,15 +84,21 @@ public record JobCancelledIntegrationEventV1(
     // is here so JobFactsProjector can populate the column without a special
     // case in the projector.
     string? FailureCategory = null,
-    string SchemaVersion = "1.0") : IIntegrationEvent;
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.1") : IIntegrationEvent;
 
 // Phase #1 — Job mirrors Trip pause/resume state. Status-history
 // projector subscribes to write Paused / Executing transitions to the
 // timeline.
 public record JobPausedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid JobId, Guid DeliveryOrderId, Guid TripId,
-    string SchemaVersion = "1.0") : IIntegrationEvent;
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.1") : IIntegrationEvent;
 
 public record JobResumedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid JobId, Guid DeliveryOrderId, Guid TripId,
-    string SchemaVersion = "1.0") : IIntegrationEvent;
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.1") : IIntegrationEvent;

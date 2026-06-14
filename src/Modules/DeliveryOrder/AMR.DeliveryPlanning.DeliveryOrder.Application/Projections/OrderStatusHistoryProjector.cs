@@ -39,15 +39,18 @@ public class OrderStatusHistoryProjector :
 
     private readonly IOrderStatusHistoryProjectionStore _store;
     private readonly ProjectionMetrics _metrics;
+    private readonly IOrderRealtimePublisher _realtime;
     private readonly ILogger<OrderStatusHistoryProjector> _logger;
 
     public OrderStatusHistoryProjector(
         IOrderStatusHistoryProjectionStore store,
         ProjectionMetrics metrics,
+        IOrderRealtimePublisher realtime,
         ILogger<OrderStatusHistoryProjector> logger)
     {
         _store = store;
         _metrics = metrics;
+        _realtime = realtime;
         _logger = logger;
     }
 
@@ -140,6 +143,21 @@ public class OrderStatusHistoryProjector :
 
             _metrics.RecordProjected(Name, typeof(TEvent).Name);
             _metrics.RecordLag(Name, evt.OccurredOn);
+
+            // Phase P1 — fire the SignalR push AFTER the durable write so
+            // a subscriber that races on it always sees the row when it
+            // re-reads via REST. Failures of the realtime push must not
+            // fail the projector (durability already secured).
+            _ = _realtime.PublishTimelineUpdatedAsync(
+                orderId,
+                new OrderTimelineEntryDto(
+                    EventId: evt.EventId,
+                    OrderId: orderId,
+                    FromStatus: fromStatus,
+                    ToStatus: toStatus,
+                    OccurredAt: evt.OccurredOn,
+                    Reason: reason),
+                ct);
 
             _logger.LogInformation(
                 "Projected {EventType} for Order {OrderId}: {From}→{To}",

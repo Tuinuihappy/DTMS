@@ -205,7 +205,7 @@ public class JobStatusHistoryProjectorTests
             .Returns(((string, DateTime)?)null);
         var metrics = new ProjectionMetrics();
         var projector = new JobStatusHistoryProjector(
-            store, metrics, NullLogger<JobStatusHistoryProjector>.Instance);
+            store, metrics, new NoopJobRealtimePublisher(), NullLogger<JobStatusHistoryProjector>.Instance);
         return (projector, store);
     }
 

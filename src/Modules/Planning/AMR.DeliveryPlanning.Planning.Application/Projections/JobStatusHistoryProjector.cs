@@ -33,15 +33,18 @@ public class JobStatusHistoryProjector :
 
     private readonly IJobStatusHistoryProjectionStore _store;
     private readonly ProjectionMetrics _metrics;
+    private readonly IJobRealtimePublisher _realtime;
     private readonly ILogger<JobStatusHistoryProjector> _logger;
 
     public JobStatusHistoryProjector(
         IJobStatusHistoryProjectionStore store,
         ProjectionMetrics metrics,
+        IJobRealtimePublisher realtime,
         ILogger<JobStatusHistoryProjector> logger)
     {
         _store = store;
         _metrics = metrics;
+        _realtime = realtime;
         _logger = logger;
     }
 
@@ -126,6 +129,19 @@ public class JobStatusHistoryProjector :
 
             _metrics.RecordProjected(Name, typeof(TEvent).Name);
             _metrics.RecordLag(Name, evt.OccurredOn);
+
+            // Phase P1 — push to job:{id:N} SignalR group after durable write.
+            _ = _realtime.PublishTimelineUpdatedAsync(
+                jobId,
+                new JobTimelineEntryDto(
+                    EventId: evt.EventId,
+                    JobId: jobId,
+                    DeliveryOrderId: deliveryOrderId == Guid.Empty ? null : deliveryOrderId,
+                    FromStatus: fromStatus,
+                    ToStatus: toStatus,
+                    OccurredAt: evt.OccurredOn,
+                    Reason: reason),
+                ct);
 
             _logger.LogInformation(
                 "Projected {EventType} for Job {JobId}: {From}→{To}",

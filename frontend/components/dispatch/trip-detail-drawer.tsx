@@ -18,7 +18,9 @@ import {
 } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
 import { StatusTimelineSection } from "@/components/projection/status-timeline-section";
+import type { StatusHistoryEntry } from "@/lib/api/status-history";
 import { getTripStatusHistory } from "@/lib/api/status-history";
+import { useTripSubscription } from "@/lib/realtime/hubs/trip-hub";
 import { AttemptBadge, RetryChainNav, TripStatusBadge } from "./badges";
 import { MissionTimeline } from "./mission-timeline";
 import { RetryHistoryPanel } from "./retry-history-panel";
@@ -46,6 +48,12 @@ export function TripDetailDrawer({
   // snapshot inspectors get the full vendor JSON. Off by default to keep
   // the network footprint light.
   const [includeRaw, setIncludeRaw] = useState(false);
+  // Phase P1 — TripHub live timeline updates while the drawer is open.
+  const [liveTimelineEntry, setLiveTimelineEntry] = useState<StatusHistoryEntry | null>(null);
+
+  useTripSubscription(tripId, {
+    TimelineUpdated: (entry) => setLiveTimelineEntry(entry as StatusHistoryEntry),
+  });
 
   useEffect(() => {
     if (!tripId) {
@@ -177,10 +185,12 @@ export function TripDetailDrawer({
                     </div>
                   )}
 
-                  {/* Phase P1 — structured status-history timeline. */}
+                  {/* Phase P1 — structured status-history timeline with
+                      realtime TripHub updates. */}
                   <StatusTimelineSection
                     entityId={data.id}
                     fetcher={getTripStatusHistory}
+                    liveEntry={liveTimelineEntry}
                   />
 
                   <section className="grid grid-cols-2 gap-3">

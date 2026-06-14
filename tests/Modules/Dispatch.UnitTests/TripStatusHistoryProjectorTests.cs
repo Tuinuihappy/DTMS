@@ -201,7 +201,7 @@ public class TripStatusHistoryProjectorTests
             .Returns((TripHistoryLatest?)null);
         var metrics = new ProjectionMetrics();
         var projector = new TripStatusHistoryProjector(
-            store, metrics, NullLogger<TripStatusHistoryProjector>.Instance);
+            store, metrics, new NoopTripRealtimePublisher(), NullLogger<TripStatusHistoryProjector>.Instance);
         return (projector, store);
     }
 

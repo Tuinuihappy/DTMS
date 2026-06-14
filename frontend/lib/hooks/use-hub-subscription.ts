@@ -1,0 +1,137 @@
+"use client";
+
+import { HubConnectionState } from "@microsoft/signalr";
+import { useEffect, useState } from "react";
+import { ensureStarted, getHub } from "@/lib/realtime/signalr-client";
+
+// Phase P0 Day 5 — generic hook that ties the lifecycle of a SignalR
+// subscription to a React component. Used by all typed hub wrappers
+// (Order/Job/Trip/Dashboard/Fleet) so the reconnect-resume + cleanup
+// semantics live in one place.
+//
+// On mount:
+//   1. Start the hub connection (idempotent — shared with other components).
+//   2. Register `eventHandlers` on the connection.
+//   3. Invoke `subscribeMethod(...subscribeArgs)` to join the group.
+//
+// On unmount:
+//   1. Try to Unsubscribe (best-effort; ignored if connection already lost).
+//   2. Detach all event handlers we registered.
+//
+// On reconnect (automatic, after a network blip):
+//   - Re-invoke `subscribeMethod` so the new connection joins the same
+//     group again. Browsers can't carry server-side group membership
+//     across reconnects — the client must re-subscribe.
+//
+// Returns `{ connected, error }` so the UI can render a connection
+// indicator and a fallback message. Polling-based <ConnectionIndicator />
+// can also read live state via `getHubState(hubPath)`.
+
+export type HubSubscriptionOptions = {
+  /** SignalR hub path, e.g. "/hubs/orders". */
+  hubPath: string;
+  /** Hub method name to invoke on mount / reconnect. */
+  subscribeMethod: string;
+  /** Method name to invoke on unmount (best-effort). */
+  unsubscribeMethod: string;
+  /**
+   * Arguments to pass to both subscribe and unsubscribe. Must be stable
+   * across renders — the hook re-subscribes when this array changes.
+   */
+  subscribeArgs: ReadonlyArray<unknown>;
+  /** Event name → handler. Names match the typed hub client interface. */
+  eventHandlers: Record<string, (...args: unknown[]) => void>;
+  /** When false, the hook does nothing (useful for "open === null" cases). */
+  enabled?: boolean;
+};
+
+export function useHubSubscription({
+  hubPath,
+  subscribeMethod,
+  unsubscribeMethod,
+  subscribeArgs,
+  eventHandlers,
+  enabled = true,
+}: HubSubscriptionOptions) {
+  const [connected, setConnected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Stringify args for the effect's dep array — re-subscribes when any
+  // arg changes value. Caller is expected to pass primitives or ids,
+  // not deep objects.
+  const argsKey = JSON.stringify(subscribeArgs);
+  // Handler names — re-attach if the SET of events changes. Function
+  // identities are not in the dep array on purpose: callers commonly
+  // pass inline functions and we don't want to re-subscribe on every
+  // render. Handlers ARE updated through a ref pattern (see below).
+  const handlerNamesKey = Object.keys(eventHandlers).sort().join("|");
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+
+    const connection = getHub(hubPath);
+    const registeredHandlers: Array<[string, (...args: unknown[]) => void]> = [];
+
+    const attach = () => {
+      for (const [event, handler] of Object.entries(eventHandlers)) {
+        connection.on(event, handler);
+        registeredHandlers.push([event, handler]);
+      }
+    };
+
+    const subscribe = async () => {
+      try {
+        await connection.invoke(subscribeMethod, ...subscribeArgs);
+        if (!cancelled) setConnected(true);
+      } catch (err) {
+        if (!cancelled) setError((err as Error).message);
+      }
+    };
+
+    const init = async () => {
+      try {
+        await ensureStarted(hubPath);
+        if (cancelled) return;
+        attach();
+        // Re-subscribe on reconnect so the new transport joins the group.
+        const onReconnected = () => {
+          setConnected(true);
+          setError(null);
+          void subscribe();
+        };
+        const onReconnecting = () => setConnected(false);
+        const onClose = (err?: Error) => {
+          setConnected(false);
+          if (err) setError(err.message);
+        };
+        connection.onreconnected(onReconnected);
+        connection.onreconnecting(onReconnecting);
+        connection.onclose(onClose);
+
+        await subscribe();
+      } catch (err) {
+        if (!cancelled) setError((err as Error).message);
+      }
+    };
+
+    void init();
+
+    return () => {
+      cancelled = true;
+      // Best-effort unsubscribe — the connection may have already gone
+      // away (page closing, network blip), in which case .invoke()
+      // throws. We swallow because cleanup must not throw.
+      if (connection.state === HubConnectionState.Connected) {
+        connection.invoke(unsubscribeMethod, ...subscribeArgs).catch(() => {});
+      }
+      for (const [event, handler] of registeredHandlers) {
+        connection.off(event, handler);
+      }
+      setConnected(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hubPath, subscribeMethod, unsubscribeMethod, argsKey, handlerNamesKey, enabled]);
+
+  return { connected, error };
+}

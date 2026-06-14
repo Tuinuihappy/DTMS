@@ -133,6 +133,11 @@ services:
       # Base URL of the local .NET API for proxied feature endpoints
       # (delivery-orders etc). Defaults to the in-network compose host.
       - DTMS_BACKEND_URL=${DTMS_BACKEND_URL:-http://dtms-api:8080}
+      # Browser-side URL for SignalR hubs (WebSocket from the user's
+      # browser bypasses the Next.js proxy). Must match the backend CORS
+      # AllowedOrigins entry (Cors__HubsAllowedOrigins env on api). For
+      # dev: API exposed at host port 5219.
+      - NEXT_PUBLIC_DTMS_HUBS_URL=${NEXT_PUBLIC_DTMS_HUBS_URL:-http://localhost:5219}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/"]
