@@ -204,7 +204,9 @@ public class Job : AggregateRoot<Guid>
     public void MarkFailed(string reason, JobFailureCategory category)
     {
         if (Status == JobStatus.Failed) return;  // webhook redelivery
-        if (Status is not (JobStatus.Created or JobStatus.Dispatched or JobStatus.Executing))
+        // Phase #1 — Paused is a valid source: a paused trip can fail
+        // without resuming first.
+        if (Status is not (JobStatus.Created or JobStatus.Dispatched or JobStatus.Executing or JobStatus.Paused))
             throw new InvalidOperationException($"Cannot mark job {Id} failed from {Status}.");
 
         Status = JobStatus.Failed;
@@ -235,14 +237,48 @@ public class Job : AggregateRoot<Guid>
     }
 
     /// <summary>
+    /// Phase #1 — Trip paused; mirror the state onto Job. Only valid
+    /// from Executing (pause without start makes no sense — log + ignore).
+    /// Idempotent: a duplicate pause webhook is a no-op. Terminal states
+    /// also no-op so a late pause webhook can't regress a completed job.
+    /// </summary>
+    public void MarkPaused(Guid tripId)
+    {
+        if (Status == JobStatus.Paused) return;          // webhook redelivery
+        if (Status is JobStatus.Completed or JobStatus.Failed or JobStatus.Cancelled) return;
+        if (Status != JobStatus.Executing) return;       // pre-Executing pauses don't apply
+
+        Status = JobStatus.Paused;
+        AddDomainEvent(new JobPausedDomainEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, tripId));
+    }
+
+    /// <summary>
+    /// Phase #1 — Trip resumed; flip Job back to Executing. Only valid
+    /// from Paused. Late/out-of-order webhooks for non-paused jobs are
+    /// no-ops.
+    /// </summary>
+    public void MarkResumed(Guid tripId)
+    {
+        if (Status == JobStatus.Executing) return;       // webhook redelivery
+        if (Status is JobStatus.Completed or JobStatus.Failed or JobStatus.Cancelled) return;
+        if (Status != JobStatus.Paused) return;          // can only resume from Paused
+
+        Status = JobStatus.Executing;
+        AddDomainEvent(new JobResumedDomainEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, tripId));
+    }
+
+    /// <summary>
     /// Phase b9 — Vendor reported the trip finished successfully.
-    /// Idempotent. Accepts Dispatched (skip Executing if webhook missed) and
-    /// Executing as valid origins.
+    /// Idempotent. Accepts Dispatched (skip Executing if webhook missed),
+    /// Executing, and Paused (trip resumed straight to Completed via a
+    /// late-arriving webhook) as valid origins.
     /// </summary>
     public void MarkCompleted(Guid tripId)
     {
         if (Status == JobStatus.Completed) return;  // webhook redelivery
-        if (Status is not (JobStatus.Dispatched or JobStatus.Executing))
+        if (Status is not (JobStatus.Dispatched or JobStatus.Executing or JobStatus.Paused))
             throw new InvalidOperationException($"Cannot mark job {Id} completed from {Status}.");
 
         Status = JobStatus.Completed;
@@ -261,7 +297,9 @@ public class Job : AggregateRoot<Guid>
         // Completed is terminal-success — don't let a late cancellation
         // webhook flip it negative. Failed similarly stays.
         if (Status is JobStatus.Completed or JobStatus.Failed) return;
-        if (Status is not (JobStatus.Dispatched or JobStatus.Executing))
+        // Paused is a valid source — operator can cancel a paused trip
+        // (Phase #1 mirror) without forcing a Resume first.
+        if (Status is not (JobStatus.Dispatched or JobStatus.Executing or JobStatus.Paused))
             throw new InvalidOperationException($"Cannot mark job {Id} cancelled from {Status}.");
 
         Status = JobStatus.Cancelled;

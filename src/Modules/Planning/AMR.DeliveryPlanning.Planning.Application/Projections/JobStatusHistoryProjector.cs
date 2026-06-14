@@ -25,7 +25,9 @@ public class JobStatusHistoryProjector :
     IConsumer<JobExecutingIntegrationEventV1>,
     IConsumer<JobCompletedIntegrationEventV1>,
     IConsumer<JobFailedIntegrationEventV1>,
-    IConsumer<JobCancelledIntegrationEventV1>
+    IConsumer<JobCancelledIntegrationEventV1>,
+    IConsumer<JobPausedIntegrationEventV1>,
+    IConsumer<JobResumedIntegrationEventV1>
 {
     public const string Name = nameof(JobStatusHistoryProjector);
 
@@ -70,6 +72,14 @@ public class JobStatusHistoryProjector :
 
     public Task Consume(ConsumeContext<JobCancelledIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.JobId, ctx.Message.DeliveryOrderId, "Cancelled", ctx.Message.Reason);
+
+    public Task Consume(ConsumeContext<JobPausedIntegrationEventV1> ctx)
+        => Project(ctx, ctx.Message.JobId, ctx.Message.DeliveryOrderId, "Paused",
+            reason: $"trip {ctx.Message.TripId}");
+
+    public Task Consume(ConsumeContext<JobResumedIntegrationEventV1> ctx)
+        => Project(ctx, ctx.Message.JobId, ctx.Message.DeliveryOrderId, "Executing",
+            reason: $"resumed from trip {ctx.Message.TripId}");
 
     private async Task Project<TEvent>(
         ConsumeContext<TEvent> ctx, Guid jobId, Guid deliveryOrderId,

@@ -75,6 +75,18 @@ public class PlanningDomainEventMapper : IDomainEventToIntegrationEventMapper
                     FailureCategory: evt.Category.ToString())
             ],
 
+            JobPausedDomainEvent evt =>
+            [
+                new JobPausedIntegrationEventV1(
+                    evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId, evt.TripId)
+            ],
+
+            JobResumedDomainEvent evt =>
+            [
+                new JobResumedIntegrationEventV1(
+                    evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId, evt.TripId)
+            ],
+
             // JobAssignedDomainEvent is also a status transition (→ Assigned),
             // but the existing JobAssignedIntegrationEvent shape doesn't carry
             // the data the projector needs in a stable way (PickupStationId /

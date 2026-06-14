@@ -270,7 +270,7 @@ SELECT
     END,
     o."Priority",
     o."CreatedDate" + interval '5 minutes',
-    'Direct',
+    'PointToPoint',
     o."TotalWeightKg",
     1, 1,
     900.0, 1200.0,

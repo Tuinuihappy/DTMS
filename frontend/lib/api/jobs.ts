@@ -9,6 +9,7 @@ export type JobStatus =
   | "Assigned"
   | "Committed"
   | "Executing"
+  | "Paused"        // Phase #1 — mirrors Trip pause; reversible to Executing
   | "Completed"
   | "Failed"
   | "Dispatched"

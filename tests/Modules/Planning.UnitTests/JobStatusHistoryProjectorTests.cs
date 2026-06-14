@@ -82,6 +82,48 @@ public class JobStatusHistoryProjectorTests
     }
 
     [Fact]
+    public async Task PausedEvent_AppendsPausedRow()
+    {
+        var (projector, store) = Build();
+        var jobId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var tripId = Guid.NewGuid();
+        var evt = new JobPausedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, jobId, orderId, tripId);
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).AppendAsync(
+            JobStatusHistoryProjector.Name,
+            evt.EventId, jobId, orderId,
+            fromStatus: null, toStatus: "Paused",
+            evt.OccurredOn,
+            reason: $"trip {tripId}",
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ResumedEvent_AppendsExecutingRow()
+    {
+        var (projector, store) = Build();
+        var jobId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var tripId = Guid.NewGuid();
+        var evt = new JobResumedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, jobId, orderId, tripId);
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).AppendAsync(
+            JobStatusHistoryProjector.Name,
+            evt.EventId, jobId, orderId,
+            fromStatus: null, toStatus: "Executing",
+            evt.OccurredOn,
+            reason: $"resumed from trip {tripId}",
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task DuplicateEvent_IsSkipped()
     {
         var (projector, store) = Build();

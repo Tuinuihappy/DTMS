@@ -484,6 +484,113 @@ public class JobTests
         Action act = () => job.RebindToRetryTrip(Guid.NewGuid(), "K");
         act.Should().Throw<InvalidOperationException>();
     }
+
+    // ── Phase #1: Trip pause/resume mirror ──
+
+    [Fact]
+    public void MarkPaused_FromExecuting_FlipsToPaused()
+    {
+        var job = Dispatched();
+        job.MarkExecuting(Guid.NewGuid());
+        var tripId = Guid.NewGuid();
+
+        job.MarkPaused(tripId);
+
+        job.Status.Should().Be(JobStatus.Paused);
+    }
+
+    [Fact]
+    public void MarkPaused_DuplicateWebhook_IsNoOp()
+    {
+        var job = Dispatched();
+        job.MarkExecuting(Guid.NewGuid());
+        var tripId = Guid.NewGuid();
+        job.MarkPaused(tripId);
+
+        job.MarkPaused(tripId);  // second pause — webhook redelivery
+
+        job.Status.Should().Be(JobStatus.Paused);
+    }
+
+    [Fact]
+    public void MarkPaused_FromCreated_IsNoOp()
+    {
+        // Pre-Executing pauses don't apply — Job hasn't started yet so a
+        // pause for its trip is irrelevant.
+        var job = new Job(Guid.NewGuid(), "Normal");
+
+        job.MarkPaused(Guid.NewGuid());
+
+        job.Status.Should().Be(JobStatus.Created);
+    }
+
+    [Fact]
+    public void MarkPaused_AfterCompleted_DoesNotRegress()
+    {
+        var job = Dispatched();
+        job.MarkExecuting(Guid.NewGuid());
+        job.MarkCompleted(Guid.NewGuid());
+
+        job.MarkPaused(Guid.NewGuid());  // late webhook
+
+        job.Status.Should().Be(JobStatus.Completed);
+    }
+
+    [Fact]
+    public void MarkResumed_FromPaused_FlipsBackToExecuting()
+    {
+        var job = Dispatched();
+        job.MarkExecuting(Guid.NewGuid());
+        var tripId = Guid.NewGuid();
+        job.MarkPaused(tripId);
+
+        job.MarkResumed(tripId);
+
+        job.Status.Should().Be(JobStatus.Executing);
+    }
+
+    [Fact]
+    public void MarkResumed_WithoutPause_IsNoOp()
+    {
+        // Out-of-order webhook: Resume arrives before Pause was ever
+        // recorded. Don't flip an Executing job into… Executing again
+        // (and don't emit a redundant domain event).
+        var job = Dispatched();
+        job.MarkExecuting(Guid.NewGuid());
+
+        job.MarkResumed(Guid.NewGuid());
+
+        job.Status.Should().Be(JobStatus.Executing);
+    }
+
+    [Fact]
+    public void MarkCancelled_FromPaused_FlipsTerminal()
+    {
+        // Operator cancels a paused trip — should not require a Resume
+        // first. Mirrors Trip.MarkVendorCancelled accepting Paused as a
+        // valid source.
+        var job = Dispatched();
+        job.MarkExecuting(Guid.NewGuid());
+        job.MarkPaused(Guid.NewGuid());
+
+        job.MarkCancelled(Guid.NewGuid(), "operator");
+
+        job.Status.Should().Be(JobStatus.Cancelled);
+    }
+
+    [Fact]
+    public void MarkCompleted_FromPaused_AllowedForLateWebhook()
+    {
+        // Trip resumed → completed but DTMS missed the resume webhook;
+        // the completion webhook must still close the job.
+        var job = Dispatched();
+        job.MarkExecuting(Guid.NewGuid());
+        job.MarkPaused(Guid.NewGuid());
+
+        job.MarkCompleted(Guid.NewGuid());
+
+        job.Status.Should().Be(JobStatus.Completed);
+    }
 }
 
 public class ActionTemplateTests

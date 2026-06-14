@@ -58,3 +58,20 @@ public record JobCancelledDomainEvent(
     Guid TripId,
     string Reason,
     JobFailureCategory Category) : IDomainEvent;
+
+// Phase #1 — Job mirrors Trip pause/resume state. Reason carries the
+// upstream context (e.g. "Mirrored from Trip pause webhook") so the
+// status-history timeline reads cleanly.
+public record JobPausedDomainEvent(
+    Guid EventId,
+    DateTime OccurredOn,
+    Guid JobId,
+    Guid DeliveryOrderId,
+    Guid TripId) : IDomainEvent;
+
+public record JobResumedDomainEvent(
+    Guid EventId,
+    DateTime OccurredOn,
+    Guid JobId,
+    Guid DeliveryOrderId,
+    Guid TripId) : IDomainEvent;

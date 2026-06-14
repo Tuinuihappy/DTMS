@@ -6,6 +6,12 @@ namespace AMR.DeliveryPlanning.Planning.Domain.Repositories;
 public interface IJobRepository
 {
     Task<Job?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    // Phase #1 — reverse lookup for the Trip→Job pause/resume mirror.
+    // Trip pause webhooks only carry TripId (no JobId), so the
+    // consumer needs this to find the linked Job. Returns null when
+    // no Job has TripId set to this id (legacy pre-b8 trips or trips
+    // that never reached MarkDispatched).
+    Task<Job?> GetByTripIdAsync(Guid tripId, CancellationToken cancellationToken = default);
     // Phase b10 — all Jobs for an order (one per station-pair group).
     // Order matters: sorted by GroupIndex asc so the operator UI lines
     // them up the same way as the consumer's dispatch loop.

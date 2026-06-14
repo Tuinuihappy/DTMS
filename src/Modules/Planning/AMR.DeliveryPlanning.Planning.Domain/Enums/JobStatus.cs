@@ -7,6 +7,11 @@ public enum JobStatus
     Committed,
     // Phase b9 — wired to TripStartedIntegrationEvent (envelope path).
     Executing,
+    // Phase #1 — wired to TripPausedIntegrationEventV1 (vendor/operator
+    // pause). Reversible: TripResumedIntegrationEventV1 flips back to
+    // Executing. Stays Executing as a fallback if Trip pause arrives
+    // for a Job in an unexpected state.
+    Paused,
     // Phase b9 — wired to TripCompletedIntegrationEvent (terminal).
     Completed,
     // Failed has two sources: dispatch-time (vendor never accepted) and

@@ -68,3 +68,14 @@ public record JobCancelledIntegrationEventV1(
     // case in the projector.
     string? FailureCategory = null,
     string SchemaVersion = "1.0") : IIntegrationEvent;
+
+// Phase #1 — Job mirrors Trip pause/resume state. Status-history
+// projector subscribes to write Paused / Executing transitions to the
+// timeline.
+public record JobPausedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid JobId, Guid DeliveryOrderId, Guid TripId,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
+
+public record JobResumedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid JobId, Guid DeliveryOrderId, Guid TripId,
+    string SchemaVersion = "1.0") : IIntegrationEvent;

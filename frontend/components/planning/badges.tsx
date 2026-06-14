@@ -8,7 +8,7 @@ import type { JobStatus } from "@/lib/api/jobs";
 // → same coral). "Live" states get a pulsing dot.
 type JobVisual = {
   label: string;
-  tone: "ink" | "sky" | "peach" | "amber" | "success" | "coral";
+  tone: "ink" | "sky" | "peach" | "amber" | "success" | "coral" | "lavender";
   pulse?: boolean;
 };
 
@@ -18,6 +18,10 @@ const JOB_VISUAL: Record<JobStatus, JobVisual> = {
   Committed: { label: "Committed", tone: "amber" },
   Dispatched: { label: "Dispatched", tone: "peach", pulse: true },
   Executing: { label: "Executing", tone: "peach", pulse: true },
+  // Phase #1 — distinct from Executing (no pulse, lavender tone) so ops
+  // see at a glance that the robot is intentionally idle. Mirrors
+  // Trip.Paused state via TripPausedJobConsumer.
+  Paused: { label: "Paused", tone: "lavender" },
   Completed: { label: "Completed", tone: "success" },
   Failed: { label: "Failed", tone: "coral" },
   Cancelled: { label: "Cancelled", tone: "ink" },
@@ -30,6 +34,7 @@ const TONE_BG: Record<JobVisual["tone"], string> = {
   amber: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
   success: "bg-[var(--color-success-soft)] text-[var(--color-success)]",
   coral: "bg-[#fde0db] text-[var(--color-coral)] dark:bg-[#3a1a17]",
+  lavender: "bg-[var(--color-pastel-lavender,#e9e3ff)] text-[var(--color-pastel-lavender-ink,#5b4daf)] dark:bg-[#2a2348] dark:text-[#c9c0ff]",
 };
 
 const TONE_DOT: Record<JobVisual["tone"], string> = {
@@ -39,6 +44,7 @@ const TONE_DOT: Record<JobVisual["tone"], string> = {
   amber: "bg-[var(--color-amber)]",
   success: "bg-[var(--color-success)]",
   coral: "bg-[var(--color-coral)]",
+  lavender: "bg-[var(--color-pastel-lavender-ink,#5b4daf)]",
 };
 
 export function JobStatusBadge({

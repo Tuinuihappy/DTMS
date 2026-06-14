@@ -22,6 +22,16 @@ public class JobRepository : IJobRepository
             .FirstOrDefaultAsync(j => j.Id == id, cancellationToken);
     }
 
+    public async Task<Job?> GetByTripIdAsync(Guid tripId, CancellationToken cancellationToken = default)
+    {
+        // Partial index on Jobs.TripId (DbContext line 58) makes this an
+        // index probe. Returns null when no Job has been MarkDispatched
+        // against this trip yet (or for legacy pre-b8 trips).
+        return await _context.Jobs
+            .Include(j => j.Legs)
+            .FirstOrDefaultAsync(j => j.TripId == tripId, cancellationToken);
+    }
+
     public async Task<List<Job>> GetByDeliveryOrderIdAsync(Guid deliveryOrderId, CancellationToken cancellationToken = default)
     {
         return await _context.Jobs
