@@ -28,7 +28,8 @@ WITH pivot AS (
 )
 INSERT INTO bi."TripFacts" (
     "TripId", "DeliveryOrderId", "JobId", "VehicleId",
-    "VendorUpperKey", "FinalStatus", "FailureReason", "PauseCount",
+    "VendorUpperKey", "VendorVehicleKey",
+    "FinalStatus", "FailureReason", "PauseCount",
     "CreatedAt", "StartedAt", "FirstPausedAt", "LastResumedAt",
     "CompletedAt", "FailedAt", "CancelledAt",
     "UpdatedAt"
@@ -39,6 +40,7 @@ SELECT
     NULLIF(t."JobId", '00000000-0000-0000-0000-000000000000'::uuid),
     t."VehicleId",
     NULLIF(t."UpperKey", ''),
+    NULLIF(t."VendorVehicleKey", ''),
     t."Status",
     t."FailureReason",
     COALESCE(p.pause_count, 0)::int,

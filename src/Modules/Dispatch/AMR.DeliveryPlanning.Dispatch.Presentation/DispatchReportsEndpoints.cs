@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text;
 using AMR.DeliveryPlanning.Dispatch.Application.Projections;
-using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetVendorPerformanceReport;
+using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetVehiclePerformanceReport;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -22,11 +22,15 @@ public static class DispatchReportsEndpoints
     {
         var group = app.MapGroup("/api/v1/reports").WithTags("Reports").RequireAuthorization();
 
-        group.MapGet("/vendor-performance", async (
+        // Phase #10 — renamed from /vendor-performance. The previous
+        // endpoint grouped by per-order envelope key and produced an
+        // unreadable chart. New grouping is the RIOT3 deviceKey
+        // (physical robot identity).
+        group.MapGet("/vehicle-performance", async (
             DateTime? fromUtc, DateTime? toUtc, ISender sender) =>
         {
             var (from, to) = ResolveWindow(fromUtc, toUtc, defaultDays: 7);
-            var result = await sender.Send(new GetVendorPerformanceReportQuery(from, to));
+            var result = await sender.Send(new GetVehiclePerformanceReportQuery(from, to));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 

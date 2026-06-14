@@ -1,20 +1,29 @@
 using AMR.DeliveryPlanning.Dispatch.Application.Projections;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Queries.GetVendorPerformanceReport;
+namespace AMR.DeliveryPlanning.Dispatch.Application.Queries.GetVehiclePerformanceReport;
 
 /// <summary>
-/// Phase P5.3 — Vendor performance report. Groups <c>bi.TripFacts</c>
-/// rows by <c>VendorUpperKey</c> and computes throughput + success rate
-/// + average lead time. Source rows without a VendorUpperKey
-/// (legacy/internal trips) collapse into a "(none)" bucket so ops can
-/// see them without losing the rest of the data.
+/// Phase #10 — Vehicle performance report. Groups <c>bi.TripFacts</c>
+/// rows by <c>VendorVehicleKey</c> (the deviceKey RIOT3 echoes on
+/// TASK_PROCESSING — the physical robot identity) and computes
+/// throughput, success rate, and lead-time stats per vehicle.
+///
+/// <para><b>Previous shape:</b> grouped by <c>VendorUpperKey</c>
+/// (per-order envelope key), which produced one row per trip and
+/// rendered an unreadable chart. The Vehicle dimension matches how
+/// ops actually thinks about fleet performance: "which robot is
+/// slow/fast/breaking down?"</para>
+///
+/// <para>Rows whose <c>VendorVehicleKey</c> is missing (trips that
+/// never started, or pre-V1.1 events) collapse into "(unassigned)" so
+/// ops can still see them.</para>
 /// </summary>
-public record GetVendorPerformanceReportQuery(
-    DateTime FromUtc, DateTime ToUtc) : IQuery<VendorPerformanceResponse>;
+public record GetVehiclePerformanceReportQuery(
+    DateTime FromUtc, DateTime ToUtc) : IQuery<VehiclePerformanceResponse>;
 
-public record VendorPerformanceRow(
-    string VendorUpperKey,
+public record VehiclePerformanceRow(
+    string VendorVehicleKey,
     int TotalTrips,
     int Completed,
     int Failed,
@@ -24,34 +33,34 @@ public record VendorPerformanceRow(
     double? P95TimeToCompleteSec,
     int SlaBreached);
 
-public record VendorPerformanceResponse(
+public record VehiclePerformanceResponse(
     DateTime FromUtc,
     DateTime ToUtc,
     int TotalTrips,
-    IReadOnlyList<VendorPerformanceRow> Rows);
+    IReadOnlyList<VehiclePerformanceRow> Rows);
 
-public class GetVendorPerformanceReportQueryHandler
-    : IQueryHandler<GetVendorPerformanceReportQuery, VendorPerformanceResponse>
+public class GetVehiclePerformanceReportQueryHandler
+    : IQueryHandler<GetVehiclePerformanceReportQuery, VehiclePerformanceResponse>
 {
     private const int MaxWindowDays = 90;
 
     private readonly ITripFactsReadRepository _repo;
 
-    public GetVendorPerformanceReportQueryHandler(ITripFactsReadRepository repo) => _repo = repo;
+    public GetVehiclePerformanceReportQueryHandler(ITripFactsReadRepository repo) => _repo = repo;
 
-    public async Task<Result<VendorPerformanceResponse>> Handle(
-        GetVendorPerformanceReportQuery request, CancellationToken ct)
+    public async Task<Result<VehiclePerformanceResponse>> Handle(
+        GetVehiclePerformanceReportQuery request, CancellationToken ct)
     {
         if (request.ToUtc <= request.FromUtc)
-            return Result<VendorPerformanceResponse>.Failure("ToUtc must be after FromUtc.");
+            return Result<VehiclePerformanceResponse>.Failure("ToUtc must be after FromUtc.");
         if ((request.ToUtc - request.FromUtc).TotalDays > MaxWindowDays)
-            return Result<VendorPerformanceResponse>.Failure($"Window must be <= {MaxWindowDays} days.");
+            return Result<VehiclePerformanceResponse>.Failure($"Window must be <= {MaxWindowDays} days.");
 
         var trips = await _repo.QueryAsync(
             new TripFactsFilters(request.FromUtc, request.ToUtc, null, null), ct);
 
         var rows = trips
-            .GroupBy(t => string.IsNullOrEmpty(t.VendorUpperKey) ? "(none)" : t.VendorUpperKey)
+            .GroupBy(t => string.IsNullOrEmpty(t.VendorVehicleKey) ? "(unassigned)" : t.VendorVehicleKey)
             .Select(g =>
             {
                 var total = g.Count();
@@ -66,13 +75,13 @@ public class GetVendorPerformanceReportQueryHandler
                 var p95 = Percentile(samples, 0.95);
                 var slaBreached = g.Count(t => t.SlaCompleteBreached == true);
                 // Success rate is over terminal trips only — pending/in-progress
-                // trips would otherwise dilute the number for vendors with a
-                // lot of active work.
+                // trips would otherwise dilute the number for a vehicle that
+                // has lots of active work.
                 var terminal = completed + failed + cancelled;
                 var successRate = terminal > 0 ? (double)completed / terminal : 0;
 
-                return new VendorPerformanceRow(
-                    VendorUpperKey: g.Key,
+                return new VehiclePerformanceRow(
+                    VendorVehicleKey: g.Key,
                     TotalTrips: total,
                     Completed: completed,
                     Failed: failed,
@@ -85,7 +94,7 @@ public class GetVendorPerformanceReportQueryHandler
             .OrderByDescending(r => r.TotalTrips)
             .ToList();
 
-        return Result<VendorPerformanceResponse>.Success(new VendorPerformanceResponse(
+        return Result<VehiclePerformanceResponse>.Success(new VehiclePerformanceResponse(
             request.FromUtc, request.ToUtc, trips.Count, rows));
     }
 

@@ -2,7 +2,10 @@ using AMR.DeliveryPlanning.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.Dispatch.Domain.Events;
 
-public record TripStartedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId, Guid? VehicleId) : IDomainEvent;
+// VendorVehicleKey carries the deviceKey RIOT3 echoes on TASK_PROCESSING
+// (already captured on the Trip aggregate by the time this event fires).
+// Nullable because pre-vendor-key trips and tests may not set it.
+public record TripStartedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId, Guid? VehicleId, string? VendorVehicleKey) : IDomainEvent;
 public record TripPickupCompletedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId) : IDomainEvent;
 public record TripDropCompletedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId) : IDomainEvent;
 

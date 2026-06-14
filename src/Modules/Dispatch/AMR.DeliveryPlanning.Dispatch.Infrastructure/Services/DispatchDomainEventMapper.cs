@@ -23,7 +23,11 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     // care about robot binding still receive it.
                     JobId: Guid.Empty,
                     VehicleId: evt.VehicleId ?? Guid.Empty,
-                    DeliveryOrderId: evt.DeliveryOrderId)
+                    DeliveryOrderId: evt.DeliveryOrderId,
+                    // V1.1 enrichment — TripFactsProjector consumes this to
+                    // populate bi.TripFacts.VendorVehicleKey, which the
+                    // Vehicle performance report groups by.
+                    VendorVehicleKey: evt.VendorVehicleKey)
             ],
             TripPickupCompletedDomainEvent evt =>
             [

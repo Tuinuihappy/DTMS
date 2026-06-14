@@ -43,6 +43,7 @@ public class TripFactsProjector :
             ctx.Message.DeliveryOrderId == Guid.Empty ? null : ctx.Message.DeliveryOrderId,
             ctx.Message.JobId == Guid.Empty ? null : ctx.Message.JobId,
             ctx.Message.VehicleId == Guid.Empty ? null : ctx.Message.VehicleId,
+            ctx.Message.VendorVehicleKey,
             ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<TripPausedIntegrationEventV1> ctx)

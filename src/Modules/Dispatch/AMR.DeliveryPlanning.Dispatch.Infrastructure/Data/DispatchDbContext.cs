@@ -207,6 +207,7 @@ public class DispatchDbContext : DbContext
             b.ToTable("TripFacts", "bi");
             b.HasKey(e => e.TripId);
             b.Property(e => e.VendorUpperKey).HasMaxLength(100);
+            b.Property(e => e.VendorVehicleKey).HasMaxLength(100);
             b.Property(e => e.FinalStatus).HasMaxLength(30).IsRequired();
             b.Property(e => e.FailureReason).HasMaxLength(2000);
 
@@ -228,6 +229,8 @@ public class DispatchDbContext : DbContext
 
             b.HasIndex(e => e.CreatedAt).IsDescending(true);
             b.HasIndex(e => new { e.VendorUpperKey, e.CreatedAt }).IsDescending(false, true);
+            // Vehicle performance report groups + filters by this column.
+            b.HasIndex(e => new { e.VendorVehicleKey, e.CreatedAt }).IsDescending(false, true);
             b.HasIndex(e => new { e.FinalStatus, e.CreatedAt }).IsDescending(false, true);
             b.HasIndex(e => e.DeliveryOrderId);
             b.HasIndex(e => e.SlaCompleteBreached)

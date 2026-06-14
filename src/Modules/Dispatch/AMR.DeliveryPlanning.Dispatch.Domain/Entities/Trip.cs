@@ -172,7 +172,7 @@ public class Trip : AggregateRoot<Guid>
         // DeliveryOrder side can transition Dispatched → InProgress
         // (Option A — order-level visibility).
         AddDomainEvent(new TripStartedDomainEvent(
-            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, vehicleId));
+            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, vehicleId, VendorVehicleKey));
     }
 
     /// <summary>

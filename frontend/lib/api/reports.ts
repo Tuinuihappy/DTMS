@@ -144,9 +144,9 @@ export async function getLeadTimeReport(w: Window, signal?: AbortSignal) {
   return (await res.json()) as LeadTimeReportResponse;
 }
 
-// ── Vendor performance ──
-export type VendorPerformanceRow = {
-  vendorUpperKey: string;
+// ── Vehicle performance ── (renamed from vendor-performance in #10)
+export type VehiclePerformanceRow = {
+  vendorVehicleKey: string;
   totalTrips: number;
   completed: number;
   failed: number;
@@ -156,19 +156,19 @@ export type VendorPerformanceRow = {
   p95TimeToCompleteSec: number | null;
   slaBreached: number;
 };
-export type VendorPerformanceResponse = {
+export type VehiclePerformanceResponse = {
   fromUtc: string;
   toUtc: string;
   totalTrips: number;
-  rows: VendorPerformanceRow[];
+  rows: VehiclePerformanceRow[];
 };
-export async function getVendorPerformanceReport(w: Window, signal?: AbortSignal) {
-  const res = await fetch(`/api/reports/vendor-performance?${windowQs(w)}`, {
+export async function getVehiclePerformanceReport(w: Window, signal?: AbortSignal) {
+  const res = await fetch(`/api/reports/vehicle-performance?${windowQs(w)}`, {
     signal,
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`Failed: ${res.status}`);
-  return (await res.json()) as VendorPerformanceResponse;
+  return (await res.json()) as VehiclePerformanceResponse;
 }
 
 export function tripsExportCsvUrl(

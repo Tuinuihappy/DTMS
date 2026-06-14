@@ -2,9 +2,14 @@ using AMR.DeliveryPlanning.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
 
+// VendorVehicleKey is the upstream device identifier (deviceKey RIOT3
+// echoes on TASK_PROCESSING). Added in V1.1 — nullable, backward-compat
+// for consumers that ignore it. Powers the Vehicle performance report,
+// where it's the grouping dimension.
 public record TripStartedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid VehicleId,
-    Guid DeliveryOrderId) : IIntegrationEvent;
+    Guid DeliveryOrderId,
+    string? VendorVehicleKey = null) : IIntegrationEvent;
 
 public record TripPickupCompletedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId) : IIntegrationEvent;

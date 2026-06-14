@@ -16,7 +16,7 @@ import { ChartMount } from "@/components/primitives/chart-mount";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { SectionLabel } from "@/components/primitives/section-label";
 import {
-  getVendorPerformanceReport,
+  getVehiclePerformanceReport,
   tripsExportCsvUrl,
   type Window,
 } from "@/lib/api/reports";
@@ -24,9 +24,9 @@ import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
 import { cn } from "@/lib/utils";
 import { fmtDuration } from "./window-toggle";
 
-export function VendorPerformanceReport({ window }: { window: Window }) {
+export function VehiclePerformanceReport({ window }: { window: Window }) {
   const fetcher = useCallback(
-    (signal: AbortSignal) => getVendorPerformanceReport(window, signal),
+    (signal: AbortSignal) => getVehiclePerformanceReport(window, signal),
     [window],
   );
   const { data, loading, error, refresh } = useProjectionPoll(fetcher, {
@@ -35,24 +35,31 @@ export function VendorPerformanceReport({ window }: { window: Window }) {
 
   const csvHref = tripsExportCsvUrl(window);
   const chartData = (data?.rows ?? []).slice(0, 10).map((r) => ({
-    vendor: r.vendorUpperKey,
+    vehicle: r.vendorVehicleKey,
     completed: r.completed,
     failed: r.failed,
     cancelled: r.cancelled,
   }));
+  // "(unassigned)" rows come from trips that never started — surface
+  // them in the totals tile so ops notices, but pin the "best vehicle"
+  // tile to a vehicle that actually completed something.
+  const bestVehicle = (data?.rows ?? [])
+    .filter((r) => r.vendorVehicleKey !== "(unassigned)" && r.completed + r.failed + r.cancelled > 0)
+    .reduce<typeof data extends infer T ? T extends { rows: infer R } ? R extends Array<infer Row> ? Row | null : null : null : null>(
+      (best, r) => (best === null || r.successRate > best.successRate ? r : best),
+      null,
+    );
 
   return (
     <div className="space-y-4">
       <section className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <Tile label="Total trips" value={(data?.totalTrips ?? 0).toLocaleString()} />
-        <Tile label="Vendors" value={(data?.rows.length ?? 0).toLocaleString()} />
+        <Tile label="Vehicles" value={(data?.rows.length ?? 0).toLocaleString()} />
         <Tile
           label="Best success rate"
           value={
-            data && data.rows.length > 0
-              ? `${data.rows[0].vendorUpperKey} (${(
-                  Math.max(...data.rows.map((r) => r.successRate)) * 100
-                ).toFixed(1)}%)`
+            bestVehicle
+              ? `${bestVehicle.vendorVehicleKey} (${(bestVehicle.successRate * 100).toFixed(1)}%)`
               : "—"
           }
         />
@@ -60,8 +67,8 @@ export function VendorPerformanceReport({ window }: { window: Window }) {
 
       <GlassCard variant="default" className="p-5">
         <SectionLabel
-          title="Trips by vendor (top 10)"
-          subtitle="Stacked by outcome — Completed / Failed / Cancelled. Sorted by trip volume."
+          title="Trips by vehicle (top 10)"
+          subtitle="Group by VendorVehicleKey (RIOT3 deviceKey). Stacked by outcome — Completed / Failed / Cancelled. Sorted by trip volume."
           action={
             <div className="flex items-center gap-1.5">
               <a
@@ -95,7 +102,7 @@ export function VendorPerformanceReport({ window }: { window: Window }) {
             <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 30 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-ink-100)" />
               <XAxis
-                dataKey="vendor"
+                dataKey="vehicle"
                 tick={{ fontSize: 10 }}
                 angle={-25}
                 textAnchor="end"
@@ -117,7 +124,7 @@ export function VendorPerformanceReport({ window }: { window: Window }) {
           <table className="w-full border-collapse text-[12.5px]">
             <thead>
               <tr className="text-left text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-400)]">
-                <th className="px-2 py-2">Vendor</th>
+                <th className="px-2 py-2">Vehicle</th>
                 <th className="px-2 py-2 text-right">Trips</th>
                 <th className="px-2 py-2 text-right">Completed</th>
                 <th className="px-2 py-2 text-right">Failed</th>
@@ -137,8 +144,8 @@ export function VendorPerformanceReport({ window }: { window: Window }) {
                 </tr>
               )}
               {(data?.rows ?? []).map((r) => (
-                <tr key={r.vendorUpperKey} className="border-t border-[var(--color-ink-100)]/70 dark:border-white/5">
-                  <td className="px-2 py-2 font-semibold">{r.vendorUpperKey}</td>
+                <tr key={r.vendorVehicleKey} className="border-t border-[var(--color-ink-100)]/70 dark:border-white/5">
+                  <td className="px-2 py-2 font-semibold">{r.vendorVehicleKey}</td>
                   <td className="px-2 py-2 text-right font-mono tabular-nums">{r.totalTrips.toLocaleString()}</td>
                   <td className="px-2 py-2 text-right font-mono tabular-nums">{r.completed.toLocaleString()}</td>
                   <td className="px-2 py-2 text-right font-mono tabular-nums">{r.failed.toLocaleString()}</td>

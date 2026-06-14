@@ -38,11 +38,12 @@ public class TripFactsProjectionStore : ITripFactsProjectionStore
 
     public async Task SetStartedAtAsync(
         Guid tripId, DateTime at,
-        Guid? deliveryOrderId, Guid? jobId, Guid? vehicleId, CancellationToken ct)
+        Guid? deliveryOrderId, Guid? jobId, Guid? vehicleId,
+        string? vendorVehicleKey, CancellationToken ct)
     {
         await EnsureRowAsync(tripId, at, deliveryOrderId, jobId, ct);
         var row = await Find(tripId, ct);
-        row?.SetStartedAt(at, deliveryOrderId, jobId, vehicleId);
+        row?.SetStartedAt(at, deliveryOrderId, jobId, vehicleId, vendorVehicleKey);
     }
 
     public async Task RecordPausedAsync(Guid tripId, DateTime at, CancellationToken ct)

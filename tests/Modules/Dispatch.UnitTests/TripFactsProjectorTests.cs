@@ -19,12 +19,14 @@ public class TripFactsProjectorTests
         var jobId = Guid.NewGuid();
         var vehicleId = Guid.NewGuid();
         var evt = new TripStartedIntegrationEvent(
-            Guid.NewGuid(), DateTime.UtcNow, tripId, jobId, vehicleId, orderId);
+            Guid.NewGuid(), DateTime.UtcNow, tripId, jobId, vehicleId, orderId,
+            VendorVehicleKey: "ROBOT-DELTA-42");
 
         await projector.Consume(Ctx(evt));
 
         await store.Received(1).SetStartedAtAsync(
             tripId, evt.OccurredOn, orderId, jobId, vehicleId,
+            "ROBOT-DELTA-42",
             Arg.Any<CancellationToken>());
     }
 
@@ -41,6 +43,29 @@ public class TripFactsProjectorTests
 
         await store.Received(1).SetStartedAtAsync(
             tripId, evt.OccurredOn, null, null, null,
+            Arg.Any<string?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TripStarted_NullVendorVehicleKey_StillPassedThrough()
+    {
+        // Pre-V1.1 events have VendorVehicleKey == null. Projector must
+        // pass null without throwing — store's first-write-wins rule
+        // prevents overwriting a previously-captured key.
+        var (projector, store) = Build();
+        var tripId = Guid.NewGuid();
+        var evt = new TripStartedIntegrationEvent(
+            Guid.NewGuid(), DateTime.UtcNow, tripId,
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            VendorVehicleKey: null);
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).SetStartedAtAsync(
+            tripId, evt.OccurredOn,
+            Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<Guid?>(),
+            null,
             Arg.Any<CancellationToken>());
     }
 

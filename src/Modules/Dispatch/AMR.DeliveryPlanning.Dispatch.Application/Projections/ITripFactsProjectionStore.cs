@@ -19,7 +19,8 @@ public interface ITripFactsProjectionStore
 
     Task SetStartedAtAsync(
         Guid tripId, DateTime at,
-        Guid? deliveryOrderId, Guid? jobId, Guid? vehicleId, CancellationToken ct);
+        Guid? deliveryOrderId, Guid? jobId, Guid? vehicleId,
+        string? vendorVehicleKey, CancellationToken ct);
 
     Task RecordPausedAsync(Guid tripId, DateTime at, CancellationToken ct);
     Task RecordResumedAsync(Guid tripId, DateTime at, CancellationToken ct);

@@ -13,6 +13,7 @@ public record TripFactsFilters(
     DateTime? ToCreatedAtUtc,
     string? VendorUpperKey,
     string? FinalStatus,
+    string? VendorVehicleKey = null,
     int Limit = 50_000);
 
 public record TripFactsEntry(
@@ -21,6 +22,7 @@ public record TripFactsEntry(
     Guid? JobId,
     Guid? VehicleId,
     string? VendorUpperKey,
+    string? VendorVehicleKey,
     string FinalStatus,
     string? FailureReason,
     int PauseCount,

@@ -4,7 +4,7 @@ import { proxyToBackend } from "@/lib/api/proxy-helpers";
 export async function GET(req: NextRequest) {
   return proxyToBackend({
     method: "GET",
-    path: "/api/v1/reports/vendor-performance",
+    path: "/api/v1/reports/vehicle-performance",
     search: req.nextUrl.searchParams,
     inbound: req,
   });

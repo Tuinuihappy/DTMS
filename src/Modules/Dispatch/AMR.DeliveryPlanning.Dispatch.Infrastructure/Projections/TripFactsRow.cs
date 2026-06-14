@@ -20,6 +20,11 @@ public class TripFactsRow
     public Guid? JobId { get; private set; }
     public Guid? VehicleId { get; private set; }
     public string? VendorUpperKey { get; private set; }
+    // Phase #10 — Vehicle performance report groups by this dimension.
+    // Captured from TripStartedIntegrationEvent V1.1 onward (deviceKey
+    // RIOT3 echoes back). Backfill SQL seeds it from dispatch.Trips for
+    // historical rows.
+    public string? VendorVehicleKey { get; private set; }
     public string FinalStatus { get; private set; } = string.Empty;
     public string? FailureReason { get; private set; }
     public int PauseCount { get; private set; }
@@ -56,12 +61,17 @@ public class TripFactsRow
         };
 
     public void SetStartedAt(
-        DateTime at, Guid? deliveryOrderId, Guid? jobId, Guid? vehicleId)
+        DateTime at, Guid? deliveryOrderId, Guid? jobId, Guid? vehicleId,
+        string? vendorVehicleKey)
     {
         StartedAt = at;
         DeliveryOrderId ??= deliveryOrderId;
         JobId ??= jobId;
         VehicleId ??= vehicleId;
+        // First-write-wins — matches Trip aggregate's MarkVendorStarted
+        // behaviour (empty/whitespace from upstream doesn't overwrite).
+        if (!string.IsNullOrWhiteSpace(vendorVehicleKey) && VendorVehicleKey is null)
+            VendorVehicleKey = vendorVehicleKey;
         FinalStatus = "InProgress";
         UpdatedAt = at;
     }
