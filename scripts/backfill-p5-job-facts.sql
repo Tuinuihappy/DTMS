@@ -33,7 +33,8 @@ failure_reason AS (
 )
 INSERT INTO bi."JobFacts" (
     "JobId", "DeliveryOrderId", "AssignedVehicleId", "LatestTripId",
-    "VendorOrderKey", "FinalStatus", "FailureReason", "AttemptNumber",
+    "VendorOrderKey", "FinalStatus", "FailureReason", "FailureCategory",
+    "AttemptNumber",
     "CreatedAt", "AssignedAt", "CommittedAt", "DispatchedAt", "ExecutingAt",
     "CompletedAt", "FailedAt", "CancelledAt",
     "UpdatedAt"
@@ -46,6 +47,9 @@ SELECT
     NULL,                       -- VendorOrderKey lives on trips, not jobs
     j."Status",
     COALESCE(j."FailureReason", fr.reason),
+    -- Phase #9 — source of truth is the write side. Defaults to 'None'
+    -- via the column DEFAULT for pre-b13 rows.
+    COALESCE(NULLIF(j."FailureCategory", ''), 'None'),
     j."AttemptNumber",
     j."CreatedAt",
     p.assigned_at,

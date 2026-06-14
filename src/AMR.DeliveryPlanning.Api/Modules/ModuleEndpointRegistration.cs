@@ -22,6 +22,7 @@ public static class ModuleEndpointRegistration
         app.MapFleetDashboardEndpoints();
         app.MapReportsEndpoints();
         app.MapDispatchReportsEndpoints();
+        app.MapPlanningReportsEndpoints();
         app.MapAdminProjectionsEndpoints();
         app.MapPlanningEndpoints();
         app.MapDispatchEndpoints();

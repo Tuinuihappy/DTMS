@@ -61,14 +61,18 @@ public class PlanningDomainEventMapper : IDomainEventToIntegrationEventMapper
             [
                 new JobFailedIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId,
-                    evt.Reason, evt.AttemptNumber)
+                    evt.Reason, evt.AttemptNumber,
+                    // Cross-module wire format = string, not enum, so consumers
+                    // in other modules don't take a ref on Planning.Domain.
+                    FailureCategory: evt.Category.ToString())
             ],
 
             JobCancelledDomainEvent evt =>
             [
                 new JobCancelledIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.JobId, evt.DeliveryOrderId,
-                    evt.TripId, evt.Reason)
+                    evt.TripId, evt.Reason,
+                    FailureCategory: evt.Category.ToString())
             ],
 
             // JobAssignedDomainEvent is also a status transition (→ Assigned),

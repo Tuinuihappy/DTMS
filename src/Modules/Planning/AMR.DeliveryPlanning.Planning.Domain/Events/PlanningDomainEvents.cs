@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.Planning.Domain.Events;
@@ -22,13 +23,17 @@ public record JobDispatchedDomainEvent(
     string? VendorOrderKey,
     int AttemptNumber) : IDomainEvent;
 
+// Category added in Phase #9 — Job.MarkFailed already classifies the
+// failure (see b13). Domain event carries the enum directly; the
+// integration-event mapper converts to string at the module boundary.
 public record JobFailedDomainEvent(
     Guid EventId,
     DateTime OccurredOn,
     Guid JobId,
     Guid DeliveryOrderId,
     string Reason,
-    int AttemptNumber) : IDomainEvent;
+    int AttemptNumber,
+    JobFailureCategory Category) : IDomainEvent;
 
 // Phase b9 — Trip lifecycle events that update Job status.
 public record JobExecutingDomainEvent(
@@ -51,4 +56,5 @@ public record JobCancelledDomainEvent(
     Guid JobId,
     Guid DeliveryOrderId,
     Guid TripId,
-    string Reason) : IDomainEvent;
+    string Reason,
+    JobFailureCategory Category) : IDomainEvent;

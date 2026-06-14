@@ -118,12 +118,15 @@ public class JobFactsProjectorTests
         var evt = new JobFailedIntegrationEventV1(
             Guid.NewGuid(), DateTime.UtcNow, jobId,
             DeliveryOrderId: Guid.NewGuid(),
-            Reason: "vendor 429", AttemptNumber: 3);
+            Reason: "vendor 429", AttemptNumber: 3,
+            FailureCategory: "VendorRateLimited");
 
         await projector.Consume(Ctx(evt));
 
         await store.Received(1).SetFailedAtAsync(
-            jobId, evt.OccurredOn, "vendor 429", 3, Arg.Any<CancellationToken>());
+            jobId, evt.OccurredOn, "vendor 429", 3,
+            "VendorRateLimited",
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -134,12 +137,35 @@ public class JobFactsProjectorTests
         var tripId = Guid.NewGuid();
         var evt = new JobCancelledIntegrationEventV1(
             Guid.NewGuid(), DateTime.UtcNow, jobId,
-            DeliveryOrderId: Guid.NewGuid(), TripId: tripId, Reason: "operator");
+            DeliveryOrderId: Guid.NewGuid(), TripId: tripId, Reason: "operator",
+            FailureCategory: "OperatorCancelled");
 
         await projector.Consume(Ctx(evt));
 
         await store.Received(1).SetCancelledAtAsync(
-            jobId, evt.OccurredOn, tripId, "operator", Arg.Any<CancellationToken>());
+            jobId, evt.OccurredOn, tripId, "operator",
+            "OperatorCancelled",
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task JobFailed_NullCategory_PassedThrough()
+    {
+        // Pre-V1.1 events have FailureCategory == null; projector must
+        // pass null without throwing. Store collapses null to "None"
+        // on write so the column never holds NULL.
+        var (projector, store) = Build();
+        var evt = new JobFailedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(),
+            DeliveryOrderId: Guid.NewGuid(), Reason: "legacy", AttemptNumber: 1,
+            FailureCategory: null);
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).SetFailedAtAsync(
+            Arg.Any<Guid>(), Arg.Any<DateTime>(), "legacy", 1,
+            null,
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -158,7 +184,7 @@ public class JobFactsProjectorTests
 
         await store.DidNotReceive().SetFailedAtAsync(
             Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<string?>(),
-            Arg.Any<int>(), Arg.Any<CancellationToken>());
+            Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -171,7 +197,7 @@ public class JobFactsProjectorTests
 
         store.When(s => s.SetFailedAtAsync(
                 Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<string?>(),
-                Arg.Any<int>(), Arg.Any<CancellationToken>()))
+                Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()))
             .Do(_ => throw new InvalidOperationException("schema drift"));
 
         var act = async () => await projector.Consume(Ctx(evt));
@@ -188,7 +214,7 @@ public class JobFactsProjectorTests
 
         store.When(s => s.SetFailedAtAsync(
                 Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<string?>(),
-                Arg.Any<int>(), Arg.Any<CancellationToken>()))
+                Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()))
             .Do(_ => throw new TimeoutException("db lock"));
 
         var act = async () => await projector.Consume(Ctx(evt));

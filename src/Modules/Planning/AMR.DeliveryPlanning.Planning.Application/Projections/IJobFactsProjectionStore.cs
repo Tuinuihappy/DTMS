@@ -21,8 +21,10 @@ public interface IJobFactsProjectionStore
     Task SetCompletedAtAsync(Guid jobId, DateTime at, Guid? tripId, CancellationToken ct);
 
     Task SetFailedAtAsync(
-        Guid jobId, DateTime at, string? reason, int attemptNumber, CancellationToken ct);
+        Guid jobId, DateTime at, string? reason, int attemptNumber,
+        string? failureCategory, CancellationToken ct);
 
     Task SetCancelledAtAsync(
-        Guid jobId, DateTime at, Guid? tripId, string? reason, CancellationToken ct);
+        Guid jobId, DateTime at, Guid? tripId, string? reason,
+        string? failureCategory, CancellationToken ct);
 }

@@ -51,12 +51,14 @@ public class JobFactsProjectionStore : IJobFactsProjectionStore
         => (await Find(jobId, ct))?.SetCompletedAt(at, tripId);
 
     public async Task SetFailedAtAsync(
-        Guid jobId, DateTime at, string? reason, int attemptNumber, CancellationToken ct)
-        => (await Find(jobId, ct))?.SetFailedAt(at, reason, attemptNumber);
+        Guid jobId, DateTime at, string? reason, int attemptNumber,
+        string? failureCategory, CancellationToken ct)
+        => (await Find(jobId, ct))?.SetFailedAt(at, reason, attemptNumber, failureCategory);
 
     public async Task SetCancelledAtAsync(
-        Guid jobId, DateTime at, Guid? tripId, string? reason, CancellationToken ct)
-        => (await Find(jobId, ct))?.SetCancelledAt(at, tripId, reason);
+        Guid jobId, DateTime at, Guid? tripId, string? reason,
+        string? failureCategory, CancellationToken ct)
+        => (await Find(jobId, ct))?.SetCancelledAt(at, tripId, reason, failureCategory);
 
     private Task<JobFactsRow?> Find(Guid jobId, CancellationToken ct)
         => _db.JobFacts.FirstOrDefaultAsync(r => r.JobId == jobId, ct);

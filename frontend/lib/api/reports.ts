@@ -171,6 +171,35 @@ export async function getVehiclePerformanceReport(w: Window, signal?: AbortSigna
   return (await res.json()) as VehiclePerformanceResponse;
 }
 
+// ── Job failures by category ── (Phase #9 — JobFacts.FailureCategory)
+export type JobFailureCategoryTotal = {
+  category: string;
+  count: number;
+  pct: number;
+};
+export type JobFailureRow = {
+  category: string;
+  reason: string;
+  count: number;
+  retriedCount: number;
+  pctOfTotal: number;
+};
+export type JobFailuresReportResponse = {
+  fromUtc: string;
+  toUtc: string;
+  totalFailures: number;
+  categoryTotals: JobFailureCategoryTotal[];
+  rows: JobFailureRow[];
+};
+export async function getJobFailuresReport(w: Window, signal?: AbortSignal) {
+  const res = await fetch(`/api/reports/job-failures?${windowQs(w)}`, {
+    signal,
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Failed: ${res.status}`);
+  return (await res.json()) as JobFailuresReportResponse;
+}
+
 export function tripsExportCsvUrl(
   filters: { fromUtc?: string; toUtc?: string; vendorUpperKey?: string; finalStatus?: string } = {},
 ): string {

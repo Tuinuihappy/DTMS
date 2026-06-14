@@ -255,6 +255,11 @@ public class PlanningDbContext : DbContext
             b.Property(e => e.VendorOrderKey).HasMaxLength(100);
             b.Property(e => e.FinalStatus).HasMaxLength(30).IsRequired();
             b.Property(e => e.FailureReason).HasMaxLength(2000);
+            // Phase #9 — structured failure classification (b13 → BI side).
+            b.Property(e => e.FailureCategory)
+                .HasMaxLength(40)
+                .HasDefaultValue("None")
+                .IsRequired();
 
             b.Property(e => e.TimeToDispatchSec)
                 .HasColumnType("integer")
@@ -279,6 +284,11 @@ public class PlanningDbContext : DbContext
                 .HasFilter("\"AttemptNumber\" > 1");
             b.HasIndex(e => e.SlaDispatchBreached)
                 .HasFilter("\"SlaDispatchBreached\" = true");
+            // Hot path: Job failures report groups by FailureCategory.
+            // Filter partial — most rows are FinalStatus="Completed" with
+            // category "None"; only the failure tail matters.
+            b.HasIndex(e => new { e.FailureCategory, e.CreatedAt })
+                .HasFilter("\"FailureCategory\" <> 'None'");
         });
     }
 }

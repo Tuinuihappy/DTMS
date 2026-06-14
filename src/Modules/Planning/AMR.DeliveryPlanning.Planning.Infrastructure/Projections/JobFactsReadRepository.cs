@@ -19,7 +19,8 @@ public class JobFactsReadRepository : IJobFactsReadRepository
             .Take(f.Limit)
             .Select(r => new JobFactsEntry(
                 r.JobId, r.DeliveryOrderId, r.AssignedVehicleId, r.LatestTripId,
-                r.VendorOrderKey, r.FinalStatus, r.FailureReason, r.AttemptNumber,
+                r.VendorOrderKey, r.FinalStatus, r.FailureReason, r.FailureCategory,
+                r.AttemptNumber,
                 r.CreatedAt, r.AssignedAt, r.CommittedAt, r.DispatchedAt, r.ExecutingAt,
                 r.CompletedAt, r.FailedAt, r.CancelledAt,
                 r.TimeToDispatchSec, r.TimeToCompleteSec, r.SlaDispatchBreached,
@@ -35,8 +36,9 @@ public class JobFactsReadRepository : IJobFactsReadRepository
         var q = _db.JobFacts.AsNoTracking().AsQueryable();
         if (f.FromCreatedAtUtc is not null) q = q.Where(r => r.CreatedAt >= f.FromCreatedAtUtc);
         if (f.ToCreatedAtUtc is not null)   q = q.Where(r => r.CreatedAt <  f.ToCreatedAtUtc);
-        if (!string.IsNullOrEmpty(f.FinalStatus)) q = q.Where(r => r.FinalStatus == f.FinalStatus);
-        if (f.MinAttemptNumber is not null) q = q.Where(r => r.AttemptNumber >= f.MinAttemptNumber);
+        if (!string.IsNullOrEmpty(f.FinalStatus))      q = q.Where(r => r.FinalStatus == f.FinalStatus);
+        if (f.MinAttemptNumber is not null)            q = q.Where(r => r.AttemptNumber >= f.MinAttemptNumber);
+        if (!string.IsNullOrEmpty(f.FailureCategory))  q = q.Where(r => r.FailureCategory == f.FailureCategory);
         return q;
     }
 }

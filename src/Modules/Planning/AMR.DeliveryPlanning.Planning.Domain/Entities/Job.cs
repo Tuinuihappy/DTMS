@@ -212,7 +212,7 @@ public class Job : AggregateRoot<Guid>
         FailureCategory = category;
 
         AddDomainEvent(new JobFailedDomainEvent(
-            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, reason, AttemptNumber));
+            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, reason, AttemptNumber, category));
     }
 
     /// <summary>
@@ -271,7 +271,8 @@ public class Job : AggregateRoot<Guid>
         // dispatch-time cancellation pathway lands, add an overload.
         FailureCategory = JobFailureCategory.OperatorCancelled;
         AddDomainEvent(new JobCancelledDomainEvent(
-            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, tripId, reason));
+            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, tripId, reason,
+            JobFailureCategory.OperatorCancelled));
     }
 
     /// <summary>

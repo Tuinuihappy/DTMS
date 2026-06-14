@@ -13,6 +13,7 @@ public record JobFactsFilters(
     DateTime? ToCreatedAtUtc,
     string? FinalStatus,
     int? MinAttemptNumber,
+    string? FailureCategory = null,
     int Limit = 50_000);
 
 public record JobFactsEntry(
@@ -23,6 +24,7 @@ public record JobFactsEntry(
     string? VendorOrderKey,
     string FinalStatus,
     string? FailureReason,
+    string FailureCategory,
     int AttemptNumber,
     DateTime CreatedAt,
     DateTime? AssignedAt,

@@ -19,6 +19,10 @@ public class JobFactsRow
     public string? VendorOrderKey { get; private set; }
     public string FinalStatus { get; private set; } = string.Empty;
     public string? FailureReason { get; private set; }
+    // Phase #9 — structured failure classification (b13). String, not
+    // enum, because EF maps it to a varchar; matches the cross-module
+    // wire format on the integration event. Defaults to "None".
+    public string FailureCategory { get; private set; } = "None";
     public int AttemptNumber { get; private set; }
 
     // ── Lifecycle timestamps ───────────────────────────────────────────
@@ -93,20 +97,24 @@ public class JobFactsRow
         UpdatedAt = at;
     }
 
-    public void SetFailedAt(DateTime at, string? reason, int attemptNumber)
+    public void SetFailedAt(DateTime at, string? reason, int attemptNumber, string? category)
     {
         FailedAt = at;
         FailureReason = reason;
+        // null/empty from upstream collapses to "None" so the column never
+        // holds NULL — keeps GROUP BY queries from needing a COALESCE.
+        FailureCategory = string.IsNullOrWhiteSpace(category) ? "None" : category;
         AttemptNumber = attemptNumber;
         FinalStatus = "Failed";
         UpdatedAt = at;
     }
 
-    public void SetCancelledAt(DateTime at, Guid? tripId, string? reason)
+    public void SetCancelledAt(DateTime at, Guid? tripId, string? reason, string? category)
     {
         CancelledAt = at;
         if (tripId.HasValue && tripId.Value != Guid.Empty) LatestTripId = tripId;
         FailureReason = reason;
+        FailureCategory = string.IsNullOrWhiteSpace(category) ? "OperatorCancelled" : category;
         FinalStatus = "Cancelled";
         UpdatedAt = at;
     }

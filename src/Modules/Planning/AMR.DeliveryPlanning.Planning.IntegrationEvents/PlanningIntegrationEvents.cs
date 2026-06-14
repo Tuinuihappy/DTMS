@@ -50,12 +50,21 @@ public record JobCompletedIntegrationEventV1(
     Guid TripId,
     string SchemaVersion = "1.0") : IIntegrationEvent;
 
+// FailureCategory added in V1.1 (Phase #9 — surfaces b13's structured
+// classification on the BI side). String, not enum, to keep cross-module
+// consumers free of a reference to Planning.Domain. Nullable so pre-b13
+// events still parse cleanly.
 public record JobFailedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid JobId, Guid DeliveryOrderId,
     string Reason, int AttemptNumber,
+    string? FailureCategory = null,
     string SchemaVersion = "1.0") : IIntegrationEvent;
 
 public record JobCancelledIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid JobId, Guid DeliveryOrderId,
     Guid TripId, string Reason,
+    // Today MarkCancelled always classifies as OperatorCancelled; the field
+    // is here so JobFactsProjector can populate the column without a special
+    // case in the projector.
+    string? FailureCategory = null,
     string SchemaVersion = "1.0") : IIntegrationEvent;

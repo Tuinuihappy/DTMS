@@ -6,9 +6,11 @@ import {
   BarChart3,
   Building2,
   Clock,
+  Wrench,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { JobFailuresReport } from "./job-failures-report";
 import { LeadTimeReport } from "./lead-time-report";
 import { OrdersSummaryReport } from "./orders-summary-report";
 import { SlaBreachReport } from "./sla-breach-report";
@@ -16,14 +18,15 @@ import { TopFailuresReport } from "./top-failures-report";
 import { VehiclePerformanceReport } from "./vehicle-performance-report";
 import { buildWindowRange, WindowToggle, type ReportWindow } from "./window-toggle";
 
-type TabKey = "orders" | "sla" | "failures" | "vehicles" | "lead-time";
+type TabKey = "orders" | "sla" | "failures" | "job-failures" | "vehicles" | "lead-time";
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode; hint: string }[] = [
-  { key: "orders",    label: "Orders by priority",   icon: <BarChart3 className="h-3.5 w-3.5" />,    hint: "Pivot OrderFacts by Priority × FinalStatus" },
-  { key: "sla",       label: "SLA breach",           icon: <AlertTriangle className="h-3.5 w-3.5" />, hint: "Confirm > 4h · Complete > 24h" },
-  { key: "failures",  label: "Top failures",         icon: <Activity className="h-3.5 w-3.5" />,    hint: "Most common FailureReason across terminal orders" },
-  { key: "vehicles",  label: "Vehicle performance",  icon: <Building2 className="h-3.5 w-3.5" />,   hint: "Throughput + success rate per robot (VendorVehicleKey) from TripFacts" },
-  { key: "lead-time", label: "Lead time",            icon: <Clock className="h-3.5 w-3.5" />,       hint: "Histogram of TimeToComplete with p50/p95" },
+  { key: "orders",        label: "Orders by priority",   icon: <BarChart3 className="h-3.5 w-3.5" />,    hint: "Pivot OrderFacts by Priority × FinalStatus" },
+  { key: "sla",           label: "SLA breach",           icon: <AlertTriangle className="h-3.5 w-3.5" />, hint: "Confirm > 4h · Complete > 24h" },
+  { key: "failures",      label: "Top failures",         icon: <Activity className="h-3.5 w-3.5" />,    hint: "Most common FailureReason text across terminal orders" },
+  { key: "job-failures",  label: "Job failures",         icon: <Wrench className="h-3.5 w-3.5" />,      hint: "Structured JobFailureCategory breakdown from JobFacts (b13 enum)" },
+  { key: "vehicles",      label: "Vehicle performance",  icon: <Building2 className="h-3.5 w-3.5" />,   hint: "Throughput + success rate per robot (VendorVehicleKey) from TripFacts" },
+  { key: "lead-time",     label: "Lead time",            icon: <Clock className="h-3.5 w-3.5" />,       hint: "Histogram of TimeToComplete with p50/p95" },
 ];
 
 export function ReportsExperience() {
@@ -70,6 +73,7 @@ export function ReportsExperience() {
       {tab === "orders" && <OrdersSummaryReport window={window} />}
       {tab === "sla" && <SlaBreachReport window={window} />}
       {tab === "failures" && <TopFailuresReport window={window} />}
+      {tab === "job-failures" && <JobFailuresReport window={window} />}
       {tab === "vehicles" && <VehiclePerformanceReport window={window} />}
       {tab === "lead-time" && <LeadTimeReport window={window} />}
     </div>

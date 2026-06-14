@@ -76,13 +76,17 @@ public class JobFactsProjector :
         => Run(ctx, () => _store.SetFailedAtAsync(
             ctx.Message.JobId, ctx.Message.OccurredOn,
             ctx.Message.Reason, ctx.Message.AttemptNumber,
+            // V1.1 — pre-V1.1 events have null, store defaults to "None".
+            ctx.Message.FailureCategory,
             ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<JobCancelledIntegrationEventV1> ctx)
         => Run(ctx, () => _store.SetCancelledAtAsync(
             ctx.Message.JobId, ctx.Message.OccurredOn,
             ctx.Message.TripId == Guid.Empty ? null : ctx.Message.TripId,
-            ctx.Message.Reason, ctx.CancellationToken));
+            ctx.Message.Reason,
+            ctx.Message.FailureCategory,
+            ctx.CancellationToken));
 
     private async Task Run<TEvent>(ConsumeContext<TEvent> ctx, Func<Task> body)
         where TEvent : class, IIntegrationEvent
