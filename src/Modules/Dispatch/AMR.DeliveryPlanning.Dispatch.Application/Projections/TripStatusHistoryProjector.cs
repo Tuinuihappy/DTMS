@@ -23,6 +23,7 @@ public class TripStatusHistoryProjector :
     IConsumer<TripStartedIntegrationEvent>,
     IConsumer<TripPausedIntegrationEventV1>,
     IConsumer<TripResumedIntegrationEventV1>,
+    IConsumer<TripRobotPassAcknowledgedIntegrationEventV1>,
     IConsumer<TripCompletedIntegrationEvent>,
     IConsumer<TripFailedIntegrationEvent>,
     IConsumer<TripCancelledIntegrationEvent>
@@ -61,6 +62,15 @@ public class TripStatusHistoryProjector :
     public Task Consume(ConsumeContext<TripResumedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.TripId, deliveryOrderId: null, jobId: null,
             "InProgress", reason: "Resumed from pause");
+
+    // PASS is an interactive nudge at robot level — Trip.Status doesn't
+    // change (still InProgress). The history row records the operator's
+    // intervention so the timeline shows it; the Reason text carries the
+    // deviceKey that was acknowledged.
+    public Task Consume(ConsumeContext<TripRobotPassAcknowledgedIntegrationEventV1> ctx)
+        => Project(ctx, ctx.Message.TripId, deliveryOrderId: null, jobId: null,
+            "InProgress",
+            reason: $"Operator passed robot {ctx.Message.VendorVehicleKey} at checkpoint");
 
     public Task Consume(ConsumeContext<TripCompletedIntegrationEvent> ctx)
         => Project(ctx, ctx.Message.TripId, ctx.Message.DeliveryOrderId,

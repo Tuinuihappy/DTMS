@@ -101,3 +101,14 @@ public record TripResumedIntegrationEventV1(
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
     string SchemaVersion = "1.1") : IIntegrationEvent;
+
+// Operator acknowledged a robot waiting at a checkpoint (RIOT3 PASS).
+// Trip.Status remains InProgress — TripStatusHistoryProjector still
+// appends a row so the timeline shows the operator's intervention.
+// VendorVehicleKey is the deviceKey that was passed (used for the
+// projector's Reason text + audit).
+public record TripRobotPassAcknowledgedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid TripId, string VendorVehicleKey,
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.1") : IIntegrationEvent;

@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Dispatch.Application.Commands.AcknowledgeRobotPass;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.CancelTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.PauseTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.ResumeTrip;
@@ -276,6 +277,61 @@ public class TripTests
 
         trip.Resume();
         trip.Status.Should().Be(TripStatus.InProgress);
+    }
+
+    [Fact]
+    public void AcknowledgeRobotPass_FromInProgressWithVehicleKey_RaisesEventAndKeepsStatus()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted(vendorVehicleKey: "Delta6FAN1");
+
+        trip.AcknowledgeRobotPass();
+
+        // PASS is a nudge — status must NOT change.
+        trip.Status.Should().Be(TripStatus.InProgress);
+        var evt = trip.DomainEvents.OfType<TripRobotPassAcknowledgedDomainEvent>().Single();
+        evt.VendorVehicleKey.Should().Be("Delta6FAN1");
+        evt.TripId.Should().Be(trip.Id);
+        trip.Events.Should().Contain(e => e.EventType == "RobotPassAcknowledged" && e.Details == "Delta6FAN1");
+    }
+
+    [Fact]
+    public void AcknowledgeRobotPass_FromCreated_Throws()
+    {
+        var trip = NewEnvelopeTrip(); // Created — no vendor key, status not InProgress
+
+        var act = () => trip.AcknowledgeRobotPass();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*InProgress*");
+    }
+
+    [Fact]
+    public void AcknowledgeRobotPass_FromPaused_Throws()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted(vendorVehicleKey: "Delta6FAN1");
+        trip.Pause();
+
+        var act = () => trip.AcknowledgeRobotPass();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*InProgress*");
+    }
+
+    [Fact]
+    public void AcknowledgeRobotPass_WithoutVendorVehicleKey_Throws()
+    {
+        var trip = NewEnvelopeTrip();
+        // MarkVendorStarted with no vendor key — status flips to InProgress
+        // but VendorVehicleKey stays null. RIOT3 routes PASS by deviceKey
+        // so we can't proceed.
+        trip.MarkVendorStarted(vehicleId: Guid.NewGuid(), vendorVehicleKey: null);
+
+        var act = () => trip.AcknowledgeRobotPass();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*vehicle key*");
     }
 
     [Fact]
@@ -743,6 +799,142 @@ internal sealed class FakeTripRepository : ITripRepository
     {
         UpdateCalls++;
         return Task.CompletedTask;
+    }
+}
+
+// ── AcknowledgeRobotPass handler tests ──────────────────────────────────
+//
+// PASS targets the deviceKey (Trip.VendorVehicleKey), not the orderKey.
+// On NoVendorRecord, unlike Pause/Resume, the handler does NOT auto-fail
+// the Trip — it's still in-flight; only the operator can decide.
+
+public class AcknowledgeRobotPassHandlerTests
+{
+    [Fact]
+    public async Task VendorSuccess_PersistsAndKeepsStatusInProgress()
+    {
+        var trip = NewTripInProgressWithKey();
+        var repo = new FakeTripRepository(trip);
+        var vendor = new StubRobotOps();
+
+        var handler = new AcknowledgeRobotPassCommandHandler(
+            repo, vendor, NullLogger<AcknowledgeRobotPassCommandHandler>.Instance);
+        var result = await handler.Handle(new AcknowledgeRobotPassCommand(trip.Id), default);
+
+        result.IsSuccess.Should().BeTrue();
+        repo.UpdateCalls.Should().Be(1);
+        vendor.PassCalls.Should().ContainSingle().Which.Should().Be("Delta6FAN1");
+        trip.Status.Should().Be(TripStatus.InProgress);
+    }
+
+    [Fact]
+    public async Task TripNotFound_ReturnsFailure()
+    {
+        var trip = NewTripInProgressWithKey();
+        var repo = new FakeTripRepository(trip);
+        var vendor = new StubRobotOps();
+
+        var handler = new AcknowledgeRobotPassCommandHandler(
+            repo, vendor, NullLogger<AcknowledgeRobotPassCommandHandler>.Instance);
+        var result = await handler.Handle(new AcknowledgeRobotPassCommand(Guid.NewGuid()), default);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Contain("not found");
+        vendor.PassCalls.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DomainReject_WrongStatus_DoesNotCallVendor()
+    {
+        var trip = NewTripInProgressWithKey();
+        trip.Pause();
+        var repo = new FakeTripRepository(trip);
+        var vendor = new StubRobotOps();
+
+        var handler = new AcknowledgeRobotPassCommandHandler(
+            repo, vendor, NullLogger<AcknowledgeRobotPassCommandHandler>.Instance);
+        var result = await handler.Handle(new AcknowledgeRobotPassCommand(trip.Id), default);
+
+        result.IsFailure.Should().BeTrue();
+        vendor.PassCalls.Should().BeEmpty();
+        repo.UpdateCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DomainReject_NoVendorVehicleKey_DoesNotCallVendor()
+    {
+        // InProgress trip but no deviceKey captured (e.g. vendor never reported it).
+        var trip = Trip.CreateForEnvelope(Guid.NewGuid(), "abc-G1", "ORD-1");
+        trip.MarkVendorStarted(vehicleId: Guid.NewGuid(), vendorVehicleKey: null);
+        var repo = new FakeTripRepository(trip);
+        var vendor = new StubRobotOps();
+
+        var handler = new AcknowledgeRobotPassCommandHandler(
+            repo, vendor, NullLogger<AcknowledgeRobotPassCommandHandler>.Instance);
+        var result = await handler.Handle(new AcknowledgeRobotPassCommand(trip.Id), default);
+
+        result.IsFailure.Should().BeTrue();
+        vendor.PassCalls.Should().BeEmpty();
+        repo.UpdateCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task VendorNoRecord_DoesNotPersist_AndDoesNotAutoFailTrip()
+    {
+        // Critical contrast with Pause/Resume: PASS NoVendorRecord must
+        // leave the Trip InProgress so the operator can investigate at
+        // the floor (the robot may have already moved on).
+        var trip = NewTripInProgressWithKey();
+        var repo = new FakeTripRepository(trip);
+        var vendor = new StubRobotOps { NextOutcome = VendorOperationOutcome.NoVendorRecord };
+
+        var handler = new AcknowledgeRobotPassCommandHandler(
+            repo, vendor, NullLogger<AcknowledgeRobotPassCommandHandler>.Instance);
+        var result = await handler.Handle(new AcknowledgeRobotPassCommand(trip.Id), default);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error!.ToLowerInvariant().Should().Contain("no record");
+        trip.Status.Should().Be(TripStatus.InProgress); // NOT Failed
+        repo.UpdateCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task VendorRejected_DoesNotPersist_AndSurfacesVendorMessage()
+    {
+        var trip = NewTripInProgressWithKey();
+        var repo = new FakeTripRepository(trip);
+        var vendor = new StubRobotOps { NextError = "RIOT3 rejected pass (code E100099): robot offline" };
+
+        var handler = new AcknowledgeRobotPassCommandHandler(
+            repo, vendor, NullLogger<AcknowledgeRobotPassCommandHandler>.Instance);
+        var result = await handler.Handle(new AcknowledgeRobotPassCommand(trip.Id), default);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Contain("E100099");
+        trip.Status.Should().Be(TripStatus.InProgress);
+        repo.UpdateCalls.Should().Be(0);
+    }
+
+    private static Trip NewTripInProgressWithKey()
+    {
+        var t = Trip.CreateForEnvelope(Guid.NewGuid(), "abc-G1", "ORD-1");
+        t.MarkVendorStarted(vehicleId: Guid.NewGuid(), vendorVehicleKey: "Delta6FAN1");
+        return t;
+    }
+}
+
+internal sealed class StubRobotOps : IVendorRobotOperationService
+{
+    public VendorOperationOutcome NextOutcome { get; set; } = VendorOperationOutcome.Accepted;
+    public string? NextError { get; set; }
+    public List<string> PassCalls { get; } = new();
+
+    public Task<Result<VendorOperationOutcome>> PassAsync(string vendorVehicleKey, CancellationToken ct = default)
+    {
+        PassCalls.Add(vendorVehicleKey);
+        return Task.FromResult(NextError is not null
+            ? Result<VendorOperationOutcome>.Failure(NextError)
+            : Result<VendorOperationOutcome>.Success(NextOutcome));
     }
 }
 

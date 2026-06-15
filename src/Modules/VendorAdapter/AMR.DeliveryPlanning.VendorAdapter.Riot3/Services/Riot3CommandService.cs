@@ -104,6 +104,66 @@ public class Riot3CommandService : IVehicleCommandService
         // CMD_ORDER_CONTINUE_FROM_HELD pairs with CMD_ORDER_HELD; HANG-from-* is for system-initiated hangs.
         => SendOrderOperationAsync(vendorOrderKey, Riot3OrderCommandType.ContinueFromHeld, "resume", cancellationToken);
 
+    // Robot-level operation. Targets the vendor deviceKey (Trip.VendorVehicleKey),
+    // NOT the orderKey — RIOT3 routes PASS by which robot is being acknowledged
+    // at the waiting checkpoint, not by the in-flight order.
+    public async Task<Result<Riot3OperationOutcome>> PassRobotAsync(
+        string vendorVehicleKey, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("RIOT3 robot operation PASS for vendorVehicleKey {VehicleKey}", vendorVehicleKey);
+
+        var request = new Riot3RobotOperationRequest
+        {
+            Vehicles = new List<Riot3VehicleKey> { new() { Key = vendorVehicleKey } },
+            Operation = Riot3RobotOperationType.Pass
+        };
+
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync(
+                "/api/v4/robots/operation", request, JsonOptions, cancellationToken);
+
+            // Vendor has no record of the deviceKey — surface a graceful outcome
+            // so the caller (AcknowledgeRobotPassCommandHandler) can warn the
+            // operator without auto-failing the still-in-flight Trip.
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _logger.LogWarning("RIOT3 PASS: vendor has no record of vehicleKey {VehicleKey} (HTTP 404)",
+                    vendorVehicleKey);
+                return Result<Riot3OperationOutcome>.Success(Riot3OperationOutcome.NoVendorRecord);
+            }
+            response.EnsureSuccessStatusCode();
+
+            // Same body-level check as the order ops: RIOT3 returns HTTP 200
+            // even on logical failures. Code "0" = accepted; E110014 ("order
+            // is empty") is the soft-404 equivalent at the robot endpoint too.
+            var payload = await response.Content.ReadFromJsonAsync<Riot3CreateOrderResponse>(cancellationToken);
+            if (payload?.Code == "0")
+            {
+                _logger.LogInformation("RIOT3 PASS accepted for vehicleKey {VehicleKey}", vendorVehicleKey);
+                return Result<Riot3OperationOutcome>.Success(Riot3OperationOutcome.Accepted);
+            }
+
+            if (payload?.Code == "E110014")
+            {
+                _logger.LogWarning("RIOT3 PASS: vendor returned E110014 for vehicleKey {VehicleKey}",
+                    vendorVehicleKey);
+                return Result<Riot3OperationOutcome>.Success(Riot3OperationOutcome.NoVendorRecord);
+            }
+
+            var msg = payload?.Message ?? "(no message)";
+            _logger.LogWarning("RIOT3 rejected PASS on vehicleKey {VehicleKey}: code={Code} message={Message}",
+                vendorVehicleKey, payload?.Code ?? "(null)", msg);
+            return Result<Riot3OperationOutcome>.Failure(
+                $"RIOT3 rejected pass (code {payload?.Code ?? "null"}): {msg}");
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Failed to PASS RIOT3 vehicleKey {VehicleKey}", vendorVehicleKey);
+            return Result<Riot3OperationOutcome>.Failure($"RIOT3 pass error: {ex.Message}");
+        }
+    }
+
     public async Task<StandardRobotState?> GetVehicleStateAsync(Guid vehicleId, CancellationToken cancellationToken = default)
     {
         try

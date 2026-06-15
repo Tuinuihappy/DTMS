@@ -253,6 +253,7 @@ export function TripDetailDrawer({
                       <TripActionBar
                         tripId={data.id}
                         status={data.status}
+                        vendorVehicleKey={data.vendorVehicleKey}
                         onAction={(action, payload) => {
                           if (action === "retry" && payload?.newTripId && onOpenTrip) {
                             onOpenTrip(payload.newTripId);
@@ -272,6 +273,7 @@ export function TripDetailDrawer({
                       <TripActionBar
                         tripId={data.id}
                         status={data.status}
+                        vendorVehicleKey={data.vendorVehicleKey}
                         onAction={(action, payload) => {
                           if (action === "retry" && payload?.newTripId && onOpenTrip) {
                             onOpenTrip(payload.newTripId);

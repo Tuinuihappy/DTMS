@@ -264,6 +264,22 @@ public class Trip : AggregateRoot<Guid>
         RecordEvent("TripResumed", null);
     }
 
+    // Operator confirms a robot waiting at a checkpoint may proceed (RIOT3 PASS).
+    // Trip.Status is intentionally unchanged — this is an interactive nudge at
+    // robot level, not a state transition. Requires VendorVehicleKey because
+    // RIOT3 routes PASS by deviceKey, not by orderKey.
+    public void AcknowledgeRobotPass()
+    {
+        if (Status != TripStatus.InProgress)
+            throw new InvalidOperationException("Only InProgress trips can acknowledge a robot pass.");
+        if (string.IsNullOrWhiteSpace(VendorVehicleKey))
+            throw new InvalidOperationException("Cannot pass — no vendor vehicle key on file.");
+
+        RecordEvent("RobotPassAcknowledged", VendorVehicleKey);
+        AddDomainEvent(new TripRobotPassAcknowledgedDomainEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, VendorVehicleKey));
+    }
+
     public void Cancel(string reason)
     {
         if (Status == TripStatus.Completed || Status == TripStatus.Cancelled)

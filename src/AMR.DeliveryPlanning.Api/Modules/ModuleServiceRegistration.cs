@@ -239,6 +239,8 @@ public static class ModuleServiceRegistration
         services.AddScoped<IRobotOrderDispatcher, AMR.DeliveryPlanning.Api.Adapters.Riot3OrderDispatcherAdapter>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IVendorEnvelopeOperationService,
             AMR.DeliveryPlanning.Api.Adapters.Riot3VendorEnvelopeOperationAdapter>();
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IVendorRobotOperationService,
+            AMR.DeliveryPlanning.Api.Adapters.Riot3VendorRobotOperationAdapter>();
         services.AddScoped<IDispatchOrderTemplateService, DispatchOrderTemplateService>();
         services.Configure<AMR.DeliveryPlanning.Planning.Application.Options.DispatchOptions>(
             configuration.GetSection(AMR.DeliveryPlanning.Planning.Application.Options.DispatchOptions.SectionName));

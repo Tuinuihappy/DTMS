@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Dispatch.Application.Commands.AcknowledgeRobotPass;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.CancelTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.CapturePoD;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.PauseTrip;
@@ -100,6 +101,16 @@ public static class DispatchEndpoints
         group.MapPost("/trips/{id:guid}/resume", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new ResumeTripCommand(id));
+            return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
+        });
+
+        // POST /api/v1/dispatch/trips/{id}/acknowledge-robot-pass — operator
+        // confirms a robot waiting at a checkpoint may proceed (RIOT3 PASS).
+        // Trip.Status is unchanged on success — see AcknowledgeRobotPass on
+        // the Trip aggregate for the invariant.
+        group.MapPost("/trips/{id:guid}/acknowledge-robot-pass", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new AcknowledgeRobotPassCommand(id));
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         });
 

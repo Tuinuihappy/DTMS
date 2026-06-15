@@ -91,6 +91,34 @@ public class TripStatusHistoryProjectorTests
     }
 
     [Fact]
+    public async Task RobotPassAcknowledged_AppendsRowWithVehicleKeyInReason_StatusUnchanged()
+    {
+        var (projector, store) = Build();
+        var tripId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var t0 = DateTime.UtcNow.AddMinutes(-1);
+        store.GetLatestForTripAsync(tripId, Arg.Any<CancellationToken>())
+            .Returns(new TripHistoryLatest("InProgress", t0, orderId, null));
+
+        var evt = new TripRobotPassAcknowledgedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, tripId, "Delta6FAN1");
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).AppendAsync(
+            TripStatusHistoryProjector.Name,
+            evt.EventId, tripId,
+            deliveryOrderId: orderId,
+            jobId: (Guid?)null,
+            fromStatus: "InProgress",
+            // PASS doesn't change Trip.Status — toStatus stays InProgress.
+            toStatus: "InProgress",
+            evt.OccurredOn,
+            reason: "Operator passed robot Delta6FAN1 at checkpoint",
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task TripFailed_CarriesReason()
     {
         var (projector, store) = Build();

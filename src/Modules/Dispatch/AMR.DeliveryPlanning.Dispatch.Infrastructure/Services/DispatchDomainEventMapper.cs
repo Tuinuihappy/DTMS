@@ -118,6 +118,15 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     evt.EventId, evt.OccurredOn, evt.TripId,
                     TriggeredBy: triggeredBy, CorrelationId: correlationId)
             ],
+            // Operator acknowledged a robot waiting at a checkpoint (PASS).
+            // Status unchanged on the Trip — the projector still appends a
+            // history row so the operator's intervention shows in the timeline.
+            TripRobotPassAcknowledgedDomainEvent evt =>
+            [
+                new TripRobotPassAcknowledgedIntegrationEventV1(
+                    evt.EventId, evt.OccurredOn, evt.TripId, evt.VendorVehicleKey,
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+            ],
             ExceptionRaisedDomainEvent evt =>
             [
                 new ExceptionRaisedIntegrationEvent(

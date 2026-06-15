@@ -193,6 +193,10 @@ export function resumeTrip(tripId: string): Promise<void> {
   return api<void>(`/api/dispatch/trips/${tripId}/resume`, { method: "POST" });
 }
 
+export function acknowledgeRobotPass(tripId: string): Promise<void> {
+  return api<void>(`/api/dispatch/trips/${tripId}/acknowledge-robot-pass`, { method: "POST" });
+}
+
 export type RetryTripRequest = {
   source?: "Manual" | "Automatic" | "Reopen";
   retriedBy?: string | null;

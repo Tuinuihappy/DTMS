@@ -31,6 +31,13 @@ public record TripFailedDomainEvent(
 
 public record TripPausedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId) : IDomainEvent;
 public record TripResumedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId) : IDomainEvent;
+
+// Operator confirmed a robot waiting at a checkpoint may proceed (RIOT3 PASS).
+// Trip.Status is intentionally unchanged — this is an interactive nudge at
+// robot level, not a state transition. VendorVehicleKey is the deviceKey
+// that was acknowledged (carried for audit + projector display).
+public record TripRobotPassAcknowledgedDomainEvent(
+    Guid EventId, DateTime OccurredOn, Guid TripId, string VendorVehicleKey) : IDomainEvent;
 public record TripCancelledDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId, string Reason, string? VendorUpperKey) : IDomainEvent;
 
 // Emitted the first time a vehicle is bound to a trip that was created
