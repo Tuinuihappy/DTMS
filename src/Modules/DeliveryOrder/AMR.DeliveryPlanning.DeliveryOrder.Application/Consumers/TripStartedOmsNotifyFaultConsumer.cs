@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
@@ -21,13 +22,16 @@ public class TripStartedOmsNotifyFaultConsumer : IConsumer<Fault<TripStartedInte
     private const string AuditEventType = "UpstreamOmsNotifyFailed";
 
     private readonly IOrderAuditEventRepository _auditRepository;
+    private readonly IOrderActivityProjectionStore _activityStore;
     private readonly ILogger<TripStartedOmsNotifyFaultConsumer> _logger;
 
     public TripStartedOmsNotifyFaultConsumer(
         IOrderAuditEventRepository auditRepository,
+        IOrderActivityProjectionStore activityStore,
         ILogger<TripStartedOmsNotifyFaultConsumer> logger)
     {
         _auditRepository = auditRepository;
+        _activityStore = activityStore;
         _logger = logger;
     }
 
@@ -46,14 +50,27 @@ public class TripStartedOmsNotifyFaultConsumer : IConsumer<Fault<TripStartedInte
         // in MassTransit's _error queue + structured log.
         if (errorMessage.Length > 400) errorMessage = errorMessage[..400] + "…";
 
+        var auditDetails = $"trip-started shipmentId={evt.TripId} failed: [{exceptionType}] {errorMessage}";
         try
         {
             await _auditRepository.AddAsync(new OrderAuditEvent(
-                evt.DeliveryOrderId,
-                AuditEventType,
-                $"trip-started shipmentId={evt.TripId} failed: [{exceptionType}] {errorMessage}"),
+                evt.DeliveryOrderId, AuditEventType, auditDetails),
                 context.CancellationToken);
             await _auditRepository.SaveChangesAsync(context.CancellationToken);
+
+            // P2.5 mirror so the OmsNotificationSection UI shows red "Failed".
+            await _activityStore.AppendAsync(
+                projectorName: "OmsNotifyDirect",
+                eventId: Guid.NewGuid(),
+                orderId: evt.DeliveryOrderId,
+                category: "OmsNotify",
+                eventType: AuditEventType,
+                details: auditDetails,
+                actorId: null,
+                occurredAt: DateTime.UtcNow,
+                relatedTripId: evt.TripId,
+                attemptNumber: null,
+                cancellationToken: context.CancellationToken);
 
             _logger.LogWarning(
                 "[OmsNotify] Trip {TripId} dead-lettered after retries — audit recorded: {Error}",

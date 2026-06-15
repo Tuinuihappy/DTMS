@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
@@ -36,6 +37,7 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
     private readonly ITripRepository _tripRepository;
     private readonly IDeliveryOrderRepository _orderRepository;
     private readonly IOrderAuditEventRepository _auditRepository;
+    private readonly IOrderActivityProjectionStore _activityStore;
     private readonly ILogger<TripStartedOmsNotifyConsumer> _logger;
 
     public TripStartedOmsNotifyConsumer(
@@ -44,6 +46,7 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
         ITripRepository tripRepository,
         IDeliveryOrderRepository orderRepository,
         IOrderAuditEventRepository auditRepository,
+        IOrderActivityProjectionStore activityStore,
         ILogger<TripStartedOmsNotifyConsumer> logger)
     {
         _options = options.Value;
@@ -51,6 +54,7 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
         _tripRepository = tripRepository;
         _orderRepository = orderRepository;
         _auditRepository = auditRepository;
+        _activityStore = activityStore;
         _logger = logger;
     }
 
@@ -144,12 +148,27 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
         }
         sw.Stop();
 
+        var auditDetails = $"trip-started shipmentId={shipmentId} attempt={attemptNumber} vehicle={vendorVehicleKey} lots={lots.Count} latencyMs={sw.ElapsedMilliseconds}";
         await _auditRepository.AddAsync(new OrderAuditEvent(
-            order.Id,
-            AuditEventType,
-            $"trip-started shipmentId={shipmentId} attempt={attemptNumber} vehicle={vendorVehicleKey} lots={lots.Count} latencyMs={sw.ElapsedMilliseconds}"),
-            ct);
+            order.Id, AuditEventType, auditDetails), ct);
         await _auditRepository.SaveChangesAsync(ct);
+
+        // P2.5 mirror: OmsNotify outcomes don't flow through an integration
+        // event, so the OrderActivity projector can't pick them up. Mirror
+        // into the unified audit timeline so the OmsNotificationSection UI
+        // (which reads OrderActivity) reflects the notification.
+        await _activityStore.AppendAsync(
+            projectorName: "OmsNotifyDirect",
+            eventId: Guid.NewGuid(),
+            orderId: order.Id,
+            category: "OmsNotify",
+            eventType: AuditEventType,
+            details: auditDetails,
+            actorId: null,
+            occurredAt: DateTime.UtcNow,
+            relatedTripId: evt.TripId,
+            attemptNumber: attemptNumber,
+            cancellationToken: ct);
 
         _logger.LogInformation(
             "[OmsNotify] Trip {TripId} (attempt {N}) → OMS event=TripStarted outcome=Success shipmentId={Sid} vehicle={VehKey} lots={LotCount} latencyMs={Ms}",
