@@ -39,6 +39,9 @@ public sealed class DeliveryOrderTripItemSnapshotProvider : ITripItemSnapshotPro
                 PickupCode = item.PickupLocationCode,
                 DropCode = item.DropLocationCode,
                 item.WeightKg,
+                item.Description,
+                QuantityValue = item.Quantity.Value,
+                QuantityUom = item.Quantity.Uom,
                 DeliveryOrderId = order.Id,
                 order.OrderRef,
                 OrderStatus = order.Status
@@ -56,7 +59,10 @@ public sealed class DeliveryOrderTripItemSnapshotProvider : ITripItemSnapshotPro
                 WeightKg: r.WeightKg,
                 DeliveryOrderId: r.DeliveryOrderId,
                 OrderRef: r.OrderRef,
-                OrderStatus: r.OrderStatus.ToString()))
+                OrderStatus: r.OrderStatus.ToString(),
+                Description: r.Description,
+                QuantityValue: r.QuantityValue,
+                QuantityUom: r.QuantityUom.ToString()))
             .ToList();
     }
 }

@@ -34,6 +34,11 @@ public record TripStartedIntegrationEvent(
 // (Items.ItemId). OrderRef/OrderStatus are snapshotted at trip-start
 // and never refreshed (per P5.3 design — operator can re-fetch order
 // state via OrderId if they need live status).
+//
+// Description / QuantityValue / QuantityUom (V1.3) — optional display
+// enrichment so the trip-items table can render fulfilment context
+// without a second hop to the DeliveryOrder side. Nullable for
+// backward compatibility with pre-V1.3 emitters.
 public sealed record TripItemSnapshot(
     Guid ItemPk,
     int ItemSeq,
@@ -44,7 +49,10 @@ public sealed record TripItemSnapshot(
     double? WeightKg,
     Guid DeliveryOrderId,
     string OrderRef,
-    string OrderStatus);
+    string OrderStatus,
+    string? Description = null,
+    double? QuantityValue = null,
+    string? QuantityUom = null);
 
 public record TripPickupCompletedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId,

@@ -22,9 +22,17 @@ public sealed record TripItemDto(
     string? PickupCode,
     string? DropCode,
     double? WeightKg,
+    string? Description,
+    TripItemQuantityDto? Quantity,
     OrderRefDto Order,
     DateTime BoundAt,
     DateTime LastEventAt);
+
+// Mirrors DeliveryOrder's QuantityDto so the operator trip-items view
+// surfaces the same { value, uom } shape clients already render
+// elsewhere. Nullable on the parent — projector rows snapshotted
+// before V1.3 carry no value/uom (both NULL in the row).
+public sealed record TripItemQuantityDto(double Value, string Uom);
 
 public sealed record OrderRefDto(
     Guid Id,

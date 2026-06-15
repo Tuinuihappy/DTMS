@@ -486,6 +486,10 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.Property<Guid>("DeliveryOrderId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("DropCode")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
@@ -522,6 +526,13 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.Property<string>("PickupCode")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<string>("QuantityUom")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<double?>("QuantityValue")
+                        .HasColumnType("double precision");
 
                     b.Property<double?>("WeightKg")
                         .HasColumnType("double precision");

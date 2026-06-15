@@ -253,6 +253,11 @@ export type TripItemOrderRefDto = {
   status: string;
 };
 
+export type TripItemQuantityDto = {
+  value: number;
+  uom: string;
+};
+
 export type TripItemDto = {
   itemPk: string;
   lotNo: string;
@@ -261,6 +266,8 @@ export type TripItemDto = {
   pickupCode: string | null;
   dropCode: string | null;
   weightKg: number | null;
+  description: string | null;
+  quantity: TripItemQuantityDto | null;
   order: TripItemOrderRefDto;
   boundAt: string; // ISO-8601
   lastEventAt: string;

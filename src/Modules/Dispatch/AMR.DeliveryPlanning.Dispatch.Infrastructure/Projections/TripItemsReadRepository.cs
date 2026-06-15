@@ -29,6 +29,9 @@ public class TripItemsReadRepository : ITripItemsReadRepository
                 r.PickupCode,
                 r.DropCode,
                 r.WeightKg,
+                r.Description,
+                r.QuantityValue,
+                r.QuantityUom,
                 r.BoundAt,
                 r.LastEventAt))
             .ToListAsync(cancellationToken);

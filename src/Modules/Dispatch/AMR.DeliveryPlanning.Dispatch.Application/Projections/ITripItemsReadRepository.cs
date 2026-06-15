@@ -22,5 +22,8 @@ public sealed record TripItemReadModel(
     string? PickupCode,
     string? DropCode,
     double? WeightKg,
+    string? Description,
+    double? QuantityValue,
+    string? QuantityUom,
     DateTime BoundAt,
     DateTime LastEventAt);

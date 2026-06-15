@@ -260,6 +260,9 @@ public class DispatchDbContext : DbContext
             b.Property(e => e.PickupCode).HasMaxLength(50);
             b.Property(e => e.DropCode).HasMaxLength(50);
             b.Property(e => e.WeightKg);
+            b.Property(e => e.Description).HasMaxLength(500);
+            b.Property(e => e.QuantityValue);
+            b.Property(e => e.QuantityUom).HasMaxLength(30);
             b.Property(e => e.BoundAt).IsRequired();
             b.Property(e => e.LastEventAt).IsRequired();
 

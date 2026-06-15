@@ -106,7 +106,8 @@ export function TripItemsSection({
             <thead className="bg-[var(--color-ink-100)]/40 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--color-ink-400)] dark:bg-white/[0.03]">
               <tr>
                 <th className="px-2.5 py-1.5 text-left font-semibold">#</th>
-                <th className="px-2.5 py-1.5 text-left font-semibold">Lot</th>
+                <th className="px-2.5 py-1.5 text-left font-semibold">Lot / description</th>
+                <th className="px-2.5 py-1.5 text-left font-semibold">Qty</th>
                 <th className="px-2.5 py-1.5 text-left font-semibold">Status</th>
                 <th className="px-2.5 py-1.5 text-left font-semibold">Route</th>
                 <th className="px-2.5 py-1.5 text-left font-semibold">Order</th>
@@ -121,11 +122,31 @@ export function TripItemsSection({
                   <td className="px-2.5 py-2 align-middle font-mono text-[11px] font-semibold text-[var(--color-ink-400)]">
                     {it.itemSeq.toString().padStart(2, "0")}
                   </td>
-                  <td className="px-2.5 py-2 align-middle">
-                    <span className="inline-flex items-center gap-1 font-mono text-[11.5px] font-semibold text-[var(--color-ink-900)]">
+                  <td className="px-2.5 py-2 align-top">
+                    <span className="inline-flex items-center gap-1 font-mono text-[11.5px] font-semibold text-[var(--color-ink-900)] dark:text-white">
                       <Box className="h-3 w-3 text-[var(--color-ink-400)]" strokeWidth={2.2} />
                       {it.lotNo}
                     </span>
+                    {it.description && (
+                      <div
+                        className="mt-0.5 max-w-[260px] truncate text-[10.5px] text-[var(--color-ink-500)]"
+                        title={it.description}
+                      >
+                        {it.description}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-2.5 py-2 align-middle">
+                    {it.quantity ? (
+                      <span className="font-mono text-[11.5px] tabular-nums text-[var(--color-ink-800)] dark:text-[var(--color-ink-300)]">
+                        {it.quantity.value}
+                        <span className="ml-1 text-[10px] uppercase tracking-[0.04em] text-[var(--color-ink-400)]">
+                          {it.quantity.uom}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-[var(--color-ink-300)]">—</span>
+                    )}
                   </td>
                   <td className="px-2.5 py-2 align-middle">
                     <ItemStatusBadge status={it.itemStatus} />

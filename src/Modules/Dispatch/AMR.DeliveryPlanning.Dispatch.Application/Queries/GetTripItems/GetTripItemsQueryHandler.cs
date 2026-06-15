@@ -29,6 +29,10 @@ public class GetTripItemsQueryHandler : IQueryHandler<GetTripItemsQuery, TripIte
                 PickupCode: r.PickupCode,
                 DropCode: r.DropCode,
                 WeightKg: r.WeightKg,
+                Description: r.Description,
+                Quantity: r.QuantityValue is { } qv && r.QuantityUom is { } qu
+                    ? new TripItemQuantityDto(qv, qu)
+                    : null,
                 Order: new OrderRefDto(r.DeliveryOrderId, r.OrderRef, r.OrderStatus),
                 BoundAt: r.BoundAt,
                 LastEventAt: r.LastEventAt))

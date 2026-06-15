@@ -50,6 +50,9 @@ public class TripItemsProjectionStore : ITripItemsProjectionStore
                 pickupCode: snap.PickupCode,
                 dropCode: snap.DropCode,
                 weightKg: snap.WeightKg,
+                description: snap.Description,
+                quantityValue: snap.QuantityValue,
+                quantityUom: snap.QuantityUom,
                 boundAt: occurredAt,
                 lastEventAt: occurredAt));
         }
