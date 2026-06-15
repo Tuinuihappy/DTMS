@@ -201,12 +201,14 @@ public class GetDeliveryOrderStatsQueryHandler : IQueryHandler<GetDeliveryOrderS
         Converters = { new JsonStringEnumConverter() },
     };
 
-    private readonly IDeliveryOrderRepository _repo;
+    private readonly AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderListViewReadRepository _listRepo;
     private readonly IDistributedCache _cache;
 
-    public GetDeliveryOrderStatsQueryHandler(IDeliveryOrderRepository repo, IDistributedCache cache)
+    public GetDeliveryOrderStatsQueryHandler(
+        AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderListViewReadRepository listRepo,
+        IDistributedCache cache)
     {
-        _repo = repo;
+        _listRepo = listRepo;
         _cache = cache;
     }
 
@@ -229,7 +231,7 @@ public class GetDeliveryOrderStatsQueryHandler : IQueryHandler<GetDeliveryOrderS
             }
         }
 
-        var stats = await _repo.GetStatsAsync(cancellationToken);
+        var stats = await _listRepo.GetStatsAsync(cancellationToken);
 
         var active = OrderStatusBuckets.Active.Sum(s => stats.ByStatus.GetValueOrDefault(s));
         var completed = OrderStatusBuckets.Completed.Sum(s => stats.ByStatus.GetValueOrDefault(s));

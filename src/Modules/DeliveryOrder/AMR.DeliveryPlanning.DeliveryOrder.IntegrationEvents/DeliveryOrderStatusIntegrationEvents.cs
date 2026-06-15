@@ -79,3 +79,46 @@ public record DeliveryOrderInProgressIntegrationEventV1(
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
     string SchemaVersion = "1.1") : IIntegrationEvent;
+
+// Phase P4.5 (2026-06-15) — early-lifecycle events so the OrderListView
+// projection can materialize rows for Draft / Submitted / Validated orders
+// (previously invisible because the projector only consumed Confirmed).
+// Created carries the full row-creation payload (same items shape as
+// Confirmed); Submitted + Validated are status-only updates.
+
+public record DeliveryOrderCreatedIntegrationEventV1(
+    Guid EventId,
+    DateTime OccurredOn,
+    Guid DeliveryOrderId,
+    string OrderRef,
+    string SourceSystem,
+    string Status,
+    string Priority,
+    string? RequestedTransportMode,
+    string? RequestedBy,
+    string? CreatedBy,
+    string? Notes,
+    DateTime? EarliestUtc,
+    DateTime? LatestUtc,
+    DateTime? SubmittedAt,
+    bool? RequiresDropPod,
+    bool? RequiresPickupPod,
+    int TotalItems,
+    double TotalQuantity,
+    double TotalWeightKg,
+    IReadOnlyList<ItemSummaryDto> Items,
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
+
+public record DeliveryOrderSubmittedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
+
+public record DeliveryOrderValidatedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.0") : IIntegrationEvent;

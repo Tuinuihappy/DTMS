@@ -31,6 +31,9 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
 /// </summary>
 public class OrderListViewProjector :
     // Order lifecycle ────────────────────────────────────────────────────
+    IConsumer<DeliveryOrderCreatedIntegrationEventV1>,
+    IConsumer<DeliveryOrderSubmittedIntegrationEventV1>,
+    IConsumer<DeliveryOrderValidatedIntegrationEventV1>,
     IConsumer<DeliveryOrderConfirmedIntegrationEventV1>,
     IConsumer<DeliveryOrderDispatchedIntegrationEventV1>,
     IConsumer<DeliveryOrderInProgressIntegrationEventV1>,
@@ -75,9 +78,9 @@ public class OrderListViewProjector :
         _logger = logger;
     }
 
-    // ── Order lifecycle: Confirmed creates the row ───────────────────────
+    // ── Order lifecycle: Created materializes the row with full snapshot ─
 
-    public Task Consume(ConsumeContext<DeliveryOrderConfirmedIntegrationEventV1> ctx)
+    public Task Consume(ConsumeContext<DeliveryOrderCreatedIntegrationEventV1> ctx)
         => Run(ctx, async () =>
         {
             var m = ctx.Message;
@@ -88,26 +91,22 @@ public class OrderListViewProjector :
                 m.Items.Select(i => i.ItemId).Where(s => !string.IsNullOrEmpty(s)));
             var search = string.Join(' ', new[] {
                 m.DeliveryOrderId.ToString("N"),
+                m.OrderRef,
                 itemText,
             }.Where(s => !string.IsNullOrEmpty(s)));
 
-            // The Confirmed event doesn't carry OrderRef / RequestedBy /
-            // SourceSystem (those weren't needed for Planning). For MVP
-            // we backfill them as "(unknown)" if the row is created
-            // here; backfill SQL populates real values for existing
-            // orders. Phase P4.5: enrich the event payload.
-            await _store.UpsertOnConfirmAsync(
+            await _store.UpsertOnCreateAsync(
                 orderId: m.DeliveryOrderId,
-                orderRef: "(unknown)",
-                status: "Confirmed",
-                sourceSystem: "(unknown)",
+                orderRef: m.OrderRef,
+                status: m.Status,
+                sourceSystem: m.SourceSystem,
                 priority: m.Priority,
                 transportMode: m.RequestedTransportMode,
-                requestedBy: null, createdBy: null, notes: null,
-                totalItems: m.Items.Count,
-                totalQuantity: 0,
-                totalWeightKg: m.Items.Sum(i => i.WeightKg),
-                requiresDropPod: null, requiresPickupPod: null,
+                requestedBy: m.RequestedBy, createdBy: m.CreatedBy, notes: m.Notes,
+                totalItems: m.TotalItems,
+                totalQuantity: m.TotalQuantity,
+                totalWeightKg: m.TotalWeightKg,
+                requiresDropPod: m.RequiresDropPod, requiresPickupPod: m.RequiresPickupPod,
                 createdAt: m.OccurredOn,
                 submittedAt: m.SubmittedAt,
                 serviceWindowEarliestUtc: m.EarliestUtc,
@@ -117,6 +116,15 @@ public class OrderListViewProjector :
         });
 
     // ── Order lifecycle: other transitions just update the status ──────
+
+    public Task Consume(ConsumeContext<DeliveryOrderSubmittedIntegrationEventV1> ctx)
+        => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Submitted", ctx.Message.OccurredOn, ctx.CancellationToken));
+
+    public Task Consume(ConsumeContext<DeliveryOrderValidatedIntegrationEventV1> ctx)
+        => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Validated", ctx.Message.OccurredOn, ctx.CancellationToken));
+
+    public Task Consume(ConsumeContext<DeliveryOrderConfirmedIntegrationEventV1> ctx)
+        => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Confirmed", ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderDispatchedIntegrationEventV1> ctx)
         => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Dispatched", ctx.Message.OccurredOn, ctx.CancellationToken));

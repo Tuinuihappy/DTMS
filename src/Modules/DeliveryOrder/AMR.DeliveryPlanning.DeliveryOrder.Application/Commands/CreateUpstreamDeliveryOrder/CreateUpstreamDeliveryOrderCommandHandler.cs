@@ -104,6 +104,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
 
         try
         {
+            order.RaiseCreatedEvent();
             order.MarkAsValidated(stationMap.Value);
             order.Confirm(_options.WeightFallbackKg);
             // POD-required orders sit at DroppedOff until operator scans;

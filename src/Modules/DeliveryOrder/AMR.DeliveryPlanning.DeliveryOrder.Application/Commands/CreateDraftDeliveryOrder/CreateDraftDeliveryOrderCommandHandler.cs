@@ -73,6 +73,8 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
                 pkg.HandlingInstructions);
         }
 
+        order.RaiseCreatedEvent();
+
         await _repository.AddAsync(order, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
 

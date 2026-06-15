@@ -13,30 +13,88 @@ namespace DeliveryOrder.UnitTests;
 public class OrderListViewProjectorTests
 {
     [Fact]
-    public async Task Confirmed_UpsertsRowWithItemsInSearchText()
+    public async Task Created_UpsertsRowWithFullPayload()
     {
         var (projector, store) = Build();
         var orderId = Guid.NewGuid();
         var item1 = new ItemSummaryDto("SKU-001", 5.0, Guid.NewGuid(), Guid.NewGuid());
         var item2 = new ItemSummaryDto("SKU-002", 3.0, Guid.NewGuid(), Guid.NewGuid());
-        var evt = new DeliveryOrderConfirmedIntegrationEventV1(
-            Guid.NewGuid(), DateTime.UtcNow, orderId,
-            "High", null, null, null, new[] { item1, item2 });
+        var evt = new DeliveryOrderCreatedIntegrationEventV1(
+            EventId: Guid.NewGuid(), OccurredOn: DateTime.UtcNow, DeliveryOrderId: orderId,
+            OrderRef: "ORD-42", SourceSystem: "Sap", Status: "Draft", Priority: "High",
+            RequestedTransportMode: "Amr",
+            RequestedBy: "alice", CreatedBy: "system", Notes: "rush",
+            EarliestUtc: null, LatestUtc: null, SubmittedAt: null,
+            RequiresDropPod: true, RequiresPickupPod: false,
+            TotalItems: 2, TotalQuantity: 7, TotalWeightKg: 8.0,
+            Items: new[] { item1, item2 });
 
         await projector.Consume(Ctx(evt));
 
-        await store.Received(1).UpsertOnConfirmAsync(
-            orderId, "(unknown)", "Confirmed", "(unknown)", "High",
-            Arg.Any<string?>(),
-            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+        await store.Received(1).UpsertOnCreateAsync(
+            orderId, "ORD-42", "Draft", "Sap", "High",
+            "Amr",
+            "alice", "system", "rush",
             totalItems: 2,
-            Arg.Any<double>(),
+            totalQuantity: 7,
             totalWeightKg: 8.0,
+            requiresDropPod: true, requiresPickupPod: false,
+            Arg.Any<DateTime>(), Arg.Any<DateTime?>(),
+            Arg.Any<DateTime?>(), Arg.Any<DateTime?>(),
+            Arg.Is<string>(s => s.Contains("SKU-001") && s.Contains("SKU-002") && s.Contains("ORD-42")),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Submitted_UpdatesStatus()
+    {
+        var (projector, store) = Build();
+        var orderId = Guid.NewGuid();
+        var evt = new DeliveryOrderSubmittedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, orderId);
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).UpdateStatusAsync(
+            orderId, "Submitted", evt.OccurredOn, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Validated_UpdatesStatus()
+    {
+        var (projector, store) = Build();
+        var orderId = Guid.NewGuid();
+        var evt = new DeliveryOrderValidatedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, orderId);
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).UpdateStatusAsync(
+            orderId, "Validated", evt.OccurredOn, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Confirmed_UpdatesStatusOnly()
+    {
+        var (projector, store) = Build();
+        var orderId = Guid.NewGuid();
+        var evt = new DeliveryOrderConfirmedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, orderId,
+            "High", null, null, null, Array.Empty<ItemSummaryDto>());
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).UpdateStatusAsync(
+            orderId, "Confirmed", evt.OccurredOn, Arg.Any<CancellationToken>());
+        await store.DidNotReceive().UpsertOnCreateAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<string?>(),
+            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<int>(), Arg.Any<double>(), Arg.Any<double>(),
             Arg.Any<bool?>(), Arg.Any<bool?>(),
             Arg.Any<DateTime>(), Arg.Any<DateTime?>(),
             Arg.Any<DateTime?>(), Arg.Any<DateTime?>(),
-            Arg.Is<string>(s => s.Contains("SKU-001") && s.Contains("SKU-002")),
-            Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -115,6 +116,32 @@ public class OrderListViewReadRepository : IOrderListViewReadRepository
         var tokens = cleaned.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         if (tokens.Length == 0) return string.Empty;
         return string.Join(" & ", tokens.Select(t => $"{t}:*"));
+    }
+
+    public async Task<DeliveryOrderStats> GetStatsAsync(CancellationToken cancellationToken = default)
+    {
+        // Same shape as the write-side GetStatsAsync (DeliveryOrderRepository.cs:117)
+        // but sourced from the projection so chip counts and table rows
+        // see exactly the same universe of orders.
+        var byStatusRaw = await _db.OrderListView
+            .AsNoTracking()
+            .GroupBy(r => r.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var byStatus = new Dictionary<OrderStatus, int>();
+        foreach (var row in byStatusRaw)
+        {
+            if (Enum.TryParse<OrderStatus>(row.Status, out var s))
+                byStatus[s] = row.Count;
+        }
+        var total = byStatus.Values.Sum();
+
+        var totalWeight = total == 0
+            ? 0d
+            : await _db.OrderListView.AsNoTracking().SumAsync(r => r.TotalWeightKg, cancellationToken);
+
+        return new DeliveryOrderStats(total, byStatus, totalWeight);
     }
 
     private static OrderListViewEntry Map(OrderListViewRow r) => new(

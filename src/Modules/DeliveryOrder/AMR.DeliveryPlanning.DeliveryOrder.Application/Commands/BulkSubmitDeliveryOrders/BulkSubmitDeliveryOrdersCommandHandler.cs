@@ -109,6 +109,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                 continue;
             }
 
+            order.RaiseCreatedEvent();
             order.Submit();
             order.MarkAsValidated(stationMap.Value);
             var warnings = WeightWarningEvaluator.Evaluate(order.Items);

@@ -19,6 +19,33 @@ public record ItemEventDto(
 public record DeliveryOrderDraftedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
 public record DeliveryOrderSubmittedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
 public record DeliveryOrderValidatedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
+
+// Phase P4.5 — fired once after items are populated so the OrderListView
+// projection has the full snapshot to materialize a row. Raised by
+// `DeliveryOrder.RaiseCreatedEvent()` from the command handler, NOT from
+// `Create()`/`CreateFromUpstream()` (those fire at constructor time when
+// items haven't been added yet).
+public record DeliveryOrderCreatedDomainEvent(
+    Guid EventId,
+    DateTime OccurredOn,
+    Guid OrderId,
+    string OrderRef,
+    string SourceSystem,
+    string Status,
+    string Priority,
+    string? RequestedTransportMode,
+    string? RequestedBy,
+    string? CreatedBy,
+    string? Notes,
+    DateTime? EarliestUtc,
+    DateTime? LatestUtc,
+    DateTime? SubmittedAt,
+    bool? RequiresDropPod,
+    bool? RequiresPickupPod,
+    int TotalItems,
+    double TotalQuantity,
+    double TotalWeightKg,
+    IReadOnlyList<ItemEventDto> Items) : IDomainEvent;
 public record DeliveryOrderConfirmedDomainEvent(
     Guid EventId,
     DateTime OccurredOn,

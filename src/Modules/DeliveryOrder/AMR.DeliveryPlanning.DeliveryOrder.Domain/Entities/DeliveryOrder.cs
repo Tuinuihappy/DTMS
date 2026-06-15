@@ -137,6 +137,36 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         AddDomainEvent(new DeliveryOrderSubmittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
+    // Phase P4.5: emits a snapshot of the freshly-created order so the
+    // OrderListView projection can materialize a row immediately, instead
+    // of waiting for Confirm. Command handlers MUST call this AFTER the
+    // AddItem loop — items are read from the current aggregate state.
+    // PickupStationId / DropStationId are nullable here because pre-Validated
+    // orders haven't been resolved against the Facility map yet.
+    public void RaiseCreatedEvent()
+    {
+        var itemDtos = _items
+            .Select(p => new ItemEventDto(
+                p.ItemId, p.WeightKg ?? 0,
+                p.PickupStationId ?? Guid.Empty, p.DropStationId ?? Guid.Empty,
+                p.Hazmat is { } hz ? new ItemHazmatDto(hz.ClassCode, hz.PackingGroup?.ToString()) : null,
+                p.Temperature is { } tr ? new ItemTemperatureDto(tr.MinC, tr.MaxC) : null,
+                p.HandlingInstructions.Count > 0
+                    ? p.HandlingInstructions.Select(h => h.ToString()).ToList()
+                    : null))
+            .ToList();
+
+        AddDomainEvent(new DeliveryOrderCreatedDomainEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id,
+            OrderRef, SourceSystem.ToString(), Status.ToString(), Priority.ToString(),
+            RequestedTransportMode?.ToString(),
+            RequestedBy, CreatedBy, Notes,
+            ServiceWindow?.EarliestUtc, ServiceWindow?.LatestUtc, SubmittedAt,
+            RequiresDropPod, RequiresPickupPod,
+            TotalItems, TotalQuantity, TotalWeightKg,
+            itemDtos));
+    }
+
     public void AddItem(
         string pickupLocationCode, string dropLocationCode,
         int itemSeq, string itemId, string? description,

@@ -22,7 +22,7 @@ public class OrderListViewProjectionStore : IOrderListViewProjectionStore
         await _db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task UpsertOnConfirmAsync(
+    public async Task UpsertOnCreateAsync(
         Guid orderId, string orderRef, string status, string sourceSystem, string priority,
         string? transportMode, string? requestedBy, string? createdBy, string? notes,
         int totalItems, double totalQuantity, double totalWeightKg,
@@ -43,16 +43,15 @@ public class OrderListViewProjectionStore : IOrderListViewProjectionStore
                 createdAt, updatedAt: null, submittedAt,
                 serviceWindowEarliestUtc, serviceWindowLatestUtc,
                 searchText));
+            return;
         }
-        else
-        {
-            // Replay or out-of-order Confirmed — preserve the row's
-            // derived fields (Trip/Job-driven) while refreshing the
-            // payload fields the event carries.
-            row.UpdateStatus(status, createdAt);
-            row.UpdateNotes(notes);
-            row.RecomputeSearchText(searchText);
-        }
+
+        // Row already exists: a later status event raced ahead of Created
+        // (rare — same SaveChanges, same outbox batch — but possible on
+        // duplicate-delivery retry). Leave the existing status intact; the
+        // later handler will have set it correctly. We don't reset notes /
+        // searchText either — Created's payload is a snapshot at creation
+        // time, not the latest truth.
     }
 
     public async Task UpdateStatusAsync(Guid orderId, string newStatus, DateTime occurredAt, CancellationToken cancellationToken = default)
