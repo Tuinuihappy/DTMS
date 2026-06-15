@@ -16,7 +16,7 @@ system.** Read this first when:
 - [event-projection-plan.md](event-projection-plan.md) — what's planned, what's shipped, decision log.
 - [projection-conventions.md](projection-conventions.md) — how to write a new projector (P0 patterns).
 
-**Last updated:** 2026-06-14 — covers 10 event-driven projectors + 1
+**Last updated:** 2026-06-15 — covers 11 event-driven projectors + 1
 background snapshot writer across 4 modules. Update this doc whenever
 you add a projector, subscribe to a new event, or change a read model
 schema.
@@ -39,6 +39,7 @@ need to find the writer.
 | `bi.JobFacts` | Planning | `JobFactsProjector` | `backfill-p5-job-facts.sql` | P5.2 |
 | `dispatch.TripStatusHistory` | Dispatch | `TripStatusHistoryProjector` | `backfill-p1-trip-status-history.sql` | P1 |
 | `bi.TripFacts` | Dispatch | `TripFactsProjector` | `backfill-p5-trip-facts.sql` | P5.2 |
+| `dispatch.TripItems` | Dispatch | `TripItemsProjector` | `backfill-p5.3-trip-items.sql` | P5.3 |
 | `fleet.VehicleStateHistory` | Fleet | `VehicleStateHistoryProjector` | (none — event-driven only) | P3.2 |
 | `fleet.FleetUtilizationHourly` | Fleet | `FleetUtilizationSnapshotWriter` (background) | (none — periodic rebuild) | P3.2 |
 
@@ -72,12 +73,12 @@ breaks.
 
 | Integration event | Consumed by (count) |
 |---|---|
-| `TripStartedIntegrationEvent` | TripStatusHistory, TripFacts, OrderActivity, OrderListView (4) |
+| `TripStartedIntegrationEvent` (V1.2: + Items snapshot) | TripStatusHistory, TripFacts, OrderActivity, OrderListView, TripItems (5) |
 | `TripPickupCompletedIntegrationEvent` | OrderActivity (1) — item-level events flow through DeliveryOrder.Items elsewhere |
 | `TripDropCompletedIntegrationEvent` | OrderActivity (1) |
-| `TripCompletedIntegrationEvent` | TripStatusHistory, TripFacts, OrderActivity, OrderListView (4) |
-| `TripFailedIntegrationEvent` | TripStatusHistory, TripFacts, OrderActivity, OrderListView, TripFailedJobConsumer (5) |
-| `TripCancelledIntegrationEvent` | TripStatusHistory, TripFacts, OrderActivity, OrderListView, TripCancelledJobConsumer (5) |
+| `TripCompletedIntegrationEvent` | TripStatusHistory, TripFacts, OrderActivity, OrderListView, TripItems (5) |
+| `TripFailedIntegrationEvent` | TripStatusHistory, TripFacts, OrderActivity, OrderListView, TripFailedJobConsumer, TripItems (6) |
+| `TripCancelledIntegrationEvent` | TripStatusHistory, TripFacts, OrderActivity, OrderListView, TripCancelledJobConsumer, TripItems (6) |
 | `TripPausedIntegrationEventV1` | TripStatusHistory, TripFacts, OrderActivity, TripPausedJobConsumer (4) |
 | `TripResumedIntegrationEventV1` | TripStatusHistory, TripFacts, OrderActivity, TripResumedJobConsumer (4) |
 | `ExceptionRaisedIntegrationEvent` | OrderActivity (1) |
@@ -272,7 +273,22 @@ for impact assessment:
 | **Tests** | `tests/Modules/Fleet.UnitTests/VehicleStateHistoryProjectorTests.cs` |
 | **Notes** | Only single-event projector in the system. FromState carry-forward + out-of-order skip mirror P1 patterns. |
 
-### 11. `FleetUtilizationSnapshotWriter` (P3.2 — *background, not event-driven*)
+### 11. `TripItemsProjector` (P5.3)
+
+| | |
+|---|---|
+| **Module** | Dispatch |
+| **DbContext** | `DispatchDbContext` |
+| **Read model** | `dispatch.TripItems` (row per (TripId, ItemPk); denormalized — embeds OrderRef/OrderStatus snapshot + lot details for one-shot operator drawer query) |
+| **Subscribes** | 4 events: TripStarted (insert), TripCompleted (→ItemStatus="Delivered"), TripFailed/TripCancelled (→ItemStatus="Unbound") |
+| **Dedup** | `dispatch.ProjectionInbox` (ProjectorName=`TripItemsProjector`) |
+| **Downstream API** | `GET /api/v1/dispatch/trips/{id}/items` |
+| **Downstream UI** | `<TripItemsSection />` in Trip detail drawer (compact table; clickable OrderRef opens Order drawer on top) |
+| **Backfill** | `scripts/backfill-p5.3-trip-items.sql` (cross-schema join — Trips × Items × DeliveryOrders) |
+| **Tests** | `tests/Modules/Dispatch.UnitTests/TripItemsProjectorTests.cs` |
+| **Notes** | Requires `TripStartedIntegrationEvent.Items` (V1.2 enrichment) — populated by `ITripItemSnapshotProvider` (impl: `DeliveryOrderTripItemSnapshotProvider` in DeliveryOrder.Infrastructure) before `Trip.MarkVendorStarted` is called. OrderRef/OrderStatus are snapshotted at trip-start and **not** refreshed by Order lifecycle events — operator can re-fetch order state via OrderId for live status. Empty `Items` payload is valid: projector records the inbox row to prevent reprocessing and waits for a future enrichment event. |
+
+### 12. `FleetUtilizationSnapshotWriter` (P3.2 — *background, not event-driven*)
 
 | | |
 |---|---|

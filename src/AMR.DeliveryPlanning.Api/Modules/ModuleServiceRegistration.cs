@@ -168,6 +168,12 @@ public static class ModuleServiceRegistration
         services.AddScoped<IStationValidationService, StationValidationService>();
         services.AddScoped<IOrderAmendmentRepository, OrderAmendmentRepository>();
         services.AddScoped<IOrderAuditEventRepository, OrderAuditEventRepository>();
+        // Phase P5.3 — Dispatch-side bridge so the vendor adapter can
+        // populate TripStartedIntegrationEvent.Items without taking a
+        // hard dependency on DeliveryOrderDbContext. Implementation lives
+        // here (in DeliveryOrder.Infrastructure) where the data is.
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Services.ITripItemSnapshotProvider,
+                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services.DeliveryOrderTripItemSnapshotProvider>();
         // Phase P1 — projection infrastructure for the DeliveryOrder module.
         // Read repo serves the status-history query endpoint.
         // Projection store backs OrderStatusHistoryProjector: combines inbox
@@ -267,6 +273,11 @@ public static class ModuleServiceRegistration
                            AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripFactsReadRepository>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripFactsProjectionStore,
                            AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripFactsProjectionStore>();
+        // Phase P5.3 — TripItems read model (Trip ↔ Item binding).
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripItemsReadRepository,
+                           AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripItemsReadRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripItemsProjectionStore,
+                           AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripItemsProjectionStore>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Repositories.ITripRetryEventRepository,
             AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories.TripRetryEventRepository>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Repositories.ITripMissionEventRepository,

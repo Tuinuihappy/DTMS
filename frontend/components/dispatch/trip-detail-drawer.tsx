@@ -26,6 +26,7 @@ import { MissionTimeline } from "./mission-timeline";
 import { RetryHistoryPanel } from "./retry-history-panel";
 import { SnapshotInspector } from "./snapshot-inspector";
 import { TripActionBar } from "./trip-action-bar";
+import { TripItemsSection } from "./trip-items-section";
 
 // Slide-in drawer over the order detail drawer. Mirrors the existing
 // order drawer pattern (backdrop + spring transition + escape-to-close)
@@ -34,12 +35,17 @@ export function TripDetailDrawer({
   tripId,
   onClose,
   onOpenTrip,
+  onOpenOrder,
 }: {
   tripId: string | null;
   onClose: () => void;
   // Lets the drawer hand control to a sibling Trip (e.g. previous retry
   // attempt) without forcing a parent re-render.
   onOpenTrip?: (id: string) => void;
+  // Phase P5.3 — clicking an OrderRef in the trip items table opens
+  // the Order drawer stacked on top of this one. Parent (e.g.
+  // orders-experience) wires the state.
+  onOpenOrder?: (orderId: string) => void;
 }) {
   const [data, setData] = useState<TripDetailsDto | null>(null);
   const [loading, setLoading] = useState(false);
@@ -235,6 +241,11 @@ export function TripDetailDrawer({
                       }
                     />
                   </section>
+
+                  {/* Phase P5.3 — items bound to this trip + each
+                      item's owning order context. Clicking an OrderRef
+                      opens the Order drawer stacked on top. */}
+                  <TripItemsSection tripId={data.id} onOpenOrder={onOpenOrder} />
 
                   {isTripInFlight(data.status) && (
                     <section>

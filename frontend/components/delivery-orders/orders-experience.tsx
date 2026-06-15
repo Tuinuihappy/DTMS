@@ -960,6 +960,7 @@ function ExperienceInner() {
       <OrderDetailDrawer
         orderId={detailId}
         onClose={() => setDetailId(null)}
+        onOpenOrder={(id) => setDetailId(id)}
         onAction={async (a, id) => {
           await runAction(a, id);
           if (a !== "delete") {

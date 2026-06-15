@@ -26,6 +26,9 @@ public class DispatchDbContext : DbContext
     // ── Phase P5.2 — BI fact table (cross-cutting bi schema, owned here) ──
     public DbSet<TripFactsRow> TripFacts => Set<TripFactsRow>();
 
+    // ── Phase P5.3 — TripItems read model (Trip ↔ Item binding) ───────────
+    public DbSet<TripItemsRow> TripItems => Set<TripItemsRow>();
+
     public DispatchDbContext(DbContextOptions<DispatchDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -235,6 +238,36 @@ public class DispatchDbContext : DbContext
             b.HasIndex(e => e.DeliveryOrderId);
             b.HasIndex(e => e.SlaCompleteBreached)
                 .HasFilter("\"SlaCompleteBreached\" = true");
+        });
+
+        // ── Phase P5.3 — dispatch.TripItems read model ─────────────────
+        // Written exclusively by TripItemsProjector. Composite PK on
+        // (TripId, ItemPk) so a duplicate replay can't insert twice.
+        // EventId is UNIQUE for replay safety (single event writes N rows
+        // but the EventId is the same on all of them — UNIQUE applies to
+        // the inbox row instead; we keep the column here for forensics).
+        modelBuilder.Entity<TripItemsRow>(b =>
+        {
+            b.ToTable("TripItems", Schema);
+            b.HasKey(e => new { e.TripId, e.ItemPk });
+            b.Property(e => e.EventId).IsRequired();
+            b.Property(e => e.DeliveryOrderId).IsRequired();
+            b.Property(e => e.OrderRef).HasMaxLength(100).IsRequired();
+            b.Property(e => e.OrderStatus).HasMaxLength(30).IsRequired();
+            b.Property(e => e.LotNo).HasMaxLength(200).IsRequired();
+            b.Property(e => e.ItemSeq).IsRequired();
+            b.Property(e => e.ItemStatus).HasMaxLength(30).IsRequired();
+            b.Property(e => e.PickupCode).HasMaxLength(50);
+            b.Property(e => e.DropCode).HasMaxLength(50);
+            b.Property(e => e.WeightKg);
+            b.Property(e => e.BoundAt).IsRequired();
+            b.Property(e => e.LastEventAt).IsRequired();
+
+            // Operator drawer drives traffic by TripId; covered by the PK.
+            // Reverse-lookup indexes for "which trips ever carried this order/lot".
+            b.HasIndex(e => e.DeliveryOrderId);
+            b.HasIndex(e => e.OrderRef);
+            b.HasIndex(e => e.LotNo);
         });
     }
 }

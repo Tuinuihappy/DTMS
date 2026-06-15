@@ -47,7 +47,11 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     // Vehicle performance report groups by.
                     VendorVehicleKey: evt.VendorVehicleKey,
                     TriggeredBy: triggeredBy,
-                    CorrelationId: correlationId)
+                    CorrelationId: correlationId,
+                    // V1.2 enrichment (Phase P5.3) — Items snapshot for
+                    // TripItemsProjector. Pass-through from the domain event
+                    // (caller populated via ITripItemSnapshotProvider).
+                    Items: evt.Items)
             ],
             TripPickupCompletedDomainEvent evt =>
             [

@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using AMR.DeliveryPlanning.Dispatch.Domain.Services;
 using AMR.DeliveryPlanning.VendorAdapter.Feeder.Options;
 using AMR.DeliveryPlanning.VendorAdapter.Riot3.Models;
 using AMR.DeliveryPlanning.VendorAdapter.Riot3.Services;
@@ -65,6 +66,9 @@ public sealed class Riot3ReconciliationService : BackgroundService
         var tripRepo = scope.ServiceProvider.GetRequiredService<ITripRepository>();
         var missionRepo = scope.ServiceProvider.GetRequiredService<ITripMissionEventRepository>();
         var queryService = scope.ServiceProvider.GetRequiredService<IRiot3OrderQueryService>();
+        // Phase P5.3 — used when reconciler observes PROCESSING for a trip
+        // that's still Created (we missed the TASK_PROCESSING webhook).
+        var itemSnapshotProvider = scope.ServiceProvider.GetRequiredService<ITripItemSnapshotProvider>();
 
         var staleCutoff = DateTime.UtcNow.AddHours(-opts.StaleThresholdHours);
         var inFlight = await tripRepo.GetInFlightEnvelopeTripsAsync(staleCutoff, ct);
@@ -112,7 +116,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
             // have arrived; upsert is idempotent so duplicates are safe.
             await UpsertMissionsAsync(missionRepo, trip.Id, data, ct);
 
-            var transition = ApplyVendorState(trip, data);
+            var transition = await ApplyVendorStateAsync(trip, data, itemSnapshotProvider, ct);
             switch (transition)
             {
                 case Transition.Completed: completed++; break;
@@ -172,7 +176,11 @@ public sealed class Riot3ReconciliationService : BackgroundService
             inFlight.Count, reconciled, completed, failed, cancelled, started, paused, resumed, skippedNoVendorRecord, skippedFetchError, stale);
     }
 
-    private static Transition ApplyVendorState(Trip trip, Riot3OrderQueryData data)
+    private static async Task<Transition> ApplyVendorStateAsync(
+        Trip trip,
+        Riot3OrderQueryData data,
+        ITripItemSnapshotProvider itemSnapshotProvider,
+        CancellationToken ct)
     {
         var state = data.State?.ToUpperInvariant();
         try
@@ -204,9 +212,12 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     {
                         // Same as the webhook: capture the vendor deviceKey
                         // string as-is. No Fleet resolver call here.
+                        // Phase P5.3 — snapshot items for TripItemsProjector.
+                        var itemSnapshots = await itemSnapshotProvider.GetForTripAsync(trip.Id, ct);
                         trip.MarkVendorStarted(
                             vehicleId: null,
-                            vendorVehicleKey: data.ProcessingVehicle?.Key);
+                            vendorVehicleKey: data.ProcessingVehicle?.Key,
+                            items: itemSnapshots);
                         return Transition.Started;
                     }
                     if (trip.Status == AMR.DeliveryPlanning.Dispatch.Domain.Enums.TripStatus.Paused)

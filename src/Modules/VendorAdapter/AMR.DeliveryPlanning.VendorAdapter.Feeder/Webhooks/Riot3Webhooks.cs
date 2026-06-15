@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using AMR.DeliveryPlanning.Dispatch.Domain.Services;
 using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.Fleet.IntegrationEvents;
 using AMR.DeliveryPlanning.SharedKernel;
@@ -32,6 +33,7 @@ public static class Riot3Webhooks
             IVehicleIdentityResolver vehicleIdentityResolver,
             ITripRepository tripRepository,
             ITripMissionEventRepository missionEventRepository,
+            ITripItemSnapshotProvider tripItemSnapshotProvider,
             AMR.DeliveryPlanning.Facility.Application.Services.IFacilityReadService facilityReadService,
             ILogger<Riot3NotifyPayload> logger,
             CancellationToken cancellationToken) =>
@@ -42,7 +44,7 @@ public static class Riot3Webhooks
             switch (NormalizeNotifyType(payload.Type))
             {
                 case "task":
-                    await HandleTaskEvent(payload, outbox, tripRepository, logger, cancellationToken);
+                    await HandleTaskEvent(payload, outbox, tripRepository, tripItemSnapshotProvider, logger, cancellationToken);
                     break;
 
                 case "subtask":
@@ -104,6 +106,7 @@ public static class Riot3Webhooks
         Riot3NotifyPayload payload,
         IVendorAdapterOutbox outbox,
         ITripRepository tripRepository,
+        ITripItemSnapshotProvider tripItemSnapshotProvider,
         ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -119,7 +122,7 @@ public static class Riot3Webhooks
             return;
         }
 
-        await HandleEnvelopeTaskEvent(payload, upperKey!, orderKey, tripRepository, logger, cancellationToken);
+        await HandleEnvelopeTaskEvent(payload, upperKey!, orderKey, tripRepository, tripItemSnapshotProvider, logger, cancellationToken);
     }
 
     // ── envelope-dispatched task events ──────────────────────────────────────
@@ -133,6 +136,7 @@ public static class Riot3Webhooks
         string upperKey,
         string orderKey,
         ITripRepository tripRepository,
+        ITripItemSnapshotProvider tripItemSnapshotProvider,
         ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -158,9 +162,13 @@ public static class Riot3Webhooks
                     // (DTMS Guid) intentionally stays null in this flow — a
                     // Fleet lookup is left for a future iteration.
                     var vehKey = payload.Task?.ProcessingVehicle?.Key;
-                    trip.MarkVendorStarted(vehicleId: null, vendorVehicleKey: vehKey);
-                    logger.LogInformation("[EnvelopeWebhook] Trip {TripId} started (upperKey {UpperKey}, vendor vehicle '{VehKey}')",
-                        trip.Id, upperKey, vehKey ?? "(none)");
+                    // Phase P5.3 — snapshot items bound to this trip so
+                    // TripItemsProjector can materialize dispatch.TripItems
+                    // for the operator drawer.
+                    var itemSnapshots = await tripItemSnapshotProvider.GetForTripAsync(trip.Id, cancellationToken);
+                    trip.MarkVendorStarted(vehicleId: null, vendorVehicleKey: vehKey, items: itemSnapshots);
+                    logger.LogInformation("[EnvelopeWebhook] Trip {TripId} started (upperKey {UpperKey}, vendor vehicle '{VehKey}', items={ItemCount})",
+                        trip.Id, upperKey, vehKey ?? "(none)", itemSnapshots.Count);
                     break;
 
                 case "TASK_FINISHED":

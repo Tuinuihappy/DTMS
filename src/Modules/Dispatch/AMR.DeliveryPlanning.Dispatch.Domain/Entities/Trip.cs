@@ -154,7 +154,10 @@ public class Trip : AggregateRoot<Guid>
     // Envelope-flow vendor state transitions. All idempotent — duplicate
     // webhooks (or race with the reconciliation poller) are safe.
 
-    public void MarkVendorStarted(Guid? vehicleId = null, string? vendorVehicleKey = null)
+    public void MarkVendorStarted(
+        Guid? vehicleId = null,
+        string? vendorVehicleKey = null,
+        IReadOnlyList<IntegrationEvents.TripItemSnapshot>? items = null)
     {
         if (Status != TripStatus.Created)
             return;
@@ -170,9 +173,12 @@ public class Trip : AggregateRoot<Guid>
         RecordEvent("VendorStarted", vendorVehicleKey ?? vehicleId?.ToString());
         // Fires TripStartedIntegrationEvent via the outbox so the
         // DeliveryOrder side can transition Dispatched → InProgress
-        // (Option A — order-level visibility).
+        // (Option A — order-level visibility). Phase P5.3 — Items
+        // snapshot is forwarded so TripItemsProjector can populate
+        // dispatch.TripItems for the operator drawer.
         AddDomainEvent(new TripStartedDomainEvent(
-            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, vehicleId, VendorVehicleKey));
+            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, vehicleId, VendorVehicleKey,
+            Items: items));
     }
 
     /// <summary>

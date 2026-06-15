@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.Dispatch.Domain.Events;
@@ -5,7 +6,16 @@ namespace AMR.DeliveryPlanning.Dispatch.Domain.Events;
 // VendorVehicleKey carries the deviceKey RIOT3 echoes on TASK_PROCESSING
 // (already captured on the Trip aggregate by the time this event fires).
 // Nullable because pre-vendor-key trips and tests may not set it.
-public record TripStartedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId, Guid? VehicleId, string? VendorVehicleKey) : IDomainEvent;
+//
+// Items (Phase P5.3) — snapshot of items bound to the trip, supplied by
+// the caller of MarkVendorStarted via ITripItemSnapshotProvider. Domain
+// event carries the same shape as the integration event so the mapper is
+// a 1:1 pass-through. Null/empty means "no item context available" —
+// not an error.
+public record TripStartedDomainEvent(
+    Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId,
+    Guid? VehicleId, string? VendorVehicleKey,
+    IReadOnlyList<TripItemSnapshot>? Items = null) : IDomainEvent;
 public record TripPickupCompletedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId) : IDomainEvent;
 public record TripDropCompletedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId) : IDomainEvent;
 

@@ -13,12 +13,38 @@ namespace AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
 // echoes on TASK_PROCESSING). Added in V1.1 — nullable, backward-compat
 // for consumers that ignore it. Powers the Vehicle performance report,
 // where it's the grouping dimension.
+//
+// Items (V1.2, Phase P5.3) — denormalized snapshot of every Item bound
+// to this Trip at start, plus each item's owning Order context. Consumed
+// by TripItemsProjector to materialize dispatch.TripItems. Caller in the
+// vendor adapter loads this via ITripItemSnapshotProvider before calling
+// Trip.MarkVendorStarted. Null/empty is valid for legacy/test paths —
+// TripItemsProjector records the empty binding and waits for a future
+// enrichment event.
 public record TripStartedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid VehicleId,
     Guid DeliveryOrderId,
     string? VendorVehicleKey = null,
     string? TriggeredBy = null,
-    Guid? CorrelationId = null) : IIntegrationEvent;
+    Guid? CorrelationId = null,
+    IReadOnlyList<TripItemSnapshot>? Items = null) : IIntegrationEvent;
+
+// Wire shape for a single Item-on-Trip binding. ItemPk is the
+// deliveryorder.Items.Id PK; LotNo is the operator-facing identifier
+// (Items.ItemId). OrderRef/OrderStatus are snapshotted at trip-start
+// and never refreshed (per P5.3 design — operator can re-fetch order
+// state via OrderId if they need live status).
+public sealed record TripItemSnapshot(
+    Guid ItemPk,
+    int ItemSeq,
+    string LotNo,
+    string ItemStatus,
+    string PickupCode,
+    string DropCode,
+    double? WeightKg,
+    Guid DeliveryOrderId,
+    string OrderRef,
+    string OrderStatus);
 
 public record TripPickupCompletedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId,

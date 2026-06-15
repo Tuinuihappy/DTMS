@@ -67,11 +67,17 @@ export function OrderDetailDrawer({
   onClose,
   onAction,
   onPodScan,
+  onOpenOrder,
 }: {
   orderId: string | null;
   onClose: () => void;
   onAction: (a: Action, id: string) => Promise<void> | void;
   onPodScan?: (itemId: string, itemLabel: string) => void;
+  // Phase P5.3 — clicking an OrderRef inside the stacked Trip drawer
+  // hops to that order. Parent (orders-experience) wires it to
+  // setDetailId so this drawer simply switches what it's showing
+  // rather than spawning yet another stacked instance.
+  onOpenOrder?: (id: string) => void;
 }) {
   const [data, setData] = useState<DeliveryOrderDetailDto | null>(null);
   const [loading, setLoading] = useState(false);
@@ -679,6 +685,13 @@ export function OrderDetailDrawer({
             tripId={openTripId}
             onClose={() => setOpenTripId(null)}
             onOpenTrip={(id) => setOpenTripId(id)}
+            onOpenOrder={(id) => {
+              // Hop the order drawer to the clicked order. Close the
+              // stacked trip drawer first so the user lands on the new
+              // order's overview, not on a trip from the previous one.
+              setOpenTripId(null);
+              onOpenOrder?.(id);
+            }}
           />
         </>
       )}

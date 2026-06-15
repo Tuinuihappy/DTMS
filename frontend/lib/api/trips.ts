@@ -237,3 +237,37 @@ export function isTripTerminal(s: TripStatus): boolean {
 export function isTripInFlight(s: TripStatus): boolean {
   return TRIP_IN_FLIGHT_STATES.includes(s);
 }
+
+// ── Trip items (Phase P5.3) ─────────────────────────────────────────────
+// Backed by dispatch.TripItems read model. One row per (Trip, Item)
+// binding with embedded order context — the drawer can render the
+// table without a second round-trip per item.
+
+export type TripItemOrderRefDto = {
+  id: string;
+  orderRef: string;
+  status: string;
+};
+
+export type TripItemDto = {
+  itemPk: string;
+  lotNo: string;
+  itemSeq: number;
+  itemStatus: string;
+  pickupCode: string | null;
+  dropCode: string | null;
+  weightKg: number | null;
+  order: TripItemOrderRefDto;
+  boundAt: string; // ISO-8601
+  lastEventAt: string;
+};
+
+export type TripItemsResponseDto = {
+  tripId: string;
+  itemCount: number;
+  items: TripItemDto[];
+};
+
+export async function getTripItems(tripId: string): Promise<TripItemsResponseDto> {
+  return api<TripItemsResponseDto>(`/api/dispatch/trips/${tripId}/items`);
+}

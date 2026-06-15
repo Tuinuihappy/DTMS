@@ -7,6 +7,7 @@ using AMR.DeliveryPlanning.Dispatch.Application.Commands.ResolveException;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.ResumeTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripById;
 using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripDetails;
+using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripItems;
 using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripRetryHistory;
 using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripsByOrder;
 using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripStatusHistory;
@@ -48,6 +49,18 @@ public static class DispatchEndpoints
         {
             var result = await sender.Send(new GetTripDetailsQuery(id, includeRaw ?? false));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
+        });
+
+        // GET /api/v1/dispatch/trips/{id}/items — Phase P5.3 — items
+        // bound to this trip plus each item's owning order context.
+        // Backed by dispatch.TripItems (TripItemsProjector materializes
+        // it from TripStartedIntegrationEvent.Items). Empty list when the
+        // projector hasn't seen the trip yet (vendor adapter hasn't bound
+        // items — operator should retry shortly).
+        group.MapGet("/trips/{id:guid}/items", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new GetTripItemsQuery(id));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
         // GET /api/v1/dispatch/orders/{orderId}/trips — list every Trip of an
