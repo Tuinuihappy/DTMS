@@ -138,6 +138,91 @@ export async function getTripsByOrder(orderId: string): Promise<TripSummaryDto[]
   return raw.map(normalizeTrip);
 }
 
+// ── Operator Trips list (GET /api/v1/dispatch/trips) ────────────────────
+// Paginated list with status / search / vehicle / date filters. Backed by
+// dispatch.Trips with a LEFT JOIN onto dispatch.TripItems so each row
+// surfaces a human-readable OrderRef. Mirrors the Orders list shape so the
+// page can reuse the same pagination/sorting controls.
+
+export type TripQueueItemDto = {
+  id: string;
+  deliveryOrderId: string;
+  orderRef: string | null;
+  jobId: string;
+  vehicleId: string | null;
+  vendorVehicleKey: string | null;
+  status: TripStatus;
+  attemptNumber: number;
+  previousAttemptId: string | null;
+  upperKey: string;
+  vendorOrderKey: string | null;
+  templateNameAtDispatch: string | null;
+  priorityAtDispatch: number | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  vendorExpectedCompletionAt: string | null;
+  failureReason: string | null;
+  pickupStationId: string | null;
+  dropStationId: string | null;
+};
+
+export type TripsQueueResultDto = {
+  items: TripQueueItemDto[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+};
+
+export type TripQueueSortKey =
+  | "createdAt"
+  | "startedAt"
+  | "completedAt"
+  | "attemptNumber"
+  | "status"
+  | "priority";
+
+export type ListTripsParams = {
+  statuses?: TripStatus[];
+  search?: string;
+  vehicleKey?: string;
+  fromUtc?: string; // ISO-8601
+  toUtc?: string;
+  sortBy?: TripQueueSortKey;
+  sortDir?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+};
+
+export async function listTrips(
+  params: ListTripsParams = {},
+  signal?: AbortSignal,
+): Promise<TripsQueueResultDto> {
+  const qs = new URLSearchParams();
+  for (const s of params.statuses ?? []) qs.append("status", s);
+  if (params.search) qs.set("search", params.search);
+  if (params.vehicleKey) qs.set("vehicleKey", params.vehicleKey);
+  if (params.fromUtc) qs.set("fromUtc", params.fromUtc);
+  if (params.toUtc) qs.set("toUtc", params.toUtc);
+  if (params.sortBy) qs.set("sortBy", params.sortBy);
+  if (params.sortDir) qs.set("sortDir", params.sortDir);
+  if (params.page) qs.set("page", String(params.page));
+  if (params.pageSize) qs.set("pageSize", String(params.pageSize));
+
+  const url = qs.toString().length > 0
+    ? `/api/dispatch/trips?${qs.toString()}`
+    : "/api/dispatch/trips";
+
+  const raw = await api<TripsQueueResultDto>(url, { signal });
+  return {
+    ...raw,
+    items: raw.items.map((t) => ({
+      ...t,
+      status: pascalFromUpperSnake(t.status) as TripStatus,
+    })),
+  };
+}
+
 // ── Retry history (Phase 4.1) ───────────────────────────────────────────
 
 export type TripRetryTriggerDto = {

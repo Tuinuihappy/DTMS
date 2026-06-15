@@ -280,6 +280,10 @@ public static class ModuleServiceRegistration
                            AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripItemsReadRepository>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripItemsProjectionStore,
                            AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripItemsProjectionStore>();
+        // Operator Trips list (GET /api/v1/dispatch/trips). Reads dispatch.Trips
+        // joined to dispatch.TripItems for the OrderRef column.
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripQueueReadRepository,
+                           AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripQueueReadRepository>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Repositories.ITripRetryEventRepository,
             AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories.TripRetryEventRepository>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Repositories.ITripMissionEventRepository,

@@ -21,6 +21,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Map,
+  Route,
   RotateCcw,
   Send,
   Smartphone,
@@ -105,6 +106,18 @@ const actions: RailAction[] = [
         label: "Action template",
         href: "/delivery-orders/action-templates",
         hint: "Workflow building blocks",
+      },
+    ],
+  },
+  {
+    icon: <Route className="h-4 w-4" strokeWidth={2} />,
+    label: "Dispatch",
+    children: [
+      {
+        icon: <ListChecks className="h-3.5 w-3.5" strokeWidth={2.1} />,
+        label: "Trip list",
+        href: "/dispatch/trips",
+        hint: "Envelope dispatches across every order",
       },
     ],
   },
