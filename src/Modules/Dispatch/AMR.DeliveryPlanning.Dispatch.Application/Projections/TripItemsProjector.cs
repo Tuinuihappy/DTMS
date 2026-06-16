@@ -13,6 +13,8 @@ namespace AMR.DeliveryPlanning.Dispatch.Application.Projections;
 ///
 /// Row lifecycle:
 ///   TripStarted                         → INSERT 1 row per snapshot item
+///   TripPickupCompleted                 → UPDATE ItemStatus = "Picked"
+///   TripDropCompleted                   → UPDATE ItemStatus = "DroppedOff"
 ///   TripCompleted                       → UPDATE ItemStatus = "Delivered"
 ///   TripFailed / TripCancelled          → UPDATE ItemStatus = "Unbound"
 ///
@@ -24,12 +26,16 @@ namespace AMR.DeliveryPlanning.Dispatch.Application.Projections;
 /// </summary>
 public class TripItemsProjector :
     IConsumer<TripStartedIntegrationEvent>,
+    IConsumer<TripPickupCompletedIntegrationEvent>,
+    IConsumer<TripDropCompletedIntegrationEvent>,
     IConsumer<TripCompletedIntegrationEvent>,
     IConsumer<TripFailedIntegrationEvent>,
     IConsumer<TripCancelledIntegrationEvent>
 {
     public const string Name = nameof(TripItemsProjector);
 
+    private const string StatusPicked = "Picked";
+    private const string StatusDroppedOff = "DroppedOff";
     private const string StatusDelivered = "Delivered";
     private const string StatusUnbound = "Unbound";
 
@@ -105,6 +111,12 @@ public class TripItemsProjector :
                 evt.EventId);
         }
     }
+
+    public Task Consume(ConsumeContext<TripPickupCompletedIntegrationEvent> ctx)
+        => RefreshItemStatusAsync(ctx, ctx.Message.TripId, StatusPicked, nameof(TripPickupCompletedIntegrationEvent));
+
+    public Task Consume(ConsumeContext<TripDropCompletedIntegrationEvent> ctx)
+        => RefreshItemStatusAsync(ctx, ctx.Message.TripId, StatusDroppedOff, nameof(TripDropCompletedIntegrationEvent));
 
     public Task Consume(ConsumeContext<TripCompletedIntegrationEvent> ctx)
         => RefreshItemStatusAsync(ctx, ctx.Message.TripId, StatusDelivered, nameof(TripCompletedIntegrationEvent));

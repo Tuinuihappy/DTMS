@@ -100,6 +100,42 @@ public class TripItemsProjectorTests
     }
 
     [Fact]
+    public async Task TripPickupCompleted_FlipsItemStatusToPicked()
+    {
+        var (projector, store) = Build();
+        var tripId = Guid.NewGuid();
+        var evt = new TripPickupCompletedIntegrationEvent(
+            Guid.NewGuid(), DateTime.UtcNow, tripId, DeliveryOrderId: Guid.NewGuid());
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).UpdateItemStatusForTripAsync(
+            TripItemsProjector.Name,
+            evt.EventId, tripId,
+            newItemStatus: "Picked",
+            evt.OccurredOn,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TripDropCompleted_FlipsItemStatusToDroppedOff()
+    {
+        var (projector, store) = Build();
+        var tripId = Guid.NewGuid();
+        var evt = new TripDropCompletedIntegrationEvent(
+            Guid.NewGuid(), DateTime.UtcNow, tripId, DeliveryOrderId: Guid.NewGuid());
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).UpdateItemStatusForTripAsync(
+            TripItemsProjector.Name,
+            evt.EventId, tripId,
+            newItemStatus: "DroppedOff",
+            evt.OccurredOn,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task TripCompleted_FlipsItemStatusToDelivered()
     {
         var (projector, store) = Build();
