@@ -57,7 +57,7 @@ for the projector-side rules.
 |---|---|---|---|
 | `TimelineUpdated` | `StatusTimelineEntryDto` (P1) | `OrderStatusHistoryProjector` | New row in `order_status_history` |
 | `StatusChanged` | `{ orderId, fromStatus, toStatus, occurredAt }` | Same projector | After successful row insert |
-| `ActivityUpdated` | `ActivityEntryDto` (P2) | `OrderActivityProjector` | New unified-timeline row |
+| `ActivityUpdated` | `OrderActivityEntryDto` (P2, shape mirrors `FullAuditEntryDto`) | `OrderActivityProjector` | New unified-timeline row (status + amendment + trip + POD); `Id = EventId` (deterministic for dedup with REST refresh) |
 
 ### Frontend usage
 

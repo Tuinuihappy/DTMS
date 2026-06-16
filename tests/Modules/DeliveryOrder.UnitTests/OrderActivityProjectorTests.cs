@@ -219,7 +219,7 @@ public class OrderActivityProjectorTests
             .Returns(false);
         var metrics = new ProjectionMetrics();
         var projector = new OrderActivityProjector(
-            store, metrics, NullLogger<OrderActivityProjector>.Instance);
+            store, metrics, new NoopOrderRealtimePublisher(), NullLogger<OrderActivityProjector>.Instance);
         return (projector, store);
     }
 

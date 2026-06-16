@@ -34,10 +34,8 @@ import { AttemptBadge, TripStatusBadge } from "@/components/dispatch/badges";
 import { JobStatusBadge } from "@/components/planning/badges";
 import { TripDetailDrawer } from "@/components/dispatch/trip-detail-drawer";
 import { FullAuditLog } from "./full-audit-log";
-import { StatusTimelineSection } from "@/components/projection/status-timeline-section";
-import type { StatusHistoryEntry } from "@/lib/api/status-history";
 import { useOrderHubSubscription } from "@/lib/realtime/hubs/order-hub";
-import { getOrderStatusHistory } from "@/lib/api/status-history";
+import type { FullAuditEntryDto } from "@/lib/api/delivery-orders";
 import { OmsNotificationSection } from "./oms-notification-section";
 import { cn } from "@/lib/utils";
 import { PriorityBadge, StatusBadge, TransportModeBadge } from "./badges";
@@ -94,15 +92,14 @@ export function OrderDetailDrawer({
   const [jobs, setJobs] = useState<JobDto[] | null>(null);
   // Currently-open Trip detail drawer (stacks above this drawer).
   const [openTripId, setOpenTripId] = useState<string | null>(null);
-  // Phase P1 — latest entry pushed by OrderHub. StatusTimelineSection
-  // merges this into its entries set whenever it changes.
-  const [liveTimelineEntry, setLiveTimelineEntry] = useState<StatusHistoryEntry | null>(null);
+  // Phase P2 (Option A) — latest activity entry pushed via OrderHub.
+  // FullAuditLog dedup-merges by Id (deterministic = EventId, so live +
+  // REST refresh land the same row). StatusTimelineSection was retired
+  // here because FullAuditLog covers all categories including status.
+  const [liveActivityEntry, setLiveActivityEntry] = useState<FullAuditEntryDto | null>(null);
 
-  // SignalR subscription — enabled while the drawer is open. The hook
-  // is no-op when orderId is null (between drawer closes), so reopening
-  // the same order picks up the same connection without reconnect cost.
   useOrderHubSubscription(orderId, {
-    TimelineUpdated: (entry) => setLiveTimelineEntry(entry as StatusHistoryEntry),
+    ActivityUpdated: (entry) => setLiveActivityEntry(entry as FullAuditEntryDto),
   });
 
   useEffect(() => {
@@ -299,14 +296,10 @@ export function OrderDetailDrawer({
                     />
                   </section>
 
-                  {/* Phase P1 — structured status-history timeline from
-                      the projection read model. Self-hides when the
-                      projection has no rows (legacy / pre-backfill). */}
-                  <StatusTimelineSection
-                    entityId={data.id}
-                    fetcher={getOrderStatusHistory}
-                    liveEntry={liveTimelineEntry}
-                  />
+                  {/* Phase P2 (Option A, 2026-06-15) — StatusTimelineSection
+                      was retired here. FullAuditLog below covers status
+                      transitions plus trip events / amendments / POD —
+                      one unified timeline with category filter chips. */}
 
                   {/* Notes */}
                   {data.notes && (
@@ -444,6 +437,7 @@ export function OrderDetailDrawer({
                       <FullAuditLog
                         orderId={data.id}
                         onOpenTrip={(tripId) => setOpenTripId(tripId)}
+                        liveEntry={liveActivityEntry}
                       />
                     </div>
                   </section>

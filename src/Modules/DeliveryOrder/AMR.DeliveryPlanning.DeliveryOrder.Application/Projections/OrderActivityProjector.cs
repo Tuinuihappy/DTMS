@@ -13,21 +13,24 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
 /// integration event whose semantics imply a row in the operator's
 /// "what happened to this order?" view.
 ///
-/// <para><b>Coverage matrix:</b></para>
+/// <para><b>Coverage matrix (2026-06-15 P2 housekeeping):</b></para>
 /// <list type="bullet">
-///   <item>Order lifecycle (11 events) — full coverage via DeliveryOrder
-///         integration events.</item>
-///   <item>Trip execution (8 events) — full coverage via Dispatch
-///         integration events.</item>
+///   <item>Order lifecycle (14 events) — Created, Submitted, Validated,
+///         Confirmed, Dispatched, InProgress, Completed,
+///         PartiallyCompleted, Failed, Cancelled, Rejected, Held,
+///         Released, Amended.</item>
+///   <item>Trip execution (9 events) — Started, PickupCompleted,
+///         DropCompleted, Completed, Failed, Cancelled, Paused, Resumed,
+///         RobotPassAcknowledged. Plus ExceptionRaised under the same
+///         category.</item>
+///   <item>POD (1 event) — PodCaptured (Phase P2, surfaces operator scan
+///         records in the timeline).</item>
 /// </list>
 ///
 /// <para><b>Known gaps (MVP — accepted):</b></para>
 /// <list type="bullet">
-///   <item>Item POD scans — written to OrderAuditEvent only, no
-///         integration event. Historical rows seeded via backfill SQL;
-///         new scans don't appear in the timeline until POD events
-///         are added under P2.5 hardening.</item>
-///   <item>Upstream OMS notify outcomes — same situation.</item>
+///   <item>Upstream OMS notify outcomes — no integration event today;
+///         backfill rows only.</item>
 ///   <item>Trip retry triggers — no integration event; backfill only.</item>
 ///   <item>Admin actions (OrderReopened, OrderAbandoned) — OrderAuditEvent
 ///         only; backfill only.</item>
@@ -39,6 +42,10 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
 /// FromStatus — readers sort on OccurredAt at query time.
 /// </summary>
 public class OrderActivityProjector :
+    // Order early lifecycle (Phase P2 — close gap from upstream e53db1f7) ─
+    IConsumer<DeliveryOrderCreatedIntegrationEventV1>,
+    IConsumer<DeliveryOrderSubmittedIntegrationEventV1>,
+    IConsumer<DeliveryOrderValidatedIntegrationEventV1>,
     // Order lifecycle ────────────────────────────────────────────────────
     IConsumer<DeliveryOrderConfirmedIntegrationEventV1>,
     IConsumer<DeliveryOrderDispatchedIntegrationEventV1>,
@@ -60,7 +67,10 @@ public class OrderActivityProjector :
     IConsumer<TripCancelledIntegrationEvent>,
     IConsumer<TripPausedIntegrationEventV1>,
     IConsumer<TripResumedIntegrationEventV1>,
-    IConsumer<ExceptionRaisedIntegrationEvent>
+    IConsumer<TripRobotPassAcknowledgedIntegrationEventV1>,
+    IConsumer<ExceptionRaisedIntegrationEvent>,
+    // POD (Phase P2 — operator scan records appear in unified timeline) ─
+    IConsumer<PodCapturedIntegrationEvent>
 {
     public const string Name = nameof(OrderActivityProjector);
 
@@ -72,19 +82,55 @@ public class OrderActivityProjector :
 
     private readonly IOrderActivityProjectionStore _store;
     private readonly ProjectionMetrics _metrics;
+    private readonly IOrderRealtimePublisher _realtime;
     private readonly ILogger<OrderActivityProjector> _logger;
 
     public OrderActivityProjector(
         IOrderActivityProjectionStore store,
         ProjectionMetrics metrics,
+        IOrderRealtimePublisher realtime,
         ILogger<OrderActivityProjector> logger)
     {
         _store = store;
         _metrics = metrics;
+        _realtime = realtime;
         _logger = logger;
     }
 
+    // Phase P2 (Option A) — same category→source mapping as
+    // GetFullOrderAuditQueryHandler so the SignalR push entry has the same
+    // <c>Source</c> the REST endpoint would produce. Keep the two
+    // mappings in sync — if a category moves buckets, both places change.
+    private static string MapCategoryToSource(string category) => category switch
+    {
+        "OrderLifecycle" => "Order",
+        "Amendment"      => "Amendment",
+        "TripExecution"  => "TripExecution",
+        "TripRetry"      => "TripRetry",
+        _                => "Order",
+    };
+
     // ── Order lifecycle handlers ─────────────────────────────────────────
+
+    // Phase P2 early lifecycle (closes upstream e53db1f7 gap).
+    public Task Consume(ConsumeContext<DeliveryOrderCreatedIntegrationEventV1> ctx)
+        => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
+            "OrderCreated",
+            // Status on the wire reflects the entry point (Draft for manual,
+            // Submitted for upstream-originated) — surface so the timeline
+            // explains why the next transition may be missing.
+            details: $"Entered as {ctx.Message.Status}",
+            actorId: ctx.Message.TriggeredBy);
+
+    public Task Consume(ConsumeContext<DeliveryOrderSubmittedIntegrationEventV1> ctx)
+        => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
+            "OrderSubmitted", details: null,
+            actorId: ctx.Message.TriggeredBy);
+
+    public Task Consume(ConsumeContext<DeliveryOrderValidatedIntegrationEventV1> ctx)
+        => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
+            "OrderValidated", details: null,
+            actorId: ctx.Message.TriggeredBy);
 
     public Task Consume(ConsumeContext<DeliveryOrderConfirmedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
@@ -194,6 +240,30 @@ public class OrderActivityProjector :
         return Task.CompletedTask;
     }
 
+    // Phase P2 — operator-acknowledged robot checkpoint pass.
+    // No DeliveryOrderId on the wire (RIOT3 webhook scope = trip-only);
+    // skip like Pause/Resume. The Trip drawer's status timeline (P1)
+    // covers this event independently via TripStatusHistoryProjector.
+    public Task Consume(ConsumeContext<TripRobotPassAcknowledgedIntegrationEventV1> ctx)
+    {
+        _logger.LogDebug(
+            "TripRobotPassAcknowledged {EventId} for Trip {TripId} skipped — no DeliveryOrderId in payload",
+            ctx.Message.EventId, ctx.Message.TripId);
+        return Task.CompletedTask;
+    }
+
+    // Phase P2 — POD scan captured at a stop. Same scoping problem (no
+    // DeliveryOrderId on the wire). Backfill SQL seeds historical POD
+    // rows; live POD rows wait for the event payload to carry OrderId
+    // (deferred to P2.5 hardening).
+    public Task Consume(ConsumeContext<PodCapturedIntegrationEvent> ctx)
+    {
+        _logger.LogDebug(
+            "PodCaptured {EventId} for Trip {TripId} skipped — no DeliveryOrderId in payload",
+            ctx.Message.EventId, ctx.Message.TripId);
+        return Task.CompletedTask;
+    }
+
     // ── Core projection routine — same shape as P1 projectors ────────────
 
     private async Task Project<TEvent>(
@@ -241,6 +311,23 @@ public class OrderActivityProjector :
 
             _metrics.RecordProjected(Name, typeof(TEvent).Name);
             _metrics.RecordLag(Name, evt.OccurredOn);
+
+            // Phase P2 — push to "order:{id:N}" group after durable write.
+            // Mirrors the same record shape FullAuditLog renders (with the
+            // category→source already mapped) so the frontend can append
+            // the entry without an adapter.
+            _ = _realtime.PublishActivityUpdatedAsync(
+                orderId,
+                new OrderActivityEntryDto(
+                    Id: evt.EventId,
+                    Source: MapCategoryToSource(category),
+                    EventType: eventType,
+                    Details: details,
+                    ActorId: actorId,
+                    OccurredAt: evt.OccurredOn,
+                    RelatedTripId: relatedTripId,
+                    AttemptNumber: attemptNumber),
+                ct);
 
             _logger.LogInformation(
                 "Projected {EventType} for Order {OrderId}: {Category}/{Activity}",

@@ -47,4 +47,23 @@ public sealed class SignalROrderRealtimePublisher : IOrderRealtimePublisher
                 orderId);
         }
     }
+
+    public async Task PublishActivityUpdatedAsync(
+        Guid orderId,
+        OrderActivityEntryDto entry,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _hub.Clients
+                .Group(OrderHub.GroupKey(orderId))
+                .ActivityUpdated(entry);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Failed to push ActivityUpdated for Order {OrderId} — UI will catch up on next REST refresh",
+                orderId);
+        }
+    }
 }

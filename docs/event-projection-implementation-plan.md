@@ -13,7 +13,7 @@
 |---|---|---|
 | **P0 Foundation** | IdempotentProjector base, ActorContext, event V1.1 enrichment, 5 SignalR hubs, MessagePack + JWT-in-query + CORS, filters (Tracing + RateLimit), throttlers (DashboardCounterBatcher 250ms / FleetPositionThrottler 1s), `/admin/projections` page + ReplayDialog, runbooks | ✅ Done (Days 1-7 / 2026-06-14) |
 | **P1 Status History** | 3 publisher abstractions (Order/Job/Trip), 3 SignalR-backed impls, projectors push `TimelineUpdated` after row insert, 3 detail drawers wired via `useXxxSubscription` hooks, `<StatusTimelineSection liveEntry>` dedup-merge — **first feature on realtime SignalR**, E2E verified | ✅ Done (2026-06-15) |
-| **P2 Activity Timeline** | Unified per-order activity (status + amendment + trip + OMS notify + POD) via `OrderHub.ActivityUpdated`; replaces `FullAuditLog` UNION query | ⏭️ Next |
+| **P2 Activity Timeline** | `OrderActivityProjector` extended (+Created/Submitted/Validated/RobotPassAck/PodCaptured = 5 events), `IOrderRealtimePublisher.PublishActivityUpdatedAsync` wires push to `OrderHub.ActivityUpdated`, `OrderActivityRow.Id = EventId` (deterministic for dedup), `FullAuditLog` gets `liveEntry` prop with dedup-merge sort, `StatusTimelineSection` retired from Order drawer (Option A). E2E verified — cancel order → activity row written + push silent. | ✅ Done (2026-06-16) |
 | **P3 Dashboard Read Models** | Counter + funnel + utilization projections; `DashboardHub.CountersUpdated` batched 250ms; migrate 3 dashboard pages | ⏭️ |
 | **P4 Search/List** | `order_list_view` denormalized + FTS; migrate list endpoint | ⏭️ |
 | **P5 Reporting/BI** | Wide fact tables, `bi` schema, optional `/reports` UI | ⏭️ |

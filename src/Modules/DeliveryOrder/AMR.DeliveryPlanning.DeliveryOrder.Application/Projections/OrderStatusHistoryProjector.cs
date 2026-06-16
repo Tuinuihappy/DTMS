@@ -11,11 +11,17 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
 /// deliveryorder.OrderStatusHistory read model. Subscribes to every
 /// DeliveryOrder integration event whose semantics imply a status change.
 ///
-/// Coverage gaps (deliberate — no integration event exists today; will be
-/// added in P0.2 hardening if needed):
-///   - Submitted, Validated, Planning, Planned
-///     (Planning + Planned are deliberately internal-only per
-///     DeliveryOrderStatusIntegrationEvents.cs comment.)
+/// Coverage (2026-06-15 housekeeping):
+///   - Created (Draft), Submitted, Validated — added in P2 housekeeping
+///     after upstream commit e53db1f7 introduced the early-lifecycle
+///     integration events.
+///   - Confirmed, Dispatched, InProgress, Completed, PartiallyCompleted,
+///     Failed, Cancelled, Rejected, Held, Released, Amended — P1 baseline.
+///
+/// Coverage gaps (deliberate — internal-only domain events):
+///   - DraftUpdated, PlanningStarted, Planned, Reopened, Redispatched
+///     (DeliveryOrderDomainEventMapper returns [] for these — no
+///     integration event reaches the bus.)
 ///
 /// Idempotent + out-of-order safe:
 ///   - Inbox check skips duplicate redeliveries.
@@ -23,6 +29,12 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
 ///     a warning (decision logged in docs/event-projection-plan.md).
 /// </summary>
 public class OrderStatusHistoryProjector :
+    // Early lifecycle (P2 housekeeping, 2026-06-15) — close gap surfaced
+    // after upstream commit e53db1f7 added the integration events.
+    IConsumer<DeliveryOrderCreatedIntegrationEventV1>,
+    IConsumer<DeliveryOrderSubmittedIntegrationEventV1>,
+    IConsumer<DeliveryOrderValidatedIntegrationEventV1>,
+    // P1 baseline coverage.
     IConsumer<DeliveryOrderConfirmedIntegrationEventV1>,
     IConsumer<DeliveryOrderDispatchedIntegrationEventV1>,
     IConsumer<DeliveryOrderInProgressIntegrationEventV1>,
@@ -58,6 +70,21 @@ public class OrderStatusHistoryProjector :
     //    into (orderId, toStatus, reason) and delegates to the shared
     //    Project method. Keep these small + symmetrical so a reviewer can
     //    eyeball the status mapping at a glance.
+
+    // ── Early lifecycle (P2 housekeeping) ─────────────────────────────────
+
+    public Task Consume(ConsumeContext<DeliveryOrderCreatedIntegrationEventV1> ctx)
+        // ToStatus from the event payload — upstream-originated orders arrive
+        // already Submitted, manual orders arrive as Draft. Trust the wire.
+        => Project(ctx, ctx.Message.DeliveryOrderId, ctx.Message.Status, reason: null);
+
+    public Task Consume(ConsumeContext<DeliveryOrderSubmittedIntegrationEventV1> ctx)
+        => Project(ctx, ctx.Message.DeliveryOrderId, "Submitted", reason: null);
+
+    public Task Consume(ConsumeContext<DeliveryOrderValidatedIntegrationEventV1> ctx)
+        => Project(ctx, ctx.Message.DeliveryOrderId, "Validated", reason: null);
+
+    // ── P1 baseline ───────────────────────────────────────────────────────
 
     public Task Consume(ConsumeContext<DeliveryOrderConfirmedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, "Confirmed", reason: null);

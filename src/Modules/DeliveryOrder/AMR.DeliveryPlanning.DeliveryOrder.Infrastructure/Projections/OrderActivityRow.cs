@@ -53,7 +53,11 @@ public class OrderActivityRow
         if (string.IsNullOrWhiteSpace(eventType))
             throw new ArgumentException("EventType is required.", nameof(eventType));
 
-        Id = Guid.NewGuid();
+        // Phase P2 (2026-06-15) — deterministic PK = EventId so SignalR
+        // pushes can use the same Id the REST read returns; FullAuditLog
+        // dedup-merge by Id stays accurate across live + refresh paths.
+        // Inbox UNIQUE(eventId) already guarantees no duplicate inserts.
+        Id = eventId;
         EventId = eventId;
         OrderId = orderId;
         Category = category;

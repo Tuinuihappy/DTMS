@@ -26,9 +26,18 @@ type SourceFilter = "All" | "Order" | "TripExecution" | "TripRetry" | "Amendment
 export function FullAuditLog({
   orderId,
   onOpenTrip,
+  liveEntry,
 }: {
   orderId: string;
   onOpenTrip?: (tripId: string) => void;
+  /**
+   * Phase P2 (Option A) — most recent entry received over SignalR via
+   * <c>OrderHub.ActivityUpdated</c>. The parent owns the hub
+   * subscription so this component stays presentation-only.
+   * Dedup-merge by Id keeps the entries list correct even when a fast
+   * refetch races a push.
+   */
+  liveEntry?: FullAuditEntryDto | null;
 }) {
   const [data, setData] = useState<FullOrderAuditDto | null>(null);
   const [loading, setLoading] = useState(false);
@@ -55,6 +64,22 @@ export function FullAuditLog({
       cancelled = true;
     };
   }, [orderId]);
+
+  // Phase P2 — merge the latest hub-pushed entry into data. Dedup by Id
+  // (which is deterministic — backend sets it to EventId, so live + REST
+  // yield the same Id for the same event). Insert at newest-first order
+  // by OccurredAt so the row lands where the visual sort expects it.
+  useEffect(() => {
+    if (!liveEntry) return;
+    setData((prev) => {
+      if (!prev) return prev;
+      if (prev.entries.some((e) => e.id === liveEntry.id)) return prev;
+      const merged = [liveEntry, ...prev.entries].sort((a, b) =>
+        b.occurredAt.localeCompare(a.occurredAt),
+      );
+      return { ...prev, totalEntries: merged.length, entries: merged };
+    });
+  }, [liveEntry]);
 
   // Count per source, used in filter chips so operators see what's
   // available before clicking. Recomputed only when data changes.
