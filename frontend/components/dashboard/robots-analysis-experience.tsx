@@ -1,7 +1,7 @@
 "use client";
 
 import { Battery, BatteryLow, RefreshCw, Truck, Wrench } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { SectionLabel } from "@/components/primitives/section-label";
 import { DataFreshnessChip } from "@/components/projection/data-freshness-chip";
@@ -11,6 +11,7 @@ import {
   type FleetUtilizationBucket,
 } from "@/lib/api/dashboard";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
+import { useDashboardSubscription } from "@/lib/realtime/hubs/dashboard-hub";
 import { cn } from "@/lib/utils";
 
 // Phase P3.2 — Robot analysis subpage. Reads fleet.FleetUtilizationHourly
@@ -45,6 +46,26 @@ export function RobotsAnalysisExperience() {
   const { data, loading, error, refresh, lastUpdated } = useProjectionPoll(fetcher, {
     intervalMs: 30_000,
   });
+
+  // Phase P3.x — DashboardHub live updates from FleetUtilizationSnapshotService.
+  // The hosted service ticks every minute and enqueues a "fleet" board hint
+  // after each successful UpsertCurrentBucketAsync; the batcher coalesces
+  // hints in its 250 ms window. Debounce locally so we never trigger more
+  // than one refetch per second even if the snapshot writer ever fires faster.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useDashboardSubscription("fleet", {
+    CountersUpdated: () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        void refresh();
+      }, 500);
+    },
+  });
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   // Current-state strip uses the latest snapshot (independent of window).
   const latest = data?.latest;

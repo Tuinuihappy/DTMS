@@ -1,13 +1,14 @@
 "use client";
 
 import { Activity, AlertTriangle, CheckCircle2, ListChecks } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { NumberTicker } from "@/components/primitives/number-ticker";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { DataFreshnessChip } from "@/components/projection/data-freshness-chip";
 import { getOrderFunnel, type OrderFunnelTotals } from "@/lib/api/dashboard";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
+import { useDashboardSubscription } from "@/lib/realtime/hubs/dashboard-hub";
 import { cn } from "@/lib/utils";
 
 // Phase P3 — Real data from deliveryorder.OrderFunnelHourly. Each tile
@@ -48,7 +49,27 @@ export function KpiRail() {
     (signal: AbortSignal) => getOrderFunnel(defaultWindow(), signal),
     [],
   );
-  const { data, lastUpdated } = useProjectionPoll(fetcher, { intervalMs: 15_000 });
+  const { data, lastUpdated, refresh } = useProjectionPoll(fetcher, { intervalMs: 15_000 });
+
+  // Phase P3.x — KPI rail reads the same OrderFunnel projection as
+  // /dashboard/orders, so it subscribes to the same "orders" board. The
+  // OrderFunnelProjector enqueues a hint per processed event; the batcher
+  // coalesces hints in its 250 ms window. Debounce locally so a burst
+  // (e.g. cancel-storm) doesn't trigger N refetches in close succession.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useDashboardSubscription("orders", {
+    CountersUpdated: () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        void refresh();
+      }, 500);
+    },
+  });
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   const totals = data?.totals ?? EMPTY_TOTALS;
   const kpis = buildKpis(totals);

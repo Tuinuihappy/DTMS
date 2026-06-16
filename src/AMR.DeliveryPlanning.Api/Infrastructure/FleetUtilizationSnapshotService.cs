@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Api.Realtime.Pipeline;
 using AMR.DeliveryPlanning.Fleet.Application.Projections;
 
 namespace AMR.DeliveryPlanning.Api.Infrastructure;
@@ -16,13 +17,16 @@ public class FleetUtilizationSnapshotService : BackgroundService
     private static readonly TimeSpan WarmupDelay = TimeSpan.FromSeconds(20);
 
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly DashboardCounterBatcher _batcher;
     private readonly ILogger<FleetUtilizationSnapshotService> _logger;
 
     public FleetUtilizationSnapshotService(
         IServiceScopeFactory scopeFactory,
+        DashboardCounterBatcher batcher,
         ILogger<FleetUtilizationSnapshotService> logger)
     {
         _scopeFactory = scopeFactory;
+        _batcher = batcher;
         _logger = logger;
     }
 
@@ -46,6 +50,14 @@ public class FleetUtilizationSnapshotService : BackgroundService
                 using var scope = _scopeFactory.CreateScope();
                 var writer = scope.ServiceProvider.GetRequiredService<IFleetUtilizationSnapshotWriter>();
                 await writer.UpsertCurrentBucketAsync(stoppingToken);
+
+                // Phase P3.x — hint the "fleet" dashboard board after each
+                // successful upsert. Batcher coalesces hints in its 250 ms
+                // window so 2-3 concurrent ticks (shouldn't happen, but defensively
+                // OK) become one CountersUpdated push.
+                await _batcher.Enqueue(
+                    "fleet",
+                    new { kind = "fleet-utilization.bucket-touched", snapshotAtUtc = DateTime.UtcNow });
             }
             catch (OperationCanceledException) { /* shutdown */ }
             catch (Exception ex)
