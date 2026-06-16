@@ -1,7 +1,7 @@
 # Upstream OMS Notification — Implementation Plan
 
-> **Status (2026-06-14)**: Phase 1–4 ทั้งหมด **เสร็จและ wire เข้า production code แล้ว** + ขยาย scope เพิ่ม Arrived (drop completed) notification ด้วย
-> เหลือเฉพาะ (a) เปิด kill switch `UpstreamOms.Enabled` ใน prod, (b) งานในกล่อง "Defer" — ดูตาราง **Status snapshot** ท้ายเอกสาร
+> **Status (2026-06-16)**: Phase 1–4 ครบ + B3 (WireMock integration tests, 20 tests) + B4 (TripFailed / TripCancelled / PodCompleted notifications, full backend + frontend) ใน production code แล้ว — ดูตาราง **Status snapshot** ท้ายเอกสาร
+> เหลือเฉพาะ (a) เปิด kill switch `UpstreamOms.Enabled` ใน prod, (b) งานที่ defer: Token refresh (exp ก.ย. 2027), Metrics counters, Backfill tool
 
 ## Overview
 
@@ -281,15 +281,17 @@ Confirm dialog → POST → refresh order
 
 ---
 
-## Status snapshot (2026-06-14)
+## Status snapshot (2026-06-16)
 
 ### ✅ Completed
 - Phase 1, 2, 3, 4 ครบทุก acceptance criteria
 - Arrived (drop completed) notification flow — **ขยายเกินแผนเดิม**
 - Stable shipmentId across retry chain (Option A)
 - 409 Conflict handling
-- Manual resend สำหรับทั้ง Started + Arrived
-- MassTransit consumers + Fault consumers registered
+- Manual resend สำหรับทั้ง Started + Arrived + (B4) Failed + Cancelled + PodCompleted
+- MassTransit consumers + Fault consumers registered (5 main + 5 fault หลัง B4)
+- **B3 — WireMock.Net integration tests** (2026-06-16): 20 tests, 5 stages × {200/201/409/5xx/argument-validation}
+- **B4 — Failure-path notifications** (2026-06-16): TripFailed / TripCancelled / PodCompleted backend + frontend ครบ. UI 4 stages: Started → Arrived → POD captured → conditional "Trip aborted" row (merged failed/cancelled, latest-wins, subtype badge). Greying logic: success rows render `n/a (trip aborted)` เมื่อ trip aborted แทน "Awaiting…"
 
 ### ⬜ Remaining work
 
