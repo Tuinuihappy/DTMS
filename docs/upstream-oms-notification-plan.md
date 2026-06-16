@@ -297,12 +297,12 @@ Confirm dialog → POST → refresh order
    - Dev: toggle เปิดเพื่อทดสอบ end-to-end กับ TASK_PROCESSING / SUB_TASK_FINISHED จริง
    - Prod: set env var `UpstreamOms__Enabled=true` + `UpstreamOms__BearerToken=<token>` ผ่าน deployment config (ไม่ commit token)
 
-2. **ยังคง defer (จากแผนเดิม)**
-   - Token refresh (JWT exp ~2027-09 — ยังมีเวลา)
-   - Metrics counters (`oms_notify_total`, `oms_notify_latency_ms`)
-   - Integration test ด้วย WireMock.Net
-   - ขยาย `IOmsShipmentClient` รองรับ **TripFailed / Canceled / PodCompleted** (DropCompleted/Arrived เสร็จแล้ว)
-   - Backfill tool (replay missed notifications)
+2. **Status ของแผนเดิม (อัปเดต 2026-06-16)**
+   - ⏭ Token refresh — defer ยาว (JWT exp ~ก.ย. 2027 — เหลือ 15 เดือน)
+   - ⏭ Metrics counters (`oms_notify_total`, `oms_notify_latency_ms`) — defer สั้น (2-3 ชม.); ทำ B4 ก่อน
+   - ✅ **B3 — WireMock.Net integration tests** — Done 2026-06-16. `tests/Modules/OmsAdapter.IntegrationTests/` project + `HttpOmsShipmentClientFixture` + 20 tests ครอบคลุม 5 stages × {200/201/409/5xx/argument-validation} scenarios. `WireMock.Net 1.5.62` (กับ `System.Linq.Dynamic.Core 1.6.7` pin ผ่าน CVE GHSA-4cv2-4hjh-77rx). `HttpOmsShipmentClient` ถูก expose ผ่าน `InternalsVisibleTo` แต่ test ใช้ surface `IOmsShipmentClient` เท่านั้น.
+   - ✅ **B4 — ขยาย `IOmsShipmentClient` รองรับ TripFailed / TripCancelled / PodCompleted** — Done 2026-06-16. 3 new payload models (`OmsTripFailedNotification`, `OmsTripCancelledNotification`, `OmsPodCompletedNotification`) + 3 interface methods + shared `PostStageAsync<TBody>` helper ใน `HttpOmsShipmentClient` (409 Conflict treated as idempotent success). 3 consumers (`TripFailedOmsNotifyConsumer`, `TripCancelledOmsNotifyConsumer`, `PodCapturedOmsNotifyConsumer`) + 3 fault consumers (mirror existing pattern); auto-registered via `AddConsumers(assembly)`. 3 resend MediatR commands + handlers (`ResendOmsTripFailedNotification`, `ResendOmsTripCancelledNotification`, `ResendOmsPodCompletedNotification`) + 3 endpoints `POST /api/v1/delivery-orders/{id}/trips/{tripId}/notify-oms-{failed,cancelled,pod}`. Frontend `OmsNotificationSection` ขยายเป็น 4 stages: Started → Arrived → POD captured → **Trip aborted** (conditional row ที่รวม Failed + Cancelled, latest-wins, แสดง subtype badge). Success-path stages render เป็น `n/a (trip aborted)` แทน "Awaiting…" เมื่อ trip aborted (greyed). 6 audit event types ใหม่ (9 รวม fault) — category `OmsNotify` (ใช้ mapping เดิม → source "Order").
+   - ⏭ Backfill tool (replay missed notifications) — defer until prod cutover
 
 ---
 

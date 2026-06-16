@@ -11,4 +11,11 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- B3 — WireMock integration tests reach into HttpOmsShipmentClient
+         (internal sealed) so they can exercise the actual HTTP wire shape
+         the OMS receives, not just the public IOmsShipmentClient surface. -->
+    <InternalsVisibleTo Include="OmsAdapter.IntegrationTests" />
+  </ItemGroup>
+
 </Project>

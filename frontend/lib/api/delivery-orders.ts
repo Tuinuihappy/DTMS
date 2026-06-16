@@ -581,3 +581,62 @@ export async function resendOmsArrivedNotification(
   });
   return unwrap<ResendOmsArrivedNotificationResult>(res);
 }
+
+// Phase OMS B4 — three more resend endpoints corresponding to the new
+// stages (TripFailed / TripCancelled / PodCompleted). Identical shape
+// to the Started/Arrived resends; backend gates trip-state-appropriate
+// preconditions (e.g. trip must be Failed to resend a failed notify).
+export type ResendOmsTripFailedNotificationResult = {
+  shipmentId: string;
+  latencyMs: number;
+};
+
+export async function resendOmsTripFailedNotification(
+  orderId: string,
+  tripId: string,
+  requestedBy?: string,
+): Promise<ResendOmsTripFailedNotificationResult> {
+  const res = await fetch(`/api/delivery-orders/${orderId}/trips/${tripId}/notify-oms-failed`, {
+    method: "POST",
+    headers: mutationHeaders(),
+    body: JSON.stringify({ requestedBy: requestedBy ?? null }),
+  });
+  return unwrap<ResendOmsTripFailedNotificationResult>(res);
+}
+
+export type ResendOmsTripCancelledNotificationResult = {
+  shipmentId: string;
+  latencyMs: number;
+};
+
+export async function resendOmsTripCancelledNotification(
+  orderId: string,
+  tripId: string,
+  requestedBy?: string,
+): Promise<ResendOmsTripCancelledNotificationResult> {
+  const res = await fetch(`/api/delivery-orders/${orderId}/trips/${tripId}/notify-oms-cancelled`, {
+    method: "POST",
+    headers: mutationHeaders(),
+    body: JSON.stringify({ requestedBy: requestedBy ?? null }),
+  });
+  return unwrap<ResendOmsTripCancelledNotificationResult>(res);
+}
+
+export type ResendOmsPodCompletedNotificationResult = {
+  shipmentId: string;
+  scannedCount: number;
+  latencyMs: number;
+};
+
+export async function resendOmsPodCompletedNotification(
+  orderId: string,
+  tripId: string,
+  requestedBy?: string,
+): Promise<ResendOmsPodCompletedNotificationResult> {
+  const res = await fetch(`/api/delivery-orders/${orderId}/trips/${tripId}/notify-oms-pod`, {
+    method: "POST",
+    headers: mutationHeaders(),
+    body: JSON.stringify({ requestedBy: requestedBy ?? null }),
+  });
+  return unwrap<ResendOmsPodCompletedNotificationResult>(res);
+}

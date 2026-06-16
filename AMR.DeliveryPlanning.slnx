@@ -62,6 +62,7 @@
     <Project Path="tests/Modules/Facility.UnitTests/Facility.UnitTests.csproj" />
     <Project Path="tests/Modules/Fleet.IntegrationTests/Fleet.IntegrationTests.csproj" />
     <Project Path="tests/Modules/Fleet.UnitTests/Fleet.UnitTests.csproj" />
+    <Project Path="tests/Modules/OmsAdapter.IntegrationTests/OmsAdapter.IntegrationTests.csproj" />
     <Project Path="tests/Modules/Planning.IntegrationTests/Planning.IntegrationTests.csproj" />
     <Project Path="tests/Modules/Planning.UnitTests/Planning.UnitTests.csproj" />
     <Project Path="tests/Modules/VendorAdapter.IntegrationTests/VendorAdapter.IntegrationTests.csproj" />
