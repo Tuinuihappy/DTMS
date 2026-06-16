@@ -18,7 +18,7 @@
 | **P3.x Dashboard increments 2-3 (KPI rail + fleet board)** | `FleetUtilizationSnapshotService` (Api/Infrastructure) injects `DashboardCounterBatcher` directly (already in Api composition root) and enqueues `"fleet"` hint after every successful `UpsertCurrentBucketAsync`; `RobotsAnalysisExperience` (`/dashboard/robots`) subscribes via `useDashboardSubscription("fleet")` + 500ms debounce refresh. `KpiRail` on `/dashboard` overview reuses the existing `"orders"` board (same `OrderFunnel` data source) — no new backend wiring, just frontend subscribe. Pattern identical to increment 1 — proves the publisher abstraction stays optional when the producer lives in the composition root. | ✅ Done (2026-06-16) |
 | **P4 Search/List** | `order_list_view` denormalized + FTS + faceted filters (`hasFailedTrip`/`hasActiveJob`) already in place by previous work; this increment adds the **live wire**: `OrderHub.SubscribeList()`/`UnsubscribeList()` for the cross-order `orders-list` group, `IOrderClient.ListItemUpdated(hint)`, `IOrderRealtimePublisher.PublishOrderListChangedAsync(orderId, changeHint)`, `SignalROrderRealtimePublisher` impl, `OrderListViewProjector.Run()` extended to fire the push after every successful store+MarkProcessed (23 events: 13 order lifecycle + 4 trip + 6 job — `changeHint` is the lifecycle status for orders, `"TripXxx"`/`"JobXxx"` for derived-field updates). Frontend: `useOrderListSubscription` hook in `lib/realtime/hubs/order-hub.ts`, `orders-experience.tsx` subscribes + debounce-refetches list+stats (500ms) — hint-and-refetch (not delta merge) so server-side FTS/facets stay authoritative. | ✅ Done (2026-06-16) |
 | **P5 Reporting/BI** | Discovery during this milestone revealed P5 was shipped incrementally during earlier phases — `bi.OrderFacts` / `bi.TripFacts` / `bi.JobFacts` (36/29/34 rows) materialized by `OrderFactsProjector` / `TripFactsProjector` / `JobFactsProjector`; 6 report templates live under `/reports` (orders-summary, sla-breach, top-failures, lead-time, job-failures, vehicle-performance) backed by `ReportsEndpoints` / `DispatchReportsEndpoints` / `PlanningReportsEndpoints`; CSV exports work for orders + trips. **This increment closes the only real gap**: added `/api/v1/reports/jobs-export` (mirrors trips-export but reads `bi.JobFacts` directly) + `jobsExportCsvUrl` frontend helper; `job-failures-report.tsx` no longer hijacks the trips CSV (wrong schema for analysts). Deferred: F3 ReportBuilder flexible UI, F5 scheduled reports, F6 embed mode, B5/B6 bi-reader role + read replica (dev DB has one role only). | ✅ Done (2026-06-16) |
-| **P6 Compliance** | Tamper-evidence + archival (only if regulated) | ⏭️ |
+| **P6 Compliance** | Tamper-evidence + archival (only if regulated) | ⛔ Skipped (2026-06-16) — no regulatory requirement on the table (no GDPR/PDPA/SOX/HIPAA/ISO-27001 obligation, no EU/UK customer, no auditor ask). Existing event log + projection lineage is sufficient for operational debugging. Revisit only if a concrete compliance ask lands (customer contract, regulator inquiry, certification target). See §8 for what would need to be built when that happens. |
 
 ---
 
@@ -397,9 +397,21 @@ Total: 5-10s (outbox poll dominates) — can reduce to <1s by switching to push 
 
 ---
 
-## 8. Phase P6 — Compliance Hardening (Optional)
+## 8. Phase P6 — Compliance Hardening (Optional) — ⛔ SKIPPED 2026-06-16
 
-**Duration:** 1-2 weeks
+> **Decision (2026-06-16):** Skipped — no concrete regulatory ask. The
+> roadmap below stays as a reference for when (if) a compliance
+> requirement actually lands. Triggers that would reopen this phase:
+> EU/UK customer onboarding (GDPR right-to-access), Thai PDPA audit,
+> SOX-style internal financial audit, ISO 27001 / IEC 62443
+> certification target, or a customer contract clause asking for
+> tamper-evident audit logs. Until then, the existing event log
+> (`EventId` + `OccurredOn` + projection lineage) is enough for
+> operational debugging and informal forensics — but it has no
+> cryptographic tamper-evidence and no enforced retention policy, so do
+> not represent it as audit-grade.
+
+**Duration (if reopened):** 1-2 weeks
 **Goal:** Tamper-evidence, immutability, audit-grade — only if regulatory need arises
 
 ### 8.1 Backend
