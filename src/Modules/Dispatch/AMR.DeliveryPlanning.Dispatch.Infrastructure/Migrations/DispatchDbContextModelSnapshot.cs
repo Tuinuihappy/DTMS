@@ -527,6 +527,10 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<string>("OrderTransportMode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("PickupCode")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");

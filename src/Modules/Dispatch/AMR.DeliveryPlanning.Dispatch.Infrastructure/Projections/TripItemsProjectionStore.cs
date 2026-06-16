@@ -53,6 +53,7 @@ public class TripItemsProjectionStore : ITripItemsProjectionStore
                 description: snap.Description,
                 quantityValue: snap.QuantityValue,
                 quantityUom: snap.QuantityUom,
+                orderTransportMode: snap.OrderTransportMode,
                 boundAt: occurredAt,
                 lastEventAt: occurredAt));
         }

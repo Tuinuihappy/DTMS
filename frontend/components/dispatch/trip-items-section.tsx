@@ -177,6 +177,9 @@ export function TripItemsSection({
                           {it.order.orderRef}
                         </span>
                         <OrderStatusChip status={it.order.status} />
+                        {it.order.transportMode && (
+                          <TransportModeChip mode={it.order.transportMode} />
+                        )}
                       </button>
                     ) : (
                       <span className="inline-flex items-center gap-1.5">
@@ -184,6 +187,9 @@ export function TripItemsSection({
                           {it.order.orderRef}
                         </span>
                         <OrderStatusChip status={it.order.status} />
+                        {it.order.transportMode && (
+                          <TransportModeChip mode={it.order.transportMode} />
+                        )}
                       </span>
                     )}
                   </td>
@@ -236,6 +242,35 @@ function OrderStatusChip({ status }: { status: string }) {
   return (
     <span className="inline-flex items-center rounded bg-[var(--color-ink-100)] px-1.5 py-[1px] text-[9px] font-bold uppercase tracking-[0.06em] text-[var(--color-ink-500)] dark:bg-white/[0.06]">
       {status}
+    </span>
+  );
+}
+
+// Transport mode picked at order-creation time. Pastel-coded so the
+// operator can scan the items table and group rows by routing intent
+// without reading the label.
+function TransportModeChip({ mode }: { mode: string }) {
+  const palette = (() => {
+    switch (mode) {
+      case "Amr":
+        return "bg-[var(--color-pastel-sky)] text-[var(--color-pastel-sky-ink)]";
+      case "Fleet":
+        return "bg-[var(--color-pastel-lavender)] text-[var(--color-pastel-lavender-ink)]";
+      case "Manual":
+        return "bg-[var(--color-pastel-peach)] text-[var(--color-pastel-peach-ink)]";
+      default:
+        return "bg-[var(--color-ink-100)] text-[var(--color-ink-500)] dark:bg-white/[0.06]";
+    }
+  })();
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded px-1.5 py-[1px] text-[9px] font-bold uppercase tracking-[0.06em]",
+        palette,
+      )}
+      title={`Transport mode: ${mode}`}
+    >
+      {mode}
     </span>
   );
 }

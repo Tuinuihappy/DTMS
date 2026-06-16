@@ -16,6 +16,7 @@ public sealed record TripItemReadModel(
     Guid DeliveryOrderId,
     string OrderRef,
     string OrderStatus,
+    string? OrderTransportMode,
     string LotNo,
     int ItemSeq,
     string ItemStatus,

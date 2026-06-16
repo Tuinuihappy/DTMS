@@ -52,7 +52,12 @@ public sealed record TripItemSnapshot(
     string OrderStatus,
     string? Description = null,
     double? QuantityValue = null,
-    string? QuantityUom = null);
+    string? QuantityUom = null,
+    // Order-level routing mode (Amr/Manual/Fleet) captured at trip-start
+    // so operators see the dispatched mode without a live join to the
+    // DeliveryOrder side. Nullable because the source field is nullable
+    // and pre-V1.4 snapshots carry NULL.
+    string? OrderTransportMode = null);
 
 public record TripPickupCompletedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId,

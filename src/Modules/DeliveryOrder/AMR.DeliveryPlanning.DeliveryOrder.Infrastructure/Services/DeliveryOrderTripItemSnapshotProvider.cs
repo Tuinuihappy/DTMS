@@ -44,7 +44,8 @@ public sealed class DeliveryOrderTripItemSnapshotProvider : ITripItemSnapshotPro
                 QuantityUom = item.Quantity.Uom,
                 DeliveryOrderId = order.Id,
                 order.OrderRef,
-                OrderStatus = order.Status
+                OrderStatus = order.Status,
+                OrderTransportMode = order.RequestedTransportMode
             }
         ).ToListAsync(cancellationToken);
 
@@ -62,7 +63,8 @@ public sealed class DeliveryOrderTripItemSnapshotProvider : ITripItemSnapshotPro
                 OrderStatus: r.OrderStatus.ToString(),
                 Description: r.Description,
                 QuantityValue: r.QuantityValue,
-                QuantityUom: r.QuantityUom.ToString()))
+                QuantityUom: r.QuantityUom.ToString(),
+                OrderTransportMode: r.OrderTransportMode?.ToString()))
             .ToList();
     }
 }

@@ -27,6 +27,7 @@ public class TripItemsRow
     public string? Description { get; private set; }
     public double? QuantityValue { get; private set; }
     public string? QuantityUom { get; private set; }
+    public string? OrderTransportMode { get; private set; }
     public DateTime BoundAt { get; private set; }
     public DateTime LastEventAt { get; private set; }
 
@@ -38,6 +39,7 @@ public class TripItemsRow
         string lotNo, int itemSeq, string itemStatus,
         string? pickupCode, string? dropCode, double? weightKg,
         string? description, double? quantityValue, string? quantityUom,
+        string? orderTransportMode,
         DateTime boundAt, DateTime lastEventAt)
     {
         if (tripId == Guid.Empty)
@@ -64,6 +66,7 @@ public class TripItemsRow
         Description = description;
         QuantityValue = quantityValue;
         QuantityUom = quantityUom;
+        OrderTransportMode = orderTransportMode;
         BoundAt = boundAt;
         LastEventAt = lastEventAt;
     }
