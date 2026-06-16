@@ -32,15 +32,18 @@ public class OrderFunnelProjector :
 
     private readonly IOrderFunnelProjectionStore _store;
     private readonly ProjectionMetrics _metrics;
+    private readonly IDashboardRealtimePublisher _realtime;
     private readonly ILogger<OrderFunnelProjector> _logger;
 
     public OrderFunnelProjector(
         IOrderFunnelProjectionStore store,
         ProjectionMetrics metrics,
+        IDashboardRealtimePublisher realtime,
         ILogger<OrderFunnelProjector> logger)
     {
         _store = store;
         _metrics = metrics;
+        _realtime = realtime;
         _logger = logger;
     }
 
@@ -101,6 +104,17 @@ public class OrderFunnelProjector :
 
             _metrics.RecordProjected(Name, typeof(TEvent).Name);
             _metrics.RecordLag(Name, evt.OccurredOn);
+
+            // Phase P3 — hint the dashboard that the touched bucket has
+            // fresh data. BatchedDashboardRealtimePublisher coalesces this
+            // with other hints in the same 250 ms window into one
+            // CountersUpdated push per board.
+            // Bucket aligns to OccurredOn's UTC hour (matches the store's
+            // own keying logic).
+            var bucketHourUtc = new DateTime(
+                evt.OccurredOn.Year, evt.OccurredOn.Month, evt.OccurredOn.Day,
+                evt.OccurredOn.Hour, 0, 0, DateTimeKind.Utc);
+            _ = _realtime.PublishOrderFunnelUpdatedAsync(bucketHourUtc, ct);
 
             _logger.LogDebug("Incremented {Status} in bucket for {OccurredOn:O}", status, evt.OccurredOn);
         }

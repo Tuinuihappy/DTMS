@@ -198,6 +198,13 @@ public static class ModuleServiceRegistration
                            AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderFunnelReadRepository>();
         services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderFunnelProjectionStore,
                            AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderFunnelProjectionStore>();
+        // Phase P3 — dashboard realtime publisher. OrderFunnelProjector
+        // enqueues "data changed" hints via this interface; the
+        // composition-root implementation forwards into the existing
+        // DashboardCounterBatcher (P0.B11) so frontend receives one
+        // CountersUpdated push per board per 250 ms window.
+        services.AddSingleton<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IDashboardRealtimePublisher,
+                              AMR.DeliveryPlanning.Api.Realtime.Publishers.BatchedDashboardRealtimePublisher>();
         // Phase P4 — denormalized order list/search view projection.
         services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderListViewReadRepository,
                            AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderListViewReadRepository>();

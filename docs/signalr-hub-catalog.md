@@ -136,7 +136,7 @@ every **250 ms**, fanning out one `CountersUpdated` call per board.
 
 | Callback | Payload | When |
 |---|---|---|
-| `CountersUpdated` | `IReadOnlyList<CounterDelta>` | 250 ms drain tick (only if buffer non-empty) |
+| `CountersUpdated` | `IReadOnlyList<object>` | 250 ms drain tick. Phase P3 — `OrderFunnelProjector` enqueues `{ kind: "order-funnel.bucket-touched", bucketHourUtc }` hints via `IDashboardRealtimePublisher`. Frontend treats payloads as refetch triggers (debounced 500 ms), not deltas to merge — avoids chart-vs-projection drift. |
 | `KpiSnapshotUpdated` | `KpiSnapshotDto` | Initial load + reconnect |
 
 ### Why batching is mandatory here

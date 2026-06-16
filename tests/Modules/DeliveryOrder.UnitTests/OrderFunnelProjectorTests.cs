@@ -133,7 +133,7 @@ public class OrderFunnelProjectorTests
             .Returns(false);
         var metrics = new ProjectionMetrics();
         var projector = new OrderFunnelProjector(
-            store, metrics, NullLogger<OrderFunnelProjector>.Instance);
+            store, metrics, new NoopDashboardRealtimePublisher(), NullLogger<OrderFunnelProjector>.Instance);
         return (projector, store);
     }
 

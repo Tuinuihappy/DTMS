@@ -1,13 +1,14 @@
 "use client";
 
 import { Calendar, RefreshCw } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { SectionLabel } from "@/components/primitives/section-label";
 import { DataFreshnessChip } from "@/components/projection/data-freshness-chip";
 import { OrderStatusChart } from "./order-status-chart";
 import { getOrderFunnel } from "@/lib/api/dashboard";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
+import { useDashboardSubscription } from "@/lib/realtime/hubs/dashboard-hub";
 import { cn } from "@/lib/utils";
 
 // Phase P3.2 — Order analysis subpage. Drills the OrderFunnelHourly
@@ -41,6 +42,26 @@ export function OrdersAnalysisExperience() {
   const { data, loading, error, refresh, lastUpdated } = useProjectionPoll(fetcher, {
     intervalMs: 30_000,
   });
+
+  // Phase P3 — DashboardHub live updates. OrderFunnelProjector pushes a
+  // "data changed" hint via DashboardCounterBatcher (250 ms drain) →
+  // CountersUpdated arrives here. We debounce-refetch rather than apply
+  // deltas client-side, so the chart can never drift from the projection
+  // state. 500 ms debounce smooths bursty cancel-storms into one refetch.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useDashboardSubscription("orders", {
+    CountersUpdated: () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        void refresh();
+      }, 500);
+    },
+  });
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   // Derive a per-status grand-total row from the totals object so the
   // header cards don't re-read the .totals shape in every render.
