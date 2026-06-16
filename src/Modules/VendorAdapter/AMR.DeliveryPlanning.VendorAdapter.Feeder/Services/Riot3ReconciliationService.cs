@@ -217,6 +217,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
                         trip.MarkVendorStarted(
                             vehicleId: null,
                             vendorVehicleKey: data.ProcessingVehicle?.Key,
+                            vendorVehicleName: data.ProcessingVehicle?.Name,
                             items: itemSnapshots);
                         return Transition.Started;
                     }

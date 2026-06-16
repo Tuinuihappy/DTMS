@@ -48,6 +48,7 @@ public class GetTripDetailsQueryHandler : IQueryHandler<GetTripDetailsQuery, Tri
             UpperKey: trip.UpperKey,
             VendorOrderKey: trip.VendorOrderKey,
             VendorVehicleKey: trip.VendorVehicleKey,
+            VendorVehicleName: trip.VendorVehicleName,
             TemplateNameAtDispatch: trip.TemplateNameAtDispatch,
             PriorityAtDispatch: trip.PriorityAtDispatch,
             CreatedAt: trip.CreatedAt,

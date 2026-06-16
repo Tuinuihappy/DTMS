@@ -42,6 +42,7 @@ public class DispatchDbContext : DbContext
             builder.Property(t => t.UpperKey).HasMaxLength(80).IsRequired();
             builder.Property(t => t.VendorOrderKey).HasMaxLength(100);
             builder.Property(t => t.VendorVehicleKey).HasMaxLength(100);
+            builder.Property(t => t.VendorVehicleName).HasMaxLength(100);
             builder.Property(t => t.FailureReason).HasMaxLength(1000);
             builder.Property(t => t.AttemptNumber).HasDefaultValue(1);
             builder.HasIndex(t => t.PreviousAttemptId)

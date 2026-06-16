@@ -579,9 +579,29 @@ function TripsTable({
                   {t.upperKey}
                 </span>
               </Td>
-              <Td>
-                {t.vendorVehicleKey ? (
-                  <span className="font-mono text-[11.5px] text-[var(--color-ink-700)] dark:text-[var(--color-ink-500)]">
+              <Td className="max-w-[180px]">
+                {t.vendorVehicleName ? (
+                  <div className="truncate">
+                    <div
+                      className="truncate text-[11.5px] font-semibold text-[var(--color-ink-900)] dark:text-white"
+                      title={t.vendorVehicleKey ?? undefined}
+                    >
+                      {t.vendorVehicleName}
+                    </div>
+                    {t.vendorVehicleKey && (
+                      <div
+                        className="truncate font-mono text-[10px] text-[var(--color-ink-400)]"
+                        title={t.vendorVehicleKey}
+                      >
+                        {t.vendorVehicleKey}
+                      </div>
+                    )}
+                  </div>
+                ) : t.vendorVehicleKey ? (
+                  <span
+                    className="font-mono text-[11.5px] text-[var(--color-ink-700)] dark:text-[var(--color-ink-500)]"
+                    title={t.vendorVehicleKey}
+                  >
                     {t.vendorVehicleKey}
                   </span>
                 ) : (

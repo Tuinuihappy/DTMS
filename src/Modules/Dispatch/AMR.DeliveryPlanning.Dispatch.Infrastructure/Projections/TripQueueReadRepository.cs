@@ -87,6 +87,7 @@ public class TripQueueReadRepository : ITripQueueReadRepository
                 r.Trip.JobId,
                 r.Trip.VehicleId,
                 r.Trip.VendorVehicleKey,
+                r.Trip.VendorVehicleName,
                 r.Trip.Status,
                 r.Trip.AttemptNumber,
                 r.Trip.PreviousAttemptId,

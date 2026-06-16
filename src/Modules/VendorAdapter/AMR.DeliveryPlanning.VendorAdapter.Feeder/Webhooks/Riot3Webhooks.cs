@@ -162,13 +162,14 @@ public static class Riot3Webhooks
                     // (DTMS Guid) intentionally stays null in this flow — a
                     // Fleet lookup is left for a future iteration.
                     var vehKey = payload.Task?.ProcessingVehicle?.Key;
+                    var vehName = payload.Task?.ProcessingVehicle?.Name;
                     // Phase P5.3 — snapshot items bound to this trip so
                     // TripItemsProjector can materialize dispatch.TripItems
                     // for the operator drawer.
                     var itemSnapshots = await tripItemSnapshotProvider.GetForTripAsync(trip.Id, cancellationToken);
-                    trip.MarkVendorStarted(vehicleId: null, vendorVehicleKey: vehKey, items: itemSnapshots);
-                    logger.LogInformation("[EnvelopeWebhook] Trip {TripId} started (upperKey {UpperKey}, vendor vehicle '{VehKey}', items={ItemCount})",
-                        trip.Id, upperKey, vehKey ?? "(none)", itemSnapshots.Count);
+                    trip.MarkVendorStarted(vehicleId: null, vendorVehicleKey: vehKey, vendorVehicleName: vehName, items: itemSnapshots);
+                    logger.LogInformation("[EnvelopeWebhook] Trip {TripId} started (upperKey {UpperKey}, vendor vehicle '{VehKey}' / '{VehName}', items={ItemCount})",
+                        trip.Id, upperKey, vehKey ?? "(none)", vehName ?? "(none)", itemSnapshots.Count);
                     break;
 
                 case "TASK_FINISHED":

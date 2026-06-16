@@ -45,6 +45,7 @@ public class GetTripsQueueQueryHandler : IQueryHandler<GetTripsQueueQuery, Trips
                 t.JobId,
                 t.VehicleId,
                 t.VendorVehicleKey,
+                t.VendorVehicleName,
                 t.Status.ToString(),
                 t.AttemptNumber,
                 t.PreviousAttemptId,

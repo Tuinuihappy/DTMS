@@ -129,6 +129,9 @@ public class TripRepository : ITripRepository
             entry.Property(t => t.CompletedAt).IsModified = true;
             entry.Property(t => t.FailureReason).IsModified = true;
             entry.Property(t => t.VehicleId).IsModified = true;
+            // Vendor identity captured on first TASK_PROCESSING webhook.
+            entry.Property(t => t.VendorVehicleKey).IsModified = true;
+            entry.Property(t => t.VendorVehicleName).IsModified = true;
             // Vendor snapshot fields — modifiable post-create when the
             // final snapshot consumer captures the terminal-state response.
             entry.Property(t => t.VendorFinalSnapshot).IsModified = true;

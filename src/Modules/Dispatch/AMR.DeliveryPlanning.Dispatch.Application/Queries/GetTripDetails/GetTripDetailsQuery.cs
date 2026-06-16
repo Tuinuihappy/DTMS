@@ -21,6 +21,7 @@ public sealed record TripDetailsDto(
     string UpperKey,
     string? VendorOrderKey,
     string? VendorVehicleKey,
+    string? VendorVehicleName,
     string? TemplateNameAtDispatch,
     int? PriorityAtDispatch,
     DateTime CreatedAt,

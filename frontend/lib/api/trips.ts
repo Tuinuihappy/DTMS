@@ -34,6 +34,7 @@ export type TripDetailsDto = {
   upperKey: string;
   vendorOrderKey: string | null;
   vendorVehicleKey: string | null;
+  vendorVehicleName: string | null;
   templateNameAtDispatch: string | null;
   priorityAtDispatch: number | null;
   createdAt: string;
@@ -151,6 +152,7 @@ export type TripQueueItemDto = {
   jobId: string;
   vehicleId: string | null;
   vendorVehicleKey: string | null;
+  vendorVehicleName: string | null;
   status: TripStatus;
   attemptNumber: number;
   previousAttemptId: string | null;
@@ -336,6 +338,7 @@ export type TripItemOrderRefDto = {
   id: string;
   orderRef: string;
   status: string;
+  transportMode: string | null;
 };
 
 export type TripItemQuantityDto = {
@@ -358,12 +361,37 @@ export type TripItemDto = {
   lastEventAt: string;
 };
 
+export type TripContextDto = {
+  status: TripStatus;
+  attemptNumber: number;
+  upperKey: string;
+  vendorOrderKey: string | null;
+  vendorVehicleKey: string | null;
+  vendorVehicleName: string | null;
+  templateNameAtDispatch: string | null;
+  priorityAtDispatch: number | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  failureReason: string | null;
+};
+
 export type TripItemsResponseDto = {
   tripId: string;
-  itemCount: number;
+  trip: TripContextDto;
   items: TripItemDto[];
 };
 
 export async function getTripItems(tripId: string): Promise<TripItemsResponseDto> {
-  return api<TripItemsResponseDto>(`/api/dispatch/trips/${tripId}/items`);
+  const raw = await api<TripItemsResponseDto>(`/api/dispatch/trips/${tripId}/items`);
+  // Backend serializes the trip's status enum as UPPER_SNAKE_CASE; the
+  // UI types use PascalCase so normalize at the boundary (same pattern
+  // as listTrips/getTripDetails).
+  return {
+    ...raw,
+    trip: {
+      ...raw.trip,
+      status: pascalFromUpperSnake(raw.trip.status) as TripStatus,
+    },
+  };
 }

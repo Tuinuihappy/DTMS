@@ -32,6 +32,11 @@ public class Trip : AggregateRoot<Guid>
     public string UpperKey { get; private set; } = string.Empty;
     public string? VendorOrderKey { get; private set; }
     public string? VendorVehicleKey { get; private set; }
+    // Human-readable robot label from the vendor (RIOT3 processingVehicle.name
+    // e.g. "FAN1_STANDARD_NO5"). Captured first-write-wins alongside
+    // VendorVehicleKey so operator UIs can show a friendly label without a
+    // Fleet lookup. Display-only — never used for correlation.
+    public string? VendorVehicleName { get; private set; }
 
     // Route context — the station pair the trip dispatches against.
     // Captured at create time so retry can re-resolve the OrderTemplate
@@ -157,6 +162,7 @@ public class Trip : AggregateRoot<Guid>
     public void MarkVendorStarted(
         Guid? vehicleId = null,
         string? vendorVehicleKey = null,
+        string? vendorVehicleName = null,
         IReadOnlyList<IntegrationEvents.TripItemSnapshot>? items = null)
     {
         if (Status != TripStatus.Created)
@@ -168,6 +174,8 @@ public class Trip : AggregateRoot<Guid>
         // overwrite a previously-captured value.
         if (!string.IsNullOrWhiteSpace(vendorVehicleKey) && VendorVehicleKey is null)
             VendorVehicleKey = vendorVehicleKey;
+        if (!string.IsNullOrWhiteSpace(vendorVehicleName) && VendorVehicleName is null)
+            VendorVehicleName = vendorVehicleName;
         Status = TripStatus.InProgress;
         StartedAt = DateTime.UtcNow;
         RecordEvent("VendorStarted", vendorVehicleKey ?? vehicleId?.ToString());

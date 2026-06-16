@@ -35,6 +35,7 @@ public sealed record TripQueueItemDto(
     Guid JobId,
     Guid? VehicleId,
     string? VendorVehicleKey,
+    string? VendorVehicleName,
     string Status,
     int AttemptNumber,
     Guid? PreviousAttemptId,

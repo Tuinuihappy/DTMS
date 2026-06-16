@@ -213,8 +213,9 @@ export function TripDetailDrawer({
                     <MetaCell
                       icon={<Bot className="h-3 w-3" strokeWidth={2.2} />}
                       label="Vehicle"
-                      value={data.vendorVehicleKey ?? "— not assigned"}
-                      mono={!!data.vendorVehicleKey}
+                      value={data.vendorVehicleName ?? data.vendorVehicleKey ?? "— not assigned"}
+                      mono={!data.vendorVehicleName && !!data.vendorVehicleKey}
+                      hint={data.vendorVehicleName && data.vendorVehicleKey ? data.vendorVehicleKey : undefined}
                     />
                     <MetaCell
                       icon={<Box className="h-3 w-3" strokeWidth={2.2} />}
@@ -357,11 +358,16 @@ function MetaCell({
   label,
   value,
   mono = false,
+  hint,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   mono?: boolean;
+  // Secondary line under `value` — used to show the raw vendor key
+  // when a friendly label is available, so the operator can still
+  // copy the correlation id if needed.
+  hint?: string;
 }) {
   return (
     <div className="rounded-xl bg-[var(--color-ink-100)]/40 px-3 py-2.5 dark:bg-white/[0.03]">
@@ -374,10 +380,18 @@ function MetaCell({
           "mt-1 text-[12.5px] text-[var(--color-ink-900)] truncate",
           mono && "font-mono",
         )}
-        title={value}
+        title={hint ? `${value} (${hint})` : value}
       >
         {value}
       </div>
+      {hint && (
+        <div
+          className="mt-0.5 font-mono text-[10px] text-[var(--color-ink-400)] truncate"
+          title={hint}
+        >
+          {hint}
+        </div>
+      )}
     </div>
   );
 }
