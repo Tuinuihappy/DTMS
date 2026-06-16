@@ -346,7 +346,7 @@ Total: 5-10s (outbox poll dominates) — can reduce to <1s by switching to push 
 | P4.F3 | **Sort by more columns** — all indexed | ✅ Done |
 | P4.F4 | **Infinite scroll mode** option (toggle pagination/scroll) | ✅ Done — `OrdersTable` |
 | P4.F5 | **URL state persistence** — filters in query params | ✅ Done |
-| P4.F6 | **Saved filters** — localStorage + dropdown | ⏭️ Deferred (UX upgrade — separate ticket) |
+| P4.F6 | **Saved filters** — localStorage + dropdown | ✅ Done — `saved-filters.tsx` `SavedFiltersMenu`: Bookmark chip in `FilterBar`, dropdown with list/apply/delete + "Save current filters" prompt. Stored as `SavedFilter[]` under localStorage key `orders:saved-filters`. Snapshot = whole filter state object captured at save time. |
 | P4.F7 | Live list updates via OrderHub | ✅ Done (2026-06-16) — `useOrderListSubscription` in `lib/realtime/hubs/order-hub.ts`, `orders-experience.tsx` subscribes + 500 ms debounce-refetches `fetchOrders({silent:true}) + fetchStats()`. Hint payload `{orderId, toStatus}` is opaque — refetch keeps server FTS/facets/sort authoritative. |
 
 ### 6.3 Acceptance
