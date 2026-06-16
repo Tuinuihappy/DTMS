@@ -36,4 +36,26 @@ public sealed class SignalRJobRealtimePublisher : IJobRealtimePublisher
                 jobId);
         }
     }
+
+    public async Task PublishJobQueueChangedAsync(
+        Guid jobId,
+        string toStatus,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Push minimal hint payload via IJobClient.JobUpdated — the
+            // queue page treats it as a refetch trigger (debounced) so the
+            // payload's exact shape doesn't matter to consumers.
+            await _hub.Clients
+                .Group(JobHub.QueueGroupKey)
+                .JobUpdated(new { jobId, toStatus });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Failed to push JobUpdated queue hint for Job {JobId} — UI will catch up on next REST refresh",
+                jobId);
+        }
+    }
 }

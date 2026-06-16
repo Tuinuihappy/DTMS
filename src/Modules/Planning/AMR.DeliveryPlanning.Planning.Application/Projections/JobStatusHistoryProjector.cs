@@ -143,6 +143,12 @@ public class JobStatusHistoryProjector :
                     Reason: reason),
                 ct);
 
+            // Phase P3 quick-win — also hint the cross-order jobs queue
+            // page so Failed/Stuck rows surface live without manual refresh.
+            // Lightweight payload (jobId + toStatus); the queue page
+            // debounce-refetches /api/planning/jobs/queue.
+            _ = _realtime.PublishJobQueueChangedAsync(jobId, toStatus, ct);
+
             _logger.LogInformation(
                 "Projected {EventType} for Job {JobId}: {From}→{To}",
                 typeof(TEvent).Name, jobId, fromStatus ?? "(initial)", toStatus);

@@ -3,7 +3,7 @@
 import { ChevronRight, RotateCcw, Search, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getJobById,
   getJobsQueue,
@@ -17,7 +17,7 @@ import { ToastProvider, useToast } from "@/components/delivery-orders/toast";
 import { StatusTimelineSection } from "@/components/projection/status-timeline-section";
 import type { StatusHistoryEntry } from "@/lib/api/status-history";
 import { getJobStatusHistory } from "@/lib/api/status-history";
-import { useJobSubscription } from "@/lib/realtime/hubs/job-hub";
+import { useJobQueueSubscription, useJobSubscription } from "@/lib/realtime/hubs/job-hub";
 import { JobStatusBadge } from "./badges";
 import { cn } from "@/lib/utils";
 
@@ -84,6 +84,25 @@ function JobsExperienceInner() {
     void fetch(ctl.signal);
     return () => ctl.abort();
   }, [fetch]);
+
+  // Phase P3 quick-win — JobStatusHistoryProjector pushes a queue hint
+  // via JobHub.JobUpdated on every job status change. Debounce-refetch
+  // so a burst (e.g. retry-storm during ops cutover) doesn't trigger N
+  // back-to-back fetches inside the batcher window.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useJobQueueSubscription({
+    JobUpdated: () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        void fetch();
+      }, 500);
+    },
+  });
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   // Reset to page 1 on tab change so the operator doesn't land on an
   // empty page after switching to a sparser status set.

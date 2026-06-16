@@ -2,12 +2,13 @@
 
 import { Calendar, Filter, RefreshCw } from "lucide-react";
 import { motion } from "motion/react";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { SectionLabel } from "@/components/primitives/section-label";
 import { DataFreshnessChip } from "@/components/projection/data-freshness-chip";
 import { getOrderFunnel } from "@/lib/api/dashboard";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
+import { useDashboardSubscription } from "@/lib/realtime/hubs/dashboard-hub";
 import { cn } from "@/lib/utils";
 
 // Phase P3 — Real data from deliveryorder.OrderFunnelHourly via the
@@ -58,6 +59,25 @@ export function DispatchFunnel() {
   const { data, loading, error, refresh, lastUpdated } = useProjectionPoll(fetcher, {
     intervalMs: 15_000,
   });
+
+  // Phase P3 quick-win — funnel shares the OrderFunnel projection with
+  // KpiRail + /dashboard/orders, so subscribe to the same "orders" board.
+  // Debounce-refetch keeps a burst (cancel-storm during ops cutover) from
+  // hammering the REST endpoint N times within the batcher's 250 ms window.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useDashboardSubscription("orders", {
+    CountersUpdated: () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        void refresh();
+      }, 500);
+    },
+  });
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   const stages: FunnelStage[] = data
     ? buildStages(data.totals)
