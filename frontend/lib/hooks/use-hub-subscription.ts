@@ -4,6 +4,32 @@ import { HubConnectionState } from "@microsoft/signalr";
 import { useEffect, useState } from "react";
 import { ensureStarted, getHub } from "@/lib/realtime/signalr-client";
 
+// Backend SignalR uses MessagePack with the default ContractlessStandardResolver.
+// Two mismatches with the REST JSON shape consumers expect:
+//   1. Property names — MessagePack preserves C# PascalCase (OccurredAt) while
+//      ASP.NET JSON converts to camelCase (occurredAt).
+//   2. DateTime — MessagePack serializes as a timestamp extension which the JS
+//      decoder hydrates as a Date object, while JSON gives an ISO 8601 string.
+// Frontend types/sort callbacks assume the JSON shape, so we normalize both
+// here once and every hub consumer gets the REST-shape behavior for free.
+function normalizeKeys(value: unknown): unknown {
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(normalizeKeys);
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    Object.getPrototypeOf(value) === Object.prototype
+  ) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      const key = k.length > 0 ? k.charAt(0).toLowerCase() + k.slice(1) : k;
+      out[key] = normalizeKeys(v);
+    }
+    return out;
+  }
+  return value;
+}
+
 // Phase P0 Day 5 — generic hook that ties the lifecycle of a SignalR
 // subscription to a React component. Used by all typed hub wrappers
 // (Order/Job/Trip/Dashboard/Fleet) so the reconnect-resume + cleanup
@@ -75,8 +101,10 @@ export function useHubSubscription({
 
     const attach = () => {
       for (const [event, handler] of Object.entries(eventHandlers)) {
-        connection.on(event, handler);
-        registeredHandlers.push([event, handler]);
+        const wrapped = (...args: unknown[]) =>
+          handler(...(args.map(normalizeKeys) as unknown[]));
+        connection.on(event, wrapped);
+        registeredHandlers.push([event, wrapped]);
       }
     };
 
