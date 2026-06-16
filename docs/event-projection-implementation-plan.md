@@ -17,7 +17,7 @@
 | **P3 Dashboard Read Models — increment 1 (orders board)** | `IDashboardRealtimePublisher.PublishOrderFunnelUpdatedAsync` abstraction in DeliveryOrder.Application; `BatchedDashboardRealtimePublisher` in Api forwards hints to existing `DashboardCounterBatcher` (P0.B11) — coalesces into 1 `CountersUpdated` per board per 250 ms; `OrderFunnelProjector` enqueues hint after `IncrementAsync`; `/dashboard/orders` page (orders-analysis-experience.tsx) subscribes via `useDashboardSubscription("orders")` and debounce-refetches (500 ms) — no client-side delta merge to avoid chart drift. E2E verified — cancel order → funnel cancelled 1→2 with REST refresh hint delivered. | ✅ Done (2026-06-16) |
 | **P3.x Dashboard increments 2-3 (KPI rail + fleet board)** | `FleetUtilizationSnapshotService` (Api/Infrastructure) injects `DashboardCounterBatcher` directly (already in Api composition root) and enqueues `"fleet"` hint after every successful `UpsertCurrentBucketAsync`; `RobotsAnalysisExperience` (`/dashboard/robots`) subscribes via `useDashboardSubscription("fleet")` + 500ms debounce refresh. `KpiRail` on `/dashboard` overview reuses the existing `"orders"` board (same `OrderFunnel` data source) — no new backend wiring, just frontend subscribe. Pattern identical to increment 1 — proves the publisher abstraction stays optional when the producer lives in the composition root. | ✅ Done (2026-06-16) |
 | **P4 Search/List** | `order_list_view` denormalized + FTS + faceted filters (`hasFailedTrip`/`hasActiveJob`) already in place by previous work; this increment adds the **live wire**: `OrderHub.SubscribeList()`/`UnsubscribeList()` for the cross-order `orders-list` group, `IOrderClient.ListItemUpdated(hint)`, `IOrderRealtimePublisher.PublishOrderListChangedAsync(orderId, changeHint)`, `SignalROrderRealtimePublisher` impl, `OrderListViewProjector.Run()` extended to fire the push after every successful store+MarkProcessed (23 events: 13 order lifecycle + 4 trip + 6 job — `changeHint` is the lifecycle status for orders, `"TripXxx"`/`"JobXxx"` for derived-field updates). Frontend: `useOrderListSubscription` hook in `lib/realtime/hubs/order-hub.ts`, `orders-experience.tsx` subscribes + debounce-refetches list+stats (500ms) — hint-and-refetch (not delta merge) so server-side FTS/facets stay authoritative. | ✅ Done (2026-06-16) |
-| **P5 Reporting/BI** | Wide fact tables, `bi` schema, optional `/reports` UI | ⏭️ |
+| **P5 Reporting/BI** | Discovery during this milestone revealed P5 was shipped incrementally during earlier phases — `bi.OrderFacts` / `bi.TripFacts` / `bi.JobFacts` (36/29/34 rows) materialized by `OrderFactsProjector` / `TripFactsProjector` / `JobFactsProjector`; 6 report templates live under `/reports` (orders-summary, sla-breach, top-failures, lead-time, job-failures, vehicle-performance) backed by `ReportsEndpoints` / `DispatchReportsEndpoints` / `PlanningReportsEndpoints`; CSV exports work for orders + trips. **This increment closes the only real gap**: added `/api/v1/reports/jobs-export` (mirrors trips-export but reads `bi.JobFacts` directly) + `jobsExportCsvUrl` frontend helper; `job-failures-report.tsx` no longer hijacks the trips CSV (wrong schema for analysts). Deferred: F3 ReportBuilder flexible UI, F5 scheduled reports, F6 embed mode, B5/B6 bi-reader role + read replica (dev DB has one role only). | ✅ Done (2026-06-16) |
 | **P6 Compliance** | Tamper-evidence + archival (only if regulated) | ⏭️ |
 
 ---
@@ -368,24 +368,24 @@ Total: 5-10s (outbox poll dominates) — can reduce to <1s by switching to push 
 
 | # | Deliverable | Notes |
 |---|---|---|
-| P5.B1 | `bi.order_facts` wide table | Pre-computed durations, dimensions |
-| P5.B2 | `bi.trip_facts`, `bi.job_facts` | Same pattern |
-| P5.B3 | `OrderFactsProjector`, `TripFactsProjector`, `JobFactsProjector` | UPDATE specific columns per event |
-| P5.B4 | Read endpoints + GraphQL-style flexible query (optional) | Or pre-defined report templates |
-| P5.B5 | Schema permissions — `bi` readable to BI tools, write blocked | Postgres roles |
-| P5.B6 | Optional: read replica connection string for BI | Operational |
+| P5.B1 | `bi.order_facts` wide table | ✅ Done — `bi.OrderFacts` (36 rows) — pre-computed durations, dimensions |
+| P5.B2 | `bi.trip_facts`, `bi.job_facts` | ✅ Done — `bi.TripFacts` (29 rows), `bi.JobFacts` (34 rows) |
+| P5.B3 | `OrderFactsProjector`, `TripFactsProjector`, `JobFactsProjector` | ✅ Done — UPDATE specific columns per event, IConsumer<T> auto-wired |
+| P5.B4 | Read endpoints + report templates | ✅ Done — `ReportsEndpoints` (orders-summary, sla-breach, top-failures, lead-time, orders-export) + `DispatchReportsEndpoints` (vehicle-performance, trips-export) + `PlanningReportsEndpoints` (job-failures, **jobs-export added 2026-06-16**) |
+| P5.B5 | Schema permissions — `bi` readable to BI tools, write blocked | ⏭️ Deferred — dev DB has only `postgres` role; rev when staging/prod role separation is set up |
+| P5.B6 | Optional: read replica connection string for BI | ⏭️ Deferred — operational (infra ticket, not code) |
 
 ### 7.2 Frontend Deliverables (Option B — in-app Reports section)
 
 | # | Deliverable | Notes |
 |---|---|---|
-| P5.F1 | `/reports` page — template list + recent reports | new section |
-| P5.F2 | Pre-built templates — "Daily Ops Summary", "SLA Performance", "Failure Analysis", "Utilization" | 4-6 templates |
-| P5.F3 | `<ReportBuilder />` — time range + dimensions + metrics | structured query UI |
-| P5.F4 | Export CSV / Excel / PDF | papaparse + xlsx + jsPDF |
-| P5.F5 | Scheduled reports (backend + UI) | cron-like UI |
-| P5.F6 | Embed mode — iframe-friendly URLs | for external dashboards |
-| P5.F7 | Left-rail "Reports" section | navigation |
+| P5.F1 | `/reports` page — template list + recent reports | ✅ Done — `app/reports/page.tsx` + `reports-experience.tsx` (tab nav + window toggle) |
+| P5.F2 | Pre-built templates — "Daily Ops Summary", "SLA Performance", "Failure Analysis", "Utilization" | ✅ Done — 6 templates: orders-summary, sla-breach, top-failures, lead-time, job-failures, vehicle-performance |
+| P5.F3 | `<ReportBuilder />` — time range + dimensions + metrics | ⏭️ Deferred — 6 fixed templates cover known use cases; revisit when an analyst hits a wall |
+| P5.F4 | Export CSV / Excel / PDF | ⚠️ Partial — CSV done for orders + trips + **jobs (added 2026-06-16)**; Excel + PDF deferred (analysts can pivot CSV in Excel — adding xlsx/jsPDF bundles costs ~80kB for marginal gain) |
+| P5.F5 | Scheduled reports (backend + UI) | ⏭️ Deferred — needs concrete request (cadence, recipients) before designing |
+| P5.F6 | Embed mode — iframe-friendly URLs | ⏭️ Deferred — no external dashboard consumer yet |
+| P5.F7 | Left-rail "Reports" section | ✅ Done — `left-rail.tsx` has Reports link with `FileBarChart2` icon |
 
 ### 7.3 Acceptance
 - ✅ Report on 1M rows < 2s

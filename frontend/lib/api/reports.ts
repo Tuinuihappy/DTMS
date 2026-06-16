@@ -211,3 +211,19 @@ export function tripsExportCsvUrl(
   const s = qs.toString();
   return s ? `/api/reports/trips-export?${s}` : "/api/reports/trips-export";
 }
+
+// Raw JobFacts CSV — backs the Download button on JobFailuresReport.
+// Schema matches bi.JobFacts directly (jobs ≠ trips — earlier the report
+// borrowed trips-export which gave analysts the wrong row shape).
+export function jobsExportCsvUrl(
+  filters: { fromUtc?: string; toUtc?: string; finalStatus?: string; failureCategory?: string; minAttemptNumber?: number } = {},
+): string {
+  const qs = new URLSearchParams();
+  if (filters.fromUtc) qs.set("fromUtc", filters.fromUtc);
+  if (filters.toUtc) qs.set("toUtc", filters.toUtc);
+  if (filters.finalStatus) qs.set("finalStatus", filters.finalStatus);
+  if (filters.failureCategory) qs.set("failureCategory", filters.failureCategory);
+  if (filters.minAttemptNumber != null) qs.set("minAttemptNumber", String(filters.minAttemptNumber));
+  const s = qs.toString();
+  return s ? `/api/reports/jobs-export?${s}` : "/api/reports/jobs-export";
+}

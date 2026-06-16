@@ -16,7 +16,7 @@ import { GlassCard } from "@/components/primitives/glass-card";
 import { SectionLabel } from "@/components/primitives/section-label";
 import {
   getJobFailuresReport,
-  tripsExportCsvUrl,
+  jobsExportCsvUrl,
   type Window,
 } from "@/lib/api/reports";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
@@ -36,10 +36,7 @@ export function JobFailuresReport({ window }: { window: Window }) {
     intervalMs: 5 * 60_000,
   });
 
-  // CSV export reuses trips-export — it's not a perfect match (trips ≠
-  // jobs) but JobFacts doesn't have its own CSV endpoint yet. Analyst
-  // who needs raw job rows can SQL the bi.JobFacts table directly.
-  const csvHref = tripsExportCsvUrl(window);
+  const csvHref = jobsExportCsvUrl(window);
   const chartData = (data?.categoryTotals ?? []).map((c) => ({
     category: c.category,
     count: c.count,
