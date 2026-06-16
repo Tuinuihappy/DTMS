@@ -27,6 +27,14 @@ public interface IOrderRealtimePublisher
     /// separate StatusTimelineSection.
     /// </summary>
     Task PublishActivityUpdatedAsync(Guid orderId, OrderActivityEntryDto entry, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Phase P4 — hint that the OrderListView projection row for the
+    /// given order changed. Lightweight payload (orderId + toStatus) so
+    /// the cross-order list page debounce-refetches; avoids re-shipping
+    /// the whole denormalized row whenever any column changes.
+    /// </summary>
+    Task PublishOrderListChangedAsync(Guid orderId, string toStatus, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -76,5 +84,9 @@ public sealed class NoopOrderRealtimePublisher : IOrderRealtimePublisher
 
     public Task PublishActivityUpdatedAsync(
         Guid orderId, OrderActivityEntryDto entry, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task PublishOrderListChangedAsync(
+        Guid orderId, string toStatus, CancellationToken cancellationToken = default)
         => Task.CompletedTask;
 }

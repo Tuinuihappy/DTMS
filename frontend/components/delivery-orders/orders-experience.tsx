@@ -24,6 +24,7 @@ import {
   type TransportMode,
 } from "@/lib/api/delivery-orders";
 import { getTripsByOrder, type TripStatus } from "@/lib/api/trips";
+import { useOrderListSubscription } from "@/lib/realtime/hubs/order-hub";
 import { BulkActionBar } from "./bulk-bar";
 import { CancelOrderDialog } from "./cancel-dialog";
 import { CreateOrderDialog } from "./create-dialog";
@@ -493,6 +494,32 @@ function ExperienceInner() {
       stop();
     };
   }, [createOpen, detailId, fetchOrders, fetchStats]);
+
+  // Phase P4 — SignalR live updates for the cross-order list. Backend
+  // pushes ListItemUpdated hints to the "orders-list" group whenever any
+  // row in the OrderListView projection changes. We debounce-refetch
+  // (500ms) so a burst of events (e.g. many JobCreated in quick
+  // succession) collapses into one round-trip. Refetch — not delta
+  // merge — keeps server-side search/facets authoritative.
+  const listHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleListRefetch = useCallback(() => {
+    if (listHintTimerRef.current) clearTimeout(listHintTimerRef.current);
+    listHintTimerRef.current = setTimeout(() => {
+      listHintTimerRef.current = null;
+      fetchOrders({ silent: true });
+      fetchStats();
+    }, 500);
+  }, [fetchOrders, fetchStats]);
+
+  useEffect(() => {
+    return () => {
+      if (listHintTimerRef.current) clearTimeout(listHintTimerRef.current);
+    };
+  }, []);
+
+  useOrderListSubscription({
+    ListItemUpdated: scheduleListRefetch,
+  });
 
   // Counts for the chip row come from the unfiltered stats endpoint, with
   // synthetic "All", "Active", "Completed" derived from stats.byStatus.

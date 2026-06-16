@@ -16,7 +16,7 @@
 | **P2 Activity Timeline** | `OrderActivityProjector` extended (+Created/Submitted/Validated/RobotPassAck/PodCaptured = 5 events), `IOrderRealtimePublisher.PublishActivityUpdatedAsync` wires push to `OrderHub.ActivityUpdated`, `OrderActivityRow.Id = EventId` (deterministic for dedup), `FullAuditLog` gets `liveEntry` prop with dedup-merge sort, `StatusTimelineSection` retired from Order drawer (Option A). E2E verified — cancel order → activity row written + push silent. | ✅ Done (2026-06-16) |
 | **P3 Dashboard Read Models — increment 1 (orders board)** | `IDashboardRealtimePublisher.PublishOrderFunnelUpdatedAsync` abstraction in DeliveryOrder.Application; `BatchedDashboardRealtimePublisher` in Api forwards hints to existing `DashboardCounterBatcher` (P0.B11) — coalesces into 1 `CountersUpdated` per board per 250 ms; `OrderFunnelProjector` enqueues hint after `IncrementAsync`; `/dashboard/orders` page (orders-analysis-experience.tsx) subscribes via `useDashboardSubscription("orders")` and debounce-refetches (500 ms) — no client-side delta merge to avoid chart drift. E2E verified — cancel order → funnel cancelled 1→2 with REST refresh hint delivered. | ✅ Done (2026-06-16) |
 | **P3.x Dashboard increments 2-3 (KPI rail + fleet board)** | `FleetUtilizationSnapshotService` (Api/Infrastructure) injects `DashboardCounterBatcher` directly (already in Api composition root) and enqueues `"fleet"` hint after every successful `UpsertCurrentBucketAsync`; `RobotsAnalysisExperience` (`/dashboard/robots`) subscribes via `useDashboardSubscription("fleet")` + 500ms debounce refresh. `KpiRail` on `/dashboard` overview reuses the existing `"orders"` board (same `OrderFunnel` data source) — no new backend wiring, just frontend subscribe. Pattern identical to increment 1 — proves the publisher abstraction stays optional when the producer lives in the composition root. | ✅ Done (2026-06-16) |
-| **P4 Search/List** | `order_list_view` denormalized + FTS; migrate list endpoint | ⏭️ |
+| **P4 Search/List** | `order_list_view` denormalized + FTS + faceted filters (`hasFailedTrip`/`hasActiveJob`) already in place by previous work; this increment adds the **live wire**: `OrderHub.SubscribeList()`/`UnsubscribeList()` for the cross-order `orders-list` group, `IOrderClient.ListItemUpdated(hint)`, `IOrderRealtimePublisher.PublishOrderListChangedAsync(orderId, changeHint)`, `SignalROrderRealtimePublisher` impl, `OrderListViewProjector.Run()` extended to fire the push after every successful store+MarkProcessed (23 events: 13 order lifecycle + 4 trip + 6 job — `changeHint` is the lifecycle status for orders, `"TripXxx"`/`"JobXxx"` for derived-field updates). Frontend: `useOrderListSubscription` hook in `lib/realtime/hubs/order-hub.ts`, `orders-experience.tsx` subscribes + debounce-refetches list+stats (500ms) — hint-and-refetch (not delta merge) so server-side FTS/facets stay authoritative. | ✅ Done (2026-06-16) |
 | **P5 Reporting/BI** | Wide fact tables, `bi` schema, optional `/reports` UI | ⏭️ |
 | **P6 Compliance** | Tamper-evidence + archival (only if regulated) | ⏭️ |
 
@@ -330,24 +330,24 @@ Total: 5-10s (outbox poll dominates) — can reduce to <1s by switching to push 
 
 | # | Deliverable | Notes |
 |---|---|---|
-| P4.B1 | `search.order_list_view` denormalized table | + tsvector for FTS, partial indices |
-| P4.B2 | `OrderListViewProjector` — subscribes Order + Trip + Job events that affect list view | UPSERT pattern |
-| P4.B3 | Search API enhancement — `q` (FTS), `hasFailedTrip`, `hasActiveJob` filters | new params |
-| P4.B4 | Migrate `GET /orders` to query `order_list_view` | Same response contract |
-| P4.B5 | Push to `OrderHub.ListItemUpdated` for live updates | Optional realtime list |
-| P4.B6 | Backfill from existing orders + computed derived columns | One-time job |
+| P4.B1 | `search.order_list_view` denormalized table | ✅ Done — tsvector for FTS, partial indices |
+| P4.B2 | `OrderListViewProjector` — subscribes Order + Trip + Job events that affect list view | ✅ Done — UPSERT pattern, 23 IConsumer subscriptions |
+| P4.B3 | Search API enhancement — `q` (FTS), `hasFailedTrip`, `hasActiveJob` filters | ✅ Done |
+| P4.B4 | Migrate `GET /orders` to query `order_list_view` | ✅ Done — Same response contract |
+| P4.B5 | Push to `OrderHub.ListItemUpdated` for live updates | ✅ Done (2026-06-16) — `SubscribeList`/`UnsubscribeList` on `OrderHub`, `IOrderClient.ListItemUpdated`, `PublishOrderListChangedAsync` impl in `SignalROrderRealtimePublisher`, `OrderListViewProjector.Run` pushes hint `(orderId, changeHint)` after every successful store+MarkProcessed. AFTER MarkProcessed so redelivery + dedup skip doesn't fire a duplicate push. |
+| P4.B6 | Backfill from existing orders + computed derived columns | ✅ Done |
 
 ### 6.2 Frontend Deliverables
 
 | # | Deliverable | Notes |
 |---|---|---|
-| P4.F1 | **Full-text search box** (debounced 300ms) | enhance `FilterBar` |
-| P4.F2 | **Faceted filters** — Has failed trip / Has active job toggles | inline |
-| P4.F3 | **Sort by more columns** — all indexed | enhanced table |
-| P4.F4 | **Infinite scroll mode** option (toggle pagination/scroll) | `OrdersTable` |
-| P4.F5 | **URL state persistence** — filters in query params | router hooks |
-| P4.F6 | **Saved filters** — localStorage + dropdown | UX upgrade |
-| P4.F7 | Optional live list updates via OrderHub | uses P0.F3 hook |
+| P4.F1 | **Full-text search box** (debounced 300ms) | ✅ Done — `FilterBar` |
+| P4.F2 | **Faceted filters** — Has failed trip / Has active job toggles | ✅ Done — inline |
+| P4.F3 | **Sort by more columns** — all indexed | ✅ Done |
+| P4.F4 | **Infinite scroll mode** option (toggle pagination/scroll) | ✅ Done — `OrdersTable` |
+| P4.F5 | **URL state persistence** — filters in query params | ✅ Done |
+| P4.F6 | **Saved filters** — localStorage + dropdown | ⏭️ Deferred (UX upgrade — separate ticket) |
+| P4.F7 | Live list updates via OrderHub | ✅ Done (2026-06-16) — `useOrderListSubscription` in `lib/realtime/hubs/order-hub.ts`, `orders-experience.tsx` subscribes + 500 ms debounce-refetches `fetchOrders({silent:true}) + fetchStats()`. Hint payload `{orderId, toStatus}` is opaque — refetch keeps server FTS/facets/sort authoritative. |
 
 ### 6.3 Acceptance
 - ✅ Search typing → results < 100ms

@@ -66,4 +66,25 @@ public sealed class SignalROrderRealtimePublisher : IOrderRealtimePublisher
                 orderId);
         }
     }
+
+    public async Task PublishOrderListChangedAsync(
+        Guid orderId,
+        string toStatus,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Push minimal hint to the cross-order list group — the
+            // /delivery-orders/list page treats this as a refetch trigger.
+            await _hub.Clients
+                .Group(OrderHub.ListGroupKey)
+                .ListItemUpdated(new { orderId, toStatus });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Failed to push ListItemUpdated hint for Order {OrderId} — UI will catch up on next REST refresh",
+                orderId);
+        }
+    }
 }

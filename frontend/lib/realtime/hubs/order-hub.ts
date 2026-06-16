@@ -32,4 +32,32 @@ export function useOrderHubSubscription(
   });
 }
 
+// Phase P4 — cross-order list subscription. Server pushes a tiny hint
+// ({ orderId, toStatus }) whenever any row in the OrderListView
+// projection changes; the list page treats this as a debounce-refetch
+// trigger rather than a row to merge in-place (keeps refetch logic +
+// search/facet state co-located in TanStack Query).
+export type OrderListHintPayload = {
+  orderId: string;
+  toStatus: string;
+};
+
+export type OrderListHubEvents = {
+  ListItemUpdated?: (hint: OrderListHintPayload) => void;
+};
+
+export function useOrderListSubscription(
+  events: OrderListHubEvents,
+  enabled = true,
+) {
+  return useHubSubscription({
+    hubPath: PATH,
+    subscribeMethod: "SubscribeList",
+    unsubscribeMethod: "UnsubscribeList",
+    subscribeArgs: [],
+    eventHandlers: events as Record<string, (...args: unknown[]) => void>,
+    enabled,
+  });
+}
+
 export const ORDER_HUB_PATH = PATH;

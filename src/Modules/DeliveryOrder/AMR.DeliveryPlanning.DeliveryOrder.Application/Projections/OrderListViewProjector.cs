@@ -66,22 +66,25 @@ public class OrderListViewProjector :
 
     private readonly IOrderListViewProjectionStore _store;
     private readonly ProjectionMetrics _metrics;
+    private readonly IOrderRealtimePublisher _realtime;
     private readonly ILogger<OrderListViewProjector> _logger;
 
     public OrderListViewProjector(
         IOrderListViewProjectionStore store,
         ProjectionMetrics metrics,
+        IOrderRealtimePublisher realtime,
         ILogger<OrderListViewProjector> logger)
     {
         _store = store;
         _metrics = metrics;
+        _realtime = realtime;
         _logger = logger;
     }
 
     // ── Order lifecycle: Created materializes the row with full snapshot ─
 
     public Task Consume(ConsumeContext<DeliveryOrderCreatedIntegrationEventV1> ctx)
-        => Run(ctx, async () =>
+        => Run(ctx, ctx.Message.DeliveryOrderId, ctx.Message.Status, async () =>
         {
             var m = ctx.Message;
             // SearchText concatenates the per-Order free-text fields +
@@ -118,88 +121,107 @@ public class OrderListViewProjector :
     // ── Order lifecycle: other transitions just update the status ──────
 
     public Task Consume(ConsumeContext<DeliveryOrderSubmittedIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Submitted", ctx.Message.OccurredOn, ctx.CancellationToken));
+        => Run(ctx, ctx.Message.DeliveryOrderId, "Submitted",
+            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Submitted", ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderValidatedIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Validated", ctx.Message.OccurredOn, ctx.CancellationToken));
+        => Run(ctx, ctx.Message.DeliveryOrderId, "Validated",
+            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Validated", ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderConfirmedIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Confirmed", ctx.Message.OccurredOn, ctx.CancellationToken));
+        => Run(ctx, ctx.Message.DeliveryOrderId, "Confirmed",
+            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Confirmed", ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderDispatchedIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Dispatched", ctx.Message.OccurredOn, ctx.CancellationToken));
+        => Run(ctx, ctx.Message.DeliveryOrderId, "Dispatched",
+            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Dispatched", ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderInProgressIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "InProgress", ctx.Message.OccurredOn, ctx.CancellationToken));
+        => Run(ctx, ctx.Message.DeliveryOrderId, "InProgress",
+            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "InProgress", ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderCompletedIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Completed", ctx.Message.OccurredOn, ctx.CancellationToken));
+        => Run(ctx, ctx.Message.DeliveryOrderId, "Completed",
+            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Completed", ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderPartiallyCompletedIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "PartiallyCompleted", ctx.Message.OccurredOn, ctx.CancellationToken));
+        => Run(ctx, ctx.Message.DeliveryOrderId, "PartiallyCompleted",
+            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "PartiallyCompleted", ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderFailedIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Failed", ctx.Message.OccurredOn, ctx.CancellationToken));
+        => Run(ctx, ctx.Message.DeliveryOrderId, "Failed",
+            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Failed", ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderCancelledIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Cancelled", ctx.Message.OccurredOn, ctx.CancellationToken));
+        => Run(ctx, ctx.Message.DeliveryOrderId, "Cancelled",
+            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Cancelled", ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderRejectedIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Rejected", ctx.Message.OccurredOn, ctx.CancellationToken));
+        => Run(ctx, ctx.Message.DeliveryOrderId, "Rejected",
+            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Rejected", ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderHeldIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Held", ctx.Message.OccurredOn, ctx.CancellationToken));
+        => Run(ctx, ctx.Message.DeliveryOrderId, "Held",
+            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Held", ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderReleasedIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Confirmed", ctx.Message.OccurredOn, ctx.CancellationToken));
+        => Run(ctx, ctx.Message.DeliveryOrderId, "Confirmed",
+            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Confirmed", ctx.Message.OccurredOn, ctx.CancellationToken));
 
     // ── Trip lifecycle ──────────────────────────────────────────────────
+    // Trip + Job events don't change OrderStatus itself — the changeHint
+    // mirrors the trip/job state so the SignalR payload stays informative
+    // (the frontend treats it as opaque "refetch please" anyway).
 
     public Task Consume(ConsumeContext<TripFailedIntegrationEvent> ctx)
-        => Run(ctx, () => _store.SetTripDerivedFieldsAsync(
+        => Run(ctx, ctx.Message.DeliveryOrderId, "TripFailed", () => _store.SetTripDerivedFieldsAsync(
             ctx.Message.DeliveryOrderId, hasFailedTrip: true, latestTripId: ctx.Message.TripId, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<TripCancelledIntegrationEvent> ctx)
-        => Run(ctx, () => _store.SetTripDerivedFieldsAsync(
+        => Run(ctx, ctx.Message.DeliveryOrderId, "TripCancelled", () => _store.SetTripDerivedFieldsAsync(
             ctx.Message.DeliveryOrderId, hasFailedTrip: true, latestTripId: ctx.Message.TripId, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<TripCompletedIntegrationEvent> ctx)
-        => Run(ctx, () => _store.SetTripDerivedFieldsAsync(
+        => Run(ctx, ctx.Message.DeliveryOrderId, "TripCompleted", () => _store.SetTripDerivedFieldsAsync(
             ctx.Message.DeliveryOrderId, hasFailedTrip: false, latestTripId: ctx.Message.TripId, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<TripStartedIntegrationEvent> ctx)
-        => Run(ctx, () => _store.SetTripDerivedFieldsAsync(
+        => Run(ctx, ctx.Message.DeliveryOrderId, "TripStarted", () => _store.SetTripDerivedFieldsAsync(
             ctx.Message.DeliveryOrderId, hasFailedTrip: false, latestTripId: ctx.Message.TripId, ctx.CancellationToken));
 
     // ── Job lifecycle ──────────────────────────────────────────────────
 
     public Task Consume(ConsumeContext<JobCreatedIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.SetJobDerivedFieldsAsync(
+        => Run(ctx, ctx.Message.DeliveryOrderId, "JobCreated", () => _store.SetJobDerivedFieldsAsync(
             ctx.Message.DeliveryOrderId, hasActiveJob: true, latestJobStatus: "Created", ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<JobDispatchedIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.SetJobDerivedFieldsAsync(
+        => Run(ctx, ctx.Message.DeliveryOrderId, "JobDispatched", () => _store.SetJobDerivedFieldsAsync(
             ctx.Message.DeliveryOrderId, hasActiveJob: true, latestJobStatus: "Dispatched", ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<JobExecutingIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.SetJobDerivedFieldsAsync(
+        => Run(ctx, ctx.Message.DeliveryOrderId, "JobExecuting", () => _store.SetJobDerivedFieldsAsync(
             ctx.Message.DeliveryOrderId, hasActiveJob: true, latestJobStatus: "Executing", ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<JobCompletedIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.SetJobDerivedFieldsAsync(
+        => Run(ctx, ctx.Message.DeliveryOrderId, "JobCompleted", () => _store.SetJobDerivedFieldsAsync(
             ctx.Message.DeliveryOrderId, hasActiveJob: false, latestJobStatus: "Completed", ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<JobFailedIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.SetJobDerivedFieldsAsync(
+        => Run(ctx, ctx.Message.DeliveryOrderId, "JobFailed", () => _store.SetJobDerivedFieldsAsync(
             ctx.Message.DeliveryOrderId, hasActiveJob: false, latestJobStatus: "Failed", ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<JobCancelledIntegrationEventV1> ctx)
-        => Run(ctx, () => _store.SetJobDerivedFieldsAsync(
+        => Run(ctx, ctx.Message.DeliveryOrderId, "JobCancelled", () => _store.SetJobDerivedFieldsAsync(
             ctx.Message.DeliveryOrderId, hasActiveJob: false, latestJobStatus: "Cancelled", ctx.CancellationToken));
 
     // ── Core projection wrapper: dedup + metrics + failure split ───────
 
-    private async Task Run<TEvent>(ConsumeContext<TEvent> ctx, Func<Task> body)
+    private async Task Run<TEvent>(
+        ConsumeContext<TEvent> ctx,
+        Guid orderId,
+        string changeHint,
+        Func<Task> body)
         where TEvent : class, IIntegrationEvent
     {
         var evt = ctx.Message;
@@ -222,6 +244,12 @@ public class OrderListViewProjector :
             await _store.MarkProcessedAsync(Name, evt.EventId, ctx.CancellationToken);
             _metrics.RecordProjected(Name, typeof(TEvent).Name);
             _metrics.RecordLag(Name, evt.OccurredOn);
+
+            // Phase P4 — hint cross-order list page to refetch. Pushed
+            // AFTER MarkProcessed succeeds so a redelivery + dedup-skip
+            // doesn't fire a duplicate push. Failures are swallowed by
+            // the publisher (UI catches up on next REST refresh).
+            await _realtime.PublishOrderListChangedAsync(orderId, changeHint, ctx.CancellationToken);
         }
         catch (Exception ex) when (IsTransient(ex))
         {

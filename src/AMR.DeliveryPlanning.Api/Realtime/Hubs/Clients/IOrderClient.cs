@@ -31,4 +31,13 @@ public interface IOrderClient
     /// <c>category</c> on the client.
     /// </summary>
     Task ActivityUpdated(object entry);
+
+    /// <summary>
+    /// Phase P4 — cross-order list hint. Pushed to the
+    /// <see cref="OrderHub.ListGroupKey"/> group whenever a row in the
+    /// OrderListView projection changes (any field). Frontend treats it
+    /// as a debounce-refetch trigger, not a row to merge — keeps the
+    /// payload tiny and side-steps merge-vs-search-state drift.
+    /// </summary>
+    Task ListItemUpdated(object hint);
 }

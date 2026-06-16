@@ -232,7 +232,8 @@ public class OrderListViewProjectorTests
             .Returns(false);
         var metrics = new ProjectionMetrics();
         var projector = new OrderListViewProjector(
-            store, metrics, NullLogger<OrderListViewProjector>.Instance);
+            store, metrics, new NoopOrderRealtimePublisher(),
+            NullLogger<OrderListViewProjector>.Instance);
         return (projector, store);
     }
 
