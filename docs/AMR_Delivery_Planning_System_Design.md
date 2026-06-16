@@ -539,7 +539,7 @@ Predictive replanning, battery-aware dispatch, cost-model tuning per tenant, pla
 
 - Expected peak throughput (orders/hour/facility)? Drives solver mode choice.
 - Preferred UI framework & whether the operator console is part of this scope or separate.
-- ~~Multi-tenant vs single-tenant deployment target? Drives isolation strategy.~~ **Resolved 2026-05-25**: Single-tenant deployment is the target for Phase 1–4. Multi-tenancy is descoped pending business validation (no confirmed multi-subsidiary customer). `facilityId` provides the physical scope for plant-level isolation. References to `tenantId` throughout this document are retained as forward-looking placeholders — see [`payload-delivery-refactored-tiger.md`](payload-delivery-refactored-tiger.md) P2-7 for the reintroduction trigger.
+- ~~Multi-tenant vs single-tenant deployment target? Drives isolation strategy.~~ **Resolved 2026-05-25**: Single-tenant deployment is the target for Phase 1–4. Multi-tenancy is descoped pending business validation (no confirmed multi-subsidiary customer). `facilityId` provides the physical scope for plant-level isolation. References to `tenantId` throughout this document are retained as forward-looking placeholders — see [`delivery-order-payload-review.md`](delivery-order-payload-review.md) P2-7 for the reintroduction trigger.
 - Mix of vendors expected at go-live and over 2 years? Drives how much to invest in ACL abstractions upfront.
 - Is there an existing identity provider (SSO)? Drives auth integration.
 - Real-time streaming of telemetry to BI/monitoring required, or periodic export acceptable?
