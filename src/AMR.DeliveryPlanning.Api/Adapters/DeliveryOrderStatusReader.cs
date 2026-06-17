@@ -28,4 +28,11 @@ internal sealed class DeliveryOrderStatusReader : IDeliveryOrderStatusReader
         // Dispatch.Application to DeliveryOrder.Domain just for the enum.
         return result.Value.OrderStatus.ToString();
     }
+
+    public async Task<bool?> GetRequiresDropPodAsync(Guid orderId, CancellationToken cancellationToken = default)
+    {
+        var result = await _sender.Send(new GetDeliveryOrderQuery(orderId), cancellationToken);
+        if (!result.IsSuccess || result.Value is null) return null;
+        return result.Value.RequiresDropPod;
+    }
 }

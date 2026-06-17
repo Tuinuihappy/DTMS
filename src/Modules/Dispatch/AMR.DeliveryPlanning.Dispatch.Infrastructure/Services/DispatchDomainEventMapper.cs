@@ -63,7 +63,8 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
             [
                 new TripDropCompletedIntegrationEvent(
                     evt.EventId, evt.OccurredOn, evt.TripId, evt.DeliveryOrderId,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    RequiresDropPod: evt.RequiresDropPod)
             ],
             TripCompletedDomainEvent evt =>
             [

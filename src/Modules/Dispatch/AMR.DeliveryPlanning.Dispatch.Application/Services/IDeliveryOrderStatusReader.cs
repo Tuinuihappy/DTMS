@@ -16,4 +16,15 @@ public interface IDeliveryOrderStatusReader
     /// callers decide whether that's a hard failure or a soft skip.
     /// </summary>
     Task<string?> GetStatusAsync(Guid orderId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the order's effective RequiresDropPod policy (null if the
+    /// order doesn't exist OR the field is null — caller treats null as
+    /// "fall back to template default"). Used by the vendor webhook to
+    /// stamp <see cref="Domain.Events.TripDropCompletedDomainEvent.RequiresDropPod"/>
+    /// at drop-completion time so downstream consumers/projectors can
+    /// decide whether to land items at Delivered (no POD) or DroppedOff
+    /// (POD pending) without taking a hard dependency on DeliveryOrder.
+    /// </summary>
+    Task<bool?> GetRequiresDropPodAsync(Guid orderId, CancellationToken cancellationToken = default);
 }

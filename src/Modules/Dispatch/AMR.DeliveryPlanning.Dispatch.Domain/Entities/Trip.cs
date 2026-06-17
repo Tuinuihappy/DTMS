@@ -212,15 +212,22 @@ public class Trip : AggregateRoot<Guid>
     /// <summary>
     /// Vendor reports the robot finished its drop action at this trip's
     /// drop station — items are physically at the dock. Doesn't change
-    /// Trip.Status (still InProgress until TASK_FINISHED). Fires an
-    /// integration event so DeliveryOrder flips items Picked → DroppedOff.
+    /// Trip.Status (still InProgress until TASK_FINISHED).
+    ///
+    /// <paramref name="requiresDropPod"/> is the parent order's POD policy,
+    /// resolved by the caller (vendor webhook) so the integration event
+    /// can carry it through to downstream consumers without a cross-module
+    /// read at projection time. Null = unknown; consumers fall back to
+    /// the legacy "land at DroppedOff" path. False = items land at
+    /// Delivered immediately (no POD required); true = items hold at
+    /// DroppedOff pending operator /pod-scan.
     /// </summary>
-    public void MarkVendorDropCompleted()
+    public void MarkVendorDropCompleted(bool? requiresDropPod = null)
     {
         if (Status is not TripStatus.InProgress) return;
-        RecordEvent("VendorDropCompleted", null);
+        RecordEvent("VendorDropCompleted", requiresDropPod is null ? null : $"requiresDropPod={requiresDropPod}");
         AddDomainEvent(new TripDropCompletedDomainEvent(
-            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId));
+            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, requiresDropPod));
     }
 
     public void MarkVendorCompleted()

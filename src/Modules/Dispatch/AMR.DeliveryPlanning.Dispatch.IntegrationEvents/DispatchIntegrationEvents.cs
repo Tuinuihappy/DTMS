@@ -64,10 +64,16 @@ public record TripPickupCompletedIntegrationEvent(
     string? TriggeredBy = null,
     Guid? CorrelationId = null) : IIntegrationEvent;
 
+// RequiresDropPod (V1.2) — order's POD policy at drop-completion time.
+// False → DeliveryOrder lands items at Delivered immediately and the
+// TripItems projector skips DroppedOff; true → items hold at DroppedOff
+// pending operator /pod-scan. Nullable: pre-rollout in-flight events
+// have null here, and consumers fall back to reading Order.RequiresDropPod.
 public record TripDropCompletedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId,
     string? TriggeredBy = null,
-    Guid? CorrelationId = null) : IIntegrationEvent;
+    Guid? CorrelationId = null,
+    bool? RequiresDropPod = null) : IIntegrationEvent;
 
 // VendorUpperKey is the composite envelope correlation key
 // (see EnvelopeUpperKey) that RIOT3 echoes back on every webhook.

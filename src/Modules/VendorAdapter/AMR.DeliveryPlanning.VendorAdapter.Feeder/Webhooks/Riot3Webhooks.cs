@@ -35,6 +35,7 @@ public static class Riot3Webhooks
             ITripMissionEventRepository missionEventRepository,
             ITripItemSnapshotProvider tripItemSnapshotProvider,
             AMR.DeliveryPlanning.Facility.Application.Services.IFacilityReadService facilityReadService,
+            AMR.DeliveryPlanning.Dispatch.Application.Services.IDeliveryOrderStatusReader orderReader,
             ILogger<Riot3NotifyPayload> logger,
             CancellationToken cancellationToken) =>
         {
@@ -48,7 +49,7 @@ public static class Riot3Webhooks
                     break;
 
                 case "subtask":
-                    await HandleSubTaskEvent(payload, tripRepository, missionEventRepository, facilityReadService, logger, cancellationToken);
+                    await HandleSubTaskEvent(payload, tripRepository, missionEventRepository, facilityReadService, orderReader, logger, cancellationToken);
                     break;
 
                 case "vehicle":
@@ -267,6 +268,7 @@ public static class Riot3Webhooks
         ITripRepository tripRepository,
         ITripMissionEventRepository missionEventRepository,
         AMR.DeliveryPlanning.Facility.Application.Services.IFacilityReadService facilityReadService,
+        AMR.DeliveryPlanning.Dispatch.Application.Services.IDeliveryOrderStatusReader orderReader,
         ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -395,11 +397,21 @@ public static class Riot3Webhooks
                 }
                 else if (dropHit)
                 {
-                    trip.MarkVendorDropCompleted();
+                    // Resolve order POD policy now so the integration event
+                    // carries it (V1.2). Lookup is cheap (cached order query)
+                    // and lets TripItemsProjector + TripDropCompletedConsumer
+                    // decide whether to land items at Delivered directly
+                    // (no POD) or hold at DroppedOff pending /pod-scan,
+                    // without a second cross-module read downstream.
+                    var requiresDropPod = await orderReader.GetRequiresDropPodAsync(
+                        trip.DeliveryOrderId, cancellationToken);
+                    trip.MarkVendorDropCompleted(requiresDropPod);
                     await tripRepository.UpdateAsync(trip, cancellationToken);
                     logger.LogInformation(
-                        "[SubTaskWebhook] Trip {TripId} drop completed at {Station} (vendorId={VendorId}) — items will be marked DroppedOff",
-                        trip.Id, stationName ?? "(unnamed)", stationId);
+                        "[SubTaskWebhook] Trip {TripId} drop completed at {Station} (vendorId={VendorId}, requiresDropPod={RequiresDropPod}) — items will be marked {Target}",
+                        trip.Id, stationName ?? "(unnamed)", stationId,
+                        requiresDropPod?.ToString() ?? "(null)",
+                        requiresDropPod == true ? "DroppedOff" : "Delivered");
                 }
             }
         }

@@ -742,6 +742,8 @@ internal sealed class StubOrderStatusReader : IDeliveryOrderStatusReader
     public StubOrderStatusReader(string? status) => _status = status;
     public Task<string?> GetStatusAsync(Guid orderId, CancellationToken ct = default)
         => Task.FromResult(_status);
+    public Task<bool?> GetRequiresDropPodAsync(Guid orderId, CancellationToken ct = default)
+        => Task.FromResult<bool?>(null);
 }
 
 internal sealed class StubRetryEventRepository : ITripRetryEventRepository

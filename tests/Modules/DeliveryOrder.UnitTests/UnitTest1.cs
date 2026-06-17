@@ -1388,6 +1388,25 @@ public class DeliveryOrderTests
 
     // ── Trip-aware item lifecycle (Option D — multi-group completion) ──
 
+    /// <summary>Builds a Confirmed order with a single (pickup, drop) station pair.
+    /// Used by tests that need the whole order to be finalize-able from one trip.</summary>
+    private static (AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder Order,
+                    (Guid Pickup, Guid Drop) GroupA)
+        SingleGroupOrder()
+    {
+        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+            "SG-" + Guid.NewGuid().ToString("N")[..6],
+            Priority.Normal, serviceWindow: null);
+        AddTestItem(order, itemSeq: 1, "WH-A", "DOCK-1", "SKU-A1");
+        AddTestItem(order, itemSeq: 2, "WH-A", "DOCK-1", "SKU-A2");
+        order.Submit();
+        order.MarkAsValidated(StationMap("WH-A", "DOCK-1"));
+        order.Confirm(weightFallbackKg: 5.0);
+        var groupA = (order.Items.First().PickupStationId!.Value,
+                      order.Items.First().DropStationId!.Value);
+        return (order, groupA);
+    }
+
     /// <summary>Builds a Confirmed order with N items spread across two
     /// (pickup, drop) station pairs. Returns the order and the two pair tuples.</summary>
     private static (AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder Order,
@@ -1697,6 +1716,74 @@ public class DeliveryOrderTests
         delivered.Should().Be(2);
         order.Items.Where(i => i.TripId == tripA)
             .Should().OnlyContain(i => i.Status == ItemStatus.Delivered);
+    }
+
+    // ── V1.2: TripDropCompleted no-POD short-circuit ──────────────────────
+    // The TripDropCompletedConsumer now skips the DroppedOff interstitial
+    // when RequiresDropPod is false: items jump Picked → Delivered at the
+    // drop event itself, RecomputeStatusFromItems runs, and the order can
+    // finalize without waiting for TASK_FINISHED. These tests mirror the
+    // domain-level moves the consumer makes.
+
+    [Fact]
+    public void NoPod_MarkTripItemsDelivered_FromPicked_TransitionsAllToDelivered()
+    {
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+
+        var delivered = order.MarkTripItemsDelivered(tripA);
+
+        delivered.Should().Be(2);
+        order.Items.Where(i => i.TripId == tripA)
+            .Should().OnlyContain(i => i.Status == ItemStatus.Delivered);
+    }
+
+    [Fact]
+    public void NoPod_SingleTripOrder_DroppedAtDropCompleted_FinalizesOrderImmediately()
+    {
+        // Simulates the new TripDropCompletedConsumer path end-to-end on
+        // the domain side: a single-group order with RequiresDropPod=false
+        // should reach Completed at TripDropCompleted, NOT have to wait
+        // for TripCompleted.
+        var (order, groupA) = SingleGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+
+        order.MarkTripItemsDelivered(tripA);
+        order.RecomputeStatusFromItems();
+
+        order.Status.Should().Be(OrderStatus.Completed);
+        order.DomainEvents.OfType<DeliveryOrderCompletedDomainEvent>().Should().ContainSingle();
+    }
+
+    [Fact]
+    public void NoPod_LateTripCompleted_AfterDropAlreadyDelivered_IsIdempotent()
+    {
+        // Safety net check: even if TripDropCompleted already landed items
+        // at Delivered, the trailing TripCompleted (which still fires from
+        // the vendor's TASK_FINISHED) must be a no-op — not bump events,
+        // not re-finalize the order.
+        var (order, groupA) = SingleGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+
+        // First pass: drop event delivers everything + finalizes.
+        order.MarkTripItemsDelivered(tripA);
+        order.RecomputeStatusFromItems();
+        var completedCountAfterDrop = order.DomainEvents.OfType<DeliveryOrderCompletedDomainEvent>().Count();
+
+        // Second pass: trailing TripCompleted runs the same domain calls.
+        var againDelivered = order.MarkTripItemsDelivered(tripA);
+        order.RecomputeStatusFromItems();
+
+        againDelivered.Should().Be(0);                                 // no items moved
+        order.Status.Should().Be(OrderStatus.Completed);
+        order.DomainEvents.OfType<DeliveryOrderCompletedDomainEvent>()
+            .Should().HaveCount(completedCountAfterDrop);              // no duplicate finalize event
     }
 
     [Fact]

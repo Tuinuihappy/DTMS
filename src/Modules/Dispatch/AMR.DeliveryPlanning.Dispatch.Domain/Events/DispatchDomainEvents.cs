@@ -17,7 +17,17 @@ public record TripStartedDomainEvent(
     Guid? VehicleId, string? VendorVehicleKey,
     IReadOnlyList<TripItemSnapshot>? Items = null) : IDomainEvent;
 public record TripPickupCompletedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId) : IDomainEvent;
-public record TripDropCompletedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId) : IDomainEvent;
+
+// RequiresDropPod is the order's effective POD policy resolved at
+// drop-completion time. False (or null with template-default false)
+// → DeliveryOrder consumer lands items at Delivered directly and the
+// TripItems projector skips the "DroppedOff" interstitial. True →
+// items hold at DroppedOff until /pod-scan completes. Nullable so
+// pre-rollout in-flight events still process safely (consumers fall
+// back to reading Order.RequiresDropPod when null).
+public record TripDropCompletedDomainEvent(
+    Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId,
+    bool? RequiresDropPod = null) : IDomainEvent;
 
 // VendorUpperKey is the composite envelope correlation key
 // (see EnvelopeUpperKey) that RIOT3 echoes back on every webhook.
