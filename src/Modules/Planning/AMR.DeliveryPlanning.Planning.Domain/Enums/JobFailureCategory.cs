@@ -41,4 +41,11 @@ public enum JobFailureCategory
 
     /// <summary>Operator chose to cancel via TripCancelled webhook (Phase b9) — terminal, not retriable.</summary>
     OperatorCancelled = 7,
+
+    /// <summary>
+    /// Dispatcher threw an unexpected exception (network fault, DB connection lost,
+    /// serialization error, …). Distinct from <see cref="VendorRejected"/> which
+    /// is a business response from the vendor.
+    /// </summary>
+    DispatchException = 8,
 }

@@ -10,6 +10,7 @@ using AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobFailed;
 using AMR.DeliveryPlanning.Planning.Application.Services;
 using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.SharedKernel;
+using AMR.DeliveryPlanning.SharedKernel.Diagnostics;
 using MassTransit;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -31,15 +32,18 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
 {
     private readonly IDispatchOrderTemplateService _envelopeDispatch;
     private readonly ISender _sender;
+    private readonly WorkflowMetrics _metrics;
     private readonly ILogger<DeliveryOrderValidatedConsumer> _logger;
 
     public DeliveryOrderValidatedConsumer(
         IDispatchOrderTemplateService envelopeDispatch,
         ISender sender,
+        WorkflowMetrics metrics,
         ILogger<DeliveryOrderValidatedConsumer> logger)
     {
         _envelopeDispatch = envelopeDispatch;
         _sender = sender;
+        _metrics = metrics;
         _logger = logger;
     }
 
@@ -97,77 +101,158 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         // (a) advance to Dispatched only when ≥1 trip is in vendor hands
         // and (b) mark items of failed groups Failed so the order can
         // eventually reach terminal.
+        //
+        // T1.2 — every group iteration is wrapped in try/catch with structured
+        // logging. OperationCanceledException is rethrown immediately so a host
+        // shutdown lets MassTransit redeliver the message to a healthy pod;
+        // all other exceptions are caught, the job is marked Failed, and the
+        // loop continues so unrelated groups still get a chance. If even the
+        // MarkJobFailed call faults we log critical and rethrow — we cannot
+        // leave the job stuck at Created silently (that was the OD-0374 bug).
         var successCount = 0;
         foreach (var (groupIndex, stationGroup) in stationGroups.Index())
         {
             var items = stationGroup.ToList();
-            _logger.LogInformation("[AutoPlan] Group {G}: {Count} item(s) ({Pickup} → {Drop})",
-                groupIndex + 1, items.Count,
-                stationGroup.Key.PickupStationId, stationGroup.Key.DropStationId);
-
             var upperKey = EnvelopeUpperKey.Build(evt.DeliveryOrderId, groupIndex + 1);
             var jobId = jobIdByGroup.GetValueOrDefault(groupIndex);
 
-            var envelopeResult = await _envelopeDispatch.DispatchByRouteAsync(
-                evt.DeliveryOrderId,
-                stationGroup.Key.PickupStationId,
-                stationGroup.Key.DropStationId,
-                upperKey,
-                appointVehicleKeyOverride: null,
-                jobId: jobId == Guid.Empty ? null : jobId,
-                cancellationToken: ct);
-
-            if (envelopeResult.IsSuccess && envelopeResult.Value.TripId != Guid.Empty)
+            using var groupScope = _logger.BeginScope(new Dictionary<string, object?>
             {
-                successCount++;
-                _logger.LogInformation(
-                    "[AutoPlan] ✓ Group {G} dispatched via envelope template '{Template}' " +
-                    "(upperKey {UpperKey} → vendorOrderKey {VendorKey}, tripId {TripId})",
-                    groupIndex + 1, envelopeResult.Value.TemplateName, upperKey,
-                    envelopeResult.Value.VendorOrderKey, envelopeResult.Value.TripId);
+                ["OrderId"] = evt.DeliveryOrderId,
+                ["JobId"] = jobId == Guid.Empty ? null : jobId,
+                ["GroupIndex"] = groupIndex + 1,
+                ["UpperKey"] = upperKey,
+            });
 
-                if (jobId != Guid.Empty)
-                    await _sender.Send(new MarkJobDispatchedCommand(
-                        jobId, envelopeResult.Value.TripId, envelopeResult.Value.VendorOrderKey), ct);
-            }
-            else if (envelopeResult.IsSuccess && envelopeResult.Value.TripId == Guid.Empty)
+            _logger.LogInformation("[AutoPlan] Group {G}: {Count} item(s) ({Pickup} → {Drop}) Step=Dispatching",
+                groupIndex + 1, items.Count,
+                stationGroup.Key.PickupStationId, stationGroup.Key.DropStationId);
+
+            try
             {
-                // Orphan: vendor accepted but Trip persistence failed.
-                // Items stay Pending (physically on vendor) and order
-                // proceeds to Dispatched, but the Job is marked Failed
-                // so ops can run reconciliation.
-                successCount++;
-                var orphanReason =
-                    $"vendor accepted (key={envelopeResult.Value.VendorOrderKey}) " +
-                    "but trip persistence failed — reconciliation required";
-                _logger.LogError(
-                    "[AutoPlan] ⚠ Group {G} ({Pickup} → {Drop}) orphan: {Reason}",
-                    groupIndex + 1, stationGroup.Key.PickupStationId,
-                    stationGroup.Key.DropStationId, orphanReason);
-
-                if (jobId != Guid.Empty)
-                    await _sender.Send(new MarkJobFailedCommand(
-                        jobId, orphanReason, JobFailureCategory.TripPersistenceFailed), ct);
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "[AutoPlan] ✗ Group {G} ({Pickup} → {Drop}) failed: {Reason}",
-                    groupIndex + 1, stationGroup.Key.PickupStationId,
-                    stationGroup.Key.DropStationId, envelopeResult.Error);
-
-                if (jobId != Guid.Empty)
-                    await _sender.Send(new MarkJobFailedCommand(
-                        jobId, envelopeResult.Error ?? "vendor rejected dispatch",
-                        JobFailureCategory.VendorRejected), ct);
-
-                // Mark this group's items Failed so the order's eventual
-                // RecomputeStatusFromItems isn't blocked on them.
-                await _sender.Send(new MarkGroupItemsAsDispatchFailedCommand(
+                var envelopeResult = await _envelopeDispatch.DispatchByRouteAsync(
                     evt.DeliveryOrderId,
                     stationGroup.Key.PickupStationId,
                     stationGroup.Key.DropStationId,
-                    envelopeResult.Error ?? "vendor rejected dispatch"), ct);
+                    upperKey,
+                    appointVehicleKeyOverride: null,
+                    jobId: jobId == Guid.Empty ? null : jobId,
+                    cancellationToken: ct);
+
+                if (envelopeResult.IsSuccess && envelopeResult.Value.TripId != Guid.Empty)
+                {
+                    successCount++;
+                    _logger.LogInformation(
+                        "[AutoPlan] ✓ Group {G} dispatched via envelope template '{Template}' " +
+                        "(upperKey {UpperKey} → vendorOrderKey {VendorKey}, tripId {TripId}) Step=MarkJobDispatched",
+                        groupIndex + 1, envelopeResult.Value.TemplateName, upperKey,
+                        envelopeResult.Value.VendorOrderKey, envelopeResult.Value.TripId);
+
+                    if (jobId != Guid.Empty)
+                        await _sender.Send(new MarkJobDispatchedCommand(
+                            jobId, envelopeResult.Value.TripId, envelopeResult.Value.VendorOrderKey), ct);
+                }
+                else if (envelopeResult.IsSuccess && envelopeResult.Value.TripId == Guid.Empty)
+                {
+                    // Orphan: vendor accepted but Trip persistence failed.
+                    // Items stay Pending (physically on vendor) and order
+                    // proceeds to Dispatched, but the Job is marked Failed
+                    // so ops can run reconciliation.
+                    successCount++;
+                    var orphanReason =
+                        $"vendor accepted (key={envelopeResult.Value.VendorOrderKey}) " +
+                        "but trip persistence failed — reconciliation required";
+                    _logger.LogError(
+                        "[AutoPlan] ⚠ Group {G} ({Pickup} → {Drop}) orphan: {Reason} Step=MarkJobFailed-Orphan",
+                        groupIndex + 1, stationGroup.Key.PickupStationId,
+                        stationGroup.Key.DropStationId, orphanReason);
+
+                    if (jobId != Guid.Empty)
+                        await _sender.Send(new MarkJobFailedCommand(
+                            jobId, orphanReason, JobFailureCategory.TripPersistenceFailed), ct);
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "[AutoPlan] ✗ Group {G} ({Pickup} → {Drop}) failed: {Reason} Step=MarkJobFailed-VendorRejected",
+                        groupIndex + 1, stationGroup.Key.PickupStationId,
+                        stationGroup.Key.DropStationId, envelopeResult.Error);
+
+                    if (jobId != Guid.Empty)
+                        await _sender.Send(new MarkJobFailedCommand(
+                            jobId, envelopeResult.Error ?? "vendor rejected dispatch",
+                            JobFailureCategory.VendorRejected), ct);
+
+                    // Mark this group's items Failed so the order's eventual
+                    // RecomputeStatusFromItems isn't blocked on them.
+                    await _sender.Send(new MarkGroupItemsAsDispatchFailedCommand(
+                        evt.DeliveryOrderId,
+                        stationGroup.Key.PickupStationId,
+                        stationGroup.Key.DropStationId,
+                        envelopeResult.Error ?? "vendor rejected dispatch"), ct);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Host is stopping (T1.3 graceful shutdown) — let MassTransit
+                // redeliver. Commands run so far are idempotent (T1.5), so the
+                // redelivered message will skip them and resume from this group.
+                _logger.LogWarning(
+                    "[AutoPlan] ↺ Group {G} cancelled mid-dispatch — message will be redelivered",
+                    groupIndex + 1);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Unexpected fault from DispatchByRouteAsync or a downstream
+                // command. Mark THIS group's job Failed (best-effort) so the
+                // order can converge to a terminal state instead of orphaning
+                // the Job at Status=Created (the OD-0374 stuck-Planned bug).
+                // Other groups still attempt — if the fault is infra-wide and
+                // they all throw, MassTransit's UseMessageRetry (T1.1) will
+                // redeliver and idempotent guards (T1.5) make that safe.
+                _metrics.RecordDispatchException(ex.GetType().Name);
+                _logger.LogError(ex,
+                    "[AutoPlan] ✗ Group {G} dispatch threw {ExceptionType} Step=DispatchByRoute",
+                    groupIndex + 1, ex.GetType().Name);
+
+                if (jobId != Guid.Empty)
+                {
+                    try
+                    {
+                        await _sender.Send(new MarkJobFailedCommand(
+                            jobId,
+                            $"dispatch threw {ex.GetType().Name}: {ex.Message}",
+                            JobFailureCategory.DispatchException), ct);
+                    }
+                    catch (Exception markEx) when (markEx is not OperationCanceledException)
+                    {
+                        // If we can't even mark the job failed the system is in
+                        // a bad state — rethrow so MassTransit retries the whole
+                        // consumer rather than leaving a silently-orphaned Job.
+                        _logger.LogCritical(markEx,
+                            "[AutoPlan] ✗✗ Group {G} failed to MarkJobFailed after dispatch threw — rethrowing for redelivery",
+                            groupIndex + 1);
+                        throw;
+                    }
+                }
+
+                // Also mark the items Failed so the order doesn't sit forever
+                // on Pending items waiting for a Trip that will never exist.
+                try
+                {
+                    await _sender.Send(new MarkGroupItemsAsDispatchFailedCommand(
+                        evt.DeliveryOrderId,
+                        stationGroup.Key.PickupStationId,
+                        stationGroup.Key.DropStationId,
+                        $"dispatch threw {ex.GetType().Name}"), ct);
+                }
+                catch (Exception markEx) when (markEx is not OperationCanceledException)
+                {
+                    _logger.LogError(markEx,
+                        "[AutoPlan] ✗ Group {G} failed to mark items as dispatch-failed — items may stay Pending",
+                        groupIndex + 1);
+                }
             }
         }
 
