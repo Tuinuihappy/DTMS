@@ -80,7 +80,7 @@ public class DomainEventMapperTests
 
         result.DeliveryOrderId.Should().Be(orderId);
         result.Reason.Should().Be("Not needed");
-        result.SchemaVersion.Should().Be("1.0");
+        result.SchemaVersion.Should().Be("1.1");
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class DomainEventMapperTests
 
         result.DeliveryOrderId.Should().Be(orderId);
         result.Reason.Should().Be("Awaiting confirmation");
-        result.SchemaVersion.Should().Be("1.0");
+        result.SchemaVersion.Should().Be("1.1");
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public class DomainEventMapperTests
             .Should().BeOfType<DeliveryOrderReleasedIntegrationEventV1>().Subject;
 
         result.DeliveryOrderId.Should().Be(orderId);
-        result.SchemaVersion.Should().Be("1.0");
+        result.SchemaVersion.Should().Be("1.1");
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public class DomainEventMapperTests
 
         result.DeliveryOrderId.Should().Be(orderId);
         result.Reason.Should().Be("Adjusted window");
-        result.SchemaVersion.Should().Be("1.0");
+        result.SchemaVersion.Should().Be("1.1");
     }
 
     [Fact]
