@@ -27,6 +27,7 @@ import { RetryHistoryPanel } from "./retry-history-panel";
 import { SnapshotInspector } from "./snapshot-inspector";
 import { TripActionBar } from "./trip-action-bar";
 import { TripItemsSection } from "./trip-items-section";
+import { OmsNotificationSection } from "@/components/delivery-orders/oms-notification-section";
 
 // Slide-in drawer over the order detail drawer. Mirrors the existing
 // order drawer pattern (backdrop + spring transition + escape-to-close)
@@ -197,6 +198,15 @@ export function TripDetailDrawer({
                     entityId={data.id}
                     fetcher={getTripStatusHistory}
                     liveEntry={liveTimelineEntry}
+                  />
+
+                  {/* Upstream-OMS shipment notification status. Auto-hides
+                      when the order is internal (no OMS rows in audit).
+                      Scoped to this trip — Resend buttons target this
+                      trip's id directly. */}
+                  <OmsNotificationSection
+                    orderId={data.deliveryOrderId}
+                    tripId={data.id}
                   />
 
                   <section className="grid grid-cols-2 gap-3">

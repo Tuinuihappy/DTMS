@@ -36,7 +36,6 @@ import { TripDetailDrawer } from "@/components/dispatch/trip-detail-drawer";
 import { FullAuditLog } from "./full-audit-log";
 import { useOrderHubSubscription } from "@/lib/realtime/hubs/order-hub";
 import type { FullAuditEntryDto } from "@/lib/api/delivery-orders";
-import { OmsNotificationSection } from "./oms-notification-section";
 import { cn } from "@/lib/utils";
 import { PriorityBadge, StatusBadge, TransportModeBadge } from "./badges";
 
@@ -412,17 +411,6 @@ export function OrderDetailDrawer({
                       </div>
                     </section>
                   )}
-
-                  {/* Upstream-OMS shipment notification status. Renders
-                      only for upstream-originated orders (orderRef set).
-                      The full audit timeline below also lists these events
-                      in chronological order; this section hoists the
-                      latest outcome so operators see it at a glance. */}
-                  <OmsNotificationSection
-                    orderId={data.id}
-                    orderRef={data.orderRef}
-                    trips={trips}
-                  />
 
                   {/* Full audit log — order events + amendments + per-trip
                       execution + retry triggers, consolidated (Phase 4.2). */}

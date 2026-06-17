@@ -12,31 +12,33 @@ import {
   resendOmsTripFailedNotification,
   type FullAuditEntryDto,
 } from "@/lib/api/delivery-orders";
-import type { TripSummaryDto } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
 
 /**
- * At-a-glance status for the upstream-OMS shipment notifications fired
- * across a Trip's lifecycle. 4 stages are surfaced:
+ * Per-trip view of the upstream-OMS shipment notifications fired across
+ * the trip's lifecycle. Rendered inside the Trip detail drawer so each
+ * trip owns its own OMS state — multi-trip orders no longer conflate
+ * signals from different trips.
+ *
+ * 4 stages are surfaced:
  *
  *   • Started       — POST /api/shipments                       (TASK_PROCESSING)
  *   • Arrived       — POST /api/shipments/{id}/arrived          (SUB_TASK_FINISHED @ drop)
  *   • POD captured  — POST /api/shipments/{id}/pod-completed    (PodCaptured)   [Phase B4]
  *   • Trip aborted  — POST /api/shipments/{id}/failed|cancelled  (TripFailed | TripCancelled) [Phase B4]
  *
+ * Audit entries are filtered to those whose RelatedTripId matches the
+ * trip in scope, so a single noisy trip can't override another's row.
+ *
  * "Trip aborted" is a conditional row that merges TripFailed +
- * TripCancelled (mutually exclusive at the trip level) — operator only
- * needs to see one outcome. When the trip is aborted, the success-path
- * stages (Arrived, POD) render as "n/a (trip aborted)" instead of
- * "Awaiting…" so the operator immediately understands those branches
- * will never fire.
+ * TripCancelled (mutually exclusive at the trip level). When the trip is
+ * aborted, the success-path stages (Arrived, POD) render as "n/a (trip
+ * aborted)" so the operator sees those branches won't fire.
  *
  * Each stage independently shows: Notified / Failed-after-retries /
  * Stale (trigger fired but no audit) / Empty. Resend button appears on
- * failed/stale and posts to the stage's resend endpoint; OMS dedupes
- * by shipmentId so re-firing on a row that previously succeeded is safe.
- *
- * Only renders when the order has an OrderRef (originated upstream).
+ * failed/stale and posts to the stage's resend endpoint; OMS dedupes by
+ * shipmentId so re-firing on a row that previously succeeded is safe.
  */
 
 type StageKey = "started" | "arrived" | "podCompleted" | "tripAborted";
@@ -135,12 +137,10 @@ type ResendState =
 
 export function OmsNotificationSection({
   orderId,
-  orderRef,
-  trips,
+  tripId,
 }: {
   orderId: string;
-  orderRef: string;
-  trips: TripSummaryDto[] | null;
+  tripId: string;
 }) {
   const [entries, setEntries] = useState<FullAuditEntryDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -151,7 +151,6 @@ export function OmsNotificationSection({
   const [abortedResend, setAbortedResend] = useState<ResendState>({ kind: "idle" });
 
   useEffect(() => {
-    if (!orderRef) return;
     let cancelled = false;
     setError(null);
     getFullOrderAudit(orderId)
@@ -164,25 +163,31 @@ export function OmsNotificationSection({
     return () => {
       cancelled = true;
     };
-  }, [orderId, orderRef, reloadToken]);
+  }, [orderId, reloadToken]);
 
-  // Resend target = latest-created trip on the order. Multi-group orders
-  // have multiple trips per drop; the most recently created one is the
-  // operator's likely intent (the failed retry / latest attempt).
-  const resendTripId = useMemo(() => {
-    if (!trips || trips.length === 0) return null;
-    return [...trips].sort((a, b) =>
-      b.createdAt.localeCompare(a.createdAt),
-    )[0]?.id ?? null;
-  }, [trips]);
+  // Per-trip slice of the audit stream. The audit endpoint returns
+  // entries for the whole order; we keep only this trip's so multi-trip
+  // orders don't conflate signals.
+  const tripEntries = useMemo<FullAuditEntryDto[] | null>(() => {
+    if (entries === null) return null;
+    return entries.filter((e) => e.relatedTripId === tripId);
+  }, [entries, tripId]);
+
+  // Detect orders that don't participate in upstream OMS at all. Internal
+  // orders never produce OMS audit rows, so once the audit has loaded
+  // with zero OMS-related entries we hide the section entirely rather
+  // than show four perpetually-"Awaiting…" rows.
+  const isOmsRelevant = useMemo(() => {
+    if (tripEntries === null) return null; // still loading
+    return tripEntries.some((e) => OMS_EVENT_TYPES.has(e.eventType));
+  }, [tripEntries]);
+
+  const refresh = useCallback(() => setReloadToken((t) => t + 1), []);
 
   const abortedStatus = useMemo(
-    () => deriveStatus(entries, STAGES.tripAborted),
-    [entries],
+    () => deriveStatus(tripEntries, STAGES.tripAborted),
+    [tripEntries],
   );
-  // Once the trip has an aborted audit (success/failed/stale), downstream
-  // success stages aren't going to fire — grey them rather than show
-  // "Awaiting…" so the operator immediately understands the branch.
   const tripIsAborted =
     abortedStatus.kind === "notified" ||
     abortedStatus.kind === "failed" ||
@@ -193,38 +198,35 @@ export function OmsNotificationSection({
       : "trip aborted";
 
   const startedStatus = useMemo(
-    () => deriveStatus(entries, STAGES.started),
-    [entries],
+    () => deriveStatus(tripEntries, STAGES.started),
+    [tripEntries],
   );
   const arrivedStatus = useMemo(
     () =>
       maybeDisable(
-        deriveStatus(entries, STAGES.arrived),
+        deriveStatus(tripEntries, STAGES.arrived),
         tripIsAborted,
         abortedReasonLabel,
       ),
-    [entries, tripIsAborted, abortedReasonLabel],
+    [tripEntries, tripIsAborted, abortedReasonLabel],
   );
   const podStatus = useMemo(
     () =>
       maybeDisable(
-        deriveStatus(entries, STAGES.podCompleted),
+        deriveStatus(tripEntries, STAGES.podCompleted),
         tripIsAborted,
         abortedReasonLabel,
       ),
-    [entries, tripIsAborted, abortedReasonLabel],
+    [tripEntries, tripIsAborted, abortedReasonLabel],
   );
-
-  const refresh = useCallback(() => setReloadToken((t) => t + 1), []);
 
   const makeResendHandler = (
     setState: (s: ResendState) => void,
     api: (orderId: string, tripId: string) => Promise<unknown>,
   ) => async () => {
-    if (!resendTripId) return;
     setState({ kind: "sending" });
     try {
-      await api(orderId, resendTripId);
+      await api(orderId, tripId);
       setState({ kind: "idle" });
       refresh();
     } catch (e) {
@@ -234,21 +236,17 @@ export function OmsNotificationSection({
 
   const onResendStarted = useCallback(
     makeResendHandler(setStartedResend, (o, t) => resendOmsNotification(o, t)),
-    [orderId, resendTripId, refresh],
+    [orderId, tripId, refresh],
   );
   const onResendArrived = useCallback(
     makeResendHandler(setArrivedResend, (o, t) => resendOmsArrivedNotification(o, t)),
-    [orderId, resendTripId, refresh],
+    [orderId, tripId, refresh],
   );
   const onResendPod = useCallback(
     makeResendHandler(setPodResend, (o, t) => resendOmsPodCompletedNotification(o, t)),
-    [orderId, resendTripId, refresh],
+    [orderId, tripId, refresh],
   );
-  // Aborted: the resend endpoint depends on whether the original event
-  // was a failure or a cancellation. Pick from the latest aborted
-  // audit row's subtype.
   const onResendAborted = useCallback(async () => {
-    if (!resendTripId) return;
     const subtype: AbortSubtype =
       abortedStatus.kind === "notified" || abortedStatus.kind === "failed" || abortedStatus.kind === "stale"
         ? abortedStatus.subtype ?? "failed"
@@ -256,21 +254,23 @@ export function OmsNotificationSection({
     setAbortedResend({ kind: "sending" });
     try {
       if (subtype === "cancelled") {
-        await resendOmsTripCancelledNotification(orderId, resendTripId);
+        await resendOmsTripCancelledNotification(orderId, tripId);
       } else {
-        await resendOmsTripFailedNotification(orderId, resendTripId);
+        await resendOmsTripFailedNotification(orderId, tripId);
       }
       setAbortedResend({ kind: "idle" });
       refresh();
     } catch (e) {
       setAbortedResend({ kind: "error", message: e instanceof Error ? e.message : "Resend failed" });
     }
-  }, [orderId, resendTripId, refresh, abortedStatus]);
+  }, [orderId, tripId, refresh, abortedStatus]);
 
-  if (!orderRef) return null;
   if (error) return null;
+  // Order doesn't participate in OMS — hide the section entirely once
+  // the audit has resolved with no OMS rows. While still loading
+  // (isOmsRelevant === null), fall through and render the loading state.
+  if (isOmsRelevant === false) return null;
 
-  // tripAborted is hidden on the happy path; everything else always renders.
   const showAborted = abortedStatus.kind !== "empty" && abortedStatus.kind !== "loading";
 
   return (
@@ -290,21 +290,21 @@ export function OmsNotificationSection({
         <StageRow
           config={STAGES.started}
           status={startedStatus}
-          resendTripId={resendTripId}
+          resendTripId={tripId}
           resendState={startedResend}
           onResend={onResendStarted}
         />
         <StageRow
           config={STAGES.arrived}
           status={arrivedStatus}
-          resendTripId={resendTripId}
+          resendTripId={tripId}
           resendState={arrivedResend}
           onResend={onResendArrived}
         />
         <StageRow
           config={STAGES.podCompleted}
           status={podStatus}
-          resendTripId={resendTripId}
+          resendTripId={tripId}
           resendState={podResend}
           onResend={onResendPod}
         />
@@ -312,7 +312,7 @@ export function OmsNotificationSection({
           <StageRow
             config={STAGES.tripAborted}
             status={abortedStatus}
-            resendTripId={resendTripId}
+            resendTripId={tripId}
             resendState={abortedResend}
             onResend={onResendAborted}
           />
@@ -321,6 +321,25 @@ export function OmsNotificationSection({
     </section>
   );
 }
+
+// Every OMS-related event type across the four stages. Used to decide
+// whether the order participates in upstream OMS at all — if none of
+// these ever appear on the trip's audit, the order is internal and the
+// section should not render.
+const OMS_EVENT_TYPES = new Set<string>([
+  ...STAGES.started.notifiedTypes,
+  ...STAGES.started.resentTypes,
+  ...STAGES.started.failedTypes,
+  ...STAGES.arrived.notifiedTypes,
+  ...STAGES.arrived.resentTypes,
+  ...STAGES.arrived.failedTypes,
+  ...STAGES.podCompleted.notifiedTypes,
+  ...STAGES.podCompleted.resentTypes,
+  ...STAGES.podCompleted.failedTypes,
+  ...STAGES.tripAborted.notifiedTypes,
+  ...STAGES.tripAborted.resentTypes,
+  ...STAGES.tripAborted.failedTypes,
+]);
 
 // Latest-wins per stage — pick the most recent of notified/resent vs
 // failed. A success after a failure overrides (retry recovered). If
