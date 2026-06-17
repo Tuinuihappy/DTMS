@@ -260,3 +260,67 @@ export async function deactivateActionTemplate(id: string): Promise<void> {
   });
   await unwrap(res);
 }
+
+// Dropdown-friendly view of an active action template. The mission's
+// `actionTemplateName` is the contract field, so we expose that as the
+// value while showing actionType + category as secondary context.
+export type ActionTemplateOption = {
+  name: string;
+  category: ActionCategory;
+  actionType: string;
+};
+
+// One-shot fetch for the editor combobox — paginates once with a
+// high page size and returns active templates only. If a tenant
+// ever ships >500 active templates we'll need a search-as-you-type
+// flow, but for now client-side filter on the loaded list is fine.
+export async function getActionTemplateOptions(
+  signal?: AbortSignal,
+): Promise<ActionTemplateOption[]> {
+  const paged = await listActionTemplates(
+    { page: 1, size: 500, includeInactive: false, sortBy: "actionName", sortDir: "asc" },
+    signal,
+  );
+  return paged.records
+    .filter((t) => t.isActive && t.actionName)
+    .map((t) => ({ name: t.actionName, category: t.actionCategory, actionType: t.actionType }));
+}
+
+// React hook — fetches the dropdown list once on mount.
+import { useEffect, useState } from "react";
+
+export type UseActionTemplateOptionsResult = {
+  templates: ActionTemplateOption[];
+  loading: boolean;
+  error: string | null;
+};
+
+export function useActionTemplateOptions(): UseActionTemplateOptionsResult {
+  const [templates, setTemplates] = useState<ActionTemplateOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getActionTemplateOptions(ctrl.signal)
+      .then((opts) => {
+        if (!cancelled) setTemplates(opts);
+      })
+      .catch((e: Error) => {
+        if (!cancelled && e.name !== "AbortError")
+          setError(e.message || "Failed to load action templates");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      ctrl.abort();
+    };
+  }, []);
+
+  return { templates, loading, error };
+}

@@ -83,12 +83,17 @@ import { useEffect, useState } from "react";
 
 export type UseStationOptionsResult = {
   stations: StationOption[];
+  // Station id (DTMS Guid) → code. Includes inactive stations so a
+  // template that references a now-deactivated station still resolves
+  // back to the saved code when the editor opens.
+  byId: Map<string, string>;
   loading: boolean;
   error: string | null;
 };
 
 export function useStationOptions(): UseStationOptionsResult {
   const [stations, setStations] = useState<StationOption[]>([]);
+  const [byId, setById] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,7 +101,75 @@ export function useStationOptions(): UseStationOptionsResult {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    getStationOptions()
+    // Fetch with includeInactive so the byId lookup covers
+    // deactivated stations too; the dropdown options still filter to
+    // active+non-override+has-code below.
+    getStations({ includeInactive: true })
+      .then((all) => {
+        if (cancelled) return;
+        const active = all
+          .filter((s) => s.isActive && !s.isManualOverrideActive && s.code)
+          .map((s) => ({ code: s.code as string, name: s.name, type: s.type }))
+          .sort((a, b) => a.code.localeCompare(b.code));
+        const map = new Map<string, string>();
+        for (const s of all) if (s.code) map.set(s.id, s.code);
+        setStations(active);
+        setById(map);
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setError(e.message || "Failed to load stations");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { stations, byId, loading, error };
+}
+
+// Stations exposed by their RIOT3 numeric vendor id — the int the MOVE
+// mission payload expects. Skips stations without a parseable VendorRef
+// (legacy rows or maps not yet synced), and active+not-force-offline so
+// templates can't reference a station the operator has flagged offline.
+export type StationVendorOption = {
+  vendorId: number;
+  name: string;
+  type: string;
+  code: string | null;
+};
+
+export async function getStationVendorOptions(): Promise<StationVendorOption[]> {
+  const stations = await getStations();
+  const out: StationVendorOption[] = [];
+  for (const s of stations) {
+    if (!s.isActive || s.isManualOverrideActive) continue;
+    if (!s.vendorRef) continue;
+    const n = Number(s.vendorRef);
+    if (!Number.isInteger(n)) continue;
+    out.push({ vendorId: n, name: s.name, type: s.type, code: s.code });
+  }
+  return out.sort((a, b) => a.vendorId - b.vendorId);
+}
+
+export type UseStationVendorOptionsResult = {
+  stations: StationVendorOption[];
+  loading: boolean;
+  error: string | null;
+};
+
+export function useStationVendorOptions(): UseStationVendorOptionsResult {
+  const [stations, setStations] = useState<StationVendorOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getStationVendorOptions()
       .then((opts) => {
         if (!cancelled) setStations(opts);
       })
@@ -157,6 +230,60 @@ export async function listMaps(): Promise<MapSummaryDto[]> {
     throw new Error(text || `Failed to load maps (${res.status})`);
   }
   return res.json();
+}
+
+// Maps exposed by their RIOT3 numeric vendor id — the int the MOVE
+// mission payload expects. Skips maps without a parseable VendorRef
+// (e.g. locally-created maps that were never synced from RIOT3).
+export type MapVendorOption = {
+  vendorId: number;
+  name: string;
+  version: string;
+};
+
+export async function getMapVendorOptions(): Promise<MapVendorOption[]> {
+  const maps = await listMaps();
+  const out: MapVendorOption[] = [];
+  for (const m of maps) {
+    if (!m.vendorRef) continue;
+    const n = Number(m.vendorRef);
+    if (!Number.isInteger(n)) continue;
+    out.push({ vendorId: n, name: m.name, version: m.version });
+  }
+  return out.sort((a, b) => a.vendorId - b.vendorId);
+}
+
+export type UseMapVendorOptionsResult = {
+  maps: MapVendorOption[];
+  loading: boolean;
+  error: string | null;
+};
+
+export function useMapVendorOptions(): UseMapVendorOptionsResult {
+  const [maps, setMaps] = useState<MapVendorOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getMapVendorOptions()
+      .then((opts) => {
+        if (!cancelled) setMaps(opts);
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setError(e.message || "Failed to load maps");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { maps, loading, error };
 }
 
 export type StationTypeWire =

@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   createOrderTemplate,
@@ -34,8 +34,24 @@ import {
   type OrderTemplateDto,
   type StructureType,
 } from "@/lib/api/order-templates";
-import { useStationOptions, type StationOption } from "@/lib/api/facility";
+import {
+  useMapVendorOptions,
+  useStationOptions,
+  useStationVendorOptions,
+  type MapVendorOption,
+  type StationOption,
+  type StationVendorOption,
+} from "@/lib/api/facility";
 import { StationCombobox } from "@/components/primitives/station-combobox";
+import {
+  IntIdCombobox,
+  type IntIdOption,
+} from "@/components/primitives/int-id-combobox";
+import { ActionTemplateCombobox } from "@/components/primitives/action-template-combobox";
+import {
+  useActionTemplateOptions,
+  type ActionTemplateOption,
+} from "@/lib/api/action-templates";
 
 // Editor mission shape — uses string inputs for numeric fields so the
 // form mirrors what the user actually types (empty input ≠ 0). Parsed to
@@ -46,7 +62,6 @@ type MissionForm = {
   category: string;
   mapId: string;
   stationId: string;
-  blockingType: string;
   // For ACT: prefer referencing an ActionTemplate by name. Inline path uses
   // actionType + actionParameters. We let the user pick the variant.
   actionVariant: "reference" | "inline";
@@ -84,7 +99,6 @@ function emptyMission(type: MissionType): MissionForm {
     category: "",
     mapId: "",
     stationId: "",
-    blockingType: "",
     actionVariant: "reference",
     actionTemplateName: "",
     actionType: "",
@@ -123,7 +137,6 @@ function formFromDto(t: OrderTemplateDto): FormState {
       category: m.category ?? "",
       mapId: m.mapId == null ? "" : String(m.mapId),
       stationId: m.stationId == null ? "" : String(m.stationId),
-      blockingType: m.blockingType ?? "",
       actionVariant: (m.actionTemplateName ? "reference" : "inline") as
         | "reference"
         | "inline",
@@ -168,7 +181,6 @@ function toMissionPayload(m: MissionForm): MissionPayload {
   const base: MissionPayload = {
     type: m.type,
     category: m.category.trim() || null,
-    blockingType: m.blockingType.trim() || null,
   };
   if (m.type === "MOVE") {
     base.mapId = parseIntOrNull(m.mapId);
@@ -223,10 +235,41 @@ export function TemplateEditor({
   // Shared station catalog — both pickup and drop comboboxes read from
   // this single fetch so the API is hit at most once per editor mount.
   const stations = useStationOptions();
+  // Shared map + vendor-id station catalogs for MOVE-row dropdowns.
+  // Both lists are fetched once per editor mount and reused across rows.
+  const mapVendors = useMapVendorOptions();
+  const stationVendors = useStationVendorOptions();
+  // Shared action-template catalog for ACT-reference rows.
+  const actionTemplates = useActionTemplateOptions();
 
   useEffect(() => {
     if (existing) setForm(formFromDto(existing));
   }, [existing]);
+
+  // Pickup/drop codes aren't in the read DTO (only the resolved
+  // station ids are), so on edit-mode entry we resolve them from the
+  // shared station catalog once it loads. Run-once per template id so
+  // a user clearing or retyping the field doesn't get clobbered when
+  // stations re-fetch.
+  const stationCodeAutoFilledForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!existing) return;
+    if (stations.loading || stations.error) return;
+    if (stationCodeAutoFilledForRef.current === existing.id) return;
+    stationCodeAutoFilledForRef.current = existing.id;
+    const pickup = existing.pickupStationId
+      ? (stations.byId.get(existing.pickupStationId) ?? "")
+      : "";
+    const drop = existing.dropStationId
+      ? (stations.byId.get(existing.dropStationId) ?? "")
+      : "";
+    if (!pickup && !drop) return;
+    setForm((f) => ({
+      ...f,
+      pickupStationCode: f.pickupStationCode || pickup,
+      dropStationCode: f.dropStationCode || drop,
+    }));
+  }, [existing, stations.loading, stations.error, stations.byId]);
 
   const isEdit = !!existing;
   const moveMissionCount = form.missions.filter((m) => m.type === "MOVE").length;
@@ -468,6 +511,9 @@ export function TemplateEditor({
                     onChange={(patch) => setMission(m.uid, patch)}
                     onRemove={() => removeMission(m.uid)}
                     onMove={(dir) => moveMission(m.uid, dir)}
+                    mapVendors={mapVendors}
+                    stationVendors={stationVendors}
+                    actionTemplates={actionTemplates}
                   />
                 ))}
               </AnimatePresence>
@@ -562,6 +608,9 @@ function MissionRow({
   onChange,
   onRemove,
   onMove,
+  mapVendors,
+  stationVendors,
+  actionTemplates,
 }: {
   mission: MissionForm;
   index: number;
@@ -569,6 +618,17 @@ function MissionRow({
   onChange: (patch: Partial<MissionForm>) => void;
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
+  mapVendors: { maps: MapVendorOption[]; loading: boolean; error: string | null };
+  stationVendors: {
+    stations: StationVendorOption[];
+    loading: boolean;
+    error: string | null;
+  };
+  actionTemplates: {
+    templates: ActionTemplateOption[];
+    loading: boolean;
+    error: string | null;
+  };
 }) {
   const isMove = mission.type === "MOVE";
   const dragControls = useDragControls();
@@ -662,31 +722,41 @@ function MissionRow({
           </div>
 
           {isMove ? (
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-              <FieldText
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <FieldCombobox
                 label="Map ID"
-                placeholder="e.g. 1"
                 value={mission.mapId}
                 onChange={(v) => onChange({ mapId: v })}
+                options={mapVendors.maps.map<IntIdOption>((m) => ({
+                  vendorId: m.vendorId,
+                  label: m.name,
+                  secondary: m.version ? `v${m.version}` : null,
+                }))}
+                loading={mapVendors.loading}
+                error={mapVendors.error}
+                placeholder="Select map…"
+                loadingPlaceholder="Loading maps…"
+                emptyLabel="No map matches"
+                notInListLabel={(v) => `Map id ${v} isn't in the list`}
                 icon={<MapIcon className="h-3 w-3" />}
-                mono
-                compact
               />
-              <FieldText
+              <FieldCombobox
                 label="Station ID"
-                placeholder="e.g. 12"
                 value={mission.stationId}
                 onChange={(v) => onChange({ stationId: v })}
+                options={stationVendors.stations.map<IntIdOption>((s) => ({
+                  vendorId: s.vendorId,
+                  label: s.name,
+                  secondary: s.code,
+                  badge: s.type,
+                }))}
+                loading={stationVendors.loading}
+                error={stationVendors.error}
+                placeholder="Select station…"
+                loadingPlaceholder="Loading stations…"
+                emptyLabel="No station matches"
+                notInListLabel={(v) => `Station id ${v} isn't in the list`}
                 icon={<Tag className="h-3 w-3" />}
-                mono
-                compact
-              />
-              <FieldText
-                label="Blocking type"
-                placeholder="optional"
-                value={mission.blockingType}
-                onChange={(v) => onChange({ blockingType: v })}
-                compact
               />
             </div>
           ) : (
@@ -714,42 +784,32 @@ function MissionRow({
                 })}
               </div>
               {mission.actionVariant === "reference" ? (
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                <label className="block">
+                  <span className="block text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-500)]">
+                    Action template name
+                  </span>
+                  <div className="mt-1">
+                    <ActionTemplateCombobox
+                      value={mission.actionTemplateName}
+                      onChange={(v) => onChange({ actionTemplateName: v })}
+                      templates={actionTemplates.templates}
+                      loading={actionTemplates.loading}
+                      error={actionTemplates.error}
+                      placeholder="Select action template…"
+                      icon={<Workflow className="h-3 w-3" />}
+                    />
+                  </div>
+                </label>
+              ) : (
+                <div className="space-y-2.5">
                   <FieldText
-                    label="Action template name"
-                    placeholder="e.g. pickup_handshake"
-                    value={mission.actionTemplateName}
-                    onChange={(v) => onChange({ actionTemplateName: v })}
+                    label="Action type"
+                    placeholder="e.g. standardRobotsCustom"
+                    value={mission.actionType}
+                    onChange={(v) => onChange({ actionType: v })}
                     mono
                     compact
                   />
-                  <FieldText
-                    label="Blocking type"
-                    placeholder="optional"
-                    value={mission.blockingType}
-                    onChange={(v) => onChange({ blockingType: v })}
-                    compact
-                  />
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                    <FieldText
-                      label="Action type"
-                      placeholder="e.g. standardRobotsCustom"
-                      value={mission.actionType}
-                      onChange={(v) => onChange({ actionType: v })}
-                      mono
-                      compact
-                    />
-                    <FieldText
-                      label="Blocking type"
-                      placeholder="optional"
-                      value={mission.blockingType}
-                      onChange={(v) => onChange({ blockingType: v })}
-                      compact
-                    />
-                  </div>
                   <ParameterEditor
                     parameters={mission.actionParameters}
                     onChange={(actionParameters) => onChange({ actionParameters })}
@@ -924,6 +984,58 @@ function FieldText({
           {helper}
         </span>
       )}
+    </label>
+  );
+}
+
+// FieldCombobox — wraps IntIdCombobox in the same label shell as
+// FieldText so the MOVE row's three columns line up visually.
+function FieldCombobox({
+  label,
+  value,
+  onChange,
+  options,
+  loading,
+  error,
+  placeholder,
+  loadingPlaceholder,
+  emptyLabel,
+  notInListLabel,
+  icon,
+  className,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: IntIdOption[];
+  loading?: boolean;
+  error?: string | null;
+  placeholder?: string;
+  loadingPlaceholder?: string;
+  emptyLabel?: string;
+  notInListLabel?: (value: string) => string;
+  icon?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <label className={cn("block", className)}>
+      <span className="block text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-500)]">
+        {label}
+      </span>
+      <div className="mt-1">
+        <IntIdCombobox
+          value={value}
+          onChange={onChange}
+          options={options}
+          loading={loading}
+          error={error}
+          placeholder={placeholder}
+          loadingPlaceholder={loadingPlaceholder}
+          emptyLabel={emptyLabel}
+          notInListLabel={notInListLabel}
+          icon={icon}
+        />
+      </div>
     </label>
   );
 }
