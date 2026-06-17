@@ -22,6 +22,28 @@ public class MarkJobDispatchedCommandHandler : ICommandHandler<MarkJobDispatched
         var job = await _jobRepository.GetByIdAsync(request.JobId, cancellationToken);
         if (job is null) return Result.Failure($"Job {request.JobId} not found.");
 
+        // T1.5 — idempotent on (JobId, TripId). When MassTransit redelivers
+        // the consumer (T1.1) the job may already be Dispatched from the prior
+        // attempt; succeed silently if state matches. Mismatched TripId means
+        // the second attempt produced a *different* Trip — log loudly and fail
+        // so the divergence is investigated rather than papered over.
+        if (job.Status == Domain.Enums.JobStatus.Dispatched)
+        {
+            if (job.TripId == request.TripId)
+            {
+                _logger.LogInformation(
+                    "[MarkJobDispatched] ↺ Job {JobId} already Dispatched with same TripId {TripId} — no-op (idempotent)",
+                    request.JobId, request.TripId);
+                return Result.Success();
+            }
+
+            _logger.LogError(
+                "[MarkJobDispatched] ✗ Job {JobId} already Dispatched with different TripId existing={Existing} attempted={Attempted}",
+                request.JobId, job.TripId, request.TripId);
+            return Result.Failure(
+                $"Job {request.JobId} already dispatched as trip {job.TripId}, cannot rebind to {request.TripId}.");
+        }
+
         try
         {
             job.MarkDispatched(request.TripId, request.VendorOrderKey);
