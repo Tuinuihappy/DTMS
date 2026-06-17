@@ -330,6 +330,14 @@ public static class ModuleServiceRegistration
                 o.StopTimeout = TimeSpan.FromSeconds(45);
             });
 
+        // T2 POC — Saga DbContext. Registered unconditionally so its
+        // migrations are always applied; whether the Saga actually receives
+        // events is gated on the Workflow:UseSaga feature flag below.
+        services.AddDbContext<AMR.DeliveryPlanning.Planning.Infrastructure.Data.OrchestrationDbContext>(
+            opts => opts.UseNpgsql(connectionString));
+
+        var useSaga = configuration.GetValue<bool>("Workflow:UseSaga");
+
         services.AddMassTransit(bus =>
         {
             // Auto-scan consumers from all module Application assemblies
@@ -343,6 +351,30 @@ public static class ModuleServiceRegistration
                 // past it and the snapshot is never persisted.
                 typeof(AMR.DeliveryPlanning.VendorAdapter.Feeder.Consumers.CaptureFinalSnapshotConsumer).Assembly
             );
+
+            // T2 POC — opt-in Saga registration. While disabled the saga's
+            // queue isn't subscribed so no events route to it; the legacy T1
+            // consumer remains the sole authority. When enabled, both run
+            // (dual-mode shadow phase per plan section 3.3); the cutover to
+            // saga-only happens by retiring the consumer in a later commit.
+            if (useSaga)
+            {
+                bus.AddSagaStateMachine<
+                        AMR.DeliveryPlanning.Planning.Infrastructure.Sagas.DeliveryOrderSagaStateMachine,
+                        AMR.DeliveryPlanning.Planning.Infrastructure.Sagas.DeliveryOrderSagaInstance>()
+                    .EntityFrameworkRepository(r =>
+                    {
+                        r.ConcurrencyMode = ConcurrencyMode.Optimistic;
+                        r.ExistingDbContext<
+                            AMR.DeliveryPlanning.Planning.Infrastructure.Data.OrchestrationDbContext>();
+                        r.UsePostgres();
+                    });
+
+                // POC bootstrap — see OrchestrationSchemaInitializer.cs for
+                // the "proper migration follows in Phase 2" caveat.
+                services.AddHostedService<
+                    AMR.DeliveryPlanning.Planning.Infrastructure.Sagas.OrchestrationSchemaInitializer>();
+            }
 
             bus.UsingRabbitMq((context, cfg) =>
             {

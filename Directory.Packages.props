@@ -32,6 +32,7 @@
     <!-- Messaging -->
     <PackageVersion Include="MassTransit" Version="8.2.1" />
     <PackageVersion Include="MassTransit.RabbitMQ" Version="8.2.1" />
+    <PackageVersion Include="MassTransit.EntityFrameworkCore" Version="8.2.1" />
     <!-- Caching -->
     <PackageVersion Include="StackExchange.Redis" Version="2.7.33" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.0" />
