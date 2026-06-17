@@ -11,13 +11,27 @@ using AMR.DeliveryPlanning.Fleet.IntegrationEvents;
 using AMR.DeliveryPlanning.Planning.Domain.Events;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Services;
 using AMR.DeliveryPlanning.Planning.IntegrationEvents;
+using AMR.DeliveryPlanning.SharedKernel.Auth;
 using AMR.DeliveryPlanning.SharedKernel.Domain;
 using FluentAssertions;
+using NSubstitute;
 
 namespace AMR.DeliveryPlanning.IntegrationTests;
 
 public class DomainEventMapperTests
 {
+    // P0 added an ICurrentActorContext dependency to every domain-event mapper
+    // so projections can stamp who triggered each transition. These tests
+    // predate that change and don't care about actor enrichment — give every
+    // mapper a stub that returns the system actor so the test focus stays on
+    // the event-shape mapping.
+    private static ICurrentActorContext Actor()
+    {
+        var actor = Substitute.For<ICurrentActorContext>();
+        actor.Current.Returns(ActorContext.System);
+        return actor;
+    }
+
     [Fact]
     public void DeliveryOrderMapper_MapsConfirmedEvent_ToV1()
     {
@@ -34,7 +48,7 @@ public class DomainEventMapperTests
             new("SKU-001", 5.5, pickupStationId, dropStationId)
         };
 
-        var result = new DeliveryOrderDomainEventMapper()
+        var result = new DeliveryOrderDomainEventMapper(Actor())
             .Map(new DeliveryOrderConfirmedDomainEvent(
                 eventId, occurredOn, orderId, "High",
                 earliest, latest, submittedAt, items))
@@ -59,7 +73,7 @@ public class DomainEventMapperTests
         var eventId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
 
-        var result = new DeliveryOrderDomainEventMapper()
+        var result = new DeliveryOrderDomainEventMapper(Actor())
             .Map(new DeliveryOrderCancelledDomainEvent(eventId, DateTime.UtcNow, orderId, "Not needed"))
             .Should().ContainSingle().Subject
             .Should().BeOfType<DeliveryOrderCancelledIntegrationEventV1>().Subject;
@@ -75,7 +89,7 @@ public class DomainEventMapperTests
         var eventId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
 
-        var result = new DeliveryOrderDomainEventMapper()
+        var result = new DeliveryOrderDomainEventMapper(Actor())
             .Map(new DeliveryOrderHeldDomainEvent(eventId, DateTime.UtcNow, orderId, "Awaiting confirmation"))
             .Should().ContainSingle().Subject
             .Should().BeOfType<DeliveryOrderHeldIntegrationEventV1>().Subject;
@@ -91,7 +105,7 @@ public class DomainEventMapperTests
         var eventId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
 
-        var result = new DeliveryOrderDomainEventMapper()
+        var result = new DeliveryOrderDomainEventMapper(Actor())
             .Map(new DeliveryOrderReleasedDomainEvent(eventId, DateTime.UtcNow, orderId))
             .Should().ContainSingle().Subject
             .Should().BeOfType<DeliveryOrderReleasedIntegrationEventV1>().Subject;
@@ -106,7 +120,7 @@ public class DomainEventMapperTests
         var eventId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
 
-        var result = new DeliveryOrderDomainEventMapper()
+        var result = new DeliveryOrderDomainEventMapper(Actor())
             .Map(new DeliveryOrderAmendedDomainEvent(eventId, DateTime.UtcNow, orderId, "Adjusted window"))
             .Should().ContainSingle().Subject
             .Should().BeOfType<DeliveryOrderAmendedIntegrationEventV1>().Subject;
@@ -127,7 +141,7 @@ public class DomainEventMapperTests
         var fromStationId = Guid.NewGuid();
         var toStationId = Guid.NewGuid();
 
-        var result = new PlanningDomainEventMapper()
+        var result = new PlanningDomainEventMapper(Actor())
             .Map(new JobCommittedDomainEvent(
                 eventId, occurredOn, jobId, deliveryOrderId, vehicleId,
                 [new CommittedLegSnapshot(fromStationId, toStationId, 1)]))
@@ -174,8 +188,8 @@ public class DomainEventMapperTests
         var jobId = Guid.NewGuid();
         var deliveryOrderId = Guid.NewGuid();
 
-        var result = new DispatchDomainEventMapper()
-            .Map(new TripCompletedDomainEvent(eventId, DateTime.UtcNow, tripId, jobId, deliveryOrderId))
+        var result = new DispatchDomainEventMapper(Actor())
+            .Map(new TripCompletedDomainEvent(eventId, DateTime.UtcNow, tripId, jobId, deliveryOrderId, "test-upper-key"))
             .Should().ContainSingle().Subject
             .Should().BeOfType<TripCompletedIntegrationEvent>().Subject;
 
@@ -191,7 +205,7 @@ public class DomainEventMapperTests
         var tripId = Guid.NewGuid();
         var stopId = Guid.NewGuid();
 
-        var result = new DispatchDomainEventMapper()
+        var result = new DispatchDomainEventMapper(Actor())
             .Map(new PodCapturedDomainEvent(eventId, DateTime.UtcNow, tripId, stopId, ["SKU-001"]))
             .Should().ContainSingle().Subject
             .Should().BeOfType<PodCapturedIntegrationEvent>().Subject;
@@ -216,7 +230,7 @@ public class DomainEventMapperTests
         var pickupStationId = Guid.NewGuid();
         var dropStationId = Guid.NewGuid();
 
-        var result = new PlanningDomainEventMapper()
+        var result = new PlanningDomainEventMapper(Actor())
             .Map(new JobCommittedDomainEvent(
                 eventId, DateTime.UtcNow, jobId, deliveryOrderId, null,
                 [
@@ -238,9 +252,9 @@ public class DomainEventMapperTests
         // surface stays opt-in.
         var domainEvent = new UnmappedDomainEvent(Guid.NewGuid(), DateTime.UtcNow);
 
-        new PlanningDomainEventMapper().Map(domainEvent).Should().BeEmpty();
+        new PlanningDomainEventMapper(Actor()).Map(domainEvent).Should().BeEmpty();
         new FleetDomainEventMapper().Map(domainEvent).Should().BeEmpty();
-        new DispatchDomainEventMapper().Map(domainEvent).Should().BeEmpty();
+        new DispatchDomainEventMapper(Actor()).Map(domainEvent).Should().BeEmpty();
     }
 
     [Fact]
@@ -252,7 +266,7 @@ public class DomainEventMapperTests
         // unrecognized type signals a missing entry, so the mapper throws.
         var domainEvent = new UnmappedDomainEvent(Guid.NewGuid(), DateTime.UtcNow);
 
-        var act = () => new DeliveryOrderDomainEventMapper().Map(domainEvent);
+        var act = () => new DeliveryOrderDomainEventMapper(Actor()).Map(domainEvent);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*Unhandled domain event 'UnmappedDomainEvent'*");
