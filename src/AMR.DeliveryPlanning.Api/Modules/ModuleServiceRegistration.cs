@@ -315,6 +315,21 @@ public static class ModuleServiceRegistration
         services.AddOmsAdapter(configuration);
 
         // ── MassTransit + RabbitMQ ────────────────────────────────────
+        // T1.3 — MassTransitHostOptions controls how the bus integrates with
+        // the host lifetime. WaitUntilStarted blocks the host's startup until
+        // the bus is connected (so we don't serve traffic before consumers
+        // are ready); StopTimeout=45s gives in-flight consumers a budget to
+        // finish before the broker connection closes. Total shutdown window
+        // is ShutdownTimeout (60s, set in Program.cs) ≥ StopTimeout (45s)
+        // ≥ docker stop_grace_period (90s) so each layer drains in order.
+        services.AddOptions<MassTransit.MassTransitHostOptions>()
+            .Configure(o =>
+            {
+                o.WaitUntilStarted = true;
+                o.StartTimeout = TimeSpan.FromSeconds(30);
+                o.StopTimeout = TimeSpan.FromSeconds(45);
+            });
+
         services.AddMassTransit(bus =>
         {
             // Auto-scan consumers from all module Application assemblies

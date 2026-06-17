@@ -26,6 +26,17 @@ var builder = WebApplication.CreateBuilder(args);
 var devAuthBypassEnabled = builder.Environment.IsDevelopment()
     && builder.Configuration.GetValue<bool>("Auth:Disable");
 
+// T1.3 — extend shutdown window so MassTransit consumers and in-flight HTTP
+// requests can drain before SIGKILL. Default is 5s which is far too short
+// for the multi-step Planning workflow (dispatch + Trip persistence + vendor
+// HTTP can take 10-30s on a healthy run). Combined with docker-compose
+// stop_grace_period=90s so Docker doesn't kill the container before .NET
+// finishes draining.
+builder.Host.ConfigureHostOptions(options =>
+{
+    options.ShutdownTimeout = TimeSpan.FromSeconds(60);
+});
+
 // Add Serilog
 builder.Host.UseSerilog((context, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration));

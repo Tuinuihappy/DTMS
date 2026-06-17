@@ -60,6 +60,13 @@ services:
       - "5219:8080"
     restart: unless-stopped
     mem_limit: 2g
+    # T1.3 — give the API 90 seconds to drain on SIGTERM before Docker
+    # SIGKILLs it. Internally: Host.ShutdownTimeout=60s, MassTransit
+    # StopTimeout=45s — so consumers finish in-flight work, the bus stops
+    # accepting new messages, and HTTP requests drain before the process
+    # exits. Without this Docker's default 10s gets nowhere near enough
+    # for a multi-step Planning workflow (root cause of OD-0374 / OD-0375).
+    stop_grace_period: 90s
     depends_on:
       postgres:
         condition: service_healthy
