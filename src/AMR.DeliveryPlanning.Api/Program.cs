@@ -135,10 +135,20 @@ builder.Services.AddOpenTelemetry()
     // matches AMR.DeliveryPlanning.SharedKernel.Projection.ProjectionMetrics.MeterName.
     // P0 Day 4 — DTMS.SignalR meter for hub invocations / connections /
     // rate-limit drops (HubMetrics class).
+    // T1.6 — DTMS.Workflow meter for workflow SLO (stuck orders, consumer
+    // retries/faults, outbox pending/age, watchdog replays).
     .WithMetrics(metrics => metrics
         .AddMeter("DTMS.Projection")
         .AddMeter("DTMS.SignalR")
+        .AddMeter("DTMS.Workflow")
+        // T1.6 — MassTransit native meter emits messaging.* metrics
+        // (consume_duration_seconds, receive_total, retry_total, fault_total)
+        // so we don't need to write our own observer for consumer retries.
+        .AddMeter("MassTransit")
         .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)));
+
+// T1.6 — singleton holder shared by consumers, watchdog, and outbox processor.
+builder.Services.AddSingleton<AMR.DeliveryPlanning.SharedKernel.Diagnostics.WorkflowMetrics>();
 
 // P0 — projection foundation (idempotency, replay stub, metrics singleton).
 // Per-module IProjectionInboxRepository implementations register inside

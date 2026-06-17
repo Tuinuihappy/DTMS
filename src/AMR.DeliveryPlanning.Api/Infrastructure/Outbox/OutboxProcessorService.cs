@@ -3,6 +3,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
+using AMR.DeliveryPlanning.SharedKernel.Diagnostics;
 using AMR.DeliveryPlanning.SharedKernel.Domain;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
 using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data;
@@ -14,12 +15,17 @@ namespace AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
 public class OutboxProcessorService : BackgroundService, IOutboxProcessor
 {
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly WorkflowMetrics _metrics;
     private readonly ILogger<OutboxProcessorService> _logger;
     private static readonly TimeSpan PollingInterval = TimeSpan.FromSeconds(5);
 
-    public OutboxProcessorService(IServiceScopeFactory scopeFactory, ILogger<OutboxProcessorService> logger)
+    public OutboxProcessorService(
+        IServiceScopeFactory scopeFactory,
+        WorkflowMetrics metrics,
+        ILogger<OutboxProcessorService> logger)
     {
         _scopeFactory = scopeFactory;
+        _metrics = metrics;
         _logger = logger;
     }
 
@@ -47,15 +53,22 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
         using var scope = _scopeFactory.CreateScope();
         var publisher = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
-        await ProcessOutboxAsync<OutboxDbContext>(scope, publisher, "outbox", cancellationToken);
-        await ProcessOutboxAsync<DeliveryOrderDbContext>(scope, publisher, DeliveryOrderDbContext.Schema, cancellationToken);
-        await ProcessOutboxAsync<PlanningDbContext>(scope, publisher, PlanningDbContext.Schema, cancellationToken);
-        await ProcessOutboxAsync<DispatchDbContext>(scope, publisher, DispatchDbContext.Schema, cancellationToken);
-        await ProcessOutboxAsync<FleetDbContext>(scope, publisher, FleetDbContext.Schema, cancellationToken);
-        await ProcessOutboxAsync<VendorAdapterDbContext>(scope, publisher, VendorAdapterDbContext.Schema, cancellationToken);
+        // T1.6 — aggregate pending count across all schemas per poll so the
+        // dtms_workflow_outbox_pending gauge reflects current backlog. If this
+        // climbs > 500 sustained the outbox is falling behind and ops should
+        // page (see plan section 5).
+        long totalPending = 0;
+        totalPending += await ProcessOutboxAsync<OutboxDbContext>(scope, publisher, "outbox", cancellationToken);
+        totalPending += await ProcessOutboxAsync<DeliveryOrderDbContext>(scope, publisher, DeliveryOrderDbContext.Schema, cancellationToken);
+        totalPending += await ProcessOutboxAsync<PlanningDbContext>(scope, publisher, PlanningDbContext.Schema, cancellationToken);
+        totalPending += await ProcessOutboxAsync<DispatchDbContext>(scope, publisher, DispatchDbContext.Schema, cancellationToken);
+        totalPending += await ProcessOutboxAsync<FleetDbContext>(scope, publisher, FleetDbContext.Schema, cancellationToken);
+        totalPending += await ProcessOutboxAsync<VendorAdapterDbContext>(scope, publisher, VendorAdapterDbContext.Schema, cancellationToken);
+
+        _metrics.SetOutboxPending(totalPending);
     }
 
-    private async Task ProcessOutboxAsync<TDbContext>(
+    private async Task<long> ProcessOutboxAsync<TDbContext>(
         IServiceScope scope,
         IPublishEndpoint publisher,
         string source,
@@ -72,7 +85,12 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
             .Take(50)
             .ToListAsync(cancellationToken);
 
-        if (messages.Count == 0) return;
+        if (messages.Count == 0)
+        {
+            // No batch this tick — query the residual pending count for the gauge.
+            return await db.Set<OutboxMessage>()
+                .CountAsync(m => m.ProcessedOnUtc == null, cancellationToken);
+        }
 
         _logger.LogDebug("Processing {Count} outbox messages from {Source}", messages.Count, source);
 
@@ -97,7 +115,12 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
                     await publisher.Publish(integrationEvent, type, publishCts.Token);
                 }
 
-                message.MarkAsProcessed(DateTime.UtcNow);
+                var publishedAt = DateTime.UtcNow;
+                // T1.6 — record (publish-time - occurrence-time) so the lag
+                // histogram surfaces "outbox is healthy" vs "outbox is lagging
+                // 5 minutes behind" without operators reading log files.
+                _metrics.RecordOutboxAge((publishedAt - message.OccurredOnUtc).TotalSeconds);
+                message.MarkAsProcessed(publishedAt);
             }
             catch (Exception ex)
             {
@@ -106,6 +129,12 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        // Residual pending after the batch (some messages may have failed and
+        // gone back to NextRetryAtUtc in the future — they still count as
+        // backlog for the gauge).
+        return await db.Set<OutboxMessage>()
+            .CountAsync(m => m.ProcessedOnUtc == null, cancellationToken);
     }
 
     private void HandleFailure(OutboxMessage message, string source, string error, Exception? exception)
