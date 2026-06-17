@@ -102,6 +102,14 @@ services:
       - UpstreamOms__BearerToken=${UpstreamOms__BearerToken:-}
       - UpstreamOms__TimeoutSeconds=${UpstreamOms__TimeoutSeconds:-10}
       - Dispatch__UseOrderTemplateDispatch=${Dispatch__UseOrderTemplateDispatch:-false}
+      # T1.4 — Planning workflow watchdog. Polls every 60s for orders stuck
+      # at Status=Planned with no Trip (the OD-0374 / OD-0375 incident shape)
+      # and re-publishes DeliveryOrderConfirmedIntegrationEventV1 so the
+      # Planning consumer retries. Safe under replay because commands are
+      # idempotent (T1.5). Toggle off via PlanningWatchdog__Enabled=false.
+      - PlanningWatchdog__Enabled=${PlanningWatchdog__Enabled:-true}
+      - PlanningWatchdog__PollIntervalSeconds=${PlanningWatchdog__PollIntervalSeconds:-60}
+      - PlanningWatchdog__StaleThresholdSeconds=${PlanningWatchdog__StaleThresholdSeconds:-120}
       - Dispatch__Reconciliation__Enabled=${Dispatch__Reconciliation__Enabled:-false}
       - Dispatch__Reconciliation__PollIntervalSeconds=${Dispatch__Reconciliation__PollIntervalSeconds:-60}
       - Dispatch__Reconciliation__StaleThresholdHours=${Dispatch__Reconciliation__StaleThresholdHours:-24}

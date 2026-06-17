@@ -150,6 +150,15 @@ builder.Services.AddOpenTelemetry()
 // T1.6 — singleton holder shared by consumers, watchdog, and outbox processor.
 builder.Services.AddSingleton<AMR.DeliveryPlanning.SharedKernel.Diagnostics.WorkflowMetrics>();
 
+// T1.4 — Planning reconciliation watchdog. Bound to the PlanningWatchdog
+// config section so ops can toggle Enabled at runtime via appsettings or env.
+builder.Services
+    .AddOptions<AMR.DeliveryPlanning.Api.Infrastructure.Reconciliation.PlanningWatchdogOptions>()
+    .Bind(builder.Configuration.GetSection(
+        AMR.DeliveryPlanning.Api.Infrastructure.Reconciliation.PlanningWatchdogOptions.SectionName));
+builder.Services.AddHostedService<
+    AMR.DeliveryPlanning.Api.Infrastructure.Reconciliation.PlanningReconciliationService>();
+
 // P0 — projection foundation (idempotency, replay stub, metrics singleton).
 // Per-module IProjectionInboxRepository implementations register inside
 // each module's own infrastructure registration (next to its DbContext).
