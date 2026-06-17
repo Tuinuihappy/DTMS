@@ -110,6 +110,11 @@ services:
       - PlanningWatchdog__Enabled=${PlanningWatchdog__Enabled:-true}
       - PlanningWatchdog__PollIntervalSeconds=${PlanningWatchdog__PollIntervalSeconds:-60}
       - PlanningWatchdog__StaleThresholdSeconds=${PlanningWatchdog__StaleThresholdSeconds:-120}
+      # T2 POC — saga state machine. When true the legacy Planning consumer
+      # AND the saga both subscribe to DeliveryOrderConfirmedIntegrationEventV1
+      # (dual-run shadow mode per plan section 3.3). Saga writes to its own
+      # orchestration schema; consumer remains authoritative. Default false.
+      - Workflow__UseSaga=${Workflow__UseSaga:-false}
       - Dispatch__Reconciliation__Enabled=${Dispatch__Reconciliation__Enabled:-false}
       - Dispatch__Reconciliation__PollIntervalSeconds=${Dispatch__Reconciliation__PollIntervalSeconds:-60}
       - Dispatch__Reconciliation__StaleThresholdHours=${Dispatch__Reconciliation__StaleThresholdHours:-24}

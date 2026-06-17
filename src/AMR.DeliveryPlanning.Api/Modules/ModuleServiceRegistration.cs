@@ -338,6 +338,17 @@ public static class ModuleServiceRegistration
 
         var useSaga = configuration.GetValue<bool>("Workflow:UseSaga");
 
+        // T2 POC — schema bootstrap. Registered at the IServiceCollection
+        // level (NOT inside AddMassTransit's lambda — that lambda is for
+        // bus-only configuration and putting services.AddHostedService inside
+        // it leaves the registration on a discarded scope, so the hosted
+        // service never starts and the schema never materializes).
+        if (useSaga)
+        {
+            services.AddHostedService<
+                AMR.DeliveryPlanning.Planning.Infrastructure.Sagas.OrchestrationSchemaInitializer>();
+        }
+
         services.AddMassTransit(bus =>
         {
             // Auto-scan consumers from all module Application assemblies
@@ -369,11 +380,6 @@ public static class ModuleServiceRegistration
                             AMR.DeliveryPlanning.Planning.Infrastructure.Data.OrchestrationDbContext>();
                         r.UsePostgres();
                     });
-
-                // POC bootstrap — see OrchestrationSchemaInitializer.cs for
-                // the "proper migration follows in Phase 2" caveat.
-                services.AddHostedService<
-                    AMR.DeliveryPlanning.Planning.Infrastructure.Sagas.OrchestrationSchemaInitializer>();
             }
 
             bus.UsingRabbitMq((context, cfg) =>
