@@ -338,6 +338,35 @@ public static class ModuleServiceRegistration
                     h.Password(rabbitConfig["Password"] ?? "guest");
                 });
 
+                // T1.1 — crash-recovery posture.
+                //   UseMessageRetry      : 5 in-process retries 1s→30s for transient faults.
+                //   UseDelayedRedelivery : after retries, re-queue at 1m/5m/15m/1h so the
+                //                          broker (not the dying pod) holds the message.
+                //   UseInMemoryOutbox    : buffer Publish/Send calls until the consumer
+                //                          succeeds, so a mid-consume crash never leaves
+                //                          half-published events.
+                //   UseKillSwitch        : trip the receive endpoint when ≥15% of the last
+                //                          10 messages fault, so a poison message can't
+                //                          tar-pit the queue.
+                //   PrefetchCount        : bounded so a slow consumer doesn't hoard messages
+                //                          another pod could process.
+                cfg.UseMessageRetry(r => r.Exponential(
+                    retryLimit: 5,
+                    minInterval: TimeSpan.FromSeconds(1),
+                    maxInterval: TimeSpan.FromSeconds(30),
+                    intervalDelta: TimeSpan.FromSeconds(5)));
+                cfg.UseDelayedRedelivery(r => r.Intervals(
+                    TimeSpan.FromMinutes(1),
+                    TimeSpan.FromMinutes(5),
+                    TimeSpan.FromMinutes(15),
+                    TimeSpan.FromHours(1)));
+                cfg.UseInMemoryOutbox(context);
+                cfg.UseKillSwitch(s => s
+                    .SetActivationThreshold(10)
+                    .SetTripThreshold(0.15)
+                    .SetRestartTimeout(TimeSpan.FromMinutes(1)));
+                cfg.PrefetchCount = 16;
+
                 cfg.ConfigureEndpoints(context);
             });
         });
