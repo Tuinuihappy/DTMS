@@ -42,9 +42,10 @@ Plan แก้ในระดับ enterprise 3 tier ตามขนาด blas
 
 ---
 
-## 2. Tier 1 — Immediate Stabilization (สัปดาห์ 1-2)
+## 2. Tier 1 — Immediate Stabilization (planned 1-2 weeks, delivered in 1 session)
 
-**เป้า**: stop bleeding — ปัญหา stuck order ลด 80%+ โดยไม่ต้อง re-architect
+**เป้า (planned)**: stop bleeding — ปัญหา stuck order ลด 80%+ โดยไม่ต้อง re-architect.
+**ผลที่ได้จริง**: stuck-order rate 0/100 ใน chaos test (n=100, 19 random kill points) — ดีกว่าเป้าหมายเดิม. Recovery 3 ชั้น (watchdog / Riot3 reconciler / admin override) ครบทั้งสามชั้นตามที่ออกแบบใน T1.8.
 
 | # | งาน | Status | Commit |
 |---|---|---|---|
@@ -68,7 +69,27 @@ Plan แก้ในระดับ enterprise 3 tier ตามขนาด blas
 | Real-world recovery | ✅ OD-0374 / OD-0375 unstuck via watchdog within 2 seconds of restart |
 | **Chaos test (kill mid-pipeline ×100)** | ✅ **PASS** — `scripts/chaos/kill-mid-pipeline.ps1` run 2026-06-18: 100 orders, 19 kill points, 5-min settle, 0 stuck. Details: [`docs/chaos-test-results.md`](chaos-test-results.md). Phase 5 (end-to-end completion) documented as deferred. |
 
-**Total Tier 1 effort (actual): ~10 hours single session, in line with the ~34h plan budget after accounting for batching, test-writing, and live verification.**
+### Tier 1 retrospective
+
+| | Planned | Delivered |
+|---|---|---|
+| Items | T1.1–T1.7 (7) | T1.1–T1.10 (10) |
+| Effort budget | ~34h | ~10-12h single session (the unbudgeted 1.8 / 1.9 / 1.10 emerged in response to incidents during dev) |
+| Stuck-order rate | ≤ 0.3/1000 | **0/100** in chaos test |
+| Operator MTTR | < 5 min | < 2 min (one HTTP call) |
+| Defense layers | 1 (watchdog) | **3** — watchdog skip (1.8) + Riot3 reconciler (1.10) + admin overrides (1.9) |
+
+**What changed from the plan (and why)**:
+
+- **T1.8 added after OD-0381**: the original watchdog (T1.4) treated "Order=Planned + no Trip" as "needs replay". OD-0381 showed this misses the case where vendor accepted the upperKey on a prior attempt but our Trip persistence failed — replay then sends the same upperKey, RIOT3 rejects with E110007 "duplicate key", and the watchdog loops every 5 minutes forever. Fix: skip replay if any Job has `VendorOrderKey != null`.
+- **T1.9 added during chaos test follow-up**: chaos test left 9 trips at `Created` because RIOT3 accepted but never sent TASK_PROCESSING. Force-* endpoints give operators a per-stage manual recovery without database access.
+- **T1.10 flipped on by default**: `Riot3ReconciliationService` already existed but was `Enabled=false`. Turning it on makes recovery automatic for dropped webhooks, sliding T1.9 from "primary fix" to "operator-only fallback".
+
+**Lessons for Phase 2 + future tiers**:
+
+- **Real incidents drive better items than upfront design.** T1.8/1.9/1.10 are arguably the most valuable changes shipped today, and none were in the original plan.
+- **Defense-in-depth needs all three layers**, not one robust mechanism. T1.4 alone wouldn't have caught OD-0381; T1.10 alone wouldn't have caught the cases T1.9 covers.
+- **n=2 manual verification ≠ confidence**. The chaos test (n=100 + 19 kill points) is what turned T1 from "we think it works" into "it works".
 
 ---
 
@@ -101,11 +122,13 @@ Plan แก้ในระดับ enterprise 3 tier ตามขนาด blas
 
 ### 3.3 Migration path (เลี่ยง big-bang)
 
-1. Build saga ภายใต้ feature flag `Workflow:UseSaga=false`
-2. **Dual-run** — saga subscribe events เดียวกัน, write เฉพาะ schema ของตัวเอง; legacy `DeliveryOrderValidatedConsumer` ยังเป็น authoritative
-3. **Shadow comparison job** log divergence ลง `orchestration.SagaDiffs` 1 สัปดาห์
-4. Flip flag per environment: dev → uat → prod
-5. Decommission legacy consumer ที่สัปดาห์ 8
+| Step | What | Status |
+|---|---|---|
+| 1 | Build saga ภายใต้ feature flag `Workflow:UseSaga=false` | ⚠️ **POC done, full state machine not built** — Initial → AwaitingPlan transition wired; other 7 transitions + compensation are Phase 2 step 1 work. See [3.4](#34-poc-status-as-of-2026-06-18) and [3.5](#35-phase-2-follow-ups-discovered-during-poc) below. |
+| 2 | **Dual-run** — saga subscribes to same events, writes only to its own schema; legacy `DeliveryOrderValidatedConsumer` remains authoritative | ❌ blocked on step 1 |
+| 3 | **Shadow comparison job** logs divergence to `orchestration.SagaDiffs` for 1 week | ❌ |
+| 4 | Flip flag per environment: dev → uat → prod | ❌ |
+| 5 | Decommission legacy consumer at week 8 | ❌ |
 
 **Total Tier 2: ~120h** (state machine 40h, persistence + migrations 20h, dual-run 20h, compensation 25h, tests 15h)
 
@@ -129,11 +152,39 @@ Plan แก้ในระดับ enterprise 3 tier ตามขนาด blas
 
 ### 3.6 Tier 2 effort estimate (revised after POC)
 
-POC ate ~3 hours of the originally-budgeted "state machine 40h" line. Remaining ~117h holds; the discoveries above don't change the bottom line — they sharpen what gets built in Phase 2 step 1.
+POC ate ~3 hours of the originally-budgeted "state machine 40h" line. Net change after POC discoveries:
+
+| Original line | Original | Revised | Why |
+|---|---|---|---|
+| State machine | 40h | 35h | POC scaffold (–3h) + redelivery handlers `During(state, Ignore(…))` for 5 states (+~3h net) |
+| Persistence + migrations | 20h | 25h | +5h for hand-written EF migration to replace the POC's raw-SQL bootstrap (T1.10 caveat #2) |
+| Dual-run | 20h | 20h | unchanged |
+| Compensation | 25h | 25h | unchanged |
+| Tests | 15h | 20h | +5h saga replay + compensation integration tests (chaos-test-style harness extended for saga states) |
+| **Total** | **120h** | **125h** | net +5h after POC findings |
+
+**Phase 2 entry criteria** (none are blockers, just sequencing):
+
+- ✅ POC verified end-to-end (done)
+- ⏳ T1 soak in dev for 24-48h — confirms T1 metrics stay healthy before saga starts shadowing them
+- ⏳ Decide on T2 step 1 scope: "all 5 During() handlers + 1 happy path event each" is the smallest useful slice (~15h)
 
 ---
 
 ## 4. Tier 3 — Platform Evolution (เดือน 3-6+)
+
+### 4.0 Gate-criteria readings (2026-06-18)
+
+Tier 3 is gated on observable thresholds; readings below show none are met yet.
+
+| Trigger | Threshold | Current | Verdict |
+|---|---|---|---|
+| Outbox pending sustained | > 500 | **0** | not met (no backlog at all in dev) |
+| Cross-bounded-context workflows | ≥ 3 new orchestrations | 1 (Planning consumer being replaced by saga) | not met |
+| Deploy frequency | ≥ 1/day | manual `docker compose build` per change | not met |
+| Projection lag P95 | > 5s | not yet measured (no Grafana yet — T1.6 metrics exported to OTel only) | unknown |
+
+**Recommendation**: do not start Tier 3 work yet. Re-evaluate quarterly. If any single trigger trips, treat as a prompt to plan the matching Tier 3 sub-item (CDC for outbox/lag, Temporal for workflow count, K8s for deploy frequency) — not all of Tier 3 at once.
 
 ### 4.1 Workflow Engine Decision
 
