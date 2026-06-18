@@ -108,16 +108,18 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
         }
 
         var trip = await _tripRepository.GetByIdAsync(evt.TripId, ct);
-        var vendorVehicleKey = trip?.VendorVehicleKey;
-        if (string.IsNullOrWhiteSpace(vendorVehicleKey))
+        var vendorVehicleName = trip?.VendorVehicleName;
+        if (string.IsNullOrWhiteSpace(vendorVehicleName))
         {
-            // Throw instead of sending "(unknown)" — Option A semantics:
-            // the OMS POST overwrites the deliveryBy field, so sending a
-            // placeholder would clobber a previous-attempt's real vehicle.
-            // MassTransit retry will re-read the trip; by then the racing
-            // MarkVendorStarted save should have committed VendorVehicleKey.
+            // Throw instead of sending an empty/placeholder name — Option A
+            // semantics: the OMS POST overwrites deliveryBy, so a blank
+            // would clobber a previous-attempt's real vehicle. Name + Key
+            // arrive together on RIOT3 TASK_PROCESSING and are captured
+            // first-write-wins, so a missing Name here means the racing
+            // MarkVendorStarted save hasn't committed yet — retry will
+            // re-read once it has.
             throw new InvalidOperationException(
-                $"Trip {evt.TripId} has no VendorVehicleKey yet — race with TASK_PROCESSING save. Will retry.");
+                $"Trip {evt.TripId} has no VendorVehicleName yet — race with TASK_PROCESSING save (Name + Key arrive together from RIOT3). Will retry.");
         }
 
         // [Option A] Stable shipmentId across retry chain. Walking
@@ -130,7 +132,7 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
 
         var payload = new OmsShipmentNotification(
             ShipmentId: shipmentId,
-            DeliveryBy: vendorVehicleKey,
+            DeliveryBy: vendorVehicleName,
             Lots: lots.Select(id => new OmsLot(id)).ToList());
 
         var sw = Stopwatch.StartNew();
@@ -142,13 +144,13 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
         {
             sw.Stop();
             _logger.LogWarning(ex,
-                "[OmsNotify] Trip {TripId} (attempt {N}) → OMS event=TripStarted outcome=Failed shipmentId={Sid} vehicle={VehKey} lots={LotCount} latencyMs={Ms}",
-                evt.TripId, attemptNumber, shipmentId, vendorVehicleKey, lots.Count, sw.ElapsedMilliseconds);
+                "[OmsNotify] Trip {TripId} (attempt {N}) → OMS event=TripStarted outcome=Failed shipmentId={Sid} vehicle={VehName} lots={LotCount} latencyMs={Ms}",
+                evt.TripId, attemptNumber, shipmentId, vendorVehicleName, lots.Count, sw.ElapsedMilliseconds);
             throw;
         }
         sw.Stop();
 
-        var auditDetails = $"trip-started shipmentId={shipmentId} attempt={attemptNumber} vehicle={vendorVehicleKey} lots={lots.Count} latencyMs={sw.ElapsedMilliseconds}";
+        var auditDetails = $"trip-started shipmentId={shipmentId} attempt={attemptNumber} vehicle={vendorVehicleName} lots={lots.Count} latencyMs={sw.ElapsedMilliseconds}";
         await _auditRepository.AddAsync(new OrderAuditEvent(
             order.Id, AuditEventType, auditDetails), ct);
         await _auditRepository.SaveChangesAsync(ct);
@@ -171,7 +173,7 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
             cancellationToken: ct);
 
         _logger.LogInformation(
-            "[OmsNotify] Trip {TripId} (attempt {N}) → OMS event=TripStarted outcome=Success shipmentId={Sid} vehicle={VehKey} lots={LotCount} latencyMs={Ms}",
-            evt.TripId, attemptNumber, shipmentId, vendorVehicleKey, lots.Count, sw.ElapsedMilliseconds);
+            "[OmsNotify] Trip {TripId} (attempt {N}) → OMS event=TripStarted outcome=Success shipmentId={Sid} vehicle={VehName} lots={LotCount} latencyMs={Ms}",
+            evt.TripId, attemptNumber, shipmentId, vendorVehicleName, lots.Count, sw.ElapsedMilliseconds);
     }
 }

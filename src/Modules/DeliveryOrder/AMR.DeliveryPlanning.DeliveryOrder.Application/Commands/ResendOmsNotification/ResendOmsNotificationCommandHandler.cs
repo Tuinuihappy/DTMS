@@ -84,9 +84,17 @@ public class ResendOmsNotificationCommandHandler
                 "No items are bound to this trip — nothing to send.");
         }
 
-        var vendorVehicleKey = string.IsNullOrWhiteSpace(trip.VendorVehicleKey)
-            ? "(unknown)"
-            : trip.VendorVehicleKey;
+        // Name + Key are captured together from RIOT3 TASK_PROCESSING
+        // (first-write-wins). A missing Name means the vendor hasn't
+        // reported the assigned robot yet — return Failure so the operator
+        // sees a clear reason instead of OMS receiving a "(unknown)"
+        // placeholder that would clobber a prior real value.
+        if (string.IsNullOrWhiteSpace(trip.VendorVehicleName))
+        {
+            return Result<ResendOmsNotificationResult>.Failure(
+                "Trip has no VendorVehicleName yet — vendor has not reported the assigned robot. Retry after the trip starts.");
+        }
+        var vendorVehicleName = trip.VendorVehicleName;
 
         // [Option A] Use root tripId so manual resend updates the same
         // OMS shipment that the original /shipments POST registered.
@@ -95,7 +103,7 @@ public class ResendOmsNotificationCommandHandler
 
         var payload = new OmsShipmentNotification(
             ShipmentId: shipmentId,
-            DeliveryBy: vendorVehicleKey,
+            DeliveryBy: vendorVehicleName,
             Lots: lots.Select(id => new OmsLot(id)).ToList());
 
         var sw = Stopwatch.StartNew();
@@ -114,7 +122,7 @@ public class ResendOmsNotificationCommandHandler
         }
         sw.Stop();
 
-        var auditDetails = $"trip-started shipmentId={shipmentId} attempt={trip.AttemptNumber} vehicle={vendorVehicleKey} lots={lots.Count} latencyMs={sw.ElapsedMilliseconds}";
+        var auditDetails = $"trip-started shipmentId={shipmentId} attempt={trip.AttemptNumber} vehicle={vendorVehicleName} lots={lots.Count} latencyMs={sw.ElapsedMilliseconds}";
         await _auditRepository.AddAsync(new OrderAuditEvent(
             order.Id, AuditEventType, auditDetails, actorId: request.RequestedBy),
             cancellationToken);
@@ -138,13 +146,13 @@ public class ResendOmsNotificationCommandHandler
             cancellationToken: cancellationToken);
 
         _logger.LogInformation(
-            "[OmsResend] Trip {TripId} (attempt {N}) → OMS event=ManualResend outcome=Success shipmentId={Sid} vehicle={VehKey} lots={LotCount} latencyMs={Ms} by={By}",
-            trip.Id, trip.AttemptNumber, shipmentId, vendorVehicleKey, lots.Count, sw.ElapsedMilliseconds,
+            "[OmsResend] Trip {TripId} (attempt {N}) → OMS event=ManualResend outcome=Success shipmentId={Sid} vehicle={VehName} lots={LotCount} latencyMs={Ms} by={By}",
+            trip.Id, trip.AttemptNumber, shipmentId, vendorVehicleName, lots.Count, sw.ElapsedMilliseconds,
             request.RequestedBy ?? "(anonymous)");
 
         return Result<ResendOmsNotificationResult>.Success(new ResendOmsNotificationResult(
             ShipmentId: shipmentId,
-            DeliveryBy: vendorVehicleKey,
+            DeliveryBy: vendorVehicleName,
             LotCount: lots.Count,
             LatencyMs: sw.ElapsedMilliseconds));
     }
