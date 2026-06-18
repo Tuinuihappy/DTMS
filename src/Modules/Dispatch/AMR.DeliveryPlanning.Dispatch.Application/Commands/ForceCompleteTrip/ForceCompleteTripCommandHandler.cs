@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
@@ -8,13 +9,16 @@ namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.ForceCompleteTrip;
 public class ForceCompleteTripCommandHandler : ICommandHandler<ForceCompleteTripCommand>
 {
     private readonly ITripRepository _tripRepository;
+    private readonly IDeliveryOrderStatusReader _orderReader;
     private readonly ILogger<ForceCompleteTripCommandHandler> _logger;
 
     public ForceCompleteTripCommandHandler(
         ITripRepository tripRepository,
+        IDeliveryOrderStatusReader orderReader,
         ILogger<ForceCompleteTripCommandHandler> logger)
     {
         _tripRepository = tripRepository;
+        _orderReader = orderReader;
         _logger = logger;
     }
 
@@ -32,13 +36,35 @@ public class ForceCompleteTripCommandHandler : ICommandHandler<ForceCompleteTrip
                 $"Cannot force-complete a trip in {trip.Status} status. " +
                 "Only InProgress or Paused trips can be force-completed.");
 
+        // When the drop sub-task webhook was dropped (the same root cause
+        // we're already working around), VendorDropCompleted never fired —
+        // which means TripDropCompletedIntegrationEvent never went out and
+        // OMS never received the /arrived notification. Force-complete is
+        // an "everything finished" override, so fill in that gap first so
+        // the OMS notify chain runs end-to-end. Skips if the drop already
+        // completed normally (idempotent on the consumer side too).
+        var dropAlreadyCompleted = trip.Events.Any(e => e.EventType == "VendorDropCompleted");
+        var droppedNow = false;
+        if (!dropAlreadyCompleted)
+        {
+            var requiresDropPod = await _orderReader.GetRequiresDropPodAsync(
+                trip.DeliveryOrderId, cancellationToken);
+            try { trip.MarkVendorDropCompleted(requiresDropPod); droppedNow = true; }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(
+                    "[AdminForceComplete] Trip {TripId} drop-completion skipped: {Error}",
+                    trip.Id, ex.Message);
+            }
+        }
+
         try { trip.MarkVendorCompleted(); }
         catch (InvalidOperationException ex) { return Result.Failure(ex.Message); }
 
         await _tripRepository.UpdateAsync(trip, cancellationToken);
         _logger.LogWarning(
-            "[AdminForceComplete] Trip {TripId} force-completed by {Actor} (upperKey {UpperKey}): {Reason}",
-            trip.Id, request.TriggeredBy ?? "(unknown)", trip.UpperKey ?? "(none)", request.Reason);
+            "[AdminForceComplete] Trip {TripId} force-completed by {Actor} (upperKey {UpperKey}, syntheticDrop={Drop}): {Reason}",
+            trip.Id, request.TriggeredBy ?? "(unknown)", trip.UpperKey ?? "(none)", droppedNow, request.Reason);
         return Result.Success();
     }
 }
