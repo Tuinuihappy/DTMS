@@ -117,13 +117,19 @@ export function OmsNotificationSection({
   }, [entries, tripId]);
 
   // Detect orders that don't participate in upstream OMS at all. Internal
-  // orders never produce OMS audit rows, so once the audit has loaded
-  // with zero OMS-related entries we hide the section entirely rather
-  // than show perpetually-"Awaiting…" rows.
+  // orders never produce OMS audit rows, so we hide the section for them.
+  //
+  // Use the order-level audit (not tripEntries) and key off
+  // OrderUpstreamIngested — written at ingest, ~hours before any OMS row
+  // exists. Otherwise the section stays hidden during the entire window
+  // between trip start and the first successful OMS call, exactly when
+  // the operator needs to see the stale/retrying state.
   const isOmsRelevant = useMemo(() => {
-    if (tripEntries === null) return null;
-    return tripEntries.some((e) => OMS_EVENT_TYPES.has(e.eventType));
-  }, [tripEntries]);
+    if (entries === null) return null;
+    return entries.some(
+      (e) => OMS_EVENT_TYPES.has(e.eventType) || e.eventType === "OrderUpstreamIngested",
+    );
+  }, [entries]);
 
   const refresh = useCallback(() => setReloadToken((t) => t + 1), []);
 
