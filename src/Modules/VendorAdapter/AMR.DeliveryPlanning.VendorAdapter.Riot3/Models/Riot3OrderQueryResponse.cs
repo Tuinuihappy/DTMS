@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace AMR.DeliveryPlanning.VendorAdapter.Riot3.Models;
@@ -76,7 +77,11 @@ public sealed class Riot3OrderMission
     [JsonPropertyName("actionType")]
     public string? ActionType { get; init; }
 
+    // RIOT3 emits resultCode as a JSON number on success (e.g. 0) and as a
+    // string on failure (e.g. "E700001"). The tolerant converter normalizes
+    // both to string so downstream callers don't have to care which arrived.
     [JsonPropertyName("resultCode")]
+    [JsonConverter(typeof(StringOrNumberJsonConverter))]
     public string? ResultCode { get; init; }
 
     [JsonPropertyName("resultStr")]
