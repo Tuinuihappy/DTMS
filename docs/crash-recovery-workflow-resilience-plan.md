@@ -180,7 +180,9 @@ Plan แก้ในระดับ enterprise 3 tier ตามขนาด blas
 
 ## 8. Verification Plan
 
-1. **Chaos test (T1)**: `scripts/chaos/kill-mid-pipeline.ps1` — inject 100 orders, kill API container ที่ random delay 1-8s ระหว่าง consumer exec. **Accept**: 0 stuck orders หลัง 5-min settle, ทั้ง 100 reach `Dispatched`
+1. **Chaos test (T1)**: `scripts/chaos/kill-mid-pipeline.ps1` — inject 100 orders, kill API container ที่ random delay 1-8s ระหว่าง consumer exec. **Accept**: 0 stuck orders หลัง 5-min settle, ทั้ง 100 reach `Dispatched`. **สถานะ**: ✅ PASS (run 2026-06-18, n=100, 19 kill points, 100% success — รายละเอียดใน [`docs/chaos-test-results.md`](chaos-test-results.md))
+
+    **Phase 5 — end-to-end completion verification** (deferred): หลังจาก verify ที่ระดับ `Dispatched` แล้ว รอ vendor (RIOT3) ส่ง webhook tripStarted → tripDropCompleted → podCompleted → cascade ถึง Order=`Completed`. **เวลา**: อาจใช้เป็นชั่วโมง+ ขึ้นกับ vendor robot capacity + queue depth. **Why deferred**: vendor ทำงานอยู่นอก scope ของ T1 crash-recovery — Phase 1-4 เพียงพอสำหรับ verify T1 stack. Phase 5 ตอบคำถามคนละข้อ: "vendor + ระบบ end-to-end ทำงานครบไหม" ซึ่งใกล้ integration test มากกว่า chaos test. **เมื่อเพิ่ม**: ต้อง stub vendor หรือใช้ vendor sandbox (production-ish endpoint จะถูก pollute ด้วย 100 orders ทุกครั้ง) + `-WaitForCompletion` switch ใน script + Phase 5 verify query `WHERE Status IN ('Completed', 'PartiallyCompleted')`
 2. **Graceful shutdown test (T1)**: SIGTERM ตอนมี 20 in-flight messages → assert ทั้ง 20 จบ + pod exit ภายใน 90s
 3. **Load test (T1+T2)**: k6 driving 50 orders/min × 30 min — assert P95 end-to-end < 30s, `outbox_age_seconds < 30`
 4. **Saga replay test (T2)**: kill API ที่แต่ละ saga state สำหรับ 50 orders → assert saga resume จาก persisted state + reach `Completed`

@@ -98,3 +98,48 @@ DELETE FROM deliveryorder."DeliveryOrders" WHERE "OrderRef" LIKE 'CHAOS-%';
 - Load (`k6` against the API itself) -- a separate concern, deferred per plan section 8 prioritisation.
 - Vendor-side reconciliation -- defense layer 2 in the T1.8 plan; not implemented yet.
 - T2 Saga semantics -- saga flag is off during this run.
+- **End-to-end completion** -- this is Phase 5 below.
+
+## Phase 5 -- end-to-end completion verification (planned, not yet implemented)
+
+The current script ends after verifying every order reached `Dispatched`. That confirms the **T1 stack** (consumer + crash recovery + vendor accept) works. It does **not** confirm the **full lifecycle**: vendor robot operate -> webhooks -> Trip status moves through `InProgress` -> `Completed` -> order cascades to `Completed`.
+
+This came up after the 2026-06-18 N=100 run: we noticed RIOT3 had accepted 100 trips but only operated 4 of them within the next hour and then cancelled the other 96 (vendor-side expiration). The T1 cascade handled the cancellations correctly (96 orders moved Dispatched -> Cancelled via Phase b11 cascade), so the verdict still stood, but the observation surfaced a real gap.
+
+### What Phase 5 would do
+
+```
+Phase 1 Setup
+Phase 2 Chaos          <-- current scope
+Phase 3 Settle
+Phase 4 Verify (reached Dispatched)
+   |
+   | ... wait for vendor robot operate + webhooks ...
+   |
+Phase 5 (NEW)
+   - poll every N minutes for trip status changes
+   - timeout after CompletionTimeoutHours (default 24h?)
+   - VERIFY: every chaos order reaches Completed | PartiallyCompleted | Failed
+   - HARD FAIL: any order stuck at Dispatched | InProgress past the deadline
+```
+
+### Why it's deferred
+
+- **Vendor scope**: RIOT3 robot dispatch + webhook delivery are outside T1. Phase 5 measures the integration, not the crash-recovery contract.
+- **Dev pollution**: pumping 100 orders through the real RIOT3 endpoint per run leaves a queue of stale orders for the vendor's ops team to clean up. Phase 5 needs either (a) a stub vendor that auto-completes trips for us, or (b) a RIOT3 sandbox environment.
+- **Runtime**: ~hours per run vs ~15 minutes. Not viable as a pre-commit gate.
+
+### When this becomes worth building
+
+- After T2 Saga ships: Phase 5 becomes the canonical verification for Saga state transitions across the full lifecycle.
+- When a vendor stub / sandbox is available: replaces the dev-pollution concern.
+- For pre-release verification before customer rollouts.
+
+### Script changes that would be needed
+
+- Add `[switch]$WaitForCompletion` and `[int]$CompletionTimeoutHours = 24` parameters.
+- Replace Phase 4's verify SQL with a query for the additional terminal statuses.
+- Loop with polling interval (5 min?) until timeout or all orders terminal.
+- Emit progress every poll so a developer running the script can see it's working over a long window.
+
+The current `Phase 4` verdict is left as the authoritative T1 contract. Phase 5 would print a separate "end-to-end completion" verdict that does not gate the T1 PASS/FAIL.

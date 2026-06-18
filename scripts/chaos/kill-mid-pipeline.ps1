@@ -76,7 +76,14 @@ param(
     [int]$SettleMinutes = 5,
     [string]$ApiUrl = "http://localhost:5219",
     [string]$ContainerName = "dtms-api",
-    [switch]$SkipChaos
+    [switch]$SkipChaos,
+
+    # Phase 5 (planned, not yet implemented) -- end-to-end completion
+    # verification. Reserved as a documented future switch so callers
+    # can opt in once vendor stub / sandbox lands. See the Phase 5
+    # section of docs/chaos-test-results.md for the design.
+    [switch]$WaitForCompletion,
+    [int]$CompletionTimeoutHours = 24
 )
 
 # Facility constants -- verified-active in dev.
@@ -378,4 +385,17 @@ if (-not (Test-StackHealthy)) {
 Invoke-Chaos
 Wait-ForSettle
 $exit = Invoke-Verify
+
+# Phase 5 (planned, not yet implemented) -- end-to-end completion
+# verification. When implemented, would poll for vendor robot operate +
+# webhooks to confirm every chaos order reached a terminal status
+# (Completed / PartiallyCompleted / Failed) within $CompletionTimeoutHours.
+# Until then a friendly heads-up so a caller passing -WaitForCompletion
+# does not silently get the T1-only behaviour.
+if ($WaitForCompletion) {
+    Write-Host ""
+    Write-Host "Phase 5 (-WaitForCompletion) is documented but not yet implemented." -ForegroundColor Yellow
+    Write-Host "See docs/chaos-test-results.md 'Phase 5 -- end-to-end completion verification'."
+}
+
 exit $exit
