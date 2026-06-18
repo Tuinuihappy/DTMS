@@ -13,9 +13,6 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReleaseDeliveryOrd
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReopenDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ResendOmsArrivedNotification;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ResendOmsNotification;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ResendOmsPodCompletedNotification;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ResendOmsTripCancelledNotification;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ResendOmsTripFailedNotification;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.UpdateDraftDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
@@ -202,31 +199,6 @@ public static class DeliveryOrderEndpoints
             async (Guid id, Guid tripId, [FromBody] ResendOmsNotificationRequest? body, ISender sender) =>
         {
             var result = await sender.Send(new ResendOmsArrivedNotificationCommand(id, tripId, body?.RequestedBy));
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey();
-
-        // Phase OMS B4 — three more resend endpoints for the stages added
-        // by B4 (trip-failed / trip-cancelled / pod-completed). Same
-        // shape as /notify-oms{,-arrived}: shipmentId derives from the
-        // trip's root attempt, payload rebuilds from current Trip state.
-        group.MapPost("/{id:guid}/trips/{tripId:guid}/notify-oms-failed",
-            async (Guid id, Guid tripId, [FromBody] ResendOmsNotificationRequest? body, ISender sender) =>
-        {
-            var result = await sender.Send(new ResendOmsTripFailedNotificationCommand(id, tripId, body?.RequestedBy));
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey();
-
-        group.MapPost("/{id:guid}/trips/{tripId:guid}/notify-oms-cancelled",
-            async (Guid id, Guid tripId, [FromBody] ResendOmsNotificationRequest? body, ISender sender) =>
-        {
-            var result = await sender.Send(new ResendOmsTripCancelledNotificationCommand(id, tripId, body?.RequestedBy));
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey();
-
-        group.MapPost("/{id:guid}/trips/{tripId:guid}/notify-oms-pod",
-            async (Guid id, Guid tripId, [FromBody] ResendOmsNotificationRequest? body, ISender sender) =>
-        {
-            var result = await sender.Send(new ResendOmsPodCompletedNotificationCommand(id, tripId, body?.RequestedBy));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequireIdempotencyKey();
 

@@ -1,15 +1,12 @@
 "use client";
 
-import { AlertTriangle, Ban, CheckCircle2, CircleDashed, CloudUpload, Loader2, RefreshCw, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CloudUpload, Loader2, RefreshCw, XCircle } from "lucide-react";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getFullOrderAudit,
   resendOmsArrivedNotification,
   resendOmsNotification,
-  resendOmsPodCompletedNotification,
-  resendOmsTripCancelledNotification,
-  resendOmsTripFailedNotification,
   type FullAuditEntryDto,
 } from "@/lib/api/delivery-orders";
 import { cn } from "@/lib/utils";
@@ -20,35 +17,22 @@ import { cn } from "@/lib/utils";
  * trip owns its own OMS state — multi-trip orders no longer conflate
  * signals from different trips.
  *
- * 4 stages are surfaced:
+ * 2 stages — every OMS endpoint DTMS calls today:
  *
- *   • Started       — POST /api/shipments                       (TASK_PROCESSING)
- *   • Arrived       — POST /api/shipments/{id}/arrived          (SUB_TASK_FINISHED @ drop)
- *   • POD captured  — POST /api/shipments/{id}/pod-completed    (PodCaptured)   [Phase B4]
- *   • Trip aborted  — POST /api/shipments/{id}/failed|cancelled  (TripFailed | TripCancelled) [Phase B4]
+ *   • Started  — POST /api/shipments                  (TASK_PROCESSING)
+ *   • Arrived  — POST /api/shipments/{id}/arrived     (SUB_TASK_FINISHED @ drop)
  *
  * Audit entries are filtered to those whose RelatedTripId matches the
- * trip in scope, so a single noisy trip can't override another's row.
- *
- * "Trip aborted" is a conditional row that merges TripFailed +
- * TripCancelled (mutually exclusive at the trip level). When the trip is
- * aborted, the success-path stages (Arrived, POD) render as "n/a (trip
- * aborted)" so the operator sees those branches won't fire.
- *
- * Each stage independently shows: Notified / Failed-after-retries /
- * Stale (trigger fired but no audit) / Empty. Resend button appears on
+ * trip in scope. Each stage independently shows Notified / Failed-after-retries
+ * / Stale (trigger fired but no audit) / Empty. Resend button appears on
  * failed/stale and posts to the stage's resend endpoint; OMS dedupes by
  * shipmentId so re-firing on a row that previously succeeded is safe.
  */
 
-type StageKey = "started" | "arrived" | "podCompleted" | "tripAborted";
+type StageKey = "started" | "arrived";
 
 type StageConfig = {
   label: string;
-  // Multiple event types per kind — Phase B4's tripAborted row collapses
-  // the failed + cancelled stages, so it has two notified types, two
-  // resent types, and two failed types. Single-stage rows just have
-  // a 1-element Set.
   notifiedTypes: ReadonlySet<string>;
   resentTypes: ReadonlySet<string>;
   failedTypes: ReadonlySet<string>;
@@ -56,9 +40,8 @@ type StageConfig = {
   // vendor side. If the audit shows one of these but no OMS row exists,
   // the stage is "stale" (gated/skipped/lost).
   triggerEventTypes: ReadonlySet<string>;
-  // emptyTitle undefined ⇒ row is hidden in the empty state (tripAborted).
-  emptyTitle?: string;
-  emptyHint?: string;
+  emptyTitle: string;
+  emptyHint: string;
   staleHint: string;
   resendLabel: string;
 };
@@ -86,49 +69,14 @@ const STAGES: Record<StageKey, StageConfig> = {
     staleHint: "Trip reached drop but no OMS audit row exists — kill switch may be off, or the notification was gated.",
     resendLabel: "Resend arrived",
   },
-  podCompleted: {
-    label: "POD captured",
-    notifiedTypes: new Set(["UpstreamOmsPodCompletedNotified"]),
-    resentTypes: new Set(["UpstreamOmsPodCompletedManuallyResent"]),
-    failedTypes: new Set(["UpstreamOmsPodCompletedNotifyFailed"]),
-    triggerEventTypes: new Set(["PodCaptured"]),
-    emptyTitle: "Awaiting POD scan",
-    emptyHint: "OMS will be notified once the delivery is confirmed by POD scan.",
-    staleHint: "POD captured but no OMS audit row exists — kill switch may be off, or the notification was gated.",
-    resendLabel: "Resend POD",
-  },
-  tripAborted: {
-    label: "Trip aborted",
-    notifiedTypes: new Set([
-      "UpstreamOmsTripFailedNotified",
-      "UpstreamOmsTripCancelledNotified",
-    ]),
-    resentTypes: new Set([
-      "UpstreamOmsTripFailedManuallyResent",
-      "UpstreamOmsTripCancelledManuallyResent",
-    ]),
-    failedTypes: new Set([
-      "UpstreamOmsTripFailedNotifyFailed",
-      "UpstreamOmsTripCancelledNotifyFailed",
-    ]),
-    triggerEventTypes: new Set(["TripFailed", "TripCancelled"]),
-    // emptyTitle absent — row is hidden on the happy path.
-    staleHint: "Trip aborted but no OMS audit row — kill switch may be off, or the notification was gated.",
-    resendLabel: "Resend abort notify",
-  },
 };
 
 type OmsStatus =
   | { kind: "loading" }
   | { kind: "empty" }
-  // Disabled = downstream success stage skipped because the trip
-  // aborted before this stage could fire. Visual: greyed "n/a".
-  | { kind: "disabled"; reason: string }
-  | { kind: "notified"; at: string; details: string | null; subtype?: AbortSubtype }
-  | { kind: "failed"; at: string; details: string | null; subtype?: AbortSubtype }
-  | { kind: "stale"; at: string; subtype?: AbortSubtype };
-
-type AbortSubtype = "failed" | "cancelled";
+  | { kind: "notified"; at: string; details: string | null }
+  | { kind: "failed"; at: string; details: string | null }
+  | { kind: "stale"; at: string };
 
 type ResendState =
   | { kind: "idle" }
@@ -147,8 +95,6 @@ export function OmsNotificationSection({
   const [reloadToken, setReloadToken] = useState(0);
   const [startedResend, setStartedResend] = useState<ResendState>({ kind: "idle" });
   const [arrivedResend, setArrivedResend] = useState<ResendState>({ kind: "idle" });
-  const [podResend, setPodResend] = useState<ResendState>({ kind: "idle" });
-  const [abortedResend, setAbortedResend] = useState<ResendState>({ kind: "idle" });
 
   useEffect(() => {
     let cancelled = false;
@@ -165,9 +111,6 @@ export function OmsNotificationSection({
     };
   }, [orderId, reloadToken]);
 
-  // Per-trip slice of the audit stream. The audit endpoint returns
-  // entries for the whole order; we keep only this trip's so multi-trip
-  // orders don't conflate signals.
   const tripEntries = useMemo<FullAuditEntryDto[] | null>(() => {
     if (entries === null) return null;
     return entries.filter((e) => e.relatedTripId === tripId);
@@ -176,48 +119,21 @@ export function OmsNotificationSection({
   // Detect orders that don't participate in upstream OMS at all. Internal
   // orders never produce OMS audit rows, so once the audit has loaded
   // with zero OMS-related entries we hide the section entirely rather
-  // than show four perpetually-"Awaiting…" rows.
+  // than show perpetually-"Awaiting…" rows.
   const isOmsRelevant = useMemo(() => {
-    if (tripEntries === null) return null; // still loading
+    if (tripEntries === null) return null;
     return tripEntries.some((e) => OMS_EVENT_TYPES.has(e.eventType));
   }, [tripEntries]);
 
   const refresh = useCallback(() => setReloadToken((t) => t + 1), []);
-
-  const abortedStatus = useMemo(
-    () => deriveStatus(tripEntries, STAGES.tripAborted),
-    [tripEntries],
-  );
-  const tripIsAborted =
-    abortedStatus.kind === "notified" ||
-    abortedStatus.kind === "failed" ||
-    abortedStatus.kind === "stale";
-  const abortedReasonLabel =
-    abortedStatus.kind === "notified" || abortedStatus.kind === "failed" || abortedStatus.kind === "stale"
-      ? (abortedStatus.subtype === "cancelled" ? "trip cancelled" : "trip aborted")
-      : "trip aborted";
 
   const startedStatus = useMemo(
     () => deriveStatus(tripEntries, STAGES.started),
     [tripEntries],
   );
   const arrivedStatus = useMemo(
-    () =>
-      maybeDisable(
-        deriveStatus(tripEntries, STAGES.arrived),
-        tripIsAborted,
-        abortedReasonLabel,
-      ),
-    [tripEntries, tripIsAborted, abortedReasonLabel],
-  );
-  const podStatus = useMemo(
-    () =>
-      maybeDisable(
-        deriveStatus(tripEntries, STAGES.podCompleted),
-        tripIsAborted,
-        abortedReasonLabel,
-      ),
-    [tripEntries, tripIsAborted, abortedReasonLabel],
+    () => deriveStatus(tripEntries, STAGES.arrived),
+    [tripEntries],
   );
 
   const makeResendHandler = (
@@ -242,36 +158,9 @@ export function OmsNotificationSection({
     makeResendHandler(setArrivedResend, (o, t) => resendOmsArrivedNotification(o, t)),
     [orderId, tripId, refresh],
   );
-  const onResendPod = useCallback(
-    makeResendHandler(setPodResend, (o, t) => resendOmsPodCompletedNotification(o, t)),
-    [orderId, tripId, refresh],
-  );
-  const onResendAborted = useCallback(async () => {
-    const subtype: AbortSubtype =
-      abortedStatus.kind === "notified" || abortedStatus.kind === "failed" || abortedStatus.kind === "stale"
-        ? abortedStatus.subtype ?? "failed"
-        : "failed";
-    setAbortedResend({ kind: "sending" });
-    try {
-      if (subtype === "cancelled") {
-        await resendOmsTripCancelledNotification(orderId, tripId);
-      } else {
-        await resendOmsTripFailedNotification(orderId, tripId);
-      }
-      setAbortedResend({ kind: "idle" });
-      refresh();
-    } catch (e) {
-      setAbortedResend({ kind: "error", message: e instanceof Error ? e.message : "Resend failed" });
-    }
-  }, [orderId, tripId, refresh, abortedStatus]);
 
   if (error) return null;
-  // Order doesn't participate in OMS — hide the section entirely once
-  // the audit has resolved with no OMS rows. While still loading
-  // (isOmsRelevant === null), fall through and render the loading state.
   if (isOmsRelevant === false) return null;
-
-  const showAborted = abortedStatus.kind !== "empty" && abortedStatus.kind !== "loading";
 
   return (
     <section>
@@ -301,28 +190,12 @@ export function OmsNotificationSection({
           resendState={arrivedResend}
           onResend={onResendArrived}
         />
-        <StageRow
-          config={STAGES.podCompleted}
-          status={podStatus}
-          resendTripId={tripId}
-          resendState={podResend}
-          onResend={onResendPod}
-        />
-        {showAborted && (
-          <StageRow
-            config={STAGES.tripAborted}
-            status={abortedStatus}
-            resendTripId={tripId}
-            resendState={abortedResend}
-            onResend={onResendAborted}
-          />
-        )}
       </motion.div>
     </section>
   );
 }
 
-// Every OMS-related event type across the four stages. Used to decide
+// Every OMS-related event type across both stages. Used to decide
 // whether the order participates in upstream OMS at all — if none of
 // these ever appear on the trip's audit, the order is internal and the
 // section should not render.
@@ -333,12 +206,6 @@ const OMS_EVENT_TYPES = new Set<string>([
   ...STAGES.arrived.notifiedTypes,
   ...STAGES.arrived.resentTypes,
   ...STAGES.arrived.failedTypes,
-  ...STAGES.podCompleted.notifiedTypes,
-  ...STAGES.podCompleted.resentTypes,
-  ...STAGES.podCompleted.failedTypes,
-  ...STAGES.tripAborted.notifiedTypes,
-  ...STAGES.tripAborted.resentTypes,
-  ...STAGES.tripAborted.failedTypes,
 ]);
 
 // Latest-wins per stage — pick the most recent of notified/resent vs
@@ -363,47 +230,15 @@ function deriveStatus(entries: FullAuditEntryDto[] | null, cfg: StageConfig): Om
   }
 
   if (latestOk && (!latestFail || latestOk.occurredAt >= latestFail.occurredAt)) {
-    return {
-      kind: "notified",
-      at: latestOk.occurredAt,
-      details: latestOk.details,
-      subtype: detectAbortSubtype(latestOk.eventType),
-    };
+    return { kind: "notified", at: latestOk.occurredAt, details: latestOk.details };
   }
   if (latestFail) {
-    return {
-      kind: "failed",
-      at: latestFail.occurredAt,
-      details: latestFail.details,
-      subtype: detectAbortSubtype(latestFail.eventType),
-    };
+    return { kind: "failed", at: latestFail.occurredAt, details: latestFail.details };
   }
   if (latestTrigger) {
-    return {
-      kind: "stale",
-      at: latestTrigger.occurredAt,
-      subtype: detectAbortSubtype(latestTrigger.eventType),
-    };
+    return { kind: "stale", at: latestTrigger.occurredAt };
   }
   return { kind: "empty" };
-}
-
-// Translate a tripAborted-bucket event type into "failed" | "cancelled"
-// so the row can show the right sub-label + pick the right resend
-// endpoint. Returns undefined for non-aborted stages.
-function detectAbortSubtype(eventType: string): AbortSubtype | undefined {
-  if (eventType.includes("TripCancelled") || eventType === "TripCancelled") return "cancelled";
-  if (eventType.includes("TripFailed") || eventType === "TripFailed") return "failed";
-  return undefined;
-}
-
-// If the trip has aborted and the success-path stage is still empty,
-// render "n/a (trip aborted)" instead of "Awaiting…" — the stage will
-// never fire.
-function maybeDisable(status: OmsStatus, tripIsAborted: boolean, reason: string): OmsStatus {
-  return tripIsAborted && status.kind === "empty"
-    ? { kind: "disabled", reason }
-    : status;
 }
 
 function StageRow({
@@ -465,15 +300,6 @@ function StageBadge({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SubtypeBadge({ subtype }: { subtype: AbortSubtype }) {
-  const label = subtype === "cancelled" ? "Cancelled" : "Failed";
-  return (
-    <span className="inline-flex rounded-md bg-[var(--color-coral)]/15 px-1.5 py-[1px] text-[9.5px] font-bold uppercase tracking-[0.08em] text-[var(--color-coral)]">
-      {label}
-    </span>
-  );
-}
-
 function StatusCard({ config, status }: { config: StageConfig; status: OmsStatus }) {
   if (status.kind === "loading") {
     return (
@@ -486,34 +312,16 @@ function StatusCard({ config, status }: { config: StageConfig; status: OmsStatus
   }
 
   if (status.kind === "empty") {
-    // emptyTitle absent ⇒ row should have been hidden upstream; render
-    // a minimal placeholder defensively rather than crash.
     return (
       <div className="rounded-xl bg-[var(--color-ink-100)]/40 px-4 py-3 dark:bg-white/[0.04]">
         <div className="flex items-center gap-2">
           <StageBadge>{config.label}</StageBadge>
           <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-ink-400)]" />
           <span className="text-[12px] font-medium text-[var(--color-ink-700)]">
-            {config.emptyTitle ?? "—"}
+            {config.emptyTitle}
           </span>
         </div>
-        {config.emptyHint && (
-          <p className="mt-1 text-[11px] text-[var(--color-ink-400)]">{config.emptyHint}</p>
-        )}
-      </div>
-    );
-  }
-
-  if (status.kind === "disabled") {
-    return (
-      <div className="rounded-xl bg-[var(--color-ink-100)]/30 px-4 py-3 opacity-60 dark:bg-white/[0.03]">
-        <div className="flex items-center gap-2">
-          <StageBadge>{config.label}</StageBadge>
-          <Ban className="h-3.5 w-3.5 text-[var(--color-ink-400)]" strokeWidth={2.4} />
-          <span className="text-[12px] font-medium italic text-[var(--color-ink-500)]">
-            n/a ({status.reason})
-          </span>
-        </div>
+        <p className="mt-1 text-[11px] text-[var(--color-ink-400)]">{config.emptyHint}</p>
       </div>
     );
   }
@@ -526,7 +334,6 @@ function StatusCard({ config, status }: { config: StageConfig; status: OmsStatus
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <StageBadge>{config.label}</StageBadge>
-              {status.subtype && <SubtypeBadge subtype={status.subtype} />}
               <span className="text-[12px] font-semibold text-[var(--color-success)]">Notified</span>
               <time
                 className="font-mono text-[10.5px] text-[var(--color-success)]/70"
@@ -554,7 +361,6 @@ function StatusCard({ config, status }: { config: StageConfig; status: OmsStatus
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <StageBadge>{config.label}</StageBadge>
-              {status.subtype && <SubtypeBadge subtype={status.subtype} />}
               <span className="text-[12px] font-semibold text-[var(--color-coral)]">
                 Failed after retries
               </span>
@@ -584,7 +390,6 @@ function StatusCard({ config, status }: { config: StageConfig; status: OmsStatus
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <StageBadge>{config.label}</StageBadge>
-            {status.subtype && <SubtypeBadge subtype={status.subtype} />}
             <span className="text-[12px] font-semibold text-[var(--color-amber)]">Not sent</span>
             <time
               className="font-mono text-[10.5px] text-[var(--color-amber)]/80"

@@ -80,54 +80,6 @@ internal sealed class HttpOmsShipmentClient : IOmsShipmentClient
         response.EnsureSuccessStatusCode();
     }
 
-    public Task NotifyShipmentFailedAsync(string shipmentId, OmsTripFailedNotification body, CancellationToken cancellationToken)
-        => PostStageAsync(shipmentId, "failed", body, cancellationToken);
-
-    public Task NotifyShipmentCancelledAsync(string shipmentId, OmsTripCancelledNotification body, CancellationToken cancellationToken)
-        => PostStageAsync(shipmentId, "cancelled", body, cancellationToken);
-
-    public Task NotifyShipmentPodCompletedAsync(string shipmentId, OmsPodCompletedNotification body, CancellationToken cancellationToken)
-        => PostStageAsync(shipmentId, "pod-completed", body, cancellationToken);
-
-    // Phase OMS B4 — shared POST path for the failed/cancelled/pod-completed
-    // stages. Identical pattern to /arrived: shipmentId in URL, body
-    // carries the stage-specific payload. 409 Conflict is treated as
-    // idempotent success (the OMS receiver has already accepted this
-    // stage's notification — re-firing the same shipmentId/stage must
-    // not dead-letter the retry queue).
-    private async Task PostStageAsync<TBody>(
-        string shipmentId, string stage, TBody body, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(shipmentId))
-            throw new ArgumentException("shipmentId is required", nameof(shipmentId));
-
-        var path = $"{ShipmentsPath}/{Uri.EscapeDataString(shipmentId)}/{stage}";
-        using var response = await _http.PostAsJsonAsync(path, body, cancellationToken);
-
-        if (response.IsSuccessStatusCode)
-        {
-            _logger.LogInformation(
-                "[OmsAdapter] POST {Path} shipmentId={ShipmentId} → {Status}",
-                path, shipmentId, (int)response.StatusCode);
-            return;
-        }
-
-        if (response.StatusCode == HttpStatusCode.Conflict)
-        {
-            _logger.LogInformation(
-                "[OmsAdapter] POST {Path} shipmentId={ShipmentId} → 409 — already recorded, treating as no-op",
-                path, shipmentId);
-            return;
-        }
-
-        var errBody = await SafeReadBodyAsync(response, cancellationToken);
-        _logger.LogWarning(
-            "[OmsAdapter] POST {Path} shipmentId={ShipmentId} failed → {Status} body={Body}",
-            path, shipmentId, (int)response.StatusCode, errBody);
-
-        response.EnsureSuccessStatusCode();
-    }
-
     private static async Task<string> SafeReadBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         try
