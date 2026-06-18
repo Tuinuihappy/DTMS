@@ -4,6 +4,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using MassTransit;
 using Microsoft.Extensions.Logging;
@@ -30,6 +31,7 @@ public class ReplanStuckOrderCommandHandler : ICommandHandler<ReplanStuckOrderCo
     private readonly IDeliveryOrderRepository _repository;
     private readonly IOrderAuditEventRepository _auditRepo;
     private readonly ITripRepository _tripRepository;
+    private readonly IJobRepository _jobRepository;
     private readonly IPublishEndpoint _publisher;
     private readonly DeliveryOrderOptions _options;
     private readonly ILogger<ReplanStuckOrderCommandHandler> _logger;
@@ -38,6 +40,7 @@ public class ReplanStuckOrderCommandHandler : ICommandHandler<ReplanStuckOrderCo
         IDeliveryOrderRepository repository,
         IOrderAuditEventRepository auditRepo,
         ITripRepository tripRepository,
+        IJobRepository jobRepository,
         IPublishEndpoint publisher,
         IOptions<DeliveryOrderOptions> options,
         ILogger<ReplanStuckOrderCommandHandler> logger)
@@ -45,6 +48,7 @@ public class ReplanStuckOrderCommandHandler : ICommandHandler<ReplanStuckOrderCo
         _repository = repository;
         _auditRepo = auditRepo;
         _tripRepository = tripRepository;
+        _jobRepository = jobRepository;
         _publisher = publisher;
         _options = options.Value;
         _logger = logger;
@@ -86,6 +90,24 @@ public class ReplanStuckOrderCommandHandler : ICommandHandler<ReplanStuckOrderCo
             return Result<ReplanStuckOrderResult>.Failure(
                 "Cannot replan — at least one trip on this order is still active. " +
                 "Use /trips/{id}/retry on the specific trip instead.");
+
+        // T1.8 — vendor-acceptance guard. The OD-0381 incident showed that the
+        // active-Trip check alone misses a case: vendor (RIOT3) accepted the
+        // upperKey on a prior attempt, then Trip persistence or MarkJobDispatched
+        // failed before that Trip became visible — leaving Job.VendorOrderKey
+        // set but no Trip row. Replaying then sends the same upperKey, RIOT3
+        // rejects with E110007 "upper-level unique key duplicate", and the
+        // order spins in a loop forever. If any Job for this order already has
+        // a VendorOrderKey, vendor reconciliation is the right tool — not
+        // another dispatch attempt.
+        var jobs = await _jobRepository.GetByDeliveryOrderIdAsync(order.Id, cancellationToken);
+        var vendorAcceptedJob = jobs.FirstOrDefault(j => !string.IsNullOrEmpty(j.VendorOrderKey));
+        if (vendorAcceptedJob is not null)
+            return Result<ReplanStuckOrderResult>.Failure(
+                $"Cannot replan — vendor already accepted upperKey for job {vendorAcceptedJob.Id} " +
+                $"(VendorOrderKey={vendorAcceptedJob.VendorOrderKey}). " +
+                "A replay would attempt a duplicate dispatch. Use vendor reconciliation " +
+                "or /trips/{tripId}/retry on a specific trip instead.");
 
         // Items must have PickupStationId/DropStationId resolved — they are
         // set during MarkAsValidated. A missing station ID means the order

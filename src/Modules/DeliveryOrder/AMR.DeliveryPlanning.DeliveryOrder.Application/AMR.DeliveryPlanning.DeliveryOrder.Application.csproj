@@ -11,6 +11,10 @@
     <!-- Phase P4 OrderListView projector subscribes to Job lifecycle events
          to recompute the order's "has active job" derived flag. -->
     <ProjectReference Include="..\..\Planning\AMR.DeliveryPlanning.Planning.IntegrationEvents\AMR.DeliveryPlanning.Planning.IntegrationEvents.csproj" />
+    <!-- T1.8 — ReplanStuckOrderCommandHandler checks Job.VendorOrderKey
+         before re-publishing so a replay never racing against a job whose
+         upperKey RIOT3 already accepted (the OD-0381 duplicate-key loop). -->
+    <ProjectReference Include="..\..\Planning\AMR.DeliveryPlanning.Planning.Domain\AMR.DeliveryPlanning.Planning.Domain.csproj" />
     <ProjectReference Include="..\AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents\AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.csproj" />
     <!-- TripStartedOmsNotifyConsumer dispatches POST to upstream OMS via IOmsShipmentClient. -->
     <ProjectReference Include="..\..\OmsAdapter\AMR.DeliveryPlanning.OmsAdapter.csproj" />

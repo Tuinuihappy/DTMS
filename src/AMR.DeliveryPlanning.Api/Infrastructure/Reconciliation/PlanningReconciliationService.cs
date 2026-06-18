@@ -3,6 +3,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReplanStuckOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
+using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
 using AMR.DeliveryPlanning.SharedKernel.Diagnostics;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -89,6 +90,7 @@ public sealed class PlanningReconciliationService : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var deliveryDb = scope.ServiceProvider.GetRequiredService<DeliveryOrderDbContext>();
         var dispatchDb = scope.ServiceProvider.GetRequiredService<DispatchDbContext>();
+        var planningDb = scope.ServiceProvider.GetRequiredService<PlanningDbContext>();
         var sender = scope.ServiceProvider.GetRequiredService<ISender>();
 
         var now = DateTime.UtcNow;
@@ -122,8 +124,28 @@ public sealed class PlanningReconciliationService : BackgroundService
             .Distinct()
             .ToListAsync(ct);
 
-        var trueStuck = candidates.Where(c => !idsWithTrips.Contains(c.Id)).ToList();
+        // T1.8 — also filter orders whose Jobs already carry a VendorOrderKey.
+        // Vendor accepted the upperKey on a prior attempt — replaying would
+        // re-send the same upperKey and RIOT3 would reject with E110007
+        // "upper-level unique key duplicate", spinning the watchdog forever
+        // (the OD-0381 incident shape). Reconciliation, not replay, is the
+        // right tool for these.
+        var idsVendorAccepted = await planningDb.Jobs
+            .AsNoTracking()
+            .Where(j => candidateIds.Contains(j.DeliveryOrderId) && j.VendorOrderKey != null)
+            .Select(j => j.DeliveryOrderId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var trueStuck = candidates
+            .Where(c => !idsWithTrips.Contains(c.Id) && !idsVendorAccepted.Contains(c.Id))
+            .ToList();
         _metrics.SetOrdersStuckPlanned(trueStuck.Count);
+
+        if (idsVendorAccepted.Count > 0)
+            _logger.LogInformation(
+                "[PlanningWatchdog] skipped {Count} candidate(s) whose vendor already accepted upperKey — reconciliation required",
+                idsVendorAccepted.Count);
 
         if (trueStuck.Count == 0) return;
 

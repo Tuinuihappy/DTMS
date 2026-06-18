@@ -7,6 +7,8 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using AMR.DeliveryPlanning.Planning.Domain.Entities;
+using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using FluentAssertions;
 using MassTransit;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -137,6 +139,49 @@ public class T1_ReplanStuckOrderTests
     }
 
     [Fact]
+    public async Task Handle_AnyJobHasVendorOrderKey_FailsWithReconciliationHint()
+    {
+        // T1.8 — the OD-0381 incident shape: vendor accepted upperKey on a
+        // prior attempt (Job.VendorOrderKey set) but no Trip exists. Replay
+        // would re-send the same upperKey and RIOT3 would reject with
+        // E110007. Handler must refuse and point operators at reconciliation.
+        var order = BuildPlannedOrder();
+        var acceptedJob = BuildAcceptedJob(order.Id, vendorKey: "RIOT-373");
+        var (handler, _, _, _, publisher) = HandlerWith(order, new List<Trip>(), new List<Job> { acceptedJob });
+
+        var result = await handler.Handle(
+            new ReplanStuckOrderCommand(order.Id, "ops", "manual"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("vendor already accepted");
+        result.Error.Should().Contain("RIOT-373");
+        await publisher.DidNotReceiveWithAnyArgs()
+            .Publish<DeliveryOrderConfirmedIntegrationEventV1>(default!);
+    }
+
+    [Fact]
+    public async Task Handle_JobsExistButNoneAccepted_StillSucceeds()
+    {
+        // The guard must only trip on a non-null VendorOrderKey — Job anchors
+        // that the watchdog re-uses across replays (T1.5 idempotency) carry no
+        // vendor key until the dispatcher returns one, so they should be a
+        // no-op for the guard.
+        var order = BuildPlannedOrder();
+        var anchorJob = BuildAnchorJob(order.Id);
+        var (handler, _, _, _, publisher) = HandlerWith(order, new List<Trip>(), new List<Job> { anchorJob });
+
+        var result = await handler.Handle(
+            new ReplanStuckOrderCommand(order.Id, "PlanningWatchdog", "auto"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await publisher.Received(1).Publish(
+            Arg.Any<DeliveryOrderConfirmedIntegrationEventV1>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Handle_ValidPlannedOrder_PublishesEventAndAudits()
     {
         // Happy path. The published event must carry the order's items with
@@ -177,7 +222,7 @@ public class T1_ReplanStuckOrderTests
         IOrderAuditEventRepository auditRepo,
         ITripRepository tripRepo,
         IPublishEndpoint publisher)
-        HandlerWith(DomainOrder? order, List<Trip> trips)
+        HandlerWith(DomainOrder? order, List<Trip> trips, List<Job>? jobs = null)
     {
         var orderRepo = Substitute.For<IDeliveryOrderRepository>();
         if (order is not null)
@@ -189,14 +234,35 @@ public class T1_ReplanStuckOrderTests
         tripRepo.GetByDeliveryOrderIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(trips);
 
+        var jobRepo = Substitute.For<IJobRepository>();
+        jobRepo.GetByDeliveryOrderIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(jobs ?? new List<Job>());
+
         var publisher = Substitute.For<IPublishEndpoint>();
         var options = Options.Create(new DeliveryOrderOptions { WeightFallbackKg = WeightFallbackKg });
 
         var handler = new ReplanStuckOrderCommandHandler(
-            orderRepo, auditRepo, tripRepo, publisher, options,
+            orderRepo, auditRepo, tripRepo, jobRepo, publisher, options,
             NullLogger<ReplanStuckOrderCommandHandler>.Instance);
 
         return (handler, orderRepo, auditRepo, tripRepo, publisher);
+    }
+
+    private static Job BuildAnchorJob(Guid orderId)
+    {
+        // A freshly-anchored Job — Status=Created, no TripId, no VendorOrderKey.
+        // This is what every iteration of the planning consumer sees on retry
+        // before the vendor responds.
+        return new Job(orderId, "Normal");
+    }
+
+    private static Job BuildAcceptedJob(Guid orderId, string vendorKey)
+    {
+        // Job that the vendor has already accepted — VendorOrderKey set via
+        // MarkDispatched. Mirrors the OD-0381 incident state.
+        var job = new Job(orderId, "Normal");
+        job.MarkDispatched(Guid.NewGuid(), vendorKey);
+        return job;
     }
 
     private static DomainOrder BuildOrderWithItems()
