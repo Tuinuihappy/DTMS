@@ -33,17 +33,39 @@ public sealed class OrchestrationSchemaInitializer : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        // EnsureCreated only creates the database, not schemas-or-tables in an
+        // existing one. Our database (amr_delivery_planning) already exists
+        // with planning/dispatch/etc. schemas, so EnsureCreated is a no-op
+        // here. Drop to idempotent raw SQL — CREATE … IF NOT EXISTS — so a
+        // restart with the flag still on is a fast no-op. Phase 2 replaces
+        // this with a proper EF migration in the saga's own migrations
+        // assembly.
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<OrchestrationDbContext>();
 
-        var created = await db.Database.EnsureCreatedAsync(cancellationToken);
-        if (created)
-            _logger.LogInformation(
-                "[OrchestrationSchema] created orchestration schema (POC bootstrap) — table {Table}",
-                nameof(OrchestrationDbContext.DeliveryOrderSagas));
-        else
-            _logger.LogDebug(
-                "[OrchestrationSchema] orchestration schema already present — no-op");
+        await db.Database.ExecuteSqlRawAsync(@"
+            CREATE SCHEMA IF NOT EXISTS orchestration;
+
+            CREATE TABLE IF NOT EXISTS orchestration.""DeliveryOrderSagas"" (
+                ""CorrelationId"" uuid NOT NULL PRIMARY KEY,
+                ""CurrentState"" integer NOT NULL,
+                ""JobId"" uuid NULL,
+                ""TripId"" uuid NULL,
+                ""VendorMissionId"" character varying(200) NULL,
+                ""LastFaultMessage"" character varying(2000) NULL,
+                ""RetryCount"" integer NOT NULL DEFAULT 0,
+                ""Version"" integer NOT NULL DEFAULT 0,
+                ""UpdatedAtUtc"" timestamp with time zone NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS ""IX_DeliveryOrderSagas_CurrentState""
+                ON orchestration.""DeliveryOrderSagas"" (""CurrentState"");
+            CREATE INDEX IF NOT EXISTS ""IX_DeliveryOrderSagas_UpdatedAtUtc""
+                ON orchestration.""DeliveryOrderSagas"" (""UpdatedAtUtc"");
+        ", cancellationToken);
+
+        _logger.LogInformation(
+            "[OrchestrationSchema] ensured orchestration.DeliveryOrderSagas (POC bootstrap)");
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
