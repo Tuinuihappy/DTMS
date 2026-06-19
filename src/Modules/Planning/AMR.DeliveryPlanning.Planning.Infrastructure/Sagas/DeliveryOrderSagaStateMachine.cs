@@ -5,16 +5,24 @@ using Microsoft.Extensions.Logging;
 namespace AMR.DeliveryPlanning.Planning.Infrastructure.Sagas;
 
 /// <summary>
-/// T2 POC — Saga state machine that will eventually replace the procedural
-/// <c>DeliveryOrderValidatedConsumer</c>. The advantage over the consumer is
-/// that state is persisted to <c>orchestration.DeliveryOrderSagas</c> on every
-/// transition, so a pod crash mid-workflow doesn't lose progress — the next
-/// pod (or the same one after restart) resumes from the saved state.
+/// T2 Phase 2 step 1 — Saga state machine that will eventually replace the
+/// procedural <c>DeliveryOrderValidatedConsumer</c>. The advantage over the
+/// consumer is that state is persisted to <c>orchestration.DeliveryOrderSagas</c>
+/// on every transition, so a pod crash mid-workflow doesn't lose progress —
+/// the next pod (or the same one after restart) resumes from the saved state.
 ///
-/// <para><b>POC scope</b>: only the initial transition
-/// (<see cref="OrderConfirmed"/> → AwaitingPlan) is implemented. Every other
-/// transition lands in Phase 2 along with compensation handlers and timeouts.
-/// The full state diagram is in
+/// <para><b>Step 1 scope</b>:
+///   • <see cref="OrderConfirmed"/> → AwaitingPlan (POC, already verified)
+///   • <see cref="PlanRequested"/> → Planning (NEW — first transition beyond
+///     AwaitingPlan, published by the legacy <c>DeliveryOrderValidatedConsumer</c>
+///     after <c>MarkOrderPlanning</c> so dual-run shadow mode works)
+///   • <c>OrderConfirmed</c> redeliveries explicitly ignored in every user
+///     state (NEW — was the worst POC finding: without these, T1.4 watchdog
+///     redeliveries of the same event throw <c>NotAcceptedStateMachineException</c>)
+/// </para>
+///
+/// <para>Every other transition lands in later Phase 2 steps along with
+/// compensation handlers and timeouts. The full target state diagram is in
 /// <c>docs/crash-recovery-workflow-resilience-plan.md</c> section 3.1.</para>
 ///
 /// <para><b>Disabled by default</b>. Activated by setting
@@ -49,11 +57,20 @@ public sealed class DeliveryOrderSagaStateMachine : MassTransitStateMachine<Deli
                 })
                 .TransitionTo(AwaitingPlan));
 
-        // Redeliveries of the OrderConfirmed event on an already-started saga
-        // are no-op: the state machine only matches the Initially() block on
-        // the first hit, and we don't declare a During(AwaitingPlan)
-        // handler so subsequent deliveries are silently ignored. That's the
-        // idempotency story T1.5 had to write into command handlers by hand.
+        // Step 1 — redelivery dedup. MassTransit's default for an event on a
+        // saga in a state with no matching handler is to throw
+        // NotAcceptedStateMachineException — the message then enters the
+        // retry/DLQ path and reads as a system fault. In production every
+        // redelivery source (T1.1 MassTransit retry, T1.4 watchdog,
+        // T1.7 /admin/orders/{id}/replan) republishes the same
+        // DeliveryOrderConfirmed event for an order whose saga has already
+        // moved past AwaitingPlan, so without these handlers the saga is
+        // unusable. Explicit Ignore() makes the redelivery a silent no-op.
+        During(AwaitingPlan,         Ignore(OrderConfirmed));
+        During(Planning,             Ignore(OrderConfirmed));
+        During(Dispatching,          Ignore(OrderConfirmed));
+        During(Completed,            Ignore(OrderConfirmed));
+        During(FailedAwaitingRetry,  Ignore(OrderConfirmed));
     }
 
     // States — each must be a public property so MassTransit's reflection can
