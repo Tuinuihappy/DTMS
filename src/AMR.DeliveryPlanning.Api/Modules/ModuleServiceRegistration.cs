@@ -429,6 +429,10 @@ public static class ModuleServiceRegistration
 
         // Outbox infrastructure
         services.AddDbContext<OutboxDbContext>(o => o.UseNpgsql(connectionString));
+        services
+            .AddOptions<AMR.DeliveryPlanning.Api.Infrastructure.Outbox.OutboxOptions>()
+            .Bind(configuration.GetSection(
+                AMR.DeliveryPlanning.Api.Infrastructure.Outbox.OutboxOptions.SectionName));
         services.AddSingleton<IOutboxProcessor, OutboxProcessorService>();
         services.AddHostedService<OutboxProcessorService>();
 
