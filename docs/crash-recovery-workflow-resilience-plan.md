@@ -124,7 +124,7 @@ Plan แก้ในระดับ enterprise 3 tier ตามขนาด blas
 
 | Step | What | Status |
 |---|---|---|
-| 1 | Build saga ภายใต้ feature flag `Workflow:UseSaga=false` | ⚠️ **POC done, full state machine not built** — Initial → AwaitingPlan transition wired; other 7 transitions + compensation are Phase 2 step 1 work. See [3.4](#34-poc-status-as-of-2026-06-18) and [3.5](#35-phase-2-follow-ups-discovered-during-poc) below. |
+| 1 | Build saga ภายใต้ feature flag `Workflow:UseSaga=false` | ⚠️ **POC done + Step 1 done (2026-06-19)** — Initially → AwaitingPlan + redelivery Ignore handlers for 5 states + first real transition AwaitingPlan → Planning via OrderPlanRequested. Remaining transitions (Dispatching, Completed, FailedAwaitingRetry handlers) + compensation are Step 2+ work. See [3.4](#34-poc-status-as-of-2026-06-18) and [3.5](#35-phase-2-follow-ups-discovered-during-poc) below. |
 | 2 | **Dual-run** — saga subscribes to same events, writes only to its own schema; legacy `DeliveryOrderValidatedConsumer` remains authoritative | ❌ blocked on step 1 |
 | 3 | **Shadow comparison job** logs divergence to `orchestration.SagaDiffs` for 1 week | ❌ |
 | 4 | Flip flag per environment: dev → uat → prod | ❌ |
@@ -146,7 +146,7 @@ Plan แก้ในระดับ enterprise 3 tier ตามขนาด blas
 
 | # | Finding | Why it matters | Fix in Phase 2 |
 |---|---|---|---|
-| 1 | **`NotAcceptedStateMachineException` on event redelivery** | A second `DeliveryOrderConfirmedEvent` for an already-`AwaitingPlan` saga has no `During(AwaitingPlan)` handler. MassTransit treats it as a fault → retry → DLQ. In production T1.4 watchdog + T1.1 retry will redeliver this event multiple times per order — every retry would throw. | Add `During(AwaitingPlan, Ignore(OrderConfirmed))` for each user-defined state. Or use `Event(… e.OnMissingInstance(m => m.Discard()))` policy. See [memory note on redelivery handling] |
+| 1 | **`NotAcceptedStateMachineException` on event redelivery** | A second `DeliveryOrderConfirmedEvent` for an already-`AwaitingPlan` saga has no `During(AwaitingPlan)` handler. MassTransit treats it as a fault → retry → DLQ. In production T1.4 watchdog + T1.1 retry will redeliver this event multiple times per order — every retry would throw. | ✅ **Fixed 2026-06-19 in Step 1 A1** — `During(state, Ignore(OrderConfirmed))` for all 5 user states. Verified via 3 smoke tests + docker re-run showing 0 NotAccepted exceptions. |
 | 2 | **Raw SQL bootstrap is POC-only** | `OrchestrationSchemaInitializer` uses `CREATE … IF NOT EXISTS` raw SQL because we can't generate proper EF migrations until the schema is stable. Acceptable for POC but doesn't survive schema evolution. | Hand-write EF migration in `Migrations/Orchestration/` with Designer + ModelSnapshot. Replace the initializer entirely. ~5h. |
 | 3 | **MassTransit state-index ≠ `OrderSagaState` enum** | MT auto-assigns state indices 3..N for user states (0=None, 1=Initial, 2=Final reserved). Our enum starts `None=0, AwaitingPlan=1, …`. The DB column stores MT's indices, not the enum's. The enum is documentation only; matching by name happens internally. | Either re-number the enum to align (breaking change for any consumer reading the column raw), or document this clearly in the saga instance class and use the enum only for code-side state names. |
 
