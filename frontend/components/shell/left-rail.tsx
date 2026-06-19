@@ -169,6 +169,11 @@ const actions: RailAction[] = [
     label: "Projection health",
     href: "/admin/projections",
   },
+  {
+    icon: <Gauge className="h-4 w-4" strokeWidth={2} />,
+    label: "System status",
+    href: "/admin/system-status",
+  },
   { icon: <AlertTriangle className="h-4 w-4" strokeWidth={2} />, label: "Active alerts", badge: true },
 ];
 
