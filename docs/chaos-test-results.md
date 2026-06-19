@@ -76,10 +76,37 @@ powershell -File scripts/chaos/kill-mid-pipeline.ps1 -OrderCount 5 -KillEvery 2 
 powershell -File scripts/chaos/kill-mid-pipeline.ps1 -OrderCount 100 -SkipChaos -SettleMinutes 2
 ```
 
-The script is idempotent: every order ref is `CHAOS-<uuid>-<n>` so a second run never conflicts with the first. Old chaos orders accumulate in DB; if that bothers you, delete via:
+The script is idempotent: every order ref is `CHAOS-<uuid>-<n>` so a second run never conflicts with the first. Old chaos orders accumulate in DB; clean up via the transactional pattern below (delete children explicitly because the schema lacks ON DELETE CASCADE on every projection table; we used this pattern on 2026-06-19 to clear 110 orders / 550 rows in ~150ms):
 
 ```sql
-DELETE FROM deliveryorder."DeliveryOrders" WHERE "OrderRef" LIKE 'CHAOS-%';
+BEGIN;
+DELETE FROM deliveryorder."OrderAuditEvents"
+    WHERE "DeliveryOrderId" IN (
+        SELECT "Id" FROM deliveryorder."DeliveryOrders"
+        WHERE "OrderRef" LIKE 'CHAOS-%' OR "OrderRef" LIKE 'SIGTERM-%');
+DELETE FROM dispatch."Trips"
+    WHERE "DeliveryOrderId" IN (
+        SELECT "Id" FROM deliveryorder."DeliveryOrders"
+        WHERE "OrderRef" LIKE 'CHAOS-%' OR "OrderRef" LIKE 'SIGTERM-%');
+DELETE FROM planning."Jobs"
+    WHERE "DeliveryOrderId" IN (
+        SELECT "Id" FROM deliveryorder."DeliveryOrders"
+        WHERE "OrderRef" LIKE 'CHAOS-%' OR "OrderRef" LIKE 'SIGTERM-%');
+DELETE FROM deliveryorder."OrderListView"
+    WHERE "OrderId" IN (
+        SELECT "Id" FROM deliveryorder."DeliveryOrders"
+        WHERE "OrderRef" LIKE 'CHAOS-%' OR "OrderRef" LIKE 'SIGTERM-%');
+DELETE FROM deliveryorder."DeliveryOrders"
+    WHERE "OrderRef" LIKE 'CHAOS-%' OR "OrderRef" LIKE 'SIGTERM-%';
+COMMIT;
+```
+
+Verify with no orphans left behind:
+
+```sql
+SELECT 'orphan_jobs'   AS check, COUNT(*) FROM planning."Jobs" j   WHERE NOT EXISTS (SELECT 1 FROM deliveryorder."DeliveryOrders" o WHERE o."Id" = j."DeliveryOrderId")
+UNION ALL
+SELECT 'orphan_trips',           COUNT(*) FROM dispatch."Trips" t   WHERE NOT EXISTS (SELECT 1 FROM deliveryorder."DeliveryOrders" o WHERE o."Id" = t."DeliveryOrderId");
 ```
 
 ## What the verdict means

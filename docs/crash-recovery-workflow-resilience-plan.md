@@ -284,7 +284,7 @@ Tier 3 is gated on observable thresholds; readings below show none are met yet.
 1. **Chaos test (T1)**: `scripts/chaos/kill-mid-pipeline.ps1` — inject 100 orders, kill API container ที่ random delay 1-8s ระหว่าง consumer exec. **Accept**: 0 stuck orders หลัง 5-min settle, ทั้ง 100 reach `Dispatched`. **สถานะ**: ✅ PASS (run 2026-06-18, n=100, 19 kill points, 100% success — รายละเอียดใน [`docs/chaos-test-results.md`](chaos-test-results.md))
 
     **Phase 5 — end-to-end completion verification** (deferred): หลังจาก verify ที่ระดับ `Dispatched` แล้ว รอ vendor (RIOT3) ส่ง webhook tripStarted → tripDropCompleted → podCompleted → cascade ถึง Order=`Completed`. **เวลา**: อาจใช้เป็นชั่วโมง+ ขึ้นกับ vendor robot capacity + queue depth. **Why deferred**: vendor ทำงานอยู่นอก scope ของ T1 crash-recovery — Phase 1-4 เพียงพอสำหรับ verify T1 stack. Phase 5 ตอบคำถามคนละข้อ: "vendor + ระบบ end-to-end ทำงานครบไหม" ซึ่งใกล้ integration test มากกว่า chaos test. **เมื่อเพิ่ม**: ต้อง stub vendor หรือใช้ vendor sandbox (production-ish endpoint จะถูก pollute ด้วย 100 orders ทุกครั้ง) + `-WaitForCompletion` switch ใน script + Phase 5 verify query `WHERE Status IN ('Completed', 'PartiallyCompleted')`
-2. **Graceful shutdown test (T1)**: SIGTERM ตอนมี 20 in-flight messages → assert ทั้ง 20 จบ + pod exit ภายใน 90s. **สถานะ**: ⚠️ partial — the chaos test uses SIGKILL (harder failure mode), so SIGTERM drain is implicit but not explicitly measured. Add a dedicated `kill --signal=SIGTERM` run when needed.
+2. **Graceful shutdown test (T1)**: SIGTERM ตอนมี 20 in-flight messages → assert ทั้ง 20 จบ + pod exit ภายใน 90s. **สถานะ**: ⚠️ **partial pass (2026-06-19 run)** — 5 in-flight orders all reached `Dispatched` after settle (data integrity ✅), but container exit took **149s** vs ≤ 90s target. Bus stopped cleanly in 2s; the remaining 147s waited on a long-lived SignalR `/hubs/trips` WebSocket connection from the frontend + in-flight RIOT3 HTTP requests. In production a `docker stop` (default 90s grace) would SIGKILL those, not lose order data but force the SignalR client to reconnect and abandon the vendor HTTP calls. See [§11 Production readiness gaps](#11-production-readiness-gaps) for the gap analysis and fix priorities.
 3. **Load test (T1+T2)**: k6 driving 50 orders/min × 30 min — assert P95 end-to-end < 30s, `outbox_age_seconds < 30`. **สถานะ**: ❌ deferred — not on the T1 production-ready critical path; pick up before scale events.
 4. **Saga replay test (T2)**: kill API ที่แต่ละ saga state สำหรับ 50 orders → assert saga resume จาก persisted state + reach `Completed`. **สถานะ**: ❌ Phase 2 scope.
 5. **Compensation test (T2)**: force RIOT3 vendor 500 → assert saga → `FailedAwaitingRetry` → compensate หลัง retry budget หมด, leave state consistent ทุก 6 schemas. **สถานะ**: ❌ Phase 2 scope.
@@ -318,7 +318,94 @@ Tier 3 is gated on observable thresholds; readings below show none are met yet.
 
 ### Recommended next steps (as of 2026-06-18)
 
-1. **Soak T1 in dev for 24-48h** (passive) — let metrics accumulate; confirm `dtms_workflow_orders_stuck_planned` stays at 0 and `outbox_age_seconds` P95 < 30s.
-2. **SIGTERM drain test** (~1h) — one-off `docker kill --signal=SIGTERM` mid-pipeline to close the partial-status item in verification table.
+1. **Soak T1 in dev for 24-48h** (passive) — let metrics accumulate; confirm `dtms_workflow_orders_stuck_planned` stays at 0 and `outbox_age_seconds` P95 < 30s. ✅ **22h soak done 2026-06-19 morning, all 4 signals clean.**
+2. **SIGTERM drain test** (~1h) — one-off `docker kill --signal=SIGTERM` mid-pipeline to close the partial-status item in verification table. ⚠️ **Done 2026-06-19, data integrity passed but timing (149s) exceeded 90s target. Gaps captured in §11.**
 3. **Pre-existing integration test debt triage** (15-20h, distributed) — 21 tests still failing per [`docs/integration-test-debt.md`](integration-test-debt.md); needs owner-team distribution rather than single-engineer effort.
 4. **Phase 2 step 1** when ready — add `During(state, Ignore(OrderConfirmed))` for each saga state (the redelivery handling discovered in 3.5 #1), then proceed with TripDispatched / RiotMissionAccepted handlers per plan.
+
+---
+
+## 11. Production readiness gaps
+
+> Added 2026-06-19 after the SIGTERM drain test revealed that container shutdown takes ~149s vs the 90s `stop_grace_period`. T1 data integrity is solid (chaos n=100 + 22h soak + SIGTERM all preserved order outcomes), but the **shutdown timing path** is not yet enterprise-grade for K8s rolling deploys with active SignalR clients.
+
+### G1 — SignalR connection drain protocol (blocking K8s rolling deploy)
+
+**Symptom**: A `/hubs/trips` WebSocket connection held the shutdown open for ~140s after the bus already stopped. Frontend dashboards (which subscribe to trip events) keep WebSockets alive indefinitely; ASP.NET's host won't exit while a request pipeline owns an active connection.
+
+**Fix** (~1-2 days):
+
+1. New endpoint `POST /admin/drain-start`:
+   - Flip `/health/ready` to 503 so a load balancer / K8s readiness probe stops sending new traffic.
+   - Broadcast `connection.close()` (graceful close) to every SignalR client across every hub.
+   - Sleep 10-20s while clients reconnect to a different pod.
+2. K8s `preStop` hook calls `/admin/drain-start` then sleeps 30s before the kubelet sends SIGTERM.
+3. Frontend SignalR client uses `withAutomaticReconnect([0, 2000, 5000, 10000])` for smooth backoff to the new pod.
+
+**Acceptance**: SIGTERM-to-exit ≤ 30s when no in-flight consumers; SignalR clients re-establish within 5s of disconnect.
+
+### G2 — Shutdown observability
+
+**Symptom**: We learned the 149s number by reading logs after the fact. Production needs metrics + alerts.
+
+**Fix** (~0.5 day):
+
+- Add metric `dtms_shutdown_duration_seconds{phase}` with phases `bus`, `signalr`, `hosted_services`, `total`.
+- Emit each phase value from `IHostApplicationLifetime.ApplicationStopped` via a small `IHostedService` that hooks both `ApplicationStopping` and `ApplicationStopped`.
+- Grafana alert: P95 shutdown duration > 60s over 7 days.
+
+### G3 — Cancellation propagation through HTTP client + Polly
+
+**Symptom**: Shutdown log showed in-flight `GET /api/v4/robots?*` and `GET /api/v4/orders/.../G1?*` to RIOT3 continuing for several seconds after `Application is shutting down` and then throwing `TaskCanceledException`. Polly retry policies didn't drop them early.
+
+**Fix** (~1 day):
+
+- Every `HttpClient` call inside a hosted service or consumer must accept a `CancellationToken` linked to `IHostApplicationLifetime.ApplicationStopping`.
+- Polly `AddRetry` / `AddCircuitBreaker` configured with `CancellationToken` honor so retries bail when the token trips.
+- `BackgroundService.StopAsync` overrides that explicitly cancel internal CTS with a short timeout (e.g., 2s) rather than letting the framework wait for the default ShutdownTimeout window.
+
+### G4 — Deploy storm test (multi-pod chaos)
+
+**Symptom**: Our chaos test kills one pod at a time. K8s rolling deploy with replicas > 1 takes down 1 pod while others must absorb 100% of incoming load.
+
+**Fix** (~2-3 days, paired with the K8s migration in §4.3):
+
+- Extend `scripts/chaos/kill-mid-pipeline.ps1` with a `-RollingDeploy` mode that simulates K8s rolling update timing on docker-compose (kill one pod, wait `terminationGracePeriodSeconds`, start new, repeat).
+- Run k6 at 50 req/s for 30 min, perform 10 rolling deploys during the run, assert: zero stuck orders, request P99 latency does not exceed 2× baseline.
+
+### G5 — Timeout layering alignment
+
+**Current**:
+
+| Layer | Timeout | Comment |
+|---|---|---|
+| docker `stop_grace_period` | 90s | Sets the outer cap |
+| `Host.ShutdownTimeout` | 60s | OK in isolation |
+| `MassTransitHostOptions.StopTimeout` | 45s | OK in isolation |
+| SignalR connection close | implicit | Currently no explicit bound — root cause of the 149s |
+| Polly retry budget | not aligned to shutdown | Can outlive `Host.ShutdownTimeout` |
+
+**Fix** (~0.5 day, low risk):
+
+- Add `services.Configure<HostOptions>(o => o.ServicesStopConcurrently = true)` so hosted services stop in parallel rather than sequentially.
+- Tighten `SignalR.KeepAliveInterval = TimeSpan.FromSeconds(10)` + `ClientTimeoutInterval = TimeSpan.FromSeconds(20)` so a frontend that doesn't acknowledge close is dropped server-side.
+- Document the timeout hierarchy in this section so future tuning doesn't break the invariant.
+
+### G6 — Container-name vs service-name coupling
+
+**Symptom**: Chaos and SIGTERM scripts use `docker kill dtms-api` (container name) but `docker compose up -d api` (service name). Production K8s replaces both with deployment names + label selectors.
+
+**Fix** (folds into K8s migration, §4.3): drop the container-name coupling once K8s is in.
+
+### Priority
+
+| # | Gap | Effort | When |
+|---|---|---|---|
+| 🥇 | G1 — SignalR drain protocol | 1-2 days | Before any K8s rolling deploy or any prod deploy that runs during business hours |
+| 🥈 | G2 — Shutdown observability | 0.5 day | Same sprint as G1 so we measure the fix |
+| 🥉 | G3 — Cancellation propagation | 1 day | Reduces shutdown log noise and tightens shutdown duration further |
+| 4 | G4 — Deploy storm test | 2-3 days | Pair with §4.3 K8s migration |
+| 5 | G5 — Timeout layering | 0.5 day | Quick win at any time |
+| 6 | G6 — Container vs service name | — | Folds into K8s work |
+
+**Definition of "enterprise-grade for production deploys"**: G1 + G2 + G3 done. After that, K8s rolling deploy of T1 during peak hour has zero stuck orders, no abandoned vendor HTTP calls, and frontend clients see ≤ 5s reconnect blip (visible loading spinner, no error).
