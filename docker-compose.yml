@@ -115,6 +115,11 @@ services:
       # (dual-run shadow mode per plan section 3.3). Saga writes to its own
       # orchestration schema; consumer remains authoritative. Default false.
       - Workflow__UseSaga=${Workflow__UseSaga:-false}
+      # Phase A Step A2 part 1 — outbox SKIP LOCKED fetch path. When true,
+      # per-module fetch uses raw SQL FOR UPDATE SKIP LOCKED inside an
+      # explicit tx (prerequisite for Phase D multi-replica workers).
+      # Default false (legacy EF LINQ path).
+      - Outbox__UseSkipLocked=${Outbox__UseSkipLocked:-false}
       # Safety net for dropped RIOT3 TASK_FINISHED webhooks — polls RIOT3
       # for in-flight envelope trips and reconciles via idempotent Mark*.
       # On by default so dropped webhooks self-heal within ~1 poll interval.
