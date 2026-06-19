@@ -22,4 +22,14 @@ public class OutboxOptions
     /// of longer per-tick latency. Default 50 (matches the pre-flag hardcoded value).
     /// </summary>
     public int BatchSize { get; set; } = 50;
+
+    /// <summary>
+    /// How many messages within a batch are published concurrently. Default 1
+    /// (sequential — matches the pre-flag behaviour). Raising this trades CPU
+    /// + RabbitMQ connection pressure for lower batch latency: with 50 messages
+    /// where each takes ~50ms to publish, sequential is 2.5s while concurrency=8
+    /// is ~315ms. Cap at the IBus connection pool size — going higher just
+    /// queues at the bus client.
+    /// </summary>
+    public int PublishConcurrency { get; set; } = 1;
 }

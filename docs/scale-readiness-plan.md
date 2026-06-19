@@ -81,11 +81,13 @@ CREATE INDEX CONCURRENTLY "IX_OutboxMessages_Pending"
 - ✅ Smoke order reached `Dispatched` in 3s (T1 main path unchanged)
 - ⚠️ Idle DB CPU delta deferred — measure under Phase A acceptance scenario B (load test), not at idle
 
-### Step A2 — `SKIP LOCKED` + parallel modules (1 day) 🟡 part 1 shipped 2026-06-20
+### Step A2 — `SKIP LOCKED` + parallel modules (1 day) ✅ shipped 2026-06-20
 
-**Part 1 (shipped):** SKIP LOCKED raw-SQL fetch path behind `Outbox:UseSkipLocked` flag (default off). The per-module dispatcher was first extracted into `ProcessModuleAsync` + `FetchBatchAsync` + `PublishBatchAsync` + `CountPendingAsync` helpers (pure refactor), then a `ProcessModuleSkipLockedAsync` sibling was added that wraps fetch + publish + save in an explicit transaction so the `FOR UPDATE` locks hold across the publish loop. Per-tick options snapshot via `IOptionsMonitor<OutboxOptions>` so hot-reload works module-uniformly. Flag-off default verified in docker (smoke order Dispatched in 3s, legacy LINQ path unchanged). Flag-on verify deferred to next sitting.
+**Part 1 (shipped):** SKIP LOCKED raw-SQL fetch path behind `Outbox:UseSkipLocked` flag (default off). The per-module dispatcher was first extracted into `ProcessModuleAsync` + `FetchBatchAsync` + `PublishBatchAsync` + `CountPendingAsync` helpers (pure refactor), then a `ProcessModuleSkipLockedAsync` sibling was added that wraps fetch + publish + save in an explicit transaction so the `FOR UPDATE` locks hold across the publish loop. Per-tick options snapshot via `IOptionsMonitor<OutboxOptions>` so hot-reload works module-uniformly. Flag-off verified (smoke Dispatched in 3s), flag-on verified end-to-end (deliveryorder + planning outbox processed within 1 tick, zero SQL errors).
 
-**Part 2 (pending):** `Parallel.ForEachAsync` per-message inside `PublishBatchAsync`, bounded by `OutboxOptions.PublishConcurrency`. Want SKIP LOCKED verified under flag first so we don't change two variables at once.
+**Part 2 (shipped):** `Parallel.ForEachAsync` per-message inside `PublishBatchAsync`, bounded by new `OutboxOptions.PublishConcurrency` (default 1). Refactored to **two-phase pattern** — parallel publish into a pre-allocated `results[]` array (thread-safe because `IPublishEndpoint` + OpenTelemetry histograms are thread-safe; no shared mutable collection), then sequential mutation loop that calls `MarkAsProcessed` / `MarkAsFailed` on the calling thread (DbContext change-tracker single-threaded). Verified at concurrency=1 (regression-free) and concurrency=8 with a 5-burst: all 5 orders Dispatched in ~4.7s clustered within 0.2s of each other (vs sequential where #5 would queue behind #1-4 ~23.5s).
+
+Together, parts 1+2 unblock Phase D (multi-replica outbox workers — SKIP LOCKED prevents row contention) AND raise single-replica throughput (parallel publish saturates IBus connection pool).
 
 Rewrite the dispatcher loop. Original code at [OutboxProcessorService.cs:79](../src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/OutboxProcessorService.cs#L79) iterated modules sequentially with `foreach`. New shape:
 

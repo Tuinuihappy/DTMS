@@ -38,8 +38,8 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
     {
         var opts = _options.CurrentValue;
         _logger.LogInformation(
-            "OutboxProcessorService started (UseSkipLocked={UseSkipLocked}, BatchSize={BatchSize})",
-            opts.UseSkipLocked, opts.BatchSize);
+            "OutboxProcessorService started (UseSkipLocked={UseSkipLocked}, BatchSize={BatchSize}, PublishConcurrency={PublishConcurrency})",
+            opts.UseSkipLocked, opts.BatchSize, opts.PublishConcurrency);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -89,18 +89,18 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
         CancellationToken cancellationToken)
     {
         return opts.UseSkipLocked
-            ? ProcessModuleSkipLockedAsync(db, publisher, source, opts.BatchSize, cancellationToken)
-            : ProcessModuleLegacyAsync(db, publisher, source, opts.BatchSize, cancellationToken);
+            ? ProcessModuleSkipLockedAsync(db, publisher, source, opts, cancellationToken)
+            : ProcessModuleLegacyAsync(db, publisher, source, opts, cancellationToken);
     }
 
     private async Task<long> ProcessModuleLegacyAsync(
         DbContext db,
         IPublishEndpoint publisher,
         string source,
-        int batchSize,
+        OutboxOptions opts,
         CancellationToken cancellationToken)
     {
-        var messages = await FetchBatchAsync(db, batchSize, cancellationToken);
+        var messages = await FetchBatchAsync(db, opts.BatchSize, cancellationToken);
 
         if (messages.Count == 0)
         {
@@ -109,7 +109,7 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
 
         _logger.LogDebug("Processing {Count} outbox messages from {Source}", messages.Count, source);
 
-        await PublishBatchAsync(messages, publisher, source, cancellationToken);
+        await PublishBatchAsync(messages, publisher, source, opts.PublishConcurrency, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
 
         return await CountPendingAsync(db, cancellationToken);
@@ -124,12 +124,12 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
         DbContext db,
         IPublishEndpoint publisher,
         string source,
-        int batchSize,
+        OutboxOptions opts,
         CancellationToken cancellationToken)
     {
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
-        var messages = await FetchBatchSkipLockedAsync(db, source, batchSize, cancellationToken);
+        var messages = await FetchBatchSkipLockedAsync(db, source, opts.BatchSize, cancellationToken);
 
         if (messages.Count == 0)
         {
@@ -140,7 +140,7 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
         _logger.LogDebug("Processing {Count} outbox messages from {Source} (SKIP LOCKED)",
             messages.Count, source);
 
-        await PublishBatchAsync(messages, publisher, source, cancellationToken);
+        await PublishBatchAsync(messages, publisher, source, opts.PublishConcurrency, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
 
@@ -186,43 +186,79 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
     private static Task<int> CountPendingAsync(DbContext db, CancellationToken cancellationToken) =>
         db.Set<OutboxMessage>().CountAsync(m => m.ProcessedOnUtc == null, cancellationToken);
 
+    // Two-phase publish: parallel publish + sequential mutate. The DbContext
+    // is NOT thread-safe — MarkAsProcessed/MarkAsFailed mutate change-tracked
+    // entities, so those calls must be single-threaded. IPublishEndpoint
+    // (MassTransit) IS thread-safe, so the publish itself runs in parallel
+    // bounded by publishConcurrency. With publishConcurrency=1 the timing is
+    // identical to the pre-flag sequential foreach.
     private async Task PublishBatchAsync(
         List<OutboxMessage> messages,
         IPublishEndpoint publisher,
         string source,
+        int publishConcurrency,
         CancellationToken cancellationToken)
     {
-        foreach (var message in messages)
+        var results = new (DateTime? PublishedAt, Exception? Error)[messages.Count];
+
+        // Phase 1 — publish in parallel. Each task writes its result into the
+        // pre-allocated results[] slot at the same index — no shared mutable
+        // collection, no lock needed. publishConcurrency clamped to >=1.
+        await Parallel.ForEachAsync(
+            Enumerable.Range(0, messages.Count),
+            new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Math.Max(1, publishConcurrency),
+                CancellationToken = cancellationToken,
+            },
+            async (i, ct) =>
+            {
+                var message = messages[i];
+                try
+                {
+                    var type = Type.GetType(message.Type);
+                    if (type == null)
+                    {
+                        results[i] = (null, new InvalidOperationException($"Type not found: {message.Type}"));
+                        return;
+                    }
+
+                    var payload = JsonSerializer.Deserialize(message.Content, type);
+                    if (payload is IIntegrationEvent integrationEvent)
+                    {
+                        // Per-publish timeout: fail fast when MassTransit bus is unavailable
+                        // (e.g., RabbitMQ not reachable) rather than blocking indefinitely.
+                        using var publishCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                        publishCts.CancelAfter(PublishTimeout);
+                        await publisher.Publish(integrationEvent, type, publishCts.Token);
+                    }
+
+                    var publishedAt = DateTime.UtcNow;
+                    // T1.6 — record (publish-time - occurrence-time). OpenTelemetry
+                    // histograms are thread-safe so calling from the parallel block
+                    // is fine.
+                    _metrics.RecordOutboxAge((publishedAt - message.OccurredOnUtc).TotalSeconds);
+                    results[i] = (publishedAt, null);
+                }
+                catch (Exception ex)
+                {
+                    results[i] = (null, ex);
+                }
+            });
+
+        // Phase 2 — mutate entities sequentially on the calling thread. The
+        // DbContext's change tracker stays consistent because there's only one
+        // writer here.
+        for (var i = 0; i < messages.Count; i++)
         {
-            try
+            var (publishedAt, error) = results[i];
+            if (error == null && publishedAt.HasValue)
             {
-                var type = Type.GetType(message.Type);
-                if (type == null)
-                {
-                    HandleFailure(message, source, $"Type not found: {message.Type}", exception: null);
-                    continue;
-                }
-
-                var payload = JsonSerializer.Deserialize(message.Content, type);
-                if (payload is IIntegrationEvent integrationEvent)
-                {
-                    // Per-publish timeout: fail fast when MassTransit bus is unavailable
-                    // (e.g., RabbitMQ not reachable) rather than blocking indefinitely.
-                    using var publishCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                    publishCts.CancelAfter(PublishTimeout);
-                    await publisher.Publish(integrationEvent, type, publishCts.Token);
-                }
-
-                var publishedAt = DateTime.UtcNow;
-                // T1.6 — record (publish-time - occurrence-time) so the lag
-                // histogram surfaces "outbox is healthy" vs "outbox is lagging
-                // 5 minutes behind" without operators reading log files.
-                _metrics.RecordOutboxAge((publishedAt - message.OccurredOnUtc).TotalSeconds);
-                message.MarkAsProcessed(publishedAt);
+                messages[i].MarkAsProcessed(publishedAt.Value);
             }
-            catch (Exception ex)
+            else
             {
-                HandleFailure(message, source, ex.Message, ex);
+                HandleFailure(messages[i], source, error?.Message ?? "Unknown publish failure", error);
             }
         }
     }

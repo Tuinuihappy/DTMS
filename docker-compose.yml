@@ -120,6 +120,10 @@ services:
       # explicit tx (prerequisite for Phase D multi-replica workers).
       # Default false (legacy EF LINQ path).
       - Outbox__UseSkipLocked=${Outbox__UseSkipLocked:-false}
+      # Phase A Step A2 part 2 — per-message publish concurrency within a
+      # batch. 1 = sequential (legacy). 8 is a good starting point for
+      # parallel testing — cap at the IBus connection pool size.
+      - Outbox__PublishConcurrency=${Outbox__PublishConcurrency:-1}
       # Safety net for dropped RIOT3 TASK_FINISHED webhooks — polls RIOT3
       # for in-flight envelope trips and reconciles via idempotent Mark*.
       # On by default so dropped webhooks self-heal within ~1 poll interval.
