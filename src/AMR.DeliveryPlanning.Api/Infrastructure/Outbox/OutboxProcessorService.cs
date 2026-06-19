@@ -18,6 +18,8 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
     private readonly WorkflowMetrics _metrics;
     private readonly ILogger<OutboxProcessorService> _logger;
     private static readonly TimeSpan PollingInterval = TimeSpan.FromSeconds(5);
+    private const int BatchSize = 50;
+    private static readonly TimeSpan PublishTimeout = TimeSpan.FromSeconds(10);
 
     public OutboxProcessorService(
         IServiceScopeFactory scopeFactory,
@@ -58,42 +60,65 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
         // climbs > 500 sustained the outbox is falling behind and ops should
         // page (see plan section 5).
         long totalPending = 0;
-        totalPending += await ProcessOutboxAsync<OutboxDbContext>(scope, publisher, "outbox", cancellationToken);
-        totalPending += await ProcessOutboxAsync<DeliveryOrderDbContext>(scope, publisher, DeliveryOrderDbContext.Schema, cancellationToken);
-        totalPending += await ProcessOutboxAsync<PlanningDbContext>(scope, publisher, PlanningDbContext.Schema, cancellationToken);
-        totalPending += await ProcessOutboxAsync<DispatchDbContext>(scope, publisher, DispatchDbContext.Schema, cancellationToken);
-        totalPending += await ProcessOutboxAsync<FleetDbContext>(scope, publisher, FleetDbContext.Schema, cancellationToken);
-        totalPending += await ProcessOutboxAsync<VendorAdapterDbContext>(scope, publisher, VendorAdapterDbContext.Schema, cancellationToken);
+        totalPending += await ProcessModuleAsync(scope.ServiceProvider.GetRequiredService<OutboxDbContext>(), publisher, "outbox", cancellationToken);
+        totalPending += await ProcessModuleAsync(scope.ServiceProvider.GetRequiredService<DeliveryOrderDbContext>(), publisher, DeliveryOrderDbContext.Schema, cancellationToken);
+        totalPending += await ProcessModuleAsync(scope.ServiceProvider.GetRequiredService<PlanningDbContext>(), publisher, PlanningDbContext.Schema, cancellationToken);
+        totalPending += await ProcessModuleAsync(scope.ServiceProvider.GetRequiredService<DispatchDbContext>(), publisher, DispatchDbContext.Schema, cancellationToken);
+        totalPending += await ProcessModuleAsync(scope.ServiceProvider.GetRequiredService<FleetDbContext>(), publisher, FleetDbContext.Schema, cancellationToken);
+        totalPending += await ProcessModuleAsync(scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>(), publisher, VendorAdapterDbContext.Schema, cancellationToken);
 
         _metrics.SetOutboxPending(totalPending);
     }
 
-    private async Task<long> ProcessOutboxAsync<TDbContext>(
-        IServiceScope scope,
+    private async Task<long> ProcessModuleAsync(
+        DbContext db,
         IPublishEndpoint publisher,
         string source,
         CancellationToken cancellationToken)
-        where TDbContext : DbContext
     {
-        var db = scope.ServiceProvider.GetRequiredService<TDbContext>();
-        var now = DateTime.UtcNow;
-
-        var messages = await db.Set<OutboxMessage>()
-            .Where(m => m.ProcessedOnUtc == null
-                        && (m.NextRetryAtUtc == null || m.NextRetryAtUtc <= now))
-            .OrderBy(m => m.OccurredOnUtc)
-            .Take(50)
-            .ToListAsync(cancellationToken);
+        var messages = await FetchBatchAsync(db, BatchSize, cancellationToken);
 
         if (messages.Count == 0)
         {
-            // No batch this tick — query the residual pending count for the gauge.
-            return await db.Set<OutboxMessage>()
-                .CountAsync(m => m.ProcessedOnUtc == null, cancellationToken);
+            // No batch this tick — return residual pending count for the gauge.
+            return await CountPendingAsync(db, cancellationToken);
         }
 
         _logger.LogDebug("Processing {Count} outbox messages from {Source}", messages.Count, source);
 
+        await PublishBatchAsync(messages, publisher, source, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+
+        // Residual pending after the batch (some messages may have failed and
+        // gone back to NextRetryAtUtc in the future — they still count as
+        // backlog for the gauge).
+        return await CountPendingAsync(db, cancellationToken);
+    }
+
+    // Pulled out of ProcessModuleAsync so Step A3 can branch on Outbox:UseSkipLocked
+    // — the SKIP LOCKED path will be a sibling that returns the same shape but uses
+    // raw SQL with FOR UPDATE SKIP LOCKED. Keeps the publish loop reusable.
+    private static async Task<List<OutboxMessage>> FetchBatchAsync(
+        DbContext db, int batchSize, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        return await db.Set<OutboxMessage>()
+            .Where(m => m.ProcessedOnUtc == null
+                        && (m.NextRetryAtUtc == null || m.NextRetryAtUtc <= now))
+            .OrderBy(m => m.OccurredOnUtc)
+            .Take(batchSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static Task<int> CountPendingAsync(DbContext db, CancellationToken cancellationToken) =>
+        db.Set<OutboxMessage>().CountAsync(m => m.ProcessedOnUtc == null, cancellationToken);
+
+    private async Task PublishBatchAsync(
+        List<OutboxMessage> messages,
+        IPublishEndpoint publisher,
+        string source,
+        CancellationToken cancellationToken)
+    {
         foreach (var message in messages)
         {
             try
@@ -111,7 +136,7 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
                     // Per-publish timeout: fail fast when MassTransit bus is unavailable
                     // (e.g., RabbitMQ not reachable) rather than blocking indefinitely.
                     using var publishCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                    publishCts.CancelAfter(TimeSpan.FromSeconds(10));
+                    publishCts.CancelAfter(PublishTimeout);
                     await publisher.Publish(integrationEvent, type, publishCts.Token);
                 }
 
@@ -127,14 +152,6 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
                 HandleFailure(message, source, ex.Message, ex);
             }
         }
-
-        await db.SaveChangesAsync(cancellationToken);
-
-        // Residual pending after the batch (some messages may have failed and
-        // gone back to NextRetryAtUtc in the future — they still count as
-        // backlog for the gauge).
-        return await db.Set<OutboxMessage>()
-            .CountAsync(m => m.ProcessedOnUtc == null, cancellationToken);
     }
 
     private void HandleFailure(OutboxMessage message, string source, string error, Exception? exception)
