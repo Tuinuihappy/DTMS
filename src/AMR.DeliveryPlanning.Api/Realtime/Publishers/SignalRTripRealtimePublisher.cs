@@ -36,4 +36,23 @@ public sealed class SignalRTripRealtimePublisher : ITripRealtimePublisher
                 tripId);
         }
     }
+
+    public async Task PublishMissionUpdatedAsync(
+        Guid tripId,
+        TripMissionEventDto entry,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _hub.Clients
+                .Group(TripHub.GroupKey(tripId))
+                .MissionUpdated(entry);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Failed to push MissionUpdated for Trip {TripId} (mission {MissionKey} → {State}) — UI will catch up on next REST refresh",
+                tripId, entry.MissionKey, entry.State);
+        }
+    }
 }

@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Dispatch.Application.Projections;
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Domain.Services;
@@ -66,6 +67,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
         var tripRepo = scope.ServiceProvider.GetRequiredService<ITripRepository>();
         var missionRepo = scope.ServiceProvider.GetRequiredService<ITripMissionEventRepository>();
         var queryService = scope.ServiceProvider.GetRequiredService<IRiot3OrderQueryService>();
+        var realtimePublisher = scope.ServiceProvider.GetRequiredService<ITripRealtimePublisher>();
         // Phase P5.3 — used when reconciler observes PROCESSING for a trip
         // that's still Created (we missed the TASK_PROCESSING webhook).
         var itemSnapshotProvider = scope.ServiceProvider.GetRequiredService<ITripItemSnapshotProvider>();
@@ -114,7 +116,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
             // Mission diff — independent of state transition. Even when
             // Trip status didn't change this tick, sub-task progress may
             // have arrived; upsert is idempotent so duplicates are safe.
-            await UpsertMissionsAsync(missionRepo, trip.Id, data, ct);
+            await UpsertMissionsAsync(missionRepo, realtimePublisher, trip.Id, data, ct);
 
             var transition = await ApplyVendorStateAsync(trip, data, itemSnapshotProvider, ct);
             switch (transition)
@@ -278,6 +280,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
 
     private static async Task UpsertMissionsAsync(
         ITripMissionEventRepository repo,
+        ITripRealtimePublisher realtimePublisher,
         Guid tripId,
         Riot3OrderQueryData data,
         CancellationToken ct)
@@ -309,7 +312,29 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     actionType: m.ActionType,
                     resultCode: m.ResultCode,
                     errorMessage: m.ResultStr);
-                await repo.AddIfNotExistsAsync(ev, ct);
+                var inserted = await repo.AddIfNotExistsAsync(ev, ct);
+                if (inserted)
+                {
+                    // Mirror webhook behavior: push to the operator drawer
+                    // so a missed webhook surfaces in realtime once the
+                    // reconciler catches up. Publisher swallows transport
+                    // errors so a SignalR hiccup never aborts the tick.
+                    await realtimePublisher.PublishMissionUpdatedAsync(
+                        tripId,
+                        new TripMissionEventDto(
+                            MissionIndex: ev.MissionIndex,
+                            MissionKey: ev.MissionKey,
+                            MissionType: ev.MissionType,
+                            State: ev.State,
+                            StationName: ev.StationName,
+                            ActionName: ev.ActionName,
+                            ActionType: ev.ActionType,
+                            ResultCode: ev.ResultCode,
+                            ErrorMessage: ev.ErrorMessage,
+                            ChangeStateTime: ev.ChangeStateTime,
+                            ReceivedAt: ev.ReceivedAt),
+                        ct);
+                }
             }
             catch (ArgumentException)
             {

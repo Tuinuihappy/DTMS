@@ -20,11 +20,18 @@ export function TripActionBar({
   tripId,
   status,
   vendorVehicleKey,
+  hasVendorIssue = false,
   onAction,
 }: {
   tripId: string;
   status: TripStatus;
   vendorVehicleKey?: string | null;
+  // When true, the trip has a vendor-side mission stuck in an alerting
+  // state (FAILED / HANG / REJECTED). Resume is still allowed — DTMS
+  // status is Paused so the command is technically valid — but the
+  // button surfaces warning styling + a tooltip so the operator knows
+  // RIOT may reject until the robot is cleared at the floor.
+  hasVendorIssue?: boolean;
   onAction?: (action: Action, payload?: { newTripId?: string }) => void;
 }) {
   const [busy, setBusy] = useState<Action | null>(null);
@@ -86,10 +93,15 @@ export function TripActionBar({
         <ActionButton
           icon={Play}
           label="Resume"
-          tone="success"
+          tone={canResume && hasVendorIssue ? "amber" : "success"}
           disabled={!canResume || busy !== null}
           busy={busy === "resume"}
           onClick={() => run("resume", () => resumeTrip(tripId))}
+          title={
+            canResume && hasVendorIssue
+              ? "Vendor mission ติด FAILED/HANG — Resume อาจ fail จนกว่าจะเคลียร์หุ่นที่หน้างาน"
+              : undefined
+          }
         />
         <ActionButton
           icon={Repeat2}

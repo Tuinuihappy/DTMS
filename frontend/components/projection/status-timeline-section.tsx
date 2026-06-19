@@ -1,6 +1,6 @@
 "use client";
 
-import { History } from "lucide-react";
+import { AlertTriangle, History } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { StatusHistoryEntry } from "@/lib/api/status-history";
 import { DataFreshnessChip } from "./data-freshness-chip";
@@ -28,6 +28,7 @@ export function StatusTimelineSection({
   title = "Status timeline",
   fetcher,
   liveEntry,
+  issueCount,
 }: {
   entityId: string | null;
   title?: string;
@@ -40,6 +41,13 @@ export function StatusTimelineSection({
    * without a refetch.
    */
   liveEntry?: StatusHistoryEntry | null;
+  /**
+   * When > 0, renders a coral "N issues" chip next to the section header
+   * so operators see that vendor-side problems exist even when the
+   * timeline itself only shows clean DTMS state transitions. Caller
+   * computes the count (e.g. failing missions for a Trip drawer).
+   */
+  issueCount?: number;
 }) {
   const [data, setData] = useState<FetchResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -105,7 +113,15 @@ export function StatusTimelineSection({
           <History className="h-3 w-3" strokeWidth={2.4} />
           {title}
         </span>
-        {data?.lastEventAt && <DataFreshnessChip lastEventAt={data.lastEventAt} />}
+        <span className="inline-flex items-center gap-1.5">
+          {issueCount !== undefined && issueCount > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#fde0db] px-2 py-[2px] text-[10px] font-semibold tracking-[0.04em] text-[var(--color-coral)] dark:bg-[#3a1a17]">
+              <AlertTriangle className="h-3 w-3" strokeWidth={2.6} />
+              {issueCount} {issueCount === 1 ? "issue" : "issues"}
+            </span>
+          )}
+          {data?.lastEventAt && <DataFreshnessChip lastEventAt={data.lastEventAt} />}
+        </span>
       </h4>
 
       {error && (

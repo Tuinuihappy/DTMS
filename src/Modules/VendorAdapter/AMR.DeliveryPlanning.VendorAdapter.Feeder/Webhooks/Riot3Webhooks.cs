@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Dispatch.Application.Projections;
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Domain.Services;
@@ -36,6 +37,7 @@ public static class Riot3Webhooks
             ITripItemSnapshotProvider tripItemSnapshotProvider,
             AMR.DeliveryPlanning.Facility.Application.Services.IFacilityReadService facilityReadService,
             AMR.DeliveryPlanning.Dispatch.Application.Services.IDeliveryOrderStatusReader orderReader,
+            ITripRealtimePublisher realtimePublisher,
             ILogger<Riot3NotifyPayload> logger,
             CancellationToken cancellationToken) =>
         {
@@ -49,7 +51,7 @@ public static class Riot3Webhooks
                     break;
 
                 case "subtask":
-                    await HandleSubTaskEvent(payload, tripRepository, missionEventRepository, facilityReadService, orderReader, logger, cancellationToken);
+                    await HandleSubTaskEvent(payload, tripRepository, missionEventRepository, facilityReadService, orderReader, realtimePublisher, logger, cancellationToken);
                     break;
 
                 case "vehicle":
@@ -269,6 +271,7 @@ public static class Riot3Webhooks
         ITripMissionEventRepository missionEventRepository,
         AMR.DeliveryPlanning.Facility.Application.Services.IFacilityReadService facilityReadService,
         AMR.DeliveryPlanning.Dispatch.Application.Services.IDeliveryOrderStatusReader orderReader,
+        ITripRealtimePublisher realtimePublisher,
         ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -344,11 +347,35 @@ public static class Riot3Webhooks
 
         var inserted = await missionEventRepository.AddIfNotExistsAsync(missionEvent, cancellationToken);
         if (inserted)
+        {
             logger.LogInformation("[SubTaskWebhook] Trip {TripId} mission {MissionKey} → {State}",
                 trip.Id, subTaskKey, state);
+
+            // Push to operator drawer so the Mission Timeline + failure
+            // banner update without a manual refresh. Fire-and-forget by
+            // design — publisher swallows transport errors and the UI
+            // catches up on next REST refetch.
+            await realtimePublisher.PublishMissionUpdatedAsync(
+                trip.Id,
+                new TripMissionEventDto(
+                    MissionIndex: missionEvent.MissionIndex,
+                    MissionKey: missionEvent.MissionKey,
+                    MissionType: missionEvent.MissionType,
+                    State: missionEvent.State,
+                    StationName: missionEvent.StationName,
+                    ActionName: missionEvent.ActionName,
+                    ActionType: missionEvent.ActionType,
+                    ResultCode: missionEvent.ResultCode,
+                    ErrorMessage: missionEvent.ErrorMessage,
+                    ChangeStateTime: missionEvent.ChangeStateTime,
+                    ReceivedAt: missionEvent.ReceivedAt),
+                cancellationToken);
+        }
         else
+        {
             logger.LogDebug("[SubTaskWebhook] Trip {TripId} mission {MissionKey} {State} — duplicate, skipped",
                 trip.Id, subTaskKey, state);
+        }
 
         // ── Item-Picked / DroppedOff detection ─────────────────────────
         // Once a pickup/drop sub-mission finishes at the trip's pickup OR

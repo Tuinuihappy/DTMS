@@ -15,6 +15,7 @@ import {
   getTripDetails,
   isTripInFlight,
   type TripDetailsDto,
+  type TripMissionDto,
 } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
 import { StatusTimelineSection } from "@/components/projection/status-timeline-section";
@@ -22,6 +23,11 @@ import type { StatusHistoryEntry } from "@/lib/api/status-history";
 import { getTripStatusHistory } from "@/lib/api/status-history";
 import { useTripSubscription } from "@/lib/realtime/hubs/trip-hub";
 import { AttemptBadge, RetryChainNav, TripStatusBadge } from "./badges";
+import {
+  MissionFailureAlert,
+  MISSION_TIMELINE_ANCHOR,
+  getFailingMissions,
+} from "./mission-failure-alert";
 import { MissionTimeline } from "./mission-timeline";
 import { RetryHistoryPanel } from "./retry-history-panel";
 import { SnapshotInspector } from "./snapshot-inspector";
@@ -57,12 +63,33 @@ export function TripDetailDrawer({
   const [includeRaw, setIncludeRaw] = useState(false);
   // Phase P1 — TripHub live timeline updates while the drawer is open.
   const [liveTimelineEntry, setLiveTimelineEntry] = useState<StatusHistoryEntry | null>(null);
+  // Mission events pushed over TripHub.MissionUpdated since the drawer
+  // opened. Kept separate from data.missions so a refetch (e.g. user
+  // toggles "Include raw") doesn't drop in-flight pushes. Merged with
+  // data.missions at render time; dedup by (missionKey, state) matches
+  // the backend's unique index, so a webhook + reconciler racing to
+  // upsert the same row only produces one timeline entry.
+  const [liveMissionEvents, setLiveMissionEvents] = useState<TripMissionDto[]>([]);
 
   useTripSubscription(tripId, {
     TimelineUpdated: (entry) => setLiveTimelineEntry(entry as StatusHistoryEntry),
+    MissionUpdated: (event) =>
+      setLiveMissionEvents((prev) => {
+        const incoming = event as TripMissionDto;
+        if (prev.some((m) => m.missionKey === incoming.missionKey && m.state === incoming.state)) {
+          return prev; // already seen this (missionKey, state) — dedup
+        }
+        return [...prev, incoming];
+      }),
   });
 
   useEffect(() => {
+    // Reset live pushes whenever the drawer switches to a different
+    // trip — otherwise events from the previous trip would leak into
+    // the new one. Reset on every effect run (not just tripId === null)
+    // so reopening the same trip after a close also starts clean.
+    setLiveMissionEvents([]);
+    setLiveTimelineEntry(null);
     if (!tripId) {
       setData(null);
       setError(null);
@@ -176,7 +203,23 @@ export function TripDetailDrawer({
                 </div>
               )}
 
-              {data && (
+              {data && (() => {
+                // Fold SignalR pushes into the fetched missions list so
+                // the banner + chip + Mission Timeline reflect new vendor
+                // events without waiting for a manual refresh. Dedup by
+                // (missionKey, state) matches both the backend unique
+                // index and the live-push dedup, so a webhook arriving
+                // microseconds after a fetch is harmless.
+                const seen = new Set(data.missions.map((m) => `${m.missionKey}|${m.state}`));
+                const mergedMissions = [
+                  ...data.missions,
+                  ...liveMissionEvents.filter((m) => !seen.has(`${m.missionKey}|${m.state}`)),
+                ];
+                // Compute once per render so the alert banner, the Status
+                // Timeline "N issues" chip, and the Resume button's warning
+                // style all stay in sync from the same source of truth.
+                const failingMissions = getFailingMissions(mergedMissions);
+                return (
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -192,13 +235,29 @@ export function TripDetailDrawer({
                     </div>
                   )}
 
+                  {/* Surfaces vendor-side mission failures (FAILED / HANG /
+                      REJECTED) at the top of the drawer so operators see
+                      them before reaching for Pause/Resume. Auto-hides
+                      when no missions are in alerting states. */}
+                  <MissionFailureAlert missions={mergedMissions} />
+
                   {/* Phase P1 — structured status-history timeline with
                       realtime TripHub updates. */}
                   <StatusTimelineSection
                     entityId={data.id}
                     fetcher={getTripStatusHistory}
                     liveEntry={liveTimelineEntry}
+                    issueCount={failingMissions.length}
                   />
+
+                  {/* Mission timeline sits right under the Status timeline
+                      so operators see vendor-side failures inline with
+                      DTMS state transitions. Anchor id is the target of
+                      the MissionFailureAlert scroll-to-anchor button. */}
+                  <section id={MISSION_TIMELINE_ANCHOR}>
+                    <SectionTitle>Mission timeline ({mergedMissions.length})</SectionTitle>
+                    <MissionTimeline missions={mergedMissions} />
+                  </section>
 
                   {/* Upstream-OMS shipment notification status. Auto-hides
                       when the order is internal (no OMS rows in audit).
@@ -265,6 +324,7 @@ export function TripDetailDrawer({
                         tripId={data.id}
                         status={data.status}
                         vendorVehicleKey={data.vendorVehicleKey}
+                        hasVendorIssue={failingMissions.length > 0}
                         onAction={(action, payload) => {
                           if (action === "retry" && payload?.newTripId && onOpenTrip) {
                             onOpenTrip(payload.newTripId);
@@ -285,6 +345,7 @@ export function TripDetailDrawer({
                         tripId={data.id}
                         status={data.status}
                         vendorVehicleKey={data.vendorVehicleKey}
+                        hasVendorIssue={failingMissions.length > 0}
                         onAction={(action, payload) => {
                           if (action === "retry" && payload?.newTripId && onOpenTrip) {
                             onOpenTrip(payload.newTripId);
@@ -304,11 +365,6 @@ export function TripDetailDrawer({
                       <RetryHistoryPanel tripId={data.id} onOpenAttempt={onOpenTrip} />
                     </section>
                   ) : null}
-
-                  <section>
-                    <SectionTitle>Mission timeline ({data.missions.length})</SectionTitle>
-                    <MissionTimeline missions={data.missions} />
-                  </section>
 
                   <section>
                     <div className="mb-2 flex items-center justify-between">
@@ -335,7 +391,8 @@ export function TripDetailDrawer({
                     </div>
                   </section>
                 </motion.div>
-              )}
+                );
+              })()}
             </div>
           </motion.aside>
         </>
