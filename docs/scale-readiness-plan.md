@@ -59,7 +59,7 @@ src/Modules/*/Infrastructure/Persistence/Migrations/
 └── 2026xxxx_AddOutboxPartialIndex.cs   # 6 migrations (one per module schema)
 ```
 
-### Step A1 — Partial index migration (2 hr)
+### Step A1 — Partial index migration (2 hr) ✅ shipped 2026-06-20
 
 Replace plain btree on `ProcessedOnUtc` with a partial index on pending rows. Skips the scanned-but-discarded 98% of historical rows.
 
@@ -71,11 +71,15 @@ CREATE INDEX CONCURRENTLY "IX_OutboxMessages_Pending"
   WHERE "ProcessedOnUtc" IS NULL;
 ```
 
-**Manual migration** — `dotnet-ef` is incompatible with .NET 10 preview (see [feedback_migration_manual.md](../memory/feedback_migration_manual.md)). Hand-write the `MigrationBuilder.Sql(...)` calls + a designer file per module.
+**Manual migration** — `dotnet-ef` is incompatible with .NET 10 preview (see [feedback_migration_manual.md](../memory/feedback_migration_manual.md)). Hand-write `MigrationBuilder.Sql(...)` calls with `suppressTransaction:true` (CONCURRENTLY can't run inside the EF migration tx). Put `[DbContext(typeof(...))]` + `[Migration("...")]` attributes directly on the class (no separate Designer file needed — codebase convention for manual migrations).
 
-**Accept:**
-- `EXPLAIN ANALYZE` on the outbox poll query shows `Index Scan using IX_OutboxMessages_Pending` (not `Seq Scan` or full btree scan)
-- Idle DB CPU drops noticeably (was 0.06% before, but spikes to ~340% under load — measure delta)
+**Important** — the 6 migrations share `public.__EFMigrationsHistory`. Use **unique MigrationId timestamps per module** (e.g. `20260620000020/30/40/50/60`) or the second DbContext sees the first's record and skips its own.
+
+**Result:**
+- ✅ All 6 schemas swapped to `IX_OutboxMessages_Pending`, `indisvalid=t` on each
+- ✅ `EXPLAIN ANALYZE` on `deliveryorder.OutboxMessages` poll query: `Index Scan using IX_OutboxMessages_Pending`, **Execution Time 0.461 ms → 0.065 ms** (7× faster on empty table; Sort node eliminated because the partial index is ordered by `OccurredOnUtc` matching the ORDER BY)
+- ✅ Smoke order reached `Dispatched` in 3s (T1 main path unchanged)
+- ⚠️ Idle DB CPU delta deferred — measure under Phase A acceptance scenario B (load test), not at idle
 
 ### Step A2 — `SKIP LOCKED` + parallel modules (1 day)
 
