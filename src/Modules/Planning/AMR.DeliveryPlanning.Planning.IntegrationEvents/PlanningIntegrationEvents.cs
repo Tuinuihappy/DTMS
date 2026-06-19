@@ -102,3 +102,15 @@ public record JobResumedIntegrationEventV1(
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
     string SchemaVersion = "1.1") : IIntegrationEvent;
+
+// T2 Phase 2 step 1 — fired by DeliveryOrderValidatedConsumer immediately
+// after MarkOrderPlanning succeeds. Marks the "planning has been requested
+// for this order" boundary for the saga state machine, which transitions
+// AwaitingPlan → Planning on receipt. The legacy procedural consumer
+// remains authoritative; this event is the saga's read-side signal during
+// dual-run shadow mode (see crash-recovery plan section 3.3).
+public record OrderPlanRequestedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.0") : IIntegrationEvent;

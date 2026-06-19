@@ -9,6 +9,7 @@ using AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobDispatched;
 using AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobFailed;
 using AMR.DeliveryPlanning.Planning.Application.Services;
 using AMR.DeliveryPlanning.Planning.Domain.Enums;
+using AMR.DeliveryPlanning.Planning.IntegrationEvents;
 using AMR.DeliveryPlanning.SharedKernel;
 using AMR.DeliveryPlanning.SharedKernel.Diagnostics;
 using MassTransit;
@@ -66,6 +67,19 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         // Phase 1: Confirmed → Planning. Internal event (sub-second), but
         // surfaces in audit + lets RabbitMQ redeliveries be idempotent.
         await _sender.Send(new MarkOrderPlanningCommand(evt.DeliveryOrderId), ct);
+
+        // T2 Phase 2 step 1 — also publish OrderPlanRequested for the saga
+        // shadow path. When Workflow:UseSaga=false (default) the event is
+        // published but has no subscribers, so it's a no-op. When the flag
+        // is on, DeliveryOrderSagaStateMachine consumes it to transition
+        // AwaitingPlan → Planning. Publishing AFTER MarkOrderPlanning
+        // succeeds means a transient failure won't tell the saga planning
+        // started when it didn't; if the consumer retries, the saga's Step 1
+        // Ignore handler on Planning state will dedupe the redelivery.
+        await context.Publish(new OrderPlanRequestedIntegrationEventV1(
+            EventId: Guid.NewGuid(),
+            OccurredOn: DateTime.UtcNow,
+            DeliveryOrderId: evt.DeliveryOrderId), ct);
 
         // Phase 1b (b8): Create a 1:1 Job anchor per group before the order
         // is marked Planned. Best-effort — a failed anchor logs a warning
