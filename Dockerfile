@@ -2,6 +2,13 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS base
 WORKDIR /app
 EXPOSE 8080
 
+# Install curl so docker-compose healthcheck can probe /health/ready.
+# 2-3 MB image size cost; cached layer so rebuilds don't pay it again.
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
 WORKDIR /src
 

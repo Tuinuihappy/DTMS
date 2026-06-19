@@ -60,6 +60,15 @@ services:
       - "5219:8080"
     restart: unless-stopped
     mem_limit: 2g
+    # Probes /health/ready (postgres + redis + rabbitmq + RIOT3 not required
+    # — vendors tag is separate). start_period waits 60s so the .NET app
+    # has time to JIT + bind the port before the first probe runs.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     # T1.3 — give the API 90 seconds to drain on SIGTERM before Docker
     # SIGKILLs it. Internally: Host.ShutdownTimeout=60s, MassTransit
     # StopTimeout=45s — so consumers finish in-flight work, the bus stops
