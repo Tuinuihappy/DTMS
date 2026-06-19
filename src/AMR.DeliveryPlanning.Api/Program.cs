@@ -6,6 +6,7 @@ using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
 using AMR.DeliveryPlanning.Api.Middlewares;
 using AMR.DeliveryPlanning.Api.Modules;
 using AMR.DeliveryPlanning.Api.RobotPositions;
+using AMR.DeliveryPlanning.Api.VendorHealth;
 using AMR.DeliveryPlanning.SharedKernel.Auth;
 using AMR.DeliveryPlanning.SharedKernel.Projection;
 using Microsoft.AspNetCore.Authentication;
@@ -264,6 +265,24 @@ var rabbitPass = rabbitConfig["Password"] ?? "guest";
 var riot3BaseUrl = builder.Configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:12000";
 var riot3ApiKey  = builder.Configuration.GetValue<string>("VendorAdapter:Riot3:ApiKey") ?? string.Empty;
 
+// Vendor health monitoring — background poller keeps an in-memory snapshot of
+// each vendor's health so /health/vendors answers in <1ms instead of issuing
+// an HTTP call to the vendor on every probe. State machine debounces transient
+// network blips so the dashboard doesn't flap.
+builder.Services.Configure<VendorHealthOptions>(
+    builder.Configuration.GetSection("VendorHealth"));
+builder.Services.AddSingleton<IVendorHealthStore, InMemoryVendorHealthStore>();
+builder.Services.AddHttpClient<IRiot3HealthProbe, Riot3HealthProbe>((sp, client) =>
+{
+    var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<VendorHealthOptions>>().CurrentValue.Riot3;
+    client.BaseAddress = new Uri(riot3BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(Math.Max(1, opts.TimeoutSeconds) + 1);
+    if (!string.IsNullOrWhiteSpace(riot3ApiKey))
+        client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
+});
+builder.Services.AddHostedService<Riot3HealthPollerService>();
+builder.Services.AddTransient<RiotHealthCheckFromStore>();
+
 builder.Services.AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy("Service is running"))
     .AddCheck("postgres", () =>
@@ -316,33 +335,7 @@ builder.Services.AddHealthChecks()
             return HealthCheckResult.Unhealthy(ex.Message);
         }
     }, tags: ["ready"])
-    .AddCheck("riot3", (CancellationToken ct) =>
-    {
-        try
-        {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-            if (!string.IsNullOrWhiteSpace(riot3ApiKey))
-                http.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
-
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            var response = http.GetAsync($"{riot3BaseUrl}/api/v4/maps?pageSize=1", ct).GetAwaiter().GetResult();
-            sw.Stop();
-
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                return HealthCheckResult.Degraded("RIOT3 reachable but ApiKey is invalid (401)");
-
-            response.EnsureSuccessStatusCode();
-            return HealthCheckResult.Healthy($"RIOT3 responded in {sw.ElapsedMilliseconds}ms");
-        }
-        catch (TaskCanceledException)
-        {
-            return HealthCheckResult.Unhealthy("RIOT3 connection timed out (>5s)");
-        }
-        catch (Exception ex)
-        {
-            return HealthCheckResult.Unhealthy($"RIOT3 unreachable: {ex.Message}");
-        }
-    }, tags: ["vendors"]);
+    .AddCheck<RiotHealthCheckFromStore>("riot3", tags: ["vendors"]);
 
 // Rate limiting — fixed window per remote IP. Defaults to 100 req/min; override
 // via RateLimit__PermitLimit / RateLimit__WindowSeconds / RateLimit__QueueLimit

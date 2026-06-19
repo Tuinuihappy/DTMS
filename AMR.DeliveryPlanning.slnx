@@ -50,6 +50,7 @@
     <Project Path="src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Simulator/AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/AMR.DeliveryPlanning.Api.UnitTests/AMR.DeliveryPlanning.Api.UnitTests.csproj" />
     <Project Path="tests/AMR.DeliveryPlanning.ArchitectureTests/AMR.DeliveryPlanning.ArchitectureTests.csproj" />
     <Project Path="tests/AMR.DeliveryPlanning.FunctionalTests/AMR.DeliveryPlanning.FunctionalTests.csproj" />
   </Folder>
