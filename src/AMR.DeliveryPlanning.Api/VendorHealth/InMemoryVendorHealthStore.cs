@@ -11,6 +11,9 @@ public sealed class InMemoryVendorHealthStore : IVendorHealthStore
     public VendorHealthSnapshot? Get(string vendor) =>
         _snapshots.TryGetValue(vendor, out var snapshot) ? snapshot : null;
 
+    public IReadOnlyCollection<VendorHealthSnapshot> GetAll() =>
+        _snapshots.Values.ToArray();
+
     public void Update(VendorHealthSnapshot snapshot)
     {
         VendorHealthSnapshot? previous = null;

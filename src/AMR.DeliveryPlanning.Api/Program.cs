@@ -281,6 +281,7 @@ builder.Services.AddHttpClient<IRiot3HealthProbe, Riot3HealthProbe>((sp, client)
         client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
 });
 builder.Services.AddHostedService<Riot3HealthPollerService>();
+builder.Services.AddHostedService<VendorHealthBroadcaster>();
 builder.Services.AddTransient<RiotHealthCheckFromStore>();
 
 builder.Services.AddHealthChecks()
@@ -570,6 +571,11 @@ app.MapAllModuleEndpoints();
 // Map live robot positions endpoint (lives in the Api project because the
 // store + DTO are composition-root concerns, not a Facility domain concept).
 app.MapRobotPositionEndpoints();
+
+// Vendor health snapshot endpoint — reads from in-memory store updated by
+// Riot3HealthPollerService. Push notifications go through DashboardHub
+// (boardKey="vendor-health") via VendorHealthBroadcaster.
+app.MapVendorHealth();
 
 // ── P0 Day 3 — SignalR hub endpoints ──────────────────────────────────
 // Five focused hubs (one per bounded context). Browser pages connect only

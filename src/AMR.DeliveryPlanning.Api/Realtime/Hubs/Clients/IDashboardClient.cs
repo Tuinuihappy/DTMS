@@ -20,4 +20,12 @@ public interface IDashboardClient
     /// acceptable as full payload.
     /// </summary>
     Task KpiSnapshotUpdated(object snapshot);
+
+    /// <summary>
+    /// Vendor health transitioned (Healthy/Degraded/Unhealthy). Pushed
+    /// individually — transitions are debounced by the state machine to
+    /// avoid flap noise, so batching offers no benefit.
+    /// Subscribe via <c>Subscribe("vendor-health")</c>.
+    /// </summary>
+    Task VendorHealthChanged(object snapshot);
 }
