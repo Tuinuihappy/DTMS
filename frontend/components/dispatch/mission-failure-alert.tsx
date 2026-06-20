@@ -2,6 +2,7 @@
 
 import { AlertTriangle, ArrowDown } from "lucide-react";
 import type { TripMissionDto } from "@/lib/api/trips";
+import { resolveRiot3ErrorAction } from "@/lib/vendor/riot3-error-codes";
 
 export const MISSION_TIMELINE_ANCHOR = "mission-timeline-anchor";
 
@@ -65,26 +66,38 @@ export function MissionFailureAlert({
             Vendor mission {failing.length === 1 ? "failed" : `issues (${failing.length})`}
           </div>
           <ul className="mt-1.5 space-y-1.5">
-            {failing.map((m, idx) => (
-              <li key={`${m.missionKey}-${m.state}-${idx}`} className="font-medium">
-                <span className="font-mono text-[11px] uppercase tracking-[0.04em] opacity-80">
-                  #{m.missionIndex + 1} {m.missionType}
-                  {m.stationName ? ` → ${m.stationName}` : ""}
-                </span>
-                <span className="ml-1.5 rounded-full bg-white/60 px-1.5 py-[1px] text-[10.5px] font-semibold uppercase tracking-[0.06em] dark:bg-white/[0.08]">
-                  {m.state}
-                </span>
-                {(m.resultCode || m.errorMessage) && (
-                  <div className="mt-0.5 text-[11.5px] font-normal opacity-90">
-                    {m.resultCode && (
-                      <span className="font-mono">{m.resultCode}</span>
-                    )}
-                    {m.resultCode && m.errorMessage && <span> · </span>}
-                    {m.errorMessage}
-                  </div>
-                )}
-              </li>
-            ))}
+            {failing.map((m, idx) => {
+              const action = resolveRiot3ErrorAction(m.resultCode);
+              return (
+                <li key={`${m.missionKey}-${m.state}-${idx}`} className="font-medium">
+                  <span className="font-mono text-[11px] uppercase tracking-[0.04em] opacity-80">
+                    #{m.missionIndex + 1} {m.missionType}
+                    {m.stationName ? ` → ${m.stationName}` : ""}
+                  </span>
+                  <span className="ml-1.5 rounded-full bg-white/60 px-1.5 py-[1px] text-[10.5px] font-semibold uppercase tracking-[0.06em] dark:bg-white/[0.08]">
+                    {m.state}
+                  </span>
+                  {/* Action line (mapped) takes top billing — it tells the
+                      operator what to do. Raw code + vendor message stays
+                      visible below as a smaller secondary line so IT
+                      escalations still have the original payload. */}
+                  {action && (
+                    <div className="mt-0.5 text-[12px] font-semibold">
+                      {action}
+                    </div>
+                  )}
+                  {(m.resultCode || m.errorMessage) && (
+                    <div className="mt-0.5 text-[11px] font-normal opacity-75">
+                      {m.resultCode && (
+                        <span className="font-mono">{m.resultCode}</span>
+                      )}
+                      {m.resultCode && m.errorMessage && <span> · </span>}
+                      {m.errorMessage}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
           <button
             type="button"

@@ -3,6 +3,7 @@
 import { ArrowRight, CircleAlert, MapPin, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TripMissionDto } from "@/lib/api/trips";
+import { resolveRiot3ErrorAction } from "@/lib/vendor/riot3-error-codes";
 import { MissionStateBadge } from "./badges";
 
 // Renders the per-mission timeline returned by /trips/{id}/details.
@@ -50,6 +51,7 @@ function MissionRow({ mission }: { mission: TripMissionDto }) {
   const Icon = isMove ? MapPin : Zap;
   const isFailed = ["FAILED"].includes(mission.state.toUpperCase());
   const hasError = mission.errorMessage || mission.resultCode === "1";
+  const action = resolveRiot3ErrorAction(mission.resultCode);
 
   return (
     <li className="relative">
@@ -105,12 +107,28 @@ function MissionRow({ mission }: { mission: TripMissionDto }) {
                 </>
               )}
             </div>
-            {hasError && mission.errorMessage && (
-              <div className="mt-1.5 flex items-start gap-1 text-[11px] text-[var(--color-coral)]">
+            {action && (
+              <div className="mt-1.5 flex items-start gap-1 text-[11.5px] font-semibold text-[var(--color-coral)]">
                 <CircleAlert
                   className="mt-0.5 h-3 w-3 flex-shrink-0"
                   strokeWidth={2.4}
                 />
+                <span>{action}</span>
+              </div>
+            )}
+            {hasError && mission.errorMessage && (
+              <div
+                className={cn(
+                  "flex items-start gap-1 text-[11px] text-[var(--color-coral)] opacity-75",
+                  action ? "mt-0.5 pl-4" : "mt-1.5",
+                )}
+              >
+                {!action && (
+                  <CircleAlert
+                    className="mt-0.5 h-3 w-3 flex-shrink-0"
+                    strokeWidth={2.4}
+                  />
+                )}
                 <span>{mission.errorMessage}</span>
               </div>
             )}
