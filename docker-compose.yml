@@ -150,6 +150,11 @@ services:
       - RateLimit__QueueLimit=${RateLimit__QueueLimit:-5}
       - VendorAdapter__Riot3__BaseUrl=http://10.204.212.28:12000
       - VendorAdapter__Riot3__ApiKey=${VendorAdapter__Riot3__ApiKey:-}
+      # Vendor outbound kill switch. true = production-shape (Riot3OrderDispatcherAdapter,
+      # real RIOT3 calls). false = NoOpOrderDispatcherAdapter (orders reach DTMS
+      # Dispatched without contacting RIOT) — for load tests / dev without
+      # spamming the vendor cluster. Default true so prod is safe.
+      - VendorAdapter__Riot3__Enabled=${VendorAdapter__Riot3__Enabled:-true}
       # Upstream OMS shipment notification (POST /api/shipments) fired
       # when a Trip transitions Created → InProgress. BearerToken is a
       # long-lived JWT supplied by OMS ops — DO NOT commit; pass via

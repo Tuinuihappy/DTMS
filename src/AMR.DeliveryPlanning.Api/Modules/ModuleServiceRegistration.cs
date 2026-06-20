@@ -264,7 +264,16 @@ public static class ModuleServiceRegistration
         services.AddScoped<IActionTemplateRepository, ActionTemplateRepository>();
         services.AddScoped<IOrderTemplateRepository, OrderTemplateRepository>();
         services.AddScoped<IOrderTemplateResolver, OrderTemplateResolver>();
-        services.AddScoped<IRobotOrderDispatcher, AMR.DeliveryPlanning.Api.Adapters.Riot3OrderDispatcherAdapter>();
+        // Vendor seam: swap to a no-op adapter when VendorAdapter:Riot3:Enabled=false
+        // so load tests / dev scenarios can drive orders through the full DTMS
+        // pipeline to "Dispatched" without contacting the real RIOT3 cluster.
+        // Default true — production safety, opt-out explicitly. The NoOp adapter
+        // logs every skip at INF so it's never silent.
+        var riot3Enabled = configuration.GetValue<bool>("VendorAdapter:Riot3:Enabled", true);
+        if (riot3Enabled)
+            services.AddScoped<IRobotOrderDispatcher, AMR.DeliveryPlanning.Api.Adapters.Riot3OrderDispatcherAdapter>();
+        else
+            services.AddScoped<IRobotOrderDispatcher, AMR.DeliveryPlanning.Api.Adapters.NoOpOrderDispatcherAdapter>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IVendorEnvelopeOperationService,
             AMR.DeliveryPlanning.Api.Adapters.Riot3VendorEnvelopeOperationAdapter>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IVendorRobotOperationService,
