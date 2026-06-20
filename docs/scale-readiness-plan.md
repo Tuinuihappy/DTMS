@@ -1,7 +1,8 @@
 # Scale-Readiness Implementation Plan
 
-> **Status:** Drafted 2026-06-16 — not started
+> **Status (2026-06-20):** Phase A 🟡 in progress — Steps A1 + A2 (parts 1+2) + A3 core shipped; A4 (parallel module loop) pending. Partial acceptance run @ 812 orders/s + 0 RIOT calls but drain ~143/s still trails create at 30 VU peak. Phases B-H not started.
 > **Predecessor:** [perf-tests/results-2026-06-16/REPORT.md](../perf-tests/results-2026-06-16/REPORT.md) (E2E + Load + Stress run, Volume aborted)
+> **Acceptance runs:** [REPORT.md (A1+A2 only)](../perf-tests/results-2026-06-20/REPORT.md) · [REPORT-acceptance.md (A1+A2+A3 core + NoOp)](../perf-tests/results-2026-06-20/REPORT-acceptance.md)
 > **Trigger:** Before promoting DTMS beyond pilot scale (current safe ceiling ≈ 150 concurrent users), close the architectural ceilings exposed by the perf run.
 
 ---
@@ -39,9 +40,17 @@ Perf test 2026-06-16 ran scenarios A/B/C/D/E. Result: **0 errors at 500 VU**, bu
 
 ---
 
-## Phase A — Outbox throughput (P0, 2-3 days) ⬜
+## Phase A — Outbox throughput (P0, 2-3 days) 🟡 in progress (A1+A2+A3 core shipped, A4 pending)
 
 **Goal:** Drain rate ≥ create rate. Backlog reaches steady-state ≤ 1k pending under sustained 1k orders/s.
+
+**Progress (2026-06-20):**
+- ✅ A1 partial index — shipped, EXPLAIN clean
+- ✅ A2 part 1 SKIP LOCKED + part 2 Parallel.ForEachAsync per-message — shipped, both verified under load
+- ✅ A3 core: PollIntervalSeconds + PerMessageTimeoutSeconds tunable — shipped, hot-reload
+- 🟡 A3 telemetry (per-module counters / gauge / dispatch_duration histogram) — deferred
+- ⬜ A4 Parallel per-module loop — NEW (surfaced by acceptance run); blocks final acceptance
+- ⬜ Acceptance — partial pass; see Acceptance section below
 
 ### Why P0
 
@@ -122,24 +131,62 @@ await Parallel.ForEachAsync(_modules, ct, async (module, t) =>
 
 **Why `Parallel.ForEachAsync` per-message:** publishing to MassTransit is async I/O. Sequential blocks the whole batch on one slow recipient.
 
-### Step A3 — Tunable options + telemetry (0.5 day)
+### Step A3 — Tunable options + telemetry (0.5 day) 🟡 core shipped 2026-06-20
+
+**Part 1 — Tunable options (shipped):** all 5 outbox knobs are now `OutboxOptions` properties bound from configuration via `IOptionsMonitor`, hot-reload aware (read per-iteration). Pre-flag hardcoded constants `PollingInterval=5s` and `PublishTimeout=10s` are gone. Boot log surfaces all 5 in one line so the running pod's config is self-documenting.
 
 ```csharp
-// appsettings.json
-"Outbox": {
-  "PollIntervalSeconds": 2,    // was hardcoded 5
-  "BatchSize": 500,            // was hardcoded 50
-  "PublishConcurrency": 8,     // was 1 (sequential)
-  "PerMessageTimeoutSeconds": 10
+// OutboxOptions (current)
+public class OutboxOptions
+{
+    public bool UseSkipLocked { get; set; } = false;       // A2 part 1
+    public int BatchSize { get; set; } = 50;               // A2 part 1
+    public int PublishConcurrency { get; set; } = 1;       // A2 part 2
+    public int PollIntervalSeconds { get; set; } = 5;      // A3 ✓
+    public int PerMessageTimeoutSeconds { get; set; } = 10; // A3 ✓
 }
 ```
 
-Add OpenTelemetry counters:
+**Part 2 — OpenTelemetry counters (pending):** the existing `WorkflowMetrics.SetOutboxPending` is a single aggregated gauge. The per-module breakdown below would change ops' diagnostic from "outbox is X behind, somewhere" to "vendoradapter module is X behind, others are healthy":
 - `dtms.outbox.processed` (tag: module, success)
 - `dtms.outbox.pending_gauge` (per module)
 - `dtms.outbox.dispatch_duration` histogram
 
-### Acceptance — Phase A
+Defer this until after A4 — there's no point instrumenting a loop we're about to restructure.
+
+### Step A4 — Parallel per-module loop (NEW, ~1h) ⬜
+
+**Surfaced by the 2026-06-20 acceptance run.** With A1+A2+A3 active at `BatchSize=500, PollIntervalSeconds=1, PublishConcurrency=8`, the *theoretical* drain ceiling is `500 × 6 modules / 1s = 3000 events/s`. Observed: ~143 events/s.
+
+Root cause: [`OutboxProcessorService.ProcessUnpublishedEventsAsync`](../src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/OutboxProcessorService.cs#L59) iterates the 6 module DbContexts **sequentially with `await`**. At full batch + SKIP LOCKED tx + parallel publish + SaveChanges + count, each module's tick is ~500-800ms. 6 × 700ms = ~4.2s per cycle even though the configured poll is 1s. Effective per-module rate ≈ 100-150/s.
+
+**Fix shape:**
+```csharp
+// Today (sequential):
+totalPending += await ProcessModuleAsync(outboxCtx, ..., opts, ct);
+totalPending += await ProcessModuleAsync(deliveryorderCtx, ..., opts, ct);
+totalPending += await ProcessModuleAsync(planningCtx, ..., opts, ct);
+// ... 6 modules × ~700ms = 4.2s wall-clock cycle
+
+// Target (parallel):
+var modules = new (DbContext db, string source)[] { (outboxCtx, "outbox"), ... };
+var pendingPerModule = await Task.WhenAll(
+    modules.Select(m => ProcessModuleAsync(m.db, publisher, m.source, opts, ct)));
+totalPending = pendingPerModule.Sum();
+// ~700ms wall-clock cycle = ~5× drain throughput
+```
+
+**Subtleties to handle:**
+- Each `ProcessModuleAsync` already gets its own `DbContext` instance via `scope.ServiceProvider.GetRequiredService<T>()`. Resolutions are thread-safe; the resolved instances are not shared. ✓
+- The shared `IPublishEndpoint` is thread-safe per MassTransit guarantees. ✓
+- Per-module `Task.WhenAll` means one slow module won't extend the cycle past the slowest module (rather than past the *sum*).
+- One module faulting must not cancel the others — wrap each in try/catch and aggregate errors.
+
+**Acceptance:** re-run scenario B at the same tuned config + NoOp; pending ≤ 100 within 30s of test ending.
+
+### Acceptance — Phase A 🟡 PARTIAL (2026-06-20)
+
+**Status:** API-side wins delivered (+17% TPS, −57% p95, 0 errors). Outbox drain still trails create at 30 VU peak — A4 blocks full acceptance.
 
 Run perf scenario B (write, 30 VU, 70s) → check after settle:
 ```powershell
