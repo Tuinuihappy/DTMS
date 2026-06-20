@@ -151,8 +151,13 @@ docker exec dtms-postgres psql -U postgres -d amr_delivery_planning --% -c "SELE
 **Run 2026-06-20 (Steps A1+A2 only, before A3):** see [`perf-tests/results-2026-06-20/REPORT.md`](../perf-tests/results-2026-06-20/REPORT.md).
 - ✅ API throughput: 696 → 933 orders/s (+34%), p95 35ms (−61%), 0 errors
 - 🔴 Outbox parity: ~0.6% — drain ~10 events/s vs ~7,500 events/s generated. Bottleneck is the hardcoded `PollingInterval=5s` × `BatchSize=50` (= 10/s/module ceiling). Phase A A1+A2 are necessary but not sufficient. **Step A3 must land before acceptance can be claimed.**
-- No deadlock errors in API logs
-- Outbox `processed/s` metric ≥ create rate
+
+**Run 2026-06-20 (full pipeline + NoOp vendor):** see [`perf-tests/results-2026-06-20/REPORT-acceptance.md`](../perf-tests/results-2026-06-20/REPORT-acceptance.md).
+- ✅ API: 812 orders/s sustained, p95 39.5ms, p99 51.3ms, 0 errors, 56,134 orders accepted
+- ✅ Vendor safety: 2,315 NoOp skips, **0 RIOT3 calls** (proves the safety flag works under load)
+- ✅ 5,009 orders fully Dispatched within ~2 min, 0 Failed
+- 🟡 Drain ~143 events/s observed (still trails ~6,400 events/s generation at 30 VU peak). Acceptance threshold "≤ 100 pending within 30s" NOT met; backlog drained over ~24 min instead.
+- 📋 **Next bottleneck identified**: `ProcessUnpublishedEventsAsync` iterates 6 module DbContexts sequentially. Parallel iteration would lift drain ~5×. Worth a Step A4 follow-up before claiming Phase A acceptance.
 
 ---
 
