@@ -19,8 +19,6 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
     private readonly IOptionsMonitor<OutboxOptions> _options;
     private readonly WorkflowMetrics _metrics;
     private readonly ILogger<OutboxProcessorService> _logger;
-    private static readonly TimeSpan PollingInterval = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan PublishTimeout = TimeSpan.FromSeconds(10);
 
     public OutboxProcessorService(
         IServiceScopeFactory scopeFactory,
@@ -38,8 +36,8 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
     {
         var opts = _options.CurrentValue;
         _logger.LogInformation(
-            "OutboxProcessorService started (UseSkipLocked={UseSkipLocked}, BatchSize={BatchSize}, PublishConcurrency={PublishConcurrency})",
-            opts.UseSkipLocked, opts.BatchSize, opts.PublishConcurrency);
+            "OutboxProcessorService started (UseSkipLocked={UseSkipLocked}, BatchSize={BatchSize}, PublishConcurrency={PublishConcurrency}, PollIntervalSeconds={PollIntervalSeconds}, PerMessageTimeoutSeconds={PerMessageTimeoutSeconds})",
+            opts.UseSkipLocked, opts.BatchSize, opts.PublishConcurrency, opts.PollIntervalSeconds, opts.PerMessageTimeoutSeconds);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -52,7 +50,11 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
                 _logger.LogError(ex, "Error processing outbox messages");
             }
 
-            await Task.Delay(PollingInterval, stoppingToken);
+            // Hot-reload friendly — read PollIntervalSeconds per iteration so a
+            // config edit takes effect on the NEXT sleep. Clamped to >=1s so a
+            // misconfigured 0 doesn't become a busy loop.
+            var pollSeconds = Math.Max(1, _options.CurrentValue.PollIntervalSeconds);
+            await Task.Delay(TimeSpan.FromSeconds(pollSeconds), stoppingToken);
         }
     }
 
@@ -109,7 +111,7 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
 
         _logger.LogDebug("Processing {Count} outbox messages from {Source}", messages.Count, source);
 
-        await PublishBatchAsync(messages, publisher, source, opts.PublishConcurrency, cancellationToken);
+        await PublishBatchAsync(messages, publisher, source, opts, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
 
         return await CountPendingAsync(db, cancellationToken);
@@ -150,7 +152,7 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
             _logger.LogDebug("Processing {Count} outbox messages from {Source} (SKIP LOCKED)",
                 messages.Count, source);
 
-            await PublishBatchAsync(messages, publisher, source, opts.PublishConcurrency, cancellationToken);
+            await PublishBatchAsync(messages, publisher, source, opts, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await tx.CommitAsync(cancellationToken);
 
@@ -201,25 +203,26 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
     // is NOT thread-safe — MarkAsProcessed/MarkAsFailed mutate change-tracked
     // entities, so those calls must be single-threaded. IPublishEndpoint
     // (MassTransit) IS thread-safe, so the publish itself runs in parallel
-    // bounded by publishConcurrency. With publishConcurrency=1 the timing is
-    // identical to the pre-flag sequential foreach.
+    // bounded by opts.PublishConcurrency. With PublishConcurrency=1 the timing
+    // is identical to the pre-flag sequential foreach.
     private async Task PublishBatchAsync(
         List<OutboxMessage> messages,
         IPublishEndpoint publisher,
         string source,
-        int publishConcurrency,
+        OutboxOptions opts,
         CancellationToken cancellationToken)
     {
         var results = new (DateTime? PublishedAt, Exception? Error)[messages.Count];
+        var publishTimeout = TimeSpan.FromSeconds(Math.Max(1, opts.PerMessageTimeoutSeconds));
 
         // Phase 1 — publish in parallel. Each task writes its result into the
         // pre-allocated results[] slot at the same index — no shared mutable
-        // collection, no lock needed. publishConcurrency clamped to >=1.
+        // collection, no lock needed. PublishConcurrency clamped to >=1.
         await Parallel.ForEachAsync(
             Enumerable.Range(0, messages.Count),
             new ParallelOptions
             {
-                MaxDegreeOfParallelism = Math.Max(1, publishConcurrency),
+                MaxDegreeOfParallelism = Math.Max(1, opts.PublishConcurrency),
                 CancellationToken = cancellationToken,
             },
             async (i, ct) =>
@@ -240,7 +243,7 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
                         // Per-publish timeout: fail fast when MassTransit bus is unavailable
                         // (e.g., RabbitMQ not reachable) rather than blocking indefinitely.
                         using var publishCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                        publishCts.CancelAfter(PublishTimeout);
+                        publishCts.CancelAfter(publishTimeout);
                         await publisher.Publish(integrationEvent, type, publishCts.Token);
                     }
 

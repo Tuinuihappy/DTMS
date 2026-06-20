@@ -181,6 +181,13 @@ services:
       # batch. 1 = sequential (legacy). 8 is a good starting point for
       # parallel testing — cap at the IBus connection pool size.
       - Outbox__PublishConcurrency=${Outbox__PublishConcurrency:-1}
+      # Phase A Step A3 — promoted out of the hardcoded constants.
+      # PollIntervalSeconds drives the drain ceiling (BatchSize/Poll = events/s
+      # per module). Drop to 1 + raise BatchSize to 500 for sustained
+      # 1k+ orders/s. Defaults preserve pre-flag behaviour (5s + 50).
+      - Outbox__PollIntervalSeconds=${Outbox__PollIntervalSeconds:-5}
+      - Outbox__BatchSize=${Outbox__BatchSize:-50}
+      - Outbox__PerMessageTimeoutSeconds=${Outbox__PerMessageTimeoutSeconds:-10}
       # Safety net for dropped RIOT3 TASK_FINISHED webhooks — polls RIOT3
       # for in-flight envelope trips and reconciles via idempotent Mark*.
       # On by default so dropped webhooks self-heal within ~1 poll interval.
