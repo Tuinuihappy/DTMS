@@ -6,6 +6,9 @@ src/*/obj/
 tests/*/bin/
 tests/*/obj/
 
+## Local-only data
+backups/
+
 ## NuGet
 *.nupkg
 *.snupkg

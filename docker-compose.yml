@@ -16,6 +16,31 @@ services:
       timeout: 5s
       retries: 5
 
+  # Nightly pg_dump → ./backups (kept for 7 days). Restore manually with
+  # `gunzip < backups/last/amr_delivery_planning-...sql.gz | psql ...`
+  # Ship to S3/Backblaze in prod by adding an S3_* env block (see image docs).
+  postgres-backup:
+    image: prodrigestivill/postgres-backup-local:16
+    container_name: dtms-postgres-backup
+    restart: unless-stopped
+    user: postgres:postgres
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: amr_delivery_planning
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_EXTRA_OPTS: "-Z9 --schema=public --schema=facility --schema=fleet --schema=delivery_order --schema=planning --schema=dispatch --schema=auth --schema=outbox --schema=vendor_adapter --blobs"
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+      HEALTHCHECK_PORT: 8080
+
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
     container_name: dtms-rabbitmq
