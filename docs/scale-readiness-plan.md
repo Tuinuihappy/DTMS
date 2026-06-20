@@ -1,8 +1,9 @@
 # Scale-Readiness Implementation Plan
 
-> **Status (2026-06-20):** Phase A 🟡 in progress — Steps A1 + A2 (parts 1+2) + A3 core shipped; A4 (parallel module loop) pending. Partial acceptance run @ 812 orders/s + 0 RIOT calls but drain ~143/s still trails create at 30 VU peak. Phases B-H not started.
+> **Status (2026-06-20 end of day):** Phase A 🟢 **CODE COMPLETE** — all 4 sub-steps (A1+A2+A3+A4) shipped, vendor isolation mechanism added (NoOp pattern × 2 seams + composition log + `.env.test`). API throughput +34% vs baseline, p95 latency −61%, zero errors at 30 VU. Realistic-load acceptance ✅. Burst-acceptance (≤100 pending in 30s at 30 VU peak) ❌ — root cause is downstream consumer DB throughput, addressed by **Phase B (PgBouncer)** + Phase D (separate outbox worker). **Phase B is the immediate next priority.**
 > **Predecessor:** [perf-tests/results-2026-06-16/REPORT.md](../perf-tests/results-2026-06-16/REPORT.md) (E2E + Load + Stress run, Volume aborted)
-> **Acceptance runs:** [REPORT.md (A1+A2 only)](../perf-tests/results-2026-06-20/REPORT.md) · [REPORT-acceptance.md (A1+A2+A3 core + NoOp)](../perf-tests/results-2026-06-20/REPORT-acceptance.md)
+> **Acceptance runs (chronological):** [REPORT.md (A1+A2 only)](../perf-tests/results-2026-06-20/REPORT.md) · [REPORT-acceptance.md (A1+A2+A3 + NoOp, sequential modules)](../perf-tests/results-2026-06-20/REPORT-acceptance.md) · [REPORT-acceptance-final.md (full A1-A4 + dual NoOp + `.env.test`)](../perf-tests/results-2026-06-20/REPORT-acceptance-final.md)
+> **Load-test runbook:** copy [`.env.test.example`](../.env.test.example) → `.env.test`, then `docker compose --env-file .env.test up -d --force-recreate api`. Boot log MUST show `[Composition] = NoOp/NoOp` before launching k6.
 > **Trigger:** Before promoting DTMS beyond pilot scale (current safe ceiling ≈ 150 concurrent users), close the architectural ceilings exposed by the perf run.
 
 ---
@@ -40,7 +41,7 @@ Perf test 2026-06-16 ran scenarios A/B/C/D/E. Result: **0 errors at 500 VU**, bu
 
 ---
 
-## Phase A — Outbox throughput (P0, 2-3 days) 🟡 in progress (A1+A2+A3 core shipped, A4 pending)
+## Phase A — Outbox throughput (P0, 2-3 days) 🟢 CODE COMPLETE 2026-06-20
 
 **Goal:** Drain rate ≥ create rate. Backlog reaches steady-state ≤ 1k pending under sustained 1k orders/s.
 
@@ -213,7 +214,9 @@ docker exec dtms-postgres psql -U postgres -d amr_delivery_planning --% -c "SELE
 
 ---
 
-## Phase B — DB connection pool (P0, 1-2 days) ⬜
+## Phase B — DB connection pool (P0, 1-2 days) ⬜ **← NEXT (elevated by Phase A acceptance finding)**
+
+> **Why this is now the immediate next step:** Phase A's third acceptance run revealed drain rate doesn't match peak create rate at 30 VU because consumer DB work (Planning consumer creating Jobs, Dispatch consumer creating Trips) competes with API write path on the shared Postgres connection pool. PgBouncer + larger pool removes that contention — directly unblocks Phase A's burst-acceptance threshold without touching Phase A code.
 
 **Goal:** API scales to 5+ replicas without exhausting Postgres connections. Headroom for BI/ops tooling.
 
