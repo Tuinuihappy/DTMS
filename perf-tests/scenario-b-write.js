@@ -46,8 +46,8 @@ function buildPayload() {
       {
         itemId: `${ref}-I1`,
         description: 'Load test item',
-        pickupLocationCode: 'WH-01',
-        dropLocationCode: 'BAY-A',
+        pickupLocationCode: 'SHELF1',
+        dropLocationCode: 'SHELF2',
         loadUnitProfileCode: 'PALLET-EU',
         dimensions: { lengthMm: 1200, widthMm: 800, heightMm: 1500 },
         weightKg: 250,

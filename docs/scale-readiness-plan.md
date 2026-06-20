@@ -147,6 +147,10 @@ docker exec dtms-postgres psql -U postgres -d amr_delivery_planning --% -c "SELE
 ```
 - **Before fix:** ~50k+ pending 5 min after test ends
 - **After fix:** ≤ 100 pending within 30s of test ending
+
+**Run 2026-06-20 (Steps A1+A2 only, before A3):** see [`perf-tests/results-2026-06-20/REPORT.md`](../perf-tests/results-2026-06-20/REPORT.md).
+- ✅ API throughput: 696 → 933 orders/s (+34%), p95 35ms (−61%), 0 errors
+- 🔴 Outbox parity: ~0.6% — drain ~10 events/s vs ~7,500 events/s generated. Bottleneck is the hardcoded `PollingInterval=5s` × `BatchSize=50` (= 10/s/module ceiling). Phase A A1+A2 are necessary but not sufficient. **Step A3 must land before acceptance can be claimed.**
 - No deadlock errors in API logs
 - Outbox `processed/s` metric ≥ create rate
 
