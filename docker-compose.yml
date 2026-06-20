@@ -30,6 +30,48 @@ services:
       timeout: 5s
       retries: 5
 
+  # Phase B Step B3 — PgBouncer transaction-mode pool. API connects here on
+  # port 6432 (NOT direct to postgres:5432) so N API replicas × client-side
+  # pool can multiplex onto a much smaller server-side pool. Without this,
+  # 5 API replicas × 100 NpgsqlDataSource pool = 500 connections — exactly
+  # the max_connections ceiling, leaving zero headroom for psql / BI /
+  # replication / admin tooling.
+  #
+  # Transaction-mode caveats (verified absent in DTMS codebase):
+  #   - LISTEN/NOTIFY don't survive across transactions  (grep: 0 matches)
+  #   - Temp tables don't survive across transactions    (grep: 0 matches)
+  #   - SET LOCAL works (scoped to current transaction)
+  #   - Prepared statements work iff Npgsql uses server-side prepare —
+  #     enabled by default in modern Npgsql via Multiplexing/MaxAutoPrepare
+  #
+  # Migrator continues to use postgres direct (DDL is safer on session-mode /
+  # direct connection; happens once on startup, no benefit from pooling).
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: dtms-pgbouncer
+    ports:
+      - "6432:5432"
+    environment:
+      # edoburu/pgbouncer uses these env var names (different from bitnami):
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: amr_delivery_planning
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 5000
+      DEFAULT_POOL_SIZE: 50
+      RESERVE_POOL_SIZE: 10
+      AUTH_TYPE: scram-sha-256
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Nightly pg_dump → ./backups (kept for 7 days). Restore manually with
   # `gunzip < backups/last/amr_delivery_planning-...sql.gz | psql ...`
   # Ship to S3/Backblaze in prod by adding an S3_* env block (see image docs).
@@ -139,6 +181,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       redis:
@@ -147,7 +191,13 @@ services:
         condition: service_completed_successfully
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=amr_delivery_planning;Username=postgres;Password=postgres
+      # Phase B Step B3 — API talks to PgBouncer (container internal port 5432;
+      # host port 6432 is the published mapping for external psql access),
+      # NOT postgres direct. MaxPoolSize=50 caps client-side; PgBouncer
+      # multiplexes onto its server-side pool of 50. "No Reset On Close=true"
+      # tells Npgsql not to emit DISCARD ALL on connection return — required
+      # for PgBouncer transaction-mode pooling.
+      - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=amr_delivery_planning;Username=postgres;Password=postgres;Pooling=true;MaxPoolSize=50;No Reset On Close=true
       - ConnectionStrings__Redis=redis:6379
       - RabbitMq__Host=rabbitmq
       - RabbitMq__Username=guest
