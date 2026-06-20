@@ -68,19 +68,49 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
         using var scope = _scopeFactory.CreateScope();
         var publisher = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
+        // Phase A Step A4 — parallel per-module loop. Each module's tick is
+        // ~500-800ms with full SKIP LOCKED tx + parallel publish + SaveChanges +
+        // count. Sequential await across 6 modules made the wall-clock cycle
+        // ~4.2s even though PollIntervalSeconds=1, capping observed drain at
+        // ~143/s/module. Task.WhenAll lets all 6 tick concurrently — cycle
+        // wall-clock = max(per-module), not sum, ~5x drain throughput.
+        //
+        // Safety: each DbContext resolution from `scope` returns its own
+        // instance — they're never shared across threads. IPublishEndpoint
+        // (MassTransit) is thread-safe per its guarantees. One module's
+        // fault is caught + logged per-module so the other 5 keep draining
+        // (an Exception escaping the body would cancel the rest of WhenAll
+        // and surface as a noisy "Error processing outbox messages" log
+        // every poll until the offending module recovers).
+        var modules = new (DbContext db, string source)[]
+        {
+            (scope.ServiceProvider.GetRequiredService<OutboxDbContext>(), "outbox"),
+            (scope.ServiceProvider.GetRequiredService<DeliveryOrderDbContext>(), DeliveryOrderDbContext.Schema),
+            (scope.ServiceProvider.GetRequiredService<PlanningDbContext>(), PlanningDbContext.Schema),
+            (scope.ServiceProvider.GetRequiredService<DispatchDbContext>(), DispatchDbContext.Schema),
+            (scope.ServiceProvider.GetRequiredService<FleetDbContext>(), FleetDbContext.Schema),
+            (scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>(), VendorAdapterDbContext.Schema),
+        };
+
+        var pendingPerModule = await Task.WhenAll(modules.Select(async m =>
+        {
+            try
+            {
+                return await ProcessModuleAsync(m.db, publisher, m.source, opts, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex,
+                    "Outbox module {Source} tick failed; other modules unaffected", m.source);
+                return 0L;
+            }
+        }));
+
         // T1.6 — aggregate pending count across all schemas per poll so the
         // dtms_workflow_outbox_pending gauge reflects current backlog. If this
         // climbs > 500 sustained the outbox is falling behind and ops should
         // page (see plan section 5).
-        long totalPending = 0;
-        totalPending += await ProcessModuleAsync(scope.ServiceProvider.GetRequiredService<OutboxDbContext>(), publisher, "outbox", opts, cancellationToken);
-        totalPending += await ProcessModuleAsync(scope.ServiceProvider.GetRequiredService<DeliveryOrderDbContext>(), publisher, DeliveryOrderDbContext.Schema, opts, cancellationToken);
-        totalPending += await ProcessModuleAsync(scope.ServiceProvider.GetRequiredService<PlanningDbContext>(), publisher, PlanningDbContext.Schema, opts, cancellationToken);
-        totalPending += await ProcessModuleAsync(scope.ServiceProvider.GetRequiredService<DispatchDbContext>(), publisher, DispatchDbContext.Schema, opts, cancellationToken);
-        totalPending += await ProcessModuleAsync(scope.ServiceProvider.GetRequiredService<FleetDbContext>(), publisher, FleetDbContext.Schema, opts, cancellationToken);
-        totalPending += await ProcessModuleAsync(scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>(), publisher, VendorAdapterDbContext.Schema, opts, cancellationToken);
-
-        _metrics.SetOutboxPending(totalPending);
+        _metrics.SetOutboxPending(pendingPerModule.Sum());
     }
 
     private Task<long> ProcessModuleAsync(
