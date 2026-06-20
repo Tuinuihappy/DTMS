@@ -257,6 +257,13 @@ services:
       - Outbox__PollIntervalSeconds=${Outbox__PollIntervalSeconds:-5}
       - Outbox__BatchSize=${Outbox__BatchSize:-50}
       - Outbox__PerMessageTimeoutSeconds=${Outbox__PerMessageTimeoutSeconds:-10}
+      # Phase D — gate the OutboxProcessor IHostedService. Default true so
+      # plain `docker compose up` (no worker container started) still drains
+      # the outbox from the api container. Override to false via .env.test
+      # (or env var) when running the outbox-worker container alongside so
+      # api request handling doesn't compete with outbox drain. The worker
+      # container hardcodes Outbox__RunInThisProcess=true regardless.
+      - Outbox__RunInThisProcess=${Outbox__RunInThisProcess:-true}
       # Safety net for dropped RIOT3 TASK_FINISHED webhooks — polls RIOT3
       # for in-flight envelope trips and reconciles via idempotent Mark*.
       # On by default so dropped webhooks self-heal within ~1 poll interval.
@@ -278,6 +285,69 @@ services:
       # .env.example). Default is a dev-only placeholder — overriding in
       # any non-dev environment is mandatory.
       - Jwt__Secret=${Jwt__Secret:-dev-only-secret-min-32-chars-placeholder!}
+
+  # Phase D — dedicated outbox-worker container. Same image as api but with
+  # Outbox:RunInThisProcess=true (the api container has this set to false
+  # via the env above). Both containers run the full app (HTTP, consumers,
+  # other hosted services) — only the OutboxProcessor IHostedService is
+  # gated by the flag, so request handling and consumer message processing
+  # can scale independently from outbox drain.
+  #
+  # SKIP LOCKED (A2 part 1) makes it safe to even run on multiple worker
+  # replicas if needed: `docker compose up --scale outbox-worker=3`. Each
+  # tick fetches a disjoint row set; no contention.
+  #
+  # MVP scope: only OutboxProcessor is gated. Singleton hosted services
+  # (Riot3 pollers, sync services, reconcilers) currently still run in both
+  # containers — accepted MVP trade-off (idempotent / minor duplication).
+  # Future: extend the flag pattern to gate other singletons.
+  outbox-worker:
+    image: dtms-api          # reuse the api image — no separate build
+    container_name: dtms-outbox-worker
+    restart: unless-stopped
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    stop_grace_period: 90s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=amr_delivery_planning;Username=postgres;Password=postgres;Pooling=true;MaxPoolSize=50;No Reset On Close=true
+      - ConnectionStrings__Redis=redis:6379
+      - RabbitMq__Host=rabbitmq
+      - RabbitMq__Username=guest
+      - RabbitMq__Password=guest
+      - Auth__Disable=true
+      - Auth__DevTenantId=00000000-0000-0000-0000-000000000001
+      # Worker container takes the same outbox tuning as the api container —
+      # tested on the same .env.test flags. Override per-worker if you want
+      # asymmetric tuning between api and worker (rare).
+      - Outbox__UseSkipLocked=${Outbox__UseSkipLocked:-true}
+      - Outbox__PublishConcurrency=${Outbox__PublishConcurrency:-8}
+      - Outbox__PollIntervalSeconds=${Outbox__PollIntervalSeconds:-1}
+      - Outbox__BatchSize=${Outbox__BatchSize:-500}
+      - Outbox__PerMessageTimeoutSeconds=${Outbox__PerMessageTimeoutSeconds:-10}
+      # The reason this container exists — outbox always runs here.
+      - Outbox__RunInThisProcess=true
+      # Vendor isolation flag also inherited so worker doesn't accidentally
+      # call RIOT3 even if api has it disabled.
+      - VendorAdapter__Riot3__Enabled=${VendorAdapter__Riot3__Enabled:-true}
+      - VendorAdapter__Riot3__BaseUrl=http://10.204.212.28:12000
+      - VendorAdapter__Riot3__ApiKey=${VendorAdapter__Riot3__ApiKey:-}
 
   # TMS dashboard (Next.js 16 standalone). Currently renders from mock
   # data so it doesn't depend on the .NET API — opt-in via the `prod`

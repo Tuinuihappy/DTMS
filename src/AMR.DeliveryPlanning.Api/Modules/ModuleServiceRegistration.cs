@@ -483,7 +483,19 @@ public static class ModuleServiceRegistration
             .Bind(configuration.GetSection(
                 AMR.DeliveryPlanning.Api.Infrastructure.Outbox.OutboxOptions.SectionName));
         services.AddSingleton<IOutboxProcessor, OutboxProcessorService>();
-        services.AddHostedService<OutboxProcessorService>();
+
+        // Phase D — OutboxProcessor as IHostedService is conditional. Default
+        // true so existing single-container deployments keep working. When the
+        // dtms-outbox-worker container ships, the api container sets
+        // Outbox:RunInThisProcess=false so the worker container is the sole
+        // drainer — API serves requests, worker drains outbox. SKIP LOCKED
+        // (A2 part 1) makes it safe to even run on both: each instance fetches
+        // a disjoint row set per tick, no fight. The IOutboxProcessor singleton
+        // registration above stays unconditional so the /admin replay endpoint
+        // can still call ProcessUnpublishedEventsAsync on demand from the API.
+        var runOutboxHere = configuration.GetValue<bool>("Outbox:RunInThisProcess", true);
+        if (runOutboxHere)
+            services.AddHostedService<OutboxProcessorService>();
 
         // Redis distributed cache
         var redisConnection = configuration.GetConnectionString("Redis") ?? "localhost:6379";
