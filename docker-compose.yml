@@ -4,6 +4,20 @@ services:
     container_name: dtms-postgres
     ports:
       - "5434:5432"
+    # Phase B Step B1 — raise max_connections from alpine default 100 to 500
+    # so 5 API replicas × 80-pool can coexist without "too many clients
+    # already" errors at 500 VU (the symptom that surfaced in
+    # 2026-06-16 REPORT.md finding #2). shared_buffers + effective_cache_size
+    # tuned for a single dev/CI host with ≥4 GB RAM.
+    command: >
+      postgres
+      -c max_connections=500
+      -c shared_buffers=512MB
+      -c effective_cache_size=2GB
+      -c work_mem=8MB
+      -c maintenance_work_mem=128MB
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
     environment:
       POSTGRES_DB: amr_delivery_planning
       POSTGRES_USER: postgres

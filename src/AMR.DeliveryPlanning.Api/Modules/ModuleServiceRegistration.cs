@@ -73,11 +73,26 @@ public static class ModuleServiceRegistration
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection");
 
+        // Phase B Step B1 — single NpgsqlDataSource shared by every DbContext
+        // below. Before: each AddDbContext(UseNpgsql(connString)) implicitly
+        // used Npgsql's static pool keyed by connection string — 9 DbContexts
+        // × default 100 = potentially 900 connections under load, which the
+        // alpine default max_connections=100 couldn't survive (2026-06-16
+        // perf REPORT finding #2). After: ONE pool, shared across all 9
+        // DbContexts + the /health probe, capped at MaxPoolSize on the
+        // connection string. EnableDynamicJson keeps the existing jsonb
+        // columns (Dispatch + DeliveryOrder + Planning module) round-tripping
+        // through System.Text.Json the same way they do today.
+        var npgsqlDataSource = new Npgsql.NpgsqlDataSourceBuilder(connectionString)
+            .EnableDynamicJson()
+            .Build();
+        services.AddSingleton<Npgsql.NpgsqlDataSource>(npgsqlDataSource);
+
         // ── Auth Module ────────────────────────────────────────────────
-        services.AddDbContext<AuthDbContext>(o => o.UseNpgsql(connectionString, ConfigureNpgsql));
+        services.AddDbContext<AuthDbContext>(o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));
 
         // ── Facility Module ───────────────────────────────────────────
-        services.AddDbContext<FacilityDbContext>(o => o.UseNpgsql(connectionString, ConfigureNpgsql));
+        services.AddDbContext<FacilityDbContext>(o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));
         services.AddScoped<IMapRepository, MapRepository>();
         services.AddScoped<IStationRepository, StationRepository>();
         services.AddScoped<IRouteEdgeRepository, RouteEdgeRepository>();
@@ -135,7 +150,7 @@ public static class ModuleServiceRegistration
         // ── Fleet Module ──────────────────────────────────────────────
         services.AddScoped<FleetDomainEventMapper>();
         services.AddDbContext<FleetDbContext>((sp, o) => o
-            .UseNpgsql(connectionString, ConfigureNpgsql)
+            .UseNpgsql(npgsqlDataSource, ConfigureNpgsql)
             .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
                 sp.GetRequiredService<FleetDomainEventMapper>())));
         services.AddScoped<IVehicleRepository, VehicleRepository>();
@@ -172,7 +187,7 @@ public static class ModuleServiceRegistration
         // ── DeliveryOrder Module ──────────────────────────────────────
         services.AddScoped<DeliveryOrderDomainEventMapper>();
         services.AddDbContext<DeliveryOrderDbContext>((sp, o) => o
-            .UseNpgsql(connectionString, ConfigureNpgsql)
+            .UseNpgsql(npgsqlDataSource, ConfigureNpgsql)
             .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .AddInterceptors(
                 new AuditSaveChangesInterceptor(),
@@ -244,7 +259,7 @@ public static class ModuleServiceRegistration
         // ── Planning Module ───────────────────────────────────────────
         services.AddScoped<PlanningDomainEventMapper>();
         services.AddDbContext<PlanningDbContext>((sp, o) => o
-            .UseNpgsql(connectionString, ConfigureNpgsql)
+            .UseNpgsql(npgsqlDataSource, ConfigureNpgsql)
             .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
                 sp.GetRequiredService<PlanningDomainEventMapper>())));
         services.AddScoped<IJobRepository, JobRepository>();
@@ -300,7 +315,7 @@ public static class ModuleServiceRegistration
         // ── Dispatch Module ───────────────────────────────────────────
         services.AddScoped<DispatchDomainEventMapper>();
         services.AddDbContext<DispatchDbContext>((sp, o) => o
-            .UseNpgsql(connectionString, ConfigureNpgsql)
+            .UseNpgsql(npgsqlDataSource, ConfigureNpgsql)
             .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
                 sp.GetRequiredService<DispatchDomainEventMapper>())));
         services.AddScoped<ITripRepository, TripRepository>();
@@ -368,7 +383,7 @@ public static class ModuleServiceRegistration
         // migrations are always applied; whether the Saga actually receives
         // events is gated on the Workflow:UseSaga feature flag below.
         services.AddDbContext<AMR.DeliveryPlanning.Planning.Infrastructure.Data.OrchestrationDbContext>(
-            opts => opts.UseNpgsql(connectionString, ConfigureNpgsql));
+            opts => opts.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));
 
         var useSaga = configuration.GetValue<bool>("Workflow:UseSaga");
 
@@ -462,7 +477,7 @@ public static class ModuleServiceRegistration
         services.AddScoped<IEventBus, OutboxEventBus>();
 
         // Outbox infrastructure
-        services.AddDbContext<OutboxDbContext>(o => o.UseNpgsql(connectionString, ConfigureNpgsql));
+        services.AddDbContext<OutboxDbContext>(o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));
         services
             .AddOptions<AMR.DeliveryPlanning.Api.Infrastructure.Outbox.OutboxOptions>()
             .Bind(configuration.GetSection(

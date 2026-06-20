@@ -17,13 +17,19 @@ public static class VendorAdapterServiceRegistration
 {
     public static IServiceCollection AddVendorAdapterInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("DefaultConnection");
         // Resilient connection: EnableRetryOnFailure absorbs transient Npgsql
         // errors at the EF Core layer. Mirrors ConfigureNpgsql in
         // ModuleServiceRegistration — kept inline because pulling a helper
         // out of the API project would create a cross-layer dependency.
-        services.AddDbContext<VendorAdapterDbContext>(o => o.UseNpgsql(
-            connectionString,
+        //
+        // Phase B Step B1 — resolve the shared NpgsqlDataSource singleton
+        // (registered in ModuleServiceRegistration.AddAllModules) via the
+        // (sp, o) factory so this DbContext joins the same pool as the
+        // other 8. Before: separate UseNpgsql(connectionString) created an
+        // independent Npgsql static pool keyed by connection string,
+        // doubling the connection footprint under load.
+        services.AddDbContext<VendorAdapterDbContext>((sp, o) => o.UseNpgsql(
+            sp.GetRequiredService<Npgsql.NpgsqlDataSource>(),
             npgsql => npgsql.EnableRetryOnFailure(
                 maxRetryCount: 5,
                 maxRetryDelay: TimeSpan.FromSeconds(10),
