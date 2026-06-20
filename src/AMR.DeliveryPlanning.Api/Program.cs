@@ -289,24 +289,14 @@ builder.Services.AddHttpClient(nameof(VendorHealthWebhookNotifier));
 builder.Services.AddHostedService<VendorHealthWebhookNotifier>();
 builder.Services.AddTransient<RiotHealthCheckFromStore>();
 
+// Phase B Step B2 — health-check class reuses the singleton NpgsqlDataSource
+// so /health/ready stops opening its own raw connection per probe.
+builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Infrastructure.Health.NpgsqlDataSourceHealthCheck>();
+
 builder.Services.AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy("Service is running"))
-    .AddCheck("postgres", () =>
-    {
-        try
-        {
-            using var conn = new Npgsql.NpgsqlConnection(connectionString);
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT 1";
-            cmd.ExecuteScalar();
-            return HealthCheckResult.Healthy();
-        }
-        catch (Exception ex)
-        {
-            return HealthCheckResult.Unhealthy(ex.Message);
-        }
-    }, tags: ["ready"])
+    .AddCheck<AMR.DeliveryPlanning.Api.Infrastructure.Health.NpgsqlDataSourceHealthCheck>(
+        "postgres", tags: ["ready"])
     .AddCheck("redis", () =>
     {
         try
