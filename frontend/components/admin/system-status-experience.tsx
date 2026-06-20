@@ -1,6 +1,7 @@
 "use client";
 
 import { Activity, CircleCheck, AlertTriangle, AlertCircle, HelpCircle, RefreshCw } from "lucide-react";
+import { motion } from "motion/react";
 import { memo, useCallback, useMemo } from "react";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { StatusPulse } from "@/components/primitives/status-pulse";
@@ -20,6 +21,13 @@ import {
 } from "@/lib/realtime/use-vendor-health";
 import { vendorHealthStore } from "@/lib/realtime/vendor-health-store";
 import { cn } from "@/lib/utils";
+
+// Entry animation matches the dashboard cards (kpi-rail / dispatch-funnel
+// pattern) — fade + 18px slide-up, 0.55s, cubic-out ease, staggered per
+// card index. `initial` fires once on mount so SignalR-driven re-renders
+// don't replay the animation.
+const ENTRY_EASE = [0.22, 1, 0.36, 1] as const;
+const ENTRY_DURATION = 0.55;
 
 // System status page wired through an external store (vendorHealthStore).
 // SignalR pushes and the 30s REST poll both write straight into the
@@ -66,7 +74,12 @@ export function AdminSystemStatusExperience() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <motion.header
+        className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: ENTRY_DURATION, ease: ENTRY_EASE }}
+      >
         <div>
           <h1 className="text-[1.7rem] font-semibold text-[var(--color-ink-900)]">
             System status
@@ -88,7 +101,7 @@ export function AdminSystemStatusExperience() {
             Refresh
           </button>
         </div>
-      </header>
+      </motion.header>
 
       <SummarySection />
 
@@ -106,8 +119,8 @@ export function AdminSystemStatusExperience() {
               No infrastructure snapshots yet — backend poller may still be initializing.
             </GlassCard>
           )}
-          {infraIds.map((id) => (
-            <ComponentCard key={id} vendor={id} />
+          {infraIds.map((id, i) => (
+            <ComponentCard key={id} vendor={id} animationDelay={0.4 + i * 0.06} />
           ))}
         </div>
       </section>
@@ -123,8 +136,13 @@ export function AdminSystemStatusExperience() {
               No vendor snapshots yet.
             </GlassCard>
           )}
-          {vendorIds.map((id) => (
-            <ComponentCard key={id} vendor={id} />
+          {vendorIds.map((id, i) => (
+            // Stagger after infra finishes so the eye lands top-to-bottom.
+            <ComponentCard
+              key={id}
+              vendor={id}
+              animationDelay={0.4 + (infraIds.length + i) * 0.06}
+            />
           ))}
         </div>
       </section>
@@ -165,20 +183,23 @@ function SummarySection() {
   const summary = useVendorSummary();
   return (
     <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <SummaryTile icon={<Activity className="h-4 w-4" />} label="Components" value={summary.total} />
+      <SummaryTile index={0} icon={<Activity className="h-4 w-4" />} label="Components" value={summary.total} />
       <SummaryTile
+        index={1}
         icon={<CircleCheck className="h-4 w-4" />}
         label="Healthy"
         value={summary.healthy}
         tone="mint"
       />
       <SummaryTile
+        index={2}
         icon={<AlertTriangle className="h-4 w-4" />}
         label="Degraded"
         value={summary.degraded}
         tone="amber"
       />
       <SummaryTile
+        index={3}
         icon={<AlertCircle className="h-4 w-4" />}
         label="Unhealthy"
         value={summary.unhealthy}
@@ -206,16 +227,23 @@ type SummaryTileProps = {
   label: string;
   value: number;
   tone?: "mint" | "amber" | "coral" | "ink";
+  index?: number;
 };
 
-const SummaryTile = memo(function SummaryTile({ icon, label, value, tone }: SummaryTileProps) {
+const SummaryTile = memo(function SummaryTile({ icon, label, value, tone, index = 0 }: SummaryTileProps) {
   const variant =
     tone === "mint" ? "pastel-mint"
     : tone === "amber" ? "pastel-peach"
     : tone === "coral" ? "pastel-lavender"
     : "default";
   return (
-    <GlassCard variant={variant as "default" | "pastel-mint" | "pastel-peach" | "pastel-lavender"} className="p-4">
+    <GlassCard
+      variant={variant as "default" | "pastel-mint" | "pastel-peach" | "pastel-lavender"}
+      className="p-4"
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: ENTRY_DURATION, delay: 0.15 + index * 0.06, ease: ENTRY_EASE }}
+    >
       <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-[var(--color-ink-500)]">
         {icon}
         {label}
@@ -232,15 +260,22 @@ const SummaryTile = memo(function SummaryTile({ icon, label, value, tone }: Summ
 // Each card subscribes to its own vendor slice via useSyncExternalStore.
 // When postgres transitions, only this component (for vendor="infra:postgres")
 // re-renders — parent, sibling cards, summary tile (if numbers unchanged)
-// all stay put.
-function ComponentCard({ vendor }: { vendor: string }) {
+// all stay put. animationDelay is only read on mount (motion's `initial`),
+// so SignalR-driven updates never replay the entrance animation.
+function ComponentCard({ vendor, animationDelay = 0 }: { vendor: string; animationDelay?: number }) {
   const snapshot = useVendorSnapshot(vendor);
   if (!snapshot) return null;
 
   const meta = statusMeta(snapshot.status);
 
   return (
-    <GlassCard variant="default" className="p-5">
+    <GlassCard
+      variant="default"
+      className="p-5"
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: ENTRY_DURATION, delay: animationDelay, ease: ENTRY_EASE }}
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
