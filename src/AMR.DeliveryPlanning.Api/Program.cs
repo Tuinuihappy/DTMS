@@ -283,6 +283,10 @@ builder.Services.AddHttpClient<IRiot3HealthProbe, Riot3HealthProbe>((sp, client)
 builder.Services.AddHostedService<Riot3HealthPollerService>();
 builder.Services.AddHostedService<InfraHealthPollerService>();
 builder.Services.AddHostedService<VendorHealthBroadcaster>();
+builder.Services.Configure<VendorHealthWebhookOptions>(
+    builder.Configuration.GetSection("VendorHealth:Webhook"));
+builder.Services.AddHttpClient(nameof(VendorHealthWebhookNotifier));
+builder.Services.AddHostedService<VendorHealthWebhookNotifier>();
 builder.Services.AddTransient<RiotHealthCheckFromStore>();
 
 builder.Services.AddHealthChecks()
