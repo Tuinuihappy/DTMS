@@ -214,9 +214,11 @@ docker exec dtms-postgres psql -U postgres -d amr_delivery_planning --% -c "SELE
 
 ---
 
-## Phase B — DB connection pool (P0, 1-2 days) ⬜ **← NEXT (elevated by Phase A acceptance finding)**
+## Phase B — DB connection pool (P0, 1-2 days) 🟢 SHIPPED 2026-06-20
 
-> **Why this is now the immediate next step:** Phase A's third acceptance run revealed drain rate doesn't match peak create rate at 30 VU because consumer DB work (Planning consumer creating Jobs, Dispatch consumer creating Trips) competes with API write path on the shared Postgres connection pool. PgBouncer + larger pool removes that contention — directly unblocks Phase A's burst-acceptance threshold without touching Phase A code.
+> **Shipped today**: B1 (Postgres tuning + singleton NpgsqlDataSource shared by 9 DbContexts), B2 (health check on same pool), B3 (PgBouncer transaction-mode pool). Multi-replica connection ceiling REMOVED — `pg_stat_activity` stays at ~46 connections even under 30 VU sustained load + health-probe burst.
+>
+> **Phase A burst-acceptance threshold ("≤100 pending in 30s") still NOT met after B** — see [`REPORT-phase-b.md`](../perf-tests/results-2026-06-20/REPORT-phase-b.md). Drain rate stayed at ~75/s, identical to pre-B3. Root cause confirmed: **consumer logic throughput** (Planning + Dispatch consumers doing ~5 DB ops per order under row-lock contention) is the binding constraint, not connection acquisition. Phase D (separate outbox worker container with independent resources) is the next lever for that threshold. Phase B + A together ARE sufficient for realistic sustained load (5-10 orders/s).
 
 **Goal:** API scales to 5+ replicas without exhausting Postgres connections. Headroom for BI/ops tooling.
 
