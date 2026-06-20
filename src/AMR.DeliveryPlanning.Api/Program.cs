@@ -281,6 +281,7 @@ builder.Services.AddHttpClient<IRiot3HealthProbe, Riot3HealthProbe>((sp, client)
         client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
 });
 builder.Services.AddHostedService<Riot3HealthPollerService>();
+builder.Services.AddHostedService<InfraHealthPollerService>();
 builder.Services.AddHostedService<VendorHealthBroadcaster>();
 builder.Services.AddTransient<RiotHealthCheckFromStore>();
 
