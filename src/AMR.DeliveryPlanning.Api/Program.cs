@@ -418,6 +418,19 @@ await SeedActionCatalogAsync(app.Services);
 // Seed default admin user
 await AuthEndpoints.SeedDefaultUserAsync(app.Services);
 
+// --migrate-only — when set the process exits cleanly after migrations
+// + seeds. Used by the dtms-migrator compose service to apply schema
+// changes BEFORE the api container starts (via depends_on
+// service_completed_successfully), preventing the crash-chain where
+// api startup races against a partially-ready DB. The api service
+// still runs the retry-wrapped migration block above as a defence in
+// depth — second invocation is a no-op when nothing is pending.
+if (args.Contains("--migrate-only"))
+{
+    app.Logger.LogInformation("Migrate-only mode — exiting cleanly.");
+    return;
+}
+
 static async Task SeedActionCatalogAsync(IServiceProvider services)
 {
     using var scope = services.CreateScope();

@@ -76,6 +76,27 @@ services:
     environment:
       - COLLECTOR_OTLP_ENABLED=true
 
+  # One-shot migration runner. Same image as api, but invoked with
+  # --migrate-only so it applies pending EF migrations + seeds then
+  # exits 0. api depends on it via service_completed_successfully so
+  # the main app never races against a partially-ready DB schema. If
+  # this service fails, api won't start — failure is visible in
+  # `docker compose up` instead of a silent crash chain.
+  migrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dtms-api          # share image with api — no separate build
+    container_name: dtms-migrator
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=amr_delivery_planning;Username=postgres;Password=postgres
+    command: ["dotnet", "AMR.DeliveryPlanning.Api.dll", "--migrate-only"]
+
   api:
     build:
       context: .
@@ -108,6 +129,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=amr_delivery_planning;Username=postgres;Password=postgres
