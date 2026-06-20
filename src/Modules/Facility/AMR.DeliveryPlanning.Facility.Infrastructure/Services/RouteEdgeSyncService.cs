@@ -154,28 +154,38 @@ public sealed class RouteEdgeSyncService : BackgroundService
             return;
         }
 
-        // Replace all edges for this map atomically
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        // Replace all edges for this map atomically. Wrapped in
+        // CreateExecutionStrategy because FacilityDbContext has
+        // EnableRetryOnFailure configured (see ModuleServiceRegistration
+        // .ConfigureNpgsql) — without the wrap, EF Core throws on the
+        // explicit BeginTransactionAsync below. Replay-on-retry is safe
+        // because the operation is idempotent (delete + re-insert all
+        // edges for this map).
+        var strategy = db.Database.CreateExecutionStrategy();
         try
         {
-            var existing = await db.RouteEdges.Where(e => e.MapId == map.Id).ToListAsync(ct);
-            db.RouteEdges.RemoveRange(existing);
+            await strategy.ExecuteAsync(async () =>
+            {
+                await using var tx = await db.Database.BeginTransactionAsync(ct);
 
-            var newEdges = edgeMap.Select(kv =>
-                new RouteEdge(Guid.NewGuid(), map.Id, kv.Key.Item1, kv.Key.Item2,
-                    kv.Value.distance, kv.Value.cost, isBidirectional: false));
-            await db.RouteEdges.AddRangeAsync(newEdges, ct);
+                var existing = await db.RouteEdges.Where(e => e.MapId == map.Id).ToListAsync(ct);
+                db.RouteEdges.RemoveRange(existing);
 
-            await db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
+                var newEdges = edgeMap.Select(kv =>
+                    new RouteEdge(Guid.NewGuid(), map.Id, kv.Key.Item1, kv.Key.Item2,
+                        kv.Value.distance, kv.Value.cost, isBidirectional: false));
+                await db.RouteEdges.AddRangeAsync(newEdges, ct);
 
-            _logger.LogInformation(
-                "RouteEdgeSyncService: map {MapId} ({Name}) — synced {Count} edges (replaced {Old})",
-                map.Id, map.Name, edgeMap.Count, existing.Count);
+                await db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+
+                _logger.LogInformation(
+                    "RouteEdgeSyncService: map {MapId} ({Name}) — synced {Count} edges (replaced {Old})",
+                    map.Id, map.Name, edgeMap.Count, existing.Count);
+            });
         }
         catch (Exception ex)
         {
-            await tx.RollbackAsync(ct);
             _logger.LogError(ex, "RouteEdgeSyncService: failed to save edges for map {MapId}", map.Id);
         }
     }

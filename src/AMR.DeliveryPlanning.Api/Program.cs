@@ -362,22 +362,50 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
-// Apply EF Core migrations for all module databases on startup
-using (var scope = app.Services.CreateScope())
+// Apply EF Core migrations for all module databases on startup.
+// Wrapped in a retry loop with exponential backoff so a brief postgres
+// outage (compose restart, brief network blip, slow startup ordering)
+// doesn't enter a fatal crash loop on the api container — root cause of
+// the prod-shape incident on 2026-06-20 where stopping postgres for a
+// smoke test crashed api repeatedly because every restart re-ran the
+// migration check against an unreachable DB.
 {
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    logger.LogInformation("Applying database migrations...");
+    const int maxAttempts = 12;
+    var bootstrapLogger = app.Services.GetRequiredService<ILogger<Program>>();
 
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Facility.Infrastructure.Data.FacilityDbContext>(), logger, app.Environment);
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Fleet.Infrastructure.Data.FleetDbContext>(), logger, app.Environment);
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data.DeliveryOrderDbContext>(), logger, app.Environment);
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Planning.Infrastructure.Data.PlanningDbContext>(), logger, app.Environment);
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Dispatch.Infrastructure.Data.DispatchDbContext>(), logger, app.Environment);
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AuthDbContext>(), logger, app.Environment);
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<OutboxDbContext>(), logger, app.Environment);
-    await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data.VendorAdapterDbContext>(), logger, app.Environment);
+    for (var attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        try
+        {
+            using var scope = app.Services.CreateScope();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            if (attempt == 1)
+                logger.LogInformation("Applying database migrations...");
+            else
+                logger.LogInformation("Migration retry attempt {Attempt}/{Max}", attempt, maxAttempts);
 
-    logger.LogInformation("Database migrations applied successfully.");
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Facility.Infrastructure.Data.FacilityDbContext>(), logger, app.Environment);
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Fleet.Infrastructure.Data.FleetDbContext>(), logger, app.Environment);
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data.DeliveryOrderDbContext>(), logger, app.Environment);
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Planning.Infrastructure.Data.PlanningDbContext>(), logger, app.Environment);
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Dispatch.Infrastructure.Data.DispatchDbContext>(), logger, app.Environment);
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AuthDbContext>(), logger, app.Environment);
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<OutboxDbContext>(), logger, app.Environment);
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data.VendorAdapterDbContext>(), logger, app.Environment);
+
+            logger.LogInformation("Database migrations applied successfully.");
+            break;
+        }
+        catch (Exception ex) when (attempt < maxAttempts)
+        {
+            // Cap delay at 30s — total max wait ~3-4 minutes before final exit.
+            var delay = TimeSpan.FromSeconds(Math.Min(30, Math.Pow(2, attempt)));
+            bootstrapLogger.LogWarning(
+                "Migration attempt {Attempt}/{Max} failed: {Message}. Retrying in {Delay}s",
+                attempt, maxAttempts, ex.Message, delay.TotalSeconds);
+            await Task.Delay(delay);
+        }
+    }
 }
 
 // Seed ActionCatalog defaults (upsert — safe to run every startup)

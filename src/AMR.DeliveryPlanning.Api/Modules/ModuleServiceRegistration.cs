@@ -48,15 +48,36 @@ namespace AMR.DeliveryPlanning.Api.Modules;
 /// </summary>
 public static class ModuleServiceRegistration
 {
+    // Centralised Npgsql configuration applied to every DbContext below.
+    // EnableRetryOnFailure swallows transient connection drops at the
+    // EF Core level so a brief DB blip becomes a 1-2s delay instead of
+    // an exception bubbled to the request handler. maxRetryDelay is
+    // intentionally short (10s) so requests fail fast rather than
+    // hanging the thread pool when the DB is genuinely unavailable.
+    //
+    // IMPORTANT: any code that calls db.Database.BeginTransactionAsync()
+    // MUST wrap the transaction in db.Database.CreateExecutionStrategy()
+    // — otherwise EF Core throws because the retry strategy cannot
+    // safely replay a user-initiated transaction. See OutboxProcessor
+    // (SKIP LOCKED path) and Facility RouteEdgeSyncService for examples.
+    private static void ConfigureNpgsql(
+        Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.NpgsqlDbContextOptionsBuilder npgsql)
+    {
+        npgsql.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(10),
+            errorCodesToAdd: null);
+    }
+
     public static IServiceCollection AddAllModules(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection");
 
         // ── Auth Module ────────────────────────────────────────────────
-        services.AddDbContext<AuthDbContext>(o => o.UseNpgsql(connectionString));
+        services.AddDbContext<AuthDbContext>(o => o.UseNpgsql(connectionString, ConfigureNpgsql));
 
         // ── Facility Module ───────────────────────────────────────────
-        services.AddDbContext<FacilityDbContext>(o => o.UseNpgsql(connectionString));
+        services.AddDbContext<FacilityDbContext>(o => o.UseNpgsql(connectionString, ConfigureNpgsql));
         services.AddScoped<IMapRepository, MapRepository>();
         services.AddScoped<IStationRepository, StationRepository>();
         services.AddScoped<IRouteEdgeRepository, RouteEdgeRepository>();
@@ -114,7 +135,7 @@ public static class ModuleServiceRegistration
         // ── Fleet Module ──────────────────────────────────────────────
         services.AddScoped<FleetDomainEventMapper>();
         services.AddDbContext<FleetDbContext>((sp, o) => o
-            .UseNpgsql(connectionString)
+            .UseNpgsql(connectionString, ConfigureNpgsql)
             .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
                 sp.GetRequiredService<FleetDomainEventMapper>())));
         services.AddScoped<IVehicleRepository, VehicleRepository>();
@@ -151,7 +172,7 @@ public static class ModuleServiceRegistration
         // ── DeliveryOrder Module ──────────────────────────────────────
         services.AddScoped<DeliveryOrderDomainEventMapper>();
         services.AddDbContext<DeliveryOrderDbContext>((sp, o) => o
-            .UseNpgsql(connectionString)
+            .UseNpgsql(connectionString, ConfigureNpgsql)
             .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .AddInterceptors(
                 new AuditSaveChangesInterceptor(),
@@ -223,7 +244,7 @@ public static class ModuleServiceRegistration
         // ── Planning Module ───────────────────────────────────────────
         services.AddScoped<PlanningDomainEventMapper>();
         services.AddDbContext<PlanningDbContext>((sp, o) => o
-            .UseNpgsql(connectionString)
+            .UseNpgsql(connectionString, ConfigureNpgsql)
             .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
                 sp.GetRequiredService<PlanningDomainEventMapper>())));
         services.AddScoped<IJobRepository, JobRepository>();
@@ -266,7 +287,7 @@ public static class ModuleServiceRegistration
         // ── Dispatch Module ───────────────────────────────────────────
         services.AddScoped<DispatchDomainEventMapper>();
         services.AddDbContext<DispatchDbContext>((sp, o) => o
-            .UseNpgsql(connectionString)
+            .UseNpgsql(connectionString, ConfigureNpgsql)
             .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
                 sp.GetRequiredService<DispatchDomainEventMapper>())));
         services.AddScoped<ITripRepository, TripRepository>();
@@ -334,7 +355,7 @@ public static class ModuleServiceRegistration
         // migrations are always applied; whether the Saga actually receives
         // events is gated on the Workflow:UseSaga feature flag below.
         services.AddDbContext<AMR.DeliveryPlanning.Planning.Infrastructure.Data.OrchestrationDbContext>(
-            opts => opts.UseNpgsql(connectionString));
+            opts => opts.UseNpgsql(connectionString, ConfigureNpgsql));
 
         var useSaga = configuration.GetValue<bool>("Workflow:UseSaga");
 
@@ -428,7 +449,7 @@ public static class ModuleServiceRegistration
         services.AddScoped<IEventBus, OutboxEventBus>();
 
         // Outbox infrastructure
-        services.AddDbContext<OutboxDbContext>(o => o.UseNpgsql(connectionString));
+        services.AddDbContext<OutboxDbContext>(o => o.UseNpgsql(connectionString, ConfigureNpgsql));
         services
             .AddOptions<AMR.DeliveryPlanning.Api.Infrastructure.Outbox.OutboxOptions>()
             .Bind(configuration.GetSection(

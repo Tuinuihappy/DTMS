@@ -127,24 +127,35 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
         OutboxOptions opts,
         CancellationToken cancellationToken)
     {
-        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
-
-        var messages = await FetchBatchSkipLockedAsync(db, source, opts.BatchSize, cancellationToken);
-
-        if (messages.Count == 0)
+        // CreateExecutionStrategy is required for explicit transactions when
+        // the DbContext has EnableRetryOnFailure configured (see
+        // ModuleServiceRegistration.ConfigureNpgsql). Without this wrap, EF
+        // Core throws "The configured execution strategy does not support
+        // user-initiated transactions" on first use. Replay-on-retry is
+        // safe because consumers are already idempotent — outbox is
+        // at-least-once by design.
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            await tx.RollbackAsync(cancellationToken);
+            await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+
+            var messages = await FetchBatchSkipLockedAsync(db, source, opts.BatchSize, cancellationToken);
+
+            if (messages.Count == 0)
+            {
+                await tx.RollbackAsync(cancellationToken);
+                return await CountPendingAsync(db, cancellationToken);
+            }
+
+            _logger.LogDebug("Processing {Count} outbox messages from {Source} (SKIP LOCKED)",
+                messages.Count, source);
+
+            await PublishBatchAsync(messages, publisher, source, opts.PublishConcurrency, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            await tx.CommitAsync(cancellationToken);
+
             return await CountPendingAsync(db, cancellationToken);
-        }
-
-        _logger.LogDebug("Processing {Count} outbox messages from {Source} (SKIP LOCKED)",
-            messages.Count, source);
-
-        await PublishBatchAsync(messages, publisher, source, opts.PublishConcurrency, cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
-        await tx.CommitAsync(cancellationToken);
-
-        return await CountPendingAsync(db, cancellationToken);
+        });
     }
 
     // Pulled out of ProcessModuleAsync so Step A3 can branch on Outbox:UseSkipLocked

@@ -18,7 +18,16 @@ public static class VendorAdapterServiceRegistration
     public static IServiceCollection AddVendorAdapterInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection");
-        services.AddDbContext<VendorAdapterDbContext>(o => o.UseNpgsql(connectionString));
+        // Resilient connection: EnableRetryOnFailure absorbs transient Npgsql
+        // errors at the EF Core layer. Mirrors ConfigureNpgsql in
+        // ModuleServiceRegistration — kept inline because pulling a helper
+        // out of the API project would create a cross-layer dependency.
+        services.AddDbContext<VendorAdapterDbContext>(o => o.UseNpgsql(
+            connectionString,
+            npgsql => npgsql.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(10),
+                errorCodesToAdd: null)));
 
         var riot3BaseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
         var riot3ApiKey = configuration.GetValue<string>("VendorAdapter:Riot3:ApiKey");
