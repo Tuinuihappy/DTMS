@@ -44,16 +44,30 @@ public static class VendorAdapterServiceRegistration
         .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
         .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
 
-        // Read-side query client for the reconciliation poller (GET /orders/{key}?isUpper=true)
-        services.AddHttpClient<IRiot3OrderQueryService, Riot3OrderQueryService>(client =>
+        // Read-side query client for the reconciliation poller (GET /orders/{key}?isUpper=true).
+        // Vendor seam: same VendorAdapter:Riot3:Enabled flag that controls
+        // IRobotOrderDispatcher also gates the reconciler's outbound GET path.
+        // When false, NoOpRiot3OrderQueryService returns null for every query
+        // and the reconciler treats those as "RIOT3 has no record yet" and
+        // skips for the tick — zero outbound HTTP traffic, no side effects.
+        // Default true (production safety, opt-out explicitly for dev/test).
+        var riot3Enabled = configuration.GetValue<bool>("VendorAdapter:Riot3:Enabled", true);
+        if (riot3Enabled)
         {
-            client.BaseAddress = new Uri(riot3BaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(15);
-            if (!string.IsNullOrWhiteSpace(riot3ApiKey))
-                client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
-        })
-        .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
-        .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
+            services.AddHttpClient<IRiot3OrderQueryService, Riot3OrderQueryService>(client =>
+            {
+                client.BaseAddress = new Uri(riot3BaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(15);
+                if (!string.IsNullOrWhiteSpace(riot3ApiKey))
+                    client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
+            })
+            .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
+            .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
+        }
+        else
+        {
+            services.AddSingleton<IRiot3OrderQueryService, NoOpRiot3OrderQueryService>();
+        }
 
         // Reconciliation poller — safety net for missed envelope webhooks.
         // Gated by Dispatch:Reconciliation:Enabled; off by default.

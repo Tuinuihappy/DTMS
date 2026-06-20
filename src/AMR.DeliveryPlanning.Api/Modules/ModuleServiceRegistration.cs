@@ -274,6 +274,10 @@ public static class ModuleServiceRegistration
             services.AddScoped<IRobotOrderDispatcher, AMR.DeliveryPlanning.Api.Adapters.Riot3OrderDispatcherAdapter>();
         else
             services.AddScoped<IRobotOrderDispatcher, AMR.DeliveryPlanning.Api.Adapters.NoOpOrderDispatcherAdapter>();
+
+        // Log which vendor adapters got picked at boot so it's visible without
+        // having to trigger an order first. Single line at INF level.
+        services.AddHostedService<AMR.DeliveryPlanning.Api.Adapters.CompositionLogger>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IVendorEnvelopeOperationService,
             AMR.DeliveryPlanning.Api.Adapters.Riot3VendorEnvelopeOperationAdapter>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IVendorRobotOperationService,
