@@ -1,7 +1,12 @@
-// Vendor health snapshot client. The backend maintains an in-memory snapshot
-// of every external vendor's health (RIOT3, OMS, ...) via background pollers
-// and pushes transitions through DashboardHub.VendorHealthChanged. Calling
-// this REST endpoint does NOT trigger a probe — it reads the cached snapshot.
+// Vendor + infrastructure health snapshot client. The backend maintains
+// an in-memory snapshot of every component (external vendors AND DTMS's
+// own infra dependencies) via background pollers and pushes transitions
+// through DashboardHub.VendorHealthChanged. Calling this REST endpoint
+// does NOT trigger a probe — it reads the cached snapshot.
+//
+// Vendor names use an "infra:" prefix for internal dependencies
+// (postgres / redis / rabbitmq / masstransit-bus) so the frontend can
+// split them into separate sections without a schema field.
 
 export type VendorHealthStatus = "Unknown" | "Healthy" | "Degraded" | "Unhealthy";
 
@@ -30,33 +35,14 @@ export async function getVendorHealth(
   return (await res.json()) as VendorHealthResponse;
 }
 
-// ────────────────────────────────────────────────────────────────────
-// Infrastructure readiness — DTMS's view of its own dependencies.
-// Powered by ASP.NET Core HealthChecks with tag "ready". Returns 503
-// when any check is non-Healthy but the body still itemises each one.
+export const INFRA_PREFIX = "infra:";
 
-export type InfraCheckStatus = "Healthy" | "Degraded" | "Unhealthy";
+export function isInfra(snapshot: VendorHealthSnapshot): boolean {
+  return snapshot.vendor.startsWith(INFRA_PREFIX);
+}
 
-export type InfraCheck = {
-  name: string;
-  status: InfraCheckStatus;
-  description: string | null;
-  error: string | null;
-};
-
-export type InfraReadyResponse = {
-  status: InfraCheckStatus;
-  checks: InfraCheck[];
-};
-
-export async function getInfraHealth(
-  signal?: AbortSignal,
-): Promise<InfraReadyResponse> {
-  const res = await fetch("/api/health/ready", { signal, cache: "no-store" });
-  // 200 (Healthy) and 503 (Degraded/Unhealthy) both carry a valid body;
-  // anything else is a real transport error worth raising.
-  if (res.status !== 200 && res.status !== 503) {
-    throw new Error(`Failed to load infrastructure health: ${res.status}`);
-  }
-  return (await res.json()) as InfraReadyResponse;
+export function displayName(snapshot: VendorHealthSnapshot): string {
+  return snapshot.vendor.startsWith(INFRA_PREFIX)
+    ? snapshot.vendor.slice(INFRA_PREFIX.length)
+    : snapshot.vendor;
 }

@@ -1,109 +1,68 @@
 "use client";
 
 import { Activity, CircleCheck, AlertTriangle, AlertCircle, HelpCircle, RefreshCw } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import {
-  getInfraHealth,
+  displayName,
   getVendorHealth,
-  type InfraCheck,
-  type InfraCheckStatus,
+  INFRA_PREFIX,
   type VendorHealthSnapshot,
   type VendorHealthStatus,
 } from "@/lib/api/admin-system-status";
 import { useDashboardSubscription } from "@/lib/realtime/hubs/dashboard-hub";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
+import {
+  useVendorIds,
+  useVendorSnapshot,
+  useVendorSummary,
+} from "@/lib/realtime/use-vendor-health";
+import { vendorHealthStore } from "@/lib/realtime/vendor-health-store";
 import { cn } from "@/lib/utils";
 
-// Vendor health page. Two sections:
-//   • Infrastructure — DTMS's own dependencies (postgres / redis / rabbit /
-//     masstransit-bus) sourced from /health/ready, polled every 30s. No
-//     realtime push — readiness probe is fed from K8s-style polling.
-//   • External vendors — RIOT3 (and future OMS) sourced from
-//     /api/vendors/health + DashboardHub.VendorHealthChanged. State machine
-//     debounces flap so every push is a real transition worth showing.
-
-type AnyStatus = VendorHealthStatus | InfraCheckStatus;
-
-const STATUS_ORDER: Record<AnyStatus, number> = {
-  Unhealthy: 0,
-  Degraded: 1,
-  Unknown: 2,
-  Healthy: 3,
-};
+// System status page wired through an external store (vendorHealthStore).
+// SignalR pushes and the 30s REST poll both write straight into the
+// store; React components subscribe to whichever slice they need via
+// useSyncExternalStore.
+//
+// End-to-end per-vendor independence:
+//   • Backend fires StatusChanged for one vendor at a time
+//   • Broadcaster pushes one SignalR message per event
+//   • Frontend store notifies only that vendor's subscriber
+//   • Only that ComponentCard re-renders — parent + sibling cards
+//     stay mounted untouched
+//
+// Parent re-renders only when the vendor LIST changes (e.g. OMS is
+// added) or when summary tile counts move. Card-level transitions
+// never reach the parent.
 
 export function AdminSystemStatusExperience() {
-  const vendorFetcher = useCallback(
-    (signal: AbortSignal) => getVendorHealth(signal),
-    [],
-  );
-  const infraFetcher = useCallback(
-    (signal: AbortSignal) => getInfraHealth(signal),
-    [],
-  );
+  // REST poll → bulk-write into store. Returned data is ignored — the
+  // store is the source of truth for what cards render.
+  const fetcher = useCallback(async (signal: AbortSignal) => {
+    const data = await getVendorHealth(signal);
+    vendorHealthStore.bulkSet(data.vendors);
+    return data;
+  }, []);
+  const { loading, error, refresh, lastUpdated } = useProjectionPoll(fetcher, {
+    intervalMs: 30_000,
+  });
 
-  const vendorPoll = useProjectionPoll(vendorFetcher, { intervalMs: 30_000 });
-  const infraPoll = useProjectionPoll(infraFetcher, { intervalMs: 30_000 });
-
-  // Apply realtime patches on top of the REST snapshot. Falls back cleanly
-  // if the hub never connects: REST polling keeps the state fresh.
-  const [patches, setPatches] = useState<Record<string, VendorHealthSnapshot>>({});
-
+  // SignalR push → write straight into store. No React state.
   const handleVendorChanged = useCallback((args: unknown[]) => {
     const snapshot = args[0] as VendorHealthSnapshot | undefined;
-    if (!snapshot?.vendor) return;
-    setPatches((prev) => ({ ...prev, [snapshot.vendor]: snapshot }));
+    if (snapshot?.vendor) vendorHealthStore.setSnapshot(snapshot);
   }, []);
-
   const { connected: liveConnected } = useDashboardSubscription("vendor-health", {
     VendorHealthChanged: handleVendorChanged,
   } as Record<string, (...args: unknown[]) => void>);
 
-  const vendors: VendorHealthSnapshot[] = useMemo(() => {
-    const base = vendorPoll.data?.vendors ?? [];
-    const byKey = new Map(base.map((v) => [v.vendor, v]));
-    for (const [vendor, patch] of Object.entries(patches)) {
-      byKey.set(vendor, patch);
-    }
-    return [...byKey.values()].sort(
-      (a, b) =>
-        STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.vendor.localeCompare(b.vendor),
-    );
-  }, [vendorPoll.data, patches]);
-
-  const infraChecks: InfraCheck[] = useMemo(() => {
-    const list = infraPoll.data?.checks ?? [];
-    return [...list].sort(
-      (a, b) =>
-        STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.name.localeCompare(b.name),
-    );
-  }, [infraPoll.data]);
-
-  const summary = useMemo(() => {
-    const totals = { total: 0, healthy: 0, degraded: 0, unhealthy: 0, unknown: 0 };
-    const tally = (status: AnyStatus) => {
-      totals.total++;
-      if (status === "Healthy") totals.healthy++;
-      else if (status === "Degraded") totals.degraded++;
-      else if (status === "Unhealthy") totals.unhealthy++;
-      else totals.unknown++;
-    };
-    for (const v of vendors) tally(v.status);
-    for (const c of infraChecks) tally(c.status);
-    return totals;
-  }, [vendors, infraChecks]);
-
-  const loading = vendorPoll.loading || infraPoll.loading;
-  const refresh = useCallback(() => {
-    vendorPoll.refresh();
-    infraPoll.refresh();
-  }, [vendorPoll, infraPoll]);
-
-  const lastUpdated =
-    [vendorPoll.lastUpdated, infraPoll.lastUpdated]
-      .filter((d): d is Date => !!d)
-      .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+  // Parent subscribes only to: the list shape + summary numbers.
+  // Status transitions on individual vendors never re-render this.
+  const ids = useVendorIds();
+  const infraIds = useMemo(() => ids.filter((id) => id.startsWith(INFRA_PREFIX)), [ids]);
+  const vendorIds = useMemo(() => ids.filter((id) => !id.startsWith(INFRA_PREFIX)), [ids]);
 
   return (
     <div className="space-y-6">
@@ -113,24 +72,13 @@ export function AdminSystemStatusExperience() {
             System status
           </h1>
           <p className="mt-1 text-[13px] text-[var(--color-ink-500)]">
-            DTMS infrastructure + external vendors. Infra is polled from
-            <code className="mx-1 rounded bg-[var(--color-ink-100)] px-1 text-[11px]">/health/ready</code>
-            every 30s; vendor transitions arrive over SignalR.
+            Realtime health of DTMS infrastructure and external vendors. Backend
+            polls each component on its own cadence; state machine debounces
+            flap; transitions arrive over SignalR.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium",
-              liveConnected
-                ? "bg-[var(--color-success)]/10 text-[var(--color-success)]"
-                : "bg-[var(--color-ink-100)] text-[var(--color-ink-500)]",
-            )}
-            title={liveConnected ? "Vendor updates live via SignalR" : "Reconnecting…"}
-          >
-            <StatusPulse tone={liveConnected ? "success" : "amber"} size="sm" />
-            {liveConnected ? "Live" : "Polling"}
-          </span>
+          <LiveBadge connected={liveConnected} />
           <button
             type="button"
             onClick={refresh}
@@ -142,68 +90,41 @@ export function AdminSystemStatusExperience() {
         </div>
       </header>
 
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <SummaryTile icon={<Activity className="h-4 w-4" />} label="Components" value={summary.total} />
-        <SummaryTile
-          icon={<CircleCheck className="h-4 w-4" />}
-          label="Healthy"
-          value={summary.healthy}
-          tone="mint"
-        />
-        <SummaryTile
-          icon={<AlertTriangle className="h-4 w-4" />}
-          label="Degraded"
-          value={summary.degraded}
-          tone="amber"
-        />
-        <SummaryTile
-          icon={<AlertCircle className="h-4 w-4" />}
-          label="Unhealthy"
-          value={summary.unhealthy}
-          tone="coral"
-        />
-      </section>
+      <SummarySection />
 
-      {vendorPoll.error && (
+      {error && (
         <div className="rounded-xl bg-[#fde0db] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)] dark:bg-[#3a1a17]">
-          Vendor health: {vendorPoll.error}
-        </div>
-      )}
-      {infraPoll.error && (
-        <div className="rounded-xl bg-[#fde0db] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)] dark:bg-[#3a1a17]">
-          Infrastructure: {infraPoll.error}
+          {error}
         </div>
       )}
 
-      {/* ── Infrastructure ──────────────────────────────────────── */}
       <section>
-        <SectionHeader title="Infrastructure" subtitle={`${infraChecks.length} component(s) · readiness probe`} />
+        <SectionHeader title="Infrastructure" subtitle={`${infraIds.length} component(s) · DTMS dependencies`} />
         <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {infraChecks.length === 0 && !infraPoll.loading && !infraPoll.error && (
+          {infraIds.length === 0 && !loading && !error && (
             <GlassCard variant="default" className="p-6 col-span-full text-center text-[12px] text-[var(--color-ink-400)]">
-              No infrastructure checks reported.
+              No infrastructure snapshots yet — backend poller may still be initializing.
             </GlassCard>
           )}
-          {infraChecks.map((c) => (
-            <InfraCard key={c.name} check={c} />
+          {infraIds.map((id) => (
+            <ComponentCard key={id} vendor={id} />
           ))}
         </div>
       </section>
 
-      {/* ── External vendors ────────────────────────────────────── */}
       <section>
         <SectionHeader
           title="External vendors"
-          subtitle={`${vendors.length} vendor(s) · backend pollers + state machine debounce`}
+          subtitle={`${vendorIds.length} vendor(s) · 3rd-party services`}
         />
         <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {vendors.length === 0 && !vendorPoll.loading && !vendorPoll.error && (
+          {vendorIds.length === 0 && !loading && !error && (
             <GlassCard variant="default" className="p-6 col-span-full text-center text-[12px] text-[var(--color-ink-400)]">
-              No vendor health snapshots yet — backend poller may still be initializing.
+              No vendor snapshots yet.
             </GlassCard>
           )}
-          {vendors.map((v) => (
-            <VendorCard key={v.vendor} snapshot={v} />
+          {vendorIds.map((id) => (
+            <ComponentCard key={id} vendor={id} />
           ))}
         </div>
       </section>
@@ -218,6 +139,54 @@ export function AdminSystemStatusExperience() {
 }
 
 // ────────────────────────────────────────────────────────────────────
+
+function LiveBadge({ connected }: { connected: boolean }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium",
+        connected
+          ? "bg-[var(--color-success)]/10 text-[var(--color-success)]"
+          : "bg-[var(--color-ink-100)] text-[var(--color-ink-500)]",
+      )}
+      title={connected ? "Live updates via SignalR" : "Reconnecting…"}
+    >
+      <StatusPulse tone={connected ? "success" : "amber"} size="sm" />
+      {connected ? "Live" : "Polling"}
+    </span>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────
+
+// Summary is its own component so summary-tile re-renders never reach
+// the parent's card lists.
+function SummarySection() {
+  const summary = useVendorSummary();
+  return (
+    <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <SummaryTile icon={<Activity className="h-4 w-4" />} label="Components" value={summary.total} />
+      <SummaryTile
+        icon={<CircleCheck className="h-4 w-4" />}
+        label="Healthy"
+        value={summary.healthy}
+        tone="mint"
+      />
+      <SummaryTile
+        icon={<AlertTriangle className="h-4 w-4" />}
+        label="Degraded"
+        value={summary.degraded}
+        tone="amber"
+      />
+      <SummaryTile
+        icon={<AlertCircle className="h-4 w-4" />}
+        label="Unhealthy"
+        value={summary.unhealthy}
+        tone="coral"
+      />
+    </section>
+  );
+}
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
@@ -239,7 +208,7 @@ type SummaryTileProps = {
   tone?: "mint" | "amber" | "coral" | "ink";
 };
 
-function SummaryTile({ icon, label, value, tone }: SummaryTileProps) {
+const SummaryTile = memo(function SummaryTile({ icon, label, value, tone }: SummaryTileProps) {
   const variant =
     tone === "mint" ? "pastel-mint"
     : tone === "amber" ? "pastel-peach"
@@ -256,50 +225,18 @@ function SummaryTile({ icon, label, value, tone }: SummaryTileProps) {
       </div>
     </GlassCard>
   );
-}
+});
 
 // ────────────────────────────────────────────────────────────────────
 
-function InfraCard({ check }: { check: InfraCheck }) {
-  const meta = statusMeta(check.status);
-  return (
-    <GlassCard variant="default" className="p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <StatusPulse tone={meta.tone} size="md" />
-            <span className="text-[15px] font-semibold uppercase tracking-wider text-[var(--color-ink-900)]">
-              {check.name}
-            </span>
-          </div>
-          <div className={cn("mt-0.5 text-[12.5px] font-medium", meta.textClass)}>
-            {check.status}
-          </div>
-        </div>
-        <meta.Icon className={cn("h-5 w-5", meta.textClass)} strokeWidth={2.2} />
-      </div>
-      {check.description && (
-        <div className="mt-3 text-[12.5px] text-[var(--color-ink-700)] dark:text-[var(--color-ink-200)]">
-          {check.description}
-        </div>
-      )}
-      {check.error && (
-        <div className="mt-3 rounded-lg bg-[var(--color-coral)]/10 px-3 py-2 text-[11.5px] text-[var(--color-coral)]">
-          {check.error}
-        </div>
-      )}
-      {!check.description && !check.error && (
-        <div className="mt-3 text-[11.5px] text-[var(--color-ink-400)]">
-          Reporting healthy — no detail provided by the probe.
-        </div>
-      )}
-    </GlassCard>
-  );
-}
+// Each card subscribes to its own vendor slice via useSyncExternalStore.
+// When postgres transitions, only this component (for vendor="infra:postgres")
+// re-renders — parent, sibling cards, summary tile (if numbers unchanged)
+// all stay put.
+function ComponentCard({ vendor }: { vendor: string }) {
+  const snapshot = useVendorSnapshot(vendor);
+  if (!snapshot) return null;
 
-// ────────────────────────────────────────────────────────────────────
-
-function VendorCard({ snapshot }: { snapshot: VendorHealthSnapshot }) {
   const meta = statusMeta(snapshot.status);
 
   return (
@@ -309,7 +246,7 @@ function VendorCard({ snapshot }: { snapshot: VendorHealthSnapshot }) {
           <div className="flex items-center gap-2">
             <StatusPulse tone={meta.tone} size="md" />
             <span className="text-[15px] font-semibold uppercase tracking-wider text-[var(--color-ink-900)]">
-              {snapshot.vendor}
+              {displayName(snapshot)}
             </span>
           </div>
           <div className={cn("mt-0.5 text-[12.5px] font-medium", meta.textClass)}>
@@ -344,10 +281,14 @@ function VendorCard({ snapshot }: { snapshot: VendorHealthSnapshot }) {
           value={relativeTime(snapshot.lastChangedAt)}
           title={new Date(snapshot.lastChangedAt).toLocaleString()}
         />
-        {snapshot.code && (
+        {(snapshot.code || snapshot.message) && (
           <Field
-            label="Code"
-            value={snapshot.message ? `${snapshot.code} · ${snapshot.message}` : snapshot.code}
+            label="Detail"
+            value={
+              snapshot.code && snapshot.message
+                ? `${snapshot.code} · ${snapshot.message}`
+                : snapshot.code ?? snapshot.message ?? "—"
+            }
           />
         )}
         {snapshot.failureReason && (
@@ -382,7 +323,7 @@ type StatusMeta = {
   Icon: typeof CircleCheck;
 };
 
-function statusMeta(status: AnyStatus): StatusMeta {
+function statusMeta(status: VendorHealthStatus): StatusMeta {
   switch (status) {
     case "Healthy":
       return { tone: "success", textClass: "text-[var(--color-success)]", Icon: CircleCheck };
