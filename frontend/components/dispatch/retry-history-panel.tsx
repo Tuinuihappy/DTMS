@@ -8,6 +8,7 @@ import {
   type TripRetryHistoryDto,
 } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
+import { DateTime } from "@/components/primitives/date-time";
 import { TripStatusBadge } from "./badges";
 
 /**
@@ -159,9 +160,7 @@ function AttemptRow({
               {attempt.vendorOrderKey && (
                 <span className="font-mono">vendor #{attempt.vendorOrderKey}</span>
               )}
-              <span title={new Date(attempt.createdAt).toLocaleString()}>
-                {new Date(attempt.createdAt).toLocaleString()}
-              </span>
+              <DateTime value={attempt.createdAt} />
             </div>
             {attempt.failureReason && (
               <div className="mt-1.5 flex items-start gap-1 text-[11px] text-[var(--color-coral)]">

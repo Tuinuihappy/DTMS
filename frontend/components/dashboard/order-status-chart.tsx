@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { formatDateTime, formatTime } from "@/lib/datetime";
 import {
   Area,
   AreaChart,
@@ -45,10 +46,7 @@ export function OrderStatusChart({
       buckets.map((b) => ({
         ...b,
         ts: new Date(b.bucketHour).getTime(),
-        label: new Date(b.bucketHour).toLocaleTimeString([], {
-          hour: "numeric",
-          hour12: false,
-        }),
+        label: formatTime(b.bucketHour),
       })),
     [buckets],
   );
@@ -98,9 +96,7 @@ export function OrderStatusChart({
             }}
             labelFormatter={(_, payload) => {
               const point = payload?.[0]?.payload as { bucketHour?: string } | undefined;
-              return point?.bucketHour
-                ? new Date(point.bucketHour).toLocaleString()
-                : "";
+              return point?.bucketHour ? formatDateTime(point.bucketHour) : "";
             }}
           />
           <Legend

@@ -14,19 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ActionTemplateDto } from "@/lib/api/action-templates";
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+import { DateTime } from "@/components/primitives/date-time";
 
 export function ActionTemplateDrawer({
   open,
@@ -156,7 +144,7 @@ export function ActionTemplateDrawer({
                   <MetaRow
                     icon={<Clock className="h-3.5 w-3.5" />}
                     label="Created"
-                    value={formatDate(template.createdAt)}
+                    value={<DateTime value={template.createdAt} />}
                   />
                   <MetaRow
                     icon={<User className="h-3.5 w-3.5" />}
@@ -166,7 +154,7 @@ export function ActionTemplateDrawer({
                   <MetaRow
                     icon={<Clock className="h-3.5 w-3.5" />}
                     label="Modified"
-                    value={formatDate(template.modifiedAt)}
+                    value={<DateTime value={template.modifiedAt} />}
                   />
                   <MetaRow
                     icon={<User className="h-3.5 w-3.5" />}

@@ -37,6 +37,7 @@ import { FullAuditLog } from "./full-audit-log";
 import { useOrderHubSubscription } from "@/lib/realtime/hubs/order-hub";
 import type { FullAuditEntryDto } from "@/lib/api/delivery-orders";
 import { cn } from "@/lib/utils";
+import { DateTime } from "@/components/primitives/date-time";
 import { PriorityBadge, StatusBadge, TransportModeBadge } from "./badges";
 
 type Action =
@@ -262,16 +263,12 @@ export function OrderDetailDrawer({
                     <MetaCell
                       icon={<Calendar className="h-3 w-3" strokeWidth={2.2} />}
                       label="Created"
-                      value={new Date(data.createdDate).toLocaleString()}
+                      value={<DateTime value={data.createdDate} />}
                     />
                     <MetaCell
                       icon={<Clock className="h-3 w-3" strokeWidth={2.2} />}
                       label="Window"
-                      value={
-                        data.serviceWindow?.latestUtc
-                          ? new Date(data.serviceWindow.latestUtc).toLocaleString()
-                          : "—"
-                      }
+                      value={<DateTime value={data.serviceWindow?.latestUtc} />}
                     />
                   </section>
 
@@ -482,7 +479,8 @@ export function OrderDetailDrawer({
                               </div>
                               {data.requiresDropPod === true && it.status === "DroppedOff" && it.droppedOffAt && (
                                 <p className="mt-0.5 text-[10.5px] text-[var(--color-pastel-peach-ink)]">
-                                  ⏱ Awaiting POD · dropped {relativeFromNow(it.droppedOffAt)}
+                                  ⏱ Awaiting POD · dropped{" "}
+                                  <DateTime value={it.droppedOffAt} variant="relative" />
                                 </p>
                               )}
                               {it.description && (
@@ -688,7 +686,7 @@ function MetaCell({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  value: React.ReactNode;
 }) {
   return (
     <div className="rounded-xl bg-[var(--color-surface-soft)] px-3 py-2.5 dark:bg-white/[0.04]">
@@ -774,20 +772,6 @@ function eventTone(eventType: string): { chip: string; dot: string } {
     chip: "bg-[var(--color-ink-100)] text-[var(--color-ink-700)] dark:bg-white/[0.06]",
     dot: "bg-[var(--color-ink-400)]",
   };
-}
-
-function relativeFromNow(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  const diff = Date.now() - d.getTime();
-  const min = Math.floor(diff / 60_000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  if (day < 7) return `${day}d ago`;
-  return d.toLocaleDateString();
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {

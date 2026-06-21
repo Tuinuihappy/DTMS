@@ -21,6 +21,7 @@ import {
 } from "@/lib/realtime/use-vendor-health";
 import { vendorHealthStore } from "@/lib/realtime/vendor-health-store";
 import { cn } from "@/lib/utils";
+import { DateTime } from "@/components/primitives/date-time";
 
 // Entry animation matches the dashboard cards (kpi-rail / dispatch-funnel
 // pattern) — fade + 18px slide-up, 0.55s, cubic-out ease, staggered per
@@ -149,7 +150,8 @@ export function AdminSystemStatusExperience() {
 
       {lastUpdated && (
         <p className="text-[11px] text-[var(--color-ink-400)]">
-          REST snapshot last refreshed at {lastUpdated.toLocaleTimeString()} · auto-poll every 30s.
+          REST snapshot last refreshed at{" "}
+          <DateTime value={lastUpdated} variant="time" /> · auto-poll every 30s.
         </p>
       )}
     </div>
@@ -308,13 +310,11 @@ function ComponentCard({ vendor, animationDelay = 0 }: { vendor: string; animati
         />
         <Field
           label="Last checked"
-          value={relativeTime(snapshot.lastCheckedAt)}
-          title={new Date(snapshot.lastCheckedAt).toLocaleString()}
+          value={<DateTime value={snapshot.lastCheckedAt} variant="relative" />}
         />
         <Field
           label="Last changed"
-          value={relativeTime(snapshot.lastChangedAt)}
-          title={new Date(snapshot.lastChangedAt).toLocaleString()}
+          value={<DateTime value={snapshot.lastChangedAt} variant="relative" />}
         />
         {(snapshot.code || snapshot.message) && (
           <Field
@@ -336,7 +336,7 @@ function ComponentCard({ vendor, animationDelay = 0 }: { vendor: string; animati
   );
 }
 
-type FieldProps = { label: string; value: string; title?: string };
+type FieldProps = { label: string; value: React.ReactNode; title?: string };
 function Field({ label, value, title }: FieldProps) {
   return (
     <div>
@@ -371,17 +371,3 @@ function statusMeta(status: VendorHealthStatus): StatusMeta {
   }
 }
 
-function relativeTime(iso: string): string {
-  if (!iso) return "—";
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "—";
-  const seconds = Math.round((Date.now() - then) / 1000);
-  if (seconds < 5) return "just now";
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return `${days}d ago`;
-}

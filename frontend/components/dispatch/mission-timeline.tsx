@@ -4,6 +4,7 @@ import { ArrowRight, CircleAlert, MapPin, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TripMissionDto } from "@/lib/api/trips";
 import { resolveRiot3ErrorAction } from "@/lib/vendor/riot3-error-codes";
+import { DateTime } from "@/components/primitives/date-time";
 import { MissionStateBadge } from "./badges";
 
 // Renders the per-mission timeline returned by /trips/{id}/details.
@@ -136,9 +137,11 @@ function MissionRow({ mission }: { mission: TripMissionDto }) {
           <MissionStateBadge state={mission.state} />
         </div>
         <div className="mt-1.5 flex items-center gap-3 text-[10.5px] tabular-nums text-[var(--color-ink-400)]">
-          <span title="Vendor's change-state time">
-            {new Date(mission.changeStateTime).toLocaleString()}
-          </span>
+          <DateTime
+            value={mission.changeStateTime}
+            variant="datetime-seconds"
+            showTooltip={false}
+          />
           {mission.resultCode && (
             <span className="font-mono">code: {mission.resultCode}</span>
           )}

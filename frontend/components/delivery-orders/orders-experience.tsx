@@ -41,6 +41,7 @@ import {
   type StateActionVariant,
 } from "./state-action-dialog";
 import { ToastProvider, useToast } from "./toast";
+import { formatDate } from "@/lib/datetime";
 
 // Translate the UI's StatusFilter into backend query params. Virtual
 // buckets ("Active"/"Completed"/"Terminal") resolve to server-side
@@ -109,7 +110,7 @@ function exportCsv(rows: DeliveryOrderListDto[]) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `delivery-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `delivery-orders-${formatDate(new Date())}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

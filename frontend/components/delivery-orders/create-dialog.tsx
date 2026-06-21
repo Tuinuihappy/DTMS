@@ -26,6 +26,10 @@ import {
 } from "@/lib/api/delivery-orders";
 import { getStationOptions, type StationOption } from "@/lib/api/facility";
 import { cn } from "@/lib/utils";
+import {
+  fromDateTimeLocalInput,
+  toDateTimeLocalInput,
+} from "@/lib/datetime";
 
 type ItemFormState = {
   itemId: string;
@@ -111,17 +115,6 @@ function blankForm(): FormState {
   };
 }
 
-// Convert an ISO UTC timestamp into the local-time string format that
-// <input type="datetime-local"> expects ("YYYY-MM-DDTHH:mm"). Returns
-// empty string for null/invalid so the input stays unset.
-function isoToLocalInput(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 // Hydrate the form from an existing order — used when the dialog opens
 // in edit mode. Mirrors blankForm() so every field is initialised.
 function formFromOrder(o: DeliveryOrderDetailDto): FormState {
@@ -133,8 +126,8 @@ function formFromOrder(o: DeliveryOrderDetailDto): FormState {
     transport: o.requestedTransportMode ?? "Amr",
     requiresDropPod: o.requiresDropPod ?? false,
     requiresPickupPod: o.requiresPickupPod ?? false,
-    windowEarliest: isoToLocalInput(o.serviceWindow?.earliestUtc),
-    windowLatest: isoToLocalInput(o.serviceWindow?.latestUtc),
+    windowEarliest: toDateTimeLocalInput(o.serviceWindow?.earliestUtc),
+    windowLatest: toDateTimeLocalInput(o.serviceWindow?.latestUtc),
     items: o.items.map((it) => ({
       itemId: it.itemId,
       description: it.description ?? "",
@@ -166,13 +159,8 @@ function formFromOrder(o: DeliveryOrderDetailDto): FormState {
   };
 }
 
-// datetime-local input gives a local-time string like "2026-06-04T14:30".
-// new Date(s) interprets that as local time; toISOString() flips to UTC.
-function toIso(local: string): string | undefined {
-  if (!local) return undefined;
-  const d = new Date(local);
-  return isNaN(d.getTime()) ? undefined : d.toISOString();
-}
+const toIso = (local: string): string | undefined =>
+  fromDateTimeLocalInput(local) ?? undefined;
 
 function buildPayload(form: FormState): CreateOrderPayload {
   return {

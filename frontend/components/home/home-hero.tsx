@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import Link from "next/link";
 
 import { StatusPulse } from "@/components/primitives/status-pulse";
+import { DateTime } from "@/components/primitives/date-time";
 import { HeroLiveMap } from "./hero-live-map";
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -31,7 +32,7 @@ export function HomeHero({ firstName }: { firstName: string }) {
             <StatusPulse tone="success" />
             <span>All operations nominal</span>
             <span className="text-[var(--color-ink-300)]">·</span>
-            <span className="font-mono">{nowHHMM()} GMT+7</span>
+            <DateTime value={new Date()} variant="time" className="font-mono" />
           </motion.div>
 
           <motion.h1
@@ -143,8 +144,3 @@ function useGreeting() {
   return "Late shift";
 }
 
-function nowHHMM(): string {
-  if (typeof window === "undefined") return "—";
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}

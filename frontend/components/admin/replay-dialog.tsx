@@ -8,6 +8,10 @@ import {
   type ReplaySummary,
 } from "@/lib/api/admin-projections";
 import { cn } from "@/lib/utils";
+import {
+  fromDateTimeLocalInput,
+  toDateTimeLocalInput,
+} from "@/lib/datetime";
 
 // P0 Day 6 — modal that collects replay parameters + confirms before
 // firing. Reused by every "Replay" button on the projections health
@@ -40,8 +44,8 @@ export function ReplayDialog({
     if (!open) return;
     const now = new Date();
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    setFromUtc(toLocalInput(yesterday));
-    setToUtc(toLocalInput(now));
+    setFromUtc(toDateTimeLocalInput(yesterday));
+    setToUtc(toDateTimeLocalInput(now));
     setAggregateId("");
     setError(null);
     setSubmitting(false);
@@ -57,7 +61,8 @@ export function ReplayDialog({
 
   const submit = async () => {
     if (!projectorName) return;
-    if (!fromUtc) {
+    const fromIso = fromDateTimeLocalInput(fromUtc);
+    if (!fromIso) {
       setError("FromUtc is required.");
       return;
     }
@@ -65,8 +70,8 @@ export function ReplayDialog({
     setError(null);
     try {
       const result = await replayProjector(projectorName, {
-        fromUtc: new Date(fromUtc).toISOString(),
-        toUtc: toUtc ? new Date(toUtc).toISOString() : undefined,
+        fromUtc: fromIso,
+        toUtc: fromDateTimeLocalInput(toUtc) ?? undefined,
         aggregateId: aggregateId.trim() || undefined,
       });
       if (result.ok) {
@@ -283,20 +288,3 @@ export function ReplayDialog({
   );
 }
 
-// <input type="datetime-local"> wants a "YYYY-MM-DDTHH:mm" string in the
-// user's local timezone. Date.toISOString() yields UTC, so we convert
-// here and reverse on submit (new Date(input).toISOString()).
-function toLocalInput(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    date.getFullYear() +
-    "-" +
-    pad(date.getMonth() + 1) +
-    "-" +
-    pad(date.getDate()) +
-    "T" +
-    pad(date.getHours()) +
-    ":" +
-    pad(date.getMinutes())
-  );
-}

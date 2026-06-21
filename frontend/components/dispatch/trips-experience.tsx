@@ -19,6 +19,8 @@ import {
   type TripStatus,
 } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
+import { fromDateTimeLocalInput } from "@/lib/datetime";
+import { DateTime } from "@/components/primitives/date-time";
 import { Pagination, type PageSize } from "@/components/delivery-orders/pagination";
 import { TripStatusBadge, AttemptBadge } from "./badges";
 import { TripDetailDrawer } from "./trip-detail-drawer";
@@ -163,8 +165,8 @@ export function TripsExperience() {
             vehicleKey: vehicleKey.trim() || undefined,
             // Treat date inputs as start/end of day in the user's local tz,
             // then send as ISO. Backend stores CreatedAt in UTC.
-            fromUtc: fromDate ? new Date(`${fromDate}T00:00:00`).toISOString() : undefined,
-            toUtc: toDate ? new Date(`${toDate}T23:59:59`).toISOString() : undefined,
+            fromUtc: fromDateTimeLocalInput(fromDate ? `${fromDate}T00:00:00` : "") ?? undefined,
+            toUtc: fromDateTimeLocalInput(toDate ? `${toDate}T23:59:59` : "") ?? undefined,
             sortBy,
             sortDir,
             page,
@@ -623,13 +625,22 @@ function TripsTable({
                 )}
               </Td>
               <Td>
-                <DateCell iso={t.createdAt} />
+                <DateTime
+                  value={t.createdAt}
+                  className="font-mono text-[11px] tabular-nums text-[var(--color-ink-600)] dark:text-[var(--color-ink-500)]"
+                />
               </Td>
               <Td>
-                <DateCell iso={t.startedAt} />
+                <DateTime
+                  value={t.startedAt}
+                  className="font-mono text-[11px] tabular-nums text-[var(--color-ink-600)] dark:text-[var(--color-ink-500)]"
+                />
               </Td>
               <Td>
-                <DateCell iso={t.completedAt} />
+                <DateTime
+                  value={t.completedAt}
+                  className="font-mono text-[11px] tabular-nums text-[var(--color-ink-600)] dark:text-[var(--color-ink-500)]"
+                />
               </Td>
             </tr>
           ))}
@@ -691,26 +702,3 @@ function Td({ children, className }: { children: React.ReactNode; className?: st
   return <td className={cn("px-3 py-2.5", className)}>{children}</td>;
 }
 
-function DateCell({ iso }: { iso: string | null }) {
-  const formatted = useMemo(() => {
-    if (!iso) return null;
-    try {
-      const d = new Date(iso);
-      return d.toLocaleString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return iso;
-    }
-  }, [iso]);
-  if (!formatted) return <span className="text-[var(--color-ink-300)]">—</span>;
-  return (
-    <span className="font-mono text-[11px] tabular-nums text-[var(--color-ink-600)] dark:text-[var(--color-ink-500)]">
-      {formatted}
-    </span>
-  );
-}

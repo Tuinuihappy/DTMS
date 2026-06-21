@@ -21,6 +21,7 @@ import type {
 } from "@/lib/api/delivery-orders";
 import { PriorityBadge, StatusBadge, TransportModeBadge } from "./badges";
 import { Highlight } from "./highlight";
+import { DateTime } from "@/components/primitives/date-time";
 
 type RowAction = "edit" | "submit" | "confirm" | "delete";
 
@@ -48,29 +49,6 @@ function allowedActions(o: DeliveryOrderListDto): RowAction[] {
 
 function shortRef(ref: string): string {
   return ref.length > 18 ? ref.slice(0, 15) + "…" : ref;
-}
-
-function fmtWindow(o: DeliveryOrderListDto): string {
-  const w = o.serviceWindow;
-  if (!w || (!w.earliestUtc && !w.latestUtc)) return "—";
-  const d = new Date(w.latestUtc ?? w.earliestUtc!);
-  if (isNaN(d.getTime())) return "—";
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function relativeTime(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  const diffMs = Date.now() - d.getTime();
-  const min = Math.floor(diffMs / 60000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  if (day < 7) return `${day}d ago`;
-  return d.toLocaleDateString();
 }
 
 type Props = {
@@ -252,10 +230,13 @@ export function OrdersTable({
                     )}
                   </td>
                   <td className="px-3 py-3.5 font-mono text-[12px] text-[var(--color-ink-600)]">
-                    {fmtWindow(o)}
+                    <DateTime
+                      value={o.serviceWindow?.latestUtc ?? o.serviceWindow?.earliestUtc}
+                      variant="time"
+                    />
                   </td>
                   <td className="px-3 py-3.5 text-[11.5px] text-[var(--color-ink-500)] whitespace-nowrap">
-                    {relativeTime(o.createdDate)}
+                    <DateTime value={o.createdDate} variant="relative" />
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <RowMenu
@@ -316,7 +297,11 @@ export function OrdersTable({
                 <span className="font-mono">
                   {o.totalItems} items · {o.totalWeightKg.toFixed(0)}kg
                 </span>
-                <span className="ml-auto">{relativeTime(o.createdDate)}</span>
+                <DateTime
+                  value={o.createdDate}
+                  variant="relative"
+                  className="ml-auto"
+                />
               </div>
             </motion.div>
           ))}

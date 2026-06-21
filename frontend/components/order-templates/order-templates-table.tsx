@@ -21,26 +21,12 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { OrderTemplateDto } from "@/lib/api/order-templates";
 import { Highlight } from "@/components/delivery-orders/highlight";
+import { DateTime } from "@/components/primitives/date-time";
 
 export type SortColumn = "name" | "priority" | "missions" | "isActive" | "modifiedAt";
 export type SortDir = "asc" | "desc";
 
 type RowAction = "toggle" | "delete";
-
-function relativeTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  const diffMs = Date.now() - d.getTime();
-  const min = Math.floor(diffMs / 60000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  if (day < 7) return `${day}d ago`;
-  return d.toLocaleDateString();
-}
 
 type Props = {
   templates: OrderTemplateDto[];
@@ -158,9 +144,11 @@ export function OrderTemplatesTable({
                     <ActiveBadge active={t.isActive} />
                   </td>
                   <td className="px-3 py-3.5">
-                    <div className="text-[11.5px] text-[var(--color-ink-700)] whitespace-nowrap">
-                      {relativeTime(t.modifiedAt ?? t.createdAt)}
-                    </div>
+                    <DateTime
+                      value={t.modifiedAt ?? t.createdAt}
+                      variant="relative"
+                      className="text-[11.5px] text-[var(--color-ink-700)] whitespace-nowrap"
+                    />
                     {(t.modifiedBy ?? t.createdBy) && (
                       <div className="text-[10.5px] text-[var(--color-ink-400)] truncate max-w-[140px]">
                         by {t.modifiedBy ?? t.createdBy}
@@ -243,9 +231,11 @@ export function OrderTemplatesTable({
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-3 text-[11.5px] text-[var(--color-ink-500)]">
                 <ActiveBadge active={t.isActive} />
-                <span className="ml-auto">
-                  {relativeTime(t.modifiedAt ?? t.createdAt)}
-                </span>
+                <DateTime
+                  value={t.modifiedAt ?? t.createdAt}
+                  variant="relative"
+                  className="ml-auto"
+                />
               </div>
               {t.isActive && (
                 <motion.button

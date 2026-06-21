@@ -10,6 +10,7 @@ import {
   type FullAuditEntryDto,
 } from "@/lib/api/delivery-orders";
 import { cn } from "@/lib/utils";
+import { DateTime } from "@/components/primitives/date-time";
 
 /**
  * Per-trip view of the upstream-OMS shipment notifications fired across
@@ -341,12 +342,11 @@ function StatusCard({ config, status }: { config: StageConfig; status: OmsStatus
             <div className="flex items-center gap-2 flex-wrap">
               <StageBadge>{config.label}</StageBadge>
               <span className="text-[12px] font-semibold text-[var(--color-success)]">Notified</span>
-              <time
+              <DateTime
+                value={status.at}
+                variant="relative"
                 className="font-mono text-[10.5px] text-[var(--color-success)]/70"
-                title={new Date(status.at).toLocaleString()}
-              >
-                {relativeTime(status.at)}
-              </time>
+              />
             </div>
             {status.details && (
               <p className="mt-1 break-words font-mono text-[10.5px] text-[var(--color-success)]/80">
@@ -370,12 +370,11 @@ function StatusCard({ config, status }: { config: StageConfig; status: OmsStatus
               <span className="text-[12px] font-semibold text-[var(--color-coral)]">
                 Failed after retries
               </span>
-              <time
+              <DateTime
+                value={status.at}
+                variant="relative"
                 className="font-mono text-[10.5px] text-[var(--color-coral)]/70"
-                title={new Date(status.at).toLocaleString()}
-              >
-                {relativeTime(status.at)}
-              </time>
+              />
             </div>
             {status.details && (
               <p className="mt-1 break-words font-mono text-[10.5px] leading-snug text-[var(--color-coral)]/80">
@@ -397,12 +396,11 @@ function StatusCard({ config, status }: { config: StageConfig; status: OmsStatus
           <div className="flex items-center gap-2 flex-wrap">
             <StageBadge>{config.label}</StageBadge>
             <span className="text-[12px] font-semibold text-[var(--color-amber)]">Not sent</span>
-            <time
+            <DateTime
+              value={status.at}
+              variant="relative"
               className="font-mono text-[10.5px] text-[var(--color-amber)]/80"
-              title={new Date(status.at).toLocaleString()}
-            >
-              {relativeTime(status.at)}
-            </time>
+            />
           </div>
           <p className="mt-1 text-[10.5px] text-[var(--color-amber)]/90">{config.staleHint}</p>
         </div>
@@ -411,13 +409,3 @@ function StatusCard({ config, status }: { config: StageConfig; status: OmsStatus
   );
 }
 
-function relativeTime(iso: string): string {
-  const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const min = Math.round(seconds / 60);
-  if (min < 60) return `${min}m ago`;
-  const hours = Math.round(min / 60);
-  if (hours < 48) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return `${days}d ago`;
-}

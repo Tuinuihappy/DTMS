@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/datetime";
 
 // Phase P0.F1 — Shared chip that surfaces how fresh projection-backed data
 // is, so operators understand they're looking at an eventually-consistent
@@ -63,7 +64,7 @@ export function DataFreshnessChip({
 
   return (
     <span
-      title={`Last underlying event at ${eventTime.toLocaleString()}`}
+      title={`Last underlying event at ${formatDateTime(eventTime)}`}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-2 py-[3px] text-[10.5px] font-semibold uppercase tracking-[0.06em]",
         tone,

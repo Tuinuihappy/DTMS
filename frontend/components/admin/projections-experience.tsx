@@ -11,6 +11,7 @@ import {
 } from "@/lib/api/admin-projections";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
 import { cn } from "@/lib/utils";
+import { DateTime } from "@/components/primitives/date-time";
 import { ReplayDialog } from "./replay-dialog";
 
 // CC4 — Projection health dashboard. Cross-module aggregate of
@@ -114,11 +115,7 @@ export function AdminProjectionsExperience() {
 
       <footer className="text-[11px] text-[var(--color-ink-400)]">
         Last refreshed{" "}
-        {lastUpdated
-          ? new Date(lastUpdated).toLocaleTimeString()
-          : data?.generatedAtUtc
-            ? new Date(data.generatedAtUtc).toLocaleTimeString()
-            : "—"}
+        <DateTime value={lastUpdated ?? data?.generatedAtUtc} variant="time" />
         {" · "}auto-refresh every 30s
         {" · "}thresholds: stale &gt; 5 min · idle &gt; 1 hr
       </footer>

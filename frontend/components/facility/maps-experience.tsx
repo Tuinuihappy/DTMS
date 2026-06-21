@@ -39,6 +39,7 @@ import { GlassCard } from "@/components/primitives/glass-card";
 import { NumberTicker } from "@/components/primitives/number-ticker";
 import { SectionLabel } from "@/components/primitives/section-label";
 import { StatusPulse } from "@/components/primitives/status-pulse";
+import { DateTime } from "@/components/primitives/date-time";
 import { cn } from "@/lib/utils";
 import {
   clearStationOverride,
@@ -584,7 +585,7 @@ function KpiStrip({
           </span>
           {lastSync && (
             <span className="inline-flex items-center gap-1.5 opacity-70">
-              <span>{lastSync.toLocaleTimeString()}</span>
+              <DateTime value={lastSync} variant="time" />
             </span>
           )}
         </div>

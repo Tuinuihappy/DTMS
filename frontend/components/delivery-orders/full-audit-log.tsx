@@ -13,6 +13,7 @@ import { motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { getFullOrderAudit, type FullAuditEntryDto, type FullOrderAuditDto } from "@/lib/api/delivery-orders";
 import { cn } from "@/lib/utils";
+import { DateTime } from "@/components/primitives/date-time";
 
 type SourceFilter = "All" | "Order" | "TripExecution" | "TripRetry" | "Amendment";
 
@@ -187,7 +188,6 @@ function AuditEntryRow({
 }) {
   const visual = sourceVisual(entry.source);
   const Icon = visual.icon;
-  const friendlyTime = relativeTime(entry.occurredAt);
 
   return (
     <motion.li
@@ -251,12 +251,11 @@ function AuditEntryRow({
               </p>
             )}
           </div>
-          <time
+          <DateTime
+            value={entry.occurredAt}
+            variant="relative"
             className="font-mono text-[10.5px] text-[var(--color-ink-400)] whitespace-nowrap"
-            title={new Date(entry.occurredAt).toLocaleString()}
-          >
-            {friendlyTime}
-          </time>
+          />
         </div>
       </div>
     </motion.li>
@@ -312,13 +311,3 @@ function sourceVisual(source: string): {
   }
 }
 
-function relativeTime(iso: string): string {
-  const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const min = Math.round(seconds / 60);
-  if (min < 60) return `${min}m ago`;
-  const hours = Math.round(min / 60);
-  if (hours < 48) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return `${days}d ago`;
-}

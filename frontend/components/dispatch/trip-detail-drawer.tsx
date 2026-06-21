@@ -32,6 +32,7 @@ import { MissionTimeline } from "./mission-timeline";
 import { RetryHistoryPanel } from "./retry-history-panel";
 import { SnapshotInspector } from "./snapshot-inspector";
 import { TripActionBar } from "./trip-action-bar";
+import { DateTime } from "@/components/primitives/date-time";
 import { TripItemsSection } from "./trip-items-section";
 import { OmsNotificationSection } from "@/components/delivery-orders/oms-notification-section";
 
@@ -295,19 +296,19 @@ export function TripDetailDrawer({
                     <MetaCell
                       icon={<Calendar className="h-3 w-3" strokeWidth={2.2} />}
                       label="Created"
-                      value={new Date(data.createdAt).toLocaleString()}
+                      value={<DateTime value={data.createdAt} />}
                     />
                     <MetaCell
                       icon={<Clock className="h-3 w-3" strokeWidth={2.2} />}
                       label={data.completedAt ? "Completed" : data.startedAt ? "Started" : "ETA"}
                       value={
-                        data.completedAt
-                          ? new Date(data.completedAt).toLocaleString()
-                          : data.startedAt
-                            ? new Date(data.startedAt).toLocaleString()
-                            : data.vendorExpectedCompletionAt
-                              ? new Date(data.vendorExpectedCompletionAt).toLocaleString()
-                              : "—"
+                        <DateTime
+                          value={
+                            data.completedAt ??
+                            data.startedAt ??
+                            data.vendorExpectedCompletionAt
+                          }
+                        />
                       }
                     />
                   </section>
@@ -429,7 +430,7 @@ function MetaCell({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  value: React.ReactNode;
   mono?: boolean;
   // Secondary line under `value` — used to show the raw vendor key
   // when a friendly label is available, so the operator can still
@@ -447,7 +448,13 @@ function MetaCell({
           "mt-1 text-[12.5px] text-[var(--color-ink-900)] truncate",
           mono && "font-mono",
         )}
-        title={hint ? `${value} (${hint})` : value}
+        title={
+          typeof value === "string"
+            ? hint
+              ? `${value} (${hint})`
+              : value
+            : undefined
+        }
       >
         {value}
       </div>

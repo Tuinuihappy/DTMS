@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
+import { DateTime } from "@/components/primitives/date-time";
 
 // Phase P0.F4 — Reusable vertical timeline component shared across
 // projection-backed views (status history, activity feed, audit trail).
@@ -77,8 +78,6 @@ export function TimelineView({
 
 function TimelineRow({ entry, index }: { entry: TimelineEntry; index: number }) {
   const dotClass = DOT_TONES[entry.dotTone ?? "neutral"];
-  const occurredAt =
-    entry.occurredAt instanceof Date ? entry.occurredAt : new Date(entry.occurredAt);
 
   return (
     <motion.li
@@ -107,9 +106,9 @@ function TimelineRow({ entry, index }: { entry: TimelineEntry; index: number }) 
             </div>
           )}
           <div className="mt-1 flex items-center gap-2 text-[10.5px] font-mono text-[var(--color-ink-400)]">
-            <span>{occurredAt.toLocaleString()}</span>
+            <DateTime value={entry.occurredAt} variant="datetime" />
             <span aria-hidden>·</span>
-            <span>{relativeFromNow(occurredAt)}</span>
+            <DateTime value={entry.occurredAt} variant="relative" showTooltip={false} />
           </div>
         </div>
         {entry.trailing && <div className="shrink-0">{entry.trailing}</div>}
@@ -126,16 +125,3 @@ const DOT_TONES: Record<NonNullable<TimelineEntry["dotTone"]>, string> = {
   neutral: "bg-[var(--color-ink-400)]",
 };
 
-function relativeFromNow(d: Date): string {
-  const diff = Date.now() - d.getTime();
-  const sign = diff >= 0 ? "" : "in ";
-  const abs = Math.abs(diff);
-  const min = Math.floor(abs / 60_000);
-  if (min < 1) return diff >= 0 ? "just now" : "in moments";
-  if (min < 60) return `${sign}${min}m${diff >= 0 ? " ago" : ""}`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${sign}${hr}h${diff >= 0 ? " ago" : ""}`;
-  const day = Math.floor(hr / 24);
-  if (day < 7) return `${sign}${day}d${diff >= 0 ? " ago" : ""}`;
-  return d.toLocaleDateString();
-}
