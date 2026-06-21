@@ -441,7 +441,7 @@ function MenuItem({
     default: "text-[var(--color-ink-700)] hover:bg-[var(--color-ink-100)] dark:hover:bg-white/10",
     brand: "text-[var(--color-brand-500)] hover:bg-[var(--color-pastel-sky)]",
     success: "text-[var(--color-success)] hover:bg-[var(--color-success-soft)]",
-    coral: "text-[var(--color-coral)] hover:bg-[#fde0db] dark:hover:bg-[#3a1a17]",
+    coral: "text-[var(--color-coral)] hover:bg-[var(--color-coral-soft)]",
   };
   return (
     <button

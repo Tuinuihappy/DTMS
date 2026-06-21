@@ -468,7 +468,7 @@ function FiltersBar(props: {
           <button
             type="button"
             onClick={props.onClear}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[11.5px] font-medium text-[var(--color-coral)] hover:bg-[#fde0db]/60"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[11.5px] font-medium text-[var(--color-coral)] hover:bg-[var(--color-coral-soft)]/60"
           >
             <X className="h-3 w-3" strokeWidth={2.4} />
             Clear filters
@@ -507,7 +507,7 @@ function TripsTable({
 
   if (error) {
     return (
-      <div className="rounded-2xl bg-[#fde0db]/40 p-6 text-center backdrop-blur-md border border-[var(--color-coral)]/20">
+      <div className="rounded-2xl bg-[var(--color-coral-soft)]/40 p-6 text-center backdrop-blur-md border border-[var(--color-coral)]/20">
         <p className="text-[13px] font-semibold text-[var(--color-coral)]">{error}</p>
       </div>
     );

@@ -88,7 +88,7 @@ export function TabSecurity() {
               transition={{ duration: 0.45, delay: 0.18 + i * 0.05, ease: EASE }}
               className="flex items-center gap-3 rounded-2xl bg-white/55 px-4 py-3.5 dark:bg-white/[0.04]"
             >
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-[var(--color-ink-100)] to-[#cfd6e6] text-[var(--color-ink-700)] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:to-[#3a4870] dark:text-[var(--color-ink-700)]">
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-[var(--color-ink-100)] to-[var(--color-pastel-ink-tail)] text-[var(--color-ink-700)] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:text-[var(--color-ink-700)]">
                 {s.icon}
               </span>
               <div className="min-w-0 flex-1">

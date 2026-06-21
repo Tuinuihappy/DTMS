@@ -70,14 +70,14 @@ const stats: Stat[] = [
 
 const toneRing: Record<Stat["tone"], string> = {
   brand:
-    "from-[var(--color-pastel-sky)] to-[#c7d4ff] text-[var(--color-brand-900)] dark:to-[#2a3a7a] dark:text-[var(--color-pastel-sky-ink)]",
+    "from-[var(--color-pastel-sky)] to-[var(--color-pastel-sky-tail)] text-[var(--color-brand-900)] dark:text-[var(--color-pastel-sky-ink)]",
   amber:
-    "from-[var(--color-amber-soft)] to-[#fcd398] text-[#8a4a07] dark:to-[#6a4a1c] dark:text-[var(--color-amber)]",
+    "from-[var(--color-amber-soft)] to-[var(--color-pastel-amber-tail)] text-[#8a4a07] dark:text-[var(--color-amber)]",
   success:
-    "from-[var(--color-success-soft)] to-[#b6e8cf] text-[var(--color-success)] dark:to-[#1f5a40] dark:text-[var(--color-success)]",
+    "from-[var(--color-success-soft)] to-[var(--color-pastel-mint-tail)] text-[var(--color-success)] dark:text-[var(--color-success)]",
   coral:
-    "from-[#fde0db] to-[#ffc8bf] text-[var(--color-coral)] dark:from-[#3a1d18] dark:to-[#5a2820] dark:text-[var(--color-coral)]",
-  ink: "from-[var(--color-ink-100)] to-[#cfd6e6] text-[var(--color-ink-800)] dark:to-[#3a4870] dark:text-[var(--color-ink-700)]",
+    "from-[var(--color-coral-soft)] to-[var(--color-pastel-coral-tail)] text-[var(--color-coral)] dark:text-[var(--color-coral)]",
+  ink: "from-[var(--color-ink-100)] to-[var(--color-pastel-ink-tail)] text-[var(--color-ink-800)] dark:text-[var(--color-ink-700)]",
 };
 
 export function ProfileStats() {
@@ -119,7 +119,7 @@ export function ProfileStats() {
                   "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10.5px] font-semibold",
                   s.delta.positive
                     ? "bg-[var(--color-success-soft)] text-[var(--color-success)]"
-                    : "bg-[#fde0db] text-[var(--color-coral)]",
+                    : "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
                 )}
               >
                 <ArrowUpRight className="h-2.5 w-2.5" strokeWidth={2.6} />

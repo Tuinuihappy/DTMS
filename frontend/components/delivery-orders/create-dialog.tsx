@@ -604,7 +604,7 @@ export function CreateOrderDialog({
                                     items: form.items.filter((_, i) => i !== idx),
                                   })
                                 }
-                                className="rounded-md p-1 text-[var(--color-coral)] transition-colors hover:bg-[#fde0db] dark:hover:bg-[#3a1a17]"
+                                className="rounded-md p-1 text-[var(--color-coral)] transition-colors hover:bg-[var(--color-coral-soft)]"
                               >
                                 <Trash2 className="h-3.5 w-3.5" strokeWidth={2.2} />
                               </button>
@@ -903,7 +903,7 @@ export function CreateOrderDialog({
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="mt-4 rounded-xl bg-[#fde0db] px-4 py-3 text-[12.5px] font-medium text-[var(--color-coral)] dark:bg-[#3a1a17]"
+                    className="mt-4 rounded-xl bg-[var(--color-coral-soft)] px-4 py-3 text-[12.5px] font-medium text-[var(--color-coral)]"
                   >
                     {error}
                   </motion.div>
@@ -1125,7 +1125,7 @@ function StationCombobox({
           className={cn(
             "absolute left-0 right-0 z-30 mt-1 max-h-56 overflow-y-auto rounded-lg",
             "border border-white/80 bg-white/95 shadow-lg backdrop-blur-md",
-            "dark:border-white/10 dark:bg-[#1a1f2e]/95",
+            "dark:border-white/10 dark:bg-[var(--color-popover)]/95",
           )}
         >
           {filtered.length === 0 ? (

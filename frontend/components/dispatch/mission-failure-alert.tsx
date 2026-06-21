@@ -58,7 +58,7 @@ export function MissionFailureAlert({
   };
 
   return (
-    <div className="rounded-xl bg-[#fde0db] px-4 py-3 text-[12.5px] text-[var(--color-coral)] dark:bg-[#3a1a17]">
+    <div className="rounded-xl bg-[var(--color-coral-soft)] px-4 py-3 text-[12.5px] text-[var(--color-coral)]">
       <div className="flex items-start gap-2">
         <AlertTriangle className="mt-[2px] h-4 w-4 flex-shrink-0" strokeWidth={2.4} />
         <div className="min-w-0 flex-1">

@@ -111,7 +111,7 @@ const STATE_META: Record<
   StateKey,
   { color: string; label: string }
 > = {
-  MOVING: { color: "var(--color-success)", label: "Moving" },
+  MOVING: { color: "var(--color-live)", label: "Moving" },
   IDLE: { color: "var(--color-info)", label: "Idle" },
   CHARGING: { color: "var(--color-amber)", label: "Charging" },
   ERROR: { color: "var(--color-coral)", label: "Error" },

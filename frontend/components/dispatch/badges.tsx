@@ -27,7 +27,7 @@ const TONE_BG: Record<TripVisual["tone"], string> = {
   peach: "bg-[var(--color-pastel-peach)] text-[var(--color-pastel-peach-ink)]",
   amber: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
   success: "bg-[var(--color-success-soft)] text-[var(--color-success)]",
-  coral: "bg-[#fde0db] text-[var(--color-coral)] dark:bg-[#3a1a17]",
+  coral: "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
 };
 
 const TONE_DOT: Record<TripVisual["tone"], string> = {
@@ -107,7 +107,7 @@ export function MissionStateBadge({ state }: { state: string }) {
     },
     FAILED: {
       label: "Failed",
-      cls: "bg-[#fde0db] text-[var(--color-coral)] dark:bg-[#3a1a17]",
+      cls: "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
     },
     CANCELED: {
       label: "Cancelled",

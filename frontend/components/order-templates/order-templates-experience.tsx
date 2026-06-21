@@ -42,13 +42,13 @@ type StatusFilter = "All" | "Active" | "Inactive";
 
 const KPI_TONES = {
   brand:
-    "from-[var(--color-pastel-sky)] to-[#c7d4ff] text-[var(--color-brand-900)] dark:to-[#2a3a7a] dark:text-[var(--color-pastel-sky-ink)]",
+    "from-[var(--color-pastel-sky)] to-[var(--color-pastel-sky-tail)] text-[var(--color-brand-900)] dark:text-[var(--color-pastel-sky-ink)]",
   success:
-    "from-[var(--color-success-soft)] to-[#b6e8cf] text-[var(--color-success)] dark:to-[#1f5a40] dark:text-[var(--color-success)]",
+    "from-[var(--color-success-soft)] to-[var(--color-pastel-mint-tail)] text-[var(--color-success)] dark:text-[var(--color-success)]",
   lavender:
-    "from-[var(--color-pastel-lavender)] to-[#d6c7f8] text-[var(--color-pastel-lavender-ink)] dark:to-[#3d2f6e] dark:text-[var(--color-pastel-lavender-ink)]",
+    "from-[var(--color-pastel-lavender)] to-[var(--color-pastel-lavender-tail)] text-[var(--color-pastel-lavender-ink)] dark:text-[var(--color-pastel-lavender-ink)]",
   peach:
-    "from-[var(--color-pastel-peach)] to-[#fcd0b6] text-[var(--color-pastel-peach-ink)] dark:to-[#5a2a1a] dark:text-[var(--color-pastel-peach-ink)]",
+    "from-[var(--color-pastel-peach)] to-[var(--color-pastel-peach-tail)] text-[var(--color-pastel-peach-ink)] dark:text-[var(--color-pastel-peach-ink)]",
 } as const;
 
 const EMPTY_STATS: OrderTemplateStats = {

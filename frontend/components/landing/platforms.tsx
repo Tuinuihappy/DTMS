@@ -165,9 +165,9 @@ function PlatformPreview({ platform }: { platform: PlatformKey }) {
       >
         {/* Mock window chrome */}
         <div className="absolute top-3 left-4 flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#ff6b5b]" />
-          <span className="h-2.5 w-2.5 rounded-full bg-[#fcb347]" />
-          <span className="h-2.5 w-2.5 rounded-full bg-[#34d399]" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-coral)]" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-amber)]" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-success)]" />
         </div>
         <div className="absolute top-3 left-1/2 -translate-x-1/2 rounded-full bg-white/70 px-3 py-0.5 text-[10px] font-mono text-[var(--color-ink-500)] dark:bg-white/[0.08]">
           tms.app/{platform}

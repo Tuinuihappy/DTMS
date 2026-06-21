@@ -79,7 +79,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 t.tone === "success"
                   ? "bg-[var(--color-success-soft)]/95 border-[var(--color-success)]/30 text-[var(--color-success)]"
                   : t.tone === "error"
-                    ? "bg-[#fde0db]/95 border-[var(--color-coral)]/30 text-[var(--color-coral)] dark:bg-[#3a1a17]/95"
+                    ? "bg-[var(--color-coral-soft)]/95 border-[var(--color-coral)]/30 text-[var(--color-coral)]"
                     : "glass-strong text-[var(--color-ink-900)]",
               )}
             >

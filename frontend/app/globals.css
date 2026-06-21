@@ -25,6 +25,8 @@
   --color-canvas-deep: #e6ebf3;
   --color-surface: #ffffff;
   --color-surface-soft: #f6f8fc;
+  --color-surface-raised: #ffffff;
+  --color-popover: #ffffff;
 
   /* Ink ramp (cool gray-blue) */
   --color-ink-50: #f2f4f9;
@@ -49,19 +51,35 @@
   --color-amber: #f59e0b;
   --color-amber-soft: #fef0d4;
   --color-coral: #ff6b5b;
+  --color-coral-soft: #fde0db;
   --color-success: #10b981;
   --color-success-soft: #d4f3e3;
   --color-info: #0ea5e9;
+  --color-info-soft: #e0f2fe;
+  --color-violet: #8b5cf6;
+  --color-violet-soft: #ede9fe;
+
+  /* Live / telemetry — AMR-specific. Cyan-teal so it reads as
+     "streaming" without competing with success-green or info-blue. */
+  --color-live: #0bbfa6;
+  --color-live-glow: rgba(11, 191, 166, 0.35);
 
   /* Pastel category blocks */
   --color-pastel-sky: #dde7ff;
   --color-pastel-sky-ink: #2b3a78;
+  --color-pastel-sky-tail: #c7d4ff;
   --color-pastel-lavender: #ebe5fb;
   --color-pastel-lavender-ink: #4a3b80;
+  --color-pastel-lavender-tail: #d6c7f8;
   --color-pastel-peach: #fde2d1;
   --color-pastel-peach-ink: #8a3a1f;
+  --color-pastel-peach-tail: #fcd0b6;
   --color-pastel-mint: #d8f1e4;
   --color-pastel-mint-ink: #186449;
+  --color-pastel-mint-tail: #b6e8cf;
+  --color-pastel-amber-tail: #fcd398;
+  --color-pastel-coral-tail: #f8b5aa;
+  --color-pastel-ink-tail: #cfd6e6;
 
   /* Radii — bumped for liquid-glass chunkiness. Big cards land at 36px
      so they read as "rounded panels" not "rectangles with corners". */
@@ -83,49 +101,70 @@
 .dark {
   color-scheme: dark;
 
-  /* Canvas + surfaces */
-  --color-canvas: #0b1224;
-  --color-canvas-deep: #060b18;
-  --color-surface: #141e37;
+  /* Canvas + surfaces — 3-tier elevation so modals/popovers stand off cards.
+     ~5% luminance steps between tiers — separation under blur without
+     feeling staged. */
+  --color-canvas: #0a1124;
+  --color-canvas-deep: #05091a;
+  --color-surface: #131c38;
   --color-surface-soft: #1a2547;
+  --color-surface-raised: #22305a;
+  --color-popover: #1a2240;
 
   /* Ink ramp — flipped + tuned (ink-900 is now the brightest,
-     ink-50 the darkest, so existing `text-ink-900` reads as bright). */
-  --color-ink-50: #0e1730;
-  --color-ink-100: #1a2547;
-  --color-ink-200: #2a3760;
-  --color-ink-300: #4a5780;
-  --color-ink-400: #6b78a0;
-  --color-ink-500: #8a95b5;
-  --color-ink-600: #b0bad3;
-  --color-ink-700: #cdd5e6;
-  --color-ink-800: #e3e8f2;
-  --color-ink-900: #f5f7fc;
+     ink-50 the darkest, so existing `text-ink-900` reads as bright).
+     Mids (ink-500/600) nudged warmer so secondary text doesn't fade
+     into ink-700 on dense tables. */
+  --color-ink-50: #11192f;
+  --color-ink-100: #1b2440;
+  --color-ink-200: #28324f;
+  --color-ink-300: #404b6c;
+  --color-ink-400: #5e6989;
+  --color-ink-500: #828dae;
+  --color-ink-600: #a6b0cb;
+  --color-ink-700: #c5cee2;
+  --color-ink-800: #e1e7f4;
+  --color-ink-900: #f4f7fe;
 
-  /* Brand — same hue family, lifted for AA contrast on dark */
-  --color-brand-900: #4f5dff;
-  --color-brand-800: #6f7bff;
-  --color-brand-500: #8b95ff;
-  --color-brand-400: #a2aaff;
-  --color-brand-200: #3a47cc;
+  /* Brand — electric cobalt, lifted for AA on the deeper canvas */
+  --color-brand-900: #2f3ab8;
+  --color-brand-800: #4f5dff;
+  --color-brand-500: #7b87ff;
+  --color-brand-400: #9ca4ff;
+  --color-brand-200: #bdc2ff;
 
-  /* Functional — slightly brighter to hold against deep navy */
-  --color-amber: #fcb347;
-  --color-amber-soft: #4a3617;
-  --color-coral: #ff7b6d;
-  --color-success: #34d399;
-  --color-success-soft: #143728;
-  --color-info: #38bdf8;
+  /* Functional — tuned to stay "alive" against deep navy */
+  --color-amber: #fbb347;
+  --color-amber-soft: #2e2010;
+  --color-coral: #ff7a6a;
+  --color-coral-soft: #2e1410;
+  --color-success: #3dd9a4;
+  --color-success-soft: #0f2e22;
+  --color-info: #4ec4f8;
+  --color-info-soft: #0f2638;
+  --color-violet: #b794ff;
+  --color-violet-soft: #1f1638;
 
-  /* Pastel category — deep saturated translations */
-  --color-pastel-sky: #1a2654;
-  --color-pastel-sky-ink: #b8c8ff;
-  --color-pastel-lavender: #271d4b;
-  --color-pastel-lavender-ink: #d4c6ff;
-  --color-pastel-peach: #3d1f18;
+  /* Live / telemetry — same hue, lifted glow alpha for dark canvas */
+  --color-live: #22e0c9;
+  --color-live-glow: rgba(34, 224, 201, 0.4);
+
+  /* Pastel category — deep "velvet jewel" surfaces with AA inks */
+  --color-pastel-sky: #1b2a60;
+  --color-pastel-sky-ink: #c2d0ff;
+  --color-pastel-sky-tail: #2a3760;
+  --color-pastel-lavender: #2a1f58;
+  --color-pastel-lavender-ink: #dcceff;
+  --color-pastel-lavender-tail: #3d2f6e;
+  --color-pastel-peach: #421f18;
   --color-pastel-peach-ink: #ffc9b0;
-  --color-pastel-mint: #143728;
+  --color-pastel-peach-tail: #5a2a1a;
+  --color-pastel-mint: #103828;
   --color-pastel-mint-ink: #a8e6c9;
+  --color-pastel-mint-tail: #1a4a35;
+  --color-pastel-amber-tail: #3a2a12;
+  --color-pastel-coral-tail: #4a1f18;
+  --color-pastel-ink-tail: #3a4870;
 }
 
 /* =========================================================================
@@ -179,11 +218,14 @@ body::before {
 }
 
 .dark body::before {
+  /* Cobalt Console aurora — cobalt → teal-telemetry → cyan → violet.
+     Cooler than the prior pink/violet mix so it nods at the AMR
+     telemetry character of the dashboard. */
   background:
-    radial-gradient(1100px 700px at 8% -8%, rgba(79, 93, 255, 0.22), transparent 60%),
-    radial-gradient(900px 600px at 95% 5%, rgba(139, 92, 246, 0.18), transparent 65%),
-    radial-gradient(800px 700px at 60% 110%, rgba(56, 189, 248, 0.14), transparent 60%),
-    radial-gradient(700px 500px at 25% 75%, rgba(244, 114, 182, 0.10), transparent 65%);
+    radial-gradient(1100px 700px at 8% -8%, rgba(79, 93, 255, 0.20), transparent 60%),
+    radial-gradient(900px 600px at 95% 5%, rgba(34, 224, 201, 0.12), transparent 65%),
+    radial-gradient(800px 700px at 60% 110%, rgba(78, 196, 248, 0.10), transparent 60%),
+    radial-gradient(700px 500px at 25% 75%, rgba(183, 148, 255, 0.10), transparent 65%);
 }
 
 body::after {

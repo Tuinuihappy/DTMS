@@ -81,7 +81,7 @@ export function TripItemsSection({
       )}
 
       {error && (
-        <div className="rounded-xl bg-[#fde0db] px-4 py-3 text-[12.5px] font-medium text-[var(--color-coral)] dark:bg-[#3a1a17]">
+        <div className="rounded-xl bg-[var(--color-coral-soft)] px-4 py-3 text-[12.5px] font-medium text-[var(--color-coral)]">
           <div>{error}</div>
           <button
             type="button"
@@ -219,7 +219,7 @@ function ItemStatusBadge({ status }: { status: string }) {
       case "Failed":
       case "Cancelled":
       case "Unbound":
-        return "bg-[#fde0db] text-[var(--color-coral)] dark:bg-[#3a1a17]";
+        return "bg-[var(--color-coral-soft)] text-[var(--color-coral)]";
       case "Returned":
         return "bg-[var(--color-pastel-lavender)] text-[var(--color-pastel-lavender-ink)]";
       default:

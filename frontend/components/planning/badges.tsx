@@ -33,8 +33,8 @@ const TONE_BG: Record<JobVisual["tone"], string> = {
   peach: "bg-[var(--color-pastel-peach)] text-[var(--color-pastel-peach-ink)]",
   amber: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
   success: "bg-[var(--color-success-soft)] text-[var(--color-success)]",
-  coral: "bg-[#fde0db] text-[var(--color-coral)] dark:bg-[#3a1a17]",
-  lavender: "bg-[var(--color-pastel-lavender,#e9e3ff)] text-[var(--color-pastel-lavender-ink,#5b4daf)] dark:bg-[#2a2348] dark:text-[#c9c0ff]",
+  coral: "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
+  lavender: "bg-[var(--color-pastel-lavender,#e9e3ff)] text-[var(--color-pastel-lavender-ink,#5b4daf)] dark:bg-[var(--color-pastel-lavender)] dark:text-[var(--color-pastel-lavender-ink)]",
 };
 
 const TONE_DOT: Record<JobVisual["tone"], string> = {

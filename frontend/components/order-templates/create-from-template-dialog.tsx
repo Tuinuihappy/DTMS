@@ -488,7 +488,7 @@ function SuccessCard({ result }: { result: CreateFromTemplateResult }) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-      className="relative overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-[var(--color-success-soft)] to-[#b6e8cf] px-5 py-4 dark:from-[#143728] dark:to-[#1f5a40]"
+      className="relative overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-[var(--color-success-soft)] to-[var(--color-pastel-mint-tail)] px-5 py-4"
     >
       <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-white/40 blur-2xl" />
       <div className="relative flex items-start gap-3">

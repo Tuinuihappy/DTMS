@@ -161,7 +161,7 @@ export function StationCombobox({
         <ul
           ref={listRef}
           role="listbox"
-          className="absolute left-0 right-0 z-30 mt-1 max-h-56 overflow-y-auto rounded-[var(--radius-sm)] border border-white/80 bg-white/95 shadow-[0_18px_42px_-14px_rgba(15,23,42,0.3)] backdrop-blur-md dark:border-white/10 dark:bg-[#1a1f2e]/95"
+          className="absolute left-0 right-0 z-30 mt-1 max-h-56 overflow-y-auto rounded-[var(--radius-sm)] border border-white/80 bg-[var(--color-popover)]/95 shadow-[0_18px_42px_-14px_rgba(15,23,42,0.3)] backdrop-blur-md border-[var(--color-ink-100)]"
         >
           {filtered.length === 0 ? (
             <li className="px-3 py-2 text-[12px] italic text-[var(--color-ink-400)]">

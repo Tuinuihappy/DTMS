@@ -40,7 +40,7 @@ const TONE_BG: Record<StatusVisual["tone"], string> = {
   peach: "bg-[var(--color-pastel-peach)] text-[var(--color-pastel-peach-ink)]",
   success: "bg-[var(--color-success-soft)] text-[var(--color-success)]",
   amber: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
-  coral: "bg-[#fde0db] text-[var(--color-coral)] dark:bg-[#3a1a17]",
+  coral: "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
 };
 
 const TONE_DOT: Record<StatusVisual["tone"], string> = {

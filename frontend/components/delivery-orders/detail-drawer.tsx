@@ -225,7 +225,7 @@ export function OrderDetailDrawer({
 
             <div className="flex-1 overflow-y-auto px-6 py-5">
               {error && (
-                <div className="rounded-xl bg-[#fde0db] px-4 py-3 text-[12.5px] font-medium text-[var(--color-coral)] dark:bg-[#3a1a17]">
+                <div className="rounded-xl bg-[var(--color-coral-soft)] px-4 py-3 text-[12.5px] font-medium text-[var(--color-coral)]">
                   {error}
                 </div>
               )}
@@ -744,7 +744,7 @@ function eventTone(eventType: string): { chip: string; dot: string } {
   const e = eventType.toLowerCase();
   if (e.includes("fail") || e.includes("reject") || e.includes("cancel"))
     return {
-      chip: "bg-[#fde0db] text-[var(--color-coral)] dark:bg-[#3a1a17]",
+      chip: "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
       dot: "bg-[var(--color-coral)]",
     };
   if (e.includes("complete") || e.includes("delivered"))
@@ -799,7 +799,7 @@ function DrawerActionButton({
     success:
       "bg-[var(--color-success)] text-white hover:shadow-[0_14px_36px_-12px_rgba(16,185,129,0.5)]",
     coral:
-      "bg-[#fde0db] text-[var(--color-coral)] hover:bg-[#fbc7be] dark:bg-[#3a1a17] dark:hover:bg-[#4a2520]",
+      "bg-[var(--color-coral-soft)] text-[var(--color-coral)] hover:bg-[var(--color-coral-soft)]/80",
     lavender:
       "bg-[var(--color-pastel-lavender)] text-[var(--color-pastel-lavender-ink)] hover:bg-[var(--color-pastel-lavender)]/80",
     sky:
@@ -907,7 +907,7 @@ const STATUS_VISUAL: Record<
     title: "Delivered to drop station",
   },
   Failed: {
-    className: "bg-[#fde0db] text-[var(--color-coral)] dark:bg-[#3a1a17]",
+    className: "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
     dot: "bg-[var(--color-coral)]",
     title: "Dispatch or delivery failed — Reopen + Retry to recover",
   },

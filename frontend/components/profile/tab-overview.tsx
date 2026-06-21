@@ -91,7 +91,7 @@ export function TabOverview() {
                     ? "rounded-full bg-[var(--color-success-soft)] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-[var(--color-success)]"
                     : c.tone === "amber"
                       ? "rounded-full bg-[var(--color-amber-soft)] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-[var(--color-amber)]"
-                      : "rounded-full bg-[#fde0db] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-[var(--color-coral)] dark:bg-[#3a1d18]"
+                      : "rounded-full bg-[var(--color-coral-soft)] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-[var(--color-coral)]"
                 }
               >
                 {c.tone === "coral" ? "Renew soon" : c.tone === "amber" ? "Due 6mo" : "Valid"}

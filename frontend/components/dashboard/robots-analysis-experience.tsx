@@ -123,7 +123,7 @@ export function RobotsAnalysisExperience() {
           subtitle={`Trailing ${window} · ${data?.buckets.length ?? 0} buckets · Total fleet ${latest?.total ?? 0}`}
         />
         {error && (
-          <div className="mt-4 rounded-xl bg-[#fde0db] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)] dark:bg-[#3a1a17]">
+          <div className="mt-4 rounded-xl bg-[var(--color-coral-soft)] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)]">
             {error}
           </div>
         )}
@@ -163,10 +163,10 @@ function StateTile({
   delay: number;
 }) {
   const toneClasses: Record<typeof tone, string> = {
-    brand: "from-[var(--color-pastel-sky)] to-[#c7d4ff] text-[var(--color-brand-900)] dark:to-[#2a3a7a] dark:text-[var(--color-pastel-sky-ink)]",
-    amber: "from-[var(--color-amber-soft)] to-[#fcd398] text-[#8a4a07] dark:to-[#6a4a1c] dark:text-[var(--color-amber)]",
-    coral: "from-[#fde0db] to-[#f8b5aa] text-[var(--color-coral)] dark:to-[#5c1f17] dark:text-[var(--color-coral)]",
-    ink:   "from-[var(--color-ink-100)] to-[#cfd6e6] text-[var(--color-ink-800)] dark:to-[#3a4870] dark:text-[var(--color-ink-700)]",
+    brand: "from-[var(--color-pastel-sky)] to-[var(--color-pastel-sky-tail)] text-[var(--color-brand-900)] dark:text-[var(--color-pastel-sky-ink)]",
+    amber: "from-[var(--color-amber-soft)] to-[var(--color-pastel-amber-tail)] text-[#8a4a07] dark:text-[var(--color-amber)]",
+    coral: "from-[var(--color-coral-soft)] to-[var(--color-pastel-coral-tail)] text-[var(--color-coral)] dark:text-[var(--color-coral)]",
+    ink:   "from-[var(--color-ink-100)] to-[var(--color-pastel-ink-tail)] text-[var(--color-ink-800)] dark:text-[var(--color-ink-700)]",
   };
   const pct = total > 0 ? Math.round((value / total) * 100) : 0;
 

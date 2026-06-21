@@ -62,7 +62,7 @@ function MissionRow({ mission }: { mission: TripMissionDto }) {
         className={cn(
           "absolute -left-[18px] top-1 inline-flex h-[14px] w-[14px] items-center justify-center rounded-full ring-4",
           isFailed
-            ? "bg-[var(--color-coral)] ring-[#fde0db] dark:ring-[#3a1a17]"
+            ? "bg-[var(--color-coral)] ring-[var(--color-coral-soft)]"
             : "bg-[var(--color-surface)] ring-[var(--color-ink-100)] dark:ring-white/10",
         )}
       >

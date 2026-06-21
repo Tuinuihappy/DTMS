@@ -132,7 +132,7 @@ export function FleetPulseStrip() {
               </div>
             </div>
             <div className="inline-flex items-center gap-1.5 rounded-full bg-white/60 px-2.5 py-1 text-[10.5px] font-mono tracking-tight text-[var(--color-ink-600)] dark:bg-white/[0.05]">
-              <StatusPulse tone={lastTickMs ? "success" : "amber"} />
+              <StatusPulse tone={lastTickMs ? "live" : "amber"} />
               {freshness}
             </div>
           </div>

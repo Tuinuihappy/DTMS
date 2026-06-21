@@ -188,7 +188,7 @@ export function TripDetailDrawer({
 
             <div className="flex-1 overflow-y-auto px-6 py-5">
               {error && (
-                <div className="rounded-xl bg-[#fde0db] px-4 py-3 text-[12.5px] font-medium text-[var(--color-coral)] dark:bg-[#3a1a17]">
+                <div className="rounded-xl bg-[var(--color-coral-soft)] px-4 py-3 text-[12.5px] font-medium text-[var(--color-coral)]">
                   {error}
                 </div>
               )}
@@ -228,7 +228,7 @@ export function TripDetailDrawer({
                   className="space-y-6"
                 >
                   {data.failureReason && (
-                    <div className="rounded-xl bg-[#fde0db] px-4 py-3 text-[12.5px] font-medium text-[var(--color-coral)] dark:bg-[#3a1a17]">
+                    <div className="rounded-xl bg-[var(--color-coral-soft)] px-4 py-3 text-[12.5px] font-medium text-[var(--color-coral)]">
                       <div className="text-[10.5px] font-semibold uppercase tracking-[0.06em] opacity-80">
                         Failure reason
                       </div>

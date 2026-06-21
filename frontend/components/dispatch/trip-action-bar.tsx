@@ -125,7 +125,7 @@ export function TripActionBar({
         />
       </div>
       {error && (
-        <div className="rounded-md bg-[#fde0db] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)] dark:bg-[#3a1a17]">
+        <div className="rounded-md bg-[var(--color-coral-soft)] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)]">
           {error}
         </div>
       )}
@@ -150,7 +150,7 @@ const TONE_CLS: Record<Tone, string> = {
     "bg-[var(--color-success-soft)] text-[var(--color-success)] hover:bg-[var(--color-success-soft)]/80",
   lavender:
     "bg-[var(--color-pastel-lavender)] text-[var(--color-pastel-lavender-ink)] hover:bg-[var(--color-pastel-lavender)]/80",
-  coral: "bg-[#fde0db] text-[var(--color-coral)] hover:bg-[#fde0db]/80 dark:bg-[#3a1a17]",
+  coral: "bg-[var(--color-coral-soft)] text-[var(--color-coral)] hover:bg-[var(--color-coral-soft)]/80",
   sky: "bg-[var(--color-pastel-sky)] text-[var(--color-pastel-sky-ink)] hover:bg-[var(--color-pastel-sky)]/80",
 };
 

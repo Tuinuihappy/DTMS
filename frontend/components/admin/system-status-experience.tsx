@@ -107,7 +107,7 @@ export function AdminSystemStatusExperience() {
       <SummarySection />
 
       {error && (
-        <div className="rounded-xl bg-[#fde0db] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)] dark:bg-[#3a1a17]">
+        <div className="rounded-xl bg-[var(--color-coral-soft)] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)]">
           {error}
         </div>
       )}

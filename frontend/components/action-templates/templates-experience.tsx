@@ -42,12 +42,12 @@ type CategoryFilter = "All" | ActionCategory;
 
 const KPI_TONES = {
   brand:
-    "from-[var(--color-pastel-sky)] to-[#c7d4ff] text-[var(--color-brand-900)] dark:to-[#2a3a7a] dark:text-[var(--color-pastel-sky-ink)]",
+    "from-[var(--color-pastel-sky)] to-[var(--color-pastel-sky-tail)] text-[var(--color-brand-900)] dark:text-[var(--color-pastel-sky-ink)]",
   amber:
-    "from-[var(--color-amber-soft)] to-[#fcd398] text-[#8a4a07] dark:to-[#6a4a1c] dark:text-[var(--color-amber)]",
+    "from-[var(--color-amber-soft)] to-[var(--color-pastel-amber-tail)] text-[#8a4a07] dark:text-[var(--color-amber)]",
   success:
-    "from-[var(--color-success-soft)] to-[#b6e8cf] text-[var(--color-success)] dark:to-[#1f5a40] dark:text-[var(--color-success)]",
-  ink: "from-[var(--color-ink-100)] to-[#cfd6e6] text-[var(--color-ink-800)] dark:to-[#3a4870] dark:text-[var(--color-ink-700)]",
+    "from-[var(--color-success-soft)] to-[var(--color-pastel-mint-tail)] text-[var(--color-success)] dark:text-[var(--color-success)]",
+  ink: "from-[var(--color-ink-100)] to-[var(--color-pastel-ink-tail)] text-[var(--color-ink-800)] dark:text-[var(--color-ink-700)]",
 } as const;
 
 function useDebouncedValue<T>(value: T, delay = 300): T {

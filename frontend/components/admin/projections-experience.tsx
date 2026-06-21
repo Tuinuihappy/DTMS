@@ -82,7 +82,7 @@ export function AdminProjectionsExperience() {
       </section>
 
       {error && (
-        <div className="rounded-xl bg-[#fde0db] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)] dark:bg-[#3a1a17]">
+        <div className="rounded-xl bg-[var(--color-coral-soft)] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)]">
           {error}
         </div>
       )}
@@ -176,11 +176,11 @@ function StatusBadge({ status }: { status: ProjectorStatus }) {
   const styles: Record<ProjectorStatus, { label: string; cls: string }> = {
     healthy: {
       label: "Healthy",
-      cls: "bg-[var(--color-mint-50,#e7faec)] text-[var(--color-mint-700,#15803d)] dark:bg-[var(--color-mint-500)]/15 dark:text-[var(--color-mint-300,#86efac)]",
+      cls: "bg-[var(--color-success-soft)] text-[var(--color-success)]",
     },
     stale: {
       label: "Stale",
-      cls: "bg-[var(--color-amber-50,#fff7ed)] text-[var(--color-amber-700,#b45309)] dark:bg-[var(--color-amber-500)]/15 dark:text-[var(--color-amber-300,#fcd34d)]",
+      cls: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
     },
     idle: {
       label: "Idle",

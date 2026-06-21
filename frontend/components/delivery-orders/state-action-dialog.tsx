@@ -70,9 +70,9 @@ const CONFIG: Record<StateActionVariant, VariantConfig> = {
     reasonPlaceholder: "e.g. duplicate submission; superseded by DO-…",
     submitLabel: "Reject",
     icon: <Ban className="h-4 w-4" strokeWidth={2.4} />,
-    bubbleClass: "bg-[#fde0db] text-[var(--color-coral)] dark:bg-[#3a1a17]",
+    bubbleClass: "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
     submitClass:
-      "bg-[#fde0db] text-[var(--color-coral)] hover:bg-[#fbc7be] dark:bg-[#3a1a17] dark:hover:bg-[#4a2520]",
+      "bg-[var(--color-coral-soft)] text-[var(--color-coral)] hover:bg-[var(--color-coral-soft)]/80",
   },
   // Phase b11 escape hatch — close out an order stranded at an in-flight
   // status with no active Trip remaining. Backend validates BOTH (in-flight,
@@ -249,7 +249,7 @@ export function StateActionDialog({
               </label>
 
               {error && (
-                <div className="rounded-lg bg-[#fde0db] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)] dark:bg-[#3a1a17]">
+                <div className="rounded-lg bg-[var(--color-coral-soft)] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)]">
                   {error}
                 </div>
               )}

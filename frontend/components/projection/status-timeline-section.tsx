@@ -115,7 +115,7 @@ export function StatusTimelineSection({
         </span>
         <span className="inline-flex items-center gap-1.5">
           {issueCount !== undefined && issueCount > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#fde0db] px-2 py-[2px] text-[10px] font-semibold tracking-[0.04em] text-[var(--color-coral)] dark:bg-[#3a1a17]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-coral-soft)] px-2 py-[2px] text-[10px] font-semibold tracking-[0.04em] text-[var(--color-coral)]">
               <AlertTriangle className="h-3 w-3" strokeWidth={2.6} />
               {issueCount} {issueCount === 1 ? "issue" : "issues"}
             </span>
@@ -125,7 +125,7 @@ export function StatusTimelineSection({
       </h4>
 
       {error && (
-        <div className="mt-3 rounded-xl bg-[#fde0db] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)] dark:bg-[#3a1a17]">
+        <div className="mt-3 rounded-xl bg-[var(--color-coral-soft)] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)]">
           Couldn&apos;t load timeline: {error}
         </div>
       )}
@@ -179,7 +179,7 @@ function StatusChip({
   const palette: Record<NonNullable<TimelineEntry["dotTone"]>, string> = {
     success: "bg-[var(--color-success-soft)] text-[var(--color-success)]",
     warning: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
-    error: "bg-[#fde0db] text-[var(--color-coral)] dark:bg-[#3a1a17]",
+    error: "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
     info: "bg-[var(--color-pastel-sky)] text-[var(--color-pastel-sky-ink)]",
     neutral:
       "bg-[var(--color-ink-100)] text-[var(--color-ink-700)] dark:bg-white/[0.06]",

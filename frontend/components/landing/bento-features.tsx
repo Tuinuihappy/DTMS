@@ -235,7 +235,7 @@ function FleetVisual() {
         ))}
       </div>
       {/* floating mini-card */}
-      <div className="absolute top-1/2 left-6 -translate-y-1/2 rounded-2xl bg-white/90 px-3 py-2 shadow-[0_12px_30px_-10px_rgba(15,23,42,0.18)] dark:bg-[#1a2547]/95">
+      <div className="absolute top-1/2 left-6 -translate-y-1/2 rounded-2xl bg-white/90 px-3 py-2 shadow-[0_12px_30px_-10px_rgba(15,23,42,0.18)] dark:bg-[var(--color-surface-soft)]/95">
         <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--color-ink-500)]">
           Truck 14 · ETA
         </div>

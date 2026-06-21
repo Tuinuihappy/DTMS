@@ -26,13 +26,13 @@ type KpiSpec = {
 
 const toneRing: Record<KpiTone, string> = {
   brand:
-    "from-[var(--color-pastel-sky)] to-[#c7d4ff] text-[var(--color-brand-900)] dark:to-[#2a3a7a] dark:text-[var(--color-pastel-sky-ink)]",
+    "from-[var(--color-pastel-sky)] to-[var(--color-pastel-sky-tail)] text-[var(--color-brand-900)] dark:text-[var(--color-pastel-sky-ink)]",
   amber:
-    "from-[var(--color-amber-soft)] to-[#fcd398] text-[#8a4a07] dark:to-[#6a4a1c] dark:text-[var(--color-amber)]",
+    "from-[var(--color-amber-soft)] to-[var(--color-pastel-amber-tail)] text-[#8a4a07] dark:text-[var(--color-amber)]",
   success:
-    "from-[var(--color-success-soft)] to-[#b6e8cf] text-[var(--color-success)] dark:to-[#1f5a40] dark:text-[var(--color-success)]",
+    "from-[var(--color-success-soft)] to-[var(--color-pastel-mint-tail)] text-[var(--color-success)] dark:text-[var(--color-success)]",
   coral:
-    "from-[#fde0db] to-[#f8b5aa] text-[var(--color-coral)] dark:to-[#5c1f17] dark:text-[var(--color-coral)]",
+    "from-[var(--color-coral-soft)] to-[var(--color-pastel-coral-tail)] text-[var(--color-coral)] dark:text-[var(--color-coral)]",
 };
 
 function defaultWindow() {

@@ -103,7 +103,7 @@ export function FullAuditLog({
 
   if (error) {
     return (
-      <div className="rounded-xl bg-[#fde0db] px-4 py-3 text-[12.5px] font-medium text-[var(--color-coral)] dark:bg-[#3a1a17]">
+      <div className="rounded-xl bg-[var(--color-coral-soft)] px-4 py-3 text-[12.5px] font-medium text-[var(--color-coral)]">
         Could not load audit log: {error}
       </div>
     );

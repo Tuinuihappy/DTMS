@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 type Props = {
-  tone?: "success" | "amber" | "coral" | "brand";
+  tone?: "success" | "amber" | "coral" | "brand" | "live";
   size?: "sm" | "md";
   className?: string;
 };
@@ -11,6 +11,7 @@ const toneClass: Record<NonNullable<Props["tone"]>, string> = {
   amber: "text-[var(--color-amber)] bg-[var(--color-amber)]",
   coral: "text-[var(--color-coral)] bg-[var(--color-coral)]",
   brand: "text-[var(--color-brand-500)] bg-[var(--color-brand-500)]",
+  live: "text-[var(--color-live)] bg-[var(--color-live)]",
 };
 
 export function StatusPulse({ tone = "success", size = "sm", className }: Props) {

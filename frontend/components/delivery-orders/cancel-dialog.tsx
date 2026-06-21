@@ -63,7 +63,7 @@ export function CancelOrderDialog({
               className="relative w-full max-w-md overflow-hidden rounded-[var(--radius-xl)] glass-strong"
             >
               <header className="flex items-start gap-3 px-6 pt-5">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#fde0db] text-[var(--color-coral)] dark:bg-[#3a1a17]">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--color-coral-soft)] text-[var(--color-coral)]">
                   <AlertTriangle className="h-5 w-5" strokeWidth={2.2} />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -101,7 +101,7 @@ export function CancelOrderDialog({
                   )}
                 </p>
                 {activeTripCount > 0 && count <= 1 && (
-                  <div className="mt-3 flex items-start gap-2 rounded-lg bg-[#fde0db]/60 px-3 py-2 text-[11.5px] leading-relaxed text-[var(--color-coral)] dark:bg-[#3a1a17]">
+                  <div className="mt-3 flex items-start gap-2 rounded-lg bg-[var(--color-coral-soft)]/60 px-3 py-2 text-[11.5px] leading-relaxed text-[var(--color-coral)]">
                     <Bot className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={2.4} />
                     <span>
                       <strong>Cascade:</strong> {activeTripCount} in-flight trip

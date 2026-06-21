@@ -361,7 +361,7 @@ function StatusCard({ config, status }: { config: StageConfig; status: OmsStatus
 
   if (status.kind === "failed") {
     return (
-      <div className="rounded-xl bg-[#fde0db] px-4 py-3 dark:bg-[#3a1a17]">
+      <div className="rounded-xl bg-[var(--color-coral-soft)] px-4 py-3">
         <div className="flex items-start gap-2">
           <XCircle className="mt-[2px] h-3.5 w-3.5 text-[var(--color-coral)]" strokeWidth={2.4} />
           <div className="min-w-0 flex-1">
