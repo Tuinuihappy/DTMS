@@ -455,6 +455,31 @@ export async function deleteOrder(id: string, reason: string): Promise<void> {
   if (!res.ok && res.status !== 204) await unwrap(res);
 }
 
+// Backend Phase 2 — bulk cancel many orders in one POST. Backend
+// returns 200 on full success, 207 Multi-Status when some rows
+// failed, 400 if every id failed (or the request was invalid).
+// Caller handles both 200/207 the same way; result.failures may be
+// empty on full success.
+export type BulkCancelOrdersResult = {
+  succeeded: string[];
+  failures: { orderId: string; reason: string }[];
+};
+
+export async function bulkCancelOrders(
+  orderIds: string[],
+  reason: string,
+): Promise<BulkCancelOrdersResult> {
+  const res = await fetch(`/api/delivery-orders/bulk-cancel`, {
+    method: "POST",
+    headers: mutationHeaders(),
+    body: JSON.stringify({ orderIds, reason }),
+  });
+  if (res.status !== 200 && res.status !== 207) {
+    return await unwrap<BulkCancelOrdersResult>(res);
+  }
+  return (await res.json()) as BulkCancelOrdersResult;
+}
+
 export async function submitOrder(id: string): Promise<void> {
   const res = await fetch(`/api/delivery-orders/${id}/submit`, {
     method: "POST",

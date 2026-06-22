@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.AcknowledgeRobotPass;
+using AMR.DeliveryPlanning.Dispatch.Application.Commands.BulkCancelTrips;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.CancelTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.CapturePoD;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.PauseTrip;
@@ -164,6 +165,26 @@ public static class DispatchEndpoints
         {
             var result = await sender.Send(new CancelTripCommand(id, reason));
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
+        });
+
+        // POST /api/v1/dispatch/trips/bulk-cancel — Backend Phase 2
+        // Body: { tripIds: [guid...], reason: string }
+        // Mirrors /api/v1/delivery-orders/bulk-cancel response semantics:
+        // 200 on full success, 207 Multi-Status on partial, 400 if every
+        // id failed. No idempotency middleware (matches single-cancel
+        // endpoint behaviour); handler dedups ids inside the batch.
+        group.MapPost("/trips/bulk-cancel", async (BulkCancelTripsCommand command, ISender sender) =>
+        {
+            var result = await sender.Send(command);
+            if (result.IsFailure) return Results.BadRequest(result.Error);
+
+            var bulk = result.Value;
+            if (bulk.Succeeded.Count == 0)
+                return Results.BadRequest(bulk.Failures);
+
+            return bulk.Failures.Count > 0
+                ? Results.Json(bulk, statusCode: 207)
+                : Results.Ok(bulk);
         });
 
         // POST /api/v1/dispatch/trips/{id}/retry — reissue a Cancelled trip.

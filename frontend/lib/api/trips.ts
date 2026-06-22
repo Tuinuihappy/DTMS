@@ -272,6 +272,26 @@ export function cancelTrip(tripId: string, reason: string): Promise<void> {
   return api<void>(`/api/dispatch/trips/${tripId}/cancel${qs}`, { method: "POST" });
 }
 
+// Backend Phase 2 — bulk cancel multiple trips in one POST. Server
+// returns 200 on full success, 207 Multi-Status when some rows failed
+// (e.g. wrong status, vendor RIOT3 rejection). 400 only when every id
+// failed or the body shape was invalid.
+export type BulkCancelTripsResult = {
+  succeeded: string[];
+  failures: { tripId: string; reason: string }[];
+};
+
+export function bulkCancelTrips(
+  tripIds: string[],
+  reason: string,
+): Promise<BulkCancelTripsResult> {
+  return api<BulkCancelTripsResult>(`/api/dispatch/trips/bulk-cancel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tripIds, reason }),
+  });
+}
+
 export function pauseTrip(tripId: string): Promise<void> {
   return api<void>(`/api/dispatch/trips/${tripId}/pause`, { method: "POST" });
 }

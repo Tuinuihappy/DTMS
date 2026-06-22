@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AbandonStuckDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AmendDeliveryOrder;
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkCancelDeliveryOrders;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkSubmitDeliveryOrders;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CancelDeliveryOrder;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ConfirmDeliveryOrder;
@@ -222,6 +223,25 @@ public static class DeliveryOrderEndpoints
 
             var bulk = result.Value;
             if (bulk.SucceededIds.Count == 0)
+                return Results.BadRequest(bulk.Failures);
+
+            return bulk.Failures.Count > 0
+                ? Results.Json(bulk, statusCode: 207)
+                : Results.Ok(bulk);
+        }).RequireIdempotencyKey();
+
+        // POST /api/v1/delivery-orders/bulk-cancel — Backend Phase 2
+        // Body: { orderIds: [guid...], reason: string }
+        // Returns 200 if everything cancelled, 207 Multi-Status if some
+        // rows failed (e.g. already-Cancelled or wrong state), 400 if
+        // every id failed or the request shape was invalid.
+        group.MapPost("/bulk-cancel", async (BulkCancelDeliveryOrdersCommand command, ISender sender) =>
+        {
+            var result = await sender.Send(command);
+            if (result.IsFailure) return Results.BadRequest(result.Error);
+
+            var bulk = result.Value;
+            if (bulk.Succeeded.Count == 0)
                 return Results.BadRequest(bulk.Failures);
 
             return bulk.Failures.Count > 0
