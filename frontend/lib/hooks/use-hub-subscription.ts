@@ -2,7 +2,12 @@
 
 import { HubConnectionState } from "@microsoft/signalr";
 import { useEffect, useState } from "react";
-import { ensureStarted, getHub } from "@/lib/realtime/signalr-client";
+import {
+  DRAIN_CYCLE_EVENT,
+  type DrainCycleDetail,
+  ensureStarted,
+  getHub,
+} from "@/lib/realtime/signalr-client";
 
 // Backend SignalR uses MessagePack with the default ContractlessStandardResolver.
 // Two mismatches with the REST JSON shape consumers expect:
@@ -98,6 +103,7 @@ export function useHubSubscription({
 
     const connection = getHub(hubPath);
     const registeredHandlers: Array<[string, (...args: unknown[]) => void]> = [];
+    let cleanupDrainListener: (() => void) | null = null;
 
     const attach = () => {
       for (const [event, handler] of Object.entries(eventHandlers)) {
@@ -137,6 +143,27 @@ export function useHubSubscription({
         connection.onreconnecting(onReconnecting);
         connection.onclose(onClose);
 
+        // G1 Phase 3 — drain cycle: signalr-client tore the connection
+        // down + reopened it in response to a server "__drain" broadcast.
+        // SignalR's onreconnected only fires for failure-driven recovery,
+        // not for our manual stop/start, so we listen for the bespoke
+        // CustomEvent and re-invoke Subscribe to rejoin the group.
+        const onDrainCycled = (e: Event) => {
+          const detail = (e as CustomEvent<DrainCycleDetail>).detail;
+          if (detail?.hubPath !== hubPath) return;
+          if (cancelled) return;
+          setError(null);
+          void subscribe();
+        };
+        if (typeof window !== "undefined") {
+          window.addEventListener(DRAIN_CYCLE_EVENT, onDrainCycled);
+        }
+        cleanupDrainListener = () => {
+          if (typeof window !== "undefined") {
+            window.removeEventListener(DRAIN_CYCLE_EVENT, onDrainCycled);
+          }
+        };
+
         await subscribe();
       } catch (err) {
         if (!cancelled) setError((err as Error).message);
@@ -147,6 +174,7 @@ export function useHubSubscription({
 
     return () => {
       cancelled = true;
+      cleanupDrainListener?.();
       // Best-effort unsubscribe — the connection may have already gone
       // away (page closing, network blip), in which case .invoke()
       // throws. We swallow because cleanup must not throw.
