@@ -22,6 +22,13 @@ import {
 } from "@/lib/api/reports";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
 import { cn } from "@/lib/utils";
+import {
+  DataRow,
+  DataTableBody,
+  DataTableHead,
+  TableTd,
+  TableTh,
+} from "@/components/primitives/data-table";
 
 export function SlaBreachReport({ window }: { window: Window }) {
   const fetcher = useCallback(
@@ -125,40 +132,58 @@ export function SlaBreachReport({ window }: { window: Window }) {
         </div>
 
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full border-collapse text-[12.5px]">
-            <thead>
-              <tr className="text-left text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-400)]">
-                <th className="px-2 py-2">Priority</th>
-                <th className="px-2 py-2 text-right">Total</th>
-                <th className="px-2 py-2 text-right">Confirm breach</th>
-                <th className="px-2 py-2 text-right">Complete breach</th>
-                <th className="px-2 py-2 text-right">Confirm rate</th>
-                <th className="px-2 py-2 text-right">Complete rate</th>
-              </tr>
-            </thead>
-            <tbody>
+          <table className="w-full text-left">
+            <DataTableHead>
+              <TableTh density="compact">Priority</TableTh>
+              <TableTh density="compact" align="right">Total</TableTh>
+              <TableTh density="compact" align="right">Confirm breach</TableTh>
+              <TableTh density="compact" align="right">Complete breach</TableTh>
+              <TableTh density="compact" align="right">Confirm rate</TableTh>
+              <TableTh density="compact" align="right">Complete rate</TableTh>
+            </DataTableHead>
+            <DataTableBody>
               {(data?.rows ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-2 py-6 text-center text-[var(--color-ink-400)]">
+                  <TableTd
+                    density="compact"
+                    colSpan={6}
+                    className="py-6 text-center text-[var(--color-ink-400)]"
+                  >
                     {loading ? "Loading…" : "No orders in this window."}
-                  </td>
+                  </TableTd>
                 </tr>
               )}
-              {(data?.rows ?? []).map((r) => (
-                <tr key={r.priority} className="border-t border-[var(--color-ink-100)]/70 dark:border-white/5">
-                  <td className="px-2 py-2 font-semibold">{r.priority}</td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums">{r.totalOrders.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums">{r.confirmBreached.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums">{r.completeBreached.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums text-[var(--color-amber-600)]">
+              {(data?.rows ?? []).map((r, i) => (
+                <DataRow key={r.priority} delayIndex={i}>
+                  <TableTd density="compact" className="font-semibold">
+                    {r.priority}
+                  </TableTd>
+                  <TableTd density="compact" align="right" className="font-mono tabular-nums">
+                    {r.totalOrders.toLocaleString()}
+                  </TableTd>
+                  <TableTd density="compact" align="right" className="font-mono tabular-nums">
+                    {r.confirmBreached.toLocaleString()}
+                  </TableTd>
+                  <TableTd density="compact" align="right" className="font-mono tabular-nums">
+                    {r.completeBreached.toLocaleString()}
+                  </TableTd>
+                  <TableTd
+                    density="compact"
+                    align="right"
+                    className="font-mono tabular-nums text-[var(--color-amber-600)]"
+                  >
                     {(r.confirmBreachRate * 100).toFixed(1)}%
-                  </td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums text-[var(--color-coral)]">
+                  </TableTd>
+                  <TableTd
+                    density="compact"
+                    align="right"
+                    className="font-mono tabular-nums text-[var(--color-coral)]"
+                  >
                     {(r.completeBreachRate * 100).toFixed(1)}%
-                  </td>
-                </tr>
+                  </TableTd>
+                </DataRow>
               ))}
-            </tbody>
+            </DataTableBody>
           </table>
         </div>
       </GlassCard>

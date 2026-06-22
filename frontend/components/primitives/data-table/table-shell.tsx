@@ -97,20 +97,26 @@ export function TableTh({
 
 /**
  * Data cell. Mirrors the padding scale of `TableTh` for vertical rhythm.
+ * `colSpan` is plumbed through for inline empty-state rows (report
+ * tables render "No data in this window" as a single spanning cell so
+ * the header stays visible).
  */
 export function TableTd({
   children,
   align = "left",
   density = "normal",
+  colSpan,
   className,
 }: {
   children: ReactNode;
   align?: "left" | "right";
   density?: TableDensity;
+  colSpan?: number;
   className?: string;
 }) {
   return (
     <td
+      colSpan={colSpan}
       className={cn(
         TD_PADDING[density],
         align === "right" && "text-right",

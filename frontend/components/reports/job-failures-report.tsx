@@ -21,6 +21,13 @@ import {
 } from "@/lib/api/reports";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
 import { cn } from "@/lib/utils";
+import {
+  DataRow,
+  DataTableBody,
+  DataTableHead,
+  TableTd,
+  TableTh,
+} from "@/components/primitives/data-table";
 
 /// Phase #9 — Job failures broken down by structured JobFailureCategory
 /// (b13 enum). Different angle from the "Top failures" report — that
@@ -110,40 +117,53 @@ export function JobFailuresReport({ window }: { window: Window }) {
         </div>
 
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full border-collapse text-[12.5px]">
-            <thead>
-              <tr className="text-left text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-400)]">
-                <th className="px-2 py-2">Category</th>
-                <th className="px-2 py-2">Reason</th>
-                <th className="px-2 py-2 text-right">Count</th>
-                <th className="px-2 py-2 text-right">Retried</th>
-                <th className="px-2 py-2 text-right">% of total</th>
-              </tr>
-            </thead>
-            <tbody>
+          <table className="w-full text-left">
+            <DataTableHead>
+              <TableTh density="compact">Category</TableTh>
+              <TableTh density="compact">Reason</TableTh>
+              <TableTh density="compact" align="right">Count</TableTh>
+              <TableTh density="compact" align="right">Retried</TableTh>
+              <TableTh density="compact" align="right">% of total</TableTh>
+            </DataTableHead>
+            <DataTableBody>
               {(data?.rows ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-2 py-6 text-center text-[var(--color-ink-400)]">
+                  <TableTd
+                    density="compact"
+                    colSpan={5}
+                    className="py-6 text-center text-[var(--color-ink-400)]"
+                  >
                     {loading ? "Loading…" : "No job failures in this window."}
-                  </td>
+                  </TableTd>
                 </tr>
               )}
               {(data?.rows ?? []).map((r, idx) => (
-                <tr key={`${r.category}-${r.reason}-${idx}`} className="border-t border-[var(--color-ink-100)]/70 dark:border-white/5">
-                  <td className="px-2 py-2 font-mono text-[11.5px] font-semibold text-[var(--color-coral)]">
+                <DataRow key={`${r.category}-${r.reason}-${idx}`} delayIndex={idx}>
+                  <TableTd
+                    density="compact"
+                    className="font-mono text-[11.5px] font-semibold text-[var(--color-coral)]"
+                  >
                     {r.category}
-                  </td>
-                  <td className="px-2 py-2 text-[var(--color-ink-700)]">{r.reason}</td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums">{r.count.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums text-[var(--color-amber-600)]">
+                  </TableTd>
+                  <TableTd density="compact" className="text-[var(--color-ink-700)]">
+                    {r.reason}
+                  </TableTd>
+                  <TableTd density="compact" align="right" className="font-mono tabular-nums">
+                    {r.count.toLocaleString()}
+                  </TableTd>
+                  <TableTd
+                    density="compact"
+                    align="right"
+                    className="font-mono tabular-nums text-[var(--color-amber-600)]"
+                  >
                     {r.retriedCount > 0 ? r.retriedCount.toLocaleString() : "—"}
-                  </td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums">
+                  </TableTd>
+                  <TableTd density="compact" align="right" className="font-mono tabular-nums">
                     {(r.pctOfTotal * 100).toFixed(1)}%
-                  </td>
-                </tr>
+                  </TableTd>
+                </DataRow>
               ))}
-            </tbody>
+            </DataTableBody>
           </table>
         </div>
       </GlassCard>

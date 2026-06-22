@@ -12,6 +12,13 @@ import {
 } from "@/lib/api/reports";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
 import { cn } from "@/lib/utils";
+import {
+  DataRow,
+  DataTableBody,
+  DataTableHead,
+  TableTd,
+  TableTh,
+} from "@/components/primitives/data-table";
 import { fmtDuration } from "./window-toggle";
 
 // P5.1 template — Orders by Priority × FinalStatus.
@@ -80,54 +87,64 @@ export function OrdersSummaryReport({ window }: { window: Window }) {
         )}
 
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full border-collapse text-[12.5px]">
-            <thead>
-              <tr className="text-left text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-400)]">
-                <th className="px-2 py-2">Priority</th>
-                {statuses.map((s) => (
-                  <th key={s} className="px-2 py-2 text-right">
-                    {s}
-                  </th>
-                ))}
-                <th className="px-2 py-2 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
+          <table className="w-full text-left">
+            <DataTableHead>
+              <TableTh density="compact">Priority</TableTh>
+              {statuses.map((s) => (
+                <TableTh key={s} density="compact" align="right">
+                  {s}
+                </TableTh>
+              ))}
+              <TableTh density="compact" align="right">
+                Total
+              </TableTh>
+            </DataTableHead>
+            <DataTableBody>
               {priorities.length === 0 && (
                 <tr>
-                  <td
+                  <TableTd
+                    density="compact"
                     colSpan={statuses.length + 2}
-                    className="px-2 py-6 text-center text-[var(--color-ink-400)]"
+                    className="py-6 text-center text-[var(--color-ink-400)]"
                   >
                     {loading ? "Loading…" : "No orders in this window."}
-                  </td>
+                  </TableTd>
                 </tr>
               )}
-              {priorities.map((p) => {
+              {priorities.map((p, i) => {
                 const rowTotal = statuses.reduce((a, s) => a + (matrix[p]?.[s]?.count ?? 0), 0);
                 return (
-                  <tr key={p} className="border-t border-[var(--color-ink-100)]/70 dark:border-white/5">
-                    <td className="px-2 py-2 font-semibold text-[var(--color-ink-800)] dark:text-[var(--color-ink-100)]">
+                  <DataRow key={p} delayIndex={i}>
+                    <TableTd
+                      density="compact"
+                      className="font-semibold text-[var(--color-ink-800)] dark:text-[var(--color-ink-100)]"
+                    >
                       {p}
-                    </td>
+                    </TableTd>
                     {statuses.map((s) => {
                       const cell = matrix[p]?.[s];
                       return (
-                        <td
+                        <TableTd
                           key={s}
-                          className="px-2 py-2 text-right font-mono tabular-nums text-[var(--color-ink-700)]"
+                          density="compact"
+                          align="right"
+                          className="font-mono tabular-nums text-[var(--color-ink-700)]"
                         >
                           {cell ? cell.count.toLocaleString() : "—"}
-                        </td>
+                        </TableTd>
                       );
                     })}
-                    <td className="px-2 py-2 text-right font-mono font-semibold tabular-nums text-[var(--color-ink-900)]">
+                    <TableTd
+                      density="compact"
+                      align="right"
+                      className="font-mono font-semibold tabular-nums text-[var(--color-ink-900)]"
+                    >
                       {rowTotal.toLocaleString()}
-                    </td>
-                  </tr>
+                    </TableTd>
+                  </DataRow>
                 );
               })}
-            </tbody>
+            </DataTableBody>
           </table>
         </div>
       </GlassCard>

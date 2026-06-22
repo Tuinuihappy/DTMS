@@ -21,6 +21,13 @@ import {
 } from "@/lib/api/reports";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
 import { cn } from "@/lib/utils";
+import {
+  DataRow,
+  DataTableBody,
+  DataTableHead,
+  TableTd,
+  TableTh,
+} from "@/components/primitives/data-table";
 import { fmtDuration } from "./window-toggle";
 
 export function LeadTimeReport({ window }: { window: Window }) {
@@ -93,30 +100,38 @@ export function LeadTimeReport({ window }: { window: Window }) {
         </div>
 
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full border-collapse text-[12.5px]">
-            <thead>
-              <tr className="text-left text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-400)]">
-                <th className="px-2 py-2">Bucket</th>
-                <th className="px-2 py-2 text-right">Count</th>
-                <th className="px-2 py-2 text-right">% of total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(data?.buckets ?? []).map((b) => (
-                <tr key={b.label} className="border-t border-[var(--color-ink-100)]/70 dark:border-white/5">
-                  <td className="px-2 py-2 font-semibold">{b.label}</td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums">{b.count.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums">{(b.pct * 100).toFixed(1)}%</td>
-                </tr>
+          <table className="w-full text-left">
+            <DataTableHead>
+              <TableTh density="compact">Bucket</TableTh>
+              <TableTh density="compact" align="right">Count</TableTh>
+              <TableTh density="compact" align="right">% of total</TableTh>
+            </DataTableHead>
+            <DataTableBody>
+              {(data?.buckets ?? []).map((b, i) => (
+                <DataRow key={b.label} delayIndex={i}>
+                  <TableTd density="compact" className="font-semibold">
+                    {b.label}
+                  </TableTd>
+                  <TableTd density="compact" align="right" className="font-mono tabular-nums">
+                    {b.count.toLocaleString()}
+                  </TableTd>
+                  <TableTd density="compact" align="right" className="font-mono tabular-nums">
+                    {(b.pct * 100).toFixed(1)}%
+                  </TableTd>
+                </DataRow>
               ))}
               {(data?.totalCompleted ?? 0) === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-2 py-6 text-center text-[var(--color-ink-400)]">
+                  <TableTd
+                    density="compact"
+                    colSpan={3}
+                    className="py-6 text-center text-[var(--color-ink-400)]"
+                  >
                     {loading ? "Loading…" : "No completed orders in this window."}
-                  </td>
+                  </TableTd>
                 </tr>
               )}
-            </tbody>
+            </DataTableBody>
           </table>
         </div>
       </GlassCard>

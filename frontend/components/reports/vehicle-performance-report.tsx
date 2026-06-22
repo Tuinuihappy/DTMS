@@ -22,6 +22,13 @@ import {
 } from "@/lib/api/reports";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
 import { cn } from "@/lib/utils";
+import {
+  DataRow,
+  DataTableBody,
+  DataTableHead,
+  TableTd,
+  TableTh,
+} from "@/components/primitives/data-table";
 import { fmtDuration } from "./window-toggle";
 
 export function VehiclePerformanceReport({ window }: { window: Window }) {
@@ -121,38 +128,52 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
         </div>
 
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full border-collapse text-[12.5px]">
-            <thead>
-              <tr className="text-left text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-400)]">
-                <th className="px-2 py-2">Vehicle</th>
-                <th className="px-2 py-2 text-right">Trips</th>
-                <th className="px-2 py-2 text-right">Completed</th>
-                <th className="px-2 py-2 text-right">Failed</th>
-                <th className="px-2 py-2 text-right">Cancelled</th>
-                <th className="px-2 py-2 text-right">Success</th>
-                <th className="px-2 py-2 text-right">Avg time</th>
-                <th className="px-2 py-2 text-right">P95</th>
-                <th className="px-2 py-2 text-right">SLA breach</th>
-              </tr>
-            </thead>
-            <tbody>
+          <table className="w-full text-left">
+            <DataTableHead>
+              <TableTh density="compact">Vehicle</TableTh>
+              <TableTh density="compact" align="right">Trips</TableTh>
+              <TableTh density="compact" align="right">Completed</TableTh>
+              <TableTh density="compact" align="right">Failed</TableTh>
+              <TableTh density="compact" align="right">Cancelled</TableTh>
+              <TableTh density="compact" align="right">Success</TableTh>
+              <TableTh density="compact" align="right">Avg time</TableTh>
+              <TableTh density="compact" align="right">P95</TableTh>
+              <TableTh density="compact" align="right">SLA breach</TableTh>
+            </DataTableHead>
+            <DataTableBody>
               {(data?.rows ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-2 py-6 text-center text-[var(--color-ink-400)]">
+                  <TableTd
+                    density="compact"
+                    colSpan={9}
+                    className="py-6 text-center text-[var(--color-ink-400)]"
+                  >
                     {loading ? "Loading…" : "No trips in this window."}
-                  </td>
+                  </TableTd>
                 </tr>
               )}
-              {(data?.rows ?? []).map((r) => (
-                <tr key={r.vendorVehicleKey} className="border-t border-[var(--color-ink-100)]/70 dark:border-white/5">
-                  <td className="px-2 py-2 font-semibold">{r.vendorVehicleKey}</td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums">{r.totalTrips.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums">{r.completed.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums">{r.failed.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums">{r.cancelled.toLocaleString()}</td>
-                  <td
+              {(data?.rows ?? []).map((r, i) => (
+                <DataRow key={r.vendorVehicleKey} delayIndex={i}>
+                  <TableTd density="compact" className="font-semibold">
+                    {r.vendorVehicleKey}
+                  </TableTd>
+                  <TableTd density="compact" align="right" className="font-mono tabular-nums">
+                    {r.totalTrips.toLocaleString()}
+                  </TableTd>
+                  <TableTd density="compact" align="right" className="font-mono tabular-nums">
+                    {r.completed.toLocaleString()}
+                  </TableTd>
+                  <TableTd density="compact" align="right" className="font-mono tabular-nums">
+                    {r.failed.toLocaleString()}
+                  </TableTd>
+                  <TableTd density="compact" align="right" className="font-mono tabular-nums">
+                    {r.cancelled.toLocaleString()}
+                  </TableTd>
+                  <TableTd
+                    density="compact"
+                    align="right"
                     className={cn(
-                      "px-2 py-2 text-right font-mono tabular-nums",
+                      "font-mono tabular-nums",
                       r.successRate >= 0.95
                         ? "text-[var(--color-mint, #4ade80)]"
                         : r.successRate >= 0.8
@@ -161,15 +182,23 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
                     )}
                   >
                     {(r.successRate * 100).toFixed(1)}%
-                  </td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums">{fmtDuration(r.avgTimeToCompleteSec)}</td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums">{fmtDuration(r.p95TimeToCompleteSec)}</td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums text-[var(--color-coral)]">
+                  </TableTd>
+                  <TableTd density="compact" align="right" className="font-mono tabular-nums">
+                    {fmtDuration(r.avgTimeToCompleteSec)}
+                  </TableTd>
+                  <TableTd density="compact" align="right" className="font-mono tabular-nums">
+                    {fmtDuration(r.p95TimeToCompleteSec)}
+                  </TableTd>
+                  <TableTd
+                    density="compact"
+                    align="right"
+                    className="font-mono tabular-nums text-[var(--color-coral)]"
+                  >
                     {r.slaBreached.toLocaleString()}
-                  </td>
-                </tr>
+                  </TableTd>
+                </DataRow>
               ))}
-            </tbody>
+            </DataTableBody>
           </table>
         </div>
       </GlassCard>
