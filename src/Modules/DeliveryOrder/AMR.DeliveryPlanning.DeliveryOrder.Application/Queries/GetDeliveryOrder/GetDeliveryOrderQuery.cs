@@ -110,7 +110,9 @@ public record GetDeliveryOrdersQuery(
     string? SortBy = null,
     bool SortDescending = true,
     int Page = 1,
-    int PageSize = 20)
+    int PageSize = 20,
+    DateTime? CreatedFromUtc = null,
+    DateTime? CreatedToUtc = null)
     : IQuery<PagedResult<DeliveryOrderListDto>>;
 
 public class GetDeliveryOrdersQueryHandler : IQueryHandler<GetDeliveryOrdersQuery, PagedResult<DeliveryOrderListDto>>
@@ -137,7 +139,9 @@ public class GetDeliveryOrdersQueryHandler : IQueryHandler<GetDeliveryOrdersQuer
             request.HasFailedTrip,
             request.HasActiveJob,
             request.SortBy,
-            request.SortDescending);
+            request.SortDescending,
+            request.CreatedFromUtc,
+            request.CreatedToUtc);
 
         var (entries, count) = await _listRepo.SearchAsync(filters, request.Page, request.PageSize, cancellationToken);
 

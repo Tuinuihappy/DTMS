@@ -59,7 +59,9 @@ public sealed record PagedOrderTemplates(
 public record GetOrderTemplatesQuery(
     int Page = 1,
     int Size = 20,
-    bool IncludeInactive = false) : IQuery<PagedOrderTemplates>;
+    bool IncludeInactive = false,
+    string? SortBy = null,
+    bool SortDescending = false) : IQuery<PagedOrderTemplates>;
 
 public class GetOrderTemplatesQueryHandler : IQueryHandler<GetOrderTemplatesQuery, PagedOrderTemplates>
 {
@@ -79,7 +81,12 @@ public class GetOrderTemplatesQueryHandler : IQueryHandler<GetOrderTemplatesQuer
         var size = request.Size < 1 ? 20 : Math.Min(request.Size, MaxPageSize);
 
         var (templates, total) = await _repo.ListPagedAsync(
-            page, size, request.IncludeInactive, cancellationToken);
+            page,
+            size,
+            request.IncludeInactive,
+            string.IsNullOrWhiteSpace(request.SortBy) ? null : request.SortBy.Trim(),
+            request.SortDescending,
+            cancellationToken);
 
         var records = templates.Select(OrderTemplateDtoFactory.From).ToList();
         // Mybatis-Plus convention: ceil(total/size), minimum 1 even when empty.

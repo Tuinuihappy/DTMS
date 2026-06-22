@@ -20,7 +20,12 @@ public class GetJobsQueueQueryHandler : IQueryHandler<GetJobsQueueQuery, JobsQue
             return Result<JobsQueueResult>.Failure($"PageSize must be between 1 and {MaxPageSize}.");
 
         var (jobs, total) = await _jobRepository.SearchQueueAsync(
-            request.Statuses, request.Page, request.PageSize, cancellationToken);
+            request.Statuses,
+            request.Page,
+            request.PageSize,
+            string.IsNullOrWhiteSpace(request.SortBy) ? null : request.SortBy.Trim(),
+            request.SortDescending,
+            cancellationToken);
 
         var items = jobs.Select(JobDto.From).ToList();
         return Result<JobsQueueResult>.Success(

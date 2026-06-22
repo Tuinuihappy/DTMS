@@ -300,6 +300,14 @@ export type ListOrdersParams = {
   hasActiveJob?: boolean;
   sortBy?: "createdDate" | "orderRef" | "priority" | "status" | "totalWeightKg" | "updatedAt";
   sortDir?: "asc" | "desc";
+  /**
+   * Inclusive [createdFromUtc, createdToUtc] window applied to the
+   * server-side CreatedAt column. Either side may be omitted to leave
+   * that bound open. Send ISO-8601 UTC strings (the `Z` suffix the
+   * backend already speaks for every other timestamp).
+   */
+  createdFromUtc?: string;
+  createdToUtc?: string;
   page?: number;
   pageSize?: number;
 };
@@ -319,6 +327,8 @@ export async function listOrders(
   if (params.hasActiveJob != null) qs.set("hasActiveJob", String(params.hasActiveJob));
   if (params.sortBy) qs.set("sortBy", params.sortBy);
   if (params.sortDir) qs.set("sortDir", params.sortDir);
+  if (params.createdFromUtc) qs.set("createdFromUtc", params.createdFromUtc);
+  if (params.createdToUtc) qs.set("createdToUtc", params.createdToUtc);
   if (params.page) qs.set("page", String(params.page));
   if (params.pageSize) qs.set("pageSize", String(params.pageSize));
   const res = await fetch(`/api/delivery-orders?${qs}`, { cache: "no-store", signal });

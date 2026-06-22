@@ -19,14 +19,18 @@ public interface IJobRepository
     Task<List<Job>> GetAtRiskJobsAsync(DateTime cutoffTime, CancellationToken cancellationToken = default);
     /// <summary>
     /// Phase b10-frontend.2 queue page — paginated job listing across all
-    /// orders. Filters by a status set (empty = all statuses). Sorted
-    /// newest-first by CreatedAt so the operator sees fresh failures at
-    /// the top. Returns (page items, total matching count) tuple.
+    /// orders. Filters by a status set (empty = all statuses). Default
+    /// order is newest-first by CreatedAt so the operator sees fresh
+    /// failures at the top; passing <paramref name="sortBy"/> swaps to
+    /// attemptNumber/status/slaDeadline. Returns (page items, total
+    /// matching count) tuple.
     /// </summary>
     Task<(List<Job> Items, int TotalCount)> SearchQueueAsync(
         IReadOnlyList<JobStatus> statuses,
         int page,
         int pageSize,
+        string? sortBy = null,
+        bool sortDescending = true,
         CancellationToken cancellationToken = default);
     Task AddAsync(Job job, CancellationToken cancellationToken = default);
     Task UpdateAsync(Job job, CancellationToken cancellationToken = default);

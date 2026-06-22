@@ -88,6 +88,8 @@ public class JobRepository : IJobRepository
         IReadOnlyList<JobStatus> statuses,
         int page,
         int pageSize,
+        string? sortBy = null,
+        bool sortDescending = true,
         CancellationToken cancellationToken = default)
     {
         var query = _context.Jobs.AsQueryable();
@@ -95,12 +97,46 @@ public class JobRepository : IJobRepository
             query = query.Where(j => statuses.Contains(j.Status));
 
         var total = await query.CountAsync(cancellationToken);
-        var items = await query
-            .OrderByDescending(j => j.CreatedAt)
+        var ordered = ApplyQueueOrdering(query, sortBy, sortDescending);
+        var items = await ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Include(j => j.Legs)
             .ToListAsync(cancellationToken);
         return (items, total);
+    }
+
+    // Maps the operator-facing column tokens to LINQ ordering. Unknown
+    // values fall back to CreatedAt desc — the original hardcoded order
+    // that "newest failures at the top" is built on, so clients that
+    // forget to send sortBy keep seeing the same queue.
+    private static IOrderedQueryable<Job> ApplyQueueOrdering(
+        IQueryable<Job> query, string? sortBy, bool descending)
+    {
+        return (sortBy?.ToLowerInvariant(), descending) switch
+        {
+            ("attemptnumber", false) => query
+                .OrderBy(j => j.AttemptNumber)
+                .ThenByDescending(j => j.CreatedAt),
+            ("attemptnumber", true) => query
+                .OrderByDescending(j => j.AttemptNumber)
+                .ThenByDescending(j => j.CreatedAt),
+            ("status", false) => query
+                .OrderBy(j => j.Status)
+                .ThenByDescending(j => j.CreatedAt),
+            ("status", true) => query
+                .OrderByDescending(j => j.Status)
+                .ThenByDescending(j => j.CreatedAt),
+            ("sladeadline", false) => query
+                // Nulls last on asc so jobs without an SLA don't crowd
+                // out the imminent ones at the top of the queue.
+                .OrderBy(j => j.SlaDeadline == null)
+                .ThenBy(j => j.SlaDeadline),
+            ("sladeadline", true) => query
+                .OrderBy(j => j.SlaDeadline == null)
+                .ThenByDescending(j => j.SlaDeadline),
+            ("createdat", false) => query.OrderBy(j => j.CreatedAt),
+            _ => query.OrderByDescending(j => j.CreatedAt),
+        };
     }
 }

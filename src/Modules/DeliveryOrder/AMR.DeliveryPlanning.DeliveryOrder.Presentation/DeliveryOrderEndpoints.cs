@@ -236,7 +236,7 @@ public static class DeliveryOrderEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         });
 
-        // GET /api/v1/delivery-orders?status=&statusBucket=&priority=&transportMode=&search=&sortBy=&sortDir=&page=&pageSize=
+        // GET /api/v1/delivery-orders?status=&statusBucket=&priority=&transportMode=&search=&sortBy=&sortDir=&page=&pageSize=&createdFromUtc=&createdToUtc=
         group.MapGet("/", async (
             string? status,
             string? statusBucket,
@@ -247,6 +247,8 @@ public static class DeliveryOrderEndpoints
             bool? hasActiveJob,
             string? sortBy,
             string? sortDir,
+            DateTime? createdFromUtc,
+            DateTime? createdToUtc,
             ISender sender,
             int page = 1,
             int pageSize = 20) =>
@@ -259,6 +261,15 @@ public static class DeliveryOrderEndpoints
             var descending = !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
             var clampedPage = page <= 0 ? 1 : page;
             var clampedSize = pageSize is <= 0 or > 200 ? 20 : pageSize;
+            // Normalise window bounds to UTC kind so EF translates them
+            // to `timestamp with time zone` correctly even when the caller
+            // sent a Local-kind ISO string.
+            var fromUtc = createdFromUtc.HasValue
+                ? DateTime.SpecifyKind(createdFromUtc.Value.ToUniversalTime(), DateTimeKind.Utc)
+                : (DateTime?)null;
+            var toUtc = createdToUtc.HasValue
+                ? DateTime.SpecifyKind(createdToUtc.Value.ToUniversalTime(), DateTimeKind.Utc)
+                : (DateTime?)null;
 
             var query = new GetDeliveryOrdersQuery(
                 orderStatus,
@@ -271,7 +282,9 @@ public static class DeliveryOrderEndpoints
                 string.IsNullOrWhiteSpace(sortBy) ? null : sortBy.Trim(),
                 descending,
                 clampedPage,
-                clampedSize);
+                clampedSize,
+                fromUtc,
+                toUtc);
 
             var result = await sender.Send(query);
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);

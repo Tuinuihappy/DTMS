@@ -101,10 +101,12 @@ public static class PlanningEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
-        // GET /api/v1/planning/jobs/queue?statuses=Failed&statuses=Created&page=1&pageSize=20
+        // GET /api/v1/planning/jobs/queue?statuses=Failed&statuses=Created&page=1&pageSize=20&sortBy=&sortDir=
         // — Phase b10-frontend.2 — paginated operator queue across every
         // order. `statuses` is a repeating param; empty = no filter.
-        // Sorted newest-first. Returns { items, totalCount, page, pageSize }.
+        // sortBy accepts createdAt (default) | attemptNumber | status |
+        // slaDeadline; sortDir accepts desc (default) | asc. Returns
+        // { items, totalCount, page, pageSize }.
         group.MapGet("/queue", async (HttpRequest req, ISender sender) =>
         {
             var rawStatuses = req.Query["statuses"];
@@ -118,8 +120,17 @@ public static class PlanningEndpoints
             }
             var page = int.TryParse(req.Query["page"], out var p) && p > 0 ? p : 1;
             var pageSize = int.TryParse(req.Query["pageSize"], out var s) && s > 0 ? s : 20;
+            var sortBy = req.Query["sortBy"].ToString();
+            // Default desc — preserves the "newest failures at the top"
+            // pre-sort behaviour for clients that don't send sortDir.
+            var descending = !string.Equals(req.Query["sortDir"], "asc", StringComparison.OrdinalIgnoreCase);
 
-            var result = await sender.Send(new GetJobsQueueQuery(statuses, page, pageSize));
+            var result = await sender.Send(new GetJobsQueueQuery(
+                statuses,
+                page,
+                pageSize,
+                string.IsNullOrWhiteSpace(sortBy) ? null : sortBy,
+                descending));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
@@ -397,15 +408,24 @@ public static class PlanningEndpoints
         });
 
         // GET — paged list (page/size mirror RIOT3 PageRequest semantics).
-        // Default order is Name asc — the catalog is small enough to sort
-        // client-side after fetch.
+        // sortBy accepts name (default) | priority | modifiedAt | createdAt |
+        // isActive; sortDir accepts asc (default) | desc. Mirrors the
+        // ActionTemplate endpoint's sort contract.
         orderTemplates.MapGet("/", async (
-            int? page, int? size, bool? includeInactive, ISender sender) =>
+            int? page,
+            int? size,
+            bool? includeInactive,
+            string? sortBy,
+            string? sortDir,
+            ISender sender) =>
         {
+            var descending = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase);
             var result = await sender.Send(new GetOrderTemplatesQuery(
                 Page: page ?? 1,
                 Size: size ?? 20,
-                IncludeInactive: includeInactive ?? false));
+                IncludeInactive: includeInactive ?? false,
+                SortBy: sortBy,
+                SortDescending: descending));
             return result.IsSuccess
                 ? RiotEnvelope.Ok(result.Value)
                 : RiotEnvelope.BadRequest(result.Error);

@@ -12,7 +12,12 @@ public record OrderListViewFilters(
     bool? HasFailedTrip,
     bool? HasActiveJob,
     string? SortBy,
-    bool SortDescending);
+    bool SortDescending,
+    // Inclusive [from, to] window applied to OrderListView.CreatedAt.
+    // Either side may be omitted — open-ended range stays open on that
+    // end. UTC instants (the projection stores CreatedAt as UTC).
+    DateTime? CreatedFromUtc = null,
+    DateTime? CreatedToUtc = null);
 
 public record OrderListViewEntry(
     Guid OrderId,

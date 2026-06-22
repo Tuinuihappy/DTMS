@@ -88,18 +88,29 @@ export type JobsQueueResult = {
   pageSize: number;
 };
 
+export type JobsQueueSortKey =
+  | "createdAt"
+  | "attemptNumber"
+  | "status"
+  | "slaDeadline";
+
 // Phase b10-frontend.2 — paginated cross-order queue for the operator
 // /delivery-orders/jobs page. `statuses` becomes a repeating `statuses=`
-// query param so the backend can parse an arbitrary status set.
+// query param so the backend can parse an arbitrary status set. sortBy
+// + sortDir thread the backend's queue ordering options through.
 export async function getJobsQueue(opts: {
   statuses?: JobStatus[];
   page: number;
   pageSize: number;
+  sortBy?: JobsQueueSortKey;
+  sortDir?: "asc" | "desc";
 }): Promise<JobsQueueResult> {
   const qs = new URLSearchParams();
   qs.set("page", String(opts.page));
   qs.set("pageSize", String(opts.pageSize));
   for (const s of opts.statuses ?? []) qs.append("statuses", s);
+  if (opts.sortBy) qs.set("sortBy", opts.sortBy);
+  if (opts.sortDir) qs.set("sortDir", opts.sortDir);
   return await api<JobsQueueResult>(`/api/planning/jobs/queue?${qs.toString()}`);
 }
 

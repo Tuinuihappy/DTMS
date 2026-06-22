@@ -37,6 +37,8 @@ public class OrderTemplateRepository : IOrderTemplateRepository
         int page,
         int size,
         bool includeInactive = false,
+        string? sortBy = null,
+        bool sortDescending = false,
         CancellationToken cancellationToken = default)
     {
         var query = _context.OrderTemplates.AsQueryable();
@@ -47,12 +49,39 @@ public class OrderTemplateRepository : IOrderTemplateRepository
         // page slice means total + page slice come from the same snapshot
         // even if a concurrent insert lands between the two SQL round trips.
         var total = await query.LongCountAsync(cancellationToken);
-        var items = await query
-            .OrderBy(t => t.Name)
+        var ordered = ApplyOrdering(query, sortBy, sortDescending);
+        var items = await ordered
             .Skip((page - 1) * size)
             .Take(size)
             .ToListAsync(cancellationToken);
         return (items, total);
+    }
+
+    // Maps the frontend sort-column tokens to LINQ ordering. Unknown
+    // values fall back to Name asc so a forgetful client sees the same
+    // deterministic order the catalog had before sortBy was introduced.
+    private static IOrderedQueryable<OrderTemplate> ApplyOrdering(
+        IQueryable<OrderTemplate> query, string? sortBy, bool descending)
+    {
+        return sortBy switch
+        {
+            "priority" => descending
+                ? query.OrderByDescending(t => t.Priority).ThenBy(t => t.Name)
+                : query.OrderBy(t => t.Priority).ThenBy(t => t.Name),
+            "isActive" => descending
+                ? query.OrderByDescending(t => t.IsActive).ThenBy(t => t.Name)
+                : query.OrderBy(t => t.IsActive).ThenBy(t => t.Name),
+            "modifiedAt" => descending
+                // ModifiedAt is null on never-edited rows; fall back to
+                // CreatedAt so the column reads as "last touched" rather
+                // than bucketing every fresh row to the bottom.
+                ? query.OrderByDescending(t => t.ModifiedAt ?? t.CreatedAt)
+                : query.OrderBy(t => t.ModifiedAt ?? t.CreatedAt),
+            "createdAt" => descending
+                ? query.OrderByDescending(t => t.CreatedAt)
+                : query.OrderBy(t => t.CreatedAt),
+            _ => descending ? query.OrderByDescending(t => t.Name) : query.OrderBy(t => t.Name),
+        };
     }
 
     public Task<OrderTemplate?> FindByRouteAsync(

@@ -97,10 +97,19 @@ async function unwrap<T>(res: Response): Promise<T> {
   return body as T;
 }
 
+export type OrderTemplateSortKey =
+  | "name"
+  | "priority"
+  | "modifiedAt"
+  | "createdAt"
+  | "isActive";
+
 export type ListOrderTemplatesParams = {
   page?: number;
   size?: number;
   includeInactive?: boolean;
+  sortBy?: OrderTemplateSortKey;
+  sortDir?: "asc" | "desc";
 };
 
 export async function listOrderTemplates(
@@ -111,6 +120,8 @@ export async function listOrderTemplates(
   if (params.page) qs.set("page", String(params.page));
   if (params.size) qs.set("size", String(params.size));
   if (params.includeInactive) qs.set("includeInactive", "true");
+  if (params.sortBy) qs.set("sortBy", params.sortBy);
+  if (params.sortDir) qs.set("sortDir", params.sortDir);
   const res = await fetch(`/api/order-templates?${qs}`, { cache: "no-store", signal });
   return unwrap<PagedOrderTemplates>(res);
 }

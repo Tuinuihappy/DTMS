@@ -53,6 +53,11 @@ public class OrderListViewReadRepository : IOrderListViewReadRepository
         if (filters.HasActiveJob == true)
             query = query.Where(r => r.HasActiveJob);
 
+        if (filters.CreatedFromUtc.HasValue)
+            query = query.Where(r => r.CreatedAt >= filters.CreatedFromUtc.Value);
+        if (filters.CreatedToUtc.HasValue)
+            query = query.Where(r => r.CreatedAt <= filters.CreatedToUtc.Value);
+
         if (!string.IsNullOrWhiteSpace(filters.Search))
         {
             // Postgres full-text via raw SQL: each whitespace-separated

@@ -64,7 +64,7 @@ public class GetJobsQueueQueryHandlerTests
 
         await repo.Received(1).SearchQueueAsync(
             Arg.Is<IReadOnlyList<JobStatus>>(s => s.SequenceEqual(statuses)),
-            3, 20, Arg.Any<CancellationToken>());
+            3, 20, Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public class GetJobsQueueQueryHandlerTests
         result.IsSuccess.Should().BeTrue();
         await repo.Received(1).SearchQueueAsync(
             Arg.Is<IReadOnlyList<JobStatus>>(s => s.Count == 0),
-            1, 20, Arg.Any<CancellationToken>());
+            1, 20, Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
     }
 
     private static (GetJobsQueueQueryHandler handler, IJobRepository repo)
@@ -88,7 +88,9 @@ public class GetJobsQueueQueryHandlerTests
         var repo = Substitute.For<IJobRepository>();
         repo.SearchQueueAsync(
                 Arg.Any<IReadOnlyList<JobStatus>>(),
-                Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+                Arg.Any<int>(), Arg.Any<int>(),
+                Arg.Any<string?>(), Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
             .Returns((items, totalCount));
         return (new GetJobsQueueQueryHandler(repo), repo);
     }
