@@ -214,6 +214,10 @@ builder.Services.AddSingleton<
     AMR.DeliveryPlanning.Api.Realtime.Drain.IConnectionDrainService,
     AMR.DeliveryPlanning.Api.Realtime.Drain.ConnectionDrainService>();
 builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Drain.DrainAwareHubFilter>();
+// Phase F1 follow-up — auto-join every new connection to a per-pod
+// group so the drain broadcast can target only THIS pod's clients
+// (not the whole cluster via the Redis backplane).
+builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Drain.PodGroupHubFilter>();
 // Batchers register as both singleton (so projectors can inject and
 // enqueue) AND as a hosted service (so the drain loop runs).
 builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Pipeline.DashboardCounterBatcher>();
@@ -250,11 +254,16 @@ var signalRBuilder = builder.Services.AddSignalR(options =>
         options.EnableDetailedErrors = builder.Environment.IsDevelopment();
         // Filters run in registration order. Drain is OUTERMOST so a
         // rejected connection during shutdown short-circuits before we
-        // pay for tracing/rate-limit accounting. Tracing wraps the rest
-        // (records duration including time inside rate-limit check).
-        // Rate limit is innermost so a rejected call never reaches the
-        // hub method body — and only counts once in the metrics.
+        // pay for tracing/rate-limit accounting. PodGroup runs second —
+        // joins the new connection to its per-pod group BEFORE any
+        // application-level invocations fire (so a drain broadcast that
+        // races against a fresh connect still finds it in the group).
+        // Tracing wraps the rest (records duration including time inside
+        // rate-limit check). Rate limit is innermost so a rejected call
+        // never reaches the hub method body — and only counts once in
+        // the metrics.
         options.AddFilter<AMR.DeliveryPlanning.Api.Realtime.Drain.DrainAwareHubFilter>();
+        options.AddFilter<AMR.DeliveryPlanning.Api.Realtime.Drain.PodGroupHubFilter>();
         options.AddFilter<AMR.DeliveryPlanning.Api.Realtime.Filters.TracingHubFilter>();
         options.AddFilter<AMR.DeliveryPlanning.Api.Realtime.Filters.RateLimitedHubFilter>();
     })

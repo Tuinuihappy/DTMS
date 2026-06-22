@@ -66,8 +66,8 @@ public sealed class ConnectionDrainService : IConnectionDrainService
         _startedAt = DateTimeOffset.UtcNow;
 
         _logger.LogWarning(
-            "[Drain] beginning connection drain — settle window {SettleSeconds}s",
-            settleWindow.TotalSeconds);
+            "[Drain] beginning connection drain — pod={Pod} settle window {SettleSeconds}s",
+            PodGroupHubFilter.PodGroupKey, settleWindow.TotalSeconds);
 
         // Broadcast "__drain" to every hub. Each SendAsync is wrapped in
         // try/catch independently so a failed broadcast on one hub doesn't
@@ -107,8 +107,20 @@ public sealed class ConnectionDrainService : IConnectionDrainService
     {
         try
         {
-            await hub.Clients.All.SendAsync("__drain", cancellationToken: ct);
-            _logger.LogInformation("[Drain] broadcast __drain to {Hub}", hubName);
+            // Phase F1 follow-up — target THIS pod's clients only.
+            // Clients.All would fan out via the Redis backplane to every
+            // pod in the cluster, asking every client (not just this
+            // pod's) to reconnect. That makes a rolling-deploy drain a
+            // cluster-wide reconnect storm — the exact failure mode G1
+            // was built to prevent. PodGroupHubFilter joins each new
+            // connection to a group keyed by this pod's hostname; we
+            // broadcast only to that group.
+            await hub.Clients
+                .Group(PodGroupHubFilter.PodGroupKey)
+                .SendAsync("__drain", cancellationToken: ct);
+            _logger.LogInformation(
+                "[Drain] broadcast __drain to {Hub} group={Group}",
+                hubName, PodGroupHubFilter.PodGroupKey);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

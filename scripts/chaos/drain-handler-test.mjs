@@ -11,10 +11,15 @@
 
 import * as signalR from "@microsoft/signalr";
 
+// API_URL pins to a specific replica when set (e.g. http://dtms-api-1:8080),
+// or load-balances via Docker DNS round-robin when defaulted to "api:8080".
+// Used by the F1 + per-pod-drain isolation test to assert that draining
+// pod A leaves clients connected to pod B untouched.
 const API = process.env.API_URL || "http://api:8080";
 const HUB = "/hubs/dashboard";
+const LABEL = process.env.LABEL || "client";
 
-const log = (msg) => console.log(`[${new Date().toISOString()}] ${msg}`);
+const log = (msg) => console.log(`[${new Date().toISOString()}] [${LABEL}] ${msg}`);
 
 async function login() {
   const r = await fetch(`${API}/api/auth/token`, {
