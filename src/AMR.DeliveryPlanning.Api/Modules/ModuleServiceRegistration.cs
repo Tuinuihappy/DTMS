@@ -417,8 +417,19 @@ public static class ModuleServiceRegistration
                 AMR.DeliveryPlanning.Planning.Infrastructure.Sagas.OrchestrationSchemaInitializer>();
         }
 
+        // G2 — bus shutdown timing observer (records `bus` phase metric +
+        // log line during host shutdown). Registered before AddMassTransit
+        // so it's resolvable when the bus calls IBusObserver instances.
+        services.AddSingleton<
+            AMR.DeliveryPlanning.Api.Infrastructure.Diagnostics.BusShutdownTimingObserver>();
+
         services.AddMassTransit(bus =>
         {
+            // G2 — wire the bus observer so PreStop/PostStop timings flow
+            // into WorkflowMetrics + structured logs during shutdown.
+            bus.AddBusObserver<
+                AMR.DeliveryPlanning.Api.Infrastructure.Diagnostics.BusShutdownTimingObserver>();
+
             // Auto-scan consumers from all module Application assemblies
             bus.AddConsumers(
                 typeof(AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly,

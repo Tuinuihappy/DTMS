@@ -151,6 +151,13 @@ builder.Services.AddOpenTelemetry()
 // T1.6 — singleton holder shared by consumers, watchdog, and outbox processor.
 builder.Services.AddSingleton<AMR.DeliveryPlanning.SharedKernel.Diagnostics.WorkflowMetrics>();
 
+// G2 — shutdown observability. Records `total` shutdown phase via lifetime
+// hooks; `bus` phase is recorded by BusShutdownTimingObserver wired
+// inside AddMassTransit. Both emit log lines so ops see the breakdown
+// even before Phase G's Prometheus scrape + Grafana panel lands.
+builder.Services.AddHostedService<
+    AMR.DeliveryPlanning.Api.Infrastructure.Diagnostics.ShutdownPhaseRecorder>();
+
 // T1.4 — Planning reconciliation watchdog. Bound to the PlanningWatchdog
 // config section so ops can toggle Enabled at runtime via appsettings or env.
 builder.Services

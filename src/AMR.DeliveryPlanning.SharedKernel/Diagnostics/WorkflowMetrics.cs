@@ -16,6 +16,7 @@ namespace AMR.DeliveryPlanning.SharedKernel.Diagnostics;
 ///   - dtms.workflow.outbox_pending                (gauge, set by the outbox processor)
 ///   - dtms.workflow.outbox_age_seconds            (histogram)
 ///   - dtms.workflow.watchdog_replays_total        (counter)
+///   - dtms.workflow.shutdown_duration_seconds     (histogram, G2 — tag: phase=bus|hosted_services|total)
 ///
 /// Drives the SLO alerts defined in the Tier 1 plan:
 ///   - orders_stuck_planned &gt; 0 for 5 minutes (P1)
@@ -32,6 +33,7 @@ public sealed class WorkflowMetrics : IDisposable
     private readonly Counter<long> _dispatchException;
     private readonly Counter<long> _watchdogReplays;
     private readonly Histogram<double> _outboxAge;
+    private readonly Histogram<double> _shutdownDuration;
 
     // Observable gauges read from a snapshot the producer (watchdog, outbox
     // processor) updates. Using a snapshot rather than a callback keeps the
@@ -69,6 +71,17 @@ public sealed class WorkflowMetrics : IDisposable
             unit: "s",
             description: "Age of outbox messages at publish time (occurrence-time to publish-time).");
 
+        // G2 — shutdown phase observability. Tag `phase` values:
+        //   "total"           — ApplicationStopping → ApplicationStopped (always emitted)
+        //   "bus"             — MassTransit IBusObserver.PreStop → PostStop
+        //   "hosted_services" — total - bus (computed when both available)
+        // Phase G (Grafana dashboards) builds the "Shutdown Phase Distribution"
+        // panel + an alert on P95(phase=total) > 60s.
+        _shutdownDuration = _meter.CreateHistogram<double>(
+            "dtms.workflow.shutdown_duration_seconds",
+            unit: "s",
+            description: "Time spent in each shutdown phase. Tag: phase=bus|hosted_services|total.");
+
         _meter.CreateObservableGauge(
             "dtms.workflow.orders_stuck_planned",
             () => Interlocked.Read(ref _ordersStuckPlanned),
@@ -98,6 +111,12 @@ public sealed class WorkflowMetrics : IDisposable
     {
         if (ageSeconds < 0) ageSeconds = 0;
         _outboxAge.Record(ageSeconds);
+    }
+
+    public void RecordShutdownDuration(string phase, double seconds)
+    {
+        if (seconds < 0) seconds = 0;
+        _shutdownDuration.Record(seconds, Tag("phase", phase));
     }
 
     public void SetOrdersStuckPlanned(long count)
