@@ -341,17 +341,24 @@ Tier 3 is gated on observable thresholds; readings below show none are met yet.
 
 **Measured (2026-06-22)**: Baseline SIGTERM exit dropped from 149s (2026-06-19) to **49s** even without active SignalR clients (build improvements between dates). Drain protocol shaves the **~100s SignalR-specific tail** that materialises under real client load — see [`docs/chaos-test-results.md`](chaos-test-results.md) "M2 SIGTERM exit time" for the full scorecard, reproduction steps with active clients, and the honest residual.
 
+**Follow-up bug fix (later 2026-06-22, [5d4290d](https://github.com/Tuinuihappy/DTMS/commit/5d4290d))** — F1 Redis backplane exposed that `Clients.All.SendAsync("__drain")` fans out via Redis to every pod in the cluster, making each rolling-deploy step a cluster-wide reconnect storm. Fixed by introducing `PodGroupHubFilter` that auto-joins every connection to a per-pod group, and switching the broadcast to `Clients.Group(podGroupKey)`. Verified: 2 clients pinned to different replicas, drain on api-1 only → only api-1's client receives `__drain`, api-2's client untouched (still received unrelated VendorHealthChanged broadcasts proving the backplane stayed alive — it's just drain that no longer pollutes siblings).
+
 **Deferred** (per the plan's own off-ramps): Phase 2.3 connection counter (early-exit when client count hits 0), 4 xUnit integration tests (M2 chaos script is the integration signal), drain metrics. Revisit if the K8s rollout finds the SignalR tail still over budget.
 
-### G2 — Shutdown observability
+### G2 — Shutdown observability — 🟢 **shipped 2026-06-22** ([f920151](https://github.com/Tuinuihappy/DTMS/commit/f920151))
 
 **Symptom**: We learned the 149s number by reading logs after the fact. Production needs metrics + alerts.
 
-**Fix** (~0.5 day):
+**Shipped in ~30 min**:
 
-- Add metric `dtms_shutdown_duration_seconds{phase}` with phases `bus`, `signalr`, `hosted_services`, `total`.
-- Emit each phase value from `IHostApplicationLifetime.ApplicationStopped` via a small `IHostedService` that hooks both `ApplicationStopping` and `ApplicationStopped`.
-- Grafana alert: P95 shutdown duration > 60s over 7 days.
+- `WorkflowMetrics.RecordShutdownDuration(phase, seconds)` — histogram `dtms.workflow.shutdown_duration_seconds` with `phase` tag (values: `bus`, `total`; `hosted_services` derived in Phase G dashboards as `total - bus`).
+- `ShutdownPhaseRecorder` (IHostedService) hooks `IHostApplicationLifetime.ApplicationStopping` + `ApplicationStopped` → records `total` + logs structured `[Shutdown]` lines.
+- `BusShutdownTimingObserver` (MassTransit `IBusObserver`) records `PreStop → PostStop` delta as the `bus` phase.
+- Metric is OTLP-exported via the existing pipeline today; Phase G adds the Prometheus scrape + Grafana panel.
+
+**Verified**: SIGTERM api → logs show `ApplicationStopping → MassTransit PreStop → PostStop (bus drain X.XXs) → ApplicationStopped (total Y.YYs)`. Today's test run measured 0.15s total / 0.11s bus (api had just booted, no in-flight consumes) — same instrumentation will print larger numbers under real load, which is the whole point.
+
+**Deferred to Phase G**: Prometheus scrape endpoint (`OpenTelemetry.Exporter.Prometheus.AspNetCore`), Grafana panel "Shutdown Phase Distribution", alert rule on `P95(phase=total) > 60s for 7d`.
 
 ### G3 — Cancellation propagation through HTTP client + Polly
 
@@ -401,7 +408,7 @@ Tier 3 is gated on observable thresholds; readings below show none are met yet.
 | # | Gap | Effort | When |
 |---|---|---|---|
 | ✅ | G1 — SignalR drain protocol | shipped 2026-06-22 (~6h) | Phase 1+3+5; Phase 2 deferred per off-ramp |
-| 🥈 | G2 — Shutdown observability | 0.5 day | Same sprint as G1 so we measure the fix |
+| ✅ | G2 — Shutdown observability | shipped 2026-06-22 (~30 min) | Metric + logs ready; Grafana panel waits for Phase G |
 | 🥉 | G3 — Cancellation propagation | 1 day | Reduces shutdown log noise and tightens shutdown duration further |
 | 4 | G4 — Deploy storm test | 2-3 days | Pair with §4.3 K8s migration |
 | 5 | G5 — Timeout layering | 0.5 day | Quick win at any time |

@@ -551,7 +551,17 @@ Currently `DeliveryOrderConfirmedIntegrationEventV1` triggers 3 separate SignalR
 
 This is the same pattern [DashboardCounterBatcher](../src/AMR.DeliveryPlanning.Api/Realtime/DashboardCounterBatcher.cs) uses with its 250ms coalescing window — extend that pattern to OrderHub / JobHub / TripHub.
 
-### Step F3 — Rate limiter exclusions (15 min)
+### Step F3 — Rate limiter exclusions — 🟢 shipped 2026-06-22 ([4828232](https://github.com/Tuinuihappy/DTMS/commit/4828232))
+
+Bypass added at [Program.cs](../src/AMR.DeliveryPlanning.Api/Program.cs) — `/health`, `/hubs`, `/metrics` skip the per-IP partitioned rate limiter via `GetNoLimiter("bypass-infra")`. Business paths (`/api/*`) still rate-limit per IP unchanged.
+
+Verified with curl spam test (PermitLimit=5/60s):
+- `/health/ready` × 30 → 30 ok / **0 × 429** (bypass working)
+- `/api/v1/delivery-orders` × 30 → 5 ok / **25 × 429** (limit still active)
+
+Critical prerequisite for K8s rollout — without F3 the G1 drain protocol's reconnect burst would trip 429 storms on NAT-egress clients, defeating G1's whole purpose.
+
+### Step F3 — Rate limiter exclusions (original plan, 15 min)
 
 [Program.cs:317-336](../src/AMR.DeliveryPlanning.Api/Program.cs#L317) — exclude `/health`, `/health/ready`, `/hubs`, `/metrics`:
 
@@ -580,6 +590,8 @@ options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =
 
 **Goal:** All decisions backed by data, not guesswork. SLOs measurable.
 
+> **G2 partial credit (2026-06-22, [f920151](https://github.com/Tuinuihappy/DTMS/commit/f920151))** — `dtms.workflow.shutdown_duration_seconds` histogram (phase=bus|total) emitted via the existing OTLP pipeline + structured logs. Phase G adds the Prometheus scrape exporter + Grafana panel that turns the metric into a dashboard + alert, but the data itself is already flowing into the OTel collector today. See [crash-recovery-workflow-resilience-plan.md §11 G2](crash-recovery-workflow-resilience-plan.md).
+
 ### Files
 
 ```
@@ -593,8 +605,8 @@ src/AMR.DeliveryPlanning.Api/Program.cs           # add OpenTelemetry .NET metri
 
 1. Add Prometheus + Grafana to compose.
 2. Add `OpenTelemetry.Exporter.Prometheus.AspNetCore` to API.
-3. Build a starter dashboard with: HTTP p50/p95/p99, outbox lag, EF query duration, GC pause times, ThreadPool starvation, SignalR connection count.
-4. Add alert rules: p95 > 500ms for 5 min, outbox pending > 10k for 2 min, error rate > 1% for 5 min.
+3. Build a starter dashboard with: HTTP p50/p95/p99, outbox lag, EF query duration, GC pause times, ThreadPool starvation, SignalR connection count, **shutdown phase distribution** (G2 data already flowing).
+4. Add alert rules: p95 > 500ms for 5 min, outbox pending > 10k for 2 min, error rate > 1% for 5 min, **P95(shutdown_duration_seconds{phase="total"}) > 60s over 7d**.
 
 ### Acceptance — Phase G
 
