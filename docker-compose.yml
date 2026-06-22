@@ -208,6 +208,12 @@ services:
       # Comma-separated, scheme://host:port only (no trailing slash).
       # Override via .env to add staging/prod UI hosts.
       - Cors__HubsAllowedOrigins=${Cors__HubsAllowedOrigins:-http://localhost:3000,http://localhost:3001,http://10.204.37.65:5281,https://10.204.37.65:5281}
+      # Phase F1 — Redis backplane for multi-replica SignalR. Default false
+      # so single-host docker-compose stays in-memory (no Redis round-trip
+      # cost). Flip to true via .env.test when running scale tests or in
+      # production where API has > 1 replica. Conditional wire is at
+      # src/AMR.DeliveryPlanning.Api/Program.cs around AddStackExchangeRedis.
+      - SignalR__UseRedisBackplane=${SignalR__UseRedisBackplane:-false}
       # Override rate limiter for load testing — defaults to 100 req/min/IP
       - RateLimit__PermitLimit=${RateLimit__PermitLimit:-100}
       - RateLimit__WindowSeconds=${RateLimit__WindowSeconds:-60}
@@ -346,6 +352,11 @@ services:
       - Outbox__PerMessageTimeoutSeconds=${Outbox__PerMessageTimeoutSeconds:-10}
       # The reason this container exists — outbox always runs here.
       - Outbox__RunInThisProcess=true
+      # Phase F1 — worker also needs the SignalR backplane on whenever api
+      # uses it. Worker's consumers push to IHubContext<T> during projector
+      # work; without the backplane those broadcasts would only reach clients
+      # connected to the worker (= none, worker doesn't accept hub connects).
+      - SignalR__UseRedisBackplane=${SignalR__UseRedisBackplane:-false}
       # Track C (Phase D follow-up) — skip vendor-polling hosted services
       # in this container. The api container is the single owner of:
       #   Riot3HealthPollerService, VendorHealthBroadcaster,

@@ -1,0 +1,33 @@
+# Phase F1 — multi-replica overlay for the SignalR backplane scale test.
+#
+# Usage:
+#   docker compose --env-file .env.test \
+#     -f docker-compose.yml -f docker-compose.scale.yml \
+#     up -d --scale api=2 --force-recreate api
+#
+# Why an overlay instead of editing docker-compose.yml directly:
+#   - container_name: dtms-api forces a single instance — compose errors
+#     with "container already exists" when scaling. Removing the name
+#     here lets compose auto-name (dtms-api-1, dtms-api-2).
+#   - ports: "5219:8080" binds to host. Two containers can't both bind
+#     5219. Removing the host port mapping makes the service cluster-
+#     internal only — sibling containers reach it via DNS round-robin
+#     on "api:8080". For our test, the headless client runs as a
+#     sibling so this is exactly what we want.
+#
+# Don't run this overlay in normal dev — the host loses port 5219 access
+# to the api. Browser-based testing breaks. Use only for the M3/M4 scale
+# verification, then `docker compose up -d --force-recreate api` to
+# restore the normal single-instance layout.
+
+services:
+  api:
+    container_name: !reset null   # clear so compose auto-names per replica
+    ports: !reset []              # drop host port mapping
+    # Healthcheck unchanged from the base — each replica probes itself
+    # on its own container IP:8080.
+
+  outbox-worker:
+    # No scale change needed — worker stays single-instance. Listed here
+    # only so an accidental `up -d` with this overlay doesn't recreate
+    # worker with surprise overrides.

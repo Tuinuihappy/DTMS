@@ -514,9 +514,20 @@ Helpful but not urgent. Phase A+B already give significant headroom. Revisit whe
 
 ---
 
-## Phase F — SignalR backplane + projector consolidation (P1, 2 days) ⬜
+## Phase F — SignalR backplane + projector consolidation (P1, 2 days) — F1 🟢 shipped 2026-06-22
 
 **Goal:** Multiple API replicas can deliver SignalR to any client; redundant projector pushes eliminated.
+
+### Step F1 — Redis backplane — 🟢 shipped 2026-06-22 (~1.5h actual)
+
+Flipped the flag (`SignalR__UseRedisBackplane=true` in `.env.test`), added env passthrough in docker-compose for both `api` and `outbox-worker` services, scaled api to 2 replicas via new `docker-compose.scale.yml` overlay (uses `!reset` YAML tag to clear `container_name` + host port mapping). Verified fan-out end-to-end:
+
+- 2 headless SignalR clients (`dtms-bp-client-a` + `dtms-bp-client-b`) connected via Docker DNS round-robin to api:8080
+- Drain triggered on `dtms-api-1` ONLY
+- Both clients received `__drain` event at the **identical timestamp** (06:56:37.683Z) — ~9ms end-to-end including Redis pubsub roundtrip
+- Redis showed 30+ `dtms:sr*` pubsub channels (one per hub × 2 machine IDs = api + worker both participating)
+
+Single-replica regression check passed before scaling — G1 headless client connected + subscribed + observed VendorHealthChanged events flowing through the backplane.
 
 ### Step F1 — Redis backplane (1 hr)
 
