@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
+using Scalar.AspNetCore;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -604,6 +605,13 @@ static async Task ApplyMigrationsAsync(DbContext db, Microsoft.Extensions.Loggin
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    // Scalar API reference — modern docs UI at /scalar/v1. The package
+    // is the .NET 9+ minimal-API default replacement for Swagger UI.
+    app.MapScalarApiReference(options =>
+    {
+        options.WithTitle("AMR Delivery Planning API")
+               .WithOpenApiRoutePattern("/openapi/v1.json");
+    });
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/openapi/v1.json", "AMR.DeliveryPlanning.Api v1");
