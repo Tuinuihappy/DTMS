@@ -297,10 +297,13 @@ services:
   # replicas if needed: `docker compose up --scale outbox-worker=3`. Each
   # tick fetches a disjoint row set; no contention.
   #
-  # MVP scope: only OutboxProcessor is gated. Singleton hosted services
-  # (Riot3 pollers, sync services, reconcilers) currently still run in both
-  # containers — accepted MVP trade-off (idempotent / minor duplication).
-  # Future: extend the flag pattern to gate other singletons.
+  # Track C (2026-06-22) — vendor-polling hosted services (Riot3 health +
+  # position + reconciliation + map/route sync + webhook notifier) are now
+  # gated via Workers__VendorPollers__RunInThisProcess. The api container
+  # is their single owner; this worker container skips them. Idempotent
+  # background services (PlanningReconciliation, SlaRisk, FleetUtilization,
+  # TopologyOverlayExpiry) still run in both — accepted because they only
+  # touch local DB + are safe to run 2x.
   outbox-worker:
     image: dtms-api          # reuse the api image — no separate build
     container_name: dtms-outbox-worker
@@ -343,6 +346,16 @@ services:
       - Outbox__PerMessageTimeoutSeconds=${Outbox__PerMessageTimeoutSeconds:-10}
       # The reason this container exists — outbox always runs here.
       - Outbox__RunInThisProcess=true
+      # Track C (Phase D follow-up) — skip vendor-polling hosted services
+      # in this container. The api container is the single owner of:
+      #   Riot3HealthPollerService, VendorHealthBroadcaster,
+      #   VendorHealthWebhookNotifier (Program.cs),
+      #   MapStationSyncService, RouteEdgeSyncService,
+      #   Riot3PositionPollerService (ModuleServiceRegistration.cs),
+      #   Riot3ReconciliationService (VendorAdapterServiceRegistration.cs).
+      # Without this flag, the worker doubled the RIOT3 API call rate +
+      # produced 401 spam in its logs (admin JWT not provisioned here).
+      - Workers__VendorPollers__RunInThisProcess=false
       # Vendor isolation flag also inherited so worker doesn't accidentally
       # call RIOT3 even if api has it disabled.
       - VendorAdapter__Riot3__Enabled=${VendorAdapter__Riot3__Enabled:-true}

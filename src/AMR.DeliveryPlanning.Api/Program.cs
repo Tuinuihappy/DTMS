@@ -291,13 +291,36 @@ builder.Services.AddHttpClient<IRiot3HealthProbe, Riot3HealthProbe>((sp, client)
     if (!string.IsNullOrWhiteSpace(riot3ApiKey))
         client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
 });
-builder.Services.AddHostedService<Riot3HealthPollerService>();
-builder.Services.AddHostedService<InfraHealthPollerService>();
-builder.Services.AddHostedService<VendorHealthBroadcaster>();
+// Track C (Phase D follow-up) — gate vendor-polling hosted services so
+// only the api container hits RIOT3, not the dtms-outbox-worker sibling.
+// Default true keeps current api behaviour; the outbox-worker env sets
+// Workers__VendorPollers__RunInThisProcess=false so it skips registration
+// entirely (no RIOT 401 spam, no doubled vendor call rate, no race on
+// the shared VendorHealthStore + Broadcaster).
+var runVendorPollers = builder.Configuration
+    .GetValue("Workers:VendorPollers:RunInThisProcess", true);
+
+if (runVendorPollers)
+{
+    builder.Services.AddHostedService<Riot3HealthPollerService>();
+}
+builder.Services.AddHostedService<InfraHealthPollerService>();   // DB/Redis only — fine to run 2x (idempotent reads)
+if (runVendorPollers)
+{
+    // Broadcaster reads from VendorHealthStore which is populated by the
+    // poller above; without that, the broadcaster would push stale data
+    // from a never-updated store. Coupled, gated together.
+    builder.Services.AddHostedService<VendorHealthBroadcaster>();
+}
 builder.Services.Configure<VendorHealthWebhookOptions>(
     builder.Configuration.GetSection("VendorHealth:Webhook"));
 builder.Services.AddHttpClient(nameof(VendorHealthWebhookNotifier));
-builder.Services.AddHostedService<VendorHealthWebhookNotifier>();
+if (runVendorPollers)
+{
+    // Sends webhooks to external systems on health-change events. Doubled
+    // = duplicate webhook deliveries to downstream consumers. Must gate.
+    builder.Services.AddHostedService<VendorHealthWebhookNotifier>();
+}
 builder.Services.AddTransient<RiotHealthCheckFromStore>();
 
 // Phase B Step B2 — health-check class reuses the singleton NpgsqlDataSource

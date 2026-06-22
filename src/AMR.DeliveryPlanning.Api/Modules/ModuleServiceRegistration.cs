@@ -73,6 +73,14 @@ public static class ModuleServiceRegistration
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection");
 
+        // Track C (Phase D follow-up) — gate the vendor-polling background
+        // services so they only run in the api container, not the
+        // dtms-outbox-worker sibling. See top-level Program.cs for the
+        // full rationale; this flag is read in three places that all
+        // register pollers calling out to RIOT3.
+        var runVendorPollers = configuration
+            .GetValue("Workers:VendorPollers:RunInThisProcess", true);
+
         // Phase B Step B1 — single NpgsqlDataSource shared by every DbContext
         // below. Before: each AddDbContext(UseNpgsql(connString)) implicitly
         // used Npgsql's static pool keyed by connection string — 9 DbContexts
@@ -135,15 +143,19 @@ public static class ModuleServiceRegistration
         .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
         // MapStationSync runs at 15s delay; RouteEdgeSync runs at 2min delay to ensure stations are synced first.
         // MapStationSync now dispatches SyncMapStationsCommand per map — same code path as the manual endpoint.
-        services.AddHostedService(sp => new MapStationSyncService(
-            sp.GetRequiredService<IServiceScopeFactory>(),
-            sp.GetRequiredService<ILogger<MapStationSyncService>>(),
-            TimeSpan.FromMinutes(syncIntervalMinutes)));
-        services.AddHostedService(sp => new RouteEdgeSyncService(
-            sp.GetRequiredService<IServiceScopeFactory>(),
-            sp.GetRequiredService<IRiot3RouteClient>(),
-            sp.GetRequiredService<ILogger<RouteEdgeSyncService>>(),
-            TimeSpan.FromMinutes(syncIntervalMinutes)));
+        // Track C: both poll RIOT3 — gated so only the api container runs them.
+        if (runVendorPollers)
+        {
+            services.AddHostedService(sp => new MapStationSyncService(
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                sp.GetRequiredService<ILogger<MapStationSyncService>>(),
+                TimeSpan.FromMinutes(syncIntervalMinutes)));
+            services.AddHostedService(sp => new RouteEdgeSyncService(
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                sp.GetRequiredService<IRiot3RouteClient>(),
+                sp.GetRequiredService<ILogger<RouteEdgeSyncService>>(),
+                TimeSpan.FromMinutes(syncIntervalMinutes)));
+        }
 
         services.AddHostedService<TopologyOverlayExpiryService>();
 
@@ -180,9 +192,16 @@ public static class ModuleServiceRegistration
         // Live robot positions — singleton store fed by a 1 Hz poller against
         // RIOT3. The map page polls the store (not RIOT3 directly) so the
         // upstream load stays at one request per second regardless of UI fan-out.
+        // Track C: the STORE stays registered (DI consumers in the worker
+        // would fail to resolve otherwise), but the poller itself is gated
+        // — worker container's store stays empty, which is fine because no
+        // map UI is served from the worker.
         services.AddSingleton<AMR.DeliveryPlanning.Api.RobotPositions.IRobotPositionStore,
                               AMR.DeliveryPlanning.Api.RobotPositions.InMemoryRobotPositionStore>();
-        services.AddHostedService<AMR.DeliveryPlanning.Api.RobotPositions.Riot3PositionPollerService>();
+        if (runVendorPollers)
+        {
+            services.AddHostedService<AMR.DeliveryPlanning.Api.RobotPositions.Riot3PositionPollerService>();
+        }
 
         // ── DeliveryOrder Module ──────────────────────────────────────
         services.AddScoped<DeliveryOrderDomainEventMapper>();

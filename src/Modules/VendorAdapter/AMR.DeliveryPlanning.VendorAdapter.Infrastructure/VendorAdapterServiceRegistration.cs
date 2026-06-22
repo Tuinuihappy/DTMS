@@ -79,7 +79,17 @@ public static class VendorAdapterServiceRegistration
         // Gated by Dispatch:Reconciliation:Enabled; off by default.
         services.Configure<ReconciliationOptions>(
             configuration.GetSection(ReconciliationOptions.SectionName));
-        services.AddHostedService<Riot3ReconciliationService>();
+
+        // Track C (Phase D follow-up) — only the api container polls RIOT3.
+        // The outbox-worker sibling skips this registration entirely via
+        // Workers__VendorPollers__RunInThisProcess=false so we don't double
+        // the reconciliation HTTP load on the vendor.
+        var runVendorPollers = configuration
+            .GetValue("Workers:VendorPollers:RunInThisProcess", true);
+        if (runVendorPollers)
+        {
+            services.AddHostedService<Riot3ReconciliationService>();
+        }
 
         // Inbound webhook auth — IP allowlist + URL-path secret. Reads
         // VendorAdapter:Riot3:Webhook section. RequireAuth=false by
