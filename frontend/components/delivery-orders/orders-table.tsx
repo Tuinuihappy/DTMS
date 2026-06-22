@@ -2,11 +2,8 @@
 
 import {
   ArrowRight,
-  ArrowUpDown,
   Check,
-  ChevronDown,
   ChevronRight,
-  ChevronUp,
   MoreHorizontal,
   Pencil,
   Send,
@@ -22,6 +19,18 @@ import type {
 import { PriorityBadge, StatusBadge, TransportModeBadge } from "./badges";
 import { Highlight } from "./highlight";
 import { DateTime } from "@/components/primitives/date-time";
+import {
+  DataRow,
+  DataTableBody,
+  DataTableHead,
+  DataTableShell,
+  SortableTh,
+  TableEmptyState,
+  TableSkeleton,
+  TableTd,
+  TableTh,
+  resolveEmptyStateVariant,
+} from "@/components/primitives/data-table";
 
 type RowAction = "edit" | "submit" | "confirm" | "delete";
 
@@ -106,10 +115,11 @@ export function OrdersTable({
     onSelectionChange(next);
   };
 
-  if (loading && orders.length === 0) return <TableSkeleton />;
+  if (loading && orders.length === 0)
+    return <TableSkeleton label="Loading orders…" />;
   if (!loading && orders.length === 0)
     return (
-      <EmptyState
+      <OrdersEmptyState
         search={search}
         hasFilters={hasFilters}
         onClearFilters={onClearFilters}
@@ -117,143 +127,138 @@ export function OrdersTable({
     );
 
   return (
-    <div className="overflow-hidden rounded-[var(--radius-xl)] glass">
-      {/* Desktop table */}
-      <div className="hidden md:block overflow-x-auto">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-400)]">
-              <th className="px-5 py-3.5 w-10">
-                <input
-                  ref={headerRef}
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={toggleAll}
-                  className="h-3.5 w-3.5 rounded border-[var(--color-ink-300)] accent-[var(--color-brand-500)]"
-                />
-              </th>
-              <SortableTh col="orderRef" sortBy={sortBy} sortDir={sortDir} onClick={onSortChange}>
-                Order
-              </SortableTh>
-              <th className="px-3 py-3.5">Route</th>
-              <SortableTh col="status" sortBy={sortBy} sortDir={sortDir} onClick={onSortChange}>
-                Status
-              </SortableTh>
-              <SortableTh col="priority" sortBy={sortBy} sortDir={sortDir} onClick={onSortChange}>
-                Priority
-              </SortableTh>
-              <th className="px-3 py-3.5">Transport</th>
-              <th className="px-3 py-3.5 text-right">Items</th>
-              <SortableTh
-                col="totalWeightKg"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onClick={onSortChange}
-                align="right"
+    <>
+      {/* Desktop table — primitives handle padding/header/sort/keyboard/focus.
+          Bulk-select checkbox column stops click propagation on the input
+          itself so toggling a row doesn't open the detail drawer. */}
+      <DataTableShell className="hidden md:block">
+        <DataTableHead>
+          <TableTh className="w-10" aria-label="Select all">
+            <input
+              ref={headerRef}
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleAll}
+              aria-label={
+                allSelected ? "Deselect all orders on this page" : "Select all orders on this page"
+              }
+              className="h-3.5 w-3.5 rounded border-[var(--color-ink-300)] accent-[var(--color-brand-500)]"
+            />
+          </TableTh>
+          <SortableTh col="orderRef" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
+            Order
+          </SortableTh>
+          <TableTh>Route</TableTh>
+          <SortableTh col="status" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
+            Status
+          </SortableTh>
+          <SortableTh col="priority" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
+            Priority
+          </SortableTh>
+          <TableTh>Transport</TableTh>
+          <TableTh align="right">Items</TableTh>
+          <SortableTh
+            col="totalWeightKg"
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={onSortChange}
+            align="right"
+          >
+            Weight
+          </SortableTh>
+          <TableTh>Window</TableTh>
+          <SortableTh col="createdDate" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
+            Created
+          </SortableTh>
+          <TableTh className="w-12" aria-label="Actions">
+            <span className="sr-only">Actions</span>
+          </TableTh>
+        </DataTableHead>
+        <DataTableBody>
+          <AnimatePresence initial={false}>
+            {orders.map((o, i) => (
+              <DataRow
+                key={o.id}
+                delayIndex={i}
+                selected={selected.has(o.id)}
+                onClick={() => onOpenDetail(o.id)}
               >
-                Weight
-              </SortableTh>
-              <th className="px-3 py-3.5">Window</th>
-              <SortableTh
-                col="createdDate"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onClick={onSortChange}
-              >
-                Created
-              </SortableTh>
-              <th className="px-5 py-3.5 w-12" />
-            </tr>
-          </thead>
-          <tbody>
-            <AnimatePresence initial={false}>
-              {orders.map((o, i) => (
-                <motion.tr
-                  key={o.id}
-                  layout
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, transition: { duration: 0.18 } }}
-                  transition={{
-                    duration: 0.4,
-                    delay: Math.min(i * 0.025, 0.4),
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
-                  onClick={() => onOpenDetail(o.id)}
-                  className={cn(
-                    "group cursor-pointer border-t border-[var(--color-ink-100)]/60 dark:border-white/[0.04]",
-                    "transition-colors duration-150 hover:bg-white/40 dark:hover:bg-white/[0.03]",
-                    selected.has(o.id) && "bg-[var(--color-pastel-sky)]/40 dark:bg-[var(--color-pastel-sky)]/60",
-                  )}
-                >
-                  <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(o.id)}
-                      onChange={() => toggleOne(o.id)}
-                      className="h-3.5 w-3.5 rounded border-[var(--color-ink-300)] accent-[var(--color-brand-500)]"
-                    />
-                  </td>
-                  <td className="px-3 py-3.5">
-                    <div className="font-mono text-[13px] font-semibold text-[var(--color-ink-900)]">
-                      <Highlight text={shortRef(o.orderRef)} query={search} />
+                <TableTd>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(o.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => toggleOne(o.id)}
+                    aria-label={`Select order ${o.orderRef}`}
+                    className="h-3.5 w-3.5 rounded border-[var(--color-ink-300)] accent-[var(--color-brand-500)]"
+                  />
+                </TableTd>
+                <TableTd>
+                  <div className="font-mono text-[13px] font-semibold text-[var(--color-ink-900)]">
+                    <Highlight text={shortRef(o.orderRef)} query={search} />
+                  </div>
+                  {o.requestedBy && (
+                    <div className="text-[11px] text-[var(--color-ink-400)] truncate max-w-[140px]">
+                      by <Highlight text={o.requestedBy} query={search} />
                     </div>
-                    {o.requestedBy && (
-                      <div className="text-[11px] text-[var(--color-ink-400)] truncate max-w-[140px]">
-                        by <Highlight text={o.requestedBy} query={search} />
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-3.5">
-                    <RouteCell from={firstFrom(o)} to={firstTo(o)} />
-                  </td>
-                  <td className="px-3 py-3.5">
-                    <StatusBadge status={o.orderStatus} />
-                  </td>
-                  <td className="px-3 py-3.5">
-                    <PriorityBadge priority={o.priority} />
-                  </td>
-                  <td className="px-3 py-3.5">
-                    <TransportModeBadge mode={o.requestedTransportMode} />
-                  </td>
-                  <td className="px-3 py-3.5 text-right font-mono text-[12.5px] tabular-nums text-[var(--color-ink-800)]">
-                    {o.totalItems}
-                  </td>
-                  <td className="px-3 py-3.5 text-right font-mono text-[12.5px] tabular-nums text-[var(--color-ink-800)]">
-                    {o.totalWeightKg > 0 ? (
-                      <>
-                        {o.totalWeightKg.toLocaleString("en-US", { maximumFractionDigits: 1 })}
-                        <span className="ml-0.5 text-[var(--color-ink-400)] text-[10.5px]">kg</span>
-                      </>
-                    ) : (
-                      <span className="text-[var(--color-ink-400)]">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3.5 font-mono text-[12px] text-[var(--color-ink-600)]">
-                    <DateTime
-                      value={o.serviceWindow?.latestUtc ?? o.serviceWindow?.earliestUtc}
-                      variant="time"
-                    />
-                  </td>
-                  <td className="px-3 py-3.5 text-[11.5px] text-[var(--color-ink-500)] whitespace-nowrap">
-                    <DateTime value={o.createdDate} variant="relative" />
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <RowMenu
-                      order={o}
-                      onAction={onAction}
-                      onOpenDetail={() => onOpenDetail(o.id)}
-                    />
-                  </td>
-                </motion.tr>
-              ))}
-            </AnimatePresence>
-          </tbody>
-        </table>
-      </div>
+                  )}
+                </TableTd>
+                <TableTd>
+                  <RouteCell from={firstFrom(o)} to={firstTo(o)} />
+                </TableTd>
+                <TableTd>
+                  <StatusBadge status={o.orderStatus} />
+                </TableTd>
+                <TableTd>
+                  <PriorityBadge priority={o.priority} />
+                </TableTd>
+                <TableTd>
+                  <TransportModeBadge mode={o.requestedTransportMode} />
+                </TableTd>
+                <TableTd
+                  align="right"
+                  className="font-mono text-[12.5px] tabular-nums text-[var(--color-ink-800)]"
+                >
+                  {o.totalItems}
+                </TableTd>
+                <TableTd
+                  align="right"
+                  className="font-mono text-[12.5px] tabular-nums text-[var(--color-ink-800)]"
+                >
+                  {o.totalWeightKg > 0 ? (
+                    <>
+                      {o.totalWeightKg.toLocaleString("en-US", { maximumFractionDigits: 1 })}
+                      <span className="ml-0.5 text-[var(--color-ink-400)] text-[10.5px]">kg</span>
+                    </>
+                  ) : (
+                    <span className="text-[var(--color-ink-400)]">—</span>
+                  )}
+                </TableTd>
+                <TableTd className="font-mono text-[12px] text-[var(--color-ink-600)]">
+                  <DateTime
+                    value={o.serviceWindow?.latestUtc ?? o.serviceWindow?.earliestUtc}
+                    variant="time"
+                  />
+                </TableTd>
+                <TableTd className="text-[11.5px] text-[var(--color-ink-500)] whitespace-nowrap">
+                  <DateTime value={o.createdDate} variant="relative" />
+                </TableTd>
+                <TableTd align="right">
+                  <RowMenu
+                    order={o}
+                    onAction={onAction}
+                    onOpenDetail={() => onOpenDetail(o.id)}
+                  />
+                </TableTd>
+              </DataRow>
+            ))}
+          </AnimatePresence>
+        </DataTableBody>
+      </DataTableShell>
 
-      {/* Mobile cards */}
-      <div className="md:hidden divide-y divide-[var(--color-ink-100)]/60 dark:divide-white/[0.04]">
+      {/* Mobile cards — separate glass card so the table primitives stay
+          table-shaped. Same domain content, different layout. */}
+      <div className="md:hidden overflow-hidden rounded-[var(--radius-xl)] glass divide-y divide-[var(--color-ink-100)]/60 dark:divide-white/[0.04]">
         <AnimatePresence initial={false}>
           {orders.map((o, i) => (
             <motion.div
@@ -307,7 +312,7 @@ export function OrdersTable({
           ))}
         </AnimatePresence>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -457,79 +462,9 @@ function MenuItem({
   );
 }
 
-function SortableTh({
-  col,
-  sortBy,
-  sortDir,
-  onClick,
-  align = "left",
-  children,
-}: {
-  col: SortColumn;
-  sortBy: SortColumn;
-  sortDir: SortDir;
-  onClick: (col: SortColumn) => void;
-  align?: "left" | "right";
-  children: React.ReactNode;
-}) {
-  const active = sortBy === col;
-  // Inactive columns show a faint ArrowUpDown so the affordance is
-  // visible but doesn't compete with the active sort indicator.
-  const Icon = !active ? ArrowUpDown : sortDir === "asc" ? ChevronUp : ChevronDown;
-  return (
-    <th
-      className={cn("px-3 py-3.5", align === "right" && "text-right")}
-      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
-    >
-      <button
-        type="button"
-        onClick={() => onClick(col)}
-        aria-label={`Sort by ${typeof children === "string" ? children : col}${
-          active ? `, currently ${sortDir === "asc" ? "ascending" : "descending"}` : ""
-        }`}
-        className={cn(
-          "group inline-flex items-center gap-1 transition-colors duration-150",
-          align === "right" && "flex-row-reverse",
-          active
-            ? "text-[var(--color-ink-900)]"
-            : "text-[var(--color-ink-400)] hover:text-[var(--color-ink-700)]",
-        )}
-      >
-        <span>{children}</span>
-        <Icon
-          className={cn(
-            "h-3 w-3 transition-opacity",
-            active ? "opacity-100" : "opacity-50 group-hover:opacity-80",
-          )}
-          strokeWidth={2.4}
-        />
-      </button>
-    </th>
-  );
-}
+// ── Empty state ────────────────────────────────────────────────────────
 
-function TableSkeleton() {
-  return (
-    <div className="rounded-[var(--radius-xl)] glass p-2">
-      <div className="px-3 py-3 flex gap-3 text-[10.5px] uppercase tracking-[0.1em] text-[var(--color-ink-400)]">
-        <span>Loading orders…</span>
-      </div>
-      <div className="space-y-2 px-2 pb-2">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [0.4, 0.7, 0.4] }}
-            transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.06 }}
-            className="h-12 rounded-xl bg-[var(--color-ink-100)] dark:bg-white/[0.04]"
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function EmptyState({
+function OrdersEmptyState({
   search,
   hasFilters,
   onClearFilters,
@@ -538,65 +473,51 @@ function EmptyState({
   hasFilters: boolean;
   onClearFilters: () => void;
 }) {
+  const variant = resolveEmptyStateVariant(search, hasFilters);
   const trimmed = search.trim();
-  // Three distinct states: searched but no match → mention the query;
-  // filtered but no match → mention filters + offer to clear; truly
-  // empty system → onboarding nudge.
-  const variant = trimmed
-    ? "no-search-match"
-    : hasFilters
-      ? "no-filter-match"
-      : "no-data";
 
-  const copy = {
-    "no-search-match": {
-      title: "No orders match your search",
-      body: (
-        <>
-          Nothing found for{" "}
-          <span className="font-mono font-semibold text-[var(--color-ink-700)]">
-            “{trimmed}”
-          </span>
-          . Check the spelling or widen your status filter.
-        </>
-      ),
-    },
-    "no-filter-match": {
-      title: "No orders in this view",
-      body: <>The current filters returned no rows. Clear them to see everything.</>,
-    },
-    "no-data": {
-      title: "No orders yet",
-      body: <>Use the “New order” button to create your first delivery.</>,
-    },
-  }[variant];
+  if (variant === "no-search-match") {
+    return (
+      <TableEmptyState
+        variant={variant}
+        icon={Send}
+        title="No orders match your search"
+        body={
+          <>
+            Nothing found for{" "}
+            <span className="font-mono font-semibold text-[var(--color-ink-700)]">
+              “{trimmed}”
+            </span>
+            . Check the spelling or widen your status filter.
+          </>
+        }
+        action={
+          hasFilters
+            ? { label: "Clear filters", onClick: onClearFilters }
+            : undefined
+        }
+      />
+    );
+  }
+
+  if (variant === "no-filter-match") {
+    return (
+      <TableEmptyState
+        variant={variant}
+        icon={Send}
+        title="No orders in this view"
+        body="The current filters returned no rows. Clear them to see everything."
+        action={{ label: "Clear filters", onClick: onClearFilters }}
+      />
+    );
+  }
 
   return (
-    <div className="rounded-[var(--radius-xl)] glass px-6 py-16 text-center">
-      <motion.div
-        animate={{ y: [0, -4, 0] }}
-        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-        className="mx-auto grid h-16 w-16 place-items-center rounded-[20px] bg-gradient-to-br from-[var(--color-pastel-sky)] to-[var(--color-pastel-lavender)] text-[var(--color-brand-900)]"
-      >
-        <Send className="h-6 w-6" strokeWidth={2} />
-      </motion.div>
-      <h3 className="font-display mt-5 text-lg font-semibold text-[var(--color-ink-900)]">
-        {copy.title}
-      </h3>
-      <p className="mt-1 text-[13px] text-[var(--color-ink-500)] mx-auto max-w-sm">
-        {copy.body}
-      </p>
-      {hasFilters && variant !== "no-data" && (
-        <motion.button
-          type="button"
-          onClick={onClearFilters}
-          whileHover={{ y: -1 }}
-          whileTap={{ scale: 0.97 }}
-          className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-4 py-2 text-[12px] font-semibold text-white transition-all hover:shadow-[0_14px_36px_-12px_rgba(15,23,42,0.6)] dark:bg-[var(--color-brand-500)]"
-        >
-          Clear filters
-        </motion.button>
-      )}
-    </div>
+    <TableEmptyState
+      variant={variant}
+      icon={Send}
+      title="No orders yet"
+      body="Use the “New order” button to create your first delivery."
+    />
   );
 }
