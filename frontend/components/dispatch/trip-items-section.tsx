@@ -4,6 +4,15 @@ import { ArrowRight, Box } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getTripItems, type TripItemDto } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
+import {
+  DataRow,
+  DataTableBody,
+  DataTableHead,
+  TableEmptyState,
+  TableSkeleton,
+  TableTd,
+  TableTh,
+} from "@/components/primitives/data-table";
 
 // Phase P5.3 — compact table of every item bound to a trip plus the
 // owning order context. Backed by GET /api/v1/dispatch/trips/{id}/items
@@ -69,16 +78,7 @@ export function TripItemsSection({
         </h3>
       </div>
 
-      {loading && !items && (
-        <div className="space-y-1">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-10 animate-pulse rounded-lg bg-[var(--color-ink-100)] dark:bg-white/[0.05]"
-            />
-          ))}
-        </div>
-      )}
+      {loading && !items && <TableSkeleton label="Loading items…" rows={2} />}
 
       {error && (
         <div className="rounded-xl bg-[var(--color-coral-soft)] px-4 py-3 text-[12.5px] font-medium text-[var(--color-coral)]">
@@ -94,109 +94,115 @@ export function TripItemsSection({
       )}
 
       {items && items.length === 0 && !error && (
-        <div className="rounded-xl border border-dashed border-[var(--color-ink-200)] px-4 py-3 text-[12.5px] text-[var(--color-ink-500)] dark:border-white/[0.08]">
-          No items bound to this trip yet. The vendor adapter may still
-          be binding them — retry in a moment.
-        </div>
+        <TableEmptyState
+          variant="no-data"
+          icon={Box}
+          title="No items bound to this trip yet"
+          body="The vendor adapter may still be binding them — retry in a moment."
+        />
       )}
 
       {items && items.length > 0 && (
+        // Outline wrapper (thin border, no glass) — the trip drawer already
+        // provides the surrounding card so the inner table reads as a list
+        // inside that card rather than a stacked second card.
         <div className="overflow-hidden rounded-xl border border-[var(--color-ink-100)] dark:border-white/[0.06]">
-          <table className="w-full border-collapse text-[12px]">
-            <thead className="bg-[var(--color-ink-100)]/40 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--color-ink-400)] dark:bg-white/[0.03]">
-              <tr>
-                <th className="px-2.5 py-1.5 text-left font-semibold">#</th>
-                <th className="px-2.5 py-1.5 text-left font-semibold">Lot / description</th>
-                <th className="px-2.5 py-1.5 text-left font-semibold">Qty</th>
-                <th className="px-2.5 py-1.5 text-left font-semibold">Status</th>
-                <th className="px-2.5 py-1.5 text-left font-semibold">Route</th>
-                <th className="px-2.5 py-1.5 text-left font-semibold">Order</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((it) => (
-                <tr
-                  key={it.itemPk}
-                  className="border-t border-[var(--color-ink-100)] dark:border-white/[0.06]"
-                >
-                  <td className="px-2.5 py-2 align-middle font-mono text-[11px] font-semibold text-[var(--color-ink-400)]">
-                    {it.itemSeq.toString().padStart(2, "0")}
-                  </td>
-                  <td className="px-2.5 py-2 align-top">
-                    <span className="inline-flex items-center gap-1 font-mono text-[11.5px] font-semibold text-[var(--color-ink-900)] dark:text-white">
-                      <Box className="h-3 w-3 text-[var(--color-ink-400)]" strokeWidth={2.2} />
-                      {it.lotNo}
-                    </span>
-                    {it.description && (
-                      <div
-                        className="mt-0.5 max-w-[260px] truncate text-[10.5px] text-[var(--color-ink-500)]"
-                        title={it.description}
-                      >
-                        {it.description}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-2.5 py-2 align-middle">
-                    {it.quantity ? (
-                      <span className="font-mono text-[11.5px] tabular-nums text-[var(--color-ink-800)] dark:text-[var(--color-ink-300)]">
-                        {it.quantity.value}
-                        <span className="ml-1 text-[10px] uppercase tracking-[0.04em] text-[var(--color-ink-400)]">
-                          {it.quantity.uom}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <DataTableHead>
+                <TableTh density="compact">#</TableTh>
+                <TableTh density="compact">Lot / description</TableTh>
+                <TableTh density="compact">Qty</TableTh>
+                <TableTh density="compact">Status</TableTh>
+                <TableTh density="compact">Route</TableTh>
+                <TableTh density="compact">Order</TableTh>
+              </DataTableHead>
+              <DataTableBody>
+                {items.map((it, i) => (
+                  <DataRow key={it.itemPk} delayIndex={i}>
+                    <TableTd
+                      density="compact"
+                      className="font-mono text-[11px] font-semibold text-[var(--color-ink-400)]"
+                    >
+                      {it.itemSeq.toString().padStart(2, "0")}
+                    </TableTd>
+                    <TableTd density="compact">
+                      <span className="inline-flex items-center gap-1 font-mono text-[11.5px] font-semibold text-[var(--color-ink-900)] dark:text-white">
+                        <Box className="h-3 w-3 text-[var(--color-ink-400)]" strokeWidth={2.2} />
+                        {it.lotNo}
+                      </span>
+                      {it.description && (
+                        <div
+                          className="mt-0.5 max-w-[260px] truncate text-[10.5px] text-[var(--color-ink-500)]"
+                          title={it.description}
+                        >
+                          {it.description}
+                        </div>
+                      )}
+                    </TableTd>
+                    <TableTd density="compact">
+                      {it.quantity ? (
+                        <span className="font-mono text-[11.5px] tabular-nums text-[var(--color-ink-800)] dark:text-[var(--color-ink-300)]">
+                          {it.quantity.value}
+                          <span className="ml-1 text-[10px] uppercase tracking-[0.04em] text-[var(--color-ink-400)]">
+                            {it.quantity.uom}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-[var(--color-ink-300)]">—</span>
+                      )}
+                    </TableTd>
+                    <TableTd density="compact">
+                      <ItemStatusBadge status={it.itemStatus} />
+                    </TableTd>
+                    <TableTd density="compact">
+                      <span className="inline-flex items-center gap-1 font-mono text-[11px]">
+                        <span className="rounded-md bg-[var(--color-pastel-sky)] px-1.5 py-0.5 text-[var(--color-pastel-sky-ink)]">
+                          {it.pickupCode ?? "—"}
+                        </span>
+                        <ArrowRight
+                          className="h-3 w-3 text-[var(--color-ink-400)]"
+                          strokeWidth={2.4}
+                        />
+                        <span className="rounded-md bg-[var(--color-pastel-mint)] px-1.5 py-0.5 text-[var(--color-pastel-mint-ink)]">
+                          {it.dropCode ?? "—"}
                         </span>
                       </span>
-                    ) : (
-                      <span className="text-[var(--color-ink-300)]">—</span>
-                    )}
-                  </td>
-                  <td className="px-2.5 py-2 align-middle">
-                    <ItemStatusBadge status={it.itemStatus} />
-                  </td>
-                  <td className="px-2.5 py-2 align-middle">
-                    <span className="inline-flex items-center gap-1 font-mono text-[11px]">
-                      <span className="rounded-md bg-[var(--color-pastel-sky)] px-1.5 py-0.5 text-[var(--color-pastel-sky-ink)]">
-                        {it.pickupCode ?? "—"}
-                      </span>
-                      <ArrowRight
-                        className="h-3 w-3 text-[var(--color-ink-400)]"
-                        strokeWidth={2.4}
-                      />
-                      <span className="rounded-md bg-[var(--color-pastel-mint)] px-1.5 py-0.5 text-[var(--color-pastel-mint-ink)]">
-                        {it.dropCode ?? "—"}
-                      </span>
-                    </span>
-                  </td>
-                  <td className="px-2.5 py-2 align-middle">
-                    {onOpenOrder ? (
-                      <button
-                        type="button"
-                        onClick={() => onOpenOrder(it.order.id)}
-                        className="group inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left transition-colors hover:bg-[var(--color-brand-500)]/10"
-                        title={`Open order ${it.order.orderRef}`}
-                      >
-                        <span className="font-mono text-[11.5px] font-semibold text-[var(--color-brand-500)] underline-offset-2 group-hover:underline">
-                          {it.order.orderRef}
+                    </TableTd>
+                    <TableTd density="compact">
+                      {onOpenOrder ? (
+                        <button
+                          type="button"
+                          onClick={() => onOpenOrder(it.order.id)}
+                          className="group inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left transition-colors hover:bg-[var(--color-brand-500)]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-500)]"
+                          aria-label={`Open order ${it.order.orderRef}`}
+                          title={`Open order ${it.order.orderRef}`}
+                        >
+                          <span className="font-mono text-[11.5px] font-semibold text-[var(--color-brand-500)] underline-offset-2 group-hover:underline">
+                            {it.order.orderRef}
+                          </span>
+                          <OrderStatusChip status={it.order.status} />
+                          {it.order.transportMode && (
+                            <TransportModeChip mode={it.order.transportMode} />
+                          )}
+                        </button>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="font-mono text-[11.5px] font-semibold text-[var(--color-ink-900)]">
+                            {it.order.orderRef}
+                          </span>
+                          <OrderStatusChip status={it.order.status} />
+                          {it.order.transportMode && (
+                            <TransportModeChip mode={it.order.transportMode} />
+                          )}
                         </span>
-                        <OrderStatusChip status={it.order.status} />
-                        {it.order.transportMode && (
-                          <TransportModeChip mode={it.order.transportMode} />
-                        )}
-                      </button>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="font-mono text-[11.5px] font-semibold text-[var(--color-ink-900)]">
-                          {it.order.orderRef}
-                        </span>
-                        <OrderStatusChip status={it.order.status} />
-                        {it.order.transportMode && (
-                          <TransportModeChip mode={it.order.transportMode} />
-                        )}
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      )}
+                    </TableTd>
+                  </DataRow>
+                ))}
+              </DataTableBody>
+            </table>
+          </div>
         </div>
       )}
     </section>
