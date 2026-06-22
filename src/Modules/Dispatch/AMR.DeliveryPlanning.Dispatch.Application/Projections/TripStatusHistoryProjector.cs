@@ -153,6 +153,13 @@ public class TripStatusHistoryProjector :
                     Reason: reason),
                 ct);
 
+            // Backend Phase 2 — hint the dispatcher's cross-trip list page
+            // to refetch. Same fire-and-forget pattern as the per-trip
+            // push above; the trips-list group is fed from the same
+            // durable history write so the order of side effects matches
+            // OrderListViewProjector.
+            _ = _realtime.PublishTripListChangedAsync(tripId, toStatus, ct);
+
             _logger.LogInformation(
                 "Projected {EventType} for Trip {TripId}: {From}→{To}",
                 typeof(TEvent).Name, tripId, fromStatus ?? "(initial)", toStatus);

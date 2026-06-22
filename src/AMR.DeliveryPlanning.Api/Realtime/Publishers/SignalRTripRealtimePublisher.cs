@@ -55,4 +55,25 @@ public sealed class SignalRTripRealtimePublisher : ITripRealtimePublisher
                 tripId, entry.MissionKey, entry.State);
         }
     }
+
+    public async Task PublishTripListChangedAsync(
+        Guid tripId,
+        string toStatus,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Push minimal hint to the cross-trip list group — the
+            // /dispatch/trips page treats this as a refetch trigger.
+            await _hub.Clients
+                .Group(TripHub.ListGroupKey)
+                .ListItemUpdated(new { tripId, toStatus });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Failed to push ListItemUpdated hint for Trip {TripId} — UI will catch up on next REST refresh",
+                tripId);
+        }
+    }
 }

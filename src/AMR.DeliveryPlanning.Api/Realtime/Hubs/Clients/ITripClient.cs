@@ -22,4 +22,13 @@ public interface ITripClient
     /// drop completed, etc. Used by the operator's live trip detail view.
     /// </summary>
     Task MissionUpdated(object missionEvent);
+
+    /// <summary>
+    /// Cross-trip list hint pushed to the <c>trips-list</c> group whenever
+    /// any trip in the queue changes status. Payload is a refetch hint
+    /// (<c>{ tripId, toStatus }</c>), not a full row — the list page
+    /// debounces and re-fetches the current page slice. Mirrors
+    /// <c>IOrderClient.ListItemUpdated</c>.
+    /// </summary>
+    Task ListItemUpdated(object hint);
 }

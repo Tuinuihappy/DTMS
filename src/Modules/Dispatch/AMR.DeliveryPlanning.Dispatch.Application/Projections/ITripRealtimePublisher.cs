@@ -11,6 +11,15 @@ public interface ITripRealtimePublisher
     Task PublishTimelineUpdatedAsync(Guid tripId, TripTimelineEntryDto entry, CancellationToken cancellationToken = default);
 
     Task PublishMissionUpdatedAsync(Guid tripId, TripMissionEventDto entry, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Backend Phase 2 — broadcast a refetch hint to the trips-list group
+    /// after a durable status transition. Payload mirrors
+    /// <c>IOrderRealtimePublisher.PublishOrderListChangedAsync</c>:
+    /// <c>{ tripId, toStatus }</c>, just enough for the dispatcher table
+    /// to debounce-refetch.
+    /// </summary>
+    Task PublishTripListChangedAsync(Guid tripId, string toStatus, CancellationToken cancellationToken = default);
 }
 
 public sealed record TripTimelineEntryDto(
@@ -47,5 +56,9 @@ public sealed class NoopTripRealtimePublisher : ITripRealtimePublisher
 
     public Task PublishMissionUpdatedAsync(
         Guid tripId, TripMissionEventDto entry, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task PublishTripListChangedAsync(
+        Guid tripId, string toStatus, CancellationToken cancellationToken = default)
         => Task.CompletedTask;
 }
