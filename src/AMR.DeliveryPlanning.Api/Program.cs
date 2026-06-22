@@ -381,7 +381,27 @@ var rlQueueLimit = builder.Configuration.GetValue<int?>("RateLimit:QueueLimit") 
 builder.Services.AddRateLimiter(options =>
 {
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
-        RateLimitPartition.GetFixedWindowLimiter(
+    {
+        // F3 — bypass infrastructure endpoints. These are probed at fixed
+        // intervals by K8s kubelet / service mesh / Prometheus, or carry
+        // many clients through a single egress IP (SignalR reconnect
+        // storms after a G1 drain). Either case would falsely trip the
+        // per-IP limit and break the exact reliability features rate
+        // limiting is supposed to protect — readiness flapping, drain
+        // reconnects landing on 429 instead of a healthy sibling pod,
+        // scrape gaps producing false alerts.
+        //
+        // Business API paths (/api/*) still rate-limit per IP as before;
+        // F3 only carves out infra.
+        var path = ctx.Request.Path;
+        if (path.StartsWithSegments("/health") ||
+            path.StartsWithSegments("/hubs") ||
+            path.StartsWithSegments("/metrics"))
+        {
+            return RateLimitPartition.GetNoLimiter("bypass-infra");
+        }
+
+        return RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
@@ -389,7 +409,8 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromSeconds(rlWindowSeconds),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = rlQueueLimit
-            }));
+            });
+    });
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
 
