@@ -485,7 +485,9 @@ See [`perf-tests/results-2026-06-20/REPORT-phase-d.md`](../perf-tests/results-20
 
 ### MVP scope + known follow-up
 
-Singleton hosted services (Riot3 pollers, sync services, reconcilers) currently still run in **both** containers — accepted MVP trade-off for the ~4h ship. Most are idempotent; pollers are wasted RIOT calls in prod (mitigated by NoOp flag for now). Follow-up: extend the flag pattern to gate per-service via a `Worker__SingletonServicesEnabled` flag.
+**🟢 Track C closed 2026-06-22** ([2b09928](https://github.com/Tuinuihappy/DTMS/commit/2b09928)) — 7 hosted services (5 vendor pollers + 2 downstream broadcasters) now gated under `Workers:VendorPollers:RunInThisProcess`. Default true keeps api behaviour; outbox-worker container sets false. Measured impact: worker RIOT API calls 60/min → 0/min (50% vendor load reduction). Idempotent services (PlanningReconciliation, SlaRisk, FleetUtilization, TopologyOverlayExpiry, InfraHealthPoller) intentionally NOT gated — DB-only, safe to run 2×.
+
+Remaining Phase D follow-ups: leader election for multi-replica api (only matters once K8s scales api > 1 replica — not a single-host docker-compose concern); pre-existing worker masstransit-bus Degraded endpoints (TripDropCompletedOmsNotify + TripStartedOmsNotify) — tracked as separate infra debt.
 
 ---
 
