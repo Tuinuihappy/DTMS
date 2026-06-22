@@ -39,6 +39,11 @@ public class DispatchDbContext : DbContext
         {
             builder.HasKey(t => t.Id);
             builder.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);
+            // Pair-mate to Status when Paused — string-coded so DB-side reads
+            // are intelligible ("Held" / "Hang") and a new vendor flavour can
+            // be added without an enum re-numbering. Nullable; only set when
+            // Status == Paused.
+            builder.Property(t => t.VendorPauseSource).HasConversion<string>().HasMaxLength(20);
             builder.Property(t => t.UpperKey).HasMaxLength(80).IsRequired();
             builder.Property(t => t.VendorOrderKey).HasMaxLength(100);
             builder.Property(t => t.VendorVehicleKey).HasMaxLength(100);

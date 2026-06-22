@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
+using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
@@ -32,7 +33,9 @@ public class PauseTripCommandHandler : ICommandHandler<PauseTripCommand>
         var trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);
         if (trip == null) return Result.Failure($"Trip {request.TripId} not found.");
 
-        try { trip.Pause(); }
+        // Operator-initiated pause → vendor side will be HELD → resume must
+        // use CONTINUE_FROM_HELD.
+        try { trip.Pause(VendorPauseSource.Held); }
         catch (InvalidOperationException ex) { return Result.Failure(ex.Message); }
 
         // No orderKey → nothing live at the vendor to freeze. Pause's

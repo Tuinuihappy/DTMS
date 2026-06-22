@@ -198,6 +198,10 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("VendorPauseSource")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("VendorRequestSnapshot")
                         .HasColumnType("jsonb");
 

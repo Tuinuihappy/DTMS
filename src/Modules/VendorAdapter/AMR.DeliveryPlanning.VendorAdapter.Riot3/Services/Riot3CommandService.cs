@@ -104,6 +104,13 @@ public class Riot3CommandService : IVehicleCommandService
         // CMD_ORDER_CONTINUE_FROM_HELD pairs with CMD_ORDER_HELD; HANG-from-* is for system-initiated hangs.
         => SendOrderOperationAsync(vendorOrderKey, Riot3OrderCommandType.ContinueFromHeld, "resume", cancellationToken);
 
+    // Pair-mate for vendor-initiated hangs (TASK_HANG, e.g. E230025 robot
+    // mode change). Sending CONTINUE_FROM_HELD against a HANG order returns
+    // E639999 "multi-level template fill error" because the vendor has no
+    // held template to fill from.
+    public Task<Result<Riot3OperationOutcome>> ResumeFromHangEnvelopeAsync(string vendorOrderKey, CancellationToken cancellationToken = default)
+        => SendOrderOperationAsync(vendorOrderKey, Riot3OrderCommandType.ContinueFromHang, "resume-hang", cancellationToken);
+
     // Robot-level operation. Targets the vendor deviceKey (Trip.VendorVehicleKey),
     // NOT the orderKey — RIOT3 routes PASS by which robot is being acknowledged
     // at the waiting checkpoint, not by the in-flight order.

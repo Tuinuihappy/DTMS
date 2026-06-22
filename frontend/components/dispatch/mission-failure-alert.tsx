@@ -105,7 +105,7 @@ export function MissionFailureAlert({
             className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/70 px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-white dark:bg-white/[0.08] dark:hover:bg-white/[0.14]"
           >
             <ArrowDown className="h-3 w-3" strokeWidth={2.4} />
-            ดูรายละเอียดด้านล่าง
+            See details below
           </button>
         </div>
       </div>

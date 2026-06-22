@@ -1,4 +1,5 @@
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
+using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
@@ -30,6 +31,12 @@ public class ResumeTripCommandHandler : ICommandHandler<ResumeTripCommand>
         var trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);
         if (trip == null) return Result.Failure($"Trip {request.TripId} not found.");
 
+        // Capture pause source BEFORE Resume() clears it — we need it to
+        // pick the matching RIOT3 command below. Null means a legacy row
+        // paused before the column existed; default to Held (the original
+        // hard-coded behaviour) so old data still resumes correctly.
+        var pauseSource = trip.VendorPauseSource ?? VendorPauseSource.Held;
+
         try { trip.Resume(); }
         catch (InvalidOperationException ex) { return Result.Failure(ex.Message); }
 
@@ -41,7 +48,12 @@ public class ResumeTripCommandHandler : ICommandHandler<ResumeTripCommand>
                 "Cannot resume — the vendor never minted an order key for this trip.");
         }
 
-        var vendorResult = await _vendorOps.ResumeAsync(trip.VendorOrderKey, cancellationToken);
+        // Branch by vendor-side state: HELD → CONTINUE_FROM_HELD;
+        // HANG → CONTINUE_FROM_HANG. Crossing them produces E639999
+        // "multi-level template fill error" from RIOT3.
+        var vendorResult = pauseSource == VendorPauseSource.Hang
+            ? await _vendorOps.ResumeFromHangAsync(trip.VendorOrderKey, cancellationToken)
+            : await _vendorOps.ResumeAsync(trip.VendorOrderKey, cancellationToken);
         if (vendorResult.IsFailure)
         {
             _logger.LogWarning("Vendor resume rejected for Trip {TripId} (vendorOrderKey {OrderKey}): {Error}",
@@ -69,7 +81,8 @@ public class ResumeTripCommandHandler : ICommandHandler<ResumeTripCommand>
         }
 
         await _tripRepository.UpdateAsync(trip, cancellationToken);
-        _logger.LogInformation("Trip {TripId} resumed (vendorOrderKey {OrderKey})", trip.Id, trip.VendorOrderKey);
+        _logger.LogInformation("Trip {TripId} resumed (vendorOrderKey {OrderKey}, source {Source})",
+            trip.Id, trip.VendorOrderKey, pauseSource);
         return Result.Success();
     }
 }

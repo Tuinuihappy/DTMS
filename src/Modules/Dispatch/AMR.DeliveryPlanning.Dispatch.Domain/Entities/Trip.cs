@@ -38,6 +38,11 @@ public class Trip : AggregateRoot<Guid>
     // Fleet lookup. Display-only — never used for correlation.
     public string? VendorVehicleName { get; private set; }
 
+    // When Status == Paused, records WHICH vendor event paused this trip so
+    // the resume handler can pick the matching command type. Null while
+    // Status != Paused (cleared on Resume / terminal transitions).
+    public VendorPauseSource? VendorPauseSource { get; private set; }
+
     // Route context — the station pair the trip dispatches against.
     // Captured at create time so retry can re-resolve the OrderTemplate
     // without re-reading the DeliveryOrder items. Nullable because
@@ -259,14 +264,15 @@ public class Trip : AggregateRoot<Guid>
             Guid.NewGuid(), DateTime.UtcNow, Id, JobId, DeliveryOrderId, reason, UpperKey));
     }
 
-    public void Pause()
+    public void Pause(VendorPauseSource source)
     {
         if (Status != TripStatus.InProgress)
             throw new InvalidOperationException("Only InProgress trips can be paused.");
 
         Status = TripStatus.Paused;
+        VendorPauseSource = source;
         AddDomainEvent(new TripPausedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
-        RecordEvent("TripPaused", null);
+        RecordEvent("TripPaused", source.ToString());
     }
 
     public void Resume()
@@ -275,6 +281,7 @@ public class Trip : AggregateRoot<Guid>
             throw new InvalidOperationException("Only Paused trips can be resumed.");
 
         Status = TripStatus.InProgress;
+        VendorPauseSource = null;
         AddDomainEvent(new TripResumedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
         RecordEvent("TripResumed", null);
     }

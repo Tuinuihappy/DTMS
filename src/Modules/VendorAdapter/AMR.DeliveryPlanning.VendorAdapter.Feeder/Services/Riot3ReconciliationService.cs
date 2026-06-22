@@ -237,9 +237,14 @@ public sealed class Riot3ReconciliationService : BackgroundService
                 case "HELD":
                     // Vendor paused — only transition if Trip is currently
                     // InProgress. Created/Paused/terminal states are no-ops.
+                    // Capture pause flavour so the resume command picks the
+                    // right CONTINUE_FROM_* — see Riot3Webhooks for context.
                     if (trip.Status == AMR.DeliveryPlanning.Dispatch.Domain.Enums.TripStatus.InProgress)
                     {
-                        trip.Pause();
+                        var pauseSource = state == "HANG"
+                            ? AMR.DeliveryPlanning.Dispatch.Domain.Enums.VendorPauseSource.Hang
+                            : AMR.DeliveryPlanning.Dispatch.Domain.Enums.VendorPauseSource.Held;
+                        trip.Pause(pauseSource);
                         return Transition.Paused;
                     }
                     return Transition.None;

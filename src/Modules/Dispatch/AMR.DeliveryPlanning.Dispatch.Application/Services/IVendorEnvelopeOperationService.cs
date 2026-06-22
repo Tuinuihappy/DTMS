@@ -48,5 +48,14 @@ public interface IVendorEnvelopeOperationService
 {
     Task<Result<VendorOperationOutcome>> CancelAsync(string vendorOrderKey, CancellationToken cancellationToken = default);
     Task<Result<VendorOperationOutcome>> PauseAsync(string vendorOrderKey, CancellationToken cancellationToken = default);
+
+    // Resume an order the operator paused (vendor side: HELD). Pairs with
+    // CMD_ORDER_CONTINUE_FROM_HELD on RIOT3.
     Task<Result<VendorOperationOutcome>> ResumeAsync(string vendorOrderKey, CancellationToken cancellationToken = default);
+
+    // Resume an order the vendor itself paused due to a system condition
+    // (vendor side: HANG, e.g. E230025 robot mode change). Pairs with
+    // CMD_ORDER_CONTINUE_FROM_HANG. Sending the wrong resume command
+    // produces E639999 "multi-level template fill error".
+    Task<Result<VendorOperationOutcome>> ResumeFromHangAsync(string vendorOrderKey, CancellationToken cancellationToken = default);
 }

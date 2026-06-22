@@ -204,13 +204,19 @@ public static class Riot3Webhooks
 
                 case "TASK_HANG":
                 case "TASK_HELD":
-                    // Vendor paused the order (obstacle, traffic stop, admin
-                    // hold, etc). Mirror to Trip.Paused so operators see the
-                    // real state and don't issue a duplicate Pause command.
+                    // Vendor paused the order — mirror to Trip.Paused, but
+                    // capture WHICH flavour so the resume handler picks the
+                    // matching RIOT3 command. TASK_HELD = operator pause →
+                    // CONTINUE_FROM_HELD; TASK_HANG = system pause (e.g.
+                    // E230025 mode change) → CONTINUE_FROM_HANG. Crossing
+                    // them returns E639999 "multi-level template fill error".
                     var hangReason = payload.Task?.HangReason;
-                    trip.Pause();
-                    logger.LogInformation("[EnvelopeWebhook] Trip {TripId} paused by vendor (upperKey {UpperKey}) event={Event} reason={Reason}",
-                        trip.Id, upperKey, eventType, hangReason ?? "(none)");
+                    var pauseSource = eventType == "TASK_HANG"
+                        ? AMR.DeliveryPlanning.Dispatch.Domain.Enums.VendorPauseSource.Hang
+                        : AMR.DeliveryPlanning.Dispatch.Domain.Enums.VendorPauseSource.Held;
+                    trip.Pause(pauseSource);
+                    logger.LogInformation("[EnvelopeWebhook] Trip {TripId} paused by vendor (upperKey {UpperKey}) event={Event} source={Source} reason={Reason}",
+                        trip.Id, upperKey, eventType, pauseSource, hangReason ?? "(none)");
                     break;
 
                 case "TASK_HANG_TO_CONTINUE":

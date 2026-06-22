@@ -35,6 +35,12 @@ internal sealed class Riot3VendorEnvelopeOperationAdapter : IVendorEnvelopeOpera
         return MapResult(result);
     }
 
+    public async Task<Result<VendorOperationOutcome>> ResumeFromHangAsync(string vendorOrderKey, CancellationToken cancellationToken = default)
+    {
+        var result = await _riot3.ResumeFromHangEnvelopeAsync(vendorOrderKey, cancellationToken);
+        return MapResult(result);
+    }
+
     private static Result<VendorOperationOutcome> MapResult(Result<Riot3OperationOutcome> source)
     {
         if (source.IsFailure)

@@ -272,7 +272,7 @@ public class TripTests
         var trip = NewEnvelopeTrip();
         trip.MarkVendorStarted();
 
-        trip.Pause();
+        trip.Pause(VendorPauseSource.Held);
         trip.Status.Should().Be(TripStatus.Paused);
 
         trip.Resume();
@@ -311,7 +311,7 @@ public class TripTests
     {
         var trip = NewEnvelopeTrip();
         trip.MarkVendorStarted(vendorVehicleKey: "Delta6FAN1");
-        trip.Pause();
+        trip.Pause(VendorPauseSource.Held);
 
         var act = () => trip.AcknowledgeRobotPass();
 
@@ -497,7 +497,7 @@ public class PauseAndResumeTripHandlerTests
     public async Task Resume_FromPaused_VendorSuccess_Resumes()
     {
         var trip = NewTripInProgress();
-        trip.Pause();
+        trip.Pause(VendorPauseSource.Held);
         var repo = new FakeTripRepository(trip);
         var vendor = new StubVendorOps();
 
@@ -561,7 +561,7 @@ public class PauseAndResumeTripHandlerTests
     public async Task Resume_VendorNoRecord_AutoMarksFailed_ReturnsActionableError()
     {
         var trip = NewTripInProgress();
-        trip.Pause();
+        trip.Pause(VendorPauseSource.Held);
         var repo = new FakeTripRepository(trip);
         var vendor = new StubVendorOps { NextOutcome = VendorOperationOutcome.NoVendorRecord };
 
@@ -849,7 +849,7 @@ public class AcknowledgeRobotPassHandlerTests
     public async Task DomainReject_WrongStatus_DoesNotCallVendor()
     {
         var trip = NewTripInProgressWithKey();
-        trip.Pause();
+        trip.Pause(VendorPauseSource.Held);
         var repo = new FakeTripRepository(trip);
         var vendor = new StubRobotOps();
 
@@ -950,6 +950,7 @@ internal sealed class StubVendorOps : IVendorEnvelopeOperationService
     public List<string> CancelCalls { get; } = new();
     public List<string> PauseCalls { get; } = new();
     public List<string> ResumeCalls { get; } = new();
+    public List<string> ResumeFromHangCalls { get; } = new();
 
     public Task<Result<VendorOperationOutcome>> CancelAsync(string upperKey, CancellationToken ct = default)
     {
@@ -966,6 +967,12 @@ internal sealed class StubVendorOps : IVendorEnvelopeOperationService
     public Task<Result<VendorOperationOutcome>> ResumeAsync(string upperKey, CancellationToken ct = default)
     {
         ResumeCalls.Add(upperKey);
+        return Task.FromResult(BuildResult());
+    }
+
+    public Task<Result<VendorOperationOutcome>> ResumeFromHangAsync(string upperKey, CancellationToken ct = default)
+    {
+        ResumeFromHangCalls.Add(upperKey);
         return Task.FromResult(BuildResult());
     }
 
