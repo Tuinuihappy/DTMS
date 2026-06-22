@@ -189,8 +189,8 @@ export function StationEditDrawer({
                     </h2>
                     <div className="mt-1 flex items-center gap-2 font-mono text-[10.5px] tracking-tight text-[var(--color-ink-500)]">
                       <span>
-                        {Math.round(station.x).toLocaleString()},{" "}
-                        {Math.round(station.y).toLocaleString()}
+                        {Math.round(station.x).toLocaleString("en-US")},{" "}
+                        {Math.round(station.y).toLocaleString("en-US")}
                       </span>
                       {station.vendorRef && (
                         <>
@@ -415,8 +415,8 @@ export function StationEditDrawer({
               <section>
                 <SectionLabel title="Source" />
                 <dl className="grid grid-cols-2 gap-2 text-[11.5px]">
-                  <Row icon={<MapPin className="h-3 w-3" />} label="x" value={Math.round(station.x).toLocaleString()} mono />
-                  <Row icon={<MapPin className="h-3 w-3" />} label="y" value={Math.round(station.y).toLocaleString()} mono />
+                  <Row icon={<MapPin className="h-3 w-3" />} label="x" value={Math.round(station.x).toLocaleString("en-US")} mono />
+                  <Row icon={<MapPin className="h-3 w-3" />} label="y" value={Math.round(station.y).toLocaleString("en-US")} mono />
                   <Row
                     icon={<Crosshair className="h-3 w-3" />}
                     label="θ"

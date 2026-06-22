@@ -15,7 +15,8 @@ export {
 } from "./table-shell";
 export { SortableTh } from "./sortable-th";
 export { DataRow } from "./data-row";
-export { TableSkeleton } from "./table-skeleton";
+export { MobileCardRow } from "./mobile-card-row";
+export { TableSkeleton, TableSkeletonRows } from "./table-skeleton";
 export {
   TableEmptyState,
   resolveEmptyStateVariant,

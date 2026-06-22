@@ -25,6 +25,7 @@ import {
   DataRow,
   DataTableBody,
   DataTableHead,
+  TableSkeletonRows,
   TableTd,
   TableTh,
 } from "@/components/primitives/data-table";
@@ -48,7 +49,7 @@ export function LeadTimeReport({ window }: { window: Window }) {
   return (
     <div className="space-y-4">
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Tile label="Completed orders" value={(data?.totalCompleted ?? 0).toLocaleString()} />
+        <Tile label="Completed orders" value={(data?.totalCompleted ?? 0).toLocaleString("en-US")} />
         <Tile label="Average" value={fmtDuration(data?.avgSec ?? null)} />
         <Tile label="Median (p50)" value={fmtDuration(data?.p50Sec ?? null)} />
         <Tile label="P95" value={fmtDuration(data?.p95Sec ?? null)} tone="amber" />
@@ -113,21 +114,24 @@ export function LeadTimeReport({ window }: { window: Window }) {
                     {b.label}
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
-                    {b.count.toLocaleString()}
+                    {b.count.toLocaleString("en-US")}
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
                     {(b.pct * 100).toFixed(1)}%
                   </TableTd>
                 </DataRow>
               ))}
-              {(data?.totalCompleted ?? 0) === 0 && (
+              {(data?.totalCompleted ?? 0) === 0 && loading && (
+                <TableSkeletonRows colSpan={3} rows={3} />
+              )}
+              {(data?.totalCompleted ?? 0) === 0 && !loading && (
                 <tr>
                   <TableTd
                     density="compact"
                     colSpan={3}
                     className="py-6 text-center text-[var(--color-ink-400)]"
                   >
-                    {loading ? "Loading…" : "No completed orders in this window."}
+                    No completed orders in this window.
                   </TableTd>
                 </tr>
               )}

@@ -16,6 +16,7 @@ import {
   DataRow,
   DataTableBody,
   DataTableHead,
+  TableSkeletonRows,
   TableTd,
   TableTh,
 } from "@/components/primitives/data-table";
@@ -41,15 +42,15 @@ export function OrdersSummaryReport({ window }: { window: Window }) {
   return (
     <div className="space-y-4">
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Tile label="Orders" value={(data?.totalOrders ?? 0).toLocaleString()} />
+        <Tile label="Orders" value={(data?.totalOrders ?? 0).toLocaleString("en-US")} />
         <Tile
           label="SLA confirm breach"
-          value={(data?.cells ?? []).reduce((a, c) => a + c.slaConfirmBreached, 0).toLocaleString()}
+          value={(data?.cells ?? []).reduce((a, c) => a + c.slaConfirmBreached, 0).toLocaleString("en-US")}
           tone="amber"
         />
         <Tile
           label="SLA complete breach"
-          value={(data?.cells ?? []).reduce((a, c) => a + c.slaCompleteBreached, 0).toLocaleString()}
+          value={(data?.cells ?? []).reduce((a, c) => a + c.slaCompleteBreached, 0).toLocaleString("en-US")}
           tone="coral"
         />
         <Tile label="Avg lead time" value={fmtDuration(avgLeadTime(data?.cells ?? []))} />
@@ -100,14 +101,17 @@ export function OrdersSummaryReport({ window }: { window: Window }) {
               </TableTh>
             </DataTableHead>
             <DataTableBody>
-              {priorities.length === 0 && (
+              {priorities.length === 0 && loading && (
+                <TableSkeletonRows colSpan={statuses.length + 2} rows={3} />
+              )}
+              {priorities.length === 0 && !loading && (
                 <tr>
                   <TableTd
                     density="compact"
                     colSpan={statuses.length + 2}
                     className="py-6 text-center text-[var(--color-ink-400)]"
                   >
-                    {loading ? "Loading…" : "No orders in this window."}
+                    No orders in this window.
                   </TableTd>
                 </tr>
               )}
@@ -130,7 +134,7 @@ export function OrdersSummaryReport({ window }: { window: Window }) {
                           align="right"
                           className="font-mono tabular-nums text-[var(--color-ink-700)]"
                         >
-                          {cell ? cell.count.toLocaleString() : "—"}
+                          {cell ? cell.count.toLocaleString("en-US") : "—"}
                         </TableTd>
                       );
                     })}
@@ -139,7 +143,7 @@ export function OrdersSummaryReport({ window }: { window: Window }) {
                       align="right"
                       className="font-mono font-semibold tabular-nums text-[var(--color-ink-900)]"
                     >
-                      {rowTotal.toLocaleString()}
+                      {rowTotal.toLocaleString("en-US")}
                     </TableTd>
                   </DataRow>
                 );

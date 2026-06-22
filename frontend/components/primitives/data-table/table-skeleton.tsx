@@ -47,3 +47,37 @@ export function TableSkeleton({
     </div>
   );
 }
+
+/**
+ * Inline skeleton rows for tables that want to keep their existing
+ * header visible while loading. Renders N `<tr><td colSpan>` rows
+ * with the canonical pulsing animation — drop directly inside a
+ * `<DataTableBody>` / `<tbody>`.
+ *
+ * Used by report tables, where the header carries column-name context
+ * that should stay visible even while the data fetch is in flight.
+ */
+export function TableSkeletonRows({
+  rows = 3,
+  colSpan,
+}: {
+  rows?: number;
+  colSpan: number;
+}) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <tr key={i} aria-hidden>
+          <td colSpan={colSpan} className="px-3 py-2">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0.4, 0.7, 0.4] }}
+              transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.06 }}
+              className="h-6 rounded-md bg-[var(--color-ink-100)] dark:bg-white/[0.04]"
+            />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}

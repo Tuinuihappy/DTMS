@@ -884,7 +884,7 @@ function ExperienceInner() {
               ? `Couldn't load orders · ${error}`
               : loading
                 ? "Loading active and historical orders…"
-                : `${stats?.total.toLocaleString() ?? totalCount.toLocaleString()} orders · live · refreshes every 15s`
+                : `${stats?.total.toLocaleString("en-US") ?? totalCount.toLocaleString("en-US")} orders · live · refreshes every 15s`
           }
         />
       </motion.div>

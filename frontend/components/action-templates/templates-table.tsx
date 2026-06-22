@@ -20,6 +20,7 @@ import {
   DataTableBody,
   DataTableHead,
   DataTableShell,
+  MobileCardRow,
   SortableTh,
   TableEmptyState,
   TableSkeleton,
@@ -136,7 +137,10 @@ export function TemplatesTable({
                     className="text-[11.5px] text-[var(--color-ink-700)] whitespace-nowrap"
                   />
                   {(t.modifiedBy ?? t.createdBy) && (
-                    <div className="text-[10.5px] text-[var(--color-ink-400)] truncate max-w-[140px]">
+                    <div
+                      className="text-[10.5px] text-[var(--color-ink-400)] truncate max-w-[140px]"
+                      title={`by ${t.modifiedBy ?? t.createdBy}`}
+                    >
                       by {t.modifiedBy ?? t.createdBy}
                     </div>
                   )}
@@ -160,19 +164,12 @@ export function TemplatesTable({
       <div className="md:hidden overflow-hidden rounded-[var(--radius-xl)] glass divide-y divide-[var(--color-ink-100)]/60 dark:divide-white/[0.04]">
         <AnimatePresence initial={false}>
           {templates.map((t, i) => (
-            <motion.div
+            <MobileCardRow
               key={t.id}
-              layout
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.35, delay: Math.min(i * 0.03, 0.4) }}
+              delayIndex={i}
+              disabled={!t.isActive}
+              ariaLabel={`Action template ${t.actionName} — ${t.isActive ? "active" : "inactive"}`}
               onClick={() => onOpenDetail(t)}
-              className={cn(
-                "px-4 py-4 cursor-pointer transition-colors",
-                "active:bg-white/40 dark:active:bg-white/[0.03]",
-                !t.isActive && "opacity-70",
-              )}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
@@ -196,7 +193,7 @@ export function TemplatesTable({
                   className="ml-auto"
                 />
               </div>
-            </motion.div>
+            </MobileCardRow>
           ))}
         </AnimatePresence>
       </div>

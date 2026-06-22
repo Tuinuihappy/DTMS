@@ -677,7 +677,10 @@ function MapSelectorRail({
               <MapIcon className="h-4 w-4" strokeWidth={2.2} />
             </span>
             <span className="min-w-0">
-              <span className="block font-display text-[13px] font-semibold tracking-tight truncate max-w-[180px]">
+              <span
+                className="block font-display text-[13px] font-semibold tracking-tight truncate max-w-[180px]"
+                title={m.name}
+              >
                 {m.name}
               </span>
               <span className="font-mono text-[10px] tracking-tight text-[var(--color-ink-500)]">
@@ -1176,7 +1179,7 @@ export function CanvasCard({
             <div className="font-mono text-[10.5px] tracking-tight text-[var(--color-ink-500)] flex flex-wrap items-center gap-x-3">
               {map ? (
                 <span>
-                  extent · {Math.round(map.width).toLocaleString()} × {Math.round(map.height).toLocaleString()}
+                  extent · {Math.round(map.width).toLocaleString("en-US")} × {Math.round(map.height).toLocaleString("en-US")}
                 </span>
               ) : (
                 <span>awaiting map</span>
@@ -1188,7 +1191,7 @@ export function CanvasCard({
           {cursor && (
             <span className="hidden md:inline-flex items-center gap-1.5 font-mono text-[10.5px] tabular-nums tracking-tight text-[var(--color-ink-500)] rounded-full px-2.5 py-1 bg-white/60 dark:bg-white/[0.04]">
               <Crosshair className="h-3 w-3" strokeWidth={2.4} />
-              {Math.round(cursor.x).toLocaleString()}, {Math.round(cursor.y).toLocaleString()}
+              {Math.round(cursor.x).toLocaleString("en-US")}, {Math.round(cursor.y).toLocaleString("en-US")}
             </span>
           )}
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/65 dark:bg-white/[0.05] px-2.5 py-1 text-[10.5px] font-semibold tracking-tight text-[var(--color-ink-700)]">
@@ -1844,8 +1847,8 @@ function StationDetail({ station }: { station: StationDto }) {
         </div>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-        <Detail label="x" value={Math.round(station.x).toLocaleString()} mono />
-        <Detail label="y" value={Math.round(station.y).toLocaleString()} mono />
+        <Detail label="x" value={Math.round(station.x).toLocaleString("en-US")} mono />
+        <Detail label="y" value={Math.round(station.y).toLocaleString("en-US")} mono />
         <Detail
           label="θ"
           value={station.theta !== null ? `${station.theta.toFixed(2)} rad` : "—"}
@@ -2090,8 +2093,8 @@ function StationDirectory({
                         </span>
                       </td>
                       <td className="py-3 font-mono tabular-nums text-[11px] tracking-tight text-[var(--color-ink-600)] whitespace-nowrap">
-                        {Math.round(s.x).toLocaleString()},{" "}
-                        {Math.round(s.y).toLocaleString()}
+                        {Math.round(s.x).toLocaleString("en-US")},{" "}
+                        {Math.round(s.y).toLocaleString("en-US")}
                       </td>
                       <td className="py-3 font-mono text-[11px] tabular-nums tracking-tight text-[var(--color-ink-600)]">
                         {s.vendorRef ?? <span className="text-[var(--color-ink-300)]">—</span>}

@@ -192,7 +192,7 @@ function StateTile({
         </span>
       </div>
       <div className="mt-3 font-mono text-[1.6rem] font-semibold tabular-nums leading-none text-[var(--color-ink-900)]">
-        {value.toLocaleString()}
+        {value.toLocaleString("en-US")}
       </div>
       <div className="mt-2 text-[10.5px] uppercase tracking-[0.12em] font-medium text-[var(--color-ink-500)]">
         {label}

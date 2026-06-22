@@ -406,8 +406,8 @@ export function RobotTooltip({
           tone={robot.batteryPercentage < 20 ? "warn" : "ok"}
           icon={<Battery className="h-2.5 w-2.5" strokeWidth={2.4} />}
         />
-        <Cell label="x" value={Math.round(robot.x).toLocaleString()} mono />
-        <Cell label="y" value={Math.round(robot.y).toLocaleString()} mono />
+        <Cell label="x" value={Math.round(robot.x).toLocaleString("en-US")} mono />
+        <Cell label="y" value={Math.round(robot.y).toLocaleString("en-US")} mono />
       </div>
       {(robot.orderKey || robot.orderName) && (
         <div className="mt-2.5 rounded-[10px] bg-white/55 dark:bg-white/[0.04] px-2.5 py-1.5">

@@ -125,7 +125,7 @@ export function LiveActivityCard() {
                     style={{ bottom: stemHeight + 22 }}
                   >
                     <div className="font-mono text-[15px] font-semibold tracking-tight">
-                      ${peak.value.toLocaleString()}
+                      ${peak.value.toLocaleString("en-US")}
                     </div>
                     <div className="text-[10px] uppercase tracking-[0.12em] text-white/60">
                       {peak.shipments} shipments

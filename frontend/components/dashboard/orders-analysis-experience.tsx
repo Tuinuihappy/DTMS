@@ -124,7 +124,7 @@ export function OrdersAnalysisExperience() {
               {s.label}
             </div>
             <div className="mt-2 font-mono text-[1.8rem] font-semibold tabular-nums leading-none text-[var(--color-ink-900)]">
-              {s.value.toLocaleString()}
+              {s.value.toLocaleString("en-US")}
             </div>
           </GlassCard>
         ))}

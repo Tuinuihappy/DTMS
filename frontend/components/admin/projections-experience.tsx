@@ -92,7 +92,7 @@ export function AdminProjectionsExperience() {
           <GlassCard key={m.module} variant="default" className="p-5">
             <SectionLabel
               title={m.module}
-              subtitle={`${m.projectors.length} projector(s) · ${m.inboxTotal.toLocaleString()} events processed · schema "${m.schema}"`}
+              subtitle={`${m.projectors.length} projector(s) · ${m.inboxTotal.toLocaleString("en-US")} events processed · schema "${m.schema}"`}
             />
 
             <div className="mt-3 divide-y divide-[var(--color-ink-100)]/70 dark:divide-white/5">
@@ -152,7 +152,7 @@ function ProjectorRowCard({
           <span>Last: {formatTimeAgo(projector.lagSeconds)}</span>
           <span className="text-[var(--color-ink-300)]">·</span>
           <span className="font-mono tabular-nums">
-            {projector.processed.toLocaleString()} events
+            {projector.processed.toLocaleString("en-US")} events
           </span>
         </div>
       </div>
@@ -227,7 +227,7 @@ function SummaryTile({
               : "text-[var(--color-ink-900)]",
         )}
       >
-        {value.toLocaleString()}
+        {value.toLocaleString("en-US")}
       </div>
     </GlassCard>
   );

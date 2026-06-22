@@ -26,6 +26,7 @@ import {
   DataRow,
   DataTableBody,
   DataTableHead,
+  TableSkeletonRows,
   TableTd,
   TableTh,
 } from "@/components/primitives/data-table";
@@ -60,8 +61,8 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
   return (
     <div className="space-y-4">
       <section className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <Tile label="Total trips" value={(data?.totalTrips ?? 0).toLocaleString()} />
-        <Tile label="Vehicles" value={(data?.rows.length ?? 0).toLocaleString()} />
+        <Tile label="Total trips" value={(data?.totalTrips ?? 0).toLocaleString("en-US")} />
+        <Tile label="Vehicles" value={(data?.rows.length ?? 0).toLocaleString("en-US")} />
         <Tile
           label="Best success rate"
           value={
@@ -141,14 +142,17 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
               <TableTh density="compact" align="right">SLA breach</TableTh>
             </DataTableHead>
             <DataTableBody>
-              {(data?.rows ?? []).length === 0 && (
+              {(data?.rows ?? []).length === 0 && loading && (
+                <TableSkeletonRows colSpan={9} rows={3} />
+              )}
+              {(data?.rows ?? []).length === 0 && !loading && (
                 <tr>
                   <TableTd
                     density="compact"
                     colSpan={9}
                     className="py-6 text-center text-[var(--color-ink-400)]"
                   >
-                    {loading ? "Loading…" : "No trips in this window."}
+                    No trips in this window.
                   </TableTd>
                 </tr>
               )}
@@ -158,16 +162,16 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
                     {r.vendorVehicleKey}
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
-                    {r.totalTrips.toLocaleString()}
+                    {r.totalTrips.toLocaleString("en-US")}
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
-                    {r.completed.toLocaleString()}
+                    {r.completed.toLocaleString("en-US")}
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
-                    {r.failed.toLocaleString()}
+                    {r.failed.toLocaleString("en-US")}
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
-                    {r.cancelled.toLocaleString()}
+                    {r.cancelled.toLocaleString("en-US")}
                   </TableTd>
                   <TableTd
                     density="compact"
@@ -194,7 +198,7 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
                     align="right"
                     className="font-mono tabular-nums text-[var(--color-coral)]"
                   >
-                    {r.slaBreached.toLocaleString()}
+                    {r.slaBreached.toLocaleString("en-US")}
                   </TableTd>
                 </DataRow>
               ))}

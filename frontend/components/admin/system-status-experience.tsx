@@ -251,7 +251,7 @@ const SummaryTile = memo(function SummaryTile({ icon, label, value, tone, index 
         {label}
       </div>
       <div className="mt-1 text-[1.6rem] font-semibold text-[var(--color-ink-900)]">
-        {value.toLocaleString()}
+        {value.toLocaleString("en-US")}
       </div>
     </GlassCard>
   );

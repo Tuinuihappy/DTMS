@@ -26,6 +26,7 @@ import {
   DataRow,
   DataTableBody,
   DataTableHead,
+  TableSkeletonRows,
   TableTd,
   TableTh,
 } from "@/components/primitives/data-table";
@@ -55,7 +56,7 @@ export function SlaBreachReport({ window }: { window: Window }) {
   return (
     <div className="space-y-4">
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Tile label="Total orders" value={(data?.totalOrders ?? 0).toLocaleString()} />
+        <Tile label="Total orders" value={(data?.totalOrders ?? 0).toLocaleString("en-US")} />
         <Tile
           label="Confirm SLA breach"
           value={`${data?.totalConfirmBreached ?? 0} (${overallConfirmRate.toFixed(1)}%)`}
@@ -142,14 +143,17 @@ export function SlaBreachReport({ window }: { window: Window }) {
               <TableTh density="compact" align="right">Complete rate</TableTh>
             </DataTableHead>
             <DataTableBody>
-              {(data?.rows ?? []).length === 0 && (
+              {(data?.rows ?? []).length === 0 && loading && (
+                <TableSkeletonRows colSpan={6} rows={3} />
+              )}
+              {(data?.rows ?? []).length === 0 && !loading && (
                 <tr>
                   <TableTd
                     density="compact"
                     colSpan={6}
                     className="py-6 text-center text-[var(--color-ink-400)]"
                   >
-                    {loading ? "Loading…" : "No orders in this window."}
+                    No orders in this window.
                   </TableTd>
                 </tr>
               )}
@@ -159,13 +163,13 @@ export function SlaBreachReport({ window }: { window: Window }) {
                     {r.priority}
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
-                    {r.totalOrders.toLocaleString()}
+                    {r.totalOrders.toLocaleString("en-US")}
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
-                    {r.confirmBreached.toLocaleString()}
+                    {r.confirmBreached.toLocaleString("en-US")}
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
-                    {r.completeBreached.toLocaleString()}
+                    {r.completeBreached.toLocaleString("en-US")}
                   </TableTd>
                   <TableTd
                     density="compact"

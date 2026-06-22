@@ -25,6 +25,7 @@ import {
   DataRow,
   DataTableBody,
   DataTableHead,
+  TableSkeletonRows,
   TableTd,
   TableTh,
 } from "@/components/primitives/data-table";
@@ -53,8 +54,8 @@ export function JobFailuresReport({ window }: { window: Window }) {
   return (
     <div className="space-y-4">
       <section className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <Tile label="Job failures" value={(data?.totalFailures ?? 0).toLocaleString()} tone="coral" />
-        <Tile label="Categories" value={(data?.categoryTotals.length ?? 0).toLocaleString()} />
+        <Tile label="Job failures" value={(data?.totalFailures ?? 0).toLocaleString("en-US")} tone="coral" />
+        <Tile label="Categories" value={(data?.categoryTotals.length ?? 0).toLocaleString("en-US")} />
         <Tile
           label="Top category"
           value={topCategory ? `${topCategory.category}` : "—"}
@@ -126,14 +127,17 @@ export function JobFailuresReport({ window }: { window: Window }) {
               <TableTh density="compact" align="right">% of total</TableTh>
             </DataTableHead>
             <DataTableBody>
-              {(data?.rows ?? []).length === 0 && (
+              {(data?.rows ?? []).length === 0 && loading && (
+                <TableSkeletonRows colSpan={5} rows={3} />
+              )}
+              {(data?.rows ?? []).length === 0 && !loading && (
                 <tr>
                   <TableTd
                     density="compact"
                     colSpan={5}
                     className="py-6 text-center text-[var(--color-ink-400)]"
                   >
-                    {loading ? "Loading…" : "No job failures in this window."}
+                    No job failures in this window.
                   </TableTd>
                 </tr>
               )}
@@ -149,14 +153,14 @@ export function JobFailuresReport({ window }: { window: Window }) {
                     {r.reason}
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
-                    {r.count.toLocaleString()}
+                    {r.count.toLocaleString("en-US")}
                   </TableTd>
                   <TableTd
                     density="compact"
                     align="right"
                     className="font-mono tabular-nums text-[var(--color-amber-600)]"
                   >
-                    {r.retriedCount > 0 ? r.retriedCount.toLocaleString() : "—"}
+                    {r.retriedCount > 0 ? r.retriedCount.toLocaleString("en-US") : "—"}
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
                     {(r.pctOfTotal * 100).toFixed(1)}%

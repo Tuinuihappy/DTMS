@@ -24,6 +24,7 @@ import {
   DataTableBody,
   DataTableHead,
   DataTableShell,
+  MobileCardRow,
   SortableTh,
   TableEmptyState,
   TableSkeleton,
@@ -198,7 +199,10 @@ export function OrdersTable({
                     <Highlight text={shortRef(o.orderRef)} query={search} />
                   </div>
                   {o.requestedBy && (
-                    <div className="text-[11px] text-[var(--color-ink-400)] truncate max-w-[140px]">
+                    <div
+                      className="text-[11px] text-[var(--color-ink-400)] truncate max-w-[140px]"
+                      title={`by ${o.requestedBy}`}
+                    >
                       by <Highlight text={o.requestedBy} query={search} />
                     </div>
                   )}
@@ -261,18 +265,11 @@ export function OrdersTable({
       <div className="md:hidden overflow-hidden rounded-[var(--radius-xl)] glass divide-y divide-[var(--color-ink-100)]/60 dark:divide-white/[0.04]">
         <AnimatePresence initial={false}>
           {orders.map((o, i) => (
-            <motion.div
+            <MobileCardRow
               key={o.id}
-              layout
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.35, delay: Math.min(i * 0.03, 0.4) }}
-              className={cn(
-                "px-4 py-4 cursor-pointer transition-colors",
-                "active:bg-white/40 dark:active:bg-white/[0.03]",
-                selected.has(o.id) && "bg-[var(--color-pastel-sky)]/40 dark:bg-[var(--color-pastel-sky)]/60",
-              )}
+              delayIndex={i}
+              selected={selected.has(o.id)}
+              ariaLabel={`Order ${o.orderRef} — ${o.orderStatus}`}
               onClick={() => onOpenDetail(o.id)}
             >
               <div className="flex items-start justify-between gap-3">
@@ -283,6 +280,7 @@ export function OrdersTable({
                       checked={selected.has(o.id)}
                       onClick={(e) => e.stopPropagation()}
                       onChange={() => toggleOne(o.id)}
+                      aria-label={`Select order ${o.orderRef}`}
                       className="h-3.5 w-3.5 shrink-0 rounded border-[var(--color-ink-300)] accent-[var(--color-brand-500)]"
                     />
                     <div className="font-mono text-[13px] font-semibold text-[var(--color-ink-900)] truncate">
@@ -308,7 +306,7 @@ export function OrdersTable({
                   className="ml-auto"
                 />
               </div>
-            </motion.div>
+            </MobileCardRow>
           ))}
         </AnimatePresence>
       </div>

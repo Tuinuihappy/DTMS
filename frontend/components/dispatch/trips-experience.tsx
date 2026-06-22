@@ -361,7 +361,7 @@ function Header({
           <p className="text-[12px] text-[var(--color-ink-500)]">
             Envelope dispatches across every order — search, filter, drill.
             <span className="mx-2 font-mono tabular-nums text-[var(--color-ink-400)]">
-              {total.toLocaleString()} total
+              {total.toLocaleString("en-US")} total
             </span>
           </p>
         </div>
@@ -643,7 +643,7 @@ function TripsTable({
                   <div className="truncate">
                     <div
                       className="truncate text-[11.5px] font-semibold text-[var(--color-ink-900)] dark:text-white"
-                      title={t.vendorVehicleKey ?? undefined}
+                      title={t.vendorVehicleKey ?? t.vendorVehicleName}
                     >
                       {t.vendorVehicleName}
                     </div>
@@ -667,8 +667,15 @@ function TripsTable({
                   <span className="text-[var(--color-ink-300)]">—</span>
                 )}
               </TableTd>
-              <TableTd density="compact" className="max-w-[160px] truncate text-[12.5px]">
-                {t.templateNameAtDispatch ?? (
+              <TableTd
+                density="compact"
+                className="max-w-[160px] truncate text-[12.5px]"
+              >
+                {t.templateNameAtDispatch ? (
+                  <span title={t.templateNameAtDispatch}>
+                    {t.templateNameAtDispatch}
+                  </span>
+                ) : (
                   <span className="text-[var(--color-ink-300)]">—</span>
                 )}
               </TableTd>

@@ -165,7 +165,7 @@ export function DispatchFunnel() {
 
               <div className="text-center pt-2 border-t border-[var(--color-ink-100)] w-full">
                 <div className={cn("font-mono text-[1.15rem] font-semibold leading-none tabular-nums", toneText[f.tone])}>
-                  {f.count.toLocaleString()}
+                  {f.count.toLocaleString("en-US")}
                 </div>
                 <div className="mt-1.5 text-[10.5px] uppercase tracking-[0.1em] font-medium text-[var(--color-ink-500)]">
                   {f.label}
@@ -184,7 +184,7 @@ export function DispatchFunnel() {
         </span>
         <span>
           Lost (Failed/Cancelled/Rejected):{" "}
-          <span className="font-mono font-semibold text-[var(--color-coral)]">{lostCount.toLocaleString()}</span>
+          <span className="font-mono font-semibold text-[var(--color-coral)]">{lostCount.toLocaleString("en-US")}</span>
         </span>
       </div>
     </GlassCard>

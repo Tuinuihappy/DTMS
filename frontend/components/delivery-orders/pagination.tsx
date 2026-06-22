@@ -36,9 +36,9 @@ export function Pagination({
       <div className="flex items-center gap-3 text-[11.5px] text-[var(--color-ink-500)]">
         <span className="font-mono tabular-nums">
           <span className="text-[var(--color-ink-900)] font-semibold">
-            {startIdx.toLocaleString()}–{endIdx.toLocaleString()}
+            {startIdx.toLocaleString("en-US")}–{endIdx.toLocaleString("en-US")}
           </span>{" "}
-          of {total.toLocaleString()}
+          of {total.toLocaleString("en-US")}
         </span>
         <span className="hidden sm:inline h-3 w-px bg-[var(--color-ink-200)]/60 dark:bg-white/10" />
         <label className="hidden sm:flex items-center gap-1.5">
@@ -171,9 +171,9 @@ export function InfiniteFooter({
       <div className="flex items-center gap-3 text-[11.5px] text-[var(--color-ink-500)]">
         <span className="font-mono tabular-nums">
           <span className="text-[var(--color-ink-900)] font-semibold">
-            {shown.toLocaleString()}
+            {shown.toLocaleString("en-US")}
           </span>{" "}
-          of {total.toLocaleString()}
+          of {total.toLocaleString("en-US")}
         </span>
         <span className="hidden sm:inline h-3 w-px bg-[var(--color-ink-200)]/60 dark:bg-white/10" />
         <ModeToggle mode={mode} onModeChange={onModeChange} />
