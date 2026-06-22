@@ -191,7 +191,9 @@ totalPending = pendingPerModule.Sum();
 
 **Acceptance:** re-run scenario B at the same tuned config + NoOp; pending ≤ 100 within 30s of test ending. *Result: A4 ship shifted the bottleneck downstream (consumer logic), threshold still not met. See A5 below.*
 
-### Step A5 — Consumer parallelism (NEW, ~2-4h) ⬜ **← only A-stream item left to close burst threshold**
+### Step A5 — Consumer parallelism (NEW, ~2h actual) 🟢 shipped 2026-06-21
+
+**Result**: `DeliveryOrderValidatedConsumer` `ConcurrentMessageLimit` tuned 1 → 4 via `ConsumerDefinition<T>`. Drain rate +33% (67/s → 89/s), Dispatched count +58% at settle window (3,557 → 5,609), p99 latency −12% (96 → 85ms). Modest gain — Postgres row-lock contention on per-order UPDATEs is the real ceiling, not consumer thread availability. Burst threshold "≤100 in 30s at 30 VU peak" remains mathematically unreachable on single host (4,800 events/s create vs 90/s drain) — closes only via multi-replica deployment (Phase D enables this) or workflow refactor. See [`perf-tests/results-2026-06-21/REPORT-a5.md`](../perf-tests/results-2026-06-21/REPORT-a5.md).
 
 **Surfaced by the 5th acceptance run (post Phase A+B+D).** After A1+A2+A3+A4 + B + D all shipped, observed drain rate stayed at ~67-78/s across all configurations. Postgres connection pool fine, container CPU fine, outbox publish fine — the binding constraint is the **per-order consumer logic**.
 
