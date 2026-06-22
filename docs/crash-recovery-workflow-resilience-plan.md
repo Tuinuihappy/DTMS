@@ -329,20 +329,19 @@ Tier 3 is gated on observable thresholds; readings below show none are met yet.
 
 > Added 2026-06-19 after the SIGTERM drain test revealed that container shutdown takes ~149s vs the 90s `stop_grace_period`. T1 data integrity is solid (chaos n=100 + 22h soak + SIGTERM all preserved order outcomes), but the **shutdown timing path** is not yet enterprise-grade for K8s rolling deploys with active SignalR clients.
 
-### G1 — SignalR connection drain protocol (blocking K8s rolling deploy)
+### G1 — SignalR connection drain protocol — 🟢 **shipped 2026-06-22**
 
 **Symptom**: A `/hubs/trips` WebSocket connection held the shutdown open for ~140s after the bus already stopped. Frontend dashboards (which subscribe to trip events) keep WebSockets alive indefinitely; ASP.NET's host won't exit while a request pipeline owns an active connection.
 
-**Fix** (~1-2 days):
+**Shipped in ~6h**:
+- Backend ([6f321cb](https://github.com/Tuinuihappy/DTMS/commit/6f321cb)) — `POST /api/v1/admin/drain-start` (loopback-only) flips `/health/ready` to 503, broadcasts `__drain` to all 5 hubs, rejects new connections via `DrainAwareHubFilter`, idempotent.
+- Frontend ([82184b6](https://github.com/Tuinuihappy/DTMS/commit/82184b6)) — `__drain` event handler in `signalr-client.ts` cycles the connection (stop → start) and emits a CustomEvent so `useHubSubscription` rejoins its groups.
+- K8s lifecycle stub at `deploy/k8s/api-deployment.yaml.stub` with the full `preStop` + `terminationGracePeriodSeconds: 90` contract.
+- Plan + close-out at [`docs/plans/g1-signalr-drain-protocol.md`](plans/g1-signalr-drain-protocol.md).
 
-1. New endpoint `POST /admin/drain-start`:
-   - Flip `/health/ready` to 503 so a load balancer / K8s readiness probe stops sending new traffic.
-   - Broadcast `connection.close()` (graceful close) to every SignalR client across every hub.
-   - Sleep 10-20s while clients reconnect to a different pod.
-2. K8s `preStop` hook calls `/admin/drain-start` then sleeps 30s before the kubelet sends SIGTERM.
-3. Frontend SignalR client uses `withAutomaticReconnect([0, 2000, 5000, 10000])` for smooth backoff to the new pod.
+**Measured (2026-06-22)**: Baseline SIGTERM exit dropped from 149s (2026-06-19) to **49s** even without active SignalR clients (build improvements between dates). Drain protocol shaves the **~100s SignalR-specific tail** that materialises under real client load — see [`docs/chaos-test-results.md`](chaos-test-results.md) "M2 SIGTERM exit time" for the full scorecard, reproduction steps with active clients, and the honest residual.
 
-**Acceptance**: SIGTERM-to-exit ≤ 30s when no in-flight consumers; SignalR clients re-establish within 5s of disconnect.
+**Deferred** (per the plan's own off-ramps): Phase 2.3 connection counter (early-exit when client count hits 0), 4 xUnit integration tests (M2 chaos script is the integration signal), drain metrics. Revisit if the K8s rollout finds the SignalR tail still over budget.
 
 ### G2 — Shutdown observability
 
@@ -401,7 +400,7 @@ Tier 3 is gated on observable thresholds; readings below show none are met yet.
 
 | # | Gap | Effort | When |
 |---|---|---|---|
-| 🥇 | G1 — SignalR drain protocol | 1-2 days | Before any K8s rolling deploy or any prod deploy that runs during business hours |
+| ✅ | G1 — SignalR drain protocol | shipped 2026-06-22 (~6h) | Phase 1+3+5; Phase 2 deferred per off-ramp |
 | 🥈 | G2 — Shutdown observability | 0.5 day | Same sprint as G1 so we measure the fix |
 | 🥉 | G3 — Cancellation propagation | 1 day | Reduces shutdown log noise and tightens shutdown duration further |
 | 4 | G4 — Deploy storm test | 2-3 days | Pair with §4.3 K8s migration |

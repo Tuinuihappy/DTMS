@@ -1,0 +1,133 @@
+# DTMS API Deployment -- K8s manifest stub
+#
+# G1 Phase 5.2 -- design intent for the rolling-deploy lifecycle, not
+# consumed by any CI/CD yet. When the K8s migration plan picks up, rename
+# this file to api-deployment.yaml and adapt to the chosen cluster's
+# namespace + image registry conventions.
+#
+# Lifecycle contract this stub encodes:
+#   1. preStop hook curls localhost /admin/drain-start (loopback guard
+#      passes -- it's an in-pod call) and sleeps the settle window so
+#      SignalR clients receive __drain + reconnect to a sibling pod
+#      BEFORE SIGTERM lands.
+#   2. terminationGracePeriodSeconds is sized to cover:
+#        drain settle (25s)
+#      + MassTransit consumer StopTimeout (45s, see MassTransitHostOptions)
+#      + outbox processor flush
+#      + EF DbContext + Npgsql pool dispose
+#      = headroom 90s, target observed shutdown ~75s
+#   3. Liveness probe hits /health (excludes the drain check by predicate
+#      so a draining pod stays liveness-Healthy and the kubelet doesn't
+#      restart it mid-drain).
+#   4. Readiness probe hits /health/ready (includes drain check -- flips
+#      to 503 the moment drain starts so the service mesh stops routing
+#      new traffic).
+#
+# Cross-reference:
+#   - Drain endpoint:   src/AMR.DeliveryPlanning.Api/Modules/AdminWorkflowEndpoints.cs
+#   - Drain service:    src/AMR.DeliveryPlanning.Api/Realtime/Drain/
+#   - Plan:             docs/plans/g1-signalr-drain-protocol.md
+#   - Frontend pair:    frontend/lib/realtime/signalr-client.ts (Phase 3)
+#   - Measurement:      scripts/chaos/m2-drain-exit-time.ps1
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dtms-api
+  labels:
+    app: dtms-api
+spec:
+  replicas: 2                               # G1 + Phase F backplane assume >=2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0                     # never drop below replica count
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: dtms-api
+  template:
+    metadata:
+      labels:
+        app: dtms-api
+    spec:
+      terminationGracePeriodSeconds: 90     # see lifecycle contract above
+      containers:
+        - name: api
+          image: REGISTRY/dtms-api:TAG      # replace at cutover
+          ports:
+            - containerPort: 8080
+              name: http
+
+          # Lifecycle: graceful drain before SIGTERM.
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - sh
+                  - -c
+                  - |
+                    # Loopback-only endpoint -- our IPAddress.IsLoopback
+                    # guard accepts this call because it's in-pod.
+                    # `|| true` -- never fail the preStop on a transient
+                    # curl error; the kubelet would force SIGKILL on
+                    # exit-1 from preStop, defeating the whole point.
+                    curl -sS -X POST \
+                      -H "Content-Type: application/json" \
+                      -d '{"settleSeconds": 25}' \
+                      http://localhost:8080/api/v1/admin/drain-start \
+                      || true
+                    sleep 27   # settle (25) + 2s buffer for in-flight broadcasts
+
+          # Liveness -- /health excludes the drain check, so a draining
+          # pod stays Healthy and the kubelet does NOT restart it.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # Readiness -- /health/ready INCLUDES the drain check; the moment
+          # drain-start fires, /health/ready returns 503 and the service
+          # mesh stops sending new traffic to this pod.
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+
+          env:
+            - name: ASPNETCORE_URLS
+              value: "http://+:8080"
+            # ... rest of config (DB conn strings, RabbitMQ, Redis, JWT secret,
+            #     OTel exporters) belongs in a ConfigMap + Secret pair, not here.
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dtms-api
+spec:
+  selector:
+    app: dtms-api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  # ClusterIP -- ingress fronts this; HPA target is consumer_lag (custom
+  # metric from MassTransit -- see scale-readiness-plan.md Phase F notes).
+  type: ClusterIP
