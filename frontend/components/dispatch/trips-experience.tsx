@@ -3,7 +3,6 @@
 import {
   ChevronDown,
   Filter,
-  Loader2,
   RefreshCw,
   Route,
   Search,
@@ -21,6 +20,18 @@ import {
 import { cn } from "@/lib/utils";
 import { fromDateTimeLocalInput } from "@/lib/datetime";
 import { DateTime } from "@/components/primitives/date-time";
+import {
+  DataRow,
+  DataTableBody,
+  DataTableHead,
+  DataTableShell,
+  SortableTh,
+  TableEmptyState,
+  TableSkeleton,
+  TableTd,
+  TableTh,
+} from "@/components/primitives/data-table";
+import { useTripListSubscription } from "@/lib/realtime/hubs/trip-hub";
 import { Pagination, type PageSize } from "@/components/delivery-orders/pagination";
 import { TripStatusBadge, AttemptBadge } from "./badges";
 import { TripDetailDrawer } from "./trip-detail-drawer";
@@ -193,7 +204,34 @@ export function TripsExperience() {
     fetchTrips();
   }, [fetchTrips]);
 
+  // Backend Phase 2 (B3) — SignalR live updates for the cross-trip list.
+  // TripStatusHistoryProjector pushes ListItemUpdated hints to the
+  // "trips-list" group whenever any trip changes status. Debounce-refetch
+  // (500ms) so a burst of events collapses into one round-trip. Refetch —
+  // not delta merge — keeps server-side filter/sort authoritative. Polling
+  // below stays as the fallback when SignalR is briefly disconnected.
+  const listHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleListRefetch = useCallback(() => {
+    if (listHintTimerRef.current) clearTimeout(listHintTimerRef.current);
+    listHintTimerRef.current = setTimeout(() => {
+      listHintTimerRef.current = null;
+      fetchTrips({ silent: true });
+    }, 500);
+  }, [fetchTrips]);
+
+  useEffect(() => {
+    return () => {
+      if (listHintTimerRef.current) clearTimeout(listHintTimerRef.current);
+    };
+  }, []);
+
+  useTripListSubscription({
+    ListItemUpdated: scheduleListRefetch,
+  });
+
   // Soft polling — 15s while the drawer is closed and the tab is visible.
+  // Kept as a safety net for environments where SignalR can't reach this
+  // client (proxy stripping WebSocket upgrade, browser tab throttling, etc.).
   useEffect(() => {
     if (detailTripId) return;
     const start = () => {
@@ -497,12 +535,7 @@ function TripsTable({
   onOpenTrip: (id: string) => void;
 }) {
   if (loading && trips.length === 0) {
-    return (
-      <div className="rounded-2xl bg-white/60 p-12 text-center backdrop-blur-md border border-white/70 dark:bg-white/[0.04] dark:border-white/10">
-        <Loader2 className="mx-auto h-5 w-5 animate-spin text-[var(--color-ink-400)]" />
-        <p className="mt-2 text-[12px] text-[var(--color-ink-500)]">Loading trips…</p>
-      </div>
-    );
+    return <TableSkeleton label="Loading trips…" />;
   }
 
   if (error) {
@@ -515,56 +548,77 @@ function TripsTable({
 
   if (trips.length === 0) {
     return (
-      <div className="rounded-2xl bg-white/60 p-12 text-center backdrop-blur-md border border-white/70 dark:bg-white/[0.04] dark:border-white/10">
-        <Filter className="mx-auto h-6 w-6 text-[var(--color-ink-300)]" strokeWidth={1.8} />
-        <p className="mt-3 text-[13.5px] font-semibold text-[var(--color-ink-700)]">
-          No trips match your filters
-        </p>
-        <p className="mt-1 text-[12px] text-[var(--color-ink-500)]">
-          Try widening the date range, clearing the search, or switching to All.
-        </p>
-      </div>
+      <TableEmptyState
+        variant="no-filter-match"
+        icon={Filter}
+        title="No trips match your filters"
+        body="Try widening the date range, clearing the search, or switching to All."
+      />
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl bg-white/60 backdrop-blur-md border border-white/70 dark:bg-white/[0.04] dark:border-white/10">
-      <table className="w-full text-left text-[12.5px]">
-        <thead className="bg-white/40 dark:bg-white/[0.02]">
-          <tr className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--color-ink-500)]">
-            <Th>Status</Th>
-            <Th>Order ref</Th>
-            <SortableTh col="attemptNumber" sortBy={sortBy} sortDir={sortDir} onClick={onSortHeader}>
-              Attempt
-            </SortableTh>
-            <Th>Upper key</Th>
-            <Th>Vehicle</Th>
-            <Th>Template</Th>
-            <SortableTh col="priority" sortBy={sortBy} sortDir={sortDir} onClick={onSortHeader}>
-              Priority
-            </SortableTh>
-            <SortableTh col="createdAt" sortBy={sortBy} sortDir={sortDir} onClick={onSortHeader}>
-              Created
-            </SortableTh>
-            <SortableTh col="startedAt" sortBy={sortBy} sortDir={sortDir} onClick={onSortHeader}>
-              Started
-            </SortableTh>
-            <SortableTh col="completedAt" sortBy={sortBy} sortDir={sortDir} onClick={onSortHeader}>
-              Completed
-            </SortableTh>
-          </tr>
-        </thead>
-        <tbody>
-          {trips.map((t) => (
-            <tr
-              key={t.id}
-              onClick={() => onOpenTrip(t.id)}
-              className="border-t border-white/30 transition-colors hover:bg-white/40 cursor-pointer dark:border-white/[0.04] dark:hover:bg-white/[0.04]"
-            >
-              <Td>
+    <>
+      <DataTableShell>
+        <DataTableHead>
+          <TableTh density="compact">Status</TableTh>
+          <TableTh density="compact">Order ref</TableTh>
+          <SortableTh
+            col="attemptNumber"
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={onSortHeader}
+            density="compact"
+          >
+            Attempt
+          </SortableTh>
+          <TableTh density="compact">Upper key</TableTh>
+          <TableTh density="compact">Vehicle</TableTh>
+          <TableTh density="compact">Template</TableTh>
+          <SortableTh
+            col="priority"
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={onSortHeader}
+            density="compact"
+          >
+            Priority
+          </SortableTh>
+          <SortableTh
+            col="createdAt"
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={onSortHeader}
+            density="compact"
+          >
+            Created
+          </SortableTh>
+          <SortableTh
+            col="startedAt"
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={onSortHeader}
+            density="compact"
+          >
+            Started
+          </SortableTh>
+          <SortableTh
+            col="completedAt"
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={onSortHeader}
+            density="compact"
+          >
+            Completed
+          </SortableTh>
+        </DataTableHead>
+        <DataTableBody>
+          {trips.map((t, i) => (
+            <DataRow key={t.id} delayIndex={i} onClick={() => onOpenTrip(t.id)}>
+              <TableTd density="compact">
                 <TripStatusBadge status={t.status} />
-              </Td>
-              <Td>
+              </TableTd>
+              <TableTd density="compact">
                 {t.orderRef ? (
                   <span className="font-mono text-[12px] font-semibold text-[var(--color-ink-900)] dark:text-white">
                     {t.orderRef}
@@ -572,16 +626,19 @@ function TripsTable({
                 ) : (
                   <span className="text-[var(--color-ink-300)]">—</span>
                 )}
-              </Td>
-              <Td>
+              </TableTd>
+              <TableTd density="compact">
                 <AttemptBadge attempt={t.attemptNumber} />
-              </Td>
-              <Td className="max-w-[180px] truncate">
-                <span className="font-mono text-[11.5px] text-[var(--color-ink-700)] dark:text-[var(--color-ink-500)]">
+              </TableTd>
+              <TableTd density="compact" className="max-w-[180px] truncate">
+                <span
+                  className="font-mono text-[11.5px] text-[var(--color-ink-700)] dark:text-[var(--color-ink-500)]"
+                  title={t.upperKey}
+                >
                   {t.upperKey}
                 </span>
-              </Td>
-              <Td className="max-w-[180px]">
+              </TableTd>
+              <TableTd density="compact" className="max-w-[180px]">
                 {t.vendorVehicleName ? (
                   <div className="truncate">
                     <div
@@ -609,13 +666,13 @@ function TripsTable({
                 ) : (
                   <span className="text-[var(--color-ink-300)]">—</span>
                 )}
-              </Td>
-              <Td className="max-w-[160px] truncate">
+              </TableTd>
+              <TableTd density="compact" className="max-w-[160px] truncate text-[12.5px]">
                 {t.templateNameAtDispatch ?? (
                   <span className="text-[var(--color-ink-300)]">—</span>
                 )}
-              </Td>
-              <Td>
+              </TableTd>
+              <TableTd density="compact">
                 {t.priorityAtDispatch != null ? (
                   <span className="font-mono tabular-nums text-[11.5px] font-semibold text-[var(--color-ink-700)] dark:text-[var(--color-ink-500)]">
                     {t.priorityAtDispatch}
@@ -623,82 +680,39 @@ function TripsTable({
                 ) : (
                   <span className="text-[var(--color-ink-300)]">—</span>
                 )}
-              </Td>
-              <Td>
+              </TableTd>
+              <TableTd density="compact">
                 <DateTime
                   value={t.createdAt}
                   className="font-mono text-[11px] tabular-nums text-[var(--color-ink-600)] dark:text-[var(--color-ink-500)]"
                 />
-              </Td>
-              <Td>
+              </TableTd>
+              <TableTd density="compact">
                 <DateTime
                   value={t.startedAt}
                   className="font-mono text-[11px] tabular-nums text-[var(--color-ink-600)] dark:text-[var(--color-ink-500)]"
                 />
-              </Td>
-              <Td>
+              </TableTd>
+              <TableTd density="compact">
                 <DateTime
                   value={t.completedAt}
                   className="font-mono text-[11px] tabular-nums text-[var(--color-ink-600)] dark:text-[var(--color-ink-500)]"
                 />
-              </Td>
-            </tr>
+              </TableTd>
+            </DataRow>
           ))}
-        </tbody>
-      </table>
+        </DataTableBody>
+      </DataTableShell>
 
       {trips.some((t) => t.failureReason) && (
-        <div className="border-t border-white/30 px-4 py-2 dark:border-white/[0.04]">
+        <div className="rounded-xl border border-[var(--color-coral)]/20 bg-[var(--color-coral-soft)]/30 px-4 py-2">
           <span className="text-[10.5px] uppercase tracking-[0.1em] text-[var(--color-coral)]">
             Some trips failed — click the row to see the reason.
           </span>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
-function Th({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <th className={cn("px-3 py-2.5", className)}>{children}</th>;
-}
-
-function SortableTh({
-  col,
-  sortBy,
-  sortDir,
-  onClick,
-  children,
-}: {
-  col: TripQueueSortKey;
-  sortBy: TripQueueSortKey;
-  sortDir: "asc" | "desc";
-  onClick: (c: TripQueueSortKey) => void;
-  children: React.ReactNode;
-}) {
-  const active = sortBy === col;
-  return (
-    <th className="px-3 py-2.5">
-      <button
-        type="button"
-        onClick={() => onClick(col)}
-        className={cn(
-          "inline-flex items-center gap-1 transition-colors",
-          active ? "text-[var(--color-ink-900)] dark:text-white" : "hover:text-[var(--color-ink-700)]",
-        )}
-      >
-        {children}
-        {active && (
-          <ChevronDown
-            className={cn("h-3 w-3 transition-transform", sortDir === "asc" && "rotate-180")}
-            strokeWidth={2.4}
-          />
-        )}
-      </button>
-    </th>
-  );
-}
-
-function Td({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <td className={cn("px-3 py-2.5", className)}>{children}</td>;
-}
 
