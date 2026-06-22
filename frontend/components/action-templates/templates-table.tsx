@@ -1,10 +1,7 @@
 "use client";
 
 import {
-  ArrowUpDown,
-  ChevronDown,
   ChevronRight,
-  ChevronUp,
   MoreHorizontal,
   Pencil,
   Power,
@@ -18,6 +15,18 @@ import { cn } from "@/lib/utils";
 import type { ActionTemplateDto } from "@/lib/api/action-templates";
 import { Highlight } from "@/components/delivery-orders/highlight";
 import { DateTime } from "@/components/primitives/date-time";
+import {
+  DataRow,
+  DataTableBody,
+  DataTableHead,
+  DataTableShell,
+  SortableTh,
+  TableEmptyState,
+  TableSkeleton,
+  TableTd,
+  TableTh,
+  resolveEmptyStateVariant,
+} from "@/components/primitives/data-table";
 
 export type SortColumn = "actionName" | "actionCategory" | "isActive" | "modifiedAt";
 export type SortDir = "asc" | "desc";
@@ -60,10 +69,11 @@ export function TemplatesTable({
   onClearFilters,
   onCreate,
 }: Props) {
-  if (loading && templates.length === 0) return <TableSkeleton />;
+  if (loading && templates.length === 0)
+    return <TableSkeleton label="Loading templates…" />;
   if (!loading && templates.length === 0)
     return (
-      <EmptyState
+      <TemplatesEmptyState
         search={search}
         hasFilters={hasFilters}
         onClearFilters={onClearFilters}
@@ -72,95 +82,82 @@ export function TemplatesTable({
     );
 
   return (
-    <div className="overflow-hidden rounded-[var(--radius-xl)] glass">
-      {/* Desktop table */}
-      <div className="hidden md:block overflow-x-auto">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-400)]">
-              <SortableTh col="actionName" sortBy={sortBy} sortDir={sortDir} onClick={onSortChange}>
-                Template
-              </SortableTh>
-              <SortableTh col="actionCategory" sortBy={sortBy} sortDir={sortDir} onClick={onSortChange}>
-                Category
-              </SortableTh>
-              <th className="px-3 py-3.5">Parameters</th>
-              <SortableTh col="isActive" sortBy={sortBy} sortDir={sortDir} onClick={onSortChange}>
-                Status
-              </SortableTh>
-              <SortableTh col="modifiedAt" sortBy={sortBy} sortDir={sortDir} onClick={onSortChange}>
-                Updated
-              </SortableTh>
-              <th className="px-5 py-3.5 w-12" />
-            </tr>
-          </thead>
-          <tbody>
-            <AnimatePresence initial={false}>
-              {templates.map((t, i) => (
-                <motion.tr
-                  key={t.id}
-                  layout
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, transition: { duration: 0.18 } }}
-                  transition={{
-                    duration: 0.4,
-                    delay: Math.min(i * 0.025, 0.4),
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
-                  onClick={() => onOpenDetail(t)}
-                  className={cn(
-                    "group cursor-pointer border-t border-[var(--color-ink-100)]/60 dark:border-white/[0.04]",
-                    "transition-colors duration-150 hover:bg-white/40 dark:hover:bg-white/[0.03]",
-                    !t.isActive && "opacity-70",
+    <>
+      {/* Desktop table — primitives handle padding/header/sort/keyboard/focus. */}
+      <DataTableShell className="hidden md:block">
+        <DataTableHead>
+          <SortableTh col="actionName" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
+            Template
+          </SortableTh>
+          <SortableTh col="actionCategory" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
+            Category
+          </SortableTh>
+          <TableTh>Parameters</TableTh>
+          <SortableTh col="isActive" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
+            Status
+          </SortableTh>
+          <SortableTh col="modifiedAt" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
+            Updated
+          </SortableTh>
+          <TableTh className="w-12" aria-label="Actions">
+            <span className="sr-only">Actions</span>
+          </TableTh>
+        </DataTableHead>
+        <DataTableBody>
+          <AnimatePresence initial={false}>
+            {templates.map((t, i) => (
+              <DataRow
+                key={t.id}
+                delayIndex={i}
+                disabled={!t.isActive}
+                onClick={() => onOpenDetail(t)}
+              >
+                <TableTd>
+                  <div className="font-mono text-[13px] font-semibold text-[var(--color-ink-900)]">
+                    <Highlight text={t.actionName} query={search} />
+                  </div>
+                  <div className="text-[11px] text-[var(--color-ink-400)] font-mono">
+                    {t.id.slice(0, 8)}
+                  </div>
+                </TableTd>
+                <TableTd>
+                  <CategoryBadge category={t.actionCategory} />
+                </TableTd>
+                <TableTd>
+                  <ParamChips params={paramPreview(t)} search={search} />
+                </TableTd>
+                <TableTd>
+                  <ActiveBadge active={t.isActive} />
+                </TableTd>
+                <TableTd>
+                  <DateTime
+                    value={t.modifiedAt ?? t.createdAt}
+                    variant="relative"
+                    className="text-[11.5px] text-[var(--color-ink-700)] whitespace-nowrap"
+                  />
+                  {(t.modifiedBy ?? t.createdBy) && (
+                    <div className="text-[10.5px] text-[var(--color-ink-400)] truncate max-w-[140px]">
+                      by {t.modifiedBy ?? t.createdBy}
+                    </div>
                   )}
-                >
-                  <td className="px-5 py-3.5">
-                    <div className="font-mono text-[13px] font-semibold text-[var(--color-ink-900)]">
-                      <Highlight text={t.actionName} query={search} />
-                    </div>
-                    <div className="text-[11px] text-[var(--color-ink-400)] font-mono">
-                      {t.id.slice(0, 8)}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3.5">
-                    <CategoryBadge category={t.actionCategory} />
-                  </td>
-                  <td className="px-3 py-3.5">
-                    <ParamChips params={paramPreview(t)} search={search} />
-                  </td>
-                  <td className="px-3 py-3.5">
-                    <ActiveBadge active={t.isActive} />
-                  </td>
-                  <td className="px-3 py-3.5">
-                    <DateTime
-                      value={t.modifiedAt ?? t.createdAt}
-                      variant="relative"
-                      className="text-[11.5px] text-[var(--color-ink-700)] whitespace-nowrap"
-                    />
-                    {(t.modifiedBy ?? t.createdBy) && (
-                      <div className="text-[10.5px] text-[var(--color-ink-400)] truncate max-w-[140px]">
-                        by {t.modifiedBy ?? t.createdBy}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <RowMenu
-                      template={t}
-                      busy={busyId === t.id}
-                      onAction={onAction}
-                      onOpenDetail={() => onOpenDetail(t)}
-                    />
-                  </td>
-                </motion.tr>
-              ))}
-            </AnimatePresence>
-          </tbody>
-        </table>
-      </div>
+                </TableTd>
+                <TableTd align="right">
+                  <RowMenu
+                    template={t}
+                    busy={busyId === t.id}
+                    onAction={onAction}
+                    onOpenDetail={() => onOpenDetail(t)}
+                  />
+                </TableTd>
+              </DataRow>
+            ))}
+          </AnimatePresence>
+        </DataTableBody>
+      </DataTableShell>
 
-      {/* Mobile cards */}
-      <div className="md:hidden divide-y divide-[var(--color-ink-100)]/60 dark:divide-white/[0.04]">
+      {/* Mobile cards — separate glass card so the table primitives stay
+          table-shaped. Same domain content, different layout. */}
+      <div className="md:hidden overflow-hidden rounded-[var(--radius-xl)] glass divide-y divide-[var(--color-ink-100)]/60 dark:divide-white/[0.04]">
         <AnimatePresence initial={false}>
           {templates.map((t, i) => (
             <motion.div
@@ -203,7 +200,70 @@ export function TemplatesTable({
           ))}
         </AnimatePresence>
       </div>
-    </div>
+    </>
+  );
+}
+
+// ── Empty state ────────────────────────────────────────────────────────
+
+function TemplatesEmptyState({
+  search,
+  hasFilters,
+  onClearFilters,
+  onCreate,
+}: {
+  search: string;
+  hasFilters: boolean;
+  onClearFilters: () => void;
+  onCreate: () => void;
+}) {
+  const variant = resolveEmptyStateVariant(search, hasFilters);
+  const trimmed = search.trim();
+
+  if (variant === "no-search-match") {
+    return (
+      <TableEmptyState
+        variant={variant}
+        icon={Sparkles}
+        title="No templates match your search"
+        body={
+          <>
+            Nothing found for{" "}
+            <span className="font-mono font-semibold text-[var(--color-ink-700)]">
+              “{trimmed}”
+            </span>
+            . Check the spelling or widen the type filter.
+          </>
+        }
+        action={
+          hasFilters
+            ? { label: "Clear filters", onClick: onClearFilters }
+            : undefined
+        }
+      />
+    );
+  }
+
+  if (variant === "no-filter-match") {
+    return (
+      <TableEmptyState
+        variant={variant}
+        icon={Sparkles}
+        title="No templates in this view"
+        body="The current filters returned no rows. Clear them to see everything."
+        action={{ label: "Clear filters", onClick: onClearFilters }}
+      />
+    );
+  }
+
+  return (
+    <TableEmptyState
+      variant={variant}
+      icon={Workflow}
+      title="No templates yet"
+      body="Use the “New template” button to compose your first building block."
+      action={{ label: "Create your first template", onClick: onCreate }}
+    />
   );
 }
 
@@ -292,7 +352,7 @@ function ParamChips({
   );
 }
 
-// ── Row menu (mirrors orders-table RowMenu) ────────────────────────────
+// ── Row menu ───────────────────────────────────────────────────────────
 
 function RowMenu({
   template,
@@ -398,7 +458,7 @@ function MenuItem({
     default: "text-[var(--color-ink-700)] hover:bg-[var(--color-ink-100)] dark:hover:bg-white/10",
     brand: "text-[var(--color-brand-500)] hover:bg-[var(--color-pastel-sky)]",
     success: "text-[var(--color-success)] hover:bg-[var(--color-success-soft)]",
-    coral: "text-[var(--color-coral)] hover:bg-[var(--color-coral-soft)]",
+    coral: "text-[var(--color-coral)] hover:bg-[#fde0db] dark:hover:bg-[#3a1a17]",
   };
   return (
     <button
@@ -411,163 +471,5 @@ function MenuItem({
     >
       {children}
     </button>
-  );
-}
-
-// ── Sortable headers ────────────────────────────────────────────────────
-
-function SortableTh({
-  col,
-  sortBy,
-  sortDir,
-  onClick,
-  align = "left",
-  children,
-}: {
-  col: SortColumn;
-  sortBy: SortColumn;
-  sortDir: SortDir;
-  onClick: (col: SortColumn) => void;
-  align?: "left" | "right";
-  children: React.ReactNode;
-}) {
-  const active = sortBy === col;
-  const Icon = !active ? ArrowUpDown : sortDir === "asc" ? ChevronUp : ChevronDown;
-  return (
-    <th
-      className={cn("px-3 py-3.5", align === "right" && "text-right")}
-      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
-    >
-      <button
-        type="button"
-        onClick={() => onClick(col)}
-        aria-label={`Sort by ${typeof children === "string" ? children : col}${
-          active ? `, currently ${sortDir === "asc" ? "ascending" : "descending"}` : ""
-        }`}
-        className={cn(
-          "group inline-flex items-center gap-1 transition-colors duration-150",
-          align === "right" && "flex-row-reverse",
-          active
-            ? "text-[var(--color-ink-900)]"
-            : "text-[var(--color-ink-400)] hover:text-[var(--color-ink-700)]",
-        )}
-      >
-        <span>{children}</span>
-        <Icon
-          className={cn(
-            "h-3 w-3 transition-opacity",
-            active ? "opacity-100" : "opacity-50 group-hover:opacity-80",
-          )}
-          strokeWidth={2.4}
-        />
-      </button>
-    </th>
-  );
-}
-
-// ── Skeleton + Empty ────────────────────────────────────────────────────
-
-function TableSkeleton() {
-  return (
-    <div className="rounded-[var(--radius-xl)] glass p-2">
-      <div className="px-3 py-3 flex gap-3 text-[10.5px] uppercase tracking-[0.1em] text-[var(--color-ink-400)]">
-        <span>Loading templates…</span>
-      </div>
-      <div className="space-y-2 px-2 pb-2">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [0.4, 0.7, 0.4] }}
-            transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.06 }}
-            className="h-12 rounded-xl bg-[var(--color-ink-100)] dark:bg-white/[0.04]"
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function EmptyState({
-  search,
-  hasFilters,
-  onClearFilters,
-  onCreate,
-}: {
-  search: string;
-  hasFilters: boolean;
-  onClearFilters: () => void;
-  onCreate: () => void;
-}) {
-  const trimmed = search.trim();
-  const variant = trimmed
-    ? "no-search-match"
-    : hasFilters
-      ? "no-filter-match"
-      : "no-data";
-  const copy = {
-    "no-search-match": {
-      title: "No templates match your search",
-      body: (
-        <>
-          Nothing found for{" "}
-          <span className="font-mono font-semibold text-[var(--color-ink-700)]">
-            “{trimmed}”
-          </span>
-          . Check the spelling or widen the type filter.
-        </>
-      ),
-    },
-    "no-filter-match": {
-      title: "No templates in this view",
-      body: <>The current filters returned no rows. Clear them to see everything.</>,
-    },
-    "no-data": {
-      title: "No templates yet",
-      body: <>Use the “New template” button to compose your first building block.</>,
-    },
-  }[variant];
-
-  return (
-    <div className="rounded-[var(--radius-xl)] glass px-6 py-16 text-center">
-      <motion.div
-        animate={{ y: [0, -4, 0] }}
-        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-        className="mx-auto grid h-16 w-16 place-items-center rounded-[20px] bg-gradient-to-br from-[var(--color-pastel-sky)] to-[var(--color-pastel-lavender)] text-[var(--color-brand-900)]"
-      >
-        {variant === "no-data" ? (
-          <Workflow className="h-6 w-6" strokeWidth={2} />
-        ) : (
-          <Sparkles className="h-6 w-6" strokeWidth={2} />
-        )}
-      </motion.div>
-      <h3 className="font-display mt-5 text-lg font-semibold text-[var(--color-ink-900)]">
-        {copy.title}
-      </h3>
-      <p className="mt-1 text-[13px] text-[var(--color-ink-500)] mx-auto max-w-sm">
-        {copy.body}
-      </p>
-      {hasFilters && variant !== "no-data" ? (
-        <motion.button
-          type="button"
-          onClick={onClearFilters}
-          whileHover={{ y: -1 }}
-          whileTap={{ scale: 0.97 }}
-          className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-4 py-2 text-[12px] font-semibold text-white transition-all hover:shadow-[0_14px_36px_-12px_rgba(15,23,42,0.6)] dark:bg-[var(--color-brand-500)]"
-        >
-          Clear filters
-        </motion.button>
-      ) : variant === "no-data" ? (
-        <motion.button
-          type="button"
-          onClick={onCreate}
-          whileHover={{ y: -1 }}
-          whileTap={{ scale: 0.97 }}
-          className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-4 py-2 text-[12px] font-semibold text-white transition-all hover:shadow-[0_14px_36px_-12px_rgba(15,23,42,0.6)] dark:bg-[var(--color-brand-500)]"
-        >
-          Create your first template
-        </motion.button>
-      ) : null}
-    </div>
   );
 }
