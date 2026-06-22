@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.Api.Realtime.Drain;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReplanStuckOrder;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.ForceCompleteTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.ForceDropCompletedTrip;
@@ -141,6 +142,64 @@ public static class AdminWorkflowEndpoints
         })
         .WithName("AdminForceCompleteTrip")
         .WithSummary("Force-complete a Trip stuck at InProgress/Paused because TASK_FINISHED webhook was dropped. Does NOT notify upstream OMS.");
+
+        // G1 Phase 1 — pod drain. Called by K8s preStop hook (curl from
+        // inside the pod) or operators during planned shutdown. Returns 202
+        // immediately after kicking off the drain in a background task —
+        // the kubelet's preStop is synchronous and would block the whole
+        // shutdown until either Task.Delay(settleWindow) returns or
+        // terminationGracePeriodSeconds expires. We don't want the HTTP
+        // call to hold; the K8s shutdown sequence already waits the grace
+        // period. Idempotent on the service side, so duplicate calls from
+        // a retried preStop hook are safe.
+        //
+        // Auth: bypasses the group's RequireAuthorization() because the
+        // K8s preStop hook runs without a JWT. Gated by a loopback-only
+        // check on the request's RemoteIpAddress — a drain can only be
+        // triggered from inside the pod (preStop, kubectl exec, sidecar).
+        // External callers get a 403. In prod a NetworkPolicy would be
+        // belt-and-suspenders, but the loopback check stands alone.
+        group.MapPost("/drain-start", (
+            HttpContext ctx,
+            [FromBody] AdminDrainStartRequest? body,
+            IConnectionDrainService drain,
+            ILogger<ConnectionDrainService> logger) =>
+        {
+            var remote = ctx.Connection.RemoteIpAddress;
+            if (remote is null || !System.Net.IPAddress.IsLoopback(remote))
+            {
+                logger.LogWarning("[Drain] /drain-start refused — non-loopback caller {Remote}", remote);
+                return Results.Forbid();
+            }
+
+            var settleSeconds = body?.SettleSeconds ?? 45;
+            var settle = TimeSpan.FromSeconds(Math.Clamp(settleSeconds, 1, 300));
+
+            if (drain.IsDraining)
+            {
+                return Results.Ok(new AdminDrainStartResponse(
+                    Status: "already-draining",
+                    StartedAt: drain.StartedAt,
+                    SettleSeconds: settle.TotalSeconds));
+            }
+
+            // Fire-and-forget: the drain runs in the background so the HTTP
+            // response returns immediately. Exceptions are logged inside
+            // ConnectionDrainService; nothing here to await.
+            _ = Task.Run(async () =>
+            {
+                try { await drain.StartDrainAsync(settle); }
+                catch (Exception ex) { logger.LogError(ex, "[Drain] background drain failed"); }
+            });
+
+            return Results.Accepted(value: new AdminDrainStartResponse(
+                Status: "draining",
+                StartedAt: DateTimeOffset.UtcNow,
+                SettleSeconds: settle.TotalSeconds));
+        })
+        .AllowAnonymous()
+        .WithName("AdminDrainStart")
+        .WithSummary("Begin pod drain — flips /health/ready to 503 + broadcasts __drain to all hubs + waits settle window. Loopback-only.");
     }
 }
 
@@ -151,3 +210,5 @@ public record AdminForceStartRequest(
     string? Reason,
     string? VendorVehicleKey,
     string? VendorVehicleName);
+public record AdminDrainStartRequest(int? SettleSeconds);
+public record AdminDrainStartResponse(string Status, DateTimeOffset? StartedAt, double SettleSeconds);

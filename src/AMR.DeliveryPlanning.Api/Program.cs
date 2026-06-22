@@ -206,6 +206,14 @@ var redisConn = builder.Configuration.GetConnectionString("Redis") ?? "localhost
 builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Observability.HubMetrics>();
 builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Filters.TracingHubFilter>();
 builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Filters.RateLimitedHubFilter>();
+// G1 Phase 1 — pod drain coordination. Singleton state shared between the
+// admin endpoint (POST /api/v1/admin/drain-start), the readiness health
+// check (flips /health/ready to 503), and the hub filter (rejects new
+// connections/invocations during drain).
+builder.Services.AddSingleton<
+    AMR.DeliveryPlanning.Api.Realtime.Drain.IConnectionDrainService,
+    AMR.DeliveryPlanning.Api.Realtime.Drain.ConnectionDrainService>();
+builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Drain.DrainAwareHubFilter>();
 // Batchers register as both singleton (so projectors can inject and
 // enqueue) AND as a hosted service (so the drain loop runs).
 builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Pipeline.DashboardCounterBatcher>();
@@ -240,10 +248,13 @@ var signalRBuilder = builder.Services.AddSignalR(options =>
         // belt-and-suspenders guard against accidental misuse.
         options.MaximumReceiveMessageSize = 16 * 1024;
         options.EnableDetailedErrors = builder.Environment.IsDevelopment();
-        // Filters run in registration order. Tracing wraps everything
+        // Filters run in registration order. Drain is OUTERMOST so a
+        // rejected connection during shutdown short-circuits before we
+        // pay for tracing/rate-limit accounting. Tracing wraps the rest
         // (records duration including time inside rate-limit check).
         // Rate limit is innermost so a rejected call never reaches the
         // hub method body — and only counts once in the metrics.
+        options.AddFilter<AMR.DeliveryPlanning.Api.Realtime.Drain.DrainAwareHubFilter>();
         options.AddFilter<AMR.DeliveryPlanning.Api.Realtime.Filters.TracingHubFilter>();
         options.AddFilter<AMR.DeliveryPlanning.Api.Realtime.Filters.RateLimitedHubFilter>();
     })
@@ -297,6 +308,11 @@ builder.Services.AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy("Service is running"))
     .AddCheck<AMR.DeliveryPlanning.Api.Infrastructure.Health.NpgsqlDataSourceHealthCheck>(
         "postgres", tags: ["ready"])
+    // G1 Phase 1 — readiness flips to Unhealthy as soon as drain begins,
+    // so the K8s service mesh stops routing new traffic. Liveness (/health)
+    // stays Healthy so kubelet doesn't restart the draining pod.
+    .AddCheck<AMR.DeliveryPlanning.Api.Realtime.Drain.DrainHealthCheck>(
+        "drain", tags: ["ready"])
     .AddCheck("redis", () =>
     {
         try
@@ -549,8 +565,13 @@ app.UseCors(HubsCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Liveness probe (always 200 if process is up)
-app.MapHealthChecks("/health").AllowAnonymous()
+// Liveness probe (always 200 if process is up). G1 Phase 1 — excludes the
+// "drain" check so a draining pod stays liveness-Healthy and kubelet
+// doesn't restart it. (Readiness still flips to 503 — see /health/ready.)
+app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Name != "drain"
+}).AllowAnonymous()
     .WithTags("Health").WithSummary("Liveness").WithDescription("Returns 200 if the process is running.");
 // Readiness probe (checks postgres, rabbitmq, redis)
 app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
