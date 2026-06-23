@@ -34,6 +34,7 @@ using AMR.DeliveryPlanning.Planning.Infrastructure.Services;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
 using AMR.DeliveryPlanning.OmsAdapter;
+using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Exceptions;
 using AMR.DeliveryPlanning.VendorAdapter.Infrastructure;
 using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Extensions;
 using MassTransit;
@@ -482,16 +483,30 @@ public static class ModuleServiceRegistration
                 //                          tar-pit the queue.
                 //   PrefetchCount        : bounded so a slow consumer doesn't hoard messages
                 //                          another pod could process.
-                cfg.UseMessageRetry(r => r.Exponential(
-                    retryLimit: 5,
-                    minInterval: TimeSpan.FromSeconds(1),
-                    maxInterval: TimeSpan.FromSeconds(30),
-                    intervalDelta: TimeSpan.FromSeconds(5)));
+                cfg.UseMessageRetry(r =>
+                {
+                    r.Exponential(
+                        retryLimit: 5,
+                        minInterval: TimeSpan.FromSeconds(1),
+                        maxInterval: TimeSpan.FromSeconds(30),
+                        intervalDelta: TimeSpan.FromSeconds(5));
+                    // OmsPermanentException = 4xx data-rejected by OMS that
+                    // retry will never fix (e.g. 404 "LotNo not found").
+                    // Skip the retry ladder entirely so a poison message
+                    // dead-letters in ~1s instead of dragging the queue's
+                    // fault rate up and tripping the Kill Switch — which
+                    // would block unrelated trips waiting in the same
+                    // endpoint for up to a minute per cycle.
+                    r.Ignore<OmsPermanentException>();
+                });
+                // Trimmed the 1h bucket: transient OMS errors (5xx, network)
+                // typically recover within minutes. The extra hour-long wait
+                // mostly served as a soft floor for poison messages we now
+                // fast-fail above, so leaving it in just delays real recovery.
                 cfg.UseDelayedRedelivery(r => r.Intervals(
                     TimeSpan.FromMinutes(1),
                     TimeSpan.FromMinutes(5),
-                    TimeSpan.FromMinutes(15),
-                    TimeSpan.FromHours(1)));
+                    TimeSpan.FromMinutes(15)));
                 cfg.UseInMemoryOutbox(context);
                 cfg.UseKillSwitch(s => s
                     .SetActivationThreshold(10)

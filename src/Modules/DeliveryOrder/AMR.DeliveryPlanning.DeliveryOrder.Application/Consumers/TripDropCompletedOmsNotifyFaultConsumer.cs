@@ -2,6 +2,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
+using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Exceptions;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
@@ -11,10 +12,19 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Consumers;
 /// Mirror of <see cref="TripStartedOmsNotifyFaultConsumer"/> for the
 /// arrived (drop completed) notification. Records a dead-letter audit
 /// when the primary consumer exhausts retries.
+///
+/// Two audit shapes depending on the underlying exception:
+///   - OmsPermanentException → UpstreamOmsArrivedRejected
+///     (fast-failed 4xx data error — operator must fix data upstream)
+///   - anything else         → UpstreamOmsArrivedNotifyFailed
+///     (transient retries exhausted — OMS unreachable, can retry later)
 /// </summary>
 public class TripDropCompletedOmsNotifyFaultConsumer : IConsumer<Fault<TripDropCompletedIntegrationEvent>>
 {
-    private const string AuditEventType = "UpstreamOmsArrivedNotifyFailed";
+    private const string TransientAuditEventType = "UpstreamOmsArrivedNotifyFailed";
+    private const string PermanentAuditEventType = "UpstreamOmsArrivedRejected";
+    private static readonly string PermanentExceptionTypeName =
+        typeof(OmsPermanentException).FullName!;
 
     private readonly IOrderAuditEventRepository _auditRepository;
     private readonly IOrderActivityProjectionStore _activityStore;
@@ -40,14 +50,17 @@ public class TripDropCompletedOmsNotifyFaultConsumer : IConsumer<Fault<TripDropC
         var firstException = fault.Exceptions?.FirstOrDefault();
         var errorMessage = firstException?.Message ?? "(unknown error)";
         var exceptionType = firstException?.ExceptionType ?? "(unknown type)";
+        var isPermanent = exceptionType == PermanentExceptionTypeName;
 
         if (errorMessage.Length > 400) errorMessage = errorMessage[..400] + "…";
 
-        var auditDetails = $"trip-arrived shipmentId={evt.TripId} failed: [{exceptionType}] {errorMessage}";
+        var auditEventType = isPermanent ? PermanentAuditEventType : TransientAuditEventType;
+        var outcomeLabel = isPermanent ? "rejected" : "failed";
+        var auditDetails = $"trip-arrived shipmentId={evt.TripId} {outcomeLabel}: [{exceptionType}] {errorMessage}";
         try
         {
             await _auditRepository.AddAsync(new OrderAuditEvent(
-                evt.DeliveryOrderId, AuditEventType, auditDetails),
+                evt.DeliveryOrderId, auditEventType, auditDetails),
                 context.CancellationToken);
             await _auditRepository.SaveChangesAsync(context.CancellationToken);
 
@@ -57,7 +70,7 @@ public class TripDropCompletedOmsNotifyFaultConsumer : IConsumer<Fault<TripDropC
                 eventId: Guid.NewGuid(),
                 orderId: evt.DeliveryOrderId,
                 category: "OmsNotify",
-                eventType: AuditEventType,
+                eventType: auditEventType,
                 details: auditDetails,
                 actorId: null,
                 occurredAt: DateTime.UtcNow,
@@ -66,8 +79,9 @@ public class TripDropCompletedOmsNotifyFaultConsumer : IConsumer<Fault<TripDropC
                 cancellationToken: context.CancellationToken);
 
             _logger.LogWarning(
-                "[OmsArrived] Trip {TripId} dead-lettered after retries — audit recorded: {Error}",
-                evt.TripId, errorMessage);
+                "[OmsArrived] Trip {TripId} {Outcome} — audit {AuditType} recorded: {Error}",
+                evt.TripId, isPermanent ? "rejected by OMS (fast-fail)" : "dead-lettered after retries",
+                auditEventType, errorMessage);
         }
         catch (Exception ex)
         {

@@ -4,6 +4,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.OmsAdapter.Abstractions;
+using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Exceptions;
 using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Models;
 using AMR.DeliveryPlanning.OmsAdapter.Infrastructure.Options;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
@@ -110,6 +111,17 @@ public class ResendOmsNotificationCommandHandler
         try
         {
             await _client.NotifyShipmentStartedAsync(payload, cancellationToken);
+        }
+        catch (OmsPermanentException ex)
+        {
+            sw.Stop();
+            var statusCode = (int?)ex.StatusCode ?? 0;
+            _logger.LogWarning(ex,
+                "[OmsResend] Trip {TripId} rejected by OMS ({Status}): {Body}",
+                trip.Id, statusCode, ex.ResponseBody);
+            return Result<ResendOmsNotificationResult>.Failure(
+                $"OMS rejected the data ({statusCode}): {ex.ResponseBody}. " +
+                "Fix the data at upstream (SAP/ERP/OMS) before resending — retrying with the same payload will fail again.");
         }
         catch (Exception ex)
         {

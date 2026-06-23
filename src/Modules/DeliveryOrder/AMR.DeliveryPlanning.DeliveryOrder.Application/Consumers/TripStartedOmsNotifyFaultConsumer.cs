@@ -2,6 +2,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
+using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Exceptions;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
@@ -14,12 +15,21 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Consumers;
 /// failure into the order timeline so operators can see "OMS never accepted
 /// this shipment" without grepping logs.
 ///
+/// Two audit shapes depending on the underlying exception:
+///   - OmsPermanentException → UpstreamOmsRejected
+///     (fast-failed 4xx data error — operator must fix data upstream)
+///   - anything else         → UpstreamOmsNotifyFailed
+///     (transient retries exhausted — OMS unreachable, can retry later)
+///
 /// Independent of the main consumer's lifecycle: writes audit-only, never
 /// throws (a failure here just loses the audit row, not the original event).
 /// </summary>
 public class TripStartedOmsNotifyFaultConsumer : IConsumer<Fault<TripStartedIntegrationEvent>>
 {
-    private const string AuditEventType = "UpstreamOmsNotifyFailed";
+    private const string TransientAuditEventType = "UpstreamOmsNotifyFailed";
+    private const string PermanentAuditEventType = "UpstreamOmsRejected";
+    private static readonly string PermanentExceptionTypeName =
+        typeof(OmsPermanentException).FullName!;
 
     private readonly IOrderAuditEventRepository _auditRepository;
     private readonly IOrderActivityProjectionStore _activityStore;
@@ -45,16 +55,19 @@ public class TripStartedOmsNotifyFaultConsumer : IConsumer<Fault<TripStartedInte
         var firstException = fault.Exceptions?.FirstOrDefault();
         var errorMessage = firstException?.Message ?? "(unknown error)";
         var exceptionType = firstException?.ExceptionType ?? "(unknown type)";
+        var isPermanent = exceptionType == PermanentExceptionTypeName;
 
         // Truncate to keep the audit detail row bounded; full stack lives
         // in MassTransit's _error queue + structured log.
         if (errorMessage.Length > 400) errorMessage = errorMessage[..400] + "…";
 
-        var auditDetails = $"trip-started shipmentId={evt.TripId} failed: [{exceptionType}] {errorMessage}";
+        var auditEventType = isPermanent ? PermanentAuditEventType : TransientAuditEventType;
+        var outcomeLabel = isPermanent ? "rejected" : "failed";
+        var auditDetails = $"trip-started shipmentId={evt.TripId} {outcomeLabel}: [{exceptionType}] {errorMessage}";
         try
         {
             await _auditRepository.AddAsync(new OrderAuditEvent(
-                evt.DeliveryOrderId, AuditEventType, auditDetails),
+                evt.DeliveryOrderId, auditEventType, auditDetails),
                 context.CancellationToken);
             await _auditRepository.SaveChangesAsync(context.CancellationToken);
 
@@ -64,7 +77,7 @@ public class TripStartedOmsNotifyFaultConsumer : IConsumer<Fault<TripStartedInte
                 eventId: Guid.NewGuid(),
                 orderId: evt.DeliveryOrderId,
                 category: "OmsNotify",
-                eventType: AuditEventType,
+                eventType: auditEventType,
                 details: auditDetails,
                 actorId: null,
                 occurredAt: DateTime.UtcNow,
@@ -73,8 +86,9 @@ public class TripStartedOmsNotifyFaultConsumer : IConsumer<Fault<TripStartedInte
                 cancellationToken: context.CancellationToken);
 
             _logger.LogWarning(
-                "[OmsNotify] Trip {TripId} dead-lettered after retries — audit recorded: {Error}",
-                evt.TripId, errorMessage);
+                "[OmsNotify] Trip {TripId} {Outcome} — audit {AuditType} recorded: {Error}",
+                evt.TripId, isPermanent ? "rejected by OMS (fast-fail)" : "dead-lettered after retries",
+                auditEventType, errorMessage);
         }
         catch (Exception ex)
         {

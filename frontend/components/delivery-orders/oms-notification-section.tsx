@@ -52,7 +52,12 @@ const STAGES: Record<StageKey, StageConfig> = {
     label: "Started",
     notifiedTypes: new Set(["UpstreamOmsNotified"]),
     resentTypes: new Set(["UpstreamOmsManuallyResent"]),
-    failedTypes: new Set(["UpstreamOmsNotifyFailed"]),
+    // Both failure flavours render as the same red "Failed" card (Option A).
+    // The audit Details string carries the OMS body so operators can tell
+    // them apart inline:
+    //   - UpstreamOmsNotifyFailed → transient retries exhausted (OMS down)
+    //   - UpstreamOmsRejected     → fast-failed 4xx (bad data, fix upstream)
+    failedTypes: new Set(["UpstreamOmsNotifyFailed", "UpstreamOmsRejected"]),
     triggerEventTypes: new Set(["TripStarted"]),
     emptyTitle: "Awaiting trip start",
     emptyHint: "OMS will be notified when the first trip transitions to InProgress.",
@@ -63,7 +68,7 @@ const STAGES: Record<StageKey, StageConfig> = {
     label: "Arrived",
     notifiedTypes: new Set(["UpstreamOmsArrivedNotified"]),
     resentTypes: new Set(["UpstreamOmsArrivedManuallyResent"]),
-    failedTypes: new Set(["UpstreamOmsArrivedNotifyFailed"]),
+    failedTypes: new Set(["UpstreamOmsArrivedNotifyFailed", "UpstreamOmsArrivedRejected"]),
     triggerEventTypes: new Set(["TripDropCompleted"]),
     emptyTitle: "Awaiting drop",
     emptyHint: "OMS will be notified when the trip reaches its drop station.",

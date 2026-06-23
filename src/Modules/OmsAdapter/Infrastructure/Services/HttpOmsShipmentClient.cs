@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using AMR.DeliveryPlanning.OmsAdapter.Abstractions;
+using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Exceptions;
 using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Models;
 using Microsoft.Extensions.Logging;
 
@@ -48,7 +49,7 @@ internal sealed class HttpOmsShipmentClient : IOmsShipmentClient
             "[OmsAdapter] POST {Path} shipmentId={ShipmentId} failed → {Status} body={Body}",
             ShipmentsPath, notification.ShipmentId, (int)response.StatusCode, body);
 
-        response.EnsureSuccessStatusCode();
+        ThrowMappedException(response.StatusCode, body);
     }
 
     public async Task NotifyShipmentArrivedAsync(string shipmentId, IReadOnlyList<OmsLot> lots, CancellationToken cancellationToken)
@@ -77,7 +78,29 @@ internal sealed class HttpOmsShipmentClient : IOmsShipmentClient
             "[OmsAdapter] POST {Path} shipmentId={ShipmentId} failed → {Status} body={Body}",
             path, shipmentId, (int)response.StatusCode, errBody);
 
-        response.EnsureSuccessStatusCode();
+        ThrowMappedException(response.StatusCode, errBody);
+    }
+
+    // Map HTTP status to permanent vs transient. MassTransit fast-fails
+    // OmsPermanentException to DLQ (via .Ignore<> in retry config) so a
+    // bad-data poison message can't tar-pit the queue for 80 minutes.
+    //
+    // Network-level failures (DNS, TLS, connection refused) bubble up
+    // before we ever get a response — those raise raw HttpRequestException
+    // and remain transient by default. That's intentional: a temporary
+    // DNS hiccup shouldn't dead-letter the message.
+    private static void ThrowMappedException(HttpStatusCode status, string body)
+    {
+        var code = (int)status;
+
+        // Retry-able 4xx (RFC-defined: server can't handle now, try again)
+        // plus all 5xx → transient.
+        if (code is 408 or 425 or 429 || code >= 500)
+            throw new OmsTransientException(status, body);
+
+        // Other 4xx (400/401/403/404/422/...) → permanent. The request
+        // is wrong in a way retry won't fix — operator must inspect.
+        throw new OmsPermanentException(status, body);
     }
 
     private static async Task<string> SafeReadBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
