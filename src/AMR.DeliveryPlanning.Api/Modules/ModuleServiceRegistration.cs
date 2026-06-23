@@ -110,6 +110,10 @@ public static class ModuleServiceRegistration
         services.AddScoped<IShelfRepository, ShelfRepository>();
         services.AddScoped<ICarrierTypeProfileRepository, CarrierTypeProfileRepository>();
         services.AddScoped<ILoadUnitProfileRepository, LoadUnitProfileRepository>();
+        // Phase 2.6 — Warehouse aggregate persistence + lookup. The
+        // IWarehouseLookup binding (in DeliveryOrder module section below)
+        // depends on IFacilityReadService being registered, which it is.
+        services.AddScoped<IWarehouseRepository, WarehouseRepository>();
         services.AddScoped<IFacilityReadService, FacilityReadService>();
         var riot3BaseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
         var riot3ApiKey = configuration.GetValue<string>("VendorAdapter:Riot3:ApiKey");
@@ -222,6 +226,11 @@ public static class ModuleServiceRegistration
         services.AddScoped<FacilityStationLookup>();
         services.AddScoped<IStationLookup, CachedStationLookup>();
         services.AddScoped<IStationValidationService, StationValidationService>();
+        // Phase 2.6 — Warehouse lookup adapter (DeliveryOrder.Application
+        // contract → Facility module's read service). Not yet consumed by
+        // order validation (MarkAsValidated still uses stations only);
+        // Phase 4 Manual mode will inject this for operator scope checks.
+        services.AddScoped<IWarehouseLookup, FacilityWarehouseLookup>();
         services.AddScoped<IOrderAmendmentRepository, OrderAmendmentRepository>();
         services.AddScoped<IOrderAuditEventRepository, OrderAuditEventRepository>();
         // Phase P5.3 — Dispatch-side bridge so the vendor adapter can

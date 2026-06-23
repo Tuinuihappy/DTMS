@@ -150,4 +150,56 @@ public sealed class FacilityReadService : IFacilityReadService
 
         return edge?.Cost;
     }
+
+    // ── Warehouse lookups (Phase 2.6) ────────────────────────────────────
+
+    public Task<bool> WarehouseExistsAsync(Guid warehouseId, CancellationToken cancellationToken = default)
+        => _db.Warehouses.AnyAsync(w => w.Id == warehouseId, cancellationToken);
+
+    public Task<Guid?> ResolveWarehouseByCodeAsync(string code, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return Task.FromResult<Guid?>(null);
+
+        return _db.Warehouses.AsNoTracking()
+            .Where(w => EF.Functions.ILike(w.Code, code))
+            .Select(w => (Guid?)w.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<string, WarehouseLookupResult>> ResolveWarehousesBatchAsync(
+        IReadOnlyList<string> codes,
+        CancellationToken cancellationToken = default)
+    {
+        // Normalize input — drop blanks + dedupe with case-insensitive comparer.
+        // Caller usually feeds raw operator input; the dedupe keeps the IN
+        // clause tight when the order has many items with the same warehouse.
+        var distinct = codes
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Select(c => c.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (distinct.Count == 0)
+            return new Dictionary<string, WarehouseLookupResult>(StringComparer.OrdinalIgnoreCase);
+
+        var lowered = distinct.Select(c => c.ToLowerInvariant()).ToList();
+        var matched = await _db.Warehouses
+            .AsNoTracking()
+            .Where(w => lowered.Contains(w.Code.ToLower()))
+            .Select(w => new { w.Id, w.Code, w.Name, w.IsActive })
+            .ToListAsync(cancellationToken);
+
+        // Key the result by the CALLER's original casing — they passed
+        // "wh-bkk-01"; they want "wh-bkk-01" back as the map key so the
+        // result lines up with their input slots.
+        var byLower = matched.ToDictionary(m => m.Code.ToLowerInvariant());
+        var result = new Dictionary<string, WarehouseLookupResult>(StringComparer.OrdinalIgnoreCase);
+        foreach (var input in distinct)
+        {
+            if (byLower.TryGetValue(input.ToLowerInvariant(), out var row))
+                result[input] = new WarehouseLookupResult(row.Id, row.Code, row.Name, row.IsActive);
+        }
+
+        return result;
+    }
 }
