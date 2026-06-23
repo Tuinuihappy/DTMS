@@ -503,10 +503,20 @@ public static class ModuleServiceRegistration
                 // typically recover within minutes. The extra hour-long wait
                 // mostly served as a soft floor for poison messages we now
                 // fast-fail above, so leaving it in just delays real recovery.
-                cfg.UseDelayedRedelivery(r => r.Intervals(
-                    TimeSpan.FromMinutes(1),
-                    TimeSpan.FromMinutes(5),
-                    TimeSpan.FromMinutes(15)));
+                //
+                // Ignore<OmsPermanentException> must be repeated on the outer
+                // redelivery pipeline — MassTransit treats UseMessageRetry
+                // (in-process) and UseDelayedRedelivery (re-queue) as two
+                // independent filters. Without the ignore here, a 4xx
+                // poison still bounces through 1m/5m/15m before DLQ.
+                cfg.UseDelayedRedelivery(r =>
+                {
+                    r.Intervals(
+                        TimeSpan.FromMinutes(1),
+                        TimeSpan.FromMinutes(5),
+                        TimeSpan.FromMinutes(15));
+                    r.Ignore<OmsPermanentException>();
+                });
                 cfg.UseInMemoryOutbox(context);
                 cfg.UseKillSwitch(s => s
                     .SetActivationThreshold(10)
