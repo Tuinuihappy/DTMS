@@ -73,6 +73,13 @@ jobs:
           --logger "trx;LogFileName=integration-tests.trx"
           --results-directory ./test-results
 
+      - name: Architecture Tests
+        run: >
+          dotnet test --no-build --configuration Release
+          tests/AMR.DeliveryPlanning.ArchitectureTests/
+          --logger "trx;LogFileName=architecture-tests.trx"
+          --results-directory ./test-results
+
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()

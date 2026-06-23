@@ -126,6 +126,67 @@ public class ModuleBoundaryTests
     }
 
     [Fact]
+    public void MigrationIds_AreUnique_AcrossAllDbContexts()
+    {
+        // All 8+ DbContexts share public.__EFMigrationsHistory. If two
+        // migrations from different modules collide on the [Migration("...")]
+        // ID, EF silently SKIPS the duplicate at apply time — meaning a
+        // schema change lands in source but never reaches the DB.
+        //
+        // Pattern (per memory project_shared_migration_history): use unique
+        // timestamps within each phase window (e.g. 20260628000000 +
+        // 20260628000001 + 20260628000002), never reuse a stamp cross-module.
+        //
+        // We scan Designer.cs files because every migration has exactly one
+        // matching Designer file, and the [Migration] attribute on it is
+        // canonical (matches the file's own migration name).
+
+        var repoRoot = FindRepoRoot();
+        var migrationFiles = Directory.EnumerateFiles(
+                Path.Combine(repoRoot, "src"),
+                "*.Designer.cs",
+                SearchOption.AllDirectories)
+            .Where(path => path.Contains(
+                Path.DirectorySeparatorChar + "Migrations" + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var migrationIdPattern = new Regex(
+            @"\[Migration\(""([^""]+)""\)\]",
+            RegexOptions.Compiled);
+
+        var idsByFile = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var file in migrationFiles)
+        {
+            var match = migrationIdPattern.Match(File.ReadAllText(file));
+            if (!match.Success) continue;
+            idsByFile[file] = match.Groups[1].Value;
+        }
+
+        var duplicates = idsByFile
+            .GroupBy(kv => kv.Value, StringComparer.Ordinal)
+            .Where(g => g.Count() > 1)
+            .Select(g => new
+            {
+                MigrationId = g.Key,
+                Files = g.Select(kv => Path.GetRelativePath(repoRoot, kv.Key))
+                         .OrderBy(p => p, StringComparer.Ordinal)
+                         .ToList()
+            })
+            .OrderBy(d => d.MigrationId, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(
+            duplicates.Count == 0,
+            "Duplicate MigrationIds across DbContexts — EF will silently skip the second one. " +
+            "Use unique timestamps per migration (seconds offset within phase windows is fine).\n\n" +
+            string.Join("\n\n", duplicates.Select(d =>
+                $"MigrationId: {d.MigrationId}\n" +
+                string.Join("\n", d.Files.Select(f => $"  - {f}")))));
+    }
+
+    [Fact]
     public void SourceFiles_DoNotContainRiot3AppTokens()
     {
         var repoRoot = FindRepoRoot();
