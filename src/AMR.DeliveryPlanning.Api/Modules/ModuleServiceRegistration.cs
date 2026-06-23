@@ -317,6 +317,18 @@ public static class ModuleServiceRegistration
             AMR.DeliveryPlanning.Api.Adapters.Riot3VendorEnvelopeOperationAdapter>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IVendorRobotOperationService,
             AMR.DeliveryPlanning.Api.Adapters.Riot3VendorRobotOperationAdapter>();
+
+        // ── Phase 1 foundation: strategy registry + vendor operations router ──
+        // Both auto-discover their adapters via IEnumerable<> injection. Adding
+        // Manual / Fleet later = register the new adapter + (optionally) its
+        // IDispatchStrategy — registry + router pick them up without changes
+        // here. The router is what Pause/Resume/Cancel handlers will use once
+        // Phase 3 refactors them away from the static IVendorEnvelopeOperationService
+        // binding above; for now both registrations co-exist (no behaviour change).
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IDispatchStrategyRegistry,
+            AMR.DeliveryPlanning.Dispatch.Application.Services.DispatchStrategyRegistry>();
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IVendorOperationsRouter,
+            AMR.DeliveryPlanning.Dispatch.Application.Services.VendorOperationsRouter>();
         services.AddScoped<IDispatchOrderTemplateService, DispatchOrderTemplateService>();
         services.Configure<AMR.DeliveryPlanning.Planning.Application.Options.DispatchOptions>(
             configuration.GetSection(AMR.DeliveryPlanning.Planning.Application.Options.DispatchOptions.SectionName));

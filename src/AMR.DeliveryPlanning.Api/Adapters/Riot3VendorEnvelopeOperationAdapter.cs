@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.VendorAdapter.Riot3.Models;
@@ -8,7 +9,11 @@ namespace AMR.DeliveryPlanning.Api.Adapters;
 // Composition-root bridge: forwards Dispatch.Application's vendor-agnostic
 // envelope operations to the concrete RIOT3 client. Lives in the API
 // project so Dispatch.Application has no compile-time link to RIOT3.
-internal sealed class Riot3VendorEnvelopeOperationAdapter : IVendorEnvelopeOperationService
+//
+// Implements IVendorOperationsAdapter (Mode=Amr) so VendorOperationsRouter
+// can auto-discover this adapter at startup — no explicit Register call
+// needed in composition root.
+internal sealed class Riot3VendorEnvelopeOperationAdapter : IVendorEnvelopeOperationService, IVendorOperationsAdapter
 {
     private readonly Riot3CommandService _riot3;
 
@@ -16,6 +21,8 @@ internal sealed class Riot3VendorEnvelopeOperationAdapter : IVendorEnvelopeOpera
     {
         _riot3 = riot3;
     }
+
+    public TransportMode Mode => TransportMode.Amr;
 
     public async Task<Result<VendorOperationOutcome>> CancelAsync(string vendorOrderKey, CancellationToken cancellationToken = default)
     {

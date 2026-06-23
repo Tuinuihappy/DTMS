@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.VendorAdapter.Riot3.Models;
@@ -9,7 +10,11 @@ namespace AMR.DeliveryPlanning.Api.Adapters;
 // robot operations to the concrete RIOT3 client. Lives in the API project
 // so Dispatch.Application has no compile-time link to RIOT3 — mirrors
 // the Riot3VendorEnvelopeOperationAdapter pattern.
-internal sealed class Riot3VendorRobotOperationAdapter : IVendorRobotOperationService
+//
+// Implements IVendorOperationsAdapter (Mode=Amr) so VendorOperationsRouter
+// can auto-discover this adapter — Manual / Fleet won't have a robot
+// adapter (ForRobot returns null), the marker is what differentiates.
+internal sealed class Riot3VendorRobotOperationAdapter : IVendorRobotOperationService, IVendorOperationsAdapter
 {
     private readonly Riot3CommandService _riot3;
 
@@ -17,6 +22,8 @@ internal sealed class Riot3VendorRobotOperationAdapter : IVendorRobotOperationSe
     {
         _riot3 = riot3;
     }
+
+    public TransportMode Mode => TransportMode.Amr;
 
     public async Task<Result<VendorOperationOutcome>> PassAsync(string vendorVehicleKey, CancellationToken cancellationToken = default)
     {
