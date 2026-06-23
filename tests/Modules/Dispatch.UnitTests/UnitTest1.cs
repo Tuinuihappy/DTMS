@@ -420,7 +420,9 @@ public class CancelTripCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         repo.UpdateCalls.Should().Be(1);
-        vendor.CancelCalls.Should().ContainSingle().Which.Should().Be(trip.UpperKey);
+        // Handler routes envelope ops through vendorOrderKey not upperKey
+        // (per commit 107675e — RIOT3 silently no-ops upperKey route).
+        vendor.CancelCalls.Should().ContainSingle().Which.Should().Be(trip.VendorOrderKey);
     }
 
     [Fact]
@@ -476,7 +478,9 @@ public class PauseAndResumeTripHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         repo.UpdateCalls.Should().Be(1);
-        vendor.PauseCalls.Should().ContainSingle().Which.Should().Be(trip.UpperKey);
+        // Handler routes envelope ops through vendorOrderKey not upperKey
+        // (per commit 107675e — RIOT3 silently no-ops upperKey route).
+        vendor.PauseCalls.Should().ContainSingle().Which.Should().Be(trip.VendorOrderKey);
     }
 
     [Fact]
@@ -506,7 +510,9 @@ public class PauseAndResumeTripHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         repo.UpdateCalls.Should().Be(1);
-        vendor.ResumeCalls.Should().ContainSingle().Which.Should().Be(trip.UpperKey);
+        // Handler routes envelope ops through vendorOrderKey not upperKey
+        // (per commit 107675e — RIOT3 silently no-ops upperKey route).
+        vendor.ResumeCalls.Should().ContainSingle().Which.Should().Be(trip.VendorOrderKey);
     }
 
     [Fact]
