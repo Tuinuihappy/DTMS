@@ -23,7 +23,8 @@ docs/multi-mode-transport/
 │   ├── adr-007-mobile-api-authentication.md        ← JWT + device binding
 │   ├── adr-008-migration-strategy.md               ← Manual EF migrations + conventions
 │   ├── adr-009-pod-object-storage.md               ← S3-compatible (MinIO local, S3 prod)
-│   └── adr-010-geofence-implementation.md          ← NetTopologySuite (no PostGIS)
+│   ├── adr-010-geofence-implementation.md          ← NetTopologySuite (no PostGIS)
+│   └── adr-011-frontend-architecture.md            ← Folder convention + design system + hooks
 ├── phases/                            ← Per-phase implementation guides
 │   ├── phase-1-foundation.md          ← Namespace + DI rewire
 │   ├── phase-2-facility-vehicle-split.md
@@ -31,7 +32,8 @@ docs/multi-mode-transport/
 │   ├── phase-4-transport-manual.md
 │   └── phase-5-transport-fleet.md
 ├── diagrams/
-│   └── architecture.md                ← Mermaid sequence + module dependency
+│   ├── architecture.md                ← Mermaid sequence + module dependency
+│   └── ui-mockups.md                  ← ASCII mockups (Operator Board / Waybill Tracker / 2-step Picker)
 ├── api/
 │   └── manual-operator-api.md         ← Mobile API contract (OpenAPI-style)
 └── templates/                            ← Reusable boilerplate (12 files)
@@ -58,6 +60,7 @@ docs/multi-mode-transport/
    - [ADR-006](adr/adr-006-transport-mode-feature-flag.md) — deployment toggle
 3. **Visual** — ดู [architecture diagrams](diagrams/architecture.md)
 4. **Role-specific deep dives:**
+   - **Frontend team**: [ADR-011](adr/adr-011-frontend-architecture.md) + [UI Mockups](diagrams/ui-mockups.md) + phase docs §10/§11
    - **Mobile / push integration team**: [ADR-005](adr/adr-005-push-notification-gateway.md) + [ADR-007](adr/adr-007-mobile-api-authentication.md) + [ADR-009](adr/adr-009-pod-object-storage.md) + [Manual Operator API](api/manual-operator-api.md)
    - **QA / DevOps**: [ADR-004](adr/adr-004-testing-strategy.md) + [ADR-008](adr/adr-008-migration-strategy.md)
    - **Backend / data**: [ADR-008](adr/adr-008-migration-strategy.md) + [ADR-010](adr/adr-010-geofence-implementation.md)
@@ -72,6 +75,7 @@ docs/multi-mode-transport/
 | Quality | [004](adr/adr-004-testing-strategy.md), [008](adr/adr-008-migration-strategy.md) | 4-tier gates; manual EF migrations |
 | Operational toggle | [006](adr/adr-006-transport-mode-feature-flag.md) | Config-driven per mode |
 | Mobile platform | [005](adr/adr-005-push-notification-gateway.md), [007](adr/adr-007-mobile-api-authentication.md), [009](adr/adr-009-pod-object-storage.md), [010](adr/adr-010-geofence-implementation.md) | FCM + JWT + S3 + NTS |
+| Frontend | [011](adr/adr-011-frontend-architecture.md) | Per-mode folders + design tokens + useCapabilities |
 
 ## ADRs Summary
 
@@ -87,6 +91,7 @@ docs/multi-mode-transport/
 | [008](adr/adr-008-migration-strategy.md) | Manual EF migrations + MigrationId conventions + per-DbContext apply | 7 min |
 | [009](adr/adr-009-pod-object-storage.md) | S3-compatible storage (MinIO local, AWS S3 production); server-mediated upload | 6 min |
 | [010](adr/adr-010-geofence-implementation.md) | NetTopologySuite in-memory (no PostGIS); WKT polygon format; defer PostGIS | 6 min |
+| [011](adr/adr-011-frontend-architecture.md) | Per-mode folders; design tokens; capability-driven rendering; SWR + SignalR hybrid | 8 min |
 
 ## Target Module Structure (After Refactor)
 

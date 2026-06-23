@@ -322,19 +322,270 @@ CREATE TABLE transport_amr.amr_dispatch_plan_templates (
 ALTER TABLE planning.action_templates SET SCHEMA transport_amr;
 ```
 
-### Step 9: Frontend — Decouple from Vendor Fields
+### Step 9: Frontend — Decouple from Vendor Fields (Detail)
 
-[trip-detail-drawer.tsx](../../../frontend/components/dispatch/trip-detail-drawer.tsx) — ลบการอ้าง `trip.vendorOrderKey` ตรง; ใช้ separate API:
+> Conventions: [ADR-011 Frontend Architecture](../adr/adr-011-frontend-architecture.md)
+> This phase introduces the **mode-aware composition pattern** that Phase 4-5 will replicate
+
+#### 9.1 API Layer Changes
+
+**`frontend/lib/api/transport-amr.ts`** (NEW):
 
 ```typescript
-// frontend/lib/api/transport-amr.ts (NEW)
-export async function getAmrTripExtension(tripId: string): Promise<AmrTripExtension | null>;
+// Browser-side fetch helpers + DTO types for Transport.Amr module.
+// AmrTripExtension carries vendor-specific data that previously lived
+// on Trip itself; now lazy-loaded only when displaying AMR trip details.
 
-// Trip detail drawer
-{trip.mode === 'Amr' && (
-  <AmrTripExtensionPanel tripId={trip.id} />   // lazy load
-)}
+const API_BASE = "/api/transport-amr";
+
+export type AmrTripExtensionDto = {
+  tripId: string;
+  vendorOrderKey: string | null;
+  vendorVehicleKey: string | null;
+  vendorVehicleName: string | null;
+  vendorPauseSource: 'Held' | 'Hang' | null;
+  vendorRequestSnapshot: string | null;        // JSON string
+  createdAt: string;
+  updatedAt: string | null;
+};
+
+export async function getAmrTripExtension(tripId: string): Promise<AmrTripExtensionDto | null> {
+  const res = await fetch(`${API_BASE}/trips/${tripId}/extension`, { credentials: 'include' });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+  const envelope = await res.json();
+  return envelope.data;
+}
+
+export async function getAmrPositions(): Promise<RobotPositionDto[]> {
+  // Moved from lib/api/facility.ts (was getMapRobotPositions)
+  // Now scoped to AMR module
+}
 ```
+
+**`frontend/lib/api/trips.ts`** — remove vendor fields:
+
+```typescript
+// BEFORE
+export type TripDto = {
+  id: string;
+  mode: TransportMode;
+  status: TripStatus;
+  vendorOrderKey: string | null;      // ← REMOVE
+  vendorVehicleKey: string | null;    // ← REMOVE
+  vendorVehicleName: string | null;   // ← REMOVE
+  vendorPauseSource: 'Held' | 'Hang' | null;  // ← REMOVE
+  // ... other shared fields
+};
+
+// AFTER
+export type TripDto = {
+  id: string;
+  mode: TransportMode;
+  status: TripStatus;
+  pickupWarehouseId: string;
+  dropWarehouseId: string;
+  pickupStationId: string | null;     // Amr-only
+  dropStationId: string | null;       // Amr-only
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  failureReason: string | null;
+};
+```
+
+#### 9.2 New AMR Extension Panel
+
+**`frontend/components/transport/amr/amr-trip-extension-panel.tsx`** (NEW):
+
+```tsx
+"use client";
+
+import useSWR from "swr";
+import { Loader2 } from "lucide-react";
+import { getAmrTripExtension } from "@/lib/api/transport-amr";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { DateTime } from "@/components/primitives/date-time";
+
+export function AmrTripExtensionPanel({ tripId }: { tripId: string }) {
+  const { data: ext, isLoading, error } = useSWR(
+    `/api/transport-amr/trips/${tripId}/extension`,
+    () => getAmrTripExtension(tripId),
+  );
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-4 flex items-center justify-center text-muted-foreground">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Loading AMR details...
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error || !ext) {
+    return (
+      <Card>
+        <CardContent className="p-4 text-sm text-muted-foreground">
+          No AMR extension data (trip may not have been dispatched yet)
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">AMR Details (RIOT3)</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        <DataRow label="Vendor Order Key" value={ext.vendorOrderKey ?? '—'} mono />
+        <DataRow label="Vehicle Key" value={ext.vendorVehicleKey ?? '—'} mono />
+        <DataRow label="Vehicle Name" value={ext.vendorVehicleName ?? '—'} />
+        {ext.vendorPauseSource && (
+          <DataRow label="Pause Source" value={
+            <Badge variant={ext.vendorPauseSource === 'Hang' ? 'destructive' : 'warning'}>
+              {ext.vendorPauseSource}
+            </Badge>
+          } />
+        )}
+        <DataRow label="Created" value={<DateTime value={ext.createdAt} />} />
+        {ext.updatedAt && <DataRow label="Updated" value={<DateTime value={ext.updatedAt} relative />} />}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DataRow({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={mono ? 'font-mono text-xs' : ''}>{value}</span>
+    </div>
+  );
+}
+```
+
+#### 9.3 Trip Detail Drawer Composition (mode-aware pattern introduction)
+
+**[trip-detail-drawer.tsx](../../../frontend/components/dispatch/trip-detail-drawer.tsx)** — replace direct vendor access:
+
+```tsx
+// BEFORE
+<div className="space-y-2">
+  <p>Order Key: {trip.vendorOrderKey}</p>
+  <p>Vehicle: {trip.vendorVehicleName}</p>
+</div>
+
+// AFTER
+{trip.mode === 'Amr' && <AmrTripExtensionPanel tripId={trip.id} />}
+// (Phase 4 will add ManualTripExtensionPanel, Phase 5 will add FleetTripExtensionPanel)
+```
+
+#### 9.4 Snapshot Inspector Migration
+
+**`frontend/components/transport/amr/snapshot-inspector.tsx`** (moved from `components/dispatch/`):
+
+```bash
+git mv frontend/components/dispatch/snapshot-inspector.tsx \
+       frontend/components/transport/amr/snapshot-inspector.tsx
+```
+
+Update internal API call:
+```tsx
+// BEFORE
+const snapshot = trip.vendorRequestSnapshot;
+
+// AFTER
+const { data: ext } = useSWR(...);
+const snapshot = ext?.vendorRequestSnapshot;
+```
+
+#### 9.5 Retry History Panel Migration
+
+**[retry-history-panel.tsx](../../../frontend/components/dispatch/retry-history-panel.tsx)** — references vendor key chain across attempts:
+
+```tsx
+// BEFORE: read vendorOrderKey directly from each trip in chain
+// AFTER: fetch extension for each chain trip (parallel SWR)
+
+export function RetryHistoryPanel({ rootTripId }: { rootTripId: string }) {
+  const { data: chain } = useSWR<TripDto[]>(`/api/trips/${rootTripId}/retry-chain`, fetcher);
+
+  return (
+    <div className="space-y-2">
+      {chain?.map(trip => (
+        <RetryAttemptRow key={trip.id} trip={trip} />
+      ))}
+    </div>
+  );
+}
+
+function RetryAttemptRow({ trip }: { trip: TripDto }) {
+  // Each row lazy-loads its own AMR extension
+  const { data: ext } = useSWR(
+    `/api/transport-amr/trips/${trip.id}/extension`,
+    () => getAmrTripExtension(trip.id),
+    { revalidateOnFocus: false },
+  );
+
+  return (
+    <div className="flex items-center gap-3">
+      <Badge>Attempt {trip.attemptNumber}</Badge>
+      <span className="font-mono text-xs">{ext?.vendorOrderKey ?? '(no key)'}</span>
+      <DateTime value={trip.createdAt} relative />
+    </div>
+  );
+}
+```
+
+#### 9.6 Position Polling Frontend (unchanged)
+
+`frontend/components/facility/robot-layer.tsx` continues to render robot positions from same SignalR channel — backend `VehiclePositionPollerService` (post-Phase 3) multiplexes from `IVehiclePositionProvider` implementations, but frontend doesn't need to know
+
+#### 9.7 Files Affected (Phase 3)
+
+| File | Action |
+|---|---|
+| `frontend/lib/api/transport-amr.ts` | **NEW** |
+| `frontend/lib/api/trips.ts` | Modify — remove vendor fields from TripDto |
+| `frontend/components/transport/amr/amr-trip-extension-panel.tsx` | **NEW** |
+| `frontend/components/transport/amr/snapshot-inspector.tsx` | **Move** from `dispatch/` |
+| `frontend/components/transport/amr/pass-robot-dialog.tsx` | **Move** from `dispatch/` |
+| `frontend/components/transport/amr/mission-failure-alert.tsx` | **Move** from `dispatch/` |
+| `frontend/components/dispatch/trip-detail-drawer.tsx` | Modify — compose extension panel |
+| `frontend/components/dispatch/retry-history-panel.tsx` | Modify — lazy-load extension per attempt |
+| `frontend/lib/vendor/riot3-error-codes.ts` | **Move** to `lib/transport/amr/` |
+
+### Phase 3 Frontend Manual Smoke Checklist
+
+```
+□ Open AMR Trip detail drawer — AmrTripExtensionPanel loads
+□ Vendor order key + vehicle key display correctly
+□ Pause source badge shows correct color (Held=warning, Hang=destructive)
+□ Snapshot inspector shows raw vendor JSON (forensic view)
+□ Retry history shows full chain with vendor keys per attempt
+□ Pass robot dialog (now in transport/amr/) still works for InProgress trips
+□ Mission failure alert renders RIOT3 error codes
+□ Robot layer on facility map still shows live positions
+□ Trip without extension (early Created state) shows "No AMR data yet" gracefully
+□ Trip detail for non-Amr trip does NOT show AMR panel (404 returns empty)
+□ Network failure on extension fetch — error UI with retry button
+```
+
+### Phase 3 Frontend Effort Breakdown
+
+| Task | Effort |
+|---|---|
+| API client + types (`transport-amr.ts`) | 0.5 day |
+| AmrTripExtensionPanel component | 0.5 day |
+| Trip detail drawer composition refactor | 1 day |
+| Retry history panel parallel SWR | 0.5 day |
+| File moves (dispatch → transport/amr/) + import updates | 0.5 day |
+| Manual smoke + bug fixes | 1 day |
+| **Total** | **~4 days** |
 
 ## Verification
 

@@ -342,38 +342,324 @@ ALTER TABLE dispatch.trips
 
 **MigrationId**: Per [memory project_shared_migration_history](../../memory/project_shared_migration_history.md) — ตั้ง timestamp ห่างกัน 1-2 วินาที cross-module เพื่อหลีกเลี่ยง skip
 
-### Step 10: Frontend Updates
+### Step 10: Frontend Updates (Detail)
 
-**`frontend/lib/api/facility.ts`** — แยก endpoints:
+> Visual reference: [UI Mockups — 2-Step Picker](../diagrams/ui-mockups.md#1-warehouse--amrstation-2-step-picker-phase-2)
+> Conventions: [ADR-011 Frontend Architecture](../adr/adr-011-frontend-architecture.md)
+
+#### 10.1 API Layer Changes
+
+**`frontend/lib/api/facility.ts`** — split endpoints:
+
 ```typescript
-// before:
+// BEFORE
+export type StationOption = { code: string; name: string; type: string };
 export async function getStationOptions(): Promise<StationOption[]> { ... }
 
-// after:
-export type WarehouseOption = { id: string; code: string; name: string; serviceModes: TransportMode[] };
-export type AmrStationOption = { id: string; warehouseId: string; code: string; name: string; type: string };
+// AFTER
+export type WarehouseOption = {
+  id: string;
+  code: string;
+  name: string;
+  location: { lat: number; lng: number };
+  address: string;
+  serviceModes: TransportMode[];
+  isActive: boolean;
+};
 
-export async function getWarehouses(): Promise<WarehouseOption[]> { ... }
-export async function getAmrStations(warehouseId: string): Promise<AmrStationOption[]> { ... }
+export type AmrStationOption = {
+  id: string;
+  warehouseId: string;
+  mapId: string;
+  code: string;
+  name: string;
+  type: 'Pickup' | 'Dropoff' | 'Charging' | 'Dock' | 'Parking' | 'Checkpoint' | 'Normal';
+  coordinate: { x: number; y: number; theta?: number };
+  isActive: boolean;
+  manualOverrideOffline?: boolean;
+  vendorRef?: string;
+};
+
+export async function getWarehouses(opts?: {
+  serviceMode?: TransportMode;
+  search?: string;
+}): Promise<WarehouseOption[]> { ... }
+
+export async function getWarehouse(id: string): Promise<WarehouseOption> { ... }
+
+export async function getAmrStations(
+  warehouseId: string,
+  opts?: { type?: AmrStationOption['type']; search?: string }
+): Promise<AmrStationOption[]> { ... }
 ```
+
+#### 10.2 New Primitive Components
 
 **`frontend/components/primitives/warehouse-combobox.tsx`** (NEW):
-2-step picker — Warehouse first, then conditional AmrStation:
 
 ```tsx
-<div>
-  <WarehouseCombobox value={warehouseId} onChange={setWarehouseId} />
-  {transportMode === 'Amr' && warehouseId && (
-    <AmrStationCombobox warehouseId={warehouseId} value={stationId} onChange={setStationId} />
-  )}
-</div>
+"use client";
+
+import { useState } from "react";
+import useSWR from "swr";
+import { Search } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { type WarehouseOption, getWarehouses } from "@/lib/api/facility";
+import { type TransportMode } from "@/lib/types";
+
+export function WarehouseCombobox({
+  value,
+  onChange,
+  filterByServiceMode,
+  placeholder = "Select warehouse...",
+  required = false,
+  error,
+}: {
+  value: string | null;
+  onChange: (warehouseId: string | null) => void;
+  filterByServiceMode?: TransportMode;
+  placeholder?: string;
+  required?: boolean;
+  error?: string;
+}) {
+  const [search, setSearch] = useState("");
+  const { data: warehouses, isLoading } = useSWR(
+    `/api/facility/warehouses?mode=${filterByServiceMode ?? ''}&search=${search}`,
+    () => getWarehouses({ serviceMode: filterByServiceMode, search }),
+  );
+
+  const selected = warehouses?.find(w => w.id === value);
+
+  return (
+    <div>
+      {/* Trigger button + popover with search + option list */}
+      {/* See mockup section "State C: Warehouse picker opened" */}
+      {/* Render badges for serviceModes per ADR-011 design tokens */}
+    </div>
+  );
+}
 ```
 
-**Pages affected**:
-- `frontend/app/orders/new/page.tsx`
-- `frontend/app/orders/[id]/edit/page.tsx`
-- `frontend/components/dispatch/trip-filter.tsx`
-- Other places using existing `StationCombobox`
+**`frontend/components/primitives/amr-station-combobox.tsx`** (NEW):
+
+```tsx
+"use client";
+
+export function AmrStationCombobox({
+  warehouseId,
+  value,
+  onChange,
+  filterByType,
+  disabled,
+}: {
+  warehouseId: string | null;          // disabled state if null
+  value: string | null;
+  onChange: (stationId: string | null) => void;
+  filterByType?: 'Pickup' | 'Dropoff' | 'Charging';
+  disabled?: boolean;
+}) {
+  const { data: stations, isLoading } = useSWR(
+    warehouseId ? `/api/transport-amr/stations?warehouseId=${warehouseId}` : null,
+    () => getAmrStations(warehouseId!, { type: filterByType }),
+  );
+
+  // Disabled if no warehouseId — show "Select warehouse first" placeholder
+  // Per mockup "State A"
+}
+```
+
+**`frontend/components/primitives/warehouse-info-card.tsx`** (NEW):
+
+Used when Mode=Manual/Fleet to show warehouse contact + geofence info (per mockup "State E"):
+
+```tsx
+export function WarehouseInfoCard({ warehouse }: { warehouse: WarehouseOption }) {
+  return (
+    <div className="rounded-lg border bg-muted/30 p-3 text-sm space-y-1">
+      <p className="flex items-center gap-2">
+        <MapPin className="h-4 w-4" />
+        {warehouse.address}
+      </p>
+      {warehouse.primaryContact && (
+        <p className="flex items-center gap-2">
+          <Phone className="h-4 w-4" />
+          {warehouse.primaryContact.name} — {warehouse.primaryContact.phone}
+        </p>
+      )}
+      <p className="flex items-center gap-2 text-muted-foreground">
+        <Target className="h-4 w-4" />
+        Geofence: {warehouse.geofenceRadiusM}m radius
+      </p>
+    </div>
+  );
+}
+```
+
+#### 10.3 Composite Pattern (used in pages)
+
+Standard composition for location pickers:
+
+```tsx
+// frontend/components/orders/location-picker.tsx (NEW)
+export function LocationPicker({
+  label,
+  transportMode,
+  warehouseId, onWarehouseChange,
+  stationId, onStationChange,
+}: {
+  label: "Pickup" | "Drop";
+  transportMode: TransportMode;
+  warehouseId: string | null;
+  onWarehouseChange: (id: string | null) => void;
+  stationId: string | null;
+  onStationChange: (id: string | null) => void;
+}) {
+  const { data: warehouse } = useSWR(
+    warehouseId ? `/api/facility/warehouses/${warehouseId}` : null,
+    () => getWarehouse(warehouseId!),
+  );
+
+  return (
+    <fieldset className="rounded-lg border p-4 space-y-3">
+      <legend className="px-2 font-medium">{label} Location</legend>
+
+      <div className="space-y-1">
+        <label className="text-sm font-medium">Warehouse <span className="text-destructive">*</span></label>
+        <WarehouseCombobox
+          value={warehouseId}
+          onChange={onWarehouseChange}
+          filterByServiceMode={transportMode}
+        />
+      </div>
+
+      {transportMode === 'Amr' && (
+        <div className="space-y-1">
+          <label className="text-sm font-medium">AMR Station <span className="text-destructive">*</span></label>
+          <AmrStationCombobox
+            warehouseId={warehouseId}
+            value={stationId}
+            onChange={onStationChange}
+            filterByType={label === 'Pickup' ? 'Pickup' : 'Dropoff'}
+          />
+        </div>
+      )}
+
+      {transportMode !== 'Amr' && warehouse && (
+        <WarehouseInfoCard warehouse={warehouse} />
+      )}
+    </fieldset>
+  );
+}
+```
+
+#### 10.4 Vehicle List Updates
+
+**`frontend/components/fleet/vehicle-list.tsx`** (modify):
+
+Vehicle core is mode-agnostic; AmrUnit fields shown via lazy join
+
+```tsx
+// API split
+export type VehicleDto = {
+  id: string;
+  registrationCode: string;
+  vehicleTypeId: string;
+  status: 'Available' | 'InUse' | 'OutOfService';
+};
+
+export type AmrUnitDto = {
+  id: string;
+  vehicleId: string;
+  vendorVehicleKey: string;
+  vendorVehicleName?: string;
+  batteryLevel: number;
+  state: 'Idle' | 'Moving' | 'Charging' | 'Maintenance';
+  chargingPolicyName?: string;
+};
+
+// Vehicle list component
+{vehicles.map(v => (
+  <VehicleRow key={v.id} vehicle={v} />
+))}
+
+// Vehicle row composes AMR-specific section if AmrUnit exists
+function VehicleRow({ vehicle }: { vehicle: VehicleDto }) {
+  const { data: amrUnit } = useSWR(
+    `/api/transport-amr/units?vehicleId=${vehicle.id}`,
+    fetcher,
+    { revalidateOnFocus: false },   // amr unit data changes rarely
+  );
+
+  return (
+    <tr>
+      <td>{vehicle.registrationCode}</td>
+      <td><VehicleStatusBadge status={vehicle.status} /></td>
+      {amrUnit && (
+        <>
+          <td>{amrUnit.vendorVehicleName ?? amrUnit.vendorVehicleKey}</td>
+          <td><BatteryIndicator percent={amrUnit.batteryLevel} /></td>
+        </>
+      )}
+    </tr>
+  );
+}
+```
+
+#### 10.5 Pages Affected (full list)
+
+| Page / Component | Change required |
+|---|---|
+| `app/orders/new/page.tsx` | Replace inline station picker with `<LocationPicker>` composite |
+| `app/orders/[id]/edit/page.tsx` | Same as above |
+| `app/orders/[id]/page.tsx` (detail) | Show warehouse + station separately + geofence indicator |
+| `components/dispatch/trip-filter.tsx` | Filter dropdown: Warehouse first, then optional Station |
+| `components/dispatch/trip-items-section.tsx` | Display column for `warehouseCode` + `stationCode` |
+| `components/facility/facility-map.tsx` | Map shows warehouse pins (zoom out) + AMR stations (zoom in) |
+| `components/fleet/vehicle-list.tsx` | Lazy-join AmrUnit data per row |
+| `components/dashboard/robots-analysis-experience.tsx` | Battery KPI sources from AmrUnit instead of Vehicle |
+
+#### 10.6 Component Cleanup
+
+Delete after replacement:
+```bash
+git rm frontend/components/primitives/station-combobox.tsx
+```
+
+All usages now `WarehouseCombobox` + optional `AmrStationCombobox`
+
+### Phase 2 Frontend Manual Smoke Checklist
+
+```
+□ Warehouse picker opens — search by code + name works
+□ Service mode filter — Amr-only orders only show Amr warehouses
+□ AmrStation picker disabled when no warehouse selected
+□ AmrStation picker filtered by warehouse + type
+□ Switching order mode from Amr → Manual hides station picker
+□ Switching back from Manual → Amr shows empty station picker
+□ Manual/Fleet shows WarehouseInfoCard with address + geofence
+□ Order list shows warehouse + station codes per row
+□ Trip filter accepts warehouse + station hierarchy
+□ Vehicle list shows core fields + AmrUnit (battery) lazy-loaded
+□ Facility map zoom out: warehouse pins; zoom in: AMR station layout
+□ Dark mode: all new components readable (design tokens applied)
+□ Accessibility: keyboard navigation through pickers works (Tab + Enter)
+□ Loading states: skeletons appear during fetch
+□ Empty states: "no warehouses serve Amr mode" message appears when applicable
+□ Error states: API failure shows retry button
+```
+
+### Phase 2 Frontend Effort Breakdown
+
+| Task | Effort |
+|---|---|
+| API client split (facility.ts) | 0.5 day |
+| WarehouseCombobox + AmrStationCombobox | 1 day |
+| WarehouseInfoCard + LocationPicker composite | 0.5 day |
+| Pages migration (5+ pages) | 2 days |
+| Vehicle list AmrUnit lazy-join | 0.5 day |
+| Facility map dual-zoom layers | 1 day |
+| Manual smoke + bug fixes | 1.5 days |
+| **Total** | **~7 days** |
 
 ## Verification
 
