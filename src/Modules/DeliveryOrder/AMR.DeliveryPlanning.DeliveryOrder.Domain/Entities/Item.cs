@@ -11,6 +11,14 @@ public class Item : Entity<Guid>
     public string DropLocationCode { get; private set; } = string.Empty;
     public Guid? PickupStationId { get; private set; }
     public Guid? DropStationId { get; private set; }
+
+    // Phase 2.5 — per ADR-002, every order references a Warehouse (building/site);
+    // AMR additionally references a specific Station (dock within the warehouse).
+    // Nullable now (Phase 2.5 just adds the slot); Phase 2.6 wires IWarehouseLookup
+    // into the validation pipeline so PickupWarehouseId / DropWarehouseId actually
+    // get populated alongside PickupStationId / DropStationId.
+    public Guid? PickupWarehouseId { get; private set; }
+    public Guid? DropWarehouseId { get; private set; }
     public int ItemSeq { get; private set; }
     // Upstream-supplied identifier for this item instance (e.g. SAP/ERP item id,
     // scanner barcode). Unique within an order — used by POD scan matching.
@@ -97,6 +105,24 @@ public class Item : Entity<Guid>
     {
         PickupStationId = pickupStationId;
         DropStationId = dropStationId;
+    }
+
+    /// <summary>
+    /// Set the warehouse Ids resolved from PickupLocationCode / DropLocationCode.
+    /// Phase 2.5 introduces the slot; Phase 2.6 wires IWarehouseLookup to call
+    /// this alongside the existing SetStationIds. Internal because warehouse
+    /// resolution belongs to the order validation pipeline (Application layer),
+    /// not arbitrary callers.
+    /// </summary>
+    internal void SetWarehouseIds(Guid pickupWarehouseId, Guid dropWarehouseId)
+    {
+        if (pickupWarehouseId == Guid.Empty)
+            throw new ArgumentException("PickupWarehouseId must not be empty.", nameof(pickupWarehouseId));
+        if (dropWarehouseId == Guid.Empty)
+            throw new ArgumentException("DropWarehouseId must not be empty.", nameof(dropWarehouseId));
+
+        PickupWarehouseId = pickupWarehouseId;
+        DropWarehouseId = dropWarehouseId;
     }
 
     internal void UpdateStatus(ItemStatus status) => Status = status;

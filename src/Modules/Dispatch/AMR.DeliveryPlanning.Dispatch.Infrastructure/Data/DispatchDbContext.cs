@@ -59,6 +59,14 @@ public class DispatchDbContext : DbContext
             builder.Property(t => t.TemplateNameAtDispatch).HasMaxLength(200);
             builder.Property(t => t.VendorRequestSnapshot).HasColumnType("jsonb");
             builder.Property(t => t.VendorFinalSnapshot).HasColumnType("jsonb");
+            // Phase 2.5 — warehouse Ids snapshotted at dispatch (per ADR-002).
+            // Nullable for now; existing CreateForEnvelope callers don't pass
+            // them yet. Phase 2.6 wires resolution at the command-handler
+            // layer so every new Trip carries both Ids.
+            builder.Property(t => t.PickupWarehouseId);
+            builder.Property(t => t.DropWarehouseId);
+            builder.Property(t => t.PickupStationId);
+            builder.Property(t => t.DropStationId);
             // UpperKey is the RIOT3 correlation key (and unique). Legacy
             // job/task trips (which had null UpperKey) were dropped in
             // Phase b7 — all surviving rows are envelope-dispatched.

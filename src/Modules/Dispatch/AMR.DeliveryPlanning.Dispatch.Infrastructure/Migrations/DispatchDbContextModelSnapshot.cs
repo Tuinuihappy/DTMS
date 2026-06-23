@@ -152,6 +152,9 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.Property<Guid?>("DropStationId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("DropWarehouseId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("FailureReason")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -160,6 +163,9 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("PickupStationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PickupWarehouseId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("PreviousAttemptId")

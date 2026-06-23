@@ -132,6 +132,9 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                     b.Property<Guid?>("DropStationId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("DropWarehouseId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("DroppedOffAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("DroppedOffAt");
@@ -160,6 +163,9 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
                         .HasColumnName("PickupLocationCode");
 
                     b.Property<Guid?>("PickupStationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PickupWarehouseId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Status")

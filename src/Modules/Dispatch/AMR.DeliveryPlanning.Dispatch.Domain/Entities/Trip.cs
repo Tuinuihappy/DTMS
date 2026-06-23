@@ -50,6 +50,15 @@ public class Trip : AggregateRoot<Guid>
     public Guid? PickupStationId { get; private set; }
     public Guid? DropStationId { get; private set; }
 
+    // Phase 2.5 — snapshot the warehouse Ids at create time. Mirrors the
+    // existing StationId snapshot pattern but at the building level (per
+    // ADR-002): every trip is associated with a pickup + drop warehouse,
+    // even Manual / Fleet that don't have specific stations. Nullable now
+    // because the existing CreateForEnvelope callers don't supply them
+    // yet — Phase 2.6 wires resolution into the create command handler.
+    public Guid? PickupWarehouseId { get; private set; }
+    public Guid? DropWarehouseId { get; private set; }
+
     // Retry chain. First dispatch = 1, each retry increments.
     // PreviousAttemptId points to the trip this one supersedes (null for
     // first attempt). See TripRetryEvent for the immutable audit record.
@@ -101,7 +110,9 @@ public class Trip : AggregateRoot<Guid>
         string? templateNameAtDispatch = null,
         int? priorityAtDispatch = null,
         string? vendorRequestSnapshot = null,
-        Guid? jobId = null)
+        Guid? jobId = null,
+        Guid? pickupWarehouseId = null,
+        Guid? dropWarehouseId = null)
     {
         if (string.IsNullOrWhiteSpace(upperKey))
             throw new ArgumentException("UpperKey must not be empty.", nameof(upperKey));
@@ -125,6 +136,8 @@ public class Trip : AggregateRoot<Guid>
             VendorOrderKey = trimmedVendor,
             PickupStationId = pickupStationId,
             DropStationId = dropStationId,
+            PickupWarehouseId = pickupWarehouseId,
+            DropWarehouseId = dropWarehouseId,
             AttemptNumber = attemptNumber,
             PreviousAttemptId = previousAttemptId,
             TemplateNameAtDispatch = string.IsNullOrWhiteSpace(templateNameAtDispatch) ? null : templateNameAtDispatch.Trim(),
