@@ -329,6 +329,11 @@ public static class ModuleServiceRegistration
             AMR.DeliveryPlanning.Dispatch.Application.Services.DispatchStrategyRegistry>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IVendorOperationsRouter,
             AMR.DeliveryPlanning.Dispatch.Application.Services.VendorOperationsRouter>();
+        // Phase 1.2 — AMR strategy scaffolding. Registered so the registry can
+        // resolve it, but throws if invoked (production AMR dispatch still
+        // runs through DispatchOrderTemplateService; Phase 3 will switch over).
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IDispatchStrategy,
+            AMR.DeliveryPlanning.Api.Adapters.AmrDispatchStrategy>();
         services.AddScoped<IDispatchOrderTemplateService, DispatchOrderTemplateService>();
         services.Configure<AMR.DeliveryPlanning.Planning.Application.Options.DispatchOptions>(
             configuration.GetSection(AMR.DeliveryPlanning.Planning.Application.Options.DispatchOptions.SectionName));
