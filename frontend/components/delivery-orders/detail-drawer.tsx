@@ -8,6 +8,7 @@ import {
   Check,
   ChevronRight,
   Clock,
+  Copy,
   Hash,
   History,
   PauseCircle,
@@ -49,7 +50,8 @@ type Action =
   | "hold"
   | "release"
   | "reject"
-  | "abandon";
+  | "abandon"
+  | "reorder";
 
 const ORDER_IN_FLIGHT_STATES = [
   "Confirmed",
@@ -648,6 +650,16 @@ export function OrderDetailDrawer({
                         Abandon (no active trips)
                       </DrawerActionButton>
                     )}
+                  {/* Reorder — always available. Source order is never
+                      modified; a fresh draft is opened with items copied
+                      over (orderRef + service window cleared). */}
+                  <DrawerActionButton
+                    tone="sky"
+                    icon={<Copy className="h-3.5 w-3.5" strokeWidth={2.4} />}
+                    onClick={() => onAction("reorder", data.id)}
+                  >
+                    Reorder
+                  </DrawerActionButton>
                   <button
                     type="button"
                     onClick={onClose}

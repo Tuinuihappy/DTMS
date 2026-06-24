@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   Activity,
   Clock,
+  Copy,
   Hash,
   Pencil,
   Power,
@@ -22,6 +23,7 @@ export function ActionTemplateDrawer({
   busy = false,
   onClose,
   onEdit,
+  onDuplicate,
   onToggleActive,
   onDelete,
 }: {
@@ -30,6 +32,7 @@ export function ActionTemplateDrawer({
   busy?: boolean;
   onClose: () => void;
   onEdit: (t: ActionTemplateDto) => void;
+  onDuplicate: (t: ActionTemplateDto) => void;
   onToggleActive: (t: ActionTemplateDto) => void;
   onDelete: (t: ActionTemplateDto) => void;
 }) {
@@ -198,6 +201,14 @@ export function ActionTemplateDrawer({
                   disabled={busy}
                 >
                   {template.isActive ? "Deactivate" : "Activate"}
+                </DrawerAction>
+                <DrawerAction
+                  variant="ghost"
+                  icon={<Copy className="h-3.5 w-3.5" />}
+                  onClick={() => onDuplicate(template)}
+                  disabled={busy}
+                >
+                  Duplicate
                 </DrawerAction>
                 <DrawerAction
                   variant="primary"

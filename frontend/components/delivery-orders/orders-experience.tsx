@@ -279,6 +279,10 @@ function ExperienceInner() {
   // fully-fetched detail (not the list dto) so advanced fields like
   // hazmat/dimensions are available for preservation on save.
   const [editingOrder, setEditingOrder] = useState<DeliveryOrderDetailDto | null>(null);
+  // Reorder mode — pre-fills the create dialog from an existing order
+  // but submits as a fresh POST. orderRef and serviceWindow are cleared
+  // inside the dialog; items are kept verbatim.
+  const [reorderingOrder, setReorderingOrder] = useState<DeliveryOrderDetailDto | null>(null);
   const [busy, setBusy] = useState(false);
   // Cancel dialog state — single-target uses `cancelTarget`; bulk uses
   // `bulkCancelTargets` (the dialog component is the same, but bulk
@@ -640,6 +644,27 @@ function ExperienceInner() {
     [toast],
   );
 
+  // Reorder works for any status — the source order keeps its current
+  // state; we just clone the items + metadata into a new draft create.
+  const openReorder = useCallback(
+    async (id: string) => {
+      try {
+        const detail = await getOrder(id);
+        // Close the detail drawer if it was the entry point — the
+        // create dialog is wider and would otherwise stack visibly
+        // on top of an open drawer.
+        setDetailId(null);
+        setReorderingOrder(detail);
+      } catch (e) {
+        toast.push({
+          tone: "error",
+          message: `Couldn't load order: ${(e as Error).message}`,
+        });
+      }
+    },
+    [toast],
+  );
+
   // Submit/confirm fire immediately; delete routes through the cancel
   // dialog so we can capture the reason the backend's audit log expects.
   // Edit opens the create dialog in edit mode (fetches full detail first).
@@ -647,6 +672,7 @@ function ExperienceInner() {
     async (
       action:
         | "edit"
+        | "reorder"
         | "submit"
         | "confirm"
         | "delete"
@@ -664,6 +690,11 @@ function ExperienceInner() {
 
       if (action === "edit") {
         void openEdit(id);
+        return;
+      }
+
+      if (action === "reorder") {
+        void openReorder(id);
         return;
       }
 
@@ -789,6 +820,7 @@ function ExperienceInner() {
       totalCount,
       detailId,
       openEdit,
+      openReorder,
       flushCancel,
       undoCancel,
       fetchOrders,
@@ -991,7 +1023,11 @@ function ExperienceInner() {
         onOpenOrder={(id) => setDetailId(id)}
         onAction={async (a, id) => {
           await runAction(a, id);
-          if (a !== "delete") {
+          // Re-open the drawer after state-changing actions so the user
+          // sees the new status. Skip for delete (source is gone) and
+          // reorder (the create dialog opens on top — leaving the drawer
+          // underneath looks cluttered).
+          if (a !== "delete" && a !== "reorder") {
             setTimeout(() => setDetailId(id), 50);
           }
         }}
@@ -1071,6 +1107,20 @@ function ExperienceInner() {
             setDetailId(null);
             setTimeout(() => setDetailId(editingOrder.id), 60);
           }
+        }}
+      />
+
+      <CreateOrderDialog
+        open={reorderingOrder !== null}
+        duplicating={reorderingOrder}
+        onClose={() => setReorderingOrder(null)}
+        onCreated={() => {
+          toast.push({
+            tone: "success",
+            message: `Reorder created from ${reorderingOrder?.orderRef ?? "source"}`,
+          });
+          fetchOrders({ silent: true });
+          fetchStats();
         }}
       />
 

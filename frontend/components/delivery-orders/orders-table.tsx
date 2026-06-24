@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Check,
   ChevronRight,
+  Copy,
   MoreHorizontal,
   Pencil,
   Send,
@@ -19,6 +20,7 @@ import type {
 import { PriorityBadge, StatusBadge, TransportModeBadge } from "./badges";
 import { Highlight } from "./highlight";
 import { DateTime } from "@/components/primitives/date-time";
+import { RowMenuPortal } from "@/components/primitives/row-menu-portal";
 import {
   DataRow,
   DataTableBody,
@@ -33,7 +35,7 @@ import {
   resolveEmptyStateVariant,
 } from "@/components/primitives/data-table";
 
-type RowAction = "edit" | "submit" | "confirm" | "delete";
+type RowAction = "edit" | "reorder" | "submit" | "confirm" | "delete";
 
 export type SortColumn =
   | "createdDate"
@@ -54,6 +56,9 @@ function allowedActions(o: DeliveryOrderListDto): RowAction[] {
   if (SUBMITTABLE.includes(o.orderStatus)) out.push("submit");
   if (CONFIRMABLE.includes(o.orderStatus)) out.push("confirm");
   if (DELETABLE.includes(o.orderStatus)) out.push("delete");
+  // Reorder is always available — the source order is unchanged, and a
+  // fresh draft can be made from any past order regardless of status.
+  out.push("reorder");
   return out;
 }
 
@@ -352,19 +357,12 @@ function RowMenu({
 }) {
   const [open, setOpen] = useState(false);
   const actions = allowedActions(order);
-  useEffect(() => {
-    if (!open) return;
-    const handle = () => setOpen(false);
-    const t = setTimeout(() => window.addEventListener("click", handle), 0);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener("click", handle);
-    };
-  }, [open]);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+    <div className="inline-block" onClick={(e) => e.stopPropagation()}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="rounded-md p-1.5 text-[var(--color-ink-500)] opacity-0 transition-all group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--color-ink-100)] hover:text-[var(--color-ink-900)] dark:hover:bg-white/10"
@@ -374,59 +372,61 @@ function RowMenu({
       >
         <MoreHorizontal className="h-4 w-4" strokeWidth={2.2} />
       </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.94, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -4, transition: { duration: 0.12 } }}
-            transition={{ type: "spring", stiffness: 460, damping: 30 }}
-            role="menu"
-            aria-label={`Actions for ${order.orderRef}`}
-            className="absolute right-0 z-20 mt-1 w-44 origin-top-right overflow-hidden rounded-xl glass-strong shadow-[0_20px_50px_-15px_rgba(15,23,42,0.35)]"
+      <RowMenuPortal
+        open={open}
+        onClose={() => setOpen(false)}
+        triggerRef={triggerRef}
+        width={176}
+        ariaLabel={`Actions for ${order.orderRef}`}
+      >
+        <MenuItem onClick={() => { setOpen(false); onOpenDetail(); }}>
+          <ChevronRight className="h-3.5 w-3.5" strokeWidth={2.2} />
+          View details
+        </MenuItem>
+        {actions.includes("edit") && (
+          <MenuItem
+            onClick={() => { setOpen(false); onAction("edit", order); }}
           >
-            <MenuItem onClick={() => { setOpen(false); onOpenDetail(); }}>
-              <ChevronRight className="h-3.5 w-3.5" strokeWidth={2.2} />
-              View details
-            </MenuItem>
-            {actions.includes("edit") && (
-              <MenuItem
-                onClick={() => { setOpen(false); onAction("edit", order); }}
-              >
-                <Pencil className="h-3.5 w-3.5" strokeWidth={2.2} />
-                Edit draft
-              </MenuItem>
-            )}
-            {actions.includes("submit") && (
-              <MenuItem
-                tone="brand"
-                onClick={() => { setOpen(false); onAction("submit", order); }}
-              >
-                <Send className="h-3.5 w-3.5" strokeWidth={2.2} />
-                Submit
-              </MenuItem>
-            )}
-            {actions.includes("confirm") && (
-              <MenuItem
-                tone="success"
-                onClick={() => { setOpen(false); onAction("confirm", order); }}
-              >
-                <Check className="h-3.5 w-3.5" strokeWidth={2.2} />
-                Confirm
-              </MenuItem>
-            )}
-            {actions.includes("delete") && (
-              <MenuItem
-                tone="coral"
-                onClick={() => { setOpen(false); onAction("delete", order); }}
-              >
-                <Trash2 className="h-3.5 w-3.5" strokeWidth={2.2} />
-                Cancel order
-              </MenuItem>
-            )}
-          </motion.div>
+            <Pencil className="h-3.5 w-3.5" strokeWidth={2.2} />
+            Edit draft
+          </MenuItem>
         )}
-      </AnimatePresence>
+        {actions.includes("reorder") && (
+          <MenuItem
+            onClick={() => { setOpen(false); onAction("reorder", order); }}
+          >
+            <Copy className="h-3.5 w-3.5" strokeWidth={2.2} />
+            Reorder
+          </MenuItem>
+        )}
+        {actions.includes("submit") && (
+          <MenuItem
+            tone="brand"
+            onClick={() => { setOpen(false); onAction("submit", order); }}
+          >
+            <Send className="h-3.5 w-3.5" strokeWidth={2.2} />
+            Submit
+          </MenuItem>
+        )}
+        {actions.includes("confirm") && (
+          <MenuItem
+            tone="success"
+            onClick={() => { setOpen(false); onAction("confirm", order); }}
+          >
+            <Check className="h-3.5 w-3.5" strokeWidth={2.2} />
+            Confirm
+          </MenuItem>
+        )}
+        {actions.includes("delete") && (
+          <MenuItem
+            tone="coral"
+            onClick={() => { setOpen(false); onAction("delete", order); }}
+          >
+            <Trash2 className="h-3.5 w-3.5" strokeWidth={2.2} />
+            Cancel order
+          </MenuItem>
+        )}
+      </RowMenuPortal>
     </div>
   );
 }

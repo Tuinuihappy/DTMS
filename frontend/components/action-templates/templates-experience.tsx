@@ -84,6 +84,7 @@ export function ActionTemplatesExperience() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<ActionTemplateDto | null>(null);
+  const [duplicating, setDuplicating] = useState<ActionTemplateDto | null>(null);
   const [selected, setSelected] = useState<ActionTemplateDto | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ActionTemplateDto | null>(null);
@@ -228,6 +229,7 @@ export function ActionTemplatesExperience() {
             whileHover={{ y: -1 }}
             onClick={() => {
               setEditing(null);
+              setDuplicating(null);
               setCreateOpen(true);
             }}
             className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-4 py-2 text-[12.5px] font-semibold text-white shadow-[0_6px_22px_-8px_rgba(15,23,42,0.55)] transition-shadow hover:shadow-[0_8px_28px_-8px_rgba(15,23,42,0.65)] dark:bg-[var(--color-brand-500)]"
@@ -373,12 +375,18 @@ export function ActionTemplatesExperience() {
           onClearFilters={clearFilters}
           onCreate={() => {
             setEditing(null);
+            setDuplicating(null);
             setCreateOpen(true);
           }}
           onOpenDetail={(t) => setSelected(t)}
           onAction={(action, t) => {
             if (action === "edit") {
+              setDuplicating(null);
               setEditing(t);
+              setCreateOpen(true);
+            } else if (action === "duplicate") {
+              setEditing(null);
+              setDuplicating(t);
               setCreateOpen(true);
             } else if (action === "toggle") {
               void handleToggleActive(t);
@@ -409,11 +417,23 @@ export function ActionTemplatesExperience() {
       <ActionTemplateDialog
         open={createOpen}
         editing={editing}
-        onClose={() => setCreateOpen(false)}
+        duplicating={duplicating}
+        onClose={() => {
+          setCreateOpen(false);
+          setDuplicating(null);
+          setEditing(null);
+        }}
         onSaved={() => {
           void refresh();
           void refreshStats();
-          flash("ok", editing ? "Template updated." : "Template created.");
+          flash(
+            "ok",
+            editing
+              ? "Template updated."
+              : duplicating
+                ? "Template duplicated."
+                : "Template created.",
+          );
         }}
       />
 
@@ -423,7 +443,14 @@ export function ActionTemplatesExperience() {
         busy={busyId === selected?.id}
         onClose={() => setSelected(null)}
         onEdit={(t) => {
+          setDuplicating(null);
           setEditing(t);
+          setSelected(null);
+          setCreateOpen(true);
+        }}
+        onDuplicate={(t) => {
+          setEditing(null);
+          setDuplicating(t);
           setSelected(null);
           setCreateOpen(true);
         }}

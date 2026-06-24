@@ -2,6 +2,7 @@
 
 import {
   ChevronRight,
+  Copy,
   MoreHorizontal,
   Pencil,
   Power,
@@ -10,11 +11,12 @@ import {
   Workflow,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ActionTemplateDto } from "@/lib/api/action-templates";
 import { Highlight } from "@/components/delivery-orders/highlight";
 import { DateTime } from "@/components/primitives/date-time";
+import { RowMenuPortal } from "@/components/primitives/row-menu-portal";
 import {
   DataRow,
   DataTableBody,
@@ -32,7 +34,7 @@ import {
 export type SortColumn = "actionName" | "actionCategory" | "isActive" | "modifiedAt";
 export type SortDir = "asc" | "desc";
 
-type RowAction = "edit" | "toggle" | "delete";
+type RowAction = "edit" | "duplicate" | "toggle" | "delete";
 
 function paramPreview(t: ActionTemplateDto): { key: string; value: string }[] {
   return t.actionParameters.map((p) => ({
@@ -363,19 +365,12 @@ function RowMenu({
   onOpenDetail: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    const handle = () => setOpen(false);
-    const t = setTimeout(() => window.addEventListener("click", handle), 0);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener("click", handle);
-    };
-  }, [open]);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+    <div className="inline-block" onClick={(e) => e.stopPropagation()}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={busy}
@@ -386,58 +381,61 @@ function RowMenu({
       >
         <MoreHorizontal className="h-4 w-4" strokeWidth={2.2} />
       </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.94, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -4, transition: { duration: 0.12 } }}
-            transition={{ type: "spring", stiffness: 460, damping: 30 }}
-            role="menu"
-            aria-label={`Actions for ${template.actionName}`}
-            className="absolute right-0 z-20 mt-1 w-48 origin-top-right overflow-hidden rounded-xl glass-strong shadow-[0_20px_50px_-15px_rgba(15,23,42,0.35)]"
-          >
-            <MenuItem
-              onClick={() => {
-                setOpen(false);
-                onOpenDetail();
-              }}
-            >
-              <ChevronRight className="h-3.5 w-3.5" strokeWidth={2.2} />
-              View details
-            </MenuItem>
-            <MenuItem
-              onClick={() => {
-                setOpen(false);
-                onAction("edit", template);
-              }}
-            >
-              <Pencil className="h-3.5 w-3.5" strokeWidth={2.2} />
-              Edit template
-            </MenuItem>
-            <MenuItem
-              tone={template.isActive ? "default" : "success"}
-              onClick={() => {
-                setOpen(false);
-                onAction("toggle", template);
-              }}
-            >
-              <Power className="h-3.5 w-3.5" strokeWidth={2.2} />
-              {template.isActive ? "Deactivate" : "Activate"}
-            </MenuItem>
-            <MenuItem
-              tone="coral"
-              onClick={() => {
-                setOpen(false);
-                onAction("delete", template);
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" strokeWidth={2.2} />
-              Delete template
-            </MenuItem>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <RowMenuPortal
+        open={open}
+        onClose={() => setOpen(false)}
+        triggerRef={triggerRef}
+        width={192}
+        ariaLabel={`Actions for ${template.actionName}`}
+      >
+        <MenuItem
+          onClick={() => {
+            setOpen(false);
+            onOpenDetail();
+          }}
+        >
+          <ChevronRight className="h-3.5 w-3.5" strokeWidth={2.2} />
+          View details
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setOpen(false);
+            onAction("edit", template);
+          }}
+        >
+          <Pencil className="h-3.5 w-3.5" strokeWidth={2.2} />
+          Edit template
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setOpen(false);
+            onAction("duplicate", template);
+          }}
+        >
+          <Copy className="h-3.5 w-3.5" strokeWidth={2.2} />
+          Duplicate template
+        </MenuItem>
+        <MenuItem
+          tone={template.isActive ? "default" : "success"}
+          onClick={() => {
+            setOpen(false);
+            onAction("toggle", template);
+          }}
+        >
+          <Power className="h-3.5 w-3.5" strokeWidth={2.2} />
+          {template.isActive ? "Deactivate" : "Activate"}
+        </MenuItem>
+        <MenuItem
+          tone="coral"
+          onClick={() => {
+            setOpen(false);
+            onAction("delete", template);
+          }}
+        >
+          <Trash2 className="h-3.5 w-3.5" strokeWidth={2.2} />
+          Delete template
+        </MenuItem>
+      </RowMenuPortal>
     </div>
   );
 }

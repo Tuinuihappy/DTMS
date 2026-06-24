@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
+  Copy,
   Loader2,
   Plus,
   Sliders,
@@ -219,6 +220,7 @@ function buildPayload(form: FormState): CreateOrderPayload {
 export function CreateOrderDialog({
   open,
   editing = null,
+  duplicating = null,
   onClose,
   onCreated,
 }: {
@@ -228,10 +230,17 @@ export function CreateOrderDialog({
   // POST, and the orderRef field becomes read-only (the backend
   // doesn't allow renaming on update).
   editing?: DeliveryOrderDetailDto | null;
+  // Reorder mode — pre-fills from an existing order but submits as a
+  // fresh create (POST). Resets fields that can't be reused:
+  // orderRef (unique) and serviceWindow (dates from the source order
+  // would be stale). items[] are kept verbatim. Ignored if `editing`
+  // is also set — edit wins.
+  duplicating?: DeliveryOrderDetailDto | null;
   onClose: () => void;
   onCreated: () => void;
 }) {
   const isEdit = editing !== null;
+  const isDuplicate = !isEdit && duplicating !== null;
   const [step, setStep] = useState<0 | 1>(0);
   const [form, setForm] = useState<FormState>(blankForm);
   const [submitting, setSubmitting] = useState(false);
@@ -254,10 +263,25 @@ export function CreateOrderDialog({
   useEffect(() => {
     if (open) {
       setStep(0);
-      setForm(editing ? formFromOrder(editing) : blankForm());
+      if (editing) {
+        setForm(formFromOrder(editing));
+      } else if (duplicating) {
+        // Pre-fill from the source order, but clear the fields that
+        // can't be reused. The user picks a new orderRef and decides
+        // whether to set a new service window.
+        const base = formFromOrder(duplicating);
+        setForm({
+          ...base,
+          orderRef: "",
+          windowEarliest: "",
+          windowLatest: "",
+        });
+      } else {
+        setForm(blankForm());
+      }
       setError(null);
     }
-  }, [open, editing]);
+  }, [open, editing, duplicating]);
 
   useEffect(() => {
     if (!open) return;
@@ -325,7 +349,11 @@ export function CreateOrderDialog({
     } catch (e) {
       setError(
         (e as Error).message ||
-          (editing ? "Failed to update order." : "Failed to create order."),
+          (editing
+            ? "Failed to update order."
+            : isDuplicate
+              ? "Failed to create reorder."
+              : "Failed to create order."),
       );
     } finally {
       setSubmitting(false);
@@ -366,7 +394,9 @@ export function CreateOrderDialog({
                   <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--color-ink-400)]">
                     {isEdit
                       ? `Edit draft · ${editing!.orderRef} · Step ${step + 1} / 2`
-                      : `New delivery order · Step ${step + 1} / 2`}
+                      : isDuplicate
+                        ? `Reorder of ${duplicating!.orderRef} · Step ${step + 1} / 2`
+                        : `New delivery order · Step ${step + 1} / 2`}
                   </div>
                   <h2 className="font-display mt-1 text-[1.4rem] font-semibold text-[var(--color-ink-900)]">
                     {step === 0 ? "Order details" : "Pick & drop"}
@@ -406,6 +436,22 @@ export function CreateOrderDialog({
                       transition={{ duration: 0.2 }}
                       className="space-y-4"
                     >
+                      {isDuplicate && (
+                        <div className="flex items-start gap-2.5 rounded-[var(--radius-sm)] border border-[var(--color-brand-500)]/25 bg-[var(--color-pastel-sky)]/50 px-3 py-2.5 text-[12.5px] text-[var(--color-brand-900)] dark:border-[var(--color-brand-500)]/30 dark:bg-[var(--color-brand-500)]/[0.08] dark:text-[var(--color-pastel-sky-ink)]">
+                          <Copy className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2.2} />
+                          <div className="min-w-0">
+                            <div className="font-semibold">Reordering from an existing order</div>
+                            <div className="mt-0.5 text-[11.5px] opacity-80">
+                              Source:{" "}
+                              <span className="font-mono font-semibold">
+                                {duplicating!.orderRef}
+                              </span>
+                              . Items are copied — enter a fresh order reference and review the
+                              service window before saving.
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       <Field label="Order reference" required>
                         <input
                           value={form.orderRef}
@@ -1020,10 +1066,14 @@ export function CreateOrderDialog({
                       {submitting
                         ? isEdit
                           ? "Saving…"
-                          : "Creating…"
+                          : isDuplicate
+                            ? "Creating reorder…"
+                            : "Creating…"
                         : isEdit
                           ? "Save changes"
-                          : "Create order"}
+                          : isDuplicate
+                            ? "Create reorder"
+                            : "Create order"}
                     </motion.button>
                   )}
                 </div>

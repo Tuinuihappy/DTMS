@@ -8,6 +8,7 @@ import {
   ArrowUp,
   Check,
   ChevronDown,
+  Copy,
   GripVertical,
   Layers,
   Map as MapIcon,
@@ -221,13 +222,31 @@ function validate(form: FormState): string | null {
 
 export function TemplateEditor({
   existing,
+  duplicating,
 }: {
   existing?: OrderTemplateDto | null;
+  // Source template when the user is duplicating. The editor runs in
+  // create mode (submit goes to createOrderTemplate) but pre-fills from
+  // this template and shows a "copied-from" banner. Ignored if
+  // `existing` is also set — edit wins.
+  duplicating?: OrderTemplateDto | null;
 }) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(() =>
-    existing ? formFromDto(existing) : emptyForm(),
-  );
+  const isEdit = !!existing;
+  const isDuplicate = !isEdit && !!duplicating;
+  // Source DTO whose values seed the form when present. The editor
+  // treats edit and duplicate identically up until submit — both
+  // pre-fill from a DTO, only the verb at the end differs.
+  const sourceDto = existing ?? duplicating ?? null;
+
+  const [form, setForm] = useState<FormState>(() => {
+    if (existing) return formFromDto(existing);
+    if (duplicating) {
+      const base = formFromDto(duplicating);
+      return { ...base, name: `${base.name} (Copy)` };
+    }
+    return emptyForm();
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -243,25 +262,31 @@ export function TemplateEditor({
   const actionTemplates = useActionTemplateOptions();
 
   useEffect(() => {
-    if (existing) setForm(formFromDto(existing));
-  }, [existing]);
+    if (existing) {
+      setForm(formFromDto(existing));
+    } else if (duplicating) {
+      const base = formFromDto(duplicating);
+      setForm({ ...base, name: `${base.name} (Copy)` });
+    }
+  }, [existing, duplicating]);
 
   // Pickup/drop codes aren't in the read DTO (only the resolved
   // station ids are), so on edit-mode entry we resolve them from the
   // shared station catalog once it loads. Run-once per template id so
   // a user clearing or retyping the field doesn't get clobbered when
-  // stations re-fetch.
+  // stations re-fetch. Duplicate mode hits the same path — the codes
+  // come from the source template's resolved ids.
   const stationCodeAutoFilledForRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!existing) return;
+    if (!sourceDto) return;
     if (stations.loading || stations.error) return;
-    if (stationCodeAutoFilledForRef.current === existing.id) return;
-    stationCodeAutoFilledForRef.current = existing.id;
-    const pickup = existing.pickupStationId
-      ? (stations.byId.get(existing.pickupStationId) ?? "")
+    if (stationCodeAutoFilledForRef.current === sourceDto.id) return;
+    stationCodeAutoFilledForRef.current = sourceDto.id;
+    const pickup = sourceDto.pickupStationId
+      ? (stations.byId.get(sourceDto.pickupStationId) ?? "")
       : "";
-    const drop = existing.dropStationId
-      ? (stations.byId.get(existing.dropStationId) ?? "")
+    const drop = sourceDto.dropStationId
+      ? (stations.byId.get(sourceDto.dropStationId) ?? "")
       : "";
     if (!pickup && !drop) return;
     setForm((f) => ({
@@ -269,9 +294,7 @@ export function TemplateEditor({
       pickupStationCode: f.pickupStationCode || pickup,
       dropStationCode: f.dropStationCode || drop,
     }));
-  }, [existing, stations.loading, stations.error, stations.byId]);
-
-  const isEdit = !!existing;
+  }, [sourceDto, stations.loading, stations.error, stations.byId]);
   const moveMissionCount = form.missions.filter((m) => m.type === "MOVE").length;
   const actMissionCount = form.missions.length - moveMissionCount;
 
@@ -333,6 +356,9 @@ export function TemplateEditor({
         router.push(`/delivery-orders/order-templates?updated=${existing.id}`);
         router.refresh();
       } else {
+        // Both fresh-create and duplicate land here — duplicate just
+        // happens to have a pre-filled form. The server sees an
+        // ordinary create POST either way.
         const created = await createOrderTemplate({
           ...payloadBase,
           name: form.name.trim(),
@@ -360,14 +386,23 @@ export function TemplateEditor({
           </Link>
           <div className="min-w-0">
             <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[var(--color-ink-400)]">
-              {isEdit ? "Edit order template" : "New order template"}
+              {isEdit
+                ? "Edit order template"
+                : isDuplicate
+                  ? "Duplicate order template"
+                  : "New order template"}
             </div>
             <h1 className="font-display mt-1 text-[1.6rem] font-semibold text-[var(--color-ink-900)] sm:text-[1.8rem]">
-              {isEdit ? existing!.name : "Compose a reusable order recipe"}
+              {isEdit
+                ? existing!.name
+                : isDuplicate
+                  ? `Duplicate of ${duplicating!.name}`
+                  : "Compose a reusable order recipe"}
             </h1>
             <p className="mt-1 max-w-md text-[12.5px] text-[var(--color-ink-500)]">
-              Author missions once, then dispatch live RIOT3 orders in one click —
-              with optional overrides and a dry-run preview.
+              {isDuplicate
+                ? "Review and edit the copied data, then save as a new template. The original is unchanged."
+                : "Author missions once, then dispatch live RIOT3 orders in one click — with optional overrides and a dry-run preview."}
             </p>
           </div>
         </div>
@@ -396,10 +431,39 @@ export function TemplateEditor({
             ) : (
               <Save className="h-3.5 w-3.5" strokeWidth={2.3} />
             )}
-            {busy ? "Saving…" : isEdit ? "Save changes" : "Create template"}
+            {busy
+              ? isEdit
+                ? "Saving…"
+                : isDuplicate
+                  ? "Creating copy…"
+                  : "Creating…"
+              : isEdit
+                ? "Save changes"
+                : isDuplicate
+                  ? "Create copy"
+                  : "Create template"}
           </motion.button>
         </div>
       </div>
+
+      {isDuplicate && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-start gap-2.5 rounded-[var(--radius-sm)] border border-[var(--color-brand-500)]/25 bg-[var(--color-pastel-sky)]/50 px-3.5 py-2.5 text-[12.5px] text-[var(--color-brand-900)] dark:border-[var(--color-brand-500)]/30 dark:bg-[var(--color-brand-500)]/[0.08] dark:text-[var(--color-pastel-sky-ink)]"
+        >
+          <Copy className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2.2} />
+          <div className="min-w-0">
+            <div className="font-semibold">Duplicating an existing template</div>
+            <div className="mt-0.5 text-[11.5px] opacity-80">
+              Original:{" "}
+              <span className="font-mono font-semibold">{duplicating!.name}</span>.
+              All fields are pre-filled — change anything before saving as a new
+              template.
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {(error || validationError) && (
         <motion.div

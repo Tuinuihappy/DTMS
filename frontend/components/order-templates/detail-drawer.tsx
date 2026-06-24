@@ -6,6 +6,7 @@ import {
   Anchor,
   ArrowRight,
   Clock,
+  Copy,
   FileStack,
   Hash,
   Layers,
@@ -235,6 +236,13 @@ export function OrderTemplateDrawer({
                 >
                   {template.isActive ? "Deactivate" : "Activate"}
                 </DrawerAction>
+                <DrawerLink
+                  variant="ghost"
+                  icon={<Copy className="h-3.5 w-3.5" />}
+                  href={`/delivery-orders/order-templates/${template.id}/duplicate`}
+                >
+                  Duplicate
+                </DrawerLink>
                 <DrawerLink
                   variant="ghost"
                   icon={<Pencil className="h-3.5 w-3.5" />}
