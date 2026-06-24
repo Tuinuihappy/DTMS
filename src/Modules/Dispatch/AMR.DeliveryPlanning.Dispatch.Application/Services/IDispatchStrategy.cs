@@ -1,22 +1,23 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Dispatch.Application.Services;
 
 /// <summary>
-/// Per-mode dispatch contract — turns a created <see cref="Trip"/> into
-/// an external action (RIOT3 envelope POST for AMR, push notification
-/// for Manual, 3PL shipment POST for Fleet). Implementations live in the
-/// transport-mode modules; the registry resolves the right one based on
-/// the order's <see cref="TransportMode"/>.
+/// Per-mode dispatch contract — given a station/warehouse pair + order
+/// context, dispatch the work to the appropriate external system.
 ///
-/// Phase 1 has only the AMR implementation; Phase 4 + 5 add Manual and
-/// Fleet without touching Dispatch. The trade-off vs. having a single
-/// vendor adapter is that dispatch flows (build request payload, call
-/// vendor, persist vendor key) genuinely differ per mode — strategy
-/// keeps each mode's flow self-contained instead of forcing if/else
-/// chains into Dispatch handlers.
+/// AMR (Phase 3c) → wraps the existing OrderTemplate resolution + RIOT3
+/// POST + Trip creation. Manual (Phase 4) → push notification to
+/// operator + persists Trip with no vendor key. Fleet (Phase 5) → 3PL
+/// shipment POST + Waybill record + Trip.
+///
+/// Group-level contract (not Trip-level) because today's AMR flow is
+/// vendor-first: the Trip Id is the OUTCOME, not the input. A Trip-first
+/// contract would force the consumer to mint a placeholder Trip with an
+/// idempotency token, then patch it after vendor accept — a refactor we
+/// defer until Phase 4 picks a Manual flow that genuinely benefits from
+/// trip-first lifecycle.
 /// </summary>
 public interface IDispatchStrategy
 {
@@ -24,18 +25,43 @@ public interface IDispatchStrategy
     TransportMode Mode { get; }
 
     /// <summary>
-    /// Dispatch the trip to its external system. Returns a structured
-    /// result instead of throwing so the caller can decide between
-    /// failure types (vendor unreachable vs. vendor rejected vs. data
-    /// invalid).
+    /// Dispatch one station-group to the external system. Returns a
+    /// structured result so the caller (Planning consumer) can distinguish
+    /// vendor rejected vs. persistence failed vs. data invalid and mark
+    /// Job + Items accordingly.
     /// </summary>
-    Task<Result<DispatchOutcome>> DispatchAsync(Trip trip, CancellationToken cancellationToken = default);
+    Task<Result<DispatchGroupOutcome>> DispatchGroupAsync(
+        DispatchGroupRequest request,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
-/// Result of a dispatch attempt. <see cref="VendorOrderKey"/> is the
-/// external id (RIOT3 orderKey for AMR, waybill number for Fleet, null
-/// for Manual which has no minted key). Caller persists this back on
-/// Trip (Phase 1) or AmrTripExtension (Phase 3+).
+/// Inputs the consumer passes to <see cref="IDispatchStrategy.DispatchGroupAsync"/>.
+/// AMR uses every field; Manual / Fleet ignore station Ids (they'll
+/// re-resolve via the order's warehouse Ids when Phase 4 / 5 fill in
+/// the bodies) and the appoint-vehicle overrides (Manual = operator-pick,
+/// Fleet = provider-pick).
 /// </summary>
-public sealed record DispatchOutcome(string? VendorOrderKey, string? VendorRequestSnapshot);
+public sealed record DispatchGroupRequest(
+    Guid DeliveryOrderId,
+    int GroupIndex,                       // 1-based
+    Guid PickupStationId,                 // AMR uses; Manual / Fleet ignore
+    Guid DropStationId,
+    string UpperKey,                      // idempotency token; correlates webhooks back to the trip
+    Guid? JobId,                          // 1:1 Planning anchor (b8); null when anchor failed
+    int AttemptNumber = 1,
+    Guid? PreviousAttemptId = null,
+    int? PriorityOverride = null,
+    string? AppointVehicleKeyOverride = null);
+
+/// <summary>
+/// Result of a dispatch attempt. <see cref="VendorOrderKey"/> is the
+/// external id (RIOT3 orderKey for AMR, null for Manual which has no
+/// minted key, waybill number for Fleet). <see cref="TripId"/> is
+/// <c>Guid.Empty</c> for the orphan case — vendor accepted but Trip
+/// persistence failed, ops needs reconciliation.
+/// </summary>
+public sealed record DispatchGroupOutcome(
+    Guid TripId,
+    string? VendorOrderKey,
+    string? TemplateName);

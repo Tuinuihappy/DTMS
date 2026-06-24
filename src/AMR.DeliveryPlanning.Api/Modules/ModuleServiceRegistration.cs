@@ -352,11 +352,18 @@ public static class ModuleServiceRegistration
             AMR.DeliveryPlanning.Dispatch.Application.Services.DispatchStrategyRegistry>();
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IVendorOperationsRouter,
             AMR.DeliveryPlanning.Dispatch.Application.Services.VendorOperationsRouter>();
-        // Phase 1.2 — AMR strategy scaffolding. Registered so the registry can
-        // resolve it, but throws if invoked (production AMR dispatch still
-        // runs through DispatchOrderTemplateService; Phase 3 will switch over).
+        // Phase 3c — AMR strategy wired into production. Routes through
+        // IDispatchOrderTemplateService.DispatchByRouteAsync (the existing
+        // OrderTemplate → RIOT3 envelope flow) but goes through the strategy
+        // contract so Manual / Fleet can plug their own implementations in.
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IDispatchStrategy,
             AMR.DeliveryPlanning.Api.Adapters.AmrDispatchStrategy>();
+        // Phase 3c — Manual strategy stub. Returns Failure with a clear
+        // "not yet implemented" reason so Manual orders end up at Failed
+        // (visible in the UI) instead of Confirmed-forever. Phase 4 swaps
+        // the body for the real operator-assignment flow.
+        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IDispatchStrategy,
+            AMR.DeliveryPlanning.Api.Adapters.ManualDispatchStrategy>();
         services.AddScoped<IDispatchOrderTemplateService, DispatchOrderTemplateService>();
         services.Configure<AMR.DeliveryPlanning.Planning.Application.Options.DispatchOptions>(
             configuration.GetSection(AMR.DeliveryPlanning.Planning.Application.Options.DispatchOptions.SectionName));

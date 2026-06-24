@@ -3,11 +3,12 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.MarkOrderDispatche
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.MarkOrderPlanned;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.MarkOrderPlanning;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.RecomputeOrderStatus;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
+using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobAnchor;
 using AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobDispatched;
 using AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobFailed;
-using AMR.DeliveryPlanning.Planning.Application.Services;
 using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.IntegrationEvents;
 using AMR.DeliveryPlanning.SharedKernel;
@@ -31,18 +32,18 @@ namespace AMR.DeliveryPlanning.Planning.Application.Consumers;
 /// </summary>
 public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIntegrationEventV1>
 {
-    private readonly IDispatchOrderTemplateService _envelopeDispatch;
+    private readonly IDispatchStrategyRegistry _strategyRegistry;
     private readonly ISender _sender;
     private readonly WorkflowMetrics _metrics;
     private readonly ILogger<DeliveryOrderValidatedConsumer> _logger;
 
     public DeliveryOrderValidatedConsumer(
-        IDispatchOrderTemplateService envelopeDispatch,
+        IDispatchStrategyRegistry strategyRegistry,
         ISender sender,
         WorkflowMetrics metrics,
         ILogger<DeliveryOrderValidatedConsumer> logger)
     {
-        _envelopeDispatch = envelopeDispatch;
+        _strategyRegistry = strategyRegistry;
         _sender = sender;
         _metrics = metrics;
         _logger = logger;
@@ -53,27 +54,35 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         var evt = context.Message;
         var ct = context.CancellationToken;
 
-        // Phase 3a — only AMR orders have a Planning pipeline today. Manual
-        // and Fleet orders ride on station Ids = null + warehouse Ids set;
-        // grouping by station would collapse them all into one (null, null)
-        // group and dispatch to a vendor that can't fulfil them. Phase 4
-        // will route them through ManualDispatchStrategy / FleetDispatch
-        // off a different topic (or a mode-aware branch here). Until then,
-        // they sit at Confirmed — visible in the order list but unscheduled.
-        if (!string.Equals(evt.RequestedTransportMode, "Amr", StringComparison.OrdinalIgnoreCase))
+        // Phase 3c — route through IDispatchStrategy by transport mode.
+        // AMR uses station Ids on the integration event; Manual / Fleet
+        // will eventually use warehouse Ids (the strategy contract carries
+        // both for forward compatibility). For now non-AMR stub strategies
+        // return Failure with a "not yet implemented" message, which lands
+        // the order at Failed with a clear reason — better than Confirmed-
+        // forever (the Phase 3a stopgap).
+        var mode = ParseMode(evt.RequestedTransportMode);
+        if (!_strategyRegistry.IsRegistered(mode))
         {
-            _logger.LogInformation(
-                "[AutoPlan] Order {OrderId} skipped — transport mode '{Mode}' has no Planning pipeline yet (Phase 4)",
-                evt.DeliveryOrderId, evt.RequestedTransportMode ?? "(unspecified)");
+            _logger.LogWarning(
+                "[AutoPlan] Order {OrderId} mode '{Mode}' has no registered IDispatchStrategy. " +
+                "Marking order Failed so it doesn't stall at Confirmed.",
+                evt.DeliveryOrderId, mode);
+            await _sender.Send(new MarkOrderPlanningCommand(evt.DeliveryOrderId), ct);
+            await _sender.Send(new RecomputeOrderStatusCommand(evt.DeliveryOrderId), ct);
             return;
         }
+        var strategy = _strategyRegistry.Get(mode);
 
-        // AMR guarantees non-null station Ids on Validated → Confirmed
-        // events; `.Value` is safe here because we early-returned for any
-        // other mode above. Projecting at GroupBy keeps the rest of the
-        // pipeline working on plain `Guid` like before the DTO change.
+        // Manual / Fleet orders carry null station Ids (warehouse-keyed
+        // resolution will come with the Phase 4 mode-aware grouping). For
+        // now treat them as a single group keyed at Guid.Empty — the stub
+        // strategy ignores the values and returns "not implemented" so the
+        // failure path below marks everything Failed coherently.
         var stationGroups = evt.Items
-            .GroupBy(i => (PickupStationId: i.PickupStationId!.Value, DropStationId: i.DropStationId!.Value))
+            .GroupBy(i => (
+                PickupStationId: i.PickupStationId ?? Guid.Empty,
+                DropStationId:   i.DropStationId   ?? Guid.Empty))
             .ToList();
 
         _logger.LogInformation(
@@ -163,14 +172,21 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
 
             try
             {
-                var envelopeResult = await _envelopeDispatch.DispatchByRouteAsync(
-                    evt.DeliveryOrderId,
-                    stationGroup.Key.PickupStationId,
-                    stationGroup.Key.DropStationId,
-                    upperKey,
-                    appointVehicleKeyOverride: null,
-                    jobId: jobId == Guid.Empty ? null : jobId,
-                    cancellationToken: ct);
+                // Phase 3c — dispatch routes through IDispatchStrategy
+                // resolved per mode. AMR delegates back to the existing
+                // DispatchByRouteAsync (OrderTemplate → RIOT3); Manual / Fleet
+                // route to their own stubs/impls. Same Result<DispatchGroupOutcome>
+                // shape so the success / orphan / vendor-rejected branches below
+                // stay mode-agnostic.
+                var envelopeResult = await strategy.DispatchGroupAsync(
+                    new DispatchGroupRequest(
+                        DeliveryOrderId: evt.DeliveryOrderId,
+                        GroupIndex: groupIndex + 1,
+                        PickupStationId: stationGroup.Key.PickupStationId,
+                        DropStationId: stationGroup.Key.DropStationId,
+                        UpperKey: upperKey,
+                        JobId: jobId == Guid.Empty ? null : jobId),
+                    ct);
 
                 if (envelopeResult.IsSuccess && envelopeResult.Value.TripId != Guid.Empty)
                 {
@@ -310,4 +326,13 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
             await _sender.Send(new RecomputeOrderStatusCommand(evt.DeliveryOrderId), ct);
         }
     }
+
+    // The integration event carries RequestedTransportMode as a string
+    // (sourced from the order's PascalCase enum.ToString()). Parse
+    // permissively so a malformed value or null lands on Amr, the most
+    // common case, instead of crashing the consumer.
+    private static TransportMode ParseMode(string? raw) =>
+        Enum.TryParse<TransportMode>(raw, ignoreCase: true, out var parsed)
+            ? parsed
+            : TransportMode.Amr;
 }

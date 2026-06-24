@@ -1,6 +1,5 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Planning.Application.Services;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
@@ -8,29 +7,22 @@ using Microsoft.Extensions.Logging;
 namespace AMR.DeliveryPlanning.Api.Adapters;
 
 // Composition-root bridge: AMR-mode implementation of IDispatchStrategy.
-// Lives in API/Adapters (not Dispatch.Application) because Phase 3 will
-// have it call into Planning's IDispatchOrderTemplateService —
-// Dispatch.Application must stay free of Planning references.
+// Lives in API/Adapters (not Dispatch.Application) because it calls into
+// Planning's IDispatchOrderTemplateService — Dispatch.Application must
+// stay free of Planning references for the module boundary to mean anything.
 //
-// Phase 1.2 status: REGISTERED but NOT WIRED into the production dispatch
-// path. The current AMR flow is vendor-first:
+// Phase 3c — wired into the production flow. The DeliveryOrderValidatedConsumer
+// resolves a strategy by mode through IDispatchStrategyRegistry instead of
+// calling DispatchByRouteAsync directly; AMR routes here, Manual routes to
+// ManualDispatchStrategy (stub, Phase 4 fills it in), Fleet to FleetDispatchStrategy
+// (Phase 5).
 //
-//   DeliveryOrderValidatedConsumer
-//     → DispatchOrderTemplateService.DispatchByRouteAsync()
-//        → IRobotOrderDispatcher.SendAsync()        (RIOT3 POST)
-//        → CreateEnvelopeTripCommand                (persist Trip with vendor key)
-//
-// Trip is created AFTER the vendor accepts and mints the orderKey. The
-// IDispatchStrategy contract is Trip-first (Trip exists, then strategy
-// runs) which doesn't fit the current flow — Phase 3 will:
-//   (1) Refactor consumer to create Trip with idempotency token first
-//   (2) Call IDispatchStrategy through the registry
-//   (3) Strategy delegates to IRobotOrderDispatcher
-//   (4) Strategy returns vendor key, caller updates Trip
-//
-// Until that refactor lands, this strategy throws if invoked — preventing
-// accidental double-dispatch if a partial Phase 3 wires in the registry
-// before the consumer refactor.
+// AMR dispatch is vendor-first: the Trip Id is the OUTCOME of this call,
+// not its input. We pass through to DispatchByRouteAsync which:
+//   - Resolves OrderTemplate for the (pickup, drop) pair
+//   - Builds the RIOT3 envelope payload
+//   - POSTs to RIOT3
+//   - Persists Trip with the vendor key (idempotent on UpperKey)
 internal sealed class AmrDispatchStrategy : IDispatchStrategy
 {
     private readonly IDispatchOrderTemplateService _planningDispatch;
@@ -40,31 +32,39 @@ internal sealed class AmrDispatchStrategy : IDispatchStrategy
         IDispatchOrderTemplateService planningDispatch,
         ILogger<AmrDispatchStrategy> logger)
     {
-        // Dependencies injected so Phase 3 just needs to swap the body
-        // — the wiring contract is already correct.
         _planningDispatch = planningDispatch;
         _logger = logger;
     }
 
     public TransportMode Mode => TransportMode.Amr;
 
-    public Task<Result<DispatchOutcome>> DispatchAsync(Trip trip, CancellationToken cancellationToken = default)
+    public async Task<Result<DispatchGroupOutcome>> DispatchGroupAsync(
+        DispatchGroupRequest request,
+        CancellationToken cancellationToken = default)
     {
-        // Defensive: surface as a typed failure (not exception) so callers
-        // that might invoke through the registry get a structured error
-        // rather than an uncaught throw. Phase 3 replaces this body with
-        // the delegated call to IDispatchOrderTemplateService.
-        _logger.LogWarning(
-            "AmrDispatchStrategy invoked for Trip {TripId} (UpperKey {UpperKey}) — " +
-            "production AMR dispatch still runs through DispatchOrderTemplateService. " +
-            "Phase 3 will refactor the consumer to call this strategy instead. " +
-            "Returning failure to prevent accidental double-dispatch.",
-            trip.Id, trip.UpperKey);
+        var result = await _planningDispatch.DispatchByRouteAsync(
+            request.DeliveryOrderId,
+            request.PickupStationId,
+            request.DropStationId,
+            request.UpperKey,
+            attemptNumber: request.AttemptNumber,
+            previousAttemptId: request.PreviousAttemptId,
+            priorityOverride: request.PriorityOverride,
+            appointVehicleKeyOverride: request.AppointVehicleKeyOverride,
+            jobId: request.JobId,
+            cancellationToken: cancellationToken);
 
-        return Task.FromResult(Result<DispatchOutcome>.Failure(
-            "AmrDispatchStrategy is Phase 1.2 scaffolding. The production AMR flow " +
-            "still dispatches through Planning.DispatchOrderTemplateService — calling " +
-            "this strategy now would create a duplicate dispatch. Phase 3 will refactor " +
-            "the flow to make this strategy the canonical entry point."));
+        if (result.IsFailure)
+        {
+            _logger.LogWarning(
+                "[AmrDispatch] Group {GroupIndex} ({Pickup} → {Drop}) failed: {Error}",
+                request.GroupIndex, request.PickupStationId, request.DropStationId, result.Error);
+            return Result<DispatchGroupOutcome>.Failure(result.Error);
+        }
+
+        return Result<DispatchGroupOutcome>.Success(new DispatchGroupOutcome(
+            TripId: result.Value.TripId,
+            VendorOrderKey: result.Value.VendorOrderKey,
+            TemplateName: result.Value.TemplateName));
     }
 }
