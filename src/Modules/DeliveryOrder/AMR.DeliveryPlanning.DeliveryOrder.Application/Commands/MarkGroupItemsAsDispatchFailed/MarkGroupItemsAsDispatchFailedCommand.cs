@@ -3,15 +3,21 @@ using AMR.DeliveryPlanning.SharedKernel.Messaging;
 namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.MarkGroupItemsAsDispatchFailed;
 
 /// <summary>
-/// Mark items of a (Pickup, Drop) station-pair group as Failed when the
-/// dispatcher couldn't place a vendor order for that group. Used when
-/// multi-group dispatch has partial success — failed-group items
-/// transition to Failed (terminal) so the order can eventually reach
-/// PartiallyCompleted instead of being stuck on pending items.
+/// Mark items of a (Pickup, Drop) group as Failed when the dispatcher
+/// couldn't place a vendor order for that group. Used when multi-group
+/// dispatch has partial success — failed-group items transition to Failed
+/// (terminal) so the order can eventually reach PartiallyCompleted / Failed
+/// instead of being stuck on pending items.
+///
+/// Phase 4-prep (Bug A) — accepts both station Ids (AMR pairing) and
+/// warehouse Ids (Manual / Fleet pairing). Caller (Planning consumer)
+/// supplies whichever the order's mode uses; items match by either pair.
 /// </summary>
 public record MarkGroupItemsAsDispatchFailedCommand(
     Guid OrderId,
-    Guid PickupStationId,
-    Guid DropStationId,
+    Guid? PickupStationId,
+    Guid? DropStationId,
+    Guid? PickupWarehouseId,
+    Guid? DropWarehouseId,
     string Reason
 ) : ICommand<int>;

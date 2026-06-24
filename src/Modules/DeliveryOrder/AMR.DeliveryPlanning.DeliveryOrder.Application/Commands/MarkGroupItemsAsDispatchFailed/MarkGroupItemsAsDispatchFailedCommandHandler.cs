@@ -23,14 +23,20 @@ public class MarkGroupItemsAsDispatchFailedCommandHandler : ICommandHandler<Mark
         if (order is null) return Result<int>.Failure($"Order {request.OrderId} not found.");
 
         var marked = order.MarkGroupItemsAsDispatchFailed(
-            request.PickupStationId, request.DropStationId, request.Reason);
+            request.PickupStationId, request.DropStationId,
+            request.PickupWarehouseId, request.DropWarehouseId,
+            request.Reason);
 
         if (marked > 0)
         {
             await _repository.SaveChangesAsync(cancellationToken);
+            // Log whichever pair the caller passed — caller knows the order's mode.
+            var groupLabel = request.PickupStationId.HasValue && request.PickupStationId.Value != Guid.Empty
+                ? $"station {request.PickupStationId} → {request.DropStationId}"
+                : $"warehouse {request.PickupWarehouseId} → {request.DropWarehouseId}";
             _logger.LogWarning(
-                "[GroupDispatchFailed] Order {OrderId} ({Pickup} → {Drop}): {Count} items marked Failed — {Reason}",
-                request.OrderId, request.PickupStationId, request.DropStationId, marked, request.Reason);
+                "[GroupDispatchFailed] Order {OrderId} ({Group}): {Count} items marked Failed — {Reason}",
+                request.OrderId, groupLabel, marked, request.Reason);
         }
         return Result<int>.Success(marked);
     }

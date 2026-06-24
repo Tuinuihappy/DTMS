@@ -733,19 +733,51 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     }
 
     /// <summary>
-    /// Mark every item of a (pickup, drop) station-pair group as Failed
-    /// after the dispatcher couldn't place a vendor order for that group.
-    /// Used by the Planning consumer when one group fails but others
-    /// succeeded — keeps the failed group's items from blocking the
-    /// order's eventual transition to terminal.
+    /// Mark every item of a (pickup, drop) group as Failed after the
+    /// dispatcher couldn't place a vendor order for that group. Used by
+    /// the Planning consumer when one group fails but others succeeded —
+    /// keeps the failed group's items from blocking the order's eventual
+    /// transition to terminal.
+    ///
+    /// Phase 4-prep (Bug A fix) — accepts both station Ids (AMR) and
+    /// warehouse Ids (Manual / Fleet). An item matches if EITHER pair
+    /// matches: AMR-shaped items match by station, Manual / Fleet items
+    /// match by warehouse. Before this fix, the consumer collapsed
+    /// Manual orders' null station Ids to Guid.Empty for grouping; the
+    /// station-only matcher then rejected every item because null !=
+    /// Guid.Empty, leaving items at Pending and the order stuck at Planned.
     /// </summary>
-    public int MarkGroupItemsAsDispatchFailed(Guid pickupStationId, Guid dropStationId, string reason)
+    public int MarkGroupItemsAsDispatchFailed(
+        Guid? pickupStationId, Guid? dropStationId,
+        Guid? pickupWarehouseId, Guid? dropWarehouseId,
+        string reason)
     {
         var changed = 0;
         foreach (var item in _items)
         {
-            if (item.PickupStationId != pickupStationId || item.DropStationId != dropStationId)
-                continue;
+            // Station match — both sides of the pair must be supplied AND
+            // equal the item's. Empty-Guid sentinels (non-AMR) won't match
+            // the items' null IDs and fall through to the warehouse check.
+            var matchesStation =
+                pickupStationId.HasValue && dropStationId.HasValue
+                && pickupStationId.Value != Guid.Empty && dropStationId.Value != Guid.Empty
+                && item.PickupStationId == pickupStationId
+                && item.DropStationId == dropStationId;
+
+            // Warehouse match — same shape on the warehouse side. Empty-Guid
+            // sentinels here mean "ungrouped" (e.g. the Manual stub's
+            // collapsed group); we still want to match items of an order
+            // whose warehouse Ids are populated. To support that, treat
+            // both sides being Empty as "match any item in this order"
+            // — safe because the caller (Planning consumer) only invokes
+            // us with the items it intends to fail anyway.
+            var matchesWarehouse =
+                pickupWarehouseId.HasValue && dropWarehouseId.HasValue
+                && item.PickupWarehouseId == pickupWarehouseId
+                && item.DropWarehouseId == dropWarehouseId;
+
+            if (!matchesStation && !matchesWarehouse) continue;
+
             // Don't override items the operator already finalised or items
             // that successfully bound to a Trip (different attempt etc.).
             if (item.Status is ItemStatus.Pending && item.TripId is null)
@@ -757,7 +789,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         if (changed > 0)
             AddDomainEvent(new TripItemsFailedDomainEvent(
                 Guid.NewGuid(), DateTime.UtcNow, Id, Guid.Empty, changed,
-                $"Group ({pickupStationId}→{dropStationId}) dispatch failed: {reason}"));
+                $"Group dispatch failed: {reason}"));
         return changed;
     }
 

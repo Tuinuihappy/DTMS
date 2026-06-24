@@ -1316,7 +1316,7 @@ public class DeliveryOrderTests
         var groupA = (order.Items.First(i => i.PickupLocationCode == "WH-A").PickupStationId!.Value,
                       order.Items.First(i => i.PickupLocationCode == "WH-A").DropStationId!.Value);
 
-        var marked = order.MarkGroupItemsAsDispatchFailed(groupA.Item1, groupA.Item2, "vendor 503");
+        var marked = order.MarkGroupItemsAsDispatchFailed(groupA.Item1, groupA.Item2, null, null, "vendor 503");
 
         marked.Should().Be(2);
         order.Items.Count(i => i.Status == ItemStatus.Failed).Should().Be(2);
@@ -1344,7 +1344,7 @@ public class DeliveryOrderTests
         // Consumer flow: Planning → Planned → fail group A → succeed group B → Dispatched
         order.MarkPlanning();
         order.MarkPlanned();
-        order.MarkGroupItemsAsDispatchFailed(groupA.Item1, groupA.Item2, "vendor 503");
+        order.MarkGroupItemsAsDispatchFailed(groupA.Item1, groupA.Item2, null, null, "vendor 503");
         var tripB = Guid.NewGuid();
         order.AssignItemsToTrip(tripB, 1, groupB.Item1, groupB.Item2);
         order.MarkDispatched();
@@ -1378,8 +1378,8 @@ public class DeliveryOrderTests
 
         order.MarkPlanning();
         order.MarkPlanned();
-        order.MarkGroupItemsAsDispatchFailed(groupA.Item1, groupA.Item2, "vendor 503");
-        order.MarkGroupItemsAsDispatchFailed(groupB.Item1, groupB.Item2, "vendor 503");
+        order.MarkGroupItemsAsDispatchFailed(groupA.Item1, groupA.Item2, null, null, "vendor 503");
+        order.MarkGroupItemsAsDispatchFailed(groupB.Item1, groupB.Item2, null, null, "vendor 503");
         // No MarkDispatched — successCount = 0
         order.RecomputeStatusFromItems();
 

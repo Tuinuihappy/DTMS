@@ -233,11 +233,20 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                             JobFailureCategory.VendorRejected), ct);
 
                     // Mark this group's items Failed so the order's eventual
-                    // RecomputeStatusFromItems isn't blocked on them.
+                    // RecomputeStatusFromItems isn't blocked on them. Pass
+                    // BOTH location pairs — AMR items match by station,
+                    // Manual / Fleet match by warehouse (Bug A fix). The
+                    // first item in the group is representative since the
+                    // grouping key guarantees a shared station pair, and
+                    // warehouse pairs follow station pairs (or vice versa)
+                    // by Phase 2.5 Path A's validation rules.
+                    var firstItem = stationGroup.First();
                     await _sender.Send(new MarkGroupItemsAsDispatchFailedCommand(
                         evt.DeliveryOrderId,
                         stationGroup.Key.PickupStationId,
                         stationGroup.Key.DropStationId,
+                        firstItem.PickupWarehouseId,
+                        firstItem.DropWarehouseId,
                         envelopeResult.Error ?? "vendor rejected dispatch"), ct);
                 }
             }
@@ -288,12 +297,17 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
 
                 // Also mark the items Failed so the order doesn't sit forever
                 // on Pending items waiting for a Trip that will never exist.
+                // Pass both station + warehouse Ids (Bug A fix — Manual orders
+                // match by warehouse).
                 try
                 {
+                    var firstItem = stationGroup.First();
                     await _sender.Send(new MarkGroupItemsAsDispatchFailedCommand(
                         evt.DeliveryOrderId,
                         stationGroup.Key.PickupStationId,
                         stationGroup.Key.DropStationId,
+                        firstItem.PickupWarehouseId,
+                        firstItem.DropWarehouseId,
                         $"dispatch threw {ex.GetType().Name}"), ct);
                 }
                 catch (Exception markEx) when (markEx is not OperationCanceledException)
