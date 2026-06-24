@@ -53,8 +53,27 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         var evt = context.Message;
         var ct = context.CancellationToken;
 
+        // Phase 3a — only AMR orders have a Planning pipeline today. Manual
+        // and Fleet orders ride on station Ids = null + warehouse Ids set;
+        // grouping by station would collapse them all into one (null, null)
+        // group and dispatch to a vendor that can't fulfil them. Phase 4
+        // will route them through ManualDispatchStrategy / FleetDispatch
+        // off a different topic (or a mode-aware branch here). Until then,
+        // they sit at Confirmed — visible in the order list but unscheduled.
+        if (!string.Equals(evt.RequestedTransportMode, "Amr", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogInformation(
+                "[AutoPlan] Order {OrderId} skipped — transport mode '{Mode}' has no Planning pipeline yet (Phase 4)",
+                evt.DeliveryOrderId, evt.RequestedTransportMode ?? "(unspecified)");
+            return;
+        }
+
+        // AMR guarantees non-null station Ids on Validated → Confirmed
+        // events; `.Value` is safe here because we early-returned for any
+        // other mode above. Projecting at GroupBy keeps the rest of the
+        // pipeline working on plain `Guid` like before the DTO change.
         var stationGroups = evt.Items
-            .GroupBy(i => (i.PickupStationId, i.DropStationId))
+            .GroupBy(i => (PickupStationId: i.PickupStationId!.Value, DropStationId: i.DropStationId!.Value))
             .ToList();
 
         _logger.LogInformation(

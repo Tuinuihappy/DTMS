@@ -41,7 +41,8 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
                         i.ItemId, i.WeightKg, i.PickupStationId, i.DropStationId,
                         i.Hazmat is { } hz ? new ItemHazmatSummaryDto(hz.ClassCode, hz.PackingGroup) : null,
                         i.Temperature is { } tr ? new ItemTemperatureSummaryDto(tr.MinC, tr.MaxC) : null,
-                        i.HandlingInstructions)).ToList(),
+                        i.HandlingInstructions,
+                        i.PickupWarehouseId, i.DropWarehouseId)).ToList(),
                     evt.RequestedTransportMode)
             ],
             DeliveryOrderCancelledDomainEvent evt =>
@@ -111,7 +112,8 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
                         i.ItemId, i.WeightKg, i.PickupStationId, i.DropStationId,
                         i.Hazmat is { } hz ? new ItemHazmatSummaryDto(hz.ClassCode, hz.PackingGroup) : null,
                         i.Temperature is { } tr ? new ItemTemperatureSummaryDto(tr.MinC, tr.MaxC) : null,
-                        i.HandlingInstructions)).ToList(),
+                        i.HandlingInstructions,
+                        i.PickupWarehouseId, i.DropWarehouseId)).ToList(),
                     TriggeredBy: triggeredBy, CorrelationId: correlationId)
             ],
             DeliveryOrderSubmittedDomainEvent evt =>

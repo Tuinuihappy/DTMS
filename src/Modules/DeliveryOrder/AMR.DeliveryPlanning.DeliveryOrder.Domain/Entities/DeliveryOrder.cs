@@ -145,15 +145,20 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     // orders haven't been resolved against the Facility map yet.
     public void RaiseCreatedEvent()
     {
+        // Phase 3a — drop the Guid.Empty fallbacks now that the DTO
+        // accepts nullable station + warehouse Ids. Pre-Validated orders
+        // (which is when this event commonly fires) carry null for both
+        // pairs; OrderListView consumers tolerate that already.
         var itemDtos = _items
             .Select(p => new ItemEventDto(
                 p.ItemId, p.WeightKg ?? 0,
-                p.PickupStationId ?? Guid.Empty, p.DropStationId ?? Guid.Empty,
+                p.PickupStationId, p.DropStationId,
                 p.Hazmat is { } hz ? new ItemHazmatDto(hz.ClassCode, hz.PackingGroup?.ToString()) : null,
                 p.Temperature is { } tr ? new ItemTemperatureDto(tr.MinC, tr.MaxC) : null,
                 p.HandlingInstructions.Count > 0
                     ? p.HandlingInstructions.Select(h => h.ToString()).ToList()
-                    : null))
+                    : null,
+                p.PickupWarehouseId, p.DropWarehouseId))
             .ToList();
 
         AddDomainEvent(new DeliveryOrderCreatedDomainEvent(
@@ -575,15 +580,21 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     private DeliveryOrderConfirmedDomainEvent BuildConfirmedEvent(double weightFallbackKg)
     {
+        // Phase 3a — pass station + warehouse Ids through as nullable.
+        // AMR orders populate PickupStationId/DropStationId; Manual/Fleet
+        // populate the warehouse pair. Consumers pick by RequestedTransportMode.
+        // BuildStation handler emits both as null for pre-Validated orders
+        // (defensive — Confirm requires Validated so this shouldn't fire).
         var itemDtos = _items
             .Select(p => new ItemEventDto(
                 p.ItemId, p.WeightKg ?? weightFallbackKg,
-                p.PickupStationId!.Value, p.DropStationId!.Value,
+                p.PickupStationId, p.DropStationId,
                 p.Hazmat is { } hz ? new ItemHazmatDto(hz.ClassCode, hz.PackingGroup?.ToString()) : null,
                 p.Temperature is { } tr ? new ItemTemperatureDto(tr.MinC, tr.MaxC) : null,
                 p.HandlingInstructions.Count > 0
                     ? p.HandlingInstructions.Select(h => h.ToString()).ToList()
-                    : null))
+                    : null,
+                p.PickupWarehouseId, p.DropWarehouseId))
             .ToList();
 
         return new DeliveryOrderConfirmedDomainEvent(
