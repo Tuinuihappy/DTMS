@@ -18,6 +18,7 @@ public class TripRepository : ITripRepository
     public async Task<Trip?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.Trips
+            .Include(t => t.AmrExtension)
             .Include(t => t.Events)
             .Include(t => t.Exceptions)
             .Include(t => t.ProofsOfDelivery)
@@ -32,6 +33,7 @@ public class TripRepository : ITripRepository
         // UpperKey is globally unique so cross-tenant leakage isn't a concern.
         return await _context.Trips
             .IgnoreQueryFilters()
+            .Include(t => t.AmrExtension)
             .Include(t => t.Events)
             .FirstOrDefaultAsync(t => t.UpperKey == upperKey, cancellationToken);
     }
@@ -41,11 +43,16 @@ public class TripRepository : ITripRepository
         if (string.IsNullOrWhiteSpace(vendorOrderKey)) return null;
 
         // IgnoreQueryFilters: same reasoning as GetByUpperKeyAsync — vendor
-        // webhooks have no tenant context.
+        // webhooks have no tenant context. Phase 3b — vendorOrderKey lives
+        // on AmrTripExtension; this is an AMR-only lookup (Manual / Fleet
+        // never produce a vendor order key).
         return await _context.Trips
             .IgnoreQueryFilters()
+            .Include(t => t.AmrExtension)
             .Include(t => t.Events)
-            .FirstOrDefaultAsync(t => t.VendorOrderKey == vendorOrderKey, cancellationToken);
+            .FirstOrDefaultAsync(
+                t => t.AmrExtension != null && t.AmrExtension.VendorOrderKey == vendorOrderKey,
+                cancellationToken);
     }
 
     public async Task<List<Trip>> GetActiveTripsByVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default)
@@ -129,9 +136,11 @@ public class TripRepository : ITripRepository
             entry.Property(t => t.CompletedAt).IsModified = true;
             entry.Property(t => t.FailureReason).IsModified = true;
             entry.Property(t => t.VehicleId).IsModified = true;
-            // Vendor identity captured on first TASK_PROCESSING webhook.
-            entry.Property(t => t.VendorVehicleKey).IsModified = true;
-            entry.Property(t => t.VendorVehicleName).IsModified = true;
+            // Phase 3b — vendor vehicle identity captured on first
+            // TASK_PROCESSING webhook now lives on AmrTripExtension. The
+            // navigation save propagates the change without explicit
+            // IsModified marking (the change tracker sees it because
+            // MarkVendorStarted creates or mutates the extension entity).
             // Vendor snapshot fields — modifiable post-create when the
             // final snapshot consumer captures the terminal-state response.
             entry.Property(t => t.VendorFinalSnapshot).IsModified = true;

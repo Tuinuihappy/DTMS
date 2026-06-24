@@ -39,15 +39,10 @@ public class DispatchDbContext : DbContext
         {
             builder.HasKey(t => t.Id);
             builder.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);
-            // Pair-mate to Status when Paused — string-coded so DB-side reads
-            // are intelligible ("Held" / "Hang") and a new vendor flavour can
-            // be added without an enum re-numbering. Nullable; only set when
-            // Status == Paused.
-            builder.Property(t => t.VendorPauseSource).HasConversion<string>().HasMaxLength(20);
             builder.Property(t => t.UpperKey).HasMaxLength(80).IsRequired();
-            builder.Property(t => t.VendorOrderKey).HasMaxLength(100);
-            builder.Property(t => t.VendorVehicleKey).HasMaxLength(100);
-            builder.Property(t => t.VendorVehicleName).HasMaxLength(100);
+            // Phase 3b — vendor fields moved off Trip into AmrTripExtension
+            // (mapped below). Trip core stays mode-agnostic; AMR extension
+            // is a 1:0..1 navigation, lazily created.
             builder.Property(t => t.FailureReason).HasMaxLength(1000);
             builder.Property(t => t.AttemptNumber).HasDefaultValue(1);
             builder.HasIndex(t => t.PreviousAttemptId)
@@ -101,6 +96,32 @@ public class DispatchDbContext : DbContext
             builder.Navigation(t => t.ProofsOfDelivery)
                    .HasField("_proofs")
                    .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+            // Phase 3b — 1:0..1 AMR extension. Cascade so the extension
+            // disappears when the Trip is deleted (cleanup-only path —
+            // production code never deletes Trips).
+            builder.HasOne(t => t.AmrExtension)
+                   .WithOne()
+                   .HasForeignKey<AmrTripExtension>(e => e.TripId)
+                   .OnDelete(DeleteBehavior.Cascade);
+            builder.Navigation(t => t.AmrExtension);
+        });
+
+        modelBuilder.Entity<AmrTripExtension>(builder =>
+        {
+            // PK = FK = TripId (1:0..1 share key — no separate Id needed).
+            builder.HasKey(e => e.TripId);
+            // EF's auto-pluralised table name would be "AmrTripExtension"
+            // (singular) because the entity has no DbSet<> on the context;
+            // the migration creates "AmrTripExtensions" so pin it explicitly.
+            builder.ToTable("AmrTripExtensions", "dispatch");
+            builder.Property(e => e.VendorOrderKey).HasMaxLength(100);
+            builder.Property(e => e.VendorVehicleKey).HasMaxLength(100);
+            builder.Property(e => e.VendorVehicleName).HasMaxLength(100);
+            // VendorPauseSource — string-coded so DB reads stay intelligible
+            // ("Operator" / "Vendor") and the enum can grow without a
+            // re-numbering migration. Nullable; only set when paused.
+            builder.Property(e => e.VendorPauseSource).HasConversion<string>().HasMaxLength(20);
         });
 
         modelBuilder.Entity<ExecutionEvent>(builder =>

@@ -23,6 +23,32 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.AmrTripExtension", b =>
+                {
+                    b.Property<Guid>("TripId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VendorOrderKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("VendorPauseSource")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("VendorVehicleKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("VendorVehicleName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("TripId");
+
+                    b.ToTable("AmrTripExtensions", "dispatch");
+                });
+
             modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.ExecutionEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -200,24 +226,8 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.Property<string>("VendorFinalSnapshot")
                         .HasColumnType("jsonb");
 
-                    b.Property<string>("VendorOrderKey")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("VendorPauseSource")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
                     b.Property<string>("VendorRequestSnapshot")
                         .HasColumnType("jsonb");
-
-                    b.Property<string>("VendorVehicleKey")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("VendorVehicleName")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 
@@ -678,6 +688,15 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.ToTable("ProjectionInbox", "dispatch");
                 });
 
+            modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.AmrTripExtension", b =>
+                {
+                    b.HasOne("AMR.DeliveryPlanning.Dispatch.Domain.Entities.Trip", null)
+                        .WithOne("AmrExtension")
+                        .HasForeignKey("AMR.DeliveryPlanning.Dispatch.Domain.Entities.AmrTripExtension", "TripId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.ExecutionEvent", b =>
                 {
                     b.HasOne("AMR.DeliveryPlanning.Dispatch.Domain.Entities.Trip", null)
@@ -707,6 +726,8 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
 
             modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.Trip", b =>
                 {
+                    b.Navigation("AmrExtension");
+
                     b.Navigation("Events");
 
                     b.Navigation("Exceptions");

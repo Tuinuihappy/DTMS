@@ -70,6 +70,20 @@ public static class ModuleServiceRegistration
             errorCodesToAdd: null);
     }
 
+    // Manual migrations diverge from EF's auto-detected model whenever a
+    // hand-written migration encodes behaviour the model differ can't see
+    // (Sql() statements for backfill, multi-step column moves like Phase 3b's
+    // AmrTripExtension split, etc.). EF Core 8+ throws on any divergence by
+    // default; log it instead so the migrator can apply our hand-authored
+    // migration list and the DBA / engineer sees the warning without an
+    // outage. See `feedback_migration_manual.md` for the broader manual-
+    // migration convention.
+    private static void SuppressPendingModelChangesWarning(
+        Microsoft.EntityFrameworkCore.Diagnostics.WarningsConfigurationBuilder warnings)
+    {
+        warnings.Log(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning);
+    }
+
     public static IServiceCollection AddAllModules(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection");
@@ -362,6 +376,7 @@ public static class ModuleServiceRegistration
         services.AddScoped<DispatchDomainEventMapper>();
         services.AddDbContext<DispatchDbContext>((sp, o) => o
             .UseNpgsql(npgsqlDataSource, ConfigureNpgsql)
+            .ConfigureWarnings(SuppressPendingModelChangesWarning)
             .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
                 sp.GetRequiredService<DispatchDomainEventMapper>())));
         services.AddScoped<ITripRepository, TripRepository>();

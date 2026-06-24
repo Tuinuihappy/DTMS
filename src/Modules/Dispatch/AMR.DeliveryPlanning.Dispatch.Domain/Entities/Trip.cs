@@ -21,27 +21,29 @@ public class Trip : AggregateRoot<Guid>
     public DateTime? CompletedAt { get; private set; }
     public string? FailureReason { get; private set; }
 
-    // Envelope dispatch correlation fields. UpperKey is the DTMS-side key
-    // RIOT3 echoes back on every webhook; VendorOrderKey is what RIOT3
-    // assigned. VendorVehicleKey is the deviceKey string the vendor
-    // reports on processingVehicle (e.g. "Delta6FAN1"); it is captured
-    // verbatim for audit and so the operator can see who picked up the
-    // trip even when Fleet has no mapping for it yet. Trip.VehicleId
-    // (DTMS Guid) is intentionally separate — populating it requires a
-    // Fleet lookup, which today is deferred to a future iteration.
+    // UpperKey is the DTMS-side correlation key RIOT3 echoes back on every
+    // webhook. Lives on Trip core because Manual / Fleet trips will get
+    // analogous correlation keys later (per Phase 3 plan); the field is
+    // mode-agnostic at the type level even though only AMR populates it today.
     public string UpperKey { get; private set; } = string.Empty;
-    public string? VendorOrderKey { get; private set; }
-    public string? VendorVehicleKey { get; private set; }
-    // Human-readable robot label from the vendor (RIOT3 processingVehicle.name
-    // e.g. "FAN1_STANDARD_NO5"). Captured first-write-wins alongside
-    // VendorVehicleKey so operator UIs can show a friendly label without a
-    // Fleet lookup. Display-only — never used for correlation.
-    public string? VendorVehicleName { get; private set; }
 
-    // When Status == Paused, records WHICH vendor event paused this trip so
-    // the resume handler can pick the matching command type. Null while
-    // Status != Paused (cleared on Resume / terminal transitions).
-    public VendorPauseSource? VendorPauseSource { get; private set; }
+    // Phase 3b — AMR-specific vendor fields (VendorOrderKey, VendorVehicleKey,
+    // VendorVehicleName, VendorPauseSource) moved off Trip core into a
+    // 1:0..1 navigation. AMR trips create the extension on demand; Manual /
+    // Fleet trips never touch it. Mirror entities (ManualTripExtension,
+    // FleetTripExtension) follow the same shape in Phase 4 / 5.
+    public AmrTripExtension? AmrExtension { get; private set; }
+
+    // Read-only delegations so existing in-memory consumers (handlers
+    // mapping a loaded Trip entity to a DTO, projectors mapping events)
+    // don't all have to switch to `trip.AmrExtension?.X` syntax. EF query
+    // projections still need explicit `t.AmrExtension!.X` because EF can't
+    // translate these expression-bodied properties; see TripFactsRepo /
+    // TripQueueRepo for examples that use the navigation directly.
+    public string? VendorOrderKey => AmrExtension?.VendorOrderKey;
+    public string? VendorVehicleKey => AmrExtension?.VendorVehicleKey;
+    public string? VendorVehicleName => AmrExtension?.VendorVehicleName;
+    public VendorPauseSource? VendorPauseSource => AmrExtension?.VendorPauseSource;
 
     // Route context — the station pair the trip dispatches against.
     // Captured at create time so retry can re-resolve the OrderTemplate
@@ -133,7 +135,6 @@ public class Trip : AggregateRoot<Guid>
             Status = TripStatus.Created,
             CreatedAt = DateTime.UtcNow,
             UpperKey = upperKey.Trim(),
-            VendorOrderKey = trimmedVendor,
             PickupStationId = pickupStationId,
             DropStationId = dropStationId,
             PickupWarehouseId = pickupWarehouseId,
@@ -144,6 +145,14 @@ public class Trip : AggregateRoot<Guid>
             PriorityAtDispatch = priorityAtDispatch,
             VendorRequestSnapshot = string.IsNullOrWhiteSpace(vendorRequestSnapshot) ? null : vendorRequestSnapshot
         };
+        // Phase 3b — AMR vendor key lives on the extension entity now.
+        // Created on demand so Manual / Fleet callers (which pass
+        // vendorOrderKey=null) don't create an empty AmrTripExtension row.
+        if (trimmedVendor is not null)
+        {
+            trip.AmrExtension = AmrTripExtension.Create(trip.Id);
+            trip.AmrExtension.AttachVendorOrder(trimmedVendor);
+        }
         var detail = $"vendorOrderKey={trimmedVendor ?? "(empty)"} attempt={attemptNumber}";
         if (previousAttemptId.HasValue) detail += $" retryOf={previousAttemptId.Value}";
         if (!string.IsNullOrWhiteSpace(templateNameAtDispatch)) detail += $" template={templateNameAtDispatch}";
@@ -187,13 +196,15 @@ public class Trip : AggregateRoot<Guid>
             return;
         if (vehicleId.HasValue && !VehicleId.HasValue)
             VehicleId = vehicleId.Value;
-        // Capture the vendor's raw deviceKey ("Delta6FAN1" etc) once —
-        // first webhook wins. Empty/whitespace from the vendor doesn't
-        // overwrite a previously-captured value.
-        if (!string.IsNullOrWhiteSpace(vendorVehicleKey) && VendorVehicleKey is null)
-            VendorVehicleKey = vendorVehicleKey;
-        if (!string.IsNullOrWhiteSpace(vendorVehicleName) && VendorVehicleName is null)
-            VendorVehicleName = vendorVehicleName;
+        // Phase 3b — vehicle key / name live on AmrExtension. Create it
+        // lazily on first AMR write; the webhook may fire VendorStarted
+        // for a Created trip that was Manual/Fleet (defensive — shouldn't
+        // happen, but guard rather than dirty the extension table).
+        if (!string.IsNullOrWhiteSpace(vendorVehicleKey) || !string.IsNullOrWhiteSpace(vendorVehicleName))
+        {
+            AmrExtension ??= AmrTripExtension.Create(Id);
+            AmrExtension.AttachVehicle(vendorVehicleKey, vendorVehicleName);
+        }
         Status = TripStatus.InProgress;
         StartedAt = DateTime.UtcNow;
         RecordEvent("VendorStarted", vendorVehicleKey ?? vehicleId?.ToString());
@@ -203,7 +214,8 @@ public class Trip : AggregateRoot<Guid>
         // snapshot is forwarded so TripItemsProjector can populate
         // dispatch.TripItems for the operator drawer.
         AddDomainEvent(new TripStartedDomainEvent(
-            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, vehicleId, VendorVehicleKey,
+            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, vehicleId,
+            AmrExtension?.VendorVehicleKey,
             Items: items));
     }
 
@@ -283,7 +295,11 @@ public class Trip : AggregateRoot<Guid>
             throw new InvalidOperationException("Only InProgress trips can be paused.");
 
         Status = TripStatus.Paused;
-        VendorPauseSource = source;
+        // Phase 3b — pause source lives on the AMR extension. Manual /
+        // Fleet pauses (Phase 4 / 5) will populate their own extension's
+        // equivalent column; the Trip-level Status flip is mode-agnostic.
+        AmrExtension ??= AmrTripExtension.Create(Id);
+        AmrExtension.SetPauseSource(source);
         AddDomainEvent(new TripPausedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
         RecordEvent("TripPaused", source.ToString());
     }
@@ -294,7 +310,7 @@ public class Trip : AggregateRoot<Guid>
             throw new InvalidOperationException("Only Paused trips can be resumed.");
 
         Status = TripStatus.InProgress;
-        VendorPauseSource = null;
+        AmrExtension?.ClearPauseSource();
         AddDomainEvent(new TripResumedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
         RecordEvent("TripResumed", null);
     }
@@ -302,17 +318,19 @@ public class Trip : AggregateRoot<Guid>
     // Operator confirms a robot waiting at a checkpoint may proceed (RIOT3 PASS).
     // Trip.Status is intentionally unchanged — this is an interactive nudge at
     // robot level, not a state transition. Requires VendorVehicleKey because
-    // RIOT3 routes PASS by deviceKey, not by orderKey.
+    // RIOT3 routes PASS by deviceKey, not by orderKey. Phase 3b — key lives
+    // on the AMR extension; AMR-only call is a no-op for Manual/Fleet trips.
     public void AcknowledgeRobotPass()
     {
         if (Status != TripStatus.InProgress)
             throw new InvalidOperationException("Only InProgress trips can acknowledge a robot pass.");
-        if (string.IsNullOrWhiteSpace(VendorVehicleKey))
+        var vehicleKey = AmrExtension?.VendorVehicleKey;
+        if (string.IsNullOrWhiteSpace(vehicleKey))
             throw new InvalidOperationException("Cannot pass — no vendor vehicle key on file.");
 
-        RecordEvent("RobotPassAcknowledged", VendorVehicleKey);
+        RecordEvent("RobotPassAcknowledged", vehicleKey);
         AddDomainEvent(new TripRobotPassAcknowledgedDomainEvent(
-            Guid.NewGuid(), DateTime.UtcNow, Id, VendorVehicleKey));
+            Guid.NewGuid(), DateTime.UtcNow, Id, vehicleKey));
     }
 
     public void Cancel(string reason)

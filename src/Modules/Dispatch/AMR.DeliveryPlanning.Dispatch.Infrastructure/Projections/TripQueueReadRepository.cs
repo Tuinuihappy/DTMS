@@ -19,7 +19,11 @@ public class TripQueueReadRepository : ITripQueueReadRepository
 
     public async Task<TripQueuePage> SearchAsync(TripQueueFilter filter, CancellationToken cancellationToken = default)
     {
-        var query = _db.Trips.AsNoTracking().AsQueryable();
+        // Phase 3b — eagerly load AmrExtension so the row mapper below
+        // can read VendorOrderKey / VendorVehicleKey / VendorVehicleName.
+        // Manual / Fleet trips materialise with AmrExtension = null,
+        // which the delegating properties on Trip turn into null DTO fields.
+        var query = _db.Trips.AsNoTracking().Include(t => t.AmrExtension).AsQueryable();
 
         if (filter.Statuses.Count > 0)
         {
@@ -30,7 +34,10 @@ public class TripQueueReadRepository : ITripQueueReadRepository
         if (!string.IsNullOrWhiteSpace(filter.VehicleKey))
         {
             var key = filter.VehicleKey;
-            query = query.Where(t => t.VendorVehicleKey == key);
+            // Vendor vehicle key lives on the AMR extension (Phase 3b).
+            // Filtering by it is implicitly AMR-only — Manual / Fleet
+            // trips with no extension never match.
+            query = query.Where(t => t.AmrExtension != null && t.AmrExtension.VendorVehicleKey == key);
         }
 
         if (filter.FromUtc.HasValue)
@@ -52,7 +59,8 @@ public class TripQueueReadRepository : ITripQueueReadRepository
             // table is hit by its existing (TripId) index.
             query = query.Where(t =>
                 EF.Functions.ILike(t.UpperKey, $"%{s}%")
-                || (t.VendorOrderKey != null && EF.Functions.ILike(t.VendorOrderKey, $"%{s}%"))
+                || (t.AmrExtension != null && t.AmrExtension.VendorOrderKey != null
+                    && EF.Functions.ILike(t.AmrExtension.VendorOrderKey, $"%{s}%"))
                 || _db.TripItems.Any(i => i.TripId == t.Id && EF.Functions.ILike(i.OrderRef, $"%{s}%")));
         }
 
