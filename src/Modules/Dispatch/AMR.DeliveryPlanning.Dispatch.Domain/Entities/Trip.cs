@@ -192,19 +192,31 @@ public class Trip : AggregateRoot<Guid>
         string? vendorVehicleName = null,
         IReadOnlyList<IntegrationEvents.TripItemSnapshot>? items = null)
     {
+        // Phase 3d — vehicle assignment is always recorded (audit + cache
+        // update), even on repeat TASK_PROCESSING webhooks after the trip
+        // already transitioned past Created. This is how RIOT3 reassignment
+        // (robot A fails → robot B takes over) gets captured; the history
+        // table grows, and the cache pointers on AmrExtension always reflect
+        // the latest robot so PASS / CANCEL commands target the right one.
+        // RecordVehicleAssignment is idempotent — same (key, name) as the
+        // previous assignment is a no-op, so RIOT3's normal duplicate
+        // webhooks don't bloat the history.
+        if (!string.IsNullOrWhiteSpace(vendorVehicleKey) || !string.IsNullOrWhiteSpace(vendorVehicleName))
+        {
+            AmrExtension ??= AmrTripExtension.Create(Id);
+            AmrExtension.RecordVehicleAssignment(
+                vendorVehicleKey, vendorVehicleName,
+                source: "TASK_PROCESSING",
+                assignedAt: DateTime.UtcNow);
+        }
+
+        // Status transition + event fire — only on first MarkVendorStarted.
+        // Subsequent webhooks (reassignment, retries) update vehicle
+        // assignment above but don't re-emit TripStartedDomainEvent.
         if (Status != TripStatus.Created)
             return;
         if (vehicleId.HasValue && !VehicleId.HasValue)
             VehicleId = vehicleId.Value;
-        // Phase 3b — vehicle key / name live on AmrExtension. Create it
-        // lazily on first AMR write; the webhook may fire VendorStarted
-        // for a Created trip that was Manual/Fleet (defensive — shouldn't
-        // happen, but guard rather than dirty the extension table).
-        if (!string.IsNullOrWhiteSpace(vendorVehicleKey) || !string.IsNullOrWhiteSpace(vendorVehicleName))
-        {
-            AmrExtension ??= AmrTripExtension.Create(Id);
-            AmrExtension.AttachVehicle(vendorVehicleKey, vendorVehicleName);
-        }
         Status = TripStatus.InProgress;
         StartedAt = DateTime.UtcNow;
         RecordEvent("VendorStarted", vendorVehicleKey ?? vehicleId?.ToString());

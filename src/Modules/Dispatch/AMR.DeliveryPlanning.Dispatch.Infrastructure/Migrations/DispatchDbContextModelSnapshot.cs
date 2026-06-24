@@ -49,6 +49,43 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.ToTable("AmrTripExtensions", "dispatch");
                 });
 
+            modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.AmrVehicleAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<Guid>("TripId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VendorVehicleKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("VendorVehicleName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TripId", "Sequence")
+                        .IsUnique();
+
+                    b.ToTable("AmrVehicleAssignments", "dispatch");
+                });
+
             modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.ExecutionEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -697,6 +734,16 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.AmrVehicleAssignment", b =>
+                {
+                    b.HasOne("AMR.DeliveryPlanning.Dispatch.Domain.Entities.AmrTripExtension", null)
+                        .WithMany("VehicleAssignments")
+                        .HasForeignKey("TripId")
+                        .HasPrincipalKey("TripId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.ExecutionEvent", b =>
                 {
                     b.HasOne("AMR.DeliveryPlanning.Dispatch.Domain.Entities.Trip", null)
@@ -722,6 +769,11 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                         .HasForeignKey("TripId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.AmrTripExtension", b =>
+                {
+                    b.Navigation("VehicleAssignments");
                 });
 
             modelBuilder.Entity("AMR.DeliveryPlanning.Dispatch.Domain.Entities.Trip", b =>

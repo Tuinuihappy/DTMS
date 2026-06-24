@@ -92,18 +92,38 @@ public class TripTests
     }
 
     [Fact]
-    public void MarkVendorStarted_SecondCallDoesNotOverwriteVendorKey()
+    public void MarkVendorStarted_SecondCallWithDifferentKey_RecordsReassignment()
     {
-        // Duplicate TASK_PROCESSING webhooks (vendor retry, etc.) must
-        // leave the first captured vendor key intact. Combined with the
-        // existing Status-based short-circuit this gives a single audit
-        // value per trip.
+        // Phase 3d (Bug #2 fix) — second TASK_PROCESSING with a different
+        // vehicleKey is treated as a real reassignment, not a duplicate.
+        // The cache pointer flips to the latest robot so PASS / CANCEL /
+        // PAUSE commands target it, and the history table grows so ops
+        // can audit "robot A → robot B at time X". Pre-3d behaviour was
+        // first-write-wins which silently dropped the second key.
         var trip = NewEnvelopeTrip();
         trip.MarkVendorStarted(vendorVehicleKey: "Delta6FAN1");
 
         trip.MarkVendorStarted(vendorVehicleKey: "Something-Else");
 
+        trip.VendorVehicleKey.Should().Be("Something-Else");
+        trip.AmrExtension!.VehicleAssignments.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void MarkVendorStarted_DuplicatePayload_DoesNotGrowHistory()
+    {
+        // RIOT3 fires duplicate TASK_PROCESSING webhooks routinely
+        // (retries, mission-state catchup). They must not pollute the
+        // assignment history — idempotency lives on the extension's
+        // RecordVehicleAssignment.
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted(vendorVehicleKey: "Delta6FAN1", vendorVehicleName: "FAN1_NO5");
+
+        trip.MarkVendorStarted(vendorVehicleKey: "Delta6FAN1", vendorVehicleName: "FAN1_NO5");
+        trip.MarkVendorStarted(vendorVehicleKey: "Delta6FAN1", vendorVehicleName: "FAN1_NO5");
+
         trip.VendorVehicleKey.Should().Be("Delta6FAN1");
+        trip.AmrExtension!.VehicleAssignments.Should().HaveCount(1);
     }
 
     // ── Retry / route context ─────────────────────────────────────────

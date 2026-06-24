@@ -122,6 +122,32 @@ public class DispatchDbContext : DbContext
             // ("Operator" / "Vendor") and the enum can grow without a
             // re-numbering migration. Nullable; only set when paused.
             builder.Property(e => e.VendorPauseSource).HasConversion<string>().HasMaxLength(20);
+
+            // Phase 3d — vehicle reassignment history. Cascade delete so
+            // dropping the extension also drops its history (extension
+            // lifecycle = trip lifecycle).
+            builder.HasMany(e => e.VehicleAssignments)
+                   .WithOne()
+                   .HasForeignKey(a => a.TripId)
+                   .HasPrincipalKey(e => e.TripId)
+                   .OnDelete(DeleteBehavior.Cascade);
+            builder.Navigation(e => e.VehicleAssignments)
+                   .HasField("_vehicleAssignments")
+                   .UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<AmrVehicleAssignment>(builder =>
+        {
+            builder.HasKey(a => a.Id);
+            builder.ToTable("AmrVehicleAssignments", "dispatch");
+            builder.Property(a => a.VendorVehicleKey).HasMaxLength(100).IsRequired();
+            builder.Property(a => a.VendorVehicleName).HasMaxLength(100);
+            builder.Property(a => a.Source).HasMaxLength(40).IsRequired();
+            // Composite uniqueness on (TripId, Sequence) — prevents
+            // double-write race conditions (two webhooks for the same
+            // reassignment land in parallel; one wins, the other gets a
+            // PK violation and the consumer retries).
+            builder.HasIndex(a => new { a.TripId, a.Sequence }).IsUnique();
         });
 
         modelBuilder.Entity<ExecutionEvent>(builder =>

@@ -19,6 +19,7 @@ public class TripRepository : ITripRepository
     {
         return await _context.Trips
             .Include(t => t.AmrExtension)
+                .ThenInclude(e => e!.VehicleAssignments)
             .Include(t => t.Events)
             .Include(t => t.Exceptions)
             .Include(t => t.ProofsOfDelivery)
@@ -31,9 +32,14 @@ public class TripRepository : ITripRepository
 
         // IgnoreQueryFilters: RIOT3 vendor callbacks carry no tenant claim.
         // UpperKey is globally unique so cross-tenant leakage isn't a concern.
+        // ThenInclude(VehicleAssignments) is required for EF change tracking
+        // to recognise new history rows appended via RecordVehicleAssignment
+        // (Phase 3d) — without it Add to the un-loaded collection is treated
+        // as Modified and SaveChanges fails with a 0-row concurrency error.
         return await _context.Trips
             .IgnoreQueryFilters()
             .Include(t => t.AmrExtension)
+                .ThenInclude(e => e!.VehicleAssignments)
             .Include(t => t.Events)
             .FirstOrDefaultAsync(t => t.UpperKey == upperKey, cancellationToken);
     }
@@ -49,6 +55,7 @@ public class TripRepository : ITripRepository
         return await _context.Trips
             .IgnoreQueryFilters()
             .Include(t => t.AmrExtension)
+                .ThenInclude(e => e!.VehicleAssignments)
             .Include(t => t.Events)
             .FirstOrDefaultAsync(
                 t => t.AmrExtension != null && t.AmrExtension.VendorOrderKey == vendorOrderKey,
@@ -159,8 +166,32 @@ public class TripRepository : ITripRepository
         await AddNewExecutionEventsAsync(trip, cancellationToken);
         await AddNewTripExceptionsAsync(trip, cancellationToken);
         await AddNewProofsOfDeliveryAsync(trip, cancellationToken);
+        await AddNewVehicleAssignmentsAsync(trip, cancellationToken);
 
         await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    // Phase 3d — vehicle reassignment history rows appended via
+    // RecordVehicleAssignment land in the in-memory collection but EF's
+    // change tracker may not classify them as Added when the parent
+    // extension was loaded from query (depends on whether the relationship
+    // was Include'd and on the lifecycle state of the parent). Explicit
+    // promotion to Added is the same defensive pattern used for
+    // ExecutionEvents above.
+    private async Task AddNewVehicleAssignmentsAsync(Trip trip, CancellationToken cancellationToken)
+    {
+        if (trip.AmrExtension is null) return;
+        foreach (var assignment in trip.AmrExtension.VehicleAssignments)
+        {
+            var entry = _context.Entry(assignment);
+            if (entry.State == EntityState.Added)
+                continue;
+
+            var exists = await _context.Set<Domain.Entities.AmrVehicleAssignment>()
+                .AnyAsync(a => a.Id == assignment.Id, cancellationToken);
+            if (!exists)
+                entry.State = EntityState.Added;
+        }
     }
 
     private async Task AddNewExecutionEventsAsync(Trip trip, CancellationToken cancellationToken)
