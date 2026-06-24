@@ -15,6 +15,7 @@ public static class ModuleEndpointRegistration
     public static WebApplication MapAllModuleEndpoints(this WebApplication app)
     {
         app.MapFacilityEndpoints();
+        app.MapWarehouseEndpoints();   // Phase 2.7a — separate file from MapEndpoints to keep AMR vs Warehouse surfaces distinct
         app.MapFleetEndpoints();
         app.MapDeliveryOrderEndpoints();
         app.MapItemEndpoints();
