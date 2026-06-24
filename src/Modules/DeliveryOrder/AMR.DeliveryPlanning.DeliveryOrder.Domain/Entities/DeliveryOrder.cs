@@ -470,18 +470,58 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         }
     }
 
+    // Existing AMR validation path — keeps the 4 existing call sites
+    // (Submit / BulkSubmit / CreateUpstream / ReplanStuck) working
+    // unchanged. New mode-aware path is the (stationMap, warehouseMap)
+    // overload below; this is now a thin wrapper.
     public void MarkAsValidated(IReadOnlyDictionary<string, Guid> stationMap)
+        => MarkAsValidated(stationMap, warehouseMap: null);
+
+    /// <summary>
+    /// Mode-aware validation (Phase 2.5 Path A). The order's
+    /// <see cref="RequestedTransportMode"/> determines which map(s) get
+    /// applied: AMR orders pass stationMap; Manual / Fleet orders pass
+    /// warehouseMap. At least one must be non-null — the
+    /// <see cref="PickupLocationCode"/>/<see cref="DropLocationCode"/>
+    /// strings are then expected to be present in the supplied map(s).
+    ///
+    /// Both maps non-null is allowed (Phase 2.3 onward — once AmrStation
+    /// carries FacilityId, AMR orders will populate both).
+    /// </summary>
+    public void MarkAsValidated(
+        IReadOnlyDictionary<string, Guid>? stationMap,
+        IReadOnlyDictionary<string, Guid>? warehouseMap)
     {
         if (Status != OrderStatus.Submitted)
             throw new InvalidOperationException("Only submitted orders can be validated.");
+        if (stationMap is null && warehouseMap is null)
+            throw new ArgumentException(
+                "Either stationMap or warehouseMap must be provided",
+                nameof(stationMap));
 
         foreach (var item in _items)
         {
-            if (!stationMap.TryGetValue(item.PickupLocationCode, out var pickupId))
-                throw new InvalidOperationException($"Missing station mapping for pickup {item.PickupLocationCode}.");
-            if (!stationMap.TryGetValue(item.DropLocationCode, out var dropId))
-                throw new InvalidOperationException($"Missing station mapping for drop {item.DropLocationCode}.");
-            item.SetStationIds(pickupId, dropId);
+            if (stationMap is not null)
+            {
+                if (!stationMap.TryGetValue(item.PickupLocationCode, out var pickupId))
+                    throw new InvalidOperationException(
+                        $"Missing station mapping for pickup {item.PickupLocationCode}.");
+                if (!stationMap.TryGetValue(item.DropLocationCode, out var dropId))
+                    throw new InvalidOperationException(
+                        $"Missing station mapping for drop {item.DropLocationCode}.");
+                item.SetStationIds(pickupId, dropId);
+            }
+
+            if (warehouseMap is not null)
+            {
+                if (!warehouseMap.TryGetValue(item.PickupLocationCode, out var pickupWh))
+                    throw new InvalidOperationException(
+                        $"Missing warehouse mapping for pickup {item.PickupLocationCode}.");
+                if (!warehouseMap.TryGetValue(item.DropLocationCode, out var dropWh))
+                    throw new InvalidOperationException(
+                        $"Missing warehouse mapping for drop {item.DropLocationCode}.");
+                item.SetWarehouseIds(pickupWh, dropWh);
+            }
         }
 
         Status = OrderStatus.Validated;

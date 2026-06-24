@@ -1,6 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
+using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using Microsoft.EntityFrameworkCore;
@@ -40,13 +41,33 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
             return Result<SubmitDeliveryOrderResult>.Failure(readiness.Error);
         }
 
-        var stationMap = await _stationValidation.BuildStationMapAsync(order.Items, cancellationToken);
-        if (stationMap.IsFailure) return Result<SubmitDeliveryOrderResult>.Failure(stationMap.Error);
+        // Phase 2.5 Path A — interpret location codes based on the
+        // order's RequestedTransportMode. AMR keeps the existing
+        // station-code semantics; Manual / Fleet interpret the same
+        // PickupLocationCode / DropLocationCode field as a warehouse
+        // code (since they don't reference specific AMR stations).
+        var mode = order.RequestedTransportMode ?? TransportMode.Amr;
+        IReadOnlyDictionary<string, Guid>? stationMap = null;
+        IReadOnlyDictionary<string, Guid>? warehouseMap = null;
+
+        if (mode == TransportMode.Amr)
+        {
+            var stationResult = await _stationValidation.BuildStationMapAsync(order.Items, cancellationToken);
+            if (stationResult.IsFailure) return Result<SubmitDeliveryOrderResult>.Failure(stationResult.Error);
+            stationMap = stationResult.Value;
+        }
+        else
+        {
+            // Manual / Fleet → warehouse-code interpretation.
+            var warehouseResult = await _stationValidation.BuildWarehouseMapAsync(order.Items, cancellationToken);
+            if (warehouseResult.IsFailure) return Result<SubmitDeliveryOrderResult>.Failure(warehouseResult.Error);
+            warehouseMap = warehouseResult.Value;
+        }
 
         try
         {
             order.Submit();
-            order.MarkAsValidated(stationMap.Value);
+            order.MarkAsValidated(stationMap, warehouseMap);
 
             await _auditRepo.AddAsync(new OrderAuditEvent(
                 order.Id, "OrderSubmitted",

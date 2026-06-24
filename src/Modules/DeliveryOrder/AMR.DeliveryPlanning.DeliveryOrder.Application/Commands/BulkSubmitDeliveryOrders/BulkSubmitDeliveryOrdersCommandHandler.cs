@@ -98,20 +98,41 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
             pendingOrders.Add(order);
         }
 
-        // Validate stations sequentially — IStationLookup is backed by a Facility DbContext
-        // which is not safe to use concurrently across orders.
+        // Validate locations sequentially — both IStationLookup and
+        // IWarehouseLookup back onto the Facility DbContext which is
+        // not safe to use concurrently across orders. Per Phase 2.5
+        // Path A, dispatch by RequestedTransportMode: AMR resolves
+        // station codes; Manual / Fleet resolve warehouse codes.
         foreach (var order in pendingOrders)
         {
-            var stationMap = await _stationValidation.BuildStationMapAsync(order.Items, cancellationToken);
-            if (stationMap.IsFailure)
+            var mode = order.RequestedTransportMode ?? AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums.TransportMode.Amr;
+            IReadOnlyDictionary<string, Guid>? stationMap = null;
+            IReadOnlyDictionary<string, Guid>? warehouseMap = null;
+
+            if (mode == AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums.TransportMode.Amr)
             {
-                failures.Add(new BulkSubmitFailure(order.OrderRef, stationMap.Error));
-                continue;
+                var stationResult = await _stationValidation.BuildStationMapAsync(order.Items, cancellationToken);
+                if (stationResult.IsFailure)
+                {
+                    failures.Add(new BulkSubmitFailure(order.OrderRef, stationResult.Error));
+                    continue;
+                }
+                stationMap = stationResult.Value;
+            }
+            else
+            {
+                var warehouseResult = await _stationValidation.BuildWarehouseMapAsync(order.Items, cancellationToken);
+                if (warehouseResult.IsFailure)
+                {
+                    failures.Add(new BulkSubmitFailure(order.OrderRef, warehouseResult.Error));
+                    continue;
+                }
+                warehouseMap = warehouseResult.Value;
             }
 
             order.RaiseCreatedEvent();
             order.Submit();
-            order.MarkAsValidated(stationMap.Value);
+            order.MarkAsValidated(stationMap, warehouseMap);
             var warnings = WeightWarningEvaluator.Evaluate(order.Items);
             succeeded.Add(new BulkSubmitSuccess(order.Id, warnings));
         }

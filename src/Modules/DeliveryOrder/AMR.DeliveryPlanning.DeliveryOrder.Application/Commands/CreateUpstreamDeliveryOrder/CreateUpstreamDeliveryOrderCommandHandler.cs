@@ -95,17 +95,40 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
             return Result<UpstreamOrderAckDto>.Failure(ex.Message);
         }
 
-        var stationMap = await _stationValidation.BuildStationMapAsync(order.Items, cancellationToken);
-        if (stationMap.IsFailure)
+        // Phase 2.5 Path A — interpret location codes by mode. Upstream
+        // OMS still treats AMR as the default when RequestedTransportMode
+        // isn't supplied; Manual / Fleet upstream payloads (when those
+        // modes go live) supply the mode and the same PickupLocationCode
+        // field is interpreted as a warehouse code.
+        var mode = order.RequestedTransportMode ?? AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums.TransportMode.Amr;
+        IReadOnlyDictionary<string, Guid>? stationMap = null;
+        IReadOnlyDictionary<string, Guid>? warehouseMap = null;
+
+        if (mode == AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums.TransportMode.Amr)
         {
-            _logger.LogWarning("[Upstream] Order '{OrderRef}' station mapping failed: {Error}.", request.OrderRef, stationMap.Error);
-            return Result<UpstreamOrderAckDto>.Failure(stationMap.Error);
+            var stationResult = await _stationValidation.BuildStationMapAsync(order.Items, cancellationToken);
+            if (stationResult.IsFailure)
+            {
+                _logger.LogWarning("[Upstream] Order '{OrderRef}' station mapping failed: {Error}.", request.OrderRef, stationResult.Error);
+                return Result<UpstreamOrderAckDto>.Failure(stationResult.Error);
+            }
+            stationMap = stationResult.Value;
+        }
+        else
+        {
+            var warehouseResult = await _stationValidation.BuildWarehouseMapAsync(order.Items, cancellationToken);
+            if (warehouseResult.IsFailure)
+            {
+                _logger.LogWarning("[Upstream] Order '{OrderRef}' warehouse mapping failed: {Error}.", request.OrderRef, warehouseResult.Error);
+                return Result<UpstreamOrderAckDto>.Failure(warehouseResult.Error);
+            }
+            warehouseMap = warehouseResult.Value;
         }
 
         try
         {
             order.RaiseCreatedEvent();
-            order.MarkAsValidated(stationMap.Value);
+            order.MarkAsValidated(stationMap, warehouseMap);
             order.Confirm(_options.WeightFallbackKg);
             // POD-required orders sit at DroppedOff until operator scans;
             // upstream caller opts in via the optional flag. Null leaves
