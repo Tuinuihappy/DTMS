@@ -60,12 +60,15 @@ public static class WarehouseEndpoints
         // The picker UI (Phase 2.7b) calls this on every dropdown open;
         // the response is shallow enough to fit ~100 warehouses without
         // pagination — past that we add ?page= + ?size=.
-        group.MapGet("/", async (string? serviceMode, bool excludeInactive, ISender sender) =>
+        // excludeInactive defaults true — picker UI omits the query
+        // param entirely when filtering active-only (the common case);
+        // making it required would 500 every dropdown open.
+        group.MapGet("/", async (string? serviceMode, bool? excludeInactive, ISender sender) =>
         {
             TransportMode? mode = !string.IsNullOrWhiteSpace(serviceMode)
                 ? ParseMode(serviceMode)
                 : null;
-            var result = await sender.Send(new GetWarehousesQuery(mode, excludeInactive));
+            var result = await sender.Send(new GetWarehousesQuery(mode, excludeInactive ?? true));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(new { error = result.Error });
         });
 

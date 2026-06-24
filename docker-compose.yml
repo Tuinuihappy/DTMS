@@ -90,7 +90,11 @@ services:
       POSTGRES_DB: amr_delivery_planning
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_EXTRA_OPTS: "-Z9 --schema=public --schema=facility --schema=fleet --schema=delivery_order --schema=planning --schema=dispatch --schema=auth --schema=outbox --schema=vendor_adapter --blobs"
+      # Schema names match the DbContext.Schema constants (no underscores) —
+      # earlier values "delivery_order" / "vendor_adapter" silently excluded
+      # those schemas from every nightly dump. `bi` added because the
+      # projection tables there are not recoverable from event replay.
+      POSTGRES_EXTRA_OPTS: "-Z9 --schema=public --schema=auth --schema=outbox --schema=facility --schema=fleet --schema=deliveryorder --schema=planning --schema=dispatch --schema=vendoradapter --schema=bi --blobs"
       SCHEDULE: "@daily"
       BACKUP_KEEP_DAYS: 7
       BACKUP_KEEP_WEEKS: 4

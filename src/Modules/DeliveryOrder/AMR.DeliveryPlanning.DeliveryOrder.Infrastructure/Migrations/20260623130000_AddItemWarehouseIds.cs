@@ -28,14 +28,14 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
         {
             migrationBuilder.AddColumn<Guid>(
                 name: "PickupWarehouseId",
-                schema: "delivery_order",
+                schema: "deliveryorder",
                 table: "Items",
                 type: "uuid",
                 nullable: true);
 
             migrationBuilder.AddColumn<Guid>(
                 name: "DropWarehouseId",
-                schema: "delivery_order",
+                schema: "deliveryorder",
                 table: "Items",
                 type: "uuid",
                 nullable: true);
@@ -46,12 +46,12 @@ namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
         {
             migrationBuilder.DropColumn(
                 name: "DropWarehouseId",
-                schema: "delivery_order",
+                schema: "deliveryorder",
                 table: "Items");
 
             migrationBuilder.DropColumn(
                 name: "PickupWarehouseId",
-                schema: "delivery_order",
+                schema: "deliveryorder",
                 table: "Items");
         }
     }
