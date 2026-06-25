@@ -48,7 +48,14 @@ builder.Services.AddOpenApi(options =>
 {
     options.AddOperationTransformer<AMR.DeliveryPlanning.Api.OpenApi.IdempotencyKeyOperationTransformer>();
 });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(o =>
+{
+    // Phase 4.2 — Operator PWA policies (OperatorOnly / SupervisorOnly
+    // / AdminOnly). All require the OperatorJwt scheme so the operator
+    // app's JWT can't accidentally authorize against admin endpoints
+    // and vice versa.
+    o.AddOperatorPolicies();
+});
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(
         new System.Text.Json.Serialization.JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.SnakeCaseUpper)));
@@ -61,8 +68,15 @@ if (devAuthBypassEnabled)
     {
         options.DefaultAuthenticateScheme = DevAuthenticationHandler.SchemeName;
         options.DefaultChallengeScheme = DevAuthenticationHandler.SchemeName;
-    }).AddScheme<AuthenticationSchemeOptions, DevAuthenticationHandler>(
+    })
+    .AddScheme<AuthenticationSchemeOptions, DevAuthenticationHandler>(
         DevAuthenticationHandler.SchemeName,
+        _ => { })
+    // Phase 4.2 — operator endpoints still need real claim extraction
+    // (so the sync middleware sees employeeCode/role), even when admin
+    // endpoints are bypassed. Mock scheme decodes JWT without sig check.
+    .AddScheme<AuthenticationSchemeOptions, OperatorMockJwtAuthenticationHandler>(
+        OperatorMockJwtAuthenticationHandler.SchemeName,
         _ => { });
 }
 else
@@ -104,7 +118,14 @@ else
                 return Task.CompletedTask;
             }
         };
-    });
+    })
+    // Phase 4.2 — Operator PWA mock JWT scheme. Validates structure +
+    // expiry but skips signature verification (the External Auth team
+    // hasn't supplied JWKS yet per ADR-014). Swap this with a real
+    // JwtBearer scheme pointing at the JWKS endpoint when available.
+    .AddScheme<AuthenticationSchemeOptions, OperatorMockJwtAuthenticationHandler>(
+        OperatorMockJwtAuthenticationHandler.SchemeName,
+        _ => { });
 }
 
 // Configure MediatR — scan all module Application assemblies
@@ -115,6 +136,7 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Dispatch.Application.Commands.CreateEnvelopeTrip.CreateEnvelopeTripCommand).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Transport.Manual.Application.Commands.AcknowledgeTrip.AcknowledgeTripCommand).Assembly);
     cfg.AddOpenBehavior(typeof(AMR.DeliveryPlanning.SharedKernel.Behaviors.ValidationBehavior<,>));
 });
 
@@ -633,6 +655,14 @@ app.UseCors(HubsCorsPolicy);
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Phase 4.2 — Operator PWA sync. Mounted only on /api/operator/* so it
+// doesn't run for admin/dispatcher endpoints. Runs after UseAuthorization
+// so the OperatorJwt scheme has already validated + populated User
+// claims; the middleware then upserts the DTMS-side Operator row.
+app.UseWhen(
+    ctx => ctx.Request.Path.StartsWithSegments("/api/operator"),
+    branch => branch.UseMiddleware<AMR.DeliveryPlanning.Api.Auth.OperatorSyncMiddleware>());
 
 // Liveness probe (always 200 if process is up). G1 Phase 1 — excludes the
 // "drain" check so a draining pod stays liveness-Healthy and kubelet

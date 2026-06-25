@@ -50,6 +50,8 @@
     <ProjectReference Include="..\Modules\Transport.Amr\AMR.DeliveryPlanning.Transport.Amr.Infrastructure\AMR.DeliveryPlanning.Transport.Amr.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Transport.Amr\AMR.DeliveryPlanning.Transport.Amr.Feeder\AMR.DeliveryPlanning.Transport.Amr.Feeder.csproj" />
     <ProjectReference Include="..\Modules\Transport.Manual\AMR.DeliveryPlanning.Transport.Manual.Infrastructure\AMR.DeliveryPlanning.Transport.Manual.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Transport.Manual\AMR.DeliveryPlanning.Transport.Manual.Application\AMR.DeliveryPlanning.Transport.Manual.Application.csproj" />
+    <ProjectReference Include="..\Modules\Transport.Manual\AMR.DeliveryPlanning.Transport.Manual.Presentation\AMR.DeliveryPlanning.Transport.Manual.Presentation.csproj" />
     <ProjectReference Include="..\Modules\OmsAdapter\AMR.DeliveryPlanning.OmsAdapter.csproj" />
   </ItemGroup>
 

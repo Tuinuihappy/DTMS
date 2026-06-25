@@ -222,16 +222,26 @@ public static class ModuleServiceRegistration
             services.AddHostedService<AMR.DeliveryPlanning.Api.RobotPositions.Riot3PositionPollerService>();
         }
 
-        // ── Transport.Manual Module (Phase 4.1 — skeleton) ────────────
-        // Domain + DbContext only at this point. Repositories,
-        // ManualDispatchStrategy, mobile endpoints, push gateway register
-        // in Phases 4.2-4.4.
+        // ── Transport.Manual Module (Phase 4.1 + 4.2) ─────────────────
+        // 4.1: DbContext + Domain.
+        // 4.2: Operator repositories + sync service + scoped sync
+        //      middleware that the /api/operator/* pipeline runs.
         // PendingModelChangesWarning is silenced because migrations are
         // hand-written (per feedback_migration_manual memory) and EF's
         // model differ throws otherwise.
         services.AddDbContext<AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Data.TransportManualDbContext>((_, o) => o
             .UseNpgsql(npgsqlDataSource, ConfigureNpgsql)
             .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
+
+        services.AddScoped<AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories.IOperatorRepository,
+                           AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Repositories.OperatorRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories.IGeofenceOverrideRequestRepository,
+                           AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Repositories.GeofenceOverrideRequestRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories.IManualTripExtensionRepository,
+                           AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Repositories.ManualTripExtensionRepository>();
+        services.AddScoped<AMR.DeliveryPlanning.Transport.Manual.Application.Services.IOperatorSyncService,
+                           AMR.DeliveryPlanning.Transport.Manual.Application.Services.OperatorSyncService>();
+        services.AddScoped<AMR.DeliveryPlanning.Api.Auth.OperatorSyncMiddleware>();
 
         // ── DeliveryOrder Module ──────────────────────────────────────
         services.AddScoped<DeliveryOrderDomainEventMapper>();

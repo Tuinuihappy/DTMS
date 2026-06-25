@@ -53,7 +53,9 @@
   </Folder>
   <Folder Name="/src/Modules/Transport.Manual/">
     <Project Path="src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.csproj" />
+    <Project Path="src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.Application/AMR.DeliveryPlanning.Transport.Manual.Application.csproj" />
     <Project Path="src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.Infrastructure/AMR.DeliveryPlanning.Transport.Manual.Infrastructure.csproj" />
+    <Project Path="src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.Presentation/AMR.DeliveryPlanning.Transport.Manual.Presentation.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AMR.DeliveryPlanning.Api.UnitTests/AMR.DeliveryPlanning.Api.UnitTests.csproj" />

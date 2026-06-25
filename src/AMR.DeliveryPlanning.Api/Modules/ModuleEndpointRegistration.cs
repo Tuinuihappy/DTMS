@@ -4,6 +4,7 @@ using AMR.DeliveryPlanning.Facility.Presentation;
 using AMR.DeliveryPlanning.Fleet.Presentation;
 using AMR.DeliveryPlanning.Planning.Presentation;
 using AMR.DeliveryPlanning.Transport.Amr.Feeder.Webhooks;
+using AMR.DeliveryPlanning.Transport.Manual.Presentation;
 
 namespace AMR.DeliveryPlanning.Api.Modules;
 
@@ -29,6 +30,7 @@ public static class ModuleEndpointRegistration
         app.MapPlanningEndpoints();
         app.MapDispatchEndpoints();
         app.MapRiot3Webhooks();
+        app.MapOperatorEndpoints();   // Phase 4.2 — /api/operator/* (Manual transport mode)
 
         return app;
     }
