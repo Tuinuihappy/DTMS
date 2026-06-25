@@ -29,6 +29,12 @@ public sealed class OperatorRepository : IOperatorRepository
               .Include(o => o.PushSubscriptions)
               .FirstOrDefaultAsync(o => o.Id == id, ct);
 
+    public async Task<IReadOnlyList<Operator>> ListAllAsync(CancellationToken ct = default)
+        => await _db.Operators
+                    .OrderBy(o => o.Status)            // Active first (enum value 0)
+                    .ThenBy(o => o.EmployeeCode)
+                    .ToListAsync(ct);
+
     public async Task<IReadOnlyList<Operator>> GetEligibleForAssignmentAsync(
         Guid? preferredWarehouseId, CancellationToken ct = default)
     {
@@ -82,8 +88,17 @@ public sealed class GeofenceOverrideRequestRepository : IGeofenceOverrideRequest
             .FirstOrDefaultAsync(ct);
     }
 
+    public async Task<IReadOnlyList<GeofenceOverrideRequest>> ListPendingAsync(CancellationToken ct = default)
+        => await _db.GeofenceOverrideRequests
+                    .Where(r => r.Status == OverrideRequestStatus.Pending)
+                    .OrderBy(r => r.RequestedAt)
+                    .ToListAsync(ct);
+
     public Task AddAsync(GeofenceOverrideRequest request, CancellationToken ct = default)
         => _db.GeofenceOverrideRequests.AddAsync(request, ct).AsTask();
+
+    public void Update(GeofenceOverrideRequest request)
+        => _db.GeofenceOverrideRequests.Update(request);
 
     public Task SaveChangesAsync(CancellationToken ct = default)
         => _db.SaveChangesAsync(ct);
@@ -103,8 +118,17 @@ public sealed class ManualTripExtensionRepository : IManualTripExtensionReposito
                     .OrderByDescending(e => e.AssignedAt)
                     .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<ManualTripExtension>> ListActiveAsync(CancellationToken ct = default)
+        => await _db.ManualTripExtensions
+                    .Where(e => e.DroppedAt == null)
+                    .OrderByDescending(e => e.AssignedAt)
+                    .ToListAsync(ct);
+
     public Task AddAsync(ManualTripExtension extension, CancellationToken ct = default)
         => _db.ManualTripExtensions.AddAsync(extension, ct).AsTask();
+
+    public void Update(ManualTripExtension extension)
+        => _db.ManualTripExtensions.Update(extension);
 
     public Task SaveChangesAsync(CancellationToken ct = default)
         => _db.SaveChangesAsync(ct);

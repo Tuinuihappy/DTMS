@@ -31,6 +31,7 @@ public static class ModuleEndpointRegistration
         app.MapDispatchEndpoints();
         app.MapRiot3Webhooks();
         app.MapOperatorEndpoints();   // Phase 4.2 — /api/operator/* (Manual transport mode)
+        app.MapAdminManualOperatorEndpoints();   // Phase 4.6 — /api/v1/admin/manual/*
 
         return app;
     }

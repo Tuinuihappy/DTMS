@@ -756,6 +756,8 @@ app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.JobHub>("/hubs/jobs");
 app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.TripHub>("/hubs/trips");
 app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.DashboardHub>("/hubs/dashboard");
 app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.FleetHub>("/hubs/fleet");
+// Phase 4.6 — dispatcher Manual operator board realtime hints.
+app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.ManualBoardHub>("/hubs/manual-board");
 
 app.Run();
 

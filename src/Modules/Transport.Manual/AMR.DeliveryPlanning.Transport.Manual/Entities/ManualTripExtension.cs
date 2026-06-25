@@ -100,4 +100,39 @@ public class ManualTripExtension
         DropPodKey = podKey;
         DropGeofenceOverrideId = overrideId;
     }
+
+    // Phase 4.6 — Dispatcher-initiated reassignment. Swaps the bound
+    // operator, resets the ack window (new operator needs fresh chance
+    // to ack), and bumps the pickup deadline by the original ack window
+    // size so the SLA clock isn't artificially tight against the new
+    // operator. Drop deadline keeps its absolute value — customer SLA
+    // is independent of who's carrying the package.
+    //
+    // Refuses to reassign once the trip has been dropped — at that
+    // point the operator's already handed off and only Complete is
+    // meaningful.
+    public void ReassignToOperator(Guid newOperatorId, DateTime? newAckDeadline, DateTime? newPickupDeadline)
+    {
+        if (newOperatorId == Guid.Empty)
+            throw new ArgumentException("OperatorId must not be empty.", nameof(newOperatorId));
+        if (DroppedAt.HasValue)
+            throw new InvalidOperationException("Cannot reassign a trip that has already been dropped.");
+        if (newOperatorId == OperatorId)
+            return;  // idempotent — no-op if same operator
+
+        OperatorId = newOperatorId;
+        // Reset progress so the new operator starts at the same FSM
+        // position as a fresh assignment. POD keys carry forward only
+        // if pickup already happened — the photos are still valid;
+        // the new operator just needs to do the drop.
+        if (!PickedUpAt.HasValue)
+        {
+            AcknowledgedAt = null;
+            PickupPodKey = null;
+            PickupGeofenceOverrideId = null;
+        }
+        AckDeadline = newAckDeadline ?? AckDeadline;
+        PickupDeadline = newPickupDeadline ?? PickupDeadline;
+        // DropDeadline preserved — customer SLA is operator-agnostic.
+    }
 }

@@ -23,6 +23,11 @@ public interface IOperatorRepository
     Task<IReadOnlyList<Operator>> GetEligibleForAssignmentAsync(
         Guid? preferredWarehouseId, CancellationToken ct = default);
 
+    // Phase 4.6 — Dispatcher console "operator board" feed. Returns
+    // ALL operators (any status, with or without an active trip) so
+    // ops can see who's on shift, who's busy, who's deactivated.
+    Task<IReadOnlyList<Operator>> ListAllAsync(CancellationToken ct = default);
+
     Task AddAsync(Operator op, CancellationToken ct = default);
     Task SaveChangesAsync(CancellationToken ct = default);
 }
@@ -37,7 +42,13 @@ public interface IGeofenceOverrideRequestRepository
     Task<GeofenceOverrideRequest?> GetApprovedForTripLegAsync(
         Guid tripId, Guid operatorId, Guid expectedWarehouseId, CancellationToken ct = default);
 
+    // Phase 4.6 — Dispatcher feed: "what overrides are waiting for me?"
+    // Pending only — Approved/Denied/Expired stay in the table for
+    // audit but don't surface in the queue.
+    Task<IReadOnlyList<GeofenceOverrideRequest>> ListPendingAsync(CancellationToken ct = default);
+
     Task AddAsync(GeofenceOverrideRequest request, CancellationToken ct = default);
+    void Update(GeofenceOverrideRequest request);
     Task SaveChangesAsync(CancellationToken ct = default);
 }
 
@@ -45,6 +56,13 @@ public interface IManualTripExtensionRepository
 {
     Task<ManualTripExtension?> GetByTripIdAsync(Guid tripId, CancellationToken ct = default);
     Task<IReadOnlyList<ManualTripExtension>> GetByOperatorIdAsync(Guid operatorId, CancellationToken ct = default);
+
+    // Phase 4.6 — Dispatcher feed: all active (not-yet-dropped) Manual
+    // trips so the operator board can render a "who's carrying what"
+    // table cross-cutting the operator list.
+    Task<IReadOnlyList<ManualTripExtension>> ListActiveAsync(CancellationToken ct = default);
+
     Task AddAsync(ManualTripExtension extension, CancellationToken ct = default);
+    void Update(ManualTripExtension extension);
     Task SaveChangesAsync(CancellationToken ct = default);
 }
