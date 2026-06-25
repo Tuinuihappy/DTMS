@@ -1,9 +1,11 @@
 # ADR-009: Proof of Delivery (POD) Object Storage
 
-- **Status**: Accepted
+- **Status**: Accepted (partially superseded — upload mechanism only, see ADR-015)
 - **Date**: 2026-06-22
 - **Deciders**: Architecture team
-- **Related**: [Phase 4](../phases/phase-4-transport-manual.md), [ADR-005](adr-005-push-notification-gateway.md), [ADR-007](adr-007-mobile-api-authentication.md)
+- **Related**: [ADR-015 POD Upload — Presigned URLs](adr-015-pod-upload-presigned-urls.md), [Phase 4](../phases/phase-4-transport-manual.md), [ADR-005](adr-005-push-notification-gateway.md), [ADR-007](adr-007-mobile-api-authentication.md)
+
+> **Partial supersede notice (2026-06-25):** ADR-009's backend choice (MinIO + S3-compatible abstraction + per-environment buckets + lifecycle policies + file format decisions) remains valid. The **upload mechanism** (server-mediated) was superseded by [ADR-015](adr-015-pod-upload-presigned-urls.md) (presigned URLs for direct upload to MinIO) due to PWA + Service Worker constraints introduced by [ADR-012](adr-012-operator-mobile-stack-pwa.md).
 
 ## Context
 

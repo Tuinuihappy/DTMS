@@ -1,9 +1,11 @@
 # ADR-007: Mobile API Authentication Strategy
 
-- **Status**: Accepted
+- **Status**: ⚠️ **Superseded by [ADR-014 Mobile API Authentication — External Auth + Role-Based Policy](adr-014-mobile-api-authentication-external-auth.md)** (2026-06-25)
 - **Date**: 2026-06-22
 - **Deciders**: Architecture team
 - **Related**: [Phase 4](../phases/phase-4-transport-manual.md), [Manual Operator API](../api/manual-operator-api.md), [ADR-005](adr-005-push-notification-gateway.md)
+
+> **Superseded notice (2026-06-25):** ADR-007 assumed DTMS would issue its own JWTs with audience separation + device-bound refresh tokens. Discovery on 2026-06-25 that an **External Auth API** (`http://10.204.212.28:15000`) already serves both dispatchers and operators with a single user store eliminates the need for DTMS internal auth. See [ADR-014](adr-014-mobile-api-authentication-external-auth.md) for current decision — JWT consumer pattern + role-based policies + DTMS Operator aggregate for app-specific data.
 
 ## Context
 

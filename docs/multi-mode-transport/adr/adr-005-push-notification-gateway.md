@@ -1,9 +1,11 @@
 # ADR-005: Push Notification Gateway for Operator Mobile App
 
-- **Status**: Accepted
+- **Status**: ⚠️ **Superseded by [ADR-013 Push Notification — Web Push](adr-013-push-notification-web-push.md)** (2026-06-25)
 - **Date**: 2026-06-22
 - **Deciders**: Architecture team
 - **Related**: [Phase 4: Transport.Manual](../phases/phase-4-transport-manual.md), [Manual Operator API](../api/manual-operator-api.md)
+
+> **Superseded notice (2026-06-25):** ADR-005's FCM decision assumed native iOS/Android mobile clients. [ADR-012](adr-012-operator-mobile-stack-pwa.md) changed the mobile stack to PWA, which uses Web Push (W3C standard) instead of FCM/APNs SDKs. The `IPushNotificationGateway` interface from ADR-005 is preserved in ADR-013; only the gateway implementation changes from FCM to Web Push. See [ADR-013](adr-013-push-notification-web-push.md) for current decision.
 
 ## Context
 
