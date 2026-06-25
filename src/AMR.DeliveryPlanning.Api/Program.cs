@@ -24,6 +24,19 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
 
+// Phase 4.3 — one-shot VAPID keypair generator. Run via:
+//   dotnet run --project src/AMR.DeliveryPlanning.Api -- --generate-vapid-keys
+// Prints the keypair + exits before any host setup. Operator pastes
+// the values into appsettings.Development.json or .env.
+if (args.Contains("--generate-vapid-keys"))
+{
+    var (pub, priv) = AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Push.VapidKeyHelper.Generate();
+    Console.WriteLine("# VAPID keypair — store the private key as a secret.");
+    Console.WriteLine($"Push__Vapid__PublicKey={pub}");
+    Console.WriteLine($"Push__Vapid__PrivateKey={priv}");
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 var devAuthBypassEnabled = builder.Environment.IsDevelopment()
     && builder.Configuration.GetValue<bool>("Auth:Disable");

@@ -136,6 +136,33 @@ services:
     environment:
       - COLLECTOR_OTLP_ENABLED=true
 
+  # Phase 4.3 — MinIO object storage for Manual mode POD (per ADR-015).
+  # PWA receives a presigned PUT URL from the API and uploads directly to
+  # MinIO so the .NET process never touches the photo bytes. Bucket
+  # 'dtms-pod' is auto-created by the API on startup with a private
+  # default policy (presigned-only access).
+  #
+  # Console UI at http://localhost:9001 (creds minioadmin/minioadmin) for
+  # browsing uploads + debugging policies. NOT for production use — change
+  # creds + restrict console behind reverse proxy in real deploy.
+  minio:
+    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+    container_name: dtms-minio
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Console UI
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - miniodata:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # One-shot migration runner. Same image as api, but invoked with
   # --migrate-only so it applies pending EF migrations + seeds then
   # exits 0. api depends on it via service_completed_successfully so
@@ -190,6 +217,8 @@ services:
       rabbitmq:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
       migrator:
         condition: service_completed_successfully
@@ -295,6 +324,28 @@ services:
       # .env.example). Default is a dev-only placeholder — overriding in
       # any non-dev environment is mandatory.
       - Jwt__Secret=${Jwt__Secret:-dev-only-secret-min-32-chars-placeholder!}
+      # Phase 4.3 — MinIO object storage for Manual mode POD photos
+      # (per ADR-015). UseSsl false because the dev container is plain
+      # HTTP; flip to true + use a public hostname in production.
+      - ObjectStorage__Endpoint=${ObjectStorage__Endpoint:-minio:9000}
+      - ObjectStorage__AccessKey=${ObjectStorage__AccessKey:-minioadmin}
+      - ObjectStorage__SecretKey=${ObjectStorage__SecretKey:-minioadmin}
+      - ObjectStorage__UseSsl=${ObjectStorage__UseSsl:-false}
+      - ObjectStorage__PodBucket=${ObjectStorage__PodBucket:-dtms-pod}
+      # Browser-facing URL the presigned URL embeds — different from the
+      # internal endpoint when the PWA runs on the host or behind a
+      # reverse proxy. Defaults to localhost:9000 for `npm run dev` flows;
+      # set to a public hostname in production.
+      - ObjectStorage__PublicEndpoint=${ObjectStorage__PublicEndpoint:-http://localhost:9000}
+      # Phase 4.3 — Web Push (VAPID) per ADR-013. Generate once via
+      # `dotnet run --project src/AMR.DeliveryPlanning.Api -- --generate-vapid-keys`
+      # or any web-push-libs CLI; the keypair is non-secret on the public
+      # side (PWA bakes the public key into its SW registration) and must
+      # match what's served to subscribers. Subject = mailto:ops@dtms or
+      # any URL/email per RFC 8292.
+      - Push__Vapid__PublicKey=${Push__Vapid__PublicKey:-}
+      - Push__Vapid__PrivateKey=${Push__Vapid__PrivateKey:-}
+      - Push__Vapid__Subject=${Push__Vapid__Subject:-mailto:ops@dtms.local}
 
   # Phase D — dedicated outbox-worker container. Same image as api but with
   # Outbox:RunInThisProcess=true (the api container has this set to false
@@ -419,3 +470,4 @@ services:
 
 volumes:
   pgdata:
+  miniodata:

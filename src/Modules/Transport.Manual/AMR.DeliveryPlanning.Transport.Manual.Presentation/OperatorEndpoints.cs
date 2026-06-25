@@ -8,6 +8,8 @@ using AMR.DeliveryPlanning.Transport.Manual.Application.Commands.SubmitGeofenceO
 using AMR.DeliveryPlanning.Transport.Manual.Application.Commands.UnregisterPushSubscription;
 using AMR.DeliveryPlanning.Transport.Manual.Application.Queries.GetAssignedTrips;
 using AMR.DeliveryPlanning.Transport.Manual.Application.Queries.GetMyProfile;
+using AMR.DeliveryPlanning.Transport.Manual.Application.Queries.GetPodPresignedUrl;
+using AMR.DeliveryPlanning.Transport.Manual.Application.Services;
 using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
@@ -119,22 +121,42 @@ public static class OperatorEndpoints
                 return ToHttp(result);
             });
 
-        // ── POD presign (stub) ────────────────────────────────────────
-        // Phase 4.3 will wire the real MinIO presign here. For 4.2 we
-        // return a placeholder so the operator PWA can be wired without
-        // failing the call — it'll receive a deliberately-broken URL
-        // that logs a clear "Phase 4.3 not yet shipped" hint.
-        group.MapPost("/pod/presign",
-            (PresignRequest req, HttpContext ctx) =>
+        // ── Web Push (per ADR-013) ────────────────────────────────────
+        // Public key feed for the PWA's SW.subscribe() call. Not
+        // sensitive; anonymous on purpose so a fresh PWA install can
+        // bootstrap without a token.
+        app.MapGet("/api/operator/push/vapid-public-key",
+                (IVapidPublicKeyProvider provider) =>
+                    Results.Ok(new { PublicKey = provider.PublicKey }))
+            .AllowAnonymous()
+            .WithTags("Operator");
+
+        // Self-test — operator triggers a push to themselves to verify
+        // their device registration works. Useful first-run smoke from
+        // the PWA's Settings page.
+        group.MapPost("/push/test",
+            async (HttpContext ctx, IPushNotificationGateway push) =>
             {
-                _ = ResolveOperatorId(ctx);
-                return Results.Ok(new
-                {
-                    UploadUrl = $"https://phase-4-3-not-shipped.invalid/pod/{Guid.NewGuid()}",
-                    ObjectKey = $"pod/{req.TripId}/{Guid.NewGuid()}",
-                    ExpiresAt = DateTime.UtcNow.AddMinutes(15),
-                    Note = "Stub — Phase 4.3 will replace this with a real MinIO presigned PUT URL.",
-                });
+                var opId = ResolveOperatorId(ctx);
+                var outcome = await push.SendToOperatorAsync(opId, new PushNotificationPayload(
+                    Title: "DTMS test",
+                    Body: "If you see this, push notifications are working.",
+                    Url: "/m/trips",
+                    Tag: "dtms-test"));
+                return Results.Ok(outcome);
+            });
+
+        // ── POD presign (MinIO, per ADR-015) ──────────────────────────
+        group.MapPost("/pod/presign",
+            async (PresignRequest req, HttpContext ctx, ISender sender) =>
+            {
+                var opId = ResolveOperatorId(ctx);
+                var result = await sender.Send(new GetPodPresignedUrlQuery(
+                    TripId: req.TripId,
+                    OperatorId: opId,
+                    Kind: req.Kind,
+                    FileExtension: req.FileExtension ?? "jpg"));
+                return ToHttp(result);
             });
     }
 
@@ -161,4 +183,4 @@ public record SubmitOverrideRequest(
     string Reason, string? PhotoUrl);
 public record RegisterPushRequest(
     string Platform, string Endpoint, string? PublicKey, string? AuthSecret, string? DeviceLabel);
-public record PresignRequest(Guid TripId, string Kind);
+public record PresignRequest(Guid TripId, string Kind, string? FileExtension = "jpg");

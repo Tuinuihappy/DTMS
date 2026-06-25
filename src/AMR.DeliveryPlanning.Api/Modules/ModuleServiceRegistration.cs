@@ -243,6 +243,31 @@ public static class ModuleServiceRegistration
                            AMR.DeliveryPlanning.Transport.Manual.Application.Services.OperatorSyncService>();
         services.AddScoped<AMR.DeliveryPlanning.Api.Auth.OperatorSyncMiddleware>();
 
+        // Phase 4.3 — Object storage (MinIO) for POD photos (ADR-015).
+        services.Configure<AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Storage.ObjectStorageOptions>(
+            configuration.GetSection(AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Storage.ObjectStorageOptions.SectionName));
+        services.AddSingleton<AMR.DeliveryPlanning.Transport.Manual.Application.Services.IObjectStorageService,
+                              AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Storage.MinioObjectStorageService>();
+        services.AddSingleton<AMR.DeliveryPlanning.Transport.Manual.Application.Services.IPodBucketProvider>(sp =>
+        {
+            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<
+                AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Storage.ObjectStorageOptions>>().Value;
+            return new PodBucketProvider(opts.PodBucket);
+        });
+        services.AddHostedService<AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Storage.ObjectStorageBucketInitializer>();
+
+        // Phase 4.3 — Web Push gateway (VAPID, ADR-013).
+        services.Configure<AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Push.VapidOptions>(
+            configuration.GetSection(AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Push.VapidOptions.SectionName));
+        services.AddSingleton<AMR.DeliveryPlanning.Transport.Manual.Application.Services.IVapidPublicKeyProvider>(sp =>
+        {
+            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<
+                AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Push.VapidOptions>>().Value;
+            return new VapidPublicKeyProvider(opts.PublicKey);
+        });
+        services.AddScoped<AMR.DeliveryPlanning.Transport.Manual.Application.Services.IPushNotificationGateway,
+                           AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Push.WebPushGateway>();
+
         // ── DeliveryOrder Module ──────────────────────────────────────
         services.AddScoped<DeliveryOrderDomainEventMapper>();
         services.AddDbContext<DeliveryOrderDbContext>((sp, o) => o
@@ -631,3 +656,13 @@ public static class ModuleServiceRegistration
         return services;
     }
 }
+
+// Phase 4.3 — tiny value-holders that let Application stay free of
+// Microsoft.Extensions.Options + Infrastructure-specific config types.
+// Registered as singletons against the IPodBucketProvider /
+// IVapidPublicKeyProvider interfaces above.
+internal sealed record PodBucketProvider(string PodBucket)
+    : AMR.DeliveryPlanning.Transport.Manual.Application.Services.IPodBucketProvider;
+
+internal sealed record VapidPublicKeyProvider(string PublicKey)
+    : AMR.DeliveryPlanning.Transport.Manual.Application.Services.IVapidPublicKeyProvider;
