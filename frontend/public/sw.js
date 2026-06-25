@@ -66,6 +66,75 @@ self.addEventListener('notificationclick', (event) => {
   })());
 });
 
+// Phase 4.5 — Background Sync replay. The foreground enqueue path also
+// registers this tag; whichever fires first drains the queue. SW
+// implementation re-opens the IDB store the page wrote into and
+// replays pending rows. Permanent (4xx) failures are dropped; transient
+// failures keep the row so the next sync re-tries.
+const QUEUE_DB = 'dtms-operator';
+const QUEUE_STORE = 'queue';
+
+function openQueueDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(QUEUE_DB, 1);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function listQueue() {
+  const db = await openQueueDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(QUEUE_STORE, 'readonly');
+    const req = tx.objectStore(QUEUE_STORE).getAll();
+    req.onsuccess = () => resolve((req.result || []).slice().sort((a, b) => a.createdAt - b.createdAt));
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function deleteQueueRow(id) {
+  const db = await openQueueDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(QUEUE_STORE, 'readwrite');
+    const req = tx.objectStore(QUEUE_STORE).delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function drainQueue() {
+  const items = await listQueue();
+  for (const item of items) {
+    try {
+      const res = await fetch(item.path, {
+        method: item.method,
+        headers: item.body === null ? {} : { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: item.body === null ? undefined : JSON.stringify(item.body),
+      });
+      if (res.ok || res.status === 204) {
+        await deleteQueueRow(item.id);
+        continue;
+      }
+      // 4xx — permanent. Drop so the queue isn't stuck.
+      if (res.status >= 400 && res.status < 500) {
+        await deleteQueueRow(item.id);
+        continue;
+      }
+      // 5xx — leave + bail, retry next sync event.
+      break;
+    } catch (_) {
+      // Network blip — leave the row, retry next sync.
+      break;
+    }
+  }
+}
+
+self.addEventListener('sync', (event) => {
+  if (event.tag !== 'dtms-operator-queue') return;
+  event.waitUntil(drainQueue());
+});
+
 // Push subscription rotation — push services occasionally re-issue
 // endpoint URLs. The PWA listens for this and re-POSTs to
 // /api/operator/devices/register-push with the fresh subscription.
