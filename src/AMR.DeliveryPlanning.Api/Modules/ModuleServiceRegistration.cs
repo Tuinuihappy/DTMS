@@ -222,6 +222,17 @@ public static class ModuleServiceRegistration
             services.AddHostedService<AMR.DeliveryPlanning.Api.RobotPositions.Riot3PositionPollerService>();
         }
 
+        // ── Transport.Manual Module (Phase 4.1 — skeleton) ────────────
+        // Domain + DbContext only at this point. Repositories,
+        // ManualDispatchStrategy, mobile endpoints, push gateway register
+        // in Phases 4.2-4.4.
+        // PendingModelChangesWarning is silenced because migrations are
+        // hand-written (per feedback_migration_manual memory) and EF's
+        // model differ throws otherwise.
+        services.AddDbContext<AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Data.TransportManualDbContext>((_, o) => o
+            .UseNpgsql(npgsqlDataSource, ConfigureNpgsql)
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
+
         // ── DeliveryOrder Module ──────────────────────────────────────
         services.AddScoped<DeliveryOrderDomainEventMapper>();
         services.AddDbContext<DeliveryOrderDbContext>((sp, o) => o

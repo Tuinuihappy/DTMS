@@ -51,6 +51,10 @@
     <Project Path="src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Infrastructure/AMR.DeliveryPlanning.Transport.Amr.Infrastructure.csproj" />
     <Project Path="src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Simulator/AMR.DeliveryPlanning.Transport.Amr.Simulator.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Transport.Manual/">
+    <Project Path="src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.csproj" />
+    <Project Path="src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.Infrastructure/AMR.DeliveryPlanning.Transport.Manual.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AMR.DeliveryPlanning.Api.UnitTests/AMR.DeliveryPlanning.Api.UnitTests.csproj" />
     <Project Path="tests/AMR.DeliveryPlanning.ArchitectureTests/AMR.DeliveryPlanning.ArchitectureTests.csproj" />
@@ -70,5 +74,6 @@
     <Project Path="tests/Modules/Planning.UnitTests/Planning.UnitTests.csproj" />
     <Project Path="tests/Modules/Transport.Amr.IntegrationTests/Transport.Amr.IntegrationTests.csproj" />
     <Project Path="tests/Modules/Transport.Amr.UnitTests/Transport.Amr.UnitTests.csproj" />
+    <Project Path="tests/Modules/Transport.Manual.UnitTests/Transport.Manual.UnitTests.csproj" />
   </Folder>
 </Solution>

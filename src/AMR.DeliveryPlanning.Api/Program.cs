@@ -463,6 +463,7 @@ var app = builder.Build();
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AuthDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<OutboxDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Data.VendorAdapterDbContext>(), logger, app.Environment);
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Data.TransportManualDbContext>(), logger, app.Environment);
 
             logger.LogInformation("Database migrations applied successfully.");
             break;
