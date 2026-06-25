@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.Planning.Application.Services;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.VendorAdapter.Riot3.Models;
-using AMR.DeliveryPlanning.VendorAdapter.Riot3.Services;
+using AMR.DeliveryPlanning.Transport.Amr.Models;
+using AMR.DeliveryPlanning.Transport.Amr.Services;
 
 namespace AMR.DeliveryPlanning.Api.Adapters;
 

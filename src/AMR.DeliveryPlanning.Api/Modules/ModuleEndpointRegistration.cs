@@ -3,7 +3,7 @@ using AMR.DeliveryPlanning.Dispatch.Presentation;
 using AMR.DeliveryPlanning.Facility.Presentation;
 using AMR.DeliveryPlanning.Fleet.Presentation;
 using AMR.DeliveryPlanning.Planning.Presentation;
-using AMR.DeliveryPlanning.VendorAdapter.Feeder.Webhooks;
+using AMR.DeliveryPlanning.Transport.Amr.Feeder.Webhooks;
 
 namespace AMR.DeliveryPlanning.Api.Modules;
 

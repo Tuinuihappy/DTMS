@@ -47,8 +47,8 @@
     <ProjectReference Include="..\Modules\Planning\AMR.DeliveryPlanning.Planning.Infrastructure\AMR.DeliveryPlanning.Planning.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Dispatch\AMR.DeliveryPlanning.Dispatch.Presentation\AMR.DeliveryPlanning.Dispatch.Presentation.csproj" />
     <ProjectReference Include="..\Modules\Dispatch\AMR.DeliveryPlanning.Dispatch.Infrastructure\AMR.DeliveryPlanning.Dispatch.Infrastructure.csproj" />
-    <ProjectReference Include="..\Modules\VendorAdapter\AMR.DeliveryPlanning.VendorAdapter.Infrastructure\AMR.DeliveryPlanning.VendorAdapter.Infrastructure.csproj" />
-    <ProjectReference Include="..\Modules\VendorAdapter\AMR.DeliveryPlanning.VendorAdapter.Feeder\AMR.DeliveryPlanning.VendorAdapter.Feeder.csproj" />
+    <ProjectReference Include="..\Modules\Transport.Amr\AMR.DeliveryPlanning.Transport.Amr.Infrastructure\AMR.DeliveryPlanning.Transport.Amr.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Transport.Amr\AMR.DeliveryPlanning.Transport.Amr.Feeder\AMR.DeliveryPlanning.Transport.Amr.Feeder.csproj" />
     <ProjectReference Include="..\Modules\OmsAdapter\AMR.DeliveryPlanning.OmsAdapter.csproj" />
   </ItemGroup>
 

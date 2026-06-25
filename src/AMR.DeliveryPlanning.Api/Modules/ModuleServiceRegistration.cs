@@ -35,8 +35,8 @@ using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.SharedKernel.Outbox;
 using AMR.DeliveryPlanning.OmsAdapter;
 using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Exceptions;
-using AMR.DeliveryPlanning.VendorAdapter.Infrastructure;
-using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Extensions;
+using AMR.DeliveryPlanning.Transport.Amr.Infrastructure;
+using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Extensions;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
@@ -488,7 +488,7 @@ public static class ModuleServiceRegistration
                 // VendorAdapter.Feeder hosts CaptureFinalSnapshotConsumer — must
                 // be scanned explicitly; otherwise terminal-state events go
                 // past it and the snapshot is never persisted.
-                typeof(AMR.DeliveryPlanning.VendorAdapter.Feeder.Consumers.CaptureFinalSnapshotConsumer).Assembly
+                typeof(AMR.DeliveryPlanning.Transport.Amr.Feeder.Consumers.CaptureFinalSnapshotConsumer).Assembly
             );
 
             // T2 POC — opt-in Saga registration. While disabled the saga's

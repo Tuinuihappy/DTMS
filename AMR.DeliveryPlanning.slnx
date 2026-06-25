@@ -42,12 +42,14 @@
   <Folder Name="/src/Modules/OmsAdapter/">
     <Project Path="src/Modules/OmsAdapter/AMR.DeliveryPlanning.OmsAdapter.csproj" />
   </Folder>
-  <Folder Name="/src/Modules/VendorAdapter/">
-    <Project Path="src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Abstractions/AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj" />
-    <Project Path="src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Feeder/AMR.DeliveryPlanning.VendorAdapter.Feeder.csproj" />
-    <Project Path="src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.csproj" />
-    <Project Path="src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Riot3/AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj" />
-    <Project Path="src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Simulator/AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj" />
+  <Folder Name="/src/Modules/Transport.Abstractions/">
+    <Project Path="src/Modules/Transport.Abstractions/AMR.DeliveryPlanning.Transport.Abstractions/AMR.DeliveryPlanning.Transport.Abstractions.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Transport.Amr/">
+    <Project Path="src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.csproj" />
+    <Project Path="src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Feeder/AMR.DeliveryPlanning.Transport.Amr.Feeder.csproj" />
+    <Project Path="src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Infrastructure/AMR.DeliveryPlanning.Transport.Amr.Infrastructure.csproj" />
+    <Project Path="src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Simulator/AMR.DeliveryPlanning.Transport.Amr.Simulator.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AMR.DeliveryPlanning.Api.UnitTests/AMR.DeliveryPlanning.Api.UnitTests.csproj" />
@@ -66,7 +68,7 @@
     <Project Path="tests/Modules/OmsAdapter.IntegrationTests/OmsAdapter.IntegrationTests.csproj" />
     <Project Path="tests/Modules/Planning.IntegrationTests/Planning.IntegrationTests.csproj" />
     <Project Path="tests/Modules/Planning.UnitTests/Planning.UnitTests.csproj" />
-    <Project Path="tests/Modules/VendorAdapter.IntegrationTests/VendorAdapter.IntegrationTests.csproj" />
-    <Project Path="tests/Modules/VendorAdapter.UnitTests/VendorAdapter.UnitTests.csproj" />
+    <Project Path="tests/Modules/Transport.Amr.IntegrationTests/Transport.Amr.IntegrationTests.csproj" />
+    <Project Path="tests/Modules/Transport.Amr.UnitTests/Transport.Amr.UnitTests.csproj" />
   </Folder>
 </Solution>

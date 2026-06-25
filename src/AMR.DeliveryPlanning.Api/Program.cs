@@ -462,7 +462,7 @@ var app = builder.Build();
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Dispatch.Infrastructure.Data.DispatchDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AuthDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<OutboxDbContext>(), logger, app.Environment);
-            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data.VendorAdapterDbContext>(), logger, app.Environment);
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Data.VendorAdapterDbContext>(), logger, app.Environment);
 
             logger.LogInformation("Database migrations applied successfully.");
             break;
@@ -501,7 +501,7 @@ if (args.Contains("--migrate-only"))
 static async Task SeedActionCatalogAsync(IServiceProvider services)
 {
     using var scope = services.CreateScope();
-    var catalog = scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.VendorAdapter.Abstractions.Services.IActionCatalogService>();
+    var catalog = scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Transport.Abstractions.Services.IActionCatalogService>();
 
     // Both liftup and feeder are the same vendor — both use the RIOT3 adapter.
     // Unified JSON format: {"actionType": "<ActionID>", "0": "<P0>", "1": "<P1>"}
@@ -544,7 +544,7 @@ static async Task SeedActionCatalogAsync(IServiceProvider services)
         var existing = await catalog.GetAsync(vtKey, action);
         if (existing == null)
             await catalog.UpsertAsync(
-                new AMR.DeliveryPlanning.VendorAdapter.Abstractions.Models.ActionCatalogEntry(vtKey, action, adapterKey, paramsJson));
+                new AMR.DeliveryPlanning.Transport.Abstractions.Models.ActionCatalogEntry(vtKey, action, adapterKey, paramsJson));
     }
 }
 

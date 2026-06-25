@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using AMR.DeliveryPlanning.VendorAdapter.Infrastructure.Data;
+using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
