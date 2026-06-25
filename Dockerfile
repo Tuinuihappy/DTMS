@@ -58,12 +58,20 @@ COPY src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.IntegrationEvents/AMR.De
 # OmsAdapter
 COPY src/Modules/OmsAdapter/AMR.DeliveryPlanning.OmsAdapter.csproj src/Modules/OmsAdapter/
 
-# VendorAdapter
-COPY src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Abstractions/AMR.DeliveryPlanning.VendorAdapter.Abstractions.csproj src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Abstractions/
-COPY src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/AMR.DeliveryPlanning.VendorAdapter.Infrastructure.csproj src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/
-COPY src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Riot3/AMR.DeliveryPlanning.VendorAdapter.Riot3.csproj src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Riot3/
-COPY src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Simulator/AMR.DeliveryPlanning.VendorAdapter.Simulator.csproj src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Simulator/
-COPY src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Feeder/AMR.DeliveryPlanning.VendorAdapter.Feeder.csproj src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Feeder/
+# Transport.Abstractions (Phase 4.0 rename of VendorAdapter.Abstractions)
+COPY src/Modules/Transport.Abstractions/AMR.DeliveryPlanning.Transport.Abstractions/AMR.DeliveryPlanning.Transport.Abstractions.csproj src/Modules/Transport.Abstractions/AMR.DeliveryPlanning.Transport.Abstractions/
+
+# Transport.Amr (Phase 4.0 rename of VendorAdapter.Riot3/Feeder/Infrastructure/Simulator)
+COPY src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.csproj src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr/
+COPY src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Infrastructure/AMR.DeliveryPlanning.Transport.Amr.Infrastructure.csproj src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Infrastructure/
+COPY src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Feeder/AMR.DeliveryPlanning.Transport.Amr.Feeder.csproj src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Feeder/
+COPY src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Simulator/AMR.DeliveryPlanning.Transport.Amr.Simulator.csproj src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Simulator/
+
+# Transport.Manual (Phase 4.1-4.6)
+COPY src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.csproj src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual/
+COPY src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.Application/AMR.DeliveryPlanning.Transport.Manual.Application.csproj src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.Application/
+COPY src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.Infrastructure/AMR.DeliveryPlanning.Transport.Manual.Infrastructure.csproj src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.Infrastructure/
+COPY src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.Presentation/AMR.DeliveryPlanning.Transport.Manual.Presentation.csproj src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.Presentation/
 
 RUN dotnet restore src/AMR.DeliveryPlanning.Api/AMR.DeliveryPlanning.Api.csproj
 
