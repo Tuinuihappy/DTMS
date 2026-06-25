@@ -29,6 +29,30 @@ public sealed class OperatorRepository : IOperatorRepository
               .Include(o => o.PushSubscriptions)
               .FirstOrDefaultAsync(o => o.Id == id, ct);
 
+    public async Task<IReadOnlyList<Operator>> GetEligibleForAssignmentAsync(
+        Guid? preferredWarehouseId, CancellationToken ct = default)
+    {
+        // Active + idle. Order: warehouse match first (so the policy
+        // picks a "right warehouse" operator deterministically), then
+        // by EmployeeCode for stability across runs.
+        var query = _db.Operators
+                       .Where(o => o.Status == OperatorStatus.Active
+                                && o.CurrentTripId == null);
+        if (preferredWarehouseId.HasValue)
+        {
+            // EF translates the boolean projection into ORDER BY (case … then 0 else 1)
+            // which falls back to lexical order on EmployeeCode within each bucket.
+            query = query
+                .OrderBy(o => o.PrimaryWarehouseId == preferredWarehouseId.Value ? 0 : 1)
+                .ThenBy(o => o.EmployeeCode);
+        }
+        else
+        {
+            query = query.OrderBy(o => o.EmployeeCode);
+        }
+        return await query.ToListAsync(ct);
+    }
+
     public Task AddAsync(Operator op, CancellationToken ct = default)
         => _db.Operators.AddAsync(op, ct).AsTask();
 

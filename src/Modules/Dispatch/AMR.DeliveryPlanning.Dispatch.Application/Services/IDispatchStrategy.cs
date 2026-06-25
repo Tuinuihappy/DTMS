@@ -52,7 +52,14 @@ public sealed record DispatchGroupRequest(
     int AttemptNumber = 1,
     Guid? PreviousAttemptId = null,
     int? PriorityOverride = null,
-    string? AppointVehicleKeyOverride = null);
+    string? AppointVehicleKeyOverride = null,
+    // Phase 4.4 — Manual + Fleet strategies select operators / providers
+    // off the warehouse Id, not the AMR-only station Id. Consumer reads
+    // these off the group's first item (warehouse Ids land on items via
+    // Phase 2.5 Path A) and passes them through. AMR ignores.
+    Guid? PickupWarehouseId = null,
+    Guid? DropWarehouseId = null,
+    DateTime? SlaDeadline = null);
 
 /// <summary>
 /// Result of a dispatch attempt. <see cref="VendorOrderKey"/> is the

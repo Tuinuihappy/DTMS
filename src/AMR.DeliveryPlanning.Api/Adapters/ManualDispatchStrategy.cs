@@ -1,45 +1,203 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
+using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
+using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using AMR.DeliveryPlanning.Transport.Manual.Application.Services;
+using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
+using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
+using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace AMR.DeliveryPlanning.Api.Adapters;
 
-// Phase 3c stub. Manual mode reaches Planning's consumer (Phase 3a opened
-// the gate by removing the "skip non-AMR" early-return) and lands here,
-// but the actual operator-assignment + push-notification flow is Phase 4.
+// Phase 4.4 — Real ManualDispatchStrategy (replaces the Phase 3c stub).
 //
-// Returning Failure rather than throwing means:
-//   - Planning consumer marks the job + items Failed (existing path)
-//   - The order ends up at Failed, not Confirmed-forever
-//   - Operator sees the order in the UI with a clear "Manual dispatch
-//     not yet implemented" reason, which is the right user-facing signal
-//     until Phase 4 ships
+// Flow:
+//   1. Resolve eligible operator via IOperatorAssignmentPolicy
+//      (warehouse-scoped, cert-aware in 4.4 although the consumer
+//      doesn't supply cargo cert yet).
+//   2. Persist Trip with no vendor key (Manual mode has no external
+//      vendor — the operator IS the executor).
+//   3. Persist ManualTripExtension binding Trip → Operator + SLA windows.
+//   4. Mutate Operator.AssignToTrip — fires OperatorAssignedToTrip
+//      domain event for projections.
+//   5. Fire push notification (best-effort — log if it fails; trip
+//      still proceeds because the operator can also find the trip on
+//      their PWA's polled /trips/assigned).
 //
-// Registered only when TransportModes:Manual:Enabled=true (default false);
-// see ModuleServiceRegistration.AddTransportManual().
+// Failure modes:
+//   - No eligible operator       → Result.Failure → consumer marks Job/Items Failed
+//   - Trip persistence failure   → throws; consumer's catch marks Job Failed
+//   - Push notification failure  → swallowed + logged (best-effort)
+//
+// Why this lives in API/Adapters (not Transport.Manual.Application):
+//   It bridges three modules — Dispatch (ITripRepository), Transport.Manual
+//   (Operator, ManualTripExtension), and the push gateway. Module
+//   boundaries say each module's Application/Domain stays pure; the
+//   composition root owns the cross-module wiring. Same shape as
+//   AmrDispatchStrategy.
 internal sealed class ManualDispatchStrategy : IDispatchStrategy
 {
+    private readonly IOperatorAssignmentPolicy _policy;
+    private readonly ITripRepository _trips;
+    private readonly IManualTripExtensionRepository _extensions;
+    private readonly IOperatorRepository _operators;
+    private readonly IPushNotificationGateway _push;
+    private readonly ManualDispatchOptions _options;
     private readonly ILogger<ManualDispatchStrategy> _logger;
 
-    public ManualDispatchStrategy(ILogger<ManualDispatchStrategy> logger)
+    public ManualDispatchStrategy(
+        IOperatorAssignmentPolicy policy,
+        ITripRepository trips,
+        IManualTripExtensionRepository extensions,
+        IOperatorRepository operators,
+        IPushNotificationGateway push,
+        IOptions<ManualDispatchOptions> options,
+        ILogger<ManualDispatchStrategy> logger)
     {
+        _policy = policy;
+        _trips = trips;
+        _extensions = extensions;
+        _operators = operators;
+        _push = push;
+        _options = options.Value;
         _logger = logger;
     }
 
     public TransportMode Mode => TransportMode.Manual;
 
-    public Task<Result<DispatchGroupOutcome>> DispatchGroupAsync(
+    public async Task<Result<DispatchGroupOutcome>> DispatchGroupAsync(
         DispatchGroupRequest request,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogWarning(
-            "[ManualDispatch] Order {OrderId} group {Group} reached the Manual strategy stub. " +
-            "Phase 4 will replace this with operator assignment + push notification.",
-            request.DeliveryOrderId, request.GroupIndex);
+        if (!_options.EnableDispatch)
+        {
+            return Result<DispatchGroupOutcome>.Failure(
+                "Manual dispatch is disabled (TransportModes:Manual:Dispatch:EnableDispatch=false).");
+        }
 
-        return Task.FromResult(Result<DispatchGroupOutcome>.Failure(
-            "Manual transport mode dispatch is not yet implemented (Phase 4). " +
-            "The order has been validated but no operator can be assigned until Manual mode ships."));
+        // ── 1. Pick an operator ──────────────────────────────────────
+        // Cert filter is empty in 4.4 — cargo-cert plumbing comes in a
+        // later phase once ItemEventDto carries hazmat / cold-chain flags.
+        var selection = await _policy.SelectOperatorAsync(
+            new OperatorAssignmentContext(
+                PickupWarehouseId: request.PickupWarehouseId,
+                RequiredCertifications: Array.Empty<CertificationType>()),
+            cancellationToken);
+
+        if (!selection.IsAssigned)
+        {
+            _logger.LogWarning(
+                "[ManualDispatch] Order {OrderId} group {G} — no operator: {Reason}",
+                request.DeliveryOrderId, request.GroupIndex, selection.RejectionReason);
+            return Result<DispatchGroupOutcome>.Failure(
+                $"Manual dispatch failed — {selection.RejectionReason}");
+        }
+        var op = selection.Operator!;
+
+        // ── 2. Persist Trip ──────────────────────────────────────────
+        // VendorOrderKey is null for Manual — no external system mints
+        // a key. The Trip aggregate's CreateForEnvelope skips the
+        // AmrTripExtension when vendorOrderKey is null (Phase 3b
+        // behaviour we explicitly want here).
+        var trip = Trip.CreateForEnvelope(
+            deliveryOrderId: request.DeliveryOrderId,
+            upperKey: request.UpperKey,
+            vendorOrderKey: null,
+            pickupStationId: request.PickupStationId == Guid.Empty ? null : request.PickupStationId,
+            dropStationId: request.DropStationId == Guid.Empty ? null : request.DropStationId,
+            attemptNumber: request.AttemptNumber,
+            previousAttemptId: request.PreviousAttemptId,
+            templateNameAtDispatch: null,
+            priorityAtDispatch: request.PriorityOverride,
+            vendorRequestSnapshot: null,
+            jobId: request.JobId,
+            pickupWarehouseId: request.PickupWarehouseId,
+            dropWarehouseId: request.DropWarehouseId);
+        await _trips.AddAsync(trip, cancellationToken);
+
+        // ── 3. ManualTripExtension + SLA stamps ──────────────────────
+        var now = DateTime.UtcNow;
+        var ackDeadline = now.AddMinutes(_options.AckSlaMinutes);
+        // Pickup deadline measured from now (operator hasn't ack'd yet) —
+        // gives them a single end-to-end window the watchdog can flag if
+        // they ack but never move.
+        var pickupDeadline = now.AddMinutes(_options.AckSlaMinutes + _options.PickupSlaMinutes);
+        var dropDeadline = now.AddMinutes(
+            _options.AckSlaMinutes + _options.PickupSlaMinutes + _options.DropSlaMinutes);
+        // If the upstream order has its own LatestUtc, prefer that as the
+        // drop deadline — customer SLA wins over our default window.
+        if (request.SlaDeadline.HasValue && request.SlaDeadline.Value < dropDeadline)
+            dropDeadline = request.SlaDeadline.Value;
+
+        var extension = ManualTripExtension.AssignToOperator(
+            tripId: trip.Id,
+            operatorId: op.Id,
+            ackDeadline: ackDeadline,
+            pickupDeadline: pickupDeadline,
+            dropDeadline: dropDeadline);
+        await _extensions.AddAsync(extension, cancellationToken);
+
+        // ── 4. Bind operator → trip ──────────────────────────────────
+        // GetEligibleForAssignmentAsync returned a tracking-attached
+        // entity; AssignToTrip mutates + fires the domain event.
+        // Reload via Id so we get a tracked instance even if the
+        // policy returned a detached one (cert filter path loads via
+        // GetByIdWithDetailsAsync which DOES track).
+        var trackedOp = await _operators.GetByIdAsync(op.Id, cancellationToken);
+        if (trackedOp is null)
+        {
+            // Defensive: someone deleted the operator between selection
+            // and assignment. Fail the dispatch — the consumer's failure
+            // path will roll back the trip + extension.
+            return Result<DispatchGroupOutcome>.Failure(
+                $"Operator {op.Id} disappeared between selection and assignment.");
+        }
+        trackedOp.AssignToTrip(trip.Id);
+
+        // ── 5. Persist all three aggregates in one transaction ───────
+        // SaveChanges on any of the three repos flushes the shared
+        // EF change tracker for that DbContext; the Operator save also
+        // commits the Trip + Extension changes since they share the
+        // module's outbox interceptor. Save via the operator repo so
+        // its tracked instance is the one that drives the SaveChanges.
+        await _trips.UpdateAsync(trip, cancellationToken);
+        await _operators.SaveChangesAsync(cancellationToken);
+        await _extensions.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "[ManualDispatch] ✓ Order {OrderId} group {G} → trip {TripId}, operator {EmployeeCode} ({OperatorId}), ack-by {AckBy:O}",
+            request.DeliveryOrderId, request.GroupIndex, trip.Id, op.EmployeeCode, op.Id, ackDeadline);
+
+        // ── 6. Push notification (best-effort) ───────────────────────
+        try
+        {
+            var shortOrderId = request.DeliveryOrderId.ToString()[..8];
+            var payload = new PushNotificationPayload(
+                Title: string.Format(_options.PushTitleTemplate, shortOrderId),
+                Body: _options.PushBodyTemplate,
+                Url: _options.PushTargetUrl,
+                Tag: $"trip-{trip.Id}");
+            var fanout = await _push.SendToOperatorAsync(op.Id, payload, cancellationToken);
+            _logger.LogInformation(
+                "[ManualDispatch] Push fanout for operator {OperatorId}: {Sent} sent, {Failed} failed",
+                op.Id, fanout.Sent, fanout.Failed);
+        }
+        catch (Exception ex)
+        {
+            // Don't fail the dispatch — the operator's PWA polls
+            // /trips/assigned so they'll see it on next refresh. Push
+            // is a latency optimization, not a delivery guarantee.
+            _logger.LogWarning(ex,
+                "[ManualDispatch] Push notification failed for operator {OperatorId} — trip {TripId} dispatched OK regardless.",
+                op.Id, trip.Id);
+        }
+
+        return Result<DispatchGroupOutcome>.Success(new DispatchGroupOutcome(
+            TripId: trip.Id,
+            VendorOrderKey: null,         // Manual has no external vendor key
+            TemplateName: "manual"));      // Stable label for dashboards
     }
 }

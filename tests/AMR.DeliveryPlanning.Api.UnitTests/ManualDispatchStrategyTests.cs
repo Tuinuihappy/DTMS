@@ -1,93 +1,186 @@
 using AMR.DeliveryPlanning.Api.Adapters;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
+using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
+using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using AMR.DeliveryPlanning.Transport.Manual.Application.Services;
+using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
+using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
+using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using NSubstitute;
 
 namespace AMR.DeliveryPlanning.Api.UnitTests;
 
-// Phase 3c — ManualDispatchStrategy is a stub registered so the
-// IDispatchStrategyRegistry can resolve TransportMode.Manual, but the
-// real operator-assignment + push-notification flow is Phase 4. Tests
-// pin the stub contract so:
-//   - Mode == Manual (registry key)
-//   - Implements IDispatchStrategy
-//   - DispatchGroupAsync returns Failure (not Throw) — caller's failure
-//     path lands the order at Failed instead of crashing the consumer
-//   - The Failure message names Phase 4 explicitly so an operator
-//     reading the audit knows exactly what's missing
-//
-// When Phase 4 replaces the stub body, these tests will fail loudly —
-// the Phase 4 commit should rewrite them to assert the real flow
-// (operator assigned, push notification dispatched, Trip created with
-// no vendor key, etc.).
+// Phase 4.4 — Real ManualDispatchStrategy. Pins the contract that the
+// Planning consumer depends on:
+//   - Mode is Manual (registry indexing key)
+//   - No eligible operator → Failure (consumer marks Job/Items Failed)
+//   - Happy path → Trip persisted + ManualTripExtension created +
+//     Operator.AssignToTrip called + push fired
+//   - Push failure does NOT fail the dispatch (best-effort)
+//   - Upstream SLA, if tighter than computed drop deadline, wins
 public class ManualDispatchStrategyTests
 {
-    private ManualDispatchStrategy CreateStrategy() =>
-        new(NullLogger<ManualDispatchStrategy>.Instance);
+    private readonly IOperatorAssignmentPolicy _policy = Substitute.For<IOperatorAssignmentPolicy>();
+    private readonly ITripRepository _trips = Substitute.For<ITripRepository>();
+    private readonly IManualTripExtensionRepository _extensions = Substitute.For<IManualTripExtensionRepository>();
+    private readonly IOperatorRepository _operators = Substitute.For<IOperatorRepository>();
+    private readonly IPushNotificationGateway _push = Substitute.For<IPushNotificationGateway>();
+
+    private ManualDispatchStrategy CreateStrategy(ManualDispatchOptions? opts = null) =>
+        new(_policy, _trips, _extensions, _operators, _push,
+            Options.Create(opts ?? new ManualDispatchOptions()),
+            NullLogger<ManualDispatchStrategy>.Instance);
+
+    private static DispatchGroupRequest BasicRequest(Guid? pickupWh = null) =>
+        new(
+            DeliveryOrderId: Guid.NewGuid(),
+            GroupIndex: 1,
+            PickupStationId: Guid.Empty,
+            DropStationId: Guid.Empty,
+            UpperKey: "UK-MAN-1",
+            JobId: Guid.NewGuid(),
+            PickupWarehouseId: pickupWh ?? Guid.NewGuid(),
+            DropWarehouseId: Guid.NewGuid());
 
     [Fact]
     public void Mode_IsManual()
     {
-        // Registry indexes by this; a wrong value would silently route
-        // Manual trips to AMR (or throw TransportModeNotEnabledException).
-        var strategy = CreateStrategy();
-
-        strategy.Mode.Should().Be(TransportMode.Manual);
+        CreateStrategy().Mode.Should().Be(TransportMode.Manual);
     }
 
     [Fact]
     public void Implements_IDispatchStrategy()
     {
-        // Sanity check — interface change shouldn't accidentally drop
-        // the contract that the registry depends on.
-        var strategy = CreateStrategy();
-
-        strategy.Should().BeAssignableTo<IDispatchStrategy>();
+        CreateStrategy().Should().BeAssignableTo<IDispatchStrategy>();
     }
 
     [Fact]
-    public async Task DispatchGroupAsync_ReturnsFailure_WithPhase4Message()
+    public async Task Dispatch_NoOperatorAvailable_ReturnsFailure_NoSideEffects()
     {
-        // The stub MUST surface as Result.Failure (not throw) so the
-        // Planning consumer's existing failure-handling path (mark Job +
-        // Items Failed → RecomputeStatusFromItems → escalate to Failed)
-        // runs coherently. Throwing would crash the MassTransit consumer
-        // and trigger a redelivery loop on a permanently-broken message.
-        var strategy = CreateStrategy();
-        var request = new DispatchGroupRequest(
-            DeliveryOrderId: Guid.NewGuid(),
-            GroupIndex: 1,
-            PickupStationId: Guid.Empty,    // Manual: nulls collapsed to Empty
-            DropStationId: Guid.Empty,
-            UpperKey: "upper-G1",
-            JobId: null);
+        _policy.SelectOperatorAsync(Arg.Any<OperatorAssignmentContext>(), Arg.Any<CancellationToken>())
+               .Returns(OperatorAssignmentResult.NoMatch("No active + idle operator found."));
+        var sut = CreateStrategy();
 
-        var result = await strategy.DispatchGroupAsync(request, CancellationToken.None);
+        var result = await sut.DispatchGroupAsync(BasicRequest(), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
-        // Message names Phase 4 so audit readers know exactly what's missing.
-        result.Error.Should().Contain("Phase 4");
-        result.Error.Should().Contain("Manual transport mode");
+        result.Error.Should().Contain("No active + idle operator");
+        await _trips.DidNotReceive().AddAsync(Arg.Any<Trip>(), Arg.Any<CancellationToken>());
+        await _extensions.DidNotReceive().AddAsync(Arg.Any<ManualTripExtension>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task DispatchGroupAsync_DoesNotThrow_OnAnyInput()
+    public async Task Dispatch_DisabledByOption_ReturnsFailure()
     {
-        // Defensive: even with empty / garbage inputs the stub returns
-        // a typed failure. We don't want the stub to be the source of
-        // an exception that crashes the consumer's group-iteration loop.
-        var strategy = CreateStrategy();
-        var request = new DispatchGroupRequest(
-            DeliveryOrderId: Guid.Empty,
-            GroupIndex: 0,
-            PickupStationId: Guid.Empty,
-            DropStationId: Guid.Empty,
-            UpperKey: "",
-            JobId: null);
+        var sut = CreateStrategy(new ManualDispatchOptions { EnableDispatch = false });
+        var result = await sut.DispatchGroupAsync(BasicRequest(), CancellationToken.None);
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Contain("disabled");
+    }
 
-        var act = async () => await strategy.DispatchGroupAsync(request, CancellationToken.None);
+    [Fact]
+    public async Task Dispatch_HappyPath_PersistsTripExtensionAndAssignsOperator()
+    {
+        var op = Operator.CreateFromJwtClaims("EMP-700", "Driver", OperatorRole.Operator);
+        _policy.SelectOperatorAsync(Arg.Any<OperatorAssignmentContext>(), Arg.Any<CancellationToken>())
+               .Returns(OperatorAssignmentResult.Assigned(op));
+        _operators.GetByIdAsync(op.Id, Arg.Any<CancellationToken>()).Returns(op);
+        _push.SendToOperatorAsync(op.Id, Arg.Any<PushNotificationPayload>(), Arg.Any<CancellationToken>())
+             .Returns(new PushFanoutResult(1, 0, Array.Empty<PushDeliveryOutcome>()));
 
-        await act.Should().NotThrowAsync();
+        var sut = CreateStrategy();
+        var request = BasicRequest();
+
+        var result = await sut.DispatchGroupAsync(request, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.TripId.Should().NotBe(Guid.Empty);
+        result.Value.VendorOrderKey.Should().BeNull();   // Manual has no external key
+        result.Value.TemplateName.Should().Be("manual");
+
+        op.CurrentTripId.Should().Be(result.Value.TripId);
+
+        await _trips.Received(1).AddAsync(
+            Arg.Is<Trip>(t => t.UpperKey == "UK-MAN-1"
+                           && t.DeliveryOrderId == request.DeliveryOrderId
+                           && t.PickupWarehouseId == request.PickupWarehouseId),
+            Arg.Any<CancellationToken>());
+        await _extensions.Received(1).AddAsync(
+            Arg.Is<ManualTripExtension>(e => e.OperatorId == op.Id),
+            Arg.Any<CancellationToken>());
+        await _operators.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Dispatch_PushFailure_StillReturnsSuccess()
+    {
+        var op = Operator.CreateFromJwtClaims("EMP-701", "Driver", OperatorRole.Operator);
+        _policy.SelectOperatorAsync(Arg.Any<OperatorAssignmentContext>(), Arg.Any<CancellationToken>())
+               .Returns(OperatorAssignmentResult.Assigned(op));
+        _operators.GetByIdAsync(op.Id, Arg.Any<CancellationToken>()).Returns(op);
+        _push.SendToOperatorAsync(op.Id, Arg.Any<PushNotificationPayload>(), Arg.Any<CancellationToken>())
+             .Returns<PushFanoutResult>(_ => throw new InvalidOperationException("push gateway down"));
+
+        var sut = CreateStrategy();
+        var result = await sut.DispatchGroupAsync(BasicRequest(), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Dispatch_StampsAllThreeSlaDeadlinesOnExtension()
+    {
+        var op = Operator.CreateFromJwtClaims("EMP-702", "Driver", OperatorRole.Operator);
+        _policy.SelectOperatorAsync(Arg.Any<OperatorAssignmentContext>(), Arg.Any<CancellationToken>())
+               .Returns(OperatorAssignmentResult.Assigned(op));
+        _operators.GetByIdAsync(op.Id, Arg.Any<CancellationToken>()).Returns(op);
+
+        ManualTripExtension? capturedExtension = null;
+        await _extensions.AddAsync(
+            Arg.Do<ManualTripExtension>(e => capturedExtension = e),
+            Arg.Any<CancellationToken>());
+
+        var sut = CreateStrategy(new ManualDispatchOptions
+        {
+            AckSlaMinutes = 2,
+            PickupSlaMinutes = 10,
+            DropSlaMinutes = 60,
+        });
+
+        await sut.DispatchGroupAsync(BasicRequest(), CancellationToken.None);
+
+        capturedExtension.Should().NotBeNull();
+        capturedExtension!.AckDeadline.Should().NotBeNull();
+        capturedExtension.PickupDeadline.Should().NotBeNull();
+        capturedExtension.DropDeadline.Should().NotBeNull();
+        // PickupDeadline = ack + pickup window from request time.
+        (capturedExtension.PickupDeadline! - capturedExtension.AckDeadline!).Value
+            .Should().BeCloseTo(TimeSpan.FromMinutes(10), TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task Dispatch_UpstreamSlaShorterThanComputedDropDeadline_UsesUpstream()
+    {
+        var op = Operator.CreateFromJwtClaims("EMP-703", "Driver", OperatorRole.Operator);
+        _policy.SelectOperatorAsync(Arg.Any<OperatorAssignmentContext>(), Arg.Any<CancellationToken>())
+               .Returns(OperatorAssignmentResult.Assigned(op));
+        _operators.GetByIdAsync(op.Id, Arg.Any<CancellationToken>()).Returns(op);
+
+        ManualTripExtension? capturedExtension = null;
+        await _extensions.AddAsync(
+            Arg.Do<ManualTripExtension>(e => capturedExtension = e),
+            Arg.Any<CancellationToken>());
+
+        var tightSla = DateTime.UtcNow.AddMinutes(20);   // tighter than 5+30+120 default
+        var request = BasicRequest() with { SlaDeadline = tightSla };
+
+        var sut = CreateStrategy();
+        await sut.DispatchGroupAsync(request, CancellationToken.None);
+
+        capturedExtension!.DropDeadline.Should().Be(tightSla);
     }
 }

@@ -268,6 +268,15 @@ public static class ModuleServiceRegistration
         services.AddScoped<AMR.DeliveryPlanning.Transport.Manual.Application.Services.IPushNotificationGateway,
                            AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Push.WebPushGateway>();
 
+        // Phase 4.4 — Operator assignment policy + ManualDispatchStrategy
+        // bindings. The strategy itself is registered alongside the AMR
+        // strategy further down (look for IDispatchStrategy registrations).
+        services.Configure<AMR.DeliveryPlanning.Transport.Manual.Application.Services.ManualDispatchOptions>(
+            configuration.GetSection(
+                AMR.DeliveryPlanning.Transport.Manual.Application.Services.ManualDispatchOptions.SectionName));
+        services.AddScoped<AMR.DeliveryPlanning.Transport.Manual.Application.Services.IOperatorAssignmentPolicy,
+                           AMR.DeliveryPlanning.Transport.Manual.Application.Services.WarehouseAwareOperatorAssignmentPolicy>();
+
         // ── DeliveryOrder Module ──────────────────────────────────────
         services.AddScoped<DeliveryOrderDomainEventMapper>();
         services.AddDbContext<DeliveryOrderDbContext>((sp, o) => o

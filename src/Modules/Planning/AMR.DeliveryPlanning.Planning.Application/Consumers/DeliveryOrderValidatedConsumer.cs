@@ -178,6 +178,11 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                 // route to their own stubs/impls. Same Result<DispatchGroupOutcome>
                 // shape so the success / orphan / vendor-rejected branches below
                 // stay mode-agnostic.
+                // Manual / Fleet strategies key off warehouse Ids — read
+                // them off the first item (the grouping key guarantees the
+                // station pair is shared; Phase 2.5 Path A guarantees the
+                // warehouse pair is too).
+                var firstGroupItem = items.First();
                 var envelopeResult = await strategy.DispatchGroupAsync(
                     new DispatchGroupRequest(
                         DeliveryOrderId: evt.DeliveryOrderId,
@@ -185,7 +190,10 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                         PickupStationId: stationGroup.Key.PickupStationId,
                         DropStationId: stationGroup.Key.DropStationId,
                         UpperKey: upperKey,
-                        JobId: jobId == Guid.Empty ? null : jobId),
+                        JobId: jobId == Guid.Empty ? null : jobId,
+                        PickupWarehouseId: firstGroupItem.PickupWarehouseId,
+                        DropWarehouseId: firstGroupItem.DropWarehouseId,
+                        SlaDeadline: evt.LatestUtc),
                     ct);
 
                 if (envelopeResult.IsSuccess && envelopeResult.Value.TripId != Guid.Empty)

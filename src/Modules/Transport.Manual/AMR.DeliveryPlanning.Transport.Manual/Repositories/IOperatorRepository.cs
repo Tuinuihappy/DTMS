@@ -15,6 +15,14 @@ public interface IOperatorRepository
     Task<Operator?> GetByIdWithDetailsAsync(Guid id, CancellationToken ct = default);
     Task<Operator?> GetByEmployeeCodeWithDetailsAsync(string employeeCode, CancellationToken ct = default);
 
+    // Phase 4.4 — Eligible-for-assignment query for ManualDispatchStrategy.
+    // Returns Active + CurrentTripId IS NULL operators, ordered so the
+    // assignment policy can take the first match. preferredWarehouseId
+    // floats operators whose PrimaryWarehouseId matches to the top;
+    // unscoped operators come after.
+    Task<IReadOnlyList<Operator>> GetEligibleForAssignmentAsync(
+        Guid? preferredWarehouseId, CancellationToken ct = default);
+
     Task AddAsync(Operator op, CancellationToken ct = default);
     Task SaveChangesAsync(CancellationToken ct = default);
 }
