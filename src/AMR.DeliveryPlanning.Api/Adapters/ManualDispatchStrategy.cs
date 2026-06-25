@@ -78,6 +78,29 @@ internal sealed class ManualDispatchStrategy : IDispatchStrategy
                 "Manual dispatch is disabled (TransportModes:Manual:Dispatch:EnableDispatch=false).");
         }
 
+        // ── 0. Idempotency check on UpperKey ─────────────────────────
+        // MassTransit may redeliver the DeliveryOrderConfirmed event
+        // (graceful shutdown, slow ack, etc.) — the second pass through
+        // this strategy must NOT create a duplicate Trip + try to assign
+        // an operator who's already bound to the existing trip (which
+        // would throw and mark the order Failed even though the first
+        // dispatch succeeded).
+        //
+        // AMR handles this via DispatchByRouteAsync's vendor-key
+        // persistence; Manual has no vendor so we look up Trip by
+        // UpperKey directly. Same idempotency contract.
+        var existing = await _trips.GetByUpperKeyAsync(request.UpperKey, cancellationToken);
+        if (existing is not null)
+        {
+            _logger.LogInformation(
+                "[ManualDispatch] ↺ Order {OrderId} group {G} already dispatched (trip {TripId}, upperKey {UpperKey}) — returning existing.",
+                request.DeliveryOrderId, request.GroupIndex, existing.Id, request.UpperKey);
+            return Result<DispatchGroupOutcome>.Success(new DispatchGroupOutcome(
+                TripId: existing.Id,
+                VendorOrderKey: null,
+                TemplateName: "manual"));
+        }
+
         // ── 1. Pick an operator ──────────────────────────────────────
         // Cert filter is empty in 4.4 — cargo-cert plumbing comes in a
         // later phase once ItemEventDto carries hazmat / cold-chain flags.

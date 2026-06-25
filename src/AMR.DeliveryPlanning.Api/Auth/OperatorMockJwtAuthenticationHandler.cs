@@ -71,15 +71,33 @@ public sealed class OperatorMockJwtAuthenticationHandler : AuthenticationHandler
         if (jwt.ValidTo != DateTime.MinValue && jwt.ValidTo < DateTime.UtcNow)
             return Task.FromResult(AuthenticateResult.Fail("Token has expired."));
 
+        // DTMS receives JWTs from three sources, each with its own claim
+        // convention. The handler tries each in order so any of them works
+        // without forcing the issuer to align on a specific name:
+        //   - JWT standard:           "sub"
+        //   - DTMS internal API:      "employeeCode"
+        //   - External Auth + frontend dev bypass:
+        //       "EmployeeId" + the long ClaimTypes URIs that .NET emits
+        //       via System.Security.Claims.ClaimTypes.NameIdentifier
+        const string NameIdUri = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier";
+        const string NameUri = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
+        const string RoleUri = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
+
         var employeeCode = jwt.Claims.FirstOrDefault(c => c.Type == "sub")?.Value
-                         ?? jwt.Claims.FirstOrDefault(c => c.Type == "employeeCode")?.Value;
+                         ?? jwt.Claims.FirstOrDefault(c => c.Type == "employeeCode")?.Value
+                         ?? jwt.Claims.FirstOrDefault(c => c.Type == "EmployeeId")?.Value
+                         ?? jwt.Claims.FirstOrDefault(c => c.Type == NameIdUri)?.Value;
         if (string.IsNullOrWhiteSpace(employeeCode))
-            return Task.FromResult(AuthenticateResult.Fail("Token missing 'sub' / 'employeeCode' claim."));
+            return Task.FromResult(AuthenticateResult.Fail(
+                "Token missing 'sub' / 'employeeCode' / 'EmployeeId' claim."));
 
         var displayName = jwt.Claims.FirstOrDefault(c => c.Type == "name")?.Value
                        ?? jwt.Claims.FirstOrDefault(c => c.Type == "displayName")?.Value
+                       ?? jwt.Claims.FirstOrDefault(c => c.Type == NameUri)?.Value
                        ?? employeeCode;
-        var role = jwt.Claims.FirstOrDefault(c => c.Type == "role")?.Value ?? "Operator";
+        var role = jwt.Claims.FirstOrDefault(c => c.Type == "role")?.Value
+                ?? jwt.Claims.FirstOrDefault(c => c.Type == RoleUri)?.Value
+                ?? "Operator";
 
         var claims = new List<Claim>
         {
