@@ -44,6 +44,8 @@ public class OrderListViewProjector :
     IConsumer<DeliveryOrderRejectedIntegrationEventV1>,
     IConsumer<DeliveryOrderHeldIntegrationEventV1>,
     IConsumer<DeliveryOrderReleasedIntegrationEventV1>,
+    IConsumer<DeliveryOrderAmendedIntegrationEventV1>,
+    IConsumer<DeliveryOrderDraftUpdatedIntegrationEventV1>,
     // Trip lifecycle ─────────────────────────────────────────────────────
     IConsumer<TripFailedIntegrationEvent>,
     IConsumer<TripCancelledIntegrationEvent>,
@@ -81,92 +83,77 @@ public class OrderListViewProjector :
         _logger = logger;
     }
 
-    // ── Order lifecycle: Created materializes the row with full snapshot ─
+    // ── Order lifecycle ────────────────────────────────────────────────
+    // Phase P4.6 — every Order event triggers a full refresh from the
+    // aggregate. Event payload is no longer trusted as the source of
+    // truth — it's just a "this order changed, re-read it" trigger.
+    // Benefits: lossy payloads can't drift, replay is idempotent, and
+    // adding new projection columns only touches the store's mapper.
 
     public Task Consume(ConsumeContext<DeliveryOrderCreatedIntegrationEventV1> ctx)
-        => Run(ctx, ctx.Message.DeliveryOrderId, ctx.Message.Status, async () =>
-        {
-            var m = ctx.Message;
-            // SearchText concatenates the per-Order free-text fields +
-            // every item id the event carries. The DB derives the
-            // tsvector via the generated column.
-            var itemText = string.Join(' ',
-                m.Items.Select(i => i.ItemId).Where(s => !string.IsNullOrEmpty(s)));
-            var search = string.Join(' ', new[] {
-                m.DeliveryOrderId.ToString("N"),
-                m.OrderRef,
-                itemText,
-            }.Where(s => !string.IsNullOrEmpty(s)));
-
-            await _store.UpsertOnCreateAsync(
-                orderId: m.DeliveryOrderId,
-                orderRef: m.OrderRef,
-                status: m.Status,
-                sourceSystem: m.SourceSystem,
-                priority: m.Priority,
-                transportMode: m.RequestedTransportMode,
-                requestedBy: m.RequestedBy, createdBy: m.CreatedBy, notes: m.Notes,
-                totalItems: m.TotalItems,
-                totalQuantity: m.TotalQuantity,
-                totalWeightKg: m.TotalWeightKg,
-                requiresDropPod: m.RequiresDropPod, requiresPickupPod: m.RequiresPickupPod,
-                createdAt: m.OccurredOn,
-                submittedAt: m.SubmittedAt,
-                serviceWindowEarliestUtc: m.EarliestUtc,
-                serviceWindowLatestUtc: m.LatestUtc,
-                searchText: search,
-                ctx.CancellationToken);
-        });
-
-    // ── Order lifecycle: other transitions just update the status ──────
+        => Run(ctx, ctx.Message.DeliveryOrderId, ctx.Message.Status,
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderSubmittedIntegrationEventV1> ctx)
         => Run(ctx, ctx.Message.DeliveryOrderId, "Submitted",
-            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Submitted", ctx.Message.OccurredOn, ctx.CancellationToken));
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderValidatedIntegrationEventV1> ctx)
         => Run(ctx, ctx.Message.DeliveryOrderId, "Validated",
-            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Validated", ctx.Message.OccurredOn, ctx.CancellationToken));
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderConfirmedIntegrationEventV1> ctx)
         => Run(ctx, ctx.Message.DeliveryOrderId, "Confirmed",
-            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Confirmed", ctx.Message.OccurredOn, ctx.CancellationToken));
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderDispatchedIntegrationEventV1> ctx)
         => Run(ctx, ctx.Message.DeliveryOrderId, "Dispatched",
-            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Dispatched", ctx.Message.OccurredOn, ctx.CancellationToken));
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderInProgressIntegrationEventV1> ctx)
         => Run(ctx, ctx.Message.DeliveryOrderId, "InProgress",
-            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "InProgress", ctx.Message.OccurredOn, ctx.CancellationToken));
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderCompletedIntegrationEventV1> ctx)
         => Run(ctx, ctx.Message.DeliveryOrderId, "Completed",
-            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Completed", ctx.Message.OccurredOn, ctx.CancellationToken));
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderPartiallyCompletedIntegrationEventV1> ctx)
         => Run(ctx, ctx.Message.DeliveryOrderId, "PartiallyCompleted",
-            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "PartiallyCompleted", ctx.Message.OccurredOn, ctx.CancellationToken));
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderFailedIntegrationEventV1> ctx)
         => Run(ctx, ctx.Message.DeliveryOrderId, "Failed",
-            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Failed", ctx.Message.OccurredOn, ctx.CancellationToken));
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderCancelledIntegrationEventV1> ctx)
         => Run(ctx, ctx.Message.DeliveryOrderId, "Cancelled",
-            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Cancelled", ctx.Message.OccurredOn, ctx.CancellationToken));
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderRejectedIntegrationEventV1> ctx)
         => Run(ctx, ctx.Message.DeliveryOrderId, "Rejected",
-            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Rejected", ctx.Message.OccurredOn, ctx.CancellationToken));
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderHeldIntegrationEventV1> ctx)
         => Run(ctx, ctx.Message.DeliveryOrderId, "Held",
-            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Held", ctx.Message.OccurredOn, ctx.CancellationToken));
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderReleasedIntegrationEventV1> ctx)
         => Run(ctx, ctx.Message.DeliveryOrderId, "Confirmed",
-            () => _store.UpdateStatusAsync(ctx.Message.DeliveryOrderId, "Confirmed", ctx.Message.OccurredOn, ctx.CancellationToken));
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
+
+    // Phase P4.6 — non-status mutations still need a projection refresh.
+    // Amend changes ServiceWindow / Priority; DraftUpdated replaces items
+    // + totals. Status itself doesn't move, but display columns do, so
+    // the same refresh-from-aggregate path keeps them in lockstep.
+
+    public Task Consume(ConsumeContext<DeliveryOrderAmendedIntegrationEventV1> ctx)
+        => Run(ctx, ctx.Message.DeliveryOrderId, "Amended",
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
+
+    public Task Consume(ConsumeContext<DeliveryOrderDraftUpdatedIntegrationEventV1> ctx)
+        => Run(ctx, ctx.Message.DeliveryOrderId, "DraftUpdated",
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
 
     // ── Trip lifecycle ──────────────────────────────────────────────────
     // Trip + Job events don't change OrderStatus itself — the changeHint

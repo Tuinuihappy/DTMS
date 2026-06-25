@@ -10,15 +10,17 @@ using NSubstitute;
 
 namespace DeliveryOrder.UnitTests;
 
+// Phase P4.6 — projector is now a thin trigger that hands every Order
+// event to RefreshFromAggregateAsync. Tests assert the wiring (right
+// orderId + occurredOn forwarded), not field-by-field payload mapping —
+// that mapping now lives in the store and is covered by store tests.
 public class OrderListViewProjectorTests
 {
     [Fact]
-    public async Task Created_UpsertsRowWithFullPayload()
+    public async Task Created_TriggersRefresh()
     {
         var (projector, store) = Build();
         var orderId = Guid.NewGuid();
-        var item1 = new ItemSummaryDto("SKU-001", 5.0, Guid.NewGuid(), Guid.NewGuid());
-        var item2 = new ItemSummaryDto("SKU-002", 3.0, Guid.NewGuid(), Guid.NewGuid());
         var evt = new DeliveryOrderCreatedIntegrationEventV1(
             EventId: Guid.NewGuid(), OccurredOn: DateTime.UtcNow, DeliveryOrderId: orderId,
             OrderRef: "ORD-42", SourceSystem: "Sap", Status: "Draft", Priority: "High",
@@ -27,26 +29,16 @@ public class OrderListViewProjectorTests
             EarliestUtc: null, LatestUtc: null, SubmittedAt: null,
             RequiresDropPod: true, RequiresPickupPod: false,
             TotalItems: 2, TotalQuantity: 7, TotalWeightKg: 8.0,
-            Items: new[] { item1, item2 });
+            Items: Array.Empty<ItemSummaryDto>());
 
         await projector.Consume(Ctx(evt));
 
-        await store.Received(1).UpsertOnCreateAsync(
-            orderId, "ORD-42", "Draft", "Sap", "High",
-            "Amr",
-            "alice", "system", "rush",
-            totalItems: 2,
-            totalQuantity: 7,
-            totalWeightKg: 8.0,
-            requiresDropPod: true, requiresPickupPod: false,
-            Arg.Any<DateTime>(), Arg.Any<DateTime?>(),
-            Arg.Any<DateTime?>(), Arg.Any<DateTime?>(),
-            Arg.Is<string>(s => s.Contains("SKU-001") && s.Contains("SKU-002") && s.Contains("ORD-42")),
-            Arg.Any<CancellationToken>());
+        await store.Received(1).RefreshFromAggregateAsync(
+            orderId, evt.OccurredOn, Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Submitted_UpdatesStatus()
+    public async Task Submitted_TriggersRefresh()
     {
         var (projector, store) = Build();
         var orderId = Guid.NewGuid();
@@ -55,12 +47,12 @@ public class OrderListViewProjectorTests
 
         await projector.Consume(Ctx(evt));
 
-        await store.Received(1).UpdateStatusAsync(
-            orderId, "Submitted", evt.OccurredOn, Arg.Any<CancellationToken>());
+        await store.Received(1).RefreshFromAggregateAsync(
+            orderId, evt.OccurredOn, Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Validated_UpdatesStatus()
+    public async Task Validated_TriggersRefresh()
     {
         var (projector, store) = Build();
         var orderId = Guid.NewGuid();
@@ -69,12 +61,12 @@ public class OrderListViewProjectorTests
 
         await projector.Consume(Ctx(evt));
 
-        await store.Received(1).UpdateStatusAsync(
-            orderId, "Validated", evt.OccurredOn, Arg.Any<CancellationToken>());
+        await store.Received(1).RefreshFromAggregateAsync(
+            orderId, evt.OccurredOn, Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Confirmed_UpdatesStatusOnly()
+    public async Task Confirmed_TriggersRefresh()
     {
         var (projector, store) = Build();
         var orderId = Guid.NewGuid();
@@ -84,21 +76,12 @@ public class OrderListViewProjectorTests
 
         await projector.Consume(Ctx(evt));
 
-        await store.Received(1).UpdateStatusAsync(
-            orderId, "Confirmed", evt.OccurredOn, Arg.Any<CancellationToken>());
-        await store.DidNotReceive().UpsertOnCreateAsync(
-            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<string>(), Arg.Any<string?>(),
-            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
-            Arg.Any<int>(), Arg.Any<double>(), Arg.Any<double>(),
-            Arg.Any<bool?>(), Arg.Any<bool?>(),
-            Arg.Any<DateTime>(), Arg.Any<DateTime?>(),
-            Arg.Any<DateTime?>(), Arg.Any<DateTime?>(),
-            Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await store.Received(1).RefreshFromAggregateAsync(
+            orderId, evt.OccurredOn, Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Failed_UpdatesStatus()
+    public async Task Failed_TriggersRefresh()
     {
         var (projector, store) = Build();
         var orderId = Guid.NewGuid();
@@ -107,8 +90,50 @@ public class OrderListViewProjectorTests
 
         await projector.Consume(Ctx(evt));
 
-        await store.Received(1).UpdateStatusAsync(
-            orderId, "Failed", evt.OccurredOn, Arg.Any<CancellationToken>());
+        await store.Received(1).RefreshFromAggregateAsync(
+            orderId, evt.OccurredOn, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Released_TriggersRefresh()
+    {
+        var (projector, store) = Build();
+        var orderId = Guid.NewGuid();
+        var evt = new DeliveryOrderReleasedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, orderId);
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).RefreshFromAggregateAsync(
+            orderId, evt.OccurredOn, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Amended_TriggersRefresh()
+    {
+        var (projector, store) = Build();
+        var orderId = Guid.NewGuid();
+        var evt = new DeliveryOrderAmendedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, orderId, "service window slipped");
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).RefreshFromAggregateAsync(
+            orderId, evt.OccurredOn, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DraftUpdated_TriggersRefresh()
+    {
+        var (projector, store) = Build();
+        var orderId = Guid.NewGuid();
+        var evt = new DeliveryOrderDraftUpdatedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, orderId);
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).RefreshFromAggregateAsync(
+            orderId, evt.OccurredOn, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -191,8 +216,8 @@ public class OrderListViewProjectorTests
 
         await projector.Consume(Ctx(evt));
 
-        await store.DidNotReceive().UpdateStatusAsync(
-            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+        await store.DidNotReceive().RefreshFromAggregateAsync(
+            Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -202,8 +227,8 @@ public class OrderListViewProjectorTests
         var evt = new DeliveryOrderFailedIntegrationEventV1(
             Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(), "x");
 
-        store.When(s => s.UpdateStatusAsync(
-                Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()))
+        store.When(s => s.RefreshFromAggregateAsync(
+                Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()))
             .Do(_ => throw new InvalidOperationException("schema drift"));
 
         var act = async () => await projector.Consume(Ctx(evt));
@@ -217,8 +242,8 @@ public class OrderListViewProjectorTests
         var evt = new DeliveryOrderFailedIntegrationEventV1(
             Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(), "x");
 
-        store.When(s => s.UpdateStatusAsync(
-                Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()))
+        store.When(s => s.RefreshFromAggregateAsync(
+                Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()))
             .Do(_ => throw new TimeoutException("db lock"));
 
         var act = async () => await projector.Consume(Ctx(evt));

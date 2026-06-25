@@ -106,18 +106,6 @@ public class OrderListViewRow
 
     // ── Mutation surface (projector only) ─────────────────────────────
 
-    public void UpdateStatus(string newStatus, DateTime occurredAt)
-    {
-        Status = newStatus;
-        UpdatedAt = occurredAt;
-    }
-
-    public void UpdateNotes(string? notes)
-    {
-        Notes = notes;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
     public void SetTripDerivedFields(bool hasFailedTrip, Guid? latestTripId)
     {
         HasFailedTrip = hasFailedTrip;
@@ -134,4 +122,46 @@ public class OrderListViewRow
 
     public void RecomputeSearchText(string searchText)
         => SearchText = searchText;
+
+    // Phase P4.6 — single mutation point for "refresh from aggregate".
+    // Rewrites every display column (NOT trip/job derived flags — those
+    // are owned by SetTripDerivedFields / SetJobDerivedFields and would
+    // be lost if we recomputed them here from the order alone).
+    public void RefreshFromAggregate(
+        string status,
+        string sourceSystem,
+        string priority,
+        string? transportMode,
+        string? requestedBy,
+        string? createdBy,
+        string? notes,
+        int totalItems,
+        double totalQuantity,
+        double totalWeightKg,
+        bool? requiresDropPod,
+        bool? requiresPickupPod,
+        DateTime? submittedAt,
+        DateTime? serviceWindowEarliestUtc,
+        DateTime? serviceWindowLatestUtc,
+        string searchText,
+        DateTime occurredAt)
+    {
+        Status = status;
+        SourceSystem = sourceSystem;
+        Priority = priority;
+        TransportMode = transportMode;
+        RequestedBy = requestedBy;
+        CreatedBy = createdBy;
+        Notes = notes;
+        TotalItems = totalItems;
+        TotalQuantity = totalQuantity;
+        TotalWeightKg = totalWeightKg;
+        RequiresDropPod = requiresDropPod;
+        RequiresPickupPod = requiresPickupPod;
+        SubmittedAt = submittedAt;
+        ServiceWindowEarliestUtc = serviceWindowEarliestUtc;
+        ServiceWindowLatestUtc = serviceWindowLatestUtc;
+        SearchText = searchText;
+        UpdatedAt = occurredAt;
+    }
 }

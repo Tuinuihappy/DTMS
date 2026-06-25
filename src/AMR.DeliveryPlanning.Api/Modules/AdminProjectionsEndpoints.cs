@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
@@ -111,6 +112,30 @@ public static class AdminProjectionsEndpoints
                     statusCode: StatusCodes.Status501NotImplemented);
             }
         });
+
+        // Phase 3 — safety-net rebuild of the OrderListView projection.
+        // Reads from the canonical sources (DeliveryOrders + Items +
+        // dispatch.Trips + planning.Jobs) and upserts every row in one
+        // transaction. Safe to run live: the live projector races with
+        // this only at row-level granularity, and the rebuild always
+        // converges to the same end state as the live projector's
+        // RefreshFromAggregate. Use when projection drift is suspected
+        // (e.g. permanent projector failure swallowed an event) or after
+        // a deploy that adds new projection columns.
+        group.MapPost("/projections/order-list/rebuild", async (
+            IOrderListViewProjectionStore store,
+            CancellationToken ct) =>
+        {
+            var result = await store.RebuildAllAsync(ct);
+            return Results.Ok(new
+            {
+                rowsUpserted = result.RowsUpserted,
+                orphansDeleted = result.OrphansDeleted,
+                durationMs = (long)result.Duration.TotalMilliseconds,
+            });
+        })
+        .WithName("AdminRebuildOrderListView")
+        .WithSummary("Rebuild every OrderListView row from the DeliveryOrder aggregate + dispatch.Trips + planning.Jobs.");
     }
 
     /// <summary>

@@ -130,7 +130,17 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             ],
             // internal-only — no cross-module publishing needed
             DeliveryOrderDraftedDomainEvent         => [],
-            DeliveryOrderDraftUpdatedDomainEvent     => [],
+
+            // Phase P4.6 — Draft replace mutates items + totals; surface to
+            // the OrderListView projection so the list row reflects the new
+            // shape immediately. No cross-module consumer beyond the
+            // projector cares (Draft is pre-Planning).
+            DeliveryOrderDraftUpdatedDomainEvent evt =>
+            [
+                new DeliveryOrderDraftUpdatedIntegrationEventV1(
+                    evt.EventId, evt.OccurredOn, evt.OrderId,
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+            ],
             // Option A: Planning + Planned are sub-second transitions —
             // surface in audit but don't broadcast to other modules.
             DeliveryOrderPlanningStartedDomainEvent  => [],

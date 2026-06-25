@@ -122,3 +122,13 @@ public record DeliveryOrderValidatedIntegrationEventV1(
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
     string SchemaVersion = "1.0") : IIntegrationEvent;
+
+// Phase P4.6 (2026-06-25) — Draft replace via PUT carries no status change,
+// but mutates items + totals + service window + notes / transport mode.
+// Surfaced so the OrderListView projection can refresh the row instead of
+// drifting until the next status transition.
+public record DeliveryOrderDraftUpdatedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
