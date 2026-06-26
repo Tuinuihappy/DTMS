@@ -1,3 +1,4 @@
+using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AssignItemsToTrip;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
@@ -7,6 +8,7 @@ using AMR.DeliveryPlanning.Transport.Manual.Application.Services;
 using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
 using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
 using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -45,6 +47,7 @@ internal sealed class ManualDispatchStrategy : IDispatchStrategy
     private readonly IManualTripExtensionRepository _extensions;
     private readonly IOperatorRepository _operators;
     private readonly IPushNotificationGateway _push;
+    private readonly ISender _sender;
     private readonly ManualDispatchOptions _options;
     private readonly ILogger<ManualDispatchStrategy> _logger;
 
@@ -54,6 +57,7 @@ internal sealed class ManualDispatchStrategy : IDispatchStrategy
         IManualTripExtensionRepository extensions,
         IOperatorRepository operators,
         IPushNotificationGateway push,
+        ISender sender,
         IOptions<ManualDispatchOptions> options,
         ILogger<ManualDispatchStrategy> logger)
     {
@@ -62,6 +66,7 @@ internal sealed class ManualDispatchStrategy : IDispatchStrategy
         _extensions = extensions;
         _operators = operators;
         _push = push;
+        _sender = sender;
         _options = options.Value;
         _logger = logger;
     }
@@ -194,7 +199,42 @@ internal sealed class ManualDispatchStrategy : IDispatchStrategy
             "[ManualDispatch] ✓ Order {OrderId} group {G} → trip {TripId}, operator {EmployeeCode} ({OperatorId}), ack-by {AckBy:O}",
             request.DeliveryOrderId, request.GroupIndex, trip.Id, op.EmployeeCode, op.Id, ackDeadline);
 
-        // ── 6. Push notification (best-effort) ───────────────────────
+        // ── 6. Bind items to trip ───────────────────────────────────
+        // Without this the Trip's items list stays empty AND the
+        // TripCompletedIntegrationEvent → ItemStatus=Delivered projection
+        // matches zero rows, leaving items stuck at PENDING after the
+        // operator completes the trip. AMR does the same via
+        // DispatchOrderTemplateService — Manual mirrors that contract.
+        //
+        // Best-effort — a binding failure logs a warning but doesn't
+        // roll back the dispatch. The Trip is already real on the
+        // vendor (operator) side; ops can manually re-bind via SQL if
+        // the matching path silently failed.
+        try
+        {
+            var bindResult = await _sender.Send(new AssignItemsToTripCommand(
+                OrderId: request.DeliveryOrderId,
+                TripId: trip.Id,
+                AttemptNumber: request.AttemptNumber,
+                PickupStationId: request.PickupStationId,
+                DropStationId: request.DropStationId,
+                PickupWarehouseId: request.PickupWarehouseId,
+                DropWarehouseId: request.DropWarehouseId), cancellationToken);
+            if (bindResult.IsFailure)
+            {
+                _logger.LogWarning(
+                    "[ManualDispatch] Item binding failed for trip {TripId} on order {OrderId}: {Error}",
+                    trip.Id, request.DeliveryOrderId, bindResult.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "[ManualDispatch] Item binding threw for trip {TripId} — items will stay unbound until manual recovery.",
+                trip.Id);
+        }
+
+        // ── 7. Push notification (best-effort) ───────────────────────
         try
         {
             var shortOrderId = request.DeliveryOrderId.ToString()[..8];

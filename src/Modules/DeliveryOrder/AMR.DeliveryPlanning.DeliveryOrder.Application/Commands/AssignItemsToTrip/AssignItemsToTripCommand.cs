@@ -15,5 +15,12 @@ public record AssignItemsToTripCommand(
     Guid TripId,
     int AttemptNumber,
     Guid PickupStationId,
-    Guid DropStationId
+    Guid DropStationId,
+    // Phase 4.6 follow-up — Manual / Fleet items have null station Ids
+    // (Phase 2.5 ADR-002). Caller passes warehouse Ids so the matching
+    // logic can fall back to the warehouse pair when the station pair
+    // is unusable (both sides empty Guid). AMR callers leave these null
+    // and the station-pair path keeps working.
+    Guid? PickupWarehouseId = null,
+    Guid? DropWarehouseId = null
 ) : ICommand<int>;

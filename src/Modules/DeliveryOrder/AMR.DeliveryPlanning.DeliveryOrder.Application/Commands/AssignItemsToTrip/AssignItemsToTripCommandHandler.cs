@@ -27,7 +27,9 @@ public class AssignItemsToTripCommandHandler : ICommandHandler<AssignItemsToTrip
             request.TripId,
             request.AttemptNumber,
             request.PickupStationId,
-            request.DropStationId);
+            request.DropStationId,
+            request.PickupWarehouseId,
+            request.DropWarehouseId);
 
         if (bound == 0)
         {

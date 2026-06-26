@@ -214,7 +214,10 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     /// resets any Failed/Returned items back to Pending so the new trip
     /// can drive them terminal.
     /// </summary>
-    public int AssignItemsToTrip(Guid tripId, int attemptNumber, Guid pickupStationId, Guid dropStationId)
+    public int AssignItemsToTrip(
+        Guid tripId, int attemptNumber,
+        Guid pickupStationId, Guid dropStationId,
+        Guid? pickupWarehouseId = null, Guid? dropWarehouseId = null)
     {
         if (tripId == Guid.Empty)
             throw new ArgumentException("TripId must not be empty.", nameof(tripId));
@@ -222,8 +225,23 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         var bound = 0;
         foreach (var item in _items)
         {
-            if (item.PickupStationId != pickupStationId || item.DropStationId != dropStationId)
-                continue;
+            // Mirror of MarkGroupItemsAsDispatchFailed (Bug A) — match by
+            // station pair (AMR) OR warehouse pair (Manual / Fleet whose
+            // items carry null station Ids per ADR-002). Empty-Guid station
+            // sentinel from the Manual consumer doesn't match items' null
+            // station Ids; the warehouse branch picks them up.
+            var matchesStation =
+                pickupStationId != Guid.Empty && dropStationId != Guid.Empty
+                && item.PickupStationId == pickupStationId
+                && item.DropStationId == dropStationId;
+
+            var matchesWarehouse =
+                pickupWarehouseId.HasValue && dropWarehouseId.HasValue
+                && item.PickupWarehouseId == pickupWarehouseId
+                && item.DropWarehouseId == dropWarehouseId;
+
+            if (!matchesStation && !matchesWarehouse) continue;
+
             // Skip terminal items the operator already finalised (Cancelled
             // by admin etc.) — they don't ride retries.
             if (item.Status is ItemStatus.Cancelled or ItemStatus.Delivered)

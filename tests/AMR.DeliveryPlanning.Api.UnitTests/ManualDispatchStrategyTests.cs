@@ -3,11 +3,13 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using AMR.DeliveryPlanning.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.Transport.Manual.Application.Services;
 using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
 using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
 using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
 using FluentAssertions;
+using MediatR;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -29,11 +31,19 @@ public class ManualDispatchStrategyTests
     private readonly IManualTripExtensionRepository _extensions = Substitute.For<IManualTripExtensionRepository>();
     private readonly IOperatorRepository _operators = Substitute.For<IOperatorRepository>();
     private readonly IPushNotificationGateway _push = Substitute.For<IPushNotificationGateway>();
+    private readonly ISender _sender = Substitute.For<ISender>();
 
-    private ManualDispatchStrategy CreateStrategy(ManualDispatchOptions? opts = null) =>
-        new(_policy, _trips, _extensions, _operators, _push,
+    private ManualDispatchStrategy CreateStrategy(ManualDispatchOptions? opts = null)
+    {
+        // AssignItemsToTripCommand is dispatched via ISender in the strategy;
+        // unit tests don't care about the item-binding outcome, just that
+        // the strategy doesn't crash when the command "succeeds" with 0 rows.
+        _sender.Send(Arg.Any<IRequest<Result<int>>>(), Arg.Any<CancellationToken>())
+               .Returns(Result<int>.Success(0));
+        return new(_policy, _trips, _extensions, _operators, _push, _sender,
             Options.Create(opts ?? new ManualDispatchOptions()),
             NullLogger<ManualDispatchStrategy>.Instance);
+    }
 
     private static DispatchGroupRequest BasicRequest(Guid? pickupWh = null) =>
         new(
