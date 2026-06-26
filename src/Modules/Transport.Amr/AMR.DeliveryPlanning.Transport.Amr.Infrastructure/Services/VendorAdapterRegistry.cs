@@ -10,16 +10,13 @@ public sealed class VendorAdapterRegistry : IVendorAdapterRegistry
 
     public VendorAdapterRegistry(
         Riot3CommandService riot3,
-        FeederCommandService feeder,
         SimulatorCommandService simulator)
     {
         _adapters = new Dictionary<string, IVehicleCommandService>(StringComparer.OrdinalIgnoreCase)
         {
             ["riot3"] = riot3,
-            // Current RIOT3 feeder robots use the same RIOT3 order API. Keep the
-            // legacy FeederCommandService available under an explicit key.
+            // Feeder-type robots use the same Riot3 order API as liftup.
             ["feeder"] = riot3,
-            ["legacy-feeder"] = feeder,
             ["sim"] = simulator,
             ["simulator"] = simulator
         };
