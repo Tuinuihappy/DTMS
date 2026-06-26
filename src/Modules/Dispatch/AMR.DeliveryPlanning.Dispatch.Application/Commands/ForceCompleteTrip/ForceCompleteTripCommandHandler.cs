@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.ForceCompleteTrip;

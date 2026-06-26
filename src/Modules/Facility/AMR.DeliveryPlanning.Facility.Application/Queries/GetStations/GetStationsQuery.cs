@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Facility.Domain.Entities;
 using AMR.DeliveryPlanning.Facility.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Facility.Application.Queries.GetStations;
 

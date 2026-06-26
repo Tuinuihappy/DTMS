@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Facility.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.Transport.Manual.Application.Services;
 using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
 using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;

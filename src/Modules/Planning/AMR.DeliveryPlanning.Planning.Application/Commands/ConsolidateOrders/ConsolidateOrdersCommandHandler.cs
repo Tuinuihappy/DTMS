@@ -2,7 +2,7 @@ using AMR.DeliveryPlanning.Planning.Domain.Entities;
 using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.Planning.Domain.Services;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Commands.ConsolidateOrders;
 

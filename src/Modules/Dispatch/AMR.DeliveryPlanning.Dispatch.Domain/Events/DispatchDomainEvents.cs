@@ -1,5 +1,5 @@
 using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
-using AMR.DeliveryPlanning.SharedKernel.Domain;
+using DTMS.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.Dispatch.Domain.Events;
 

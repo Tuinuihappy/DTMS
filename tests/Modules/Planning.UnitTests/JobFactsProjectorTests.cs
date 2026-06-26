@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Planning.Application.Projections;
 using AMR.DeliveryPlanning.Planning.IntegrationEvents;
-using AMR.DeliveryPlanning.SharedKernel.Projection;
+using DTMS.SharedKernel.Projection;
 using FluentAssertions;
 using MassTransit;
 using Microsoft.Extensions.Logging.Abstractions;

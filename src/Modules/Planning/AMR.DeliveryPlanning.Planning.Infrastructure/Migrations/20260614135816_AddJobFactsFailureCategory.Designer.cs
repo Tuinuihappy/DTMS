@@ -573,7 +573,7 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                     b.ToTable("JobStatusHistory", "planning");
                 });
 
-            modelBuilder.Entity("AMR.DeliveryPlanning.SharedKernel.Outbox.OutboxMessage", b =>
+            modelBuilder.Entity("DTMS.SharedKernel.Outbox.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -614,7 +614,7 @@ namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
                     b.ToTable("OutboxMessages", "planning");
                 });
 
-            modelBuilder.Entity("AMR.DeliveryPlanning.SharedKernel.Projection.InboxMessage", b =>
+            modelBuilder.Entity("DTMS.SharedKernel.Projection.InboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()

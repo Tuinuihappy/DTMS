@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.SharedKernel.Exceptions;
+namespace DTMS.SharedKernel.Exceptions;
 
 public class DomainException : Exception
 {

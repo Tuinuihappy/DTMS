@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.SharedKernel.Auth;
+namespace DTMS.SharedKernel.Auth;
 
 /// <summary>
 /// Snapshot of "who triggered this operation" carried through the request

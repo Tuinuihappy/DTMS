@@ -7,8 +7,8 @@ using AMR.DeliveryPlanning.Api.Middlewares;
 using AMR.DeliveryPlanning.Api.Modules;
 using AMR.DeliveryPlanning.Api.RobotPositions;
 using AMR.DeliveryPlanning.Api.VendorHealth;
-using AMR.DeliveryPlanning.SharedKernel.Auth;
-using AMR.DeliveryPlanning.SharedKernel.Projection;
+using DTMS.SharedKernel.Auth;
+using DTMS.SharedKernel.Projection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -150,7 +150,7 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Dispatch.Application.Commands.CreateEnvelopeTrip.CreateEnvelopeTripCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Transport.Manual.Application.Commands.AcknowledgeTrip.AcknowledgeTripCommand).Assembly);
-    cfg.AddOpenBehavior(typeof(AMR.DeliveryPlanning.SharedKernel.Behaviors.ValidationBehavior<,>));
+    cfg.AddOpenBehavior(typeof(DTMS.SharedKernel.Behaviors.ValidationBehavior<,>));
 });
 
 // Register FluentValidation validators from all module Application assemblies
@@ -169,7 +169,7 @@ builder.Services.AddOpenTelemetry()
         .AddHttpClientInstrumentation()
         .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)))
     // P0.3 — projection metrics (lag, throughput, dedup) — Meter name
-    // matches AMR.DeliveryPlanning.SharedKernel.Projection.ProjectionMetrics.MeterName.
+    // matches DTMS.SharedKernel.Projection.ProjectionMetrics.MeterName.
     // P0 Day 4 — DTMS.SignalR meter for hub invocations / connections /
     // rate-limit drops (HubMetrics class).
     // T1.6 — DTMS.Workflow meter for workflow SLO (stuck orders, consumer
@@ -185,7 +185,7 @@ builder.Services.AddOpenTelemetry()
         .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)));
 
 // T1.6 — singleton holder shared by consumers, watchdog, and outbox processor.
-builder.Services.AddSingleton<AMR.DeliveryPlanning.SharedKernel.Diagnostics.WorkflowMetrics>();
+builder.Services.AddSingleton<DTMS.SharedKernel.Diagnostics.WorkflowMetrics>();
 
 // G2 — shutdown observability. Records `total` shutdown phase via lifetime
 // hooks; `bus` phase is recorded by BusShutdownTimingObserver wired

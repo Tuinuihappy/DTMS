@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace AMR.DeliveryPlanning.SharedKernel.Auth;
+namespace DTMS.SharedKernel.Auth;
 
 public static class ActorContextServiceCollectionExtensions
 {

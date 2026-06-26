@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.SharedKernel.Projection;
+namespace DTMS.SharedKernel.Projection;
 
 /// <summary>
 /// Replay orchestration contract — given a projector name + time window,

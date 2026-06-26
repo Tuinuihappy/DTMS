@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.Transport.Amr.Models;
 using Microsoft.Extensions.Logging;
 

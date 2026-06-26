@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Planning.IntegrationEvents;
-using AMR.DeliveryPlanning.SharedKernel.Domain;
-using AMR.DeliveryPlanning.SharedKernel.Projection;
+using DTMS.SharedKernel.Domain;
+using DTMS.SharedKernel.Projection;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 

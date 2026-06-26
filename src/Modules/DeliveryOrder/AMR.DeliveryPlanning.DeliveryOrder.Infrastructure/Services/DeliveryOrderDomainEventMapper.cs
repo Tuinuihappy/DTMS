@@ -1,8 +1,8 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
 using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
-using AMR.DeliveryPlanning.SharedKernel.Auth;
-using AMR.DeliveryPlanning.SharedKernel.Domain;
-using AMR.DeliveryPlanning.SharedKernel.Outbox;
+using DTMS.SharedKernel.Auth;
+using DTMS.SharedKernel.Domain;
+using DTMS.SharedKernel.Outbox;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
 

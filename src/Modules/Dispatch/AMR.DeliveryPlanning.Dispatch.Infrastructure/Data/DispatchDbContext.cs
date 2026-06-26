@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections;
-using AMR.DeliveryPlanning.SharedKernel.Outbox;
-using AMR.DeliveryPlanning.SharedKernel.Projection;
+using DTMS.SharedKernel.Outbox;
+using DTMS.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;

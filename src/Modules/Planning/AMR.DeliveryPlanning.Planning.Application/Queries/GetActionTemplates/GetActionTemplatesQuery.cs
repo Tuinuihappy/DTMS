@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
 using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Queries.GetActionTemplates;
 

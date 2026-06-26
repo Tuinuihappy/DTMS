@@ -1,5 +1,5 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CancelDeliveryOrder;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 using MediatR;
 using Microsoft.Extensions.Logging;
 

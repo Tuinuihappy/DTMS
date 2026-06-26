@@ -2,8 +2,8 @@ using AMR.DeliveryPlanning.Planning.Domain.Entities;
 using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data.Records;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Projections;
-using AMR.DeliveryPlanning.SharedKernel.Outbox;
-using AMR.DeliveryPlanning.SharedKernel.Projection;
+using DTMS.SharedKernel.Outbox;
+using DTMS.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.Planning.Infrastructure.Data;

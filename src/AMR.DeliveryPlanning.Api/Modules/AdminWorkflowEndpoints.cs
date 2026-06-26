@@ -4,7 +4,7 @@ using AMR.DeliveryPlanning.Dispatch.Application.Commands.ForceCompleteTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.ForceDropCompletedTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.ForcePickupCompletedTrip;
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.ForceStartTrip;
-using AMR.DeliveryPlanning.SharedKernel.Auth;
+using DTMS.SharedKernel.Auth;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 

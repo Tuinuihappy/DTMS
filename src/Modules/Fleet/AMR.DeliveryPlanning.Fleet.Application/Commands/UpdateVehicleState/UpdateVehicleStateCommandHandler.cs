@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel.Exceptions;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Exceptions;
+using DTMS.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Fleet.Application.Commands.UpdateVehicleState;
 

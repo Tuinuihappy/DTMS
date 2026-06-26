@@ -1,8 +1,8 @@
 using FluentValidation;
 using MediatR;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.SharedKernel.Behaviors;
+namespace DTMS.SharedKernel.Behaviors;
 
 public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>

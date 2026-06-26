@@ -38,7 +38,7 @@ using AMR.DeliveryPlanning.{Module}.Application.Services;
 using AMR.DeliveryPlanning.{Module}.Domain.Entities;
 using AMR.DeliveryPlanning.{Module}.Domain.Enums;
 using AMR.DeliveryPlanning.{Module}.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;

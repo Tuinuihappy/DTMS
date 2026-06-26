@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.SharedKernel.Domain;
+using DTMS.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
-namespace AMR.DeliveryPlanning.SharedKernel.Outbox;
+namespace DTMS.SharedKernel.Outbox;
 
 public class DomainEventOutboxSaveChangesInterceptor : SaveChangesInterceptor
 {

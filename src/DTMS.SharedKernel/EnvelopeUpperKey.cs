@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace AMR.DeliveryPlanning.SharedKernel;
+namespace DTMS.SharedKernel;
 
 /// <summary>
 /// Composite correlation key sent to RIOT3 as <c>upperKey</c> when DTMS

@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.Fleet.Domain.Entities;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Projections;
-using AMR.DeliveryPlanning.SharedKernel.Outbox;
-using AMR.DeliveryPlanning.SharedKernel.Projection;
+using DTMS.SharedKernel.Outbox;
+using DTMS.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Data;

@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.SharedKernel.Diagnostics;
+using DTMS.SharedKernel.Diagnostics;
 using Microsoft.Extensions.Hosting;
 
 namespace AMR.DeliveryPlanning.Api.Infrastructure.Diagnostics;

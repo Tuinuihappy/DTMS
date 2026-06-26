@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel.Exceptions;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Exceptions;
+using DTMS.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Commands.DeleteOrderTemplate;
 

@@ -243,7 +243,7 @@ public class B11CascadeAndAbandonTests
     // private — reflection is the least-bad path for unit tests.
     private static void SetTripId(Trip trip, Guid id)
     {
-        typeof(AMR.DeliveryPlanning.SharedKernel.Domain.AggregateRoot<Guid>)
+        typeof(DTMS.SharedKernel.Domain.AggregateRoot<Guid>)
             .GetProperty(nameof(Trip.Id))!
             .SetValue(trip, id);
     }

@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetActionTemplates;
 using AMR.DeliveryPlanning.Planning.Domain.Enums;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Commands.CreateActionTemplate;
 

@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.SharedKernel.Domain;
+using DTMS.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.Fleet.Domain.Entities;
 

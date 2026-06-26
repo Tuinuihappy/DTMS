@@ -2,7 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AMR.DeliveryPlanning.Planning.Domain\AMR.DeliveryPlanning.Planning.Domain.csproj" />
-    <ProjectReference Include="..\..\..\AMR.DeliveryPlanning.SharedKernel\AMR.DeliveryPlanning.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\DTMS.SharedKernel\DTMS.SharedKernel.csproj" />
     <ProjectReference Include="..\..\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents\AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.csproj" />
     <ProjectReference Include="..\..\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Application\AMR.DeliveryPlanning.DeliveryOrder.Application.csproj" />
     <ProjectReference Include="..\..\Facility\AMR.DeliveryPlanning.Facility.Domain\AMR.DeliveryPlanning.Facility.Domain.csproj" />

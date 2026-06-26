@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.SharedKernel.Auth;
+using DTMS.SharedKernel.Auth;
 using FluentAssertions;
 
 namespace DeliveryOrder.UnitTests;

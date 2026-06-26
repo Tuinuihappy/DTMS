@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.SharedKernel.Outbox;
+namespace DTMS.SharedKernel.Outbox;
 
 public static class OutboxRetryPolicy
 {

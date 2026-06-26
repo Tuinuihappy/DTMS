@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.SharedKernel.Messaging;
+namespace DTMS.SharedKernel.Messaging;
 
 public class Result
 {

@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.SharedKernel.Domain;
+namespace DTMS.SharedKernel.Domain;
 
 public interface IAuditable
 {

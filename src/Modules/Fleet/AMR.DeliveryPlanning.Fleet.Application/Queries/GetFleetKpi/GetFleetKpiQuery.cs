@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Fleet.Domain.Enums;
 using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Fleet.Application.Queries.GetFleetKpi;
 

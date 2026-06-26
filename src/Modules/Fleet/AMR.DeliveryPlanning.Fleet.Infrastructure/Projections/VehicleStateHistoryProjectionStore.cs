@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Fleet.Application.Projections;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
-using AMR.DeliveryPlanning.SharedKernel.Projection;
+using DTMS.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Projections;

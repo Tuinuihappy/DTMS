@@ -11,8 +11,8 @@ using AMR.DeliveryPlanning.Fleet.IntegrationEvents;
 using AMR.DeliveryPlanning.Planning.Domain.Events;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Services;
 using AMR.DeliveryPlanning.Planning.IntegrationEvents;
-using AMR.DeliveryPlanning.SharedKernel.Auth;
-using AMR.DeliveryPlanning.SharedKernel.Domain;
+using DTMS.SharedKernel.Auth;
+using DTMS.SharedKernel.Domain;
 using FluentAssertions;
 using NSubstitute;
 

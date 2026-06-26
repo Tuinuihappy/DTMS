@@ -3,7 +3,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
 using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
-using AMR.DeliveryPlanning.SharedKernel.Projection;
+using DTMS.SharedKernel.Projection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -155,7 +155,7 @@ public static class AdminProjectionsEndpoints
     {
         // Each module owns its own ProjectionInbox table. We pull per-projector
         // counts + latest processed timestamp in a single GROUP BY.
-        var inbox = db.Set<SharedKernel.Projection.InboxMessage>();
+        var inbox = db.Set<InboxMessage>();
         var perProjector = await inbox
             .AsNoTracking()
             .GroupBy(m => m.ProjectorName)

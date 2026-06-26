@@ -1126,14 +1126,14 @@ public class EnvelopeUpperKeyTests
     public void Build_FormatsAsGuidNHyphenGN()
     {
         var orderId = Guid.Parse("48752c3e-35bb-4d0d-b227-cbde6c1da95b");
-        var key = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.Build(orderId, 1);
+        var key = DTMS.SharedKernel.EnvelopeUpperKey.Build(orderId, 1);
         key.Should().Be("48752c3e35bb4d0db227cbde6c1da95b-G1");
     }
 
     [Fact]
     public void TryParse_ValidComposite_ReturnsParts()
     {
-        var ok = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.TryParse(
+        var ok = DTMS.SharedKernel.EnvelopeUpperKey.TryParse(
             "48752c3e35bb4d0db227cbde6c1da95b-G3", out var orderId, out var groupIndex);
         ok.Should().BeTrue();
         orderId.Should().Be(Guid.Parse("48752c3e-35bb-4d0d-b227-cbde6c1da95b"));
@@ -1145,7 +1145,7 @@ public class EnvelopeUpperKeyTests
     {
         // legacy upperKey (plain Guid) should NOT match envelope format —
         // webhook needs this so it falls through to the legacy branch.
-        var ok = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.TryParse(
+        var ok = DTMS.SharedKernel.EnvelopeUpperKey.TryParse(
             "48752c3e-35bb-4d0d-b227-cbde6c1da95b", out _, out _);
         ok.Should().BeFalse();
     }
@@ -1160,7 +1160,7 @@ public class EnvelopeUpperKeyTests
     [InlineData("zzzzz35bb4d0db227cbde6c1da95b-G1")]      // bad hex
     public void TryParse_Invalid_ReturnsFalse(string? input)
     {
-        AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey
+        DTMS.SharedKernel.EnvelopeUpperKey
             .TryParse(input, out _, out _).Should().BeFalse();
     }
 
@@ -1168,8 +1168,8 @@ public class EnvelopeUpperKeyTests
     public void RoundTrip()
     {
         var orderId = Guid.NewGuid();
-        var key = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.Build(orderId, 7);
-        AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.TryParse(key, out var roundOrder, out var roundGroup)
+        var key = DTMS.SharedKernel.EnvelopeUpperKey.Build(orderId, 7);
+        DTMS.SharedKernel.EnvelopeUpperKey.TryParse(key, out var roundOrder, out var roundGroup)
             .Should().BeTrue();
         roundOrder.Should().Be(orderId);
         roundGroup.Should().Be(7);
@@ -1355,10 +1355,10 @@ public class DispatchOrderTemplateServiceTests
         public Task<TResponse> Send<TResponse>(MediatR.IRequest<TResponse> request, CancellationToken cancellationToken = default)
         {
             object response;
-            if (typeof(TResponse) == typeof(AMR.DeliveryPlanning.SharedKernel.Messaging.Result<Guid>))
-                response = AMR.DeliveryPlanning.SharedKernel.Messaging.Result<Guid>.Success(Guid.NewGuid());
-            else if (typeof(TResponse) == typeof(AMR.DeliveryPlanning.SharedKernel.Messaging.Result<int>))
-                response = AMR.DeliveryPlanning.SharedKernel.Messaging.Result<int>.Success(0);
+            if (typeof(TResponse) == typeof(DTMS.SharedKernel.Messaging.Result<Guid>))
+                response = DTMS.SharedKernel.Messaging.Result<Guid>.Success(Guid.NewGuid());
+            else if (typeof(TResponse) == typeof(DTMS.SharedKernel.Messaging.Result<int>))
+                response = DTMS.SharedKernel.Messaging.Result<int>.Success(0);
             else
                 throw new NotSupportedException($"StubSender doesn't model {typeof(TResponse).Name}.");
             return Task.FromResult((TResponse)response);
@@ -1381,7 +1381,7 @@ public class DispatchOrderTemplateServiceTests
         public string? ReturnVendorKey { get; set; }
         public string? FailWith { get; set; }
 
-        public Task<AMR.DeliveryPlanning.SharedKernel.Messaging.Result<
+        public Task<DTMS.SharedKernel.Messaging.Result<
             AMR.DeliveryPlanning.Planning.Application.Services.RobotOrderDispatchResult>> SendAsync(
             string upperKey,
             AMR.DeliveryPlanning.Planning.Application.Services.ResolvedOrder order,
@@ -1391,9 +1391,9 @@ public class DispatchOrderTemplateServiceTests
             LastUpperKey = upperKey;
             LastSentOrder = order;
             return Task.FromResult(FailWith is not null
-                ? AMR.DeliveryPlanning.SharedKernel.Messaging.Result<
+                ? DTMS.SharedKernel.Messaging.Result<
                     AMR.DeliveryPlanning.Planning.Application.Services.RobotOrderDispatchResult>.Failure(FailWith)
-                : AMR.DeliveryPlanning.SharedKernel.Messaging.Result<
+                : DTMS.SharedKernel.Messaging.Result<
                     AMR.DeliveryPlanning.Planning.Application.Services.RobotOrderDispatchResult>.Success(
                         new AMR.DeliveryPlanning.Planning.Application.Services.RobotOrderDispatchResult(
                             ReturnVendorKey!, "{\"stub\":true}")));

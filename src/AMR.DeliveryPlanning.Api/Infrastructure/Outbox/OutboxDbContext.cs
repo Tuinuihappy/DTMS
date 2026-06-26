@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.SharedKernel.Outbox;
+using DTMS.SharedKernel.Outbox;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.Api.Infrastructure.Outbox;

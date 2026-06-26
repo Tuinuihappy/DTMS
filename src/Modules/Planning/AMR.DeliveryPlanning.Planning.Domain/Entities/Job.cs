@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.Domain.Events;
-using AMR.DeliveryPlanning.SharedKernel.Domain;
+using DTMS.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.Planning.Domain.Entities;
 

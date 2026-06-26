@@ -36,7 +36,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AMR.DeliveryPlanning.SharedKernel\AMR.DeliveryPlanning.SharedKernel.csproj" />
+    <ProjectReference Include="..\DTMS.SharedKernel\DTMS.SharedKernel.csproj" />
     <ProjectReference Include="..\Modules\Facility\AMR.DeliveryPlanning.Facility.Presentation\AMR.DeliveryPlanning.Facility.Presentation.csproj" />
     <ProjectReference Include="..\Modules\Facility\AMR.DeliveryPlanning.Facility.Infrastructure\AMR.DeliveryPlanning.Facility.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Fleet\AMR.DeliveryPlanning.Fleet.Presentation\AMR.DeliveryPlanning.Fleet.Presentation.csproj" />

@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.SharedKernel.Auth;
+namespace DTMS.SharedKernel.Auth;
 
 /// <summary>
 /// Default <see cref="ICurrentActorContext"/> backed by an

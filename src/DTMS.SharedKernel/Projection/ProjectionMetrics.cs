@@ -1,6 +1,6 @@
 using System.Diagnostics.Metrics;
 
-namespace AMR.DeliveryPlanning.SharedKernel.Projection;
+namespace DTMS.SharedKernel.Projection;
 
 /// <summary>
 /// OpenTelemetry-compatible metrics for every projector in DTMS. Wired

@@ -125,7 +125,7 @@ public class OutboxTests : IClassFixture<DtmsWebApplicationFactory>
 
         // OutboxProcessorService polls every 5 seconds; wait up to 20 seconds for it to run
         VendorAdapterDbContext? db = null;
-        AMR.DeliveryPlanning.SharedKernel.Outbox.OutboxMessage? message = null;
+        DTMS.SharedKernel.Outbox.OutboxMessage? message = null;
         var deadline = DateTime.UtcNow.AddSeconds(20);
 
         while (DateTime.UtcNow < deadline)

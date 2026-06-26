@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace AMR.DeliveryPlanning.SharedKernel.Projection;
+namespace DTMS.SharedKernel.Projection;
 
 public static class ProjectionServiceCollectionExtensions
 {

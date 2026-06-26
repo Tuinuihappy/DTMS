@@ -27,7 +27,7 @@
 // FILE 1: {CommandName}Command.cs
 // =============================================================================
 
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.{Module}.Application.Commands.{CommandName};
 
@@ -50,7 +50,7 @@ public record {CommandName}Command(
 using AMR.DeliveryPlanning.{Module}.Application.Services;
 using AMR.DeliveryPlanning.{Module}.Domain.Entities;
 using AMR.DeliveryPlanning.{Module}.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.{Module}.Application.Commands.{CommandName};

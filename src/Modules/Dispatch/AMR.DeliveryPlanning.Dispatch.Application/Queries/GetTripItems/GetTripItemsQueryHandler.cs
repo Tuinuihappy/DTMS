@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Dispatch.Application.Projections;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripItems;
 

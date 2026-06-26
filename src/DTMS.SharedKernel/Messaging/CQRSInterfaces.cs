@@ -1,6 +1,6 @@
 using MediatR;
 
-namespace AMR.DeliveryPlanning.SharedKernel.Messaging;
+namespace DTMS.SharedKernel.Messaging;
 
 public interface ICommand : IRequest<Result>
 {

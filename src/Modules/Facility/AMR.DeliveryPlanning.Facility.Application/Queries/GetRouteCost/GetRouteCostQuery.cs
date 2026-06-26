@@ -1,5 +1,5 @@
 using AMR.DeliveryPlanning.Facility.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Caching.Distributed;
 
 namespace AMR.DeliveryPlanning.Facility.Application.Queries.GetRouteCost;

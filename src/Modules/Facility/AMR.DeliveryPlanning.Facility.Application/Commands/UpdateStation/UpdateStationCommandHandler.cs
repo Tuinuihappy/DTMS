@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.Facility.Application.Commands;
 using AMR.DeliveryPlanning.Facility.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel.Exceptions;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Exceptions;
+using DTMS.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Facility.Application.Commands.UpdateStation;
 

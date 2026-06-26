@@ -1,5 +1,5 @@
 using AMR.DeliveryPlanning.Dispatch.Application.Commands.CancelTrip;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 using MediatR;
 using Microsoft.Extensions.Logging;
 

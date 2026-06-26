@@ -1,5 +1,5 @@
 using AMR.DeliveryPlanning.Facility.Domain.Entities;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Facility.Application.Commands.ImportMapFromRiot3;
 

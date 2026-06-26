@@ -25,7 +25,7 @@
 
 using AMR.DeliveryPlanning.{Module}.Domain.Enums;
 using AMR.DeliveryPlanning.{Module}.Domain.Events;
-using AMR.DeliveryPlanning.SharedKernel.Domain;
+using DTMS.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.{Module}.Domain.Entities;
 

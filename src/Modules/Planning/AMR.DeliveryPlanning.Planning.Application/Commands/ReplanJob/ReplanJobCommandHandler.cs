@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.Planning.Domain.Services;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Commands.ReplanJob;

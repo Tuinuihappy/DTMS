@@ -253,7 +253,7 @@ namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
                     b.ToTable("TripExceptions", "dispatch");
                 });
 
-            modelBuilder.Entity("AMR.DeliveryPlanning.SharedKernel.Outbox.OutboxMessage", b =>
+            modelBuilder.Entity("DTMS.SharedKernel.Outbox.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()

@@ -32,7 +32,7 @@
 // =============================================================================
 
 using AMR.DeliveryPlanning.{Module}.Infrastructure.Data;
-using AMR.DeliveryPlanning.SharedKernel.Diagnostics;       // remove if no metrics
+using DTMS.SharedKernel.Diagnostics;       // remove if no metrics
 using MassTransit;                                          // remove if no event publish
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;

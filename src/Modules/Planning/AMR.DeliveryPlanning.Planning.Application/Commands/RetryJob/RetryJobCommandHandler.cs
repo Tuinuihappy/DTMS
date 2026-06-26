@@ -1,8 +1,8 @@
 using AMR.DeliveryPlanning.Planning.Application.Services;
 using AMR.DeliveryPlanning.Planning.Domain.Enums;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel;
+using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Commands.RetryJob;

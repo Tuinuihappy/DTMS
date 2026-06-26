@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Fleet.Domain.Enums;
 using AMR.DeliveryPlanning.Fleet.Domain.Events;
-using AMR.DeliveryPlanning.SharedKernel.Domain;
+using DTMS.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.Fleet.Domain.Entities;
 

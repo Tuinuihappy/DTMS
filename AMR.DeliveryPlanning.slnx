@@ -1,7 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/AMR.DeliveryPlanning.Api/AMR.DeliveryPlanning.Api.csproj" />
-    <Project Path="src/AMR.DeliveryPlanning.SharedKernel/AMR.DeliveryPlanning.SharedKernel.csproj" />
+    <Project Path="src/DTMS.SharedKernel/DTMS.SharedKernel.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/DeliveryOrder/">

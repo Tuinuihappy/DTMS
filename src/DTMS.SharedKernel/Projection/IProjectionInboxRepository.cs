@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.SharedKernel.Projection;
+namespace DTMS.SharedKernel.Projection;
 
 /// <summary>
 /// Per-module inbox repository. Implementations live next to the module's

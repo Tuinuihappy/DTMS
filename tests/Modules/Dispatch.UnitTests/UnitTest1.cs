@@ -7,7 +7,7 @@ using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Domain.Events;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -373,7 +373,7 @@ public class EnvelopeUpperKeyTests
         // Backward compat — RIOT3 + persisted rows must round-trip unchanged
         // for first attempts.
         var orderId = Guid.NewGuid();
-        var key = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.Build(orderId, 1);
+        var key = DTMS.SharedKernel.EnvelopeUpperKey.Build(orderId, 1);
         key.Should().NotContain("-A");
         key.Should().EndWith("-G1");
     }
@@ -382,7 +382,7 @@ public class EnvelopeUpperKeyTests
     public void Build_RetryAttempt_AppendsAttemptSuffix()
     {
         var orderId = Guid.NewGuid();
-        var key = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.Build(orderId, 1, attemptNumber: 3);
+        var key = DTMS.SharedKernel.EnvelopeUpperKey.Build(orderId, 1, attemptNumber: 3);
         key.Should().EndWith("-G1-A3");
     }
 
@@ -390,7 +390,7 @@ public class EnvelopeUpperKeyTests
     public void TryParse_LegacyShape_ReturnsAttemptOne()
     {
         var key = "48752c3e35bb4d0db227cbde6c1da95b-G2";
-        var ok = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.TryParse(
+        var ok = DTMS.SharedKernel.EnvelopeUpperKey.TryParse(
             key, out _, out var group, out var attempt);
         ok.Should().BeTrue();
         group.Should().Be(2);
@@ -401,7 +401,7 @@ public class EnvelopeUpperKeyTests
     public void TryParse_RetryShape_ReturnsAttemptNumber()
     {
         var key = "48752c3e35bb4d0db227cbde6c1da95b-G2-A5";
-        var ok = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.TryParse(
+        var ok = DTMS.SharedKernel.EnvelopeUpperKey.TryParse(
             key, out _, out var group, out var attempt);
         ok.Should().BeTrue();
         group.Should().Be(2);
@@ -412,7 +412,7 @@ public class EnvelopeUpperKeyTests
     public void TryParse_2OutOverload_StillWorks()
     {
         // Existing webhook + reconciler callers use the 2-out overload.
-        var ok = AMR.DeliveryPlanning.SharedKernel.EnvelopeUpperKey.TryParse(
+        var ok = DTMS.SharedKernel.EnvelopeUpperKey.TryParse(
             "48752c3e35bb4d0db227cbde6c1da95b-G1-A2", out _, out var group);
         ok.Should().BeTrue();
         group.Should().Be(1);

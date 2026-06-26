@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.SharedKernel.Domain;
+using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.SharedKernel.Outbox;
+namespace DTMS.SharedKernel.Outbox;
 
 public interface IDomainEventToIntegrationEventMapper
 {

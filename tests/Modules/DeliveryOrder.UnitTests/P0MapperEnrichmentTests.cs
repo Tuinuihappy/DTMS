@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
-using AMR.DeliveryPlanning.SharedKernel.Auth;
+using DTMS.SharedKernel.Auth;
 using FluentAssertions;
 using NSubstitute;
 

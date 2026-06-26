@@ -1,6 +1,6 @@
 using System.Diagnostics.Metrics;
 
-namespace AMR.DeliveryPlanning.SharedKernel.Diagnostics;
+namespace DTMS.SharedKernel.Diagnostics;
 
 /// <summary>
 /// OpenTelemetry-compatible business-level metrics for the order-to-dispatch

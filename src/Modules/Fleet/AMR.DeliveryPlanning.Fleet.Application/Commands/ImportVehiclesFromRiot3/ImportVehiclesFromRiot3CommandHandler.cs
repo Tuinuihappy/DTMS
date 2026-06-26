@@ -2,7 +2,7 @@ using AMR.DeliveryPlanning.Fleet.Application.Services;
 using AMR.DeliveryPlanning.Fleet.Domain.Entities;
 using AMR.DeliveryPlanning.Fleet.Domain.Enums;
 using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
 namespace AMR.DeliveryPlanning.Fleet.Application.Commands.ImportVehiclesFromRiot3;

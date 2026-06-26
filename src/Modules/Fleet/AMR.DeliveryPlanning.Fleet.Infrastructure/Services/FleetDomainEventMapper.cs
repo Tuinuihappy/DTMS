@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.Fleet.Domain.Events;
 using AMR.DeliveryPlanning.Fleet.IntegrationEvents;
-using AMR.DeliveryPlanning.SharedKernel.Domain;
-using AMR.DeliveryPlanning.SharedKernel.Outbox;
+using DTMS.SharedKernel.Domain;
+using DTMS.SharedKernel.Outbox;
 
 namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Services;
 

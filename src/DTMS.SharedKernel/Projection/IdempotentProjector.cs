@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.SharedKernel.Domain;
+using DTMS.SharedKernel.Domain;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.SharedKernel.Projection;
+namespace DTMS.SharedKernel.Projection;
 
 /// <summary>
 /// Base class for every Event Projection consumer in DTMS. Handles three

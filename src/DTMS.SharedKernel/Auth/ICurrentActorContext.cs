@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.SharedKernel.Auth;
+namespace DTMS.SharedKernel.Auth;
 
 /// <summary>
 /// Ambient accessor for the current <see cref="ActorContext"/>. Resolved

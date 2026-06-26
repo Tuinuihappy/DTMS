@@ -7,7 +7,7 @@ using AMR.DeliveryPlanning.OmsAdapter.Abstractions;
 using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Exceptions;
 using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Models;
 using AMR.DeliveryPlanning.OmsAdapter.Infrastructure.Options;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

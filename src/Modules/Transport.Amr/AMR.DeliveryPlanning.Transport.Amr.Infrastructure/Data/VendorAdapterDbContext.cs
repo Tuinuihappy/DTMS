@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.SharedKernel.Outbox;
+using DTMS.SharedKernel.Outbox;
 using AMR.DeliveryPlanning.Transport.Abstractions.Models;
 using Microsoft.EntityFrameworkCore;
 

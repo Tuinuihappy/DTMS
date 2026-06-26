@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.SharedKernel.Projection;
+namespace DTMS.SharedKernel.Projection;
 
 /// <summary>
 /// Per-projector bookkeeping row that records which integration events have

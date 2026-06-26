@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplates;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplateById;
 

@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.SharedKernel.Domain;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.SharedKernel.Outbox;
+using DTMS.SharedKernel.Domain;
+using DTMS.SharedKernel.Messaging;
+using DTMS.SharedKernel.Outbox;
 
 namespace AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
 

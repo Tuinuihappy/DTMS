@@ -4,7 +4,7 @@ using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Domain.Services;
 using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.Fleet.IntegrationEvents;
-using AMR.DeliveryPlanning.SharedKernel;
+using DTMS.SharedKernel;
 using AMR.DeliveryPlanning.Transport.Abstractions.Services;
 using AMR.DeliveryPlanning.Transport.Amr.Models;
 using Microsoft.AspNetCore.Builder;

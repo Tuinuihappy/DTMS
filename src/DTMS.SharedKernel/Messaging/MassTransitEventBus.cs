@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.SharedKernel.Domain;
+using DTMS.SharedKernel.Domain;
 using MassTransit;
 
-namespace AMR.DeliveryPlanning.SharedKernel.Messaging;
+namespace DTMS.SharedKernel.Messaging;
 
 public class MassTransitEventBus : IEventBus
 {

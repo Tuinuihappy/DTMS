@@ -2,8 +2,8 @@ using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.SharedKernel;
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel;
+using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 using ITripRetryEventRepository = AMR.DeliveryPlanning.Dispatch.Domain.Repositories.ITripRetryEventRepository;
 

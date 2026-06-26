@@ -1,5 +1,5 @@
 using AMR.DeliveryPlanning.Facility.Domain.Enums;
-using AMR.DeliveryPlanning.SharedKernel.Domain;
+using DTMS.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.Facility.Domain.Entities;
 

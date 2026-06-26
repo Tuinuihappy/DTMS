@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.SharedKernel.Messaging;
+using DTMS.SharedKernel.Messaging;
 using AMR.DeliveryPlanning.Transport.Manual.Application.Commands.AcknowledgeTrip;
 using AMR.DeliveryPlanning.Transport.Manual.Application.Commands.CompleteTrip;
 using AMR.DeliveryPlanning.Transport.Manual.Application.Commands.RecordDrop;
