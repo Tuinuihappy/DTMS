@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
+using DTMS.DeliveryOrder.IntegrationEvents;
 using DTMS.SharedKernel.Domain;
 using DTMS.SharedKernel.Projection;
 using MassTransit;

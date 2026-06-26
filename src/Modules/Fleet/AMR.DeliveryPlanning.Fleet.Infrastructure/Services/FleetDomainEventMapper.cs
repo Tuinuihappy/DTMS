@@ -1,5 +1,5 @@
 using AMR.DeliveryPlanning.Fleet.Domain.Events;
-using AMR.DeliveryPlanning.Fleet.IntegrationEvents;
+using DTMS.Fleet.IntegrationEvents;
 using DTMS.SharedKernel.Domain;
 using DTMS.SharedKernel.Outbox;
 

@@ -1,5 +1,6 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Domain.Events;
+using DTMS.Dispatch.IntegrationEvents;
 using DTMS.SharedKernel.Domain;
 
 namespace AMR.DeliveryPlanning.Dispatch.Domain.Entities;
@@ -190,7 +191,7 @@ public class Trip : AggregateRoot<Guid>
         Guid? vehicleId = null,
         string? vendorVehicleKey = null,
         string? vendorVehicleName = null,
-        IReadOnlyList<IntegrationEvents.TripItemSnapshot>? items = null)
+        IReadOnlyList<TripItemSnapshot>? items = null)
     {
         // Phase 3d — vehicle assignment is always recorded (audit + cache
         // update), even on repeat TASK_PROCESSING webhooks after the trip

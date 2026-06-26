@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
+using DTMS.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.Planning.Application.Consumers;
 using AMR.DeliveryPlanning.Planning.Domain.Entities;
 using AMR.DeliveryPlanning.Planning.Domain.Enums;

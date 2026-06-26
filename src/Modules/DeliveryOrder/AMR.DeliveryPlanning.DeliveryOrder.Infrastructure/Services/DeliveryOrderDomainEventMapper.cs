@@ -1,5 +1,5 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
-using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
+using DTMS.DeliveryOrder.IntegrationEvents;
 using DTMS.SharedKernel.Auth;
 using DTMS.SharedKernel.Domain;
 using DTMS.SharedKernel.Outbox;

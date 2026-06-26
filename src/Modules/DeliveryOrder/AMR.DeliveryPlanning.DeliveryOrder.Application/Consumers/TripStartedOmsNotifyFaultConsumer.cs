@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
-using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
+using DTMS.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Exceptions;
 using MassTransit;
 using Microsoft.Extensions.Logging;

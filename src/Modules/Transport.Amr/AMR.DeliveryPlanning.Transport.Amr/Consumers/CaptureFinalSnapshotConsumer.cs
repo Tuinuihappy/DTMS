@@ -1,6 +1,6 @@
 using System.Text.Json;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
+using DTMS.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.Transport.Amr.Services;
 using MassTransit;
 using Microsoft.Extensions.Logging;

@@ -7,7 +7,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
+using DTMS.Dispatch.IntegrationEvents;
 using FluentAssertions;
 using MassTransit;
 using Microsoft.Extensions.Logging.Abstractions;

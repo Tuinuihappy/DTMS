@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Planning.IntegrationEvents;
+namespace DTMS.Planning.IntegrationEvents;
 
 public record JobAssignedIntegrationEvent(
     Guid EventId,

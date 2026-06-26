@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Fleet.Application.Services;
 using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
-using AMR.DeliveryPlanning.Fleet.IntegrationEvents;
+using DTMS.Fleet.IntegrationEvents;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 

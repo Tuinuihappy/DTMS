@@ -1,5 +1,5 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
+using DTMS.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.Facility.Domain.Repositories;
 using MassTransit;
 using Microsoft.Extensions.Logging;

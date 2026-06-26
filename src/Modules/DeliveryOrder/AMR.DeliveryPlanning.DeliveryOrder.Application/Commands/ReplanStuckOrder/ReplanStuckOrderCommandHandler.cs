@@ -2,7 +2,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Options;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
-using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
+using DTMS.DeliveryOrder.IntegrationEvents;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;

@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Fleet.IntegrationEvents;
+namespace DTMS.Fleet.IntegrationEvents;
 
 public record VehicleStateChangedIntegrationEvent(
     Guid EventId,

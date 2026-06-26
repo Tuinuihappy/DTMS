@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
-using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
-using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
-using AMR.DeliveryPlanning.Planning.IntegrationEvents;
+using DTMS.DeliveryOrder.IntegrationEvents;
+using DTMS.Dispatch.IntegrationEvents;
+using DTMS.Planning.IntegrationEvents;
 using DTMS.SharedKernel.Projection;
 using FluentAssertions;
 using MassTransit;

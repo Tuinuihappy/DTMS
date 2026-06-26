@@ -3,19 +3,19 @@
   <ItemGroup>
     <ProjectReference Include="..\AMR.DeliveryPlanning.DeliveryOrder.Domain\AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj" />
     <ProjectReference Include="..\..\..\DTMS.SharedKernel\DTMS.SharedKernel.csproj" />
-    <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.IntegrationEvents\AMR.DeliveryPlanning.Dispatch.IntegrationEvents.csproj" />
+    <ProjectReference Include="..\..\Dispatch\DTMS.Dispatch.IntegrationEvents\DTMS.Dispatch.IntegrationEvents.csproj" />
     <!-- Option A cascade: CancelOrderCascadeConsumer dispatches CancelTripCommand
          (cross-module) so we need Dispatch.Application + Dispatch.Domain refs. -->
     <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.Application\AMR.DeliveryPlanning.Dispatch.Application.csproj" />
     <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.Domain\AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
     <!-- Phase P4 OrderListView projector subscribes to Job lifecycle events
          to recompute the order's "has active job" derived flag. -->
-    <ProjectReference Include="..\..\Planning\AMR.DeliveryPlanning.Planning.IntegrationEvents\AMR.DeliveryPlanning.Planning.IntegrationEvents.csproj" />
+    <ProjectReference Include="..\..\Planning\DTMS.Planning.IntegrationEvents\DTMS.Planning.IntegrationEvents.csproj" />
     <!-- T1.8 — ReplanStuckOrderCommandHandler checks Job.VendorOrderKey
          before re-publishing so a replay never racing against a job whose
          upperKey RIOT3 already accepted (the OD-0381 duplicate-key loop). -->
     <ProjectReference Include="..\..\Planning\AMR.DeliveryPlanning.Planning.Domain\AMR.DeliveryPlanning.Planning.Domain.csproj" />
-    <ProjectReference Include="..\AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents\AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.csproj" />
+    <ProjectReference Include="..\DTMS.DeliveryOrder.IntegrationEvents\DTMS.DeliveryOrder.IntegrationEvents.csproj" />
     <!-- TripStartedOmsNotifyConsumer dispatches POST to upstream OMS via IOmsShipmentClient. -->
     <ProjectReference Include="..\..\OmsAdapter\AMR.DeliveryPlanning.OmsAdapter.csproj" />
   </ItemGroup>

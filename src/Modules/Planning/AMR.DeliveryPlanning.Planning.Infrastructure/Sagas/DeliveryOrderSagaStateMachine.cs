@@ -1,5 +1,5 @@
-using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
-using AMR.DeliveryPlanning.Planning.IntegrationEvents;
+using DTMS.DeliveryOrder.IntegrationEvents;
+using DTMS.Planning.IntegrationEvents;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 

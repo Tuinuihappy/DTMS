@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.Fleet.IntegrationEvents;
+using DTMS.Fleet.IntegrationEvents;
 using DTMS.SharedKernel.Projection;
 using MassTransit;
 using Microsoft.Extensions.Logging;

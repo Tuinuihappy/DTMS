@@ -1,5 +1,5 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
-using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
+using DTMS.DeliveryOrder.IntegrationEvents;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
 using AMR.DeliveryPlanning.Planning.Application.Consumers;
 using AMR.DeliveryPlanning.Planning.Application.Services;

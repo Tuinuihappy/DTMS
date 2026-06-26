@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
+namespace DTMS.DeliveryOrder.IntegrationEvents;
 
 // All DeliveryOrder integration events carry an explicit SchemaVersion field
 // (semver string). The class name encodes the major version; the field encodes

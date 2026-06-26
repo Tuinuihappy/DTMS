@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using AMR.DeliveryPlanning.Dispatch.Domain.Services;
-using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
+using DTMS.Dispatch.IntegrationEvents;
 using Microsoft.EntityFrameworkCore;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;

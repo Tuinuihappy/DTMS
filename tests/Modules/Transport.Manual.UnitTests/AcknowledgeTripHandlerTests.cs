@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Domain.Services;
-using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
+using DTMS.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.Transport.Manual.Application.Commands.AcknowledgeTrip;
 using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
 using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;

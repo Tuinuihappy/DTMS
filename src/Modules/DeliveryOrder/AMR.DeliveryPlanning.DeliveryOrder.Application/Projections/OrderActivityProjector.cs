@@ -1,5 +1,5 @@
-using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
-using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
+using DTMS.DeliveryOrder.IntegrationEvents;
+using DTMS.Dispatch.IntegrationEvents;
 using DTMS.SharedKernel.Domain;
 using DTMS.SharedKernel.Projection;
 using MassTransit;

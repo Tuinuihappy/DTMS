@@ -2,7 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\DTMS.SharedKernel\DTMS.SharedKernel.csproj" />
-    <ProjectReference Include="..\AMR.DeliveryPlanning.Dispatch.IntegrationEvents\AMR.DeliveryPlanning.Dispatch.IntegrationEvents.csproj" />
+    <ProjectReference Include="..\DTMS.Dispatch.IntegrationEvents\DTMS.Dispatch.IntegrationEvents.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -488,11 +488,11 @@ public class DeliveryOrderTests
         // P1-8 sealed the V1 wire shape. The schemaVersion default is a class-
         // level constant; if a future field reshuffle ever changes it without a
         // class-name bump (V1 → V2), this test fails loudly.
-        var evt = new AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.DeliveryOrderConfirmedIntegrationEventV1(
+        var evt = new DTMS.DeliveryOrder.IntegrationEvents.DeliveryOrderConfirmedIntegrationEventV1(
             Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(),
             Priority: "Normal",
             EarliestUtc: null, LatestUtc: null, SubmittedAt: null,
-            Items: Array.Empty<AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.ItemSummaryDto>());
+            Items: Array.Empty<DTMS.DeliveryOrder.IntegrationEvents.ItemSummaryDto>());
 
         evt.SchemaVersion.Should().Be("1.0");
     }

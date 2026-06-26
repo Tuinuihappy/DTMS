@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
+using DTMS.Dispatch.IntegrationEvents;
 
 namespace AMR.DeliveryPlanning.Dispatch.Domain.Services;
 

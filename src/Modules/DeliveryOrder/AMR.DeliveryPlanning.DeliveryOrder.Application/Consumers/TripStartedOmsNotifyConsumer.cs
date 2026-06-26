@@ -3,7 +3,7 @@ using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
+using DTMS.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.OmsAdapter.Abstractions;
 using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Models;
 using AMR.DeliveryPlanning.OmsAdapter.Infrastructure.Options;

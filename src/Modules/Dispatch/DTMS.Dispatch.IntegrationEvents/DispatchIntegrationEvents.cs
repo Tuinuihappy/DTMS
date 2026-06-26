@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
+namespace DTMS.Dispatch.IntegrationEvents;
 
 // Schema 1.1 (Phase P0, 2026-06-14) — adds TriggeredBy + CorrelationId to
 // every Trip lifecycle event so projection-based audits can answer

@@ -1,5 +1,5 @@
 using AMR.DeliveryPlanning.Fleet.Application.Projections;
-using AMR.DeliveryPlanning.Fleet.IntegrationEvents;
+using DTMS.Fleet.IntegrationEvents;
 using DTMS.SharedKernel.Projection;
 using FluentAssertions;
 using MassTransit;

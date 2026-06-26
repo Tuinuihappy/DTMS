@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Dispatch.Application.Projections;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
-using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
+using DTMS.Dispatch.IntegrationEvents;
 using DTMS.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 

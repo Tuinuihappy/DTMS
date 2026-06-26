@@ -8,35 +8,35 @@
     <Project Path="src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Application/AMR.DeliveryPlanning.DeliveryOrder.Application.csproj" />
     <Project Path="src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Domain/AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj" />
     <Project Path="src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.csproj" />
-    <Project Path="src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents/AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents.csproj" />
+    <Project Path="src/Modules/DeliveryOrder/DTMS.DeliveryOrder.IntegrationEvents/DTMS.DeliveryOrder.IntegrationEvents.csproj" />
     <Project Path="src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Presentation/AMR.DeliveryPlanning.DeliveryOrder.Presentation.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Dispatch/">
     <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Application/AMR.DeliveryPlanning.Dispatch.Application.csproj" />
     <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Domain/AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
     <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Infrastructure/AMR.DeliveryPlanning.Dispatch.Infrastructure.csproj" />
-    <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.IntegrationEvents/AMR.DeliveryPlanning.Dispatch.IntegrationEvents.csproj" />
+    <Project Path="src/Modules/Dispatch/DTMS.Dispatch.IntegrationEvents/DTMS.Dispatch.IntegrationEvents.csproj" />
     <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Presentation/AMR.DeliveryPlanning.Dispatch.Presentation.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Facility/">
     <Project Path="src/Modules/Facility/AMR.DeliveryPlanning.Facility.Application/AMR.DeliveryPlanning.Facility.Application.csproj" />
     <Project Path="src/Modules/Facility/AMR.DeliveryPlanning.Facility.Domain/AMR.DeliveryPlanning.Facility.Domain.csproj" />
     <Project Path="src/Modules/Facility/AMR.DeliveryPlanning.Facility.Infrastructure/AMR.DeliveryPlanning.Facility.Infrastructure.csproj" />
-    <Project Path="src/Modules/Facility/AMR.DeliveryPlanning.Facility.IntegrationEvents/AMR.DeliveryPlanning.Facility.IntegrationEvents.csproj" />
+    <Project Path="src/Modules/Facility/DTMS.Facility.IntegrationEvents/DTMS.Facility.IntegrationEvents.csproj" />
     <Project Path="src/Modules/Facility/AMR.DeliveryPlanning.Facility.Presentation/AMR.DeliveryPlanning.Facility.Presentation.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Fleet/">
     <Project Path="src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Application/AMR.DeliveryPlanning.Fleet.Application.csproj" />
     <Project Path="src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Domain/AMR.DeliveryPlanning.Fleet.Domain.csproj" />
     <Project Path="src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Infrastructure/AMR.DeliveryPlanning.Fleet.Infrastructure.csproj" />
-    <Project Path="src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.IntegrationEvents/AMR.DeliveryPlanning.Fleet.IntegrationEvents.csproj" />
+    <Project Path="src/Modules/Fleet/DTMS.Fleet.IntegrationEvents/DTMS.Fleet.IntegrationEvents.csproj" />
     <Project Path="src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Presentation/AMR.DeliveryPlanning.Fleet.Presentation.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Planning/">
     <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.Application/AMR.DeliveryPlanning.Planning.Application.csproj" />
     <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.Domain/AMR.DeliveryPlanning.Planning.Domain.csproj" />
     <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.Infrastructure/AMR.DeliveryPlanning.Planning.Infrastructure.csproj" />
-    <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.IntegrationEvents/AMR.DeliveryPlanning.Planning.IntegrationEvents.csproj" />
+    <Project Path="src/Modules/Planning/DTMS.Planning.IntegrationEvents/DTMS.Planning.IntegrationEvents.csproj" />
     <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.Presentation/AMR.DeliveryPlanning.Planning.Presentation.csproj" />
   </Folder>
   <Folder Name="/src/Modules/OmsAdapter/">

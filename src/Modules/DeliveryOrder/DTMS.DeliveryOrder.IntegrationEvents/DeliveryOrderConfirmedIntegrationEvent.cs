@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
+namespace DTMS.DeliveryOrder.IntegrationEvents;
 
 public record ItemHazmatSummaryDto(string ClassCode, string? PackingGroup);
 

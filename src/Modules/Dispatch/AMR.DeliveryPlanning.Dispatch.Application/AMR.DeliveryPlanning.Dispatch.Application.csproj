@@ -4,9 +4,9 @@
     <ProjectReference Include="..\AMR.DeliveryPlanning.Dispatch.Domain\AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
     <ProjectReference Include="..\..\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Domain\AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj" />
     <ProjectReference Include="..\..\Facility\AMR.DeliveryPlanning.Facility.Domain\AMR.DeliveryPlanning.Facility.Domain.csproj" />
-    <ProjectReference Include="..\AMR.DeliveryPlanning.Dispatch.IntegrationEvents\AMR.DeliveryPlanning.Dispatch.IntegrationEvents.csproj" />
+    <ProjectReference Include="..\DTMS.Dispatch.IntegrationEvents\DTMS.Dispatch.IntegrationEvents.csproj" />
     <ProjectReference Include="..\..\..\DTMS.SharedKernel\DTMS.SharedKernel.csproj" />
-    <ProjectReference Include="..\..\Planning\AMR.DeliveryPlanning.Planning.IntegrationEvents\AMR.DeliveryPlanning.Planning.IntegrationEvents.csproj" />
+    <ProjectReference Include="..\..\Planning\DTMS.Planning.IntegrationEvents\DTMS.Planning.IntegrationEvents.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
+using DTMS.DeliveryOrder.IntegrationEvents;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Sagas;
-using AMR.DeliveryPlanning.Planning.IntegrationEvents;
+using DTMS.Planning.IntegrationEvents;
 using FluentAssertions;
 using MassTransit;
 using MassTransit.Testing;

@@ -1,5 +1,5 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
-using AMR.DeliveryPlanning.DeliveryOrder.IntegrationEvents;
+using DTMS.DeliveryOrder.IntegrationEvents;
 using DTMS.SharedKernel.Projection;
 using FluentAssertions;
 using MassTransit;
