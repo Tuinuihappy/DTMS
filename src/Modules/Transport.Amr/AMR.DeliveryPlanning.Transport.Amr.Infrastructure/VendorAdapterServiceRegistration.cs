@@ -96,10 +96,6 @@ public static class VendorAdapterServiceRegistration
             configuration.GetSection(Riot3WebhookOptions.SectionName));
         services.AddScoped<Riot3WebhookAuthFilter>();
 
-        // Register the adapter registry/factory. Adapters are resolved by explicit keys,
-        // never by concrete type name or fallback behavior.
-        services.AddScoped<IVendorAdapterRegistry, VendorAdapterRegistry>();
-        services.AddScoped<IVendorAdapterFactory, VendorAdapterFactory>();
         services.AddScoped<IVehicleIdentityResolver, VehicleIdentityResolver>();
         services.AddScoped<IVendorAdapterOutbox, VendorAdapterOutbox>();
 

@@ -2,8 +2,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AMR.DeliveryPlanning.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Abstractions.Models;
-using AMR.DeliveryPlanning.Transport.Abstractions.Services;
 using AMR.DeliveryPlanning.Transport.Amr.Models;
 using Microsoft.Extensions.Logging;
 
@@ -11,10 +9,9 @@ namespace AMR.DeliveryPlanning.Transport.Amr.Services;
 
 // Envelope-only RIOT3 client (Phase b7 removed per-task scheduling).
 // Inbound: SendOrderAsync POSTs the multi-mission OrderTemplate envelope.
-// Outbound state: vehicle queries via GetVehicleStateAsync; trip-level
-// cancel/pause/resume go through SendOrderOperationAsync against the
-// upperKey (the envelope key) — not individual tasks.
-public class Riot3CommandService : IVehicleCommandService
+// Trip-level cancel/pause/resume go through SendOrderOperationAsync
+// against the upperKey (the envelope key) — not individual tasks.
+public class Riot3CommandService
 {
     // Drop null/unset fields so the on-the-wire JSON matches the RIOT3 spec
     // example shape (MOVE missions don't include actionType/blockingType/
@@ -171,33 +168,6 @@ public class Riot3CommandService : IVehicleCommandService
         }
     }
 
-    public async Task<StandardRobotState?> GetVehicleStateAsync(Guid vehicleId, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var response = await _httpClient.GetFromJsonAsync<Riot3VehicleResponse>(
-                $"/api/v4/robots/{vehicleId}",
-                cancellationToken);
-
-            if (response == null) return null;
-
-            return new StandardRobotState
-            {
-                VehicleId = vehicleId,
-                State = MapSystemState(response.SystemState),
-                BatteryLevel = response.BatteryLevel / 100.0,
-                CurrentX = response.Position?.X,
-                CurrentY = response.Position?.Y,
-                Timestamp = DateTime.UtcNow
-            };
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogWarning(ex, "Failed to get vehicle state for {VehicleId} from RIOT3", vehicleId);
-            return null;
-        }
-    }
-
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private async Task<Result<Riot3OperationOutcome>> SendOrderOperationAsync(
@@ -273,13 +243,4 @@ public class Riot3CommandService : IVehicleCommandService
         }
     }
 
-    private static StandardState MapSystemState(string systemState) => systemState?.ToUpperInvariant() switch
-    {
-        "IDLE" => StandardState.Idle,
-        "BUSY" => StandardState.Moving,
-        "ERROR" => StandardState.Error,
-        "CHARGING" => StandardState.Charging,
-        "MAINTENANCE" => StandardState.Maintenance,
-        _ => StandardState.Offline
-    };
 }

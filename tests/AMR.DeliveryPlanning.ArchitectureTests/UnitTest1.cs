@@ -27,27 +27,6 @@ public class ModuleBoundaryTests
     }
 
     [Fact]
-    public void VendorAdapterFactory_DoesNotResolveAdapters_ByConcreteTypeNameOrFallback()
-    {
-        var repoRoot = FindRepoRoot();
-        var factoryPath = Path.Combine(
-            repoRoot,
-            "src",
-            "Modules",
-            "Transport.Amr",
-            "AMR.DeliveryPlanning.Transport.Amr.Infrastructure",
-            "Services",
-            "VendorAdapterFactory.cs");
-
-        var factoryText = File.ReadAllText(factoryPath);
-
-        Assert.DoesNotContain("GetServices<IVehicleCommandService>", factoryText);
-        Assert.DoesNotContain("GetType().Name", factoryText);
-        Assert.DoesNotContain("Contains(\"Riot3\"", factoryText);
-        Assert.DoesNotContain("fallback", factoryText, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
     public void CriticalWorkflowCommands_DoNotPublishIntegrationEvents_OutsideModuleOutbox()
     {
         var repoRoot = FindRepoRoot();
