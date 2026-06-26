@@ -28,6 +28,20 @@
 
 const DB_NAME = "dtms-operator";
 const DB_VERSION = 1;
+
+// crypto.randomUUID is only exposed in secure contexts (HTTPS/localhost).
+// The tablet hits http://<lan-ip>:3000 → it's missing → we fall back to a
+// Math.random-based UUID v4. ID is local-only (IDB primary key); not used
+// as a cryptographic identifier, so the entropy quality is fine.
+function newId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
 const STORE = "queue";
 const SYNC_TAG = "dtms-operator-queue";
 
@@ -160,7 +174,7 @@ async function sendOne(action: QueuedAction): Promise<{ ok: boolean; status: num
 export async function enqueueAction(args: EnqueueArgs): Promise<EnqueueResult> {
   // 1. Overwrite any pending row with the same dedupe key.
   const existing = await findByDedupeKey(args.dedupeKey);
-  const id = existing?.id ?? crypto.randomUUID();
+  const id = existing?.id ?? newId();
   const action: QueuedAction = {
     id,
     dedupeKey: args.dedupeKey,

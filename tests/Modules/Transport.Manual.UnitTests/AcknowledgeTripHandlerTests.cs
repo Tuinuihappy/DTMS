@@ -1,3 +1,7 @@
+using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
+using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using AMR.DeliveryPlanning.Dispatch.Domain.Services;
+using AMR.DeliveryPlanning.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.Transport.Manual.Application.Commands.AcknowledgeTrip;
 using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
 using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
@@ -9,13 +13,22 @@ namespace Transport.Manual.UnitTests;
 public class AcknowledgeTripHandlerTests
 {
     private readonly IManualTripExtensionRepository _extensions = Substitute.For<IManualTripExtensionRepository>();
+    private readonly ITripRepository _trips = Substitute.For<ITripRepository>();
+    private readonly ITripItemSnapshotProvider _snapshots = Substitute.For<ITripItemSnapshotProvider>();
+
+    private AcknowledgeTripCommandHandler CreateSut()
+    {
+        _snapshots.GetForTripAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                  .Returns(Array.Empty<TripItemSnapshot>());
+        return new(_extensions, _trips, _snapshots);
+    }
 
     [Fact]
     public async Task Handle_NoExtension_FailsWithMessage()
     {
         _extensions.GetByTripIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
                    .Returns((ManualTripExtension?)null);
-        var sut = new AcknowledgeTripCommandHandler(_extensions);
+        var sut = CreateSut();
 
         var result = await sut.Handle(
             new AcknowledgeTripCommand(Guid.NewGuid(), Guid.NewGuid()), default);
@@ -32,7 +45,7 @@ public class AcknowledgeTripHandlerTests
         var other = Guid.NewGuid();
         var ext = ManualTripExtension.AssignToOperator(tripId, owner, null, null, null);
         _extensions.GetByTripIdAsync(tripId, Arg.Any<CancellationToken>()).Returns(ext);
-        var sut = new AcknowledgeTripCommandHandler(_extensions);
+        var sut = CreateSut();
 
         var result = await sut.Handle(new AcknowledgeTripCommand(tripId, other), default);
 
@@ -41,18 +54,49 @@ public class AcknowledgeTripHandlerTests
     }
 
     [Fact]
-    public async Task Handle_HappyPath_MarksAcknowledgedAndSaves()
+    public async Task Handle_HappyPath_MarksExtensionAcknowledged_TransitionsTripToInProgress_PassesItemSnapshot()
     {
-        var tripId = Guid.NewGuid();
         var owner = Guid.NewGuid();
-        var ext = ManualTripExtension.AssignToOperator(tripId, owner, null, null, null);
-        _extensions.GetByTripIdAsync(tripId, Arg.Any<CancellationToken>()).Returns(ext);
-        var sut = new AcknowledgeTripCommandHandler(_extensions);
+        var trip = Trip.CreateForEnvelope(
+            deliveryOrderId: Guid.NewGuid(),
+            upperKey: "UK-ACK-1",
+            vendorOrderKey: null);
+        var ext = ManualTripExtension.AssignToOperator(trip.Id, owner, null, null, null);
+        _extensions.GetByTripIdAsync(trip.Id, Arg.Any<CancellationToken>()).Returns(ext);
+        _trips.GetByIdAsync(trip.Id, Arg.Any<CancellationToken>()).Returns(trip);
+        var snapshot = new TripItemSnapshot(
+            ItemPk: Guid.NewGuid(), ItemSeq: 1, LotNo: "L1", ItemStatus: "Pending",
+            PickupCode: "WH-A", DropCode: "WH-B",
+            WeightKg: null, DeliveryOrderId: trip.DeliveryOrderId,
+            OrderRef: "DO-X", OrderStatus: "Dispatched");
+        _snapshots.GetForTripAsync(trip.Id, Arg.Any<CancellationToken>())
+                  .Returns(new[] { snapshot });
 
-        var result = await sut.Handle(new AcknowledgeTripCommand(tripId, owner), default);
+        var sut = CreateSut();
+        var result = await sut.Handle(new AcknowledgeTripCommand(trip.Id, owner), default);
 
         result.IsSuccess.Should().BeTrue();
         ext.AcknowledgedAt.Should().NotBeNull();
-        await _extensions.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        trip.Status.Should().Be(AMR.DeliveryPlanning.Dispatch.Domain.Enums.TripStatus.InProgress);
+        await _trips.Received(1).UpdateAsync(trip, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_DoubleAcknowledge_DoesNotReTransitionTrip()
+    {
+        var owner = Guid.NewGuid();
+        var trip = Trip.CreateForEnvelope(
+            deliveryOrderId: Guid.NewGuid(), upperKey: "UK-DUP-1", vendorOrderKey: null);
+        var ext = ManualTripExtension.AssignToOperator(trip.Id, owner, null, null, null);
+        ext.MarkAcknowledged();   // already acknowledged
+        _extensions.GetByTripIdAsync(trip.Id, Arg.Any<CancellationToken>()).Returns(ext);
+        var sut = CreateSut();
+
+        var result = await sut.Handle(new AcknowledgeTripCommand(trip.Id, owner), default);
+
+        result.IsSuccess.Should().BeTrue();
+        // Trip aggregate must not be touched on the duplicate.
+        await _trips.DidNotReceive().GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await _trips.DidNotReceive().UpdateAsync(Arg.Any<Trip>(), Arg.Any<CancellationToken>());
     }
 }

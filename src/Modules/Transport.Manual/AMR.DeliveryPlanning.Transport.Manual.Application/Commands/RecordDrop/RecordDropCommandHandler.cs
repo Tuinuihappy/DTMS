@@ -60,8 +60,20 @@ internal sealed class RecordDropCommandHandler : ICommandHandler<RecordDropComma
             overrideId = approvedOverride.Id;
         }
 
+        var firstDrop = !ext.DroppedAt.HasValue;
         ext.MarkDropped(podKey: request.PodKey, overrideId: overrideId);
         await _extensions.SaveChangesAsync(cancellationToken);
+
+        // Mirror the vendor-drop event so the DeliveryOrder-side
+        // TripDropCompletedConsumer projects Item.Status PickedUp →
+        // DroppedOff (or Delivered if RequiresDropPod=false). AMR fires
+        // this from the RIOT3 webhook; Manual from the operator's drop
+        // action. Idempotent on double-tap via the firstDrop guard.
+        if (firstDrop)
+        {
+            trip.MarkVendorDropCompleted();
+            await _trips.UpdateAsync(trip, cancellationToken);
+        }
         return Result.Success();
     }
 }

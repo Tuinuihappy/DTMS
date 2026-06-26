@@ -64,8 +64,20 @@ internal sealed class RecordPickupCommandHandler : ICommandHandler<RecordPickupC
             overrideId = approvedOverride.Id;
         }
 
+        var firstPickup = !ext.PickedUpAt.HasValue;
         ext.MarkPickedUp(podKey: request.PodKey, overrideId: overrideId);
         await _extensions.SaveChangesAsync(cancellationToken);
+
+        // Mirror the vendor-pickup event so the DeliveryOrder-side
+        // TripPickupCompletedConsumer projects Item.Status PENDING →
+        // PickedUp. AMR fires this from the RIOT3 webhook; Manual fires
+        // it from the operator's pickup action. Skip on idempotent
+        // double-tap so we don't re-emit the integration event.
+        if (firstPickup)
+        {
+            trip.MarkVendorPickedUp();
+            await _trips.UpdateAsync(trip, cancellationToken);
+        }
         return Result.Success();
     }
 }

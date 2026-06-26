@@ -1,21 +1,32 @@
+# Cap json-file log growth so a chatty container can't fill the WSL2 vhdx
+# disk (which then balloons vmmemWSL's apparent RAM via page cache).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: dtms-postgres
     ports:
       - "5434:5432"
+    mem_limit: 1g
+    logging: *default-logging
     # Phase B Step B1 — raise max_connections from alpine default 100 to 500
     # so 5 API replicas × 80-pool can coexist without "too many clients
     # already" errors at 500 VU (the symptom that surfaced in
     # 2026-06-16 REPORT.md finding #2). shared_buffers + effective_cache_size
-    # tuned for a single dev/CI host with ≥4 GB RAM.
+    # right-sized for a 16 GB dev host running the full stack — bump back to
+    # 512MB / 2GB when running scale tests on a host with more headroom.
     command: >
       postgres
       -c max_connections=500
-      -c shared_buffers=512MB
-      -c effective_cache_size=2GB
+      -c shared_buffers=128MB
+      -c effective_cache_size=512MB
       -c work_mem=8MB
-      -c maintenance_work_mem=128MB
+      -c maintenance_work_mem=64MB
       -c random_page_cost=1.1
       -c effective_io_concurrency=200
     environment:
@@ -51,6 +62,8 @@ services:
     container_name: dtms-pgbouncer
     ports:
       - "6432:5432"
+    mem_limit: 128m
+    logging: *default-logging
     environment:
       # edoburu/pgbouncer uses these env var names (different from bitnami):
       DB_HOST: postgres
@@ -80,6 +93,8 @@ services:
     container_name: dtms-postgres-backup
     restart: unless-stopped
     user: postgres:postgres
+    mem_limit: 256m
+    logging: *default-logging
     volumes:
       - ./backups:/backups
     depends_on:
@@ -107,9 +122,17 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    mem_limit: 512m
+    logging: *default-logging
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
+      # Cap RabbitMQ's own high-watermark to the container limit so it
+      # pages out before the OOM killer fires. Default is 40% of host RAM,
+      # which on a 16 GB host = 6.4 GB — way over our 512 MB cap.
+      # RabbitMQ 3.13 deprecated RABBITMQ_VM_MEMORY_HIGH_WATERMARK; the
+      # supported way to set this via env is via Erlang server args.
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit vm_memory_high_watermark 0.6"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -121,6 +144,9 @@ services:
     container_name: dtms-redis
     ports:
       - "6379:6379"
+    mem_limit: 128m
+    logging: *default-logging
+    command: ["redis-server", "--maxmemory", "96mb", "--maxmemory-policy", "allkeys-lru"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -133,8 +159,12 @@ services:
     ports:
       - "16686:16686"
       - "4317:4317"
+    mem_limit: 256m
+    logging: *default-logging
     environment:
       - COLLECTOR_OTLP_ENABLED=true
+      # Cap in-memory span store (default 100k spans ≈ 200 MB+ over time).
+      - MEMORY_MAX_TRACES=20000
 
   # Phase 4.3 — MinIO object storage for Manual mode POD (per ADR-015).
   # PWA receives a presigned PUT URL from the API and uploads directly to
@@ -151,9 +181,17 @@ services:
     ports:
       - "9000:9000"   # S3 API
       - "9001:9001"   # Console UI
+    mem_limit: 256m
+    logging: *default-logging
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
+      # PWA at :3000 does presigned PUT directly to MinIO at :9000.
+      # Browsers send a CORS preflight + check Content-Type header on
+      # PUT — MinIO must echo the right headers or the upload aborts
+      # with "Failed to fetch". Comma-separated list; add prod hostnames
+      # via .env override when shipping beyond localhost.
+      MINIO_API_CORS_ALLOW_ORIGIN: "${MINIO_API_CORS_ALLOW_ORIGIN:-http://localhost:3000,http://localhost:5219}"
     volumes:
       - miniodata:/data
     command: server /data --console-address ":9001"
@@ -176,6 +214,8 @@ services:
     image: dtms-api          # share image with api — no separate build
     container_name: dtms-migrator
     restart: "no"
+    mem_limit: 512m
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -193,6 +233,7 @@ services:
       - "5219:8080"
     restart: unless-stopped
     mem_limit: 2g
+    logging: *default-logging
     # Probes /health/ready (postgres + redis + rabbitmq + RIOT3 not required
     # — vendors tag is separate). start_period waits 60s so the .NET app
     # has time to JIT + bind the port before the first probe runs.
@@ -224,6 +265,13 @@ services:
         condition: service_completed_successfully
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      # Tell .NET its memory ceiling so the GC reclaims aggressively as the
+      # heap approaches the cgroup limit (default Server GC otherwise hoards
+      # RAM until it sees memory pressure, which inside a constrained
+      # container often arrives too late and the OOM killer fires first).
+      # 9 = most aggressive conservation; pair with the mem_limit above.
+      - DOTNET_GCConserveMemory=9
+      - DOTNET_GCHeapHardLimit=0x60000000
       # Phase B Step B3 — API talks to PgBouncer (container internal port 5432;
       # host port 6432 is the published mapping for external psql access),
       # NOT postgres direct. MaxPoolSize=50 caps client-side; PgBouncer
@@ -370,6 +418,7 @@ services:
     container_name: dtms-outbox-worker
     restart: unless-stopped
     mem_limit: 1g
+    logging: *default-logging
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health/ready"]
       interval: 10s
@@ -390,6 +439,9 @@ services:
         condition: service_completed_successfully
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      # Match the api container — keep .NET GC honest against the 1 GB cap.
+      - DOTNET_GCConserveMemory=9
+      - DOTNET_GCHeapHardLimit=0x30000000
       - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=amr_delivery_planning;Username=postgres;Password=postgres;Pooling=true;MaxPoolSize=50;No Reset On Close=true
       - ConnectionStrings__Redis=redis:6379
       - RabbitMq__Host=rabbitmq
@@ -439,10 +491,19 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Dev-only GPS mock — when set, the PWA returns this fix instead
+        # of asking the browser for one. Lets tablets on http://LAN-IP
+        # exercise pickup/drop without Chrome's HTTPS-only geolocation
+        # gate. Leave unset in production.
+        NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT: ${NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT:-}
+        NEXT_PUBLIC_OPERATOR_MOCK_GPS_LNG: ${NEXT_PUBLIC_OPERATOR_MOCK_GPS_LNG:-}
     image: tms-frontend:latest
     container_name: tms-frontend
     ports:
       - "3000:3000"
+    mem_limit: 512m
+    logging: *default-logging
     environment:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1

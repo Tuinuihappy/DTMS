@@ -6,7 +6,41 @@
 // into a user-actionable message.
 export type GeoFix = { lat: number; lng: number; accuracy: number };
 
+// Dev-only escape hatch for testing on tablets over HTTP LAN IPs, where
+// Chromium refuses geolocation regardless of permission state. Two ways
+// to activate, checked in this order:
+//   1. localStorage["dtms.mockGps"] = "lat,lng"  — per-device, no rebuild
+//      Also activated by visiting any URL with ?mockGps=lat,lng once.
+//   2. NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT/_LNG    — baked at build time
+function readMockFix(): GeoFix | null {
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = params.get("mockGps");
+    if (fromUrl) {
+      window.localStorage.setItem("dtms.mockGps", fromUrl);
+    }
+    const stored = window.localStorage.getItem("dtms.mockGps");
+    if (stored) {
+      const [latStr, lngStr] = stored.split(",");
+      const lat = Number(latStr);
+      const lng = Number(lngStr);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        return { lat, lng, accuracy: 10 };
+      }
+    }
+  }
+  const lat = Number(process.env.NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT);
+  const lng = Number(process.env.NEXT_PUBLIC_OPERATOR_MOCK_GPS_LNG);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng, accuracy: 10 };
+}
+
 export async function getCurrentPosition(): Promise<GeoFix> {
+  const mock = readMockFix();
+  if (mock) {
+    console.warn("[geolocation] using NEXT_PUBLIC_OPERATOR_MOCK_GPS fix", mock);
+    return mock;
+  }
   if (typeof navigator === "undefined" || !navigator.geolocation) {
     throw new Error("This device doesn't support GPS.");
   }

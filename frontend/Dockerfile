@@ -38,6 +38,13 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# NEXT_PUBLIC_* vars are inlined at build time, so they must be present
+# during `next build`. Build args let docker-compose pass them through.
+ARG NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT
+ARG NEXT_PUBLIC_OPERATOR_MOCK_GPS_LNG
+ENV NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT=${NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT}
+ENV NEXT_PUBLIC_OPERATOR_MOCK_GPS_LNG=${NEXT_PUBLIC_OPERATOR_MOCK_GPS_LNG}
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 

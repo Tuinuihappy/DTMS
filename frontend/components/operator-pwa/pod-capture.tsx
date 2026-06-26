@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { presignPod, uploadPodBytes } from "@/lib/api/operator";
+import { compressImage } from "@/lib/operator-pwa/image-compress";
 
 // Phase 4.5 — POD capture flow:
 //   1. Operator taps "Take photo" → file input opens camera (mobile)
@@ -34,8 +35,9 @@ export function PodCapture({ tripId, kind, podKey, onCaptured }: Props) {
     setBusy(true);
     setError(null);
     try {
+      const compressed = await compressImage(file);
       const presigned = await presignPod(tripId, kind);
-      await uploadPodBytes(presigned.uploadUrl, file);
+      await uploadPodBytes(presigned.uploadUrl, compressed);
       onCaptured(presigned.objectKey);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");
