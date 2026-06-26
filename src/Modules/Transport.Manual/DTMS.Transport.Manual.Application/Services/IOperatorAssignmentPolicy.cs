@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Domain.Entities;
+using DTMS.Transport.Manual.Domain.Enums;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Services;
+namespace DTMS.Transport.Manual.Application.Services;
 
 // Phase 4.4 — Policy that picks which operator gets a Manual trip.
 //

@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Services;
+namespace DTMS.Transport.Manual.Application.Services;
 
 // Tiny indirection so Application doesn't need to know about
 // IOptions<ObjectStorageOptions> — Infrastructure registers a single-

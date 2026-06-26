@@ -1,8 +1,8 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Domain.Repositories;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Commands.CompleteTrip;
+namespace DTMS.Transport.Manual.Application.Commands.CompleteTrip;
 
 internal sealed class CompleteTripCommandHandler : ICommandHandler<CompleteTripCommand>
 {

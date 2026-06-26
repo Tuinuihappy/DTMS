@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Transport.Abstractions.Models;
-using AMR.DeliveryPlanning.Transport.Abstractions.Services;
-using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Data;
+using DTMS.Transport.Abstractions.Models;
+using DTMS.Transport.Abstractions.Services;
+using DTMS.Transport.Amr.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Services;
+namespace DTMS.Transport.Amr.Infrastructure.Services;
 
 public class DbActionCatalogService : IActionCatalogService
 {

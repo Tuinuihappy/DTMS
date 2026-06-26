@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Transport.Manual.Application.Services;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Application.Services;
+using DTMS.Transport.Manual.Domain.Entities;
+using DTMS.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Domain.Repositories;
 using FluentAssertions;
 using NSubstitute;
 

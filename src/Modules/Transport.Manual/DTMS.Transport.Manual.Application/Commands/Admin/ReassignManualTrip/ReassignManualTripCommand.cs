@@ -1,11 +1,11 @@
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Services;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Application.Services;
+using DTMS.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Domain.Repositories;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Commands.Admin.ReassignManualTrip;
+namespace DTMS.Transport.Manual.Application.Commands.Admin.ReassignManualTrip;
 
 // POST /api/admin/manual-trips/{tripId}/reassign — dispatcher moves an
 // active Manual trip from its current operator to a different one.

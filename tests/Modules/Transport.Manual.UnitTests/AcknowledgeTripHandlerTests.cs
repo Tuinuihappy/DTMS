@@ -2,9 +2,9 @@ using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Domain.Services;
 using DTMS.Dispatch.IntegrationEvents;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Commands.AcknowledgeTrip;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Application.Commands.AcknowledgeTrip;
+using DTMS.Transport.Manual.Domain.Entities;
+using DTMS.Transport.Manual.Domain.Repositories;
 using FluentAssertions;
 using NSubstitute;
 

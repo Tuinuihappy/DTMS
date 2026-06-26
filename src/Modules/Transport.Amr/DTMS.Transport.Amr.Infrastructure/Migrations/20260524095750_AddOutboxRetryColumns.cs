@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Migrations
+namespace DTMS.Transport.Amr.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class AddOutboxRetryColumns : Migration

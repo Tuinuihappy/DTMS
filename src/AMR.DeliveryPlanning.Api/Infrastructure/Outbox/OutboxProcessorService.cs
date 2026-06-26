@@ -6,7 +6,7 @@ using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
 using DTMS.SharedKernel.Diagnostics;
 using DTMS.SharedKernel.Domain;
 using DTMS.SharedKernel.Outbox;
-using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Data;
+using DTMS.Transport.Amr.Infrastructure.Data;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;

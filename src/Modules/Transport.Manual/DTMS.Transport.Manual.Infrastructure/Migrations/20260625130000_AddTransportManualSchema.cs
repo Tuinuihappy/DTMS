@@ -1,11 +1,11 @@
 using System;
-using AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Data;
+using DTMS.Transport.Manual.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Migrations
+namespace DTMS.Transport.Manual.Infrastructure.Migrations
 {
     /// <summary>
     /// PHASE: 4.1 — Manual transport mode skeleton.

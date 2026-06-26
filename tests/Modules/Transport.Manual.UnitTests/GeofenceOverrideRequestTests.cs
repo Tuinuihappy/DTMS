@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Events;
+using DTMS.Transport.Manual.Domain.Entities;
+using DTMS.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Domain.Events;
 using FluentAssertions;
 
 namespace Transport.Manual.UnitTests;

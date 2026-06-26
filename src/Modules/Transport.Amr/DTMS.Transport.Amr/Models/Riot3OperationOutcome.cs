@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Amr.Models;
+namespace DTMS.Transport.Amr.Models;
 
 /// <summary>
 /// RIOT3-side outcome of an envelope operation (cancel / pause / resume).

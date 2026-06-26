@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Services;
+namespace DTMS.Transport.Manual.Application.Services;
 
 // Phase 4.3 — Push notification abstraction (per ADR-013). Today's
 // implementation is Web Push (VAPID); future expansion to FCM/APNS

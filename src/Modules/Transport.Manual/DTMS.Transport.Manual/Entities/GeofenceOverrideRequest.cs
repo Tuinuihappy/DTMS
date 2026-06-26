@@ -1,8 +1,8 @@
 using DTMS.SharedKernel.Domain;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Events;
+using DTMS.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Domain.Events;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
+namespace DTMS.Transport.Manual.Domain.Entities;
 
 // Phase 4.1 — Per ADR-016, geofence enforcement is server-strict but
 // dispatchers/supervisors can approve an override for the rare legitimate

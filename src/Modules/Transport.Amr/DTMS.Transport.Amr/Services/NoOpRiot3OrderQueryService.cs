@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Transport.Amr.Models;
+using DTMS.Transport.Amr.Models;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Services;
+namespace DTMS.Transport.Amr.Services;
 
 // Dev/load-test sibling of Riot3OrderQueryService. Returns null for every
 // query — Riot3ReconciliationService treats null as "RIOT3 has no record

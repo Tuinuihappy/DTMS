@@ -1,10 +1,10 @@
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Services;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Application.Services;
+using DTMS.Transport.Manual.Domain.Repositories;
 
 // Note: IPodBucketProvider lives in Services/IPodBucketProvider.cs.
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Queries.GetPodPresignedUrl;
+namespace DTMS.Transport.Manual.Application.Queries.GetPodPresignedUrl;
 
 internal sealed class GetPodPresignedUrlQueryHandler
     : IQueryHandler<GetPodPresignedUrlQuery, PodPresignedUrlDto>

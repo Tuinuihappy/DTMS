@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Transport.Amr.Models;
+using DTMS.Transport.Amr.Models;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Services;
+namespace DTMS.Transport.Amr.Services;
 
 public interface IRiot3OrderQueryService
 {

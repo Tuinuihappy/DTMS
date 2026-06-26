@@ -1,8 +1,8 @@
 using DTMS.SharedKernel.Domain;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Events;
+using DTMS.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Domain.Events;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
+namespace DTMS.Transport.Manual.Domain.Entities;
 
 // Phase 4.1 — Operator aggregate root for the Manual transport mode.
 // Per ADR-014, identity is owned by External Auth (10.204.212.28:15000);

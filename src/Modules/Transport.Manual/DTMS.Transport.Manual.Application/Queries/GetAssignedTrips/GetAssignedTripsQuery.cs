@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Queries.GetAssignedTrips;
+namespace DTMS.Transport.Manual.Application.Queries.GetAssignedTrips;
 
 // GET /api/operator/trips/assigned — returns the trip queue (active +
 // recent) for the calling operator. Phase 4.2 returns the extension

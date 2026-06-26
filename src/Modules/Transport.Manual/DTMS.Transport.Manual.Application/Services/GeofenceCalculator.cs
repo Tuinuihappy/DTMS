@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Services;
+namespace DTMS.Transport.Manual.Application.Services;
 
 // Phase 4.2 — Haversine distance (great-circle, WGS84). Pure function
 // used by the pickup/drop endpoint handlers to decide whether the

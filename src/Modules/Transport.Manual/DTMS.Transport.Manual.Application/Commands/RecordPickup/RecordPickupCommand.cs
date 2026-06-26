@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Commands.RecordPickup;
+namespace DTMS.Transport.Manual.Application.Commands.RecordPickup;
 
 // POST /api/operator/trips/{id}/pickup — operator has arrived at the
 // pickup warehouse and is collecting the cargo. Server-side geofence

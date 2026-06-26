@@ -1,9 +1,9 @@
 using DTMS.SharedKernel.Domain;
 using DTMS.SharedKernel.Outbox;
-using AMR.DeliveryPlanning.Transport.Abstractions.Services;
-using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Data;
+using DTMS.Transport.Abstractions.Services;
+using DTMS.Transport.Amr.Infrastructure.Data;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Services;
+namespace DTMS.Transport.Amr.Infrastructure.Services;
 
 public class VendorAdapterOutbox : IVendorAdapterOutbox
 {

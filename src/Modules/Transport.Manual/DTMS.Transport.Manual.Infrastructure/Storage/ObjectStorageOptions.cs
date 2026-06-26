@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Storage;
+namespace DTMS.Transport.Manual.Infrastructure.Storage;
 
 // Bound from configuration section "ObjectStorage" (see appsettings +
 // docker-compose env). Two endpoints because MinIO inside the docker

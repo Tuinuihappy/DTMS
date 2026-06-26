@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Models;
+namespace DTMS.Transport.Amr.Models;
 
 // Matches RIOT3.0 API v4 "Order Operation" — PUT /api/v4/orders/{orderkey}/operation
 // Spec wraps the command in an "orderCommand" envelope.

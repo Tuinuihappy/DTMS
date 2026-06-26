@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Modules\Transport.Amr\AMR.DeliveryPlanning.Transport.Amr\AMR.DeliveryPlanning.Transport.Amr.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Transport.Amr\DTMS.Transport.Amr\DTMS.Transport.Amr.csproj" />
   </ItemGroup>
 
 </Project>

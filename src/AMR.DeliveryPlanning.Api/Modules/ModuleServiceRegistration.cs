@@ -35,8 +35,8 @@ using DTMS.SharedKernel.Messaging;
 using DTMS.SharedKernel.Outbox;
 using AMR.DeliveryPlanning.OmsAdapter;
 using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Exceptions;
-using AMR.DeliveryPlanning.Transport.Amr.Infrastructure;
-using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Extensions;
+using DTMS.Transport.Amr.Infrastructure;
+using DTMS.Transport.Amr.Infrastructure.Extensions;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
@@ -229,53 +229,53 @@ public static class ModuleServiceRegistration
         // PendingModelChangesWarning is silenced because migrations are
         // hand-written (per feedback_migration_manual memory) and EF's
         // model differ throws otherwise.
-        services.AddDbContext<AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Data.TransportManualDbContext>((_, o) => o
+        services.AddDbContext<DTMS.Transport.Manual.Infrastructure.Data.TransportManualDbContext>((_, o) => o
             .UseNpgsql(npgsqlDataSource, ConfigureNpgsql)
             .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 
-        services.AddScoped<AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories.IOperatorRepository,
-                           AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Repositories.OperatorRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories.IGeofenceOverrideRequestRepository,
-                           AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Repositories.GeofenceOverrideRequestRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories.IManualTripExtensionRepository,
-                           AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Repositories.ManualTripExtensionRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.Transport.Manual.Application.Services.IOperatorSyncService,
-                           AMR.DeliveryPlanning.Transport.Manual.Application.Services.OperatorSyncService>();
+        services.AddScoped<DTMS.Transport.Manual.Domain.Repositories.IOperatorRepository,
+                           DTMS.Transport.Manual.Infrastructure.Repositories.OperatorRepository>();
+        services.AddScoped<DTMS.Transport.Manual.Domain.Repositories.IGeofenceOverrideRequestRepository,
+                           DTMS.Transport.Manual.Infrastructure.Repositories.GeofenceOverrideRequestRepository>();
+        services.AddScoped<DTMS.Transport.Manual.Domain.Repositories.IManualTripExtensionRepository,
+                           DTMS.Transport.Manual.Infrastructure.Repositories.ManualTripExtensionRepository>();
+        services.AddScoped<DTMS.Transport.Manual.Application.Services.IOperatorSyncService,
+                           DTMS.Transport.Manual.Application.Services.OperatorSyncService>();
         services.AddScoped<AMR.DeliveryPlanning.Api.Auth.OperatorSyncMiddleware>();
 
         // Phase 4.3 — Object storage (MinIO) for POD photos (ADR-015).
-        services.Configure<AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Storage.ObjectStorageOptions>(
-            configuration.GetSection(AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Storage.ObjectStorageOptions.SectionName));
-        services.AddSingleton<AMR.DeliveryPlanning.Transport.Manual.Application.Services.IObjectStorageService,
-                              AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Storage.MinioObjectStorageService>();
-        services.AddSingleton<AMR.DeliveryPlanning.Transport.Manual.Application.Services.IPodBucketProvider>(sp =>
+        services.Configure<DTMS.Transport.Manual.Infrastructure.Storage.ObjectStorageOptions>(
+            configuration.GetSection(DTMS.Transport.Manual.Infrastructure.Storage.ObjectStorageOptions.SectionName));
+        services.AddSingleton<DTMS.Transport.Manual.Application.Services.IObjectStorageService,
+                              DTMS.Transport.Manual.Infrastructure.Storage.MinioObjectStorageService>();
+        services.AddSingleton<DTMS.Transport.Manual.Application.Services.IPodBucketProvider>(sp =>
         {
             var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<
-                AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Storage.ObjectStorageOptions>>().Value;
+                DTMS.Transport.Manual.Infrastructure.Storage.ObjectStorageOptions>>().Value;
             return new PodBucketProvider(opts.PodBucket);
         });
-        services.AddHostedService<AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Storage.ObjectStorageBucketInitializer>();
+        services.AddHostedService<DTMS.Transport.Manual.Infrastructure.Storage.ObjectStorageBucketInitializer>();
 
         // Phase 4.3 — Web Push gateway (VAPID, ADR-013).
-        services.Configure<AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Push.VapidOptions>(
-            configuration.GetSection(AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Push.VapidOptions.SectionName));
-        services.AddSingleton<AMR.DeliveryPlanning.Transport.Manual.Application.Services.IVapidPublicKeyProvider>(sp =>
+        services.Configure<DTMS.Transport.Manual.Infrastructure.Push.VapidOptions>(
+            configuration.GetSection(DTMS.Transport.Manual.Infrastructure.Push.VapidOptions.SectionName));
+        services.AddSingleton<DTMS.Transport.Manual.Application.Services.IVapidPublicKeyProvider>(sp =>
         {
             var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<
-                AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Push.VapidOptions>>().Value;
+                DTMS.Transport.Manual.Infrastructure.Push.VapidOptions>>().Value;
             return new VapidPublicKeyProvider(opts.PublicKey);
         });
-        services.AddScoped<AMR.DeliveryPlanning.Transport.Manual.Application.Services.IPushNotificationGateway,
-                           AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Push.WebPushGateway>();
+        services.AddScoped<DTMS.Transport.Manual.Application.Services.IPushNotificationGateway,
+                           DTMS.Transport.Manual.Infrastructure.Push.WebPushGateway>();
 
         // Phase 4.4 — Operator assignment policy + ManualDispatchStrategy
         // bindings. The strategy itself is registered alongside the AMR
         // strategy further down (look for IDispatchStrategy registrations).
-        services.Configure<AMR.DeliveryPlanning.Transport.Manual.Application.Services.ManualDispatchOptions>(
+        services.Configure<DTMS.Transport.Manual.Application.Services.ManualDispatchOptions>(
             configuration.GetSection(
-                AMR.DeliveryPlanning.Transport.Manual.Application.Services.ManualDispatchOptions.SectionName));
-        services.AddScoped<AMR.DeliveryPlanning.Transport.Manual.Application.Services.IOperatorAssignmentPolicy,
-                           AMR.DeliveryPlanning.Transport.Manual.Application.Services.WarehouseAwareOperatorAssignmentPolicy>();
+                DTMS.Transport.Manual.Application.Services.ManualDispatchOptions.SectionName));
+        services.AddScoped<DTMS.Transport.Manual.Application.Services.IOperatorAssignmentPolicy,
+                           DTMS.Transport.Manual.Application.Services.WarehouseAwareOperatorAssignmentPolicy>();
 
         // ── DeliveryOrder Module ──────────────────────────────────────
         services.AddScoped<DeliveryOrderDomainEventMapper>();
@@ -543,7 +543,7 @@ public static class ModuleServiceRegistration
                 // Transport.Amr hosts CaptureFinalSnapshotConsumer — must
                 // be scanned explicitly; otherwise terminal-state events go
                 // past it and the snapshot is never persisted.
-                typeof(AMR.DeliveryPlanning.Transport.Amr.Consumers.CaptureFinalSnapshotConsumer).Assembly
+                typeof(DTMS.Transport.Amr.Consumers.CaptureFinalSnapshotConsumer).Assembly
             );
 
             // T2 POC — opt-in Saga registration. While disabled the saga's
@@ -671,7 +671,7 @@ public static class ModuleServiceRegistration
 // Registered as singletons against the IPodBucketProvider /
 // IVapidPublicKeyProvider interfaces above.
 internal sealed record PodBucketProvider(string PodBucket)
-    : AMR.DeliveryPlanning.Transport.Manual.Application.Services.IPodBucketProvider;
+    : DTMS.Transport.Manual.Application.Services.IPodBucketProvider;
 
 internal sealed record VapidPublicKeyProvider(string PublicKey)
-    : AMR.DeliveryPlanning.Transport.Manual.Application.Services.IVapidPublicKeyProvider;
+    : DTMS.Transport.Manual.Application.Services.IVapidPublicKeyProvider;

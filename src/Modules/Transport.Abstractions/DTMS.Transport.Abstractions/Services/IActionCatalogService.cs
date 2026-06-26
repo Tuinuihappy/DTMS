@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Transport.Abstractions.Models;
+using DTMS.Transport.Abstractions.Models;
 
-namespace AMR.DeliveryPlanning.Transport.Abstractions.Services;
+namespace DTMS.Transport.Abstractions.Services;
 
 public interface IActionCatalogService
 {

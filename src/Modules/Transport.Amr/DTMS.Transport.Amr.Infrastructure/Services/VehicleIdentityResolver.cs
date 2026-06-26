@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.Fleet.Application.Services;
-using AMR.DeliveryPlanning.Transport.Abstractions.Services;
+using DTMS.Transport.Abstractions.Services;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Services;
+namespace DTMS.Transport.Amr.Infrastructure.Services;
 
 internal sealed class VehicleIdentityResolver : IVehicleIdentityResolver
 {

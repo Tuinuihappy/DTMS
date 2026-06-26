@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Models;
+namespace DTMS.Transport.Amr.Models;
 
 // Slim projection of the RIOT3 GET /api/v4/orders/{key}?isUpper=true response
 // used by the reconciliation poller. Only fields the reconciler maps to

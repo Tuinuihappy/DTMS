@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Amr.Models;
+namespace DTMS.Transport.Amr.Models;
 
 /// <summary>
 /// Outcome of a successful RIOT3 envelope dispatch. Carries both the

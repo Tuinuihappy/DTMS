@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Abstractions.Services;
+namespace DTMS.Transport.Abstractions.Services;
 
 public interface IVehicleIdentityResolver
 {

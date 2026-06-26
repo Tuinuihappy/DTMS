@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Commands.SubmitGeofenceOverride;
+namespace DTMS.Transport.Manual.Application.Commands.SubmitGeofenceOverride;
 
 // POST /api/operator/geofence/override-request — operator failed a
 // geofence check and is asking a supervisor for an exception. The

@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
+namespace DTMS.Transport.Manual.Domain.Enums;
 
 // Operator-app status — orthogonal to whether the operator has an
 // active trip. "Active" = available for assignment; "OnLeave" = scheduled

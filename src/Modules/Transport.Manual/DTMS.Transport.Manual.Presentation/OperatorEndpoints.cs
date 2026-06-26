@@ -1,22 +1,22 @@
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Commands.AcknowledgeTrip;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Commands.CompleteTrip;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Commands.RecordDrop;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Commands.RecordPickup;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Commands.RegisterPushSubscription;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Commands.SubmitGeofenceOverride;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Commands.UnregisterPushSubscription;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Queries.GetAssignedTrips;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Queries.GetMyProfile;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Queries.GetPodPresignedUrl;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Services;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Application.Commands.AcknowledgeTrip;
+using DTMS.Transport.Manual.Application.Commands.CompleteTrip;
+using DTMS.Transport.Manual.Application.Commands.RecordDrop;
+using DTMS.Transport.Manual.Application.Commands.RecordPickup;
+using DTMS.Transport.Manual.Application.Commands.RegisterPushSubscription;
+using DTMS.Transport.Manual.Application.Commands.SubmitGeofenceOverride;
+using DTMS.Transport.Manual.Application.Commands.UnregisterPushSubscription;
+using DTMS.Transport.Manual.Application.Queries.GetAssignedTrips;
+using DTMS.Transport.Manual.Application.Queries.GetMyProfile;
+using DTMS.Transport.Manual.Application.Queries.GetPodPresignedUrl;
+using DTMS.Transport.Manual.Application.Services;
+using DTMS.Transport.Manual.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Presentation;
+namespace DTMS.Transport.Manual.Presentation;
 
 // Phase 4.2 — Operator PWA REST API. All endpoints require the
 // OperatorOnly policy (which transitively requires the OperatorJwt

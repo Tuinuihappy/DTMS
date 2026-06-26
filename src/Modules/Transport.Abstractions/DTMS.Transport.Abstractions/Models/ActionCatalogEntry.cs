@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Transport.Abstractions.Models;
+namespace DTMS.Transport.Abstractions.Models;
 
 public class ActionCatalogEntry : Entity<Guid>
 {

@@ -1,7 +1,7 @@
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Domain.Repositories;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Queries.GetMyProfile;
+namespace DTMS.Transport.Manual.Application.Queries.GetMyProfile;
 
 internal sealed class GetMyProfileQueryHandler : IQueryHandler<GetMyProfileQuery, OperatorProfileDto>
 {

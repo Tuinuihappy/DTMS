@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Commands.AcknowledgeTrip;
+namespace DTMS.Transport.Manual.Application.Commands.AcknowledgeTrip;
 
 // POST /api/operator/trips/{id}/acknowledge — operator confirms they've
 // received the assignment and will start working on it. Sets

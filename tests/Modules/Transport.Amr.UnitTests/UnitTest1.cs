@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text.Json;
-using AMR.DeliveryPlanning.Transport.Amr.Models;
-using AMR.DeliveryPlanning.Transport.Amr.Services;
+using DTMS.Transport.Amr.Models;
+using DTMS.Transport.Amr.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace VendorAdapter.UnitTests;
@@ -169,7 +169,7 @@ public class UnitTest1
         var result = await service.CancelEnvelopeAsync("nonexistent-G1");
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(AMR.DeliveryPlanning.Transport.Amr.Models.Riot3OperationOutcome.NoVendorRecord, result.Value);
+        Assert.Equal(DTMS.Transport.Amr.Models.Riot3OperationOutcome.NoVendorRecord, result.Value);
     }
 
     [Fact]
@@ -184,7 +184,7 @@ public class UnitTest1
         var result = await service.CancelEnvelopeAsync("missing-G1");
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(AMR.DeliveryPlanning.Transport.Amr.Models.Riot3OperationOutcome.NoVendorRecord, result.Value);
+        Assert.Equal(DTMS.Transport.Amr.Models.Riot3OperationOutcome.NoVendorRecord, result.Value);
     }
 
     [Fact]

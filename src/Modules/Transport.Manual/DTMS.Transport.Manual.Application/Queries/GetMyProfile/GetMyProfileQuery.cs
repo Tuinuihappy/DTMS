@@ -1,7 +1,7 @@
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Domain.Enums;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Queries.GetMyProfile;
+namespace DTMS.Transport.Manual.Application.Queries.GetMyProfile;
 
 // GET /api/operator/me — operator app's "who am I" call. Used on login
 // to render the profile drawer + decide which trip (if any) to show.

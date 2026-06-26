@@ -1,5 +1,5 @@
 using AMR.DeliveryPlanning.Planning.Application.Services;
-using AMR.DeliveryPlanning.Transport.Amr.Services;
+using DTMS.Transport.Amr.Services;
 using Microsoft.Extensions.Configuration;
 
 namespace AMR.DeliveryPlanning.Api.Adapters;

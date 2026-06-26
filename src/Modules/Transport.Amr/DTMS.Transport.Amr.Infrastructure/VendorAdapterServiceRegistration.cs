@@ -1,15 +1,15 @@
-using AMR.DeliveryPlanning.Transport.Abstractions.Services;
-using AMR.DeliveryPlanning.Transport.Amr.Options;
-using AMR.DeliveryPlanning.Transport.Amr.Webhooks;
-using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Data;
-using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Extensions;
-using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Services;
-using AMR.DeliveryPlanning.Transport.Amr.Services;
+using DTMS.Transport.Abstractions.Services;
+using DTMS.Transport.Amr.Options;
+using DTMS.Transport.Amr.Webhooks;
+using DTMS.Transport.Amr.Infrastructure.Data;
+using DTMS.Transport.Amr.Infrastructure.Extensions;
+using DTMS.Transport.Amr.Infrastructure.Services;
+using DTMS.Transport.Amr.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Infrastructure;
+namespace DTMS.Transport.Amr.Infrastructure;
 
 public static class VendorAdapterServiceRegistration
 {

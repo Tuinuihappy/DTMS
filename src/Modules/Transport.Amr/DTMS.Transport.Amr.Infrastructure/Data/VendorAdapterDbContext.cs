@@ -1,8 +1,8 @@
 using DTMS.SharedKernel.Outbox;
-using AMR.DeliveryPlanning.Transport.Abstractions.Models;
+using DTMS.Transport.Abstractions.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Data;
+namespace DTMS.Transport.Amr.Infrastructure.Data;
 
 public class VendorAdapterDbContext : DbContext
 {

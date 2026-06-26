@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Models;
+namespace DTMS.Transport.Amr.Models;
 
 // Matches RIOT3.0 API v4 "Robot Operation" — POST /api/v4/robots/operation
 // Body shape: { "vehicles": [{ "key": "<deviceKey>" }], "operation": "PASS" }

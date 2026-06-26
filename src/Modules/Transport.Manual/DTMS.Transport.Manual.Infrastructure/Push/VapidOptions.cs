@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Push;
+namespace DTMS.Transport.Manual.Infrastructure.Push;
 
 // Bound from configuration section "Push:Vapid". Generated once via
 // any web-push-libs CLI or `WebPushClient.GenerateVapidKeys()` — the

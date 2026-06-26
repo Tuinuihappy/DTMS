@@ -1,7 +1,7 @@
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Domain.Repositories;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Commands.Admin.DenyGeofenceOverride;
+namespace DTMS.Transport.Manual.Application.Commands.Admin.DenyGeofenceOverride;
 
 // POST /api/admin/geofence-overrides/{id}/deny — supervisor declines.
 // Reason is mandatory and shown to the operator (they need to know

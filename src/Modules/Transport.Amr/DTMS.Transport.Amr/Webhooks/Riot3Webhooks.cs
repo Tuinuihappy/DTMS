@@ -5,15 +5,15 @@ using AMR.DeliveryPlanning.Dispatch.Domain.Services;
 using DTMS.Dispatch.IntegrationEvents;
 using DTMS.Fleet.IntegrationEvents;
 using DTMS.SharedKernel;
-using AMR.DeliveryPlanning.Transport.Abstractions.Services;
-using AMR.DeliveryPlanning.Transport.Amr.Models;
+using DTMS.Transport.Abstractions.Services;
+using DTMS.Transport.Amr.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Webhooks;
+namespace DTMS.Transport.Amr.Webhooks;
 
 public static class Riot3Webhooks
 {

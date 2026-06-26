@@ -1,13 +1,13 @@
 using System.Text.Json;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Services;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Application.Services;
+using DTMS.Transport.Manual.Domain.Entities;
+using DTMS.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Domain.Repositories;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using WebPush;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Push;
+namespace DTMS.Transport.Manual.Infrastructure.Push;
 
 // Phase 4.3 — Web Push (VAPID) gateway. Loads the operator's active
 // Web Push subscriptions, signs + sends in parallel, and tracks

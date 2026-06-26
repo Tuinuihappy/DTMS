@@ -1,5 +1,5 @@
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Domain.Entities;
+using DTMS.Transport.Manual.Domain.Enums;
 using FluentAssertions;
 
 namespace Transport.Manual.UnitTests;

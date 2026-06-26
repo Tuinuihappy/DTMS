@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Domain.Repositories;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Services;
+namespace DTMS.Transport.Manual.Application.Services;
 
 // Phase 4.4 — MVP implementation of IOperatorAssignmentPolicy. See the
 // interface docs for the rule list.

@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Domain.Events;
+namespace DTMS.Transport.Manual.Domain.Events;
 
 public record OperatorRegisteredDomainEvent(
     Guid EventId,

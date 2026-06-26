@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Services;
+namespace DTMS.Transport.Manual.Application.Services;
 
 // Phase 4.3 — POD upload mechanism per ADR-015. Presigned PUT URLs
 // keep photo bytes off the .NET server: operator PWA receives a URL +

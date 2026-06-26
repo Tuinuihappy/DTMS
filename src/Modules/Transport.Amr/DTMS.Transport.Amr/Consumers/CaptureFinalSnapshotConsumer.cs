@@ -1,11 +1,11 @@
 using System.Text.Json;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using DTMS.Dispatch.IntegrationEvents;
-using AMR.DeliveryPlanning.Transport.Amr.Services;
+using DTMS.Transport.Amr.Services;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Consumers;
+namespace DTMS.Transport.Amr.Consumers;
 
 /// <summary>
 /// When a Trip reaches a terminal state (Completed / Failed / Cancelled),

@@ -1,7 +1,7 @@
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Domain.Repositories;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Queries.Admin;
+namespace DTMS.Transport.Manual.Application.Queries.Admin;
 
 // Phase 4.6 — Active Manual trips feed. Powers the right-hand column
 // of the operator board: "who's carrying what right now". Active =

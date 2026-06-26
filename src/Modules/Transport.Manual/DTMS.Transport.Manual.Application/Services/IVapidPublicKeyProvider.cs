@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Services;
+namespace DTMS.Transport.Manual.Application.Services;
 
 // Same pattern as IPodBucketProvider — narrow indirection so
 // Application doesn't depend on IOptions<VapidOptions>. Infrastructure

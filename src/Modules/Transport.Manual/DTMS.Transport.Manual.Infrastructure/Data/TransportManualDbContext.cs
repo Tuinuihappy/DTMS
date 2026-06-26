@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
+using DTMS.Transport.Manual.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Data;
+namespace DTMS.Transport.Manual.Infrastructure.Data;
 
 // Phase 4.1 — Schema for the Manual transport mode.
 //

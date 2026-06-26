@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
+using DTMS.Transport.Manual.Domain.Entities;
 using FluentAssertions;
 
 namespace Transport.Manual.UnitTests;

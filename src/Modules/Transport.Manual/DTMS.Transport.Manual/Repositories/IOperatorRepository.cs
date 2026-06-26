@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
+using DTMS.Transport.Manual.Domain.Entities;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+namespace DTMS.Transport.Manual.Domain.Repositories;
 
 // Phase 4.2 — Operator aggregate persistence. Most lookups hit the
 // unique EmployeeCode index (the External Auth user identifier);

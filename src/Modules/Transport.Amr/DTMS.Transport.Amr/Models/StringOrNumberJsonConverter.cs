@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Models;
+namespace DTMS.Transport.Amr.Models;
 
 // Accepts a JSON token that is either a string or a number (or null) and
 // surfaces it as a string. RIOT3 inconsistently types result/error codes —

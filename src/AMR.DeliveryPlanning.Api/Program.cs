@@ -30,7 +30,7 @@ using Serilog;
 // the values into appsettings.Development.json or .env.
 if (args.Contains("--generate-vapid-keys"))
 {
-    var (pub, priv) = AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Push.VapidKeyHelper.Generate();
+    var (pub, priv) = DTMS.Transport.Manual.Infrastructure.Push.VapidKeyHelper.Generate();
     Console.WriteLine("# VAPID keypair — store the private key as a secret.");
     Console.WriteLine($"Push__Vapid__PublicKey={pub}");
     Console.WriteLine($"Push__Vapid__PrivateKey={priv}");
@@ -149,7 +149,7 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Dispatch.Application.Commands.CreateEnvelopeTrip.CreateEnvelopeTripCommand).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Transport.Manual.Application.Commands.AcknowledgeTrip.AcknowledgeTripCommand).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(DTMS.Transport.Manual.Application.Commands.AcknowledgeTrip.AcknowledgeTripCommand).Assembly);
     cfg.AddOpenBehavior(typeof(DTMS.SharedKernel.Behaviors.ValidationBehavior<,>));
 });
 
@@ -497,8 +497,8 @@ var app = builder.Build();
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Dispatch.Infrastructure.Data.DispatchDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AuthDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<OutboxDbContext>(), logger, app.Environment);
-            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Data.VendorAdapterDbContext>(), logger, app.Environment);
-            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Data.TransportManualDbContext>(), logger, app.Environment);
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Transport.Amr.Infrastructure.Data.VendorAdapterDbContext>(), logger, app.Environment);
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Transport.Manual.Infrastructure.Data.TransportManualDbContext>(), logger, app.Environment);
 
             logger.LogInformation("Database migrations applied successfully.");
             break;
@@ -537,7 +537,7 @@ if (args.Contains("--migrate-only"))
 static async Task SeedActionCatalogAsync(IServiceProvider services)
 {
     using var scope = services.CreateScope();
-    var catalog = scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Transport.Abstractions.Services.IActionCatalogService>();
+    var catalog = scope.ServiceProvider.GetRequiredService<DTMS.Transport.Abstractions.Services.IActionCatalogService>();
 
     // Both liftup and feeder are the same vendor — both use the RIOT3 adapter.
     // Unified JSON format: {"actionType": "<ActionID>", "0": "<P0>", "1": "<P1>"}
@@ -580,7 +580,7 @@ static async Task SeedActionCatalogAsync(IServiceProvider services)
         var existing = await catalog.GetAsync(vtKey, action);
         if (existing == null)
             await catalog.UpsertAsync(
-                new AMR.DeliveryPlanning.Transport.Abstractions.Models.ActionCatalogEntry(vtKey, action, adapterKey, paramsJson));
+                new DTMS.Transport.Abstractions.Models.ActionCatalogEntry(vtKey, action, adapterKey, paramsJson));
     }
 }
 

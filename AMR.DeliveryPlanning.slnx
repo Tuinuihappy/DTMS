@@ -43,17 +43,17 @@
     <Project Path="src/Modules/OmsAdapter/AMR.DeliveryPlanning.OmsAdapter.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Transport.Abstractions/">
-    <Project Path="src/Modules/Transport.Abstractions/AMR.DeliveryPlanning.Transport.Abstractions/AMR.DeliveryPlanning.Transport.Abstractions.csproj" />
+    <Project Path="src/Modules/Transport.Abstractions/DTMS.Transport.Abstractions/DTMS.Transport.Abstractions.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Transport.Amr/">
-    <Project Path="src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.csproj" />
-    <Project Path="src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Infrastructure/AMR.DeliveryPlanning.Transport.Amr.Infrastructure.csproj" />
+    <Project Path="src/Modules/Transport.Amr/DTMS.Transport.Amr/DTMS.Transport.Amr.csproj" />
+    <Project Path="src/Modules/Transport.Amr/DTMS.Transport.Amr.Infrastructure/DTMS.Transport.Amr.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Transport.Manual/">
-    <Project Path="src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.csproj" />
-    <Project Path="src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.Application/AMR.DeliveryPlanning.Transport.Manual.Application.csproj" />
-    <Project Path="src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.Infrastructure/AMR.DeliveryPlanning.Transport.Manual.Infrastructure.csproj" />
-    <Project Path="src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.Presentation/AMR.DeliveryPlanning.Transport.Manual.Presentation.csproj" />
+    <Project Path="src/Modules/Transport.Manual/DTMS.Transport.Manual/DTMS.Transport.Manual.csproj" />
+    <Project Path="src/Modules/Transport.Manual/DTMS.Transport.Manual.Application/DTMS.Transport.Manual.Application.csproj" />
+    <Project Path="src/Modules/Transport.Manual/DTMS.Transport.Manual.Infrastructure/DTMS.Transport.Manual.Infrastructure.csproj" />
+    <Project Path="src/Modules/Transport.Manual/DTMS.Transport.Manual.Presentation/DTMS.Transport.Manual.Presentation.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AMR.DeliveryPlanning.Api.UnitTests/AMR.DeliveryPlanning.Api.UnitTests.csproj" />

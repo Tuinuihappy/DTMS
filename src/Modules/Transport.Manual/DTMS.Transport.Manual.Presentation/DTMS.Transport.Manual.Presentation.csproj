@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AMR.DeliveryPlanning.Transport.Manual.Application\AMR.DeliveryPlanning.Transport.Manual.Application.csproj" />
+    <ProjectReference Include="..\DTMS.Transport.Manual.Application\DTMS.Transport.Manual.Application.csproj" />
   </ItemGroup>
 
 </Project>

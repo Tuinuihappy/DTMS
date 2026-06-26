@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
+namespace DTMS.Transport.Manual.Domain.Entities;
 
 // Phase 4.1 — Mirror of AmrTripExtension (Phase 3b) for the Manual mode.
 // One-to-zero-or-one with Dispatch.Trip via TripId PK/FK. Holds the

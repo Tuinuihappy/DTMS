@@ -1,7 +1,7 @@
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Domain.Repositories;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Commands.RegisterPushSubscription;
+namespace DTMS.Transport.Manual.Application.Commands.RegisterPushSubscription;
 
 internal sealed class RegisterPushSubscriptionCommandHandler : ICommandHandler<RegisterPushSubscriptionCommand>
 {

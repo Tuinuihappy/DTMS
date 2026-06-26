@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Commands.RecordDrop;
+namespace DTMS.Transport.Manual.Application.Commands.RecordDrop;
 
 // POST /api/operator/trips/{id}/drop — operator has arrived at the
 // drop warehouse and is handing off the cargo. Same geofence-check

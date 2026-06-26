@@ -1,8 +1,8 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Amr.Models;
-using AMR.DeliveryPlanning.Transport.Amr.Services;
+using DTMS.Transport.Amr.Models;
+using DTMS.Transport.Amr.Services;
 
 namespace AMR.DeliveryPlanning.Api.Adapters;
 

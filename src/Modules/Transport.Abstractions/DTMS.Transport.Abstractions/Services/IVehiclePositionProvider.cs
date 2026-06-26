@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 
-namespace AMR.DeliveryPlanning.Transport.Abstractions.Services;
+namespace DTMS.Transport.Abstractions.Services;
 
 /// <summary>
 /// Streams vehicle / operator position updates from a per-mode source.

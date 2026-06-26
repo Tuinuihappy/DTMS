@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Transport.Abstractions.Services;
+namespace DTMS.Transport.Abstractions.Services;
 
 public interface IVendorAdapterOutbox
 {

@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Models;
+namespace DTMS.Transport.Amr.Models;
 
 // Slim projection of the RIOT3 POST /api/v4/orders response — we only need
 // the orderKey so the caller can correlate later callbacks. RIOT3 returns

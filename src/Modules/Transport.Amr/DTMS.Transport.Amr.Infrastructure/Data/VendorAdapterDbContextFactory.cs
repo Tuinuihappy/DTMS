@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Data;
+namespace DTMS.Transport.Amr.Infrastructure.Data;
 
 public class VendorAdapterDbContextFactory : IDesignTimeDbContextFactory<VendorAdapterDbContext>
 {

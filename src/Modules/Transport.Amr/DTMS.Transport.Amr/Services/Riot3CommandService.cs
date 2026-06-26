@@ -2,10 +2,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Amr.Models;
+using DTMS.Transport.Amr.Models;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Services;
+namespace DTMS.Transport.Amr.Services;
 
 // Envelope-only RIOT3 client (Phase b7 removed per-task scheduling).
 // Inbound: SendOrderAsync POSTs the multi-mission OrderTemplate envelope.

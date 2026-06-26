@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Models;
+namespace DTMS.Transport.Amr.Models;
 
 // Matches RIOT3.0 API v4 callback — POST {our endpoint} /api/v4/notify
 // Spec uses a nested structure: top-level event metadata + task / subTask

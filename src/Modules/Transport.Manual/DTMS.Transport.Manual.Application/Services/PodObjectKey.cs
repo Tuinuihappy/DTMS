@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Services;
+namespace DTMS.Transport.Manual.Application.Services;
 
 // Phase 4.3 — Canonical object-key naming for POD uploads. Layout:
 //   pod/{tripId}/{kind}/{ulid}.{ext}

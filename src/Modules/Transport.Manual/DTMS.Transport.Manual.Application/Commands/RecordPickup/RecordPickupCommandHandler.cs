@@ -1,10 +1,10 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Services;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Application.Services;
+using DTMS.Transport.Manual.Domain.Repositories;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Commands.RecordPickup;
+namespace DTMS.Transport.Manual.Application.Commands.RecordPickup;
 
 // Per ADR-016 — server-strict geofence check. If the operator's GPS
 // reports outside Warehouse.GeofenceRadiusM, the pickup is rejected

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Data;
+namespace DTMS.Transport.Manual.Infrastructure.Data;
 
 // Design-time factory — only used by `dotnet ef` tooling. Production
 // runtime uses ModuleServiceRegistration.AddDbContext<TransportManualDbContext>.

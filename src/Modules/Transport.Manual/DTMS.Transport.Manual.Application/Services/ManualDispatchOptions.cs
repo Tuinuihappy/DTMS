@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Services;
+namespace DTMS.Transport.Manual.Application.Services;
 
 // Phase 4.4 — SLA windows the strategy stamps onto ManualTripExtension
 // at assignment time. The (yet-unbuilt) ManualTripSlaWatchdog reads

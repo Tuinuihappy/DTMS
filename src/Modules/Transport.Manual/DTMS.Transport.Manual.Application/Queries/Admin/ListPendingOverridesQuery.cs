@@ -1,8 +1,8 @@
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Domain.Repositories;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Queries.Admin;
+namespace DTMS.Transport.Manual.Application.Queries.Admin;
 
 // Phase 4.6 — Override approval queue feed. Pending only — decided
 // requests stay in the table for audit but don't surface here.

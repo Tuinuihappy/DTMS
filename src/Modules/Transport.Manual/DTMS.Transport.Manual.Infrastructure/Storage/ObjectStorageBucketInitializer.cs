@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Transport.Manual.Application.Services;
+using DTMS.Transport.Manual.Application.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Storage;
+namespace DTMS.Transport.Manual.Infrastructure.Storage;
 
 // Phase 4.3 — Idempotent startup hook that creates the POD bucket if
 // MinIO is freshly provisioned. Runs once on app boot and exits;

@@ -1,9 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
-using AMR.DeliveryPlanning.Transport.Amr.Models;
+using DTMS.Transport.Amr.Models;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Services;
+namespace DTMS.Transport.Amr.Services;
 
 public sealed class Riot3OrderQueryService : IRiot3OrderQueryService
 {

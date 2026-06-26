@@ -1,7 +1,7 @@
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Domain.Repositories;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Queries.GetAssignedTrips;
+namespace DTMS.Transport.Manual.Application.Queries.GetAssignedTrips;
 
 internal sealed class GetAssignedTripsQueryHandler : IQueryHandler<GetAssignedTripsQuery, IReadOnlyList<AssignedTripDto>>
 {

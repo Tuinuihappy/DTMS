@@ -1,9 +1,9 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Domain.Services;
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Domain.Repositories;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Commands.AcknowledgeTrip;
+namespace DTMS.Transport.Manual.Application.Commands.AcknowledgeTrip;
 
 // Phase 4.6 follow-up — When the operator acknowledges, ALSO transition
 // the Trip aggregate from Created → InProgress and emit

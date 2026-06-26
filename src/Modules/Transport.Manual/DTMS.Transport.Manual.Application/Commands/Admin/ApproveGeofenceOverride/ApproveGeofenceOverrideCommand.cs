@@ -1,7 +1,7 @@
 using DTMS.SharedKernel.Messaging;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Domain.Repositories;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Commands.Admin.ApproveGeofenceOverride;
+namespace DTMS.Transport.Manual.Application.Commands.Admin.ApproveGeofenceOverride;
 
 // POST /api/admin/geofence-overrides/{id}/approve — supervisor/admin
 // allows the operator to record pickup/drop despite the geofence fail.

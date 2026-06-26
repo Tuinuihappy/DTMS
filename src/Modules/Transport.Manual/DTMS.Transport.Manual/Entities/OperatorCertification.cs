@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Domain.Enums;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
+namespace DTMS.Transport.Manual.Domain.Entities;
 
 // Phase 4.1 — One certification record per (Operator, CertificationType)
 // pair. Revoked certs stay in the table for audit (compliance often wants

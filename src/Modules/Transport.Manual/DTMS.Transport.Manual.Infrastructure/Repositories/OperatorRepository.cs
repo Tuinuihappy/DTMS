@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Repositories;
-using AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Data;
+using DTMS.Transport.Manual.Domain.Entities;
+using DTMS.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Domain.Repositories;
+using DTMS.Transport.Manual.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Repositories;
+namespace DTMS.Transport.Manual.Infrastructure.Repositories;
 
 public sealed class OperatorRepository : IOperatorRepository
 {

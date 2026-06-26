@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Queries.GetPodPresignedUrl;
+namespace DTMS.Transport.Manual.Application.Queries.GetPodPresignedUrl;
 
 // POST /api/operator/pod/presign — operator app calls this to get a
 // presigned PUT URL it can upload the POD photo to. Kind is "pickup"

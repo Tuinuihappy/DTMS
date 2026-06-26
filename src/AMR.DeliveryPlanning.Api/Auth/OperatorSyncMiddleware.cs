@@ -1,6 +1,6 @@
 using System.Security.Claims;
-using AMR.DeliveryPlanning.Transport.Manual.Application.Services;
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Application.Services;
+using DTMS.Transport.Manual.Domain.Enums;
 
 namespace AMR.DeliveryPlanning.Api.Auth;
 

@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Domain.Enums;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Domain.Entities;
+namespace DTMS.Transport.Manual.Domain.Entities;
 
 // Phase 4.1 — Push notification target (per ADR-013).
 // Single table polymorphic by Platform — WebPush stores VAPID p256dh + auth

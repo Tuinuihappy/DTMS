@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Data;
+using DTMS.Transport.Amr.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Migrations
+namespace DTMS.Transport.Amr.Infrastructure.Migrations
 {
     [DbContext(typeof(VendorAdapterDbContext))]
     [Migration("20260620000050_AddOutboxPartialIndex")]

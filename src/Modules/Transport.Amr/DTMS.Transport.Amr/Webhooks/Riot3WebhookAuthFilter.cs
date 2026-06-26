@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Transport.Amr.Options;
+using DTMS.Transport.Amr.Options;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Webhooks;
+namespace DTMS.Transport.Amr.Webhooks;
 
 /// <summary>
 /// Authenticates inbound RIOT3 webhooks via IP allowlist + URL-path

@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Polly;
 using Polly.Extensions.Http;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Extensions;
+namespace DTMS.Transport.Amr.Infrastructure.Extensions;
 
 public static class ResilienceExtensions
 {

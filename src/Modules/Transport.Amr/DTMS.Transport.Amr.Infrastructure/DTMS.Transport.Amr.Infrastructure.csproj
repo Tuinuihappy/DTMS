@@ -17,8 +17,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Transport.Abstractions\AMR.DeliveryPlanning.Transport.Abstractions\AMR.DeliveryPlanning.Transport.Abstractions.csproj" />
-    <ProjectReference Include="..\AMR.DeliveryPlanning.Transport.Amr\AMR.DeliveryPlanning.Transport.Amr.csproj" />
+    <ProjectReference Include="..\..\Transport.Abstractions\DTMS.Transport.Abstractions\DTMS.Transport.Abstractions.csproj" />
+    <ProjectReference Include="..\DTMS.Transport.Amr\DTMS.Transport.Amr.csproj" />
     <ProjectReference Include="..\..\Fleet\AMR.DeliveryPlanning.Fleet.Application\AMR.DeliveryPlanning.Fleet.Application.csproj" />
   </ItemGroup>
 

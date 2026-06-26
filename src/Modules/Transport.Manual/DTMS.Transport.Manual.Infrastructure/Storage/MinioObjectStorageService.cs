@@ -1,11 +1,11 @@
-using AMR.DeliveryPlanning.Transport.Manual.Application.Services;
+using DTMS.Transport.Manual.Application.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Minio;
 using Minio.DataModel.Args;
 using Minio.Exceptions;
 
-namespace AMR.DeliveryPlanning.Transport.Manual.Infrastructure.Storage;
+namespace DTMS.Transport.Manual.Infrastructure.Storage;
 
 // Phase 4.3 — MinIO-backed IObjectStorageService.
 //
