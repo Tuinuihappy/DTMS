@@ -48,7 +48,6 @@
   <Folder Name="/src/Modules/Transport.Amr/">
     <Project Path="src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.csproj" />
     <Project Path="src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Infrastructure/AMR.DeliveryPlanning.Transport.Amr.Infrastructure.csproj" />
-    <Project Path="src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Simulator/AMR.DeliveryPlanning.Transport.Amr.Simulator.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Transport.Manual/">
     <Project Path="src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.csproj" />

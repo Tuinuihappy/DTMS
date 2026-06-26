@@ -19,7 +19,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Transport.Abstractions\AMR.DeliveryPlanning.Transport.Abstractions\AMR.DeliveryPlanning.Transport.Abstractions.csproj" />
     <ProjectReference Include="..\AMR.DeliveryPlanning.Transport.Amr\AMR.DeliveryPlanning.Transport.Amr.csproj" />
-    <ProjectReference Include="..\AMR.DeliveryPlanning.Transport.Amr.Simulator\AMR.DeliveryPlanning.Transport.Amr.Simulator.csproj" />
     <ProjectReference Include="..\..\Fleet\AMR.DeliveryPlanning.Fleet.Application\AMR.DeliveryPlanning.Fleet.Application.csproj" />
   </ItemGroup>
 

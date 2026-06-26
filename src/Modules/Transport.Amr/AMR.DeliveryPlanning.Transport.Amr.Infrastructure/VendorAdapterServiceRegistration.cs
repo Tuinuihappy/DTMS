@@ -5,7 +5,6 @@ using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Data;
 using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Extensions;
 using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Services;
 using AMR.DeliveryPlanning.Transport.Amr.Services;
-using AMR.DeliveryPlanning.Transport.Amr.Simulator.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -96,8 +95,6 @@ public static class VendorAdapterServiceRegistration
         services.Configure<Riot3WebhookOptions>(
             configuration.GetSection(Riot3WebhookOptions.SectionName));
         services.AddScoped<Riot3WebhookAuthFilter>();
-
-        services.AddScoped<SimulatorCommandService>();
 
         // Register the adapter registry/factory. Adapters are resolved by explicit keys,
         // never by concrete type name or fallback behavior.

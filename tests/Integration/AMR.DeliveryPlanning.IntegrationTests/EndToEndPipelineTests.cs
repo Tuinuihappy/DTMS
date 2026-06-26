@@ -191,7 +191,7 @@ public class EndToEndPipelineTests : IClassFixture<DtmsWebApplicationFactory>
         {
             VehicleName = $"E2E-{Guid.NewGuid():N}"[..20],
             VehicleTypeId = vehicleTypeId,
-            AdapterKey = "sim"  // Simulator — no real RIOT3 calls, no webhook race
+            AdapterKey = "riot3"
         });
         regResp.IsSuccessStatusCode.Should().BeTrue();
         var vehicleId = await regResp.Content.ReadFromJsonAsync<Guid>();

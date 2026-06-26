@@ -12,7 +12,7 @@ public class Vehicle : AggregateRoot<Guid>
     public double BatteryLevel { get; private set; }
     public Guid? CurrentNodeId { get; private set; }
     public bool IsInMaintenance => State == VehicleState.Maintenance;
-    // Identifies which vendor adapter handles this vehicle ("riot3" | "feeder" | "sim")
+    // Identifies which vendor adapter handles this vehicle ("riot3" | "feeder")
     public string AdapterKey { get; private set; } = "riot3";
     // External robot identity used by the vendor adapter, for example RIOT3 deviceKey.
     public string? VendorVehicleKey { get; private set; }
