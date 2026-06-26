@@ -61,11 +61,9 @@ COPY src/Modules/OmsAdapter/AMR.DeliveryPlanning.OmsAdapter.csproj src/Modules/O
 # Transport.Abstractions (Phase 4.0 rename of VendorAdapter.Abstractions)
 COPY src/Modules/Transport.Abstractions/AMR.DeliveryPlanning.Transport.Abstractions/AMR.DeliveryPlanning.Transport.Abstractions.csproj src/Modules/Transport.Abstractions/AMR.DeliveryPlanning.Transport.Abstractions/
 
-# Transport.Amr (Phase 4.0 rename of VendorAdapter.Riot3/Feeder/Infrastructure/Simulator)
+# Transport.Amr (consolidated — Feeder + Simulator removed)
 COPY src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.csproj src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr/
 COPY src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Infrastructure/AMR.DeliveryPlanning.Transport.Amr.Infrastructure.csproj src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Infrastructure/
-COPY src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Feeder/AMR.DeliveryPlanning.Transport.Amr.Feeder.csproj src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Feeder/
-COPY src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Simulator/AMR.DeliveryPlanning.Transport.Amr.Simulator.csproj src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr.Simulator/
 
 # Transport.Manual (Phase 4.1-4.6)
 COPY src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual/AMR.DeliveryPlanning.Transport.Manual.csproj src/Modules/Transport.Manual/AMR.DeliveryPlanning.Transport.Manual/
