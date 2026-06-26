@@ -67,26 +67,6 @@ public static class Riot3Webhooks
             return Results.Ok();
         }).AddEndpointFilter<Riot3WebhookAuthFilter>();
 
-        // Legacy simple status endpoint (kept for backward compatibility)
-        group.MapPost("/status", async (
-            RiotStatusPayload payload,
-            IVendorAdapterOutbox outbox,
-            ILogger<RiotStatusPayload> logger,
-            CancellationToken cancellationToken) =>
-        {
-            if (!Guid.TryParse(payload.RobotId, out var vehicleId))
-                return Results.BadRequest("Invalid RobotId format.");
-
-            await outbox.AddAsync(new VehicleStateChangedIntegrationEvent(
-                Guid.NewGuid(), DateTime.UtcNow, vehicleId,
-                MapRiotState(payload.State), payload.Battery,
-                payload.CurrentNode != null && Guid.TryParse(payload.CurrentNode, out var nodeId) ? nodeId : null),
-                cancellationToken);
-            await outbox.SaveChangesAsync(cancellationToken);
-
-            return Results.Ok();
-        });
-
         // RIOT3.0 action callback mid-task
         group.MapPost("/action-callback", (Riot3ActionCallbackPayload payload, ILogger<Riot3ActionCallbackPayload> logger) =>
         {
@@ -501,16 +481,6 @@ public static class Riot3Webhooks
                 Guid.NewGuid(), DateTime.UtcNow, vehicleId.Value, Guid.Empty, batteryPct), cancellationToken);
         }
     }
-
-    private static string MapRiotState(string state) => state.ToLower() switch
-    {
-        "idle" => "Idle",
-        "running" => "Moving",
-        "error" => "Error",
-        "charging" => "Charging",
-        "working" => "Working",
-        _ => "Offline"
-    };
 
     private static string MapRiotSystemState(string? systemState) => systemState?.ToUpper() switch
     {
