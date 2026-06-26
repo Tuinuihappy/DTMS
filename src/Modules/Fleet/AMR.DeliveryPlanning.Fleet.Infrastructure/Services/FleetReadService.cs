@@ -42,17 +42,6 @@ public sealed class FleetReadService : IFleetReadService
             .ToList();
     }
 
-    public Task<VehicleAdapterIdentity?> GetVehicleAdapterIdentityAsync(
-        Guid vehicleId,
-        CancellationToken cancellationToken = default)
-    {
-        return _db.Vehicles
-            .AsNoTracking()
-            .Where(v => v.Id == vehicleId)
-            .Select(v => new VehicleAdapterIdentity(v.AdapterKey, v.VendorVehicleKey))
-            .FirstOrDefaultAsync(cancellationToken);
-    }
-
     public async Task<Guid?> ResolveVehicleIdAsync(
         string adapterKey,
         string vendorVehicleKey,

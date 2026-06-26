@@ -7,17 +7,9 @@ public sealed record FleetVehicleAvailability(
     Guid? CurrentNodeId,
     IReadOnlyCollection<string>? Capabilities);
 
-public sealed record VehicleAdapterIdentity(
-    string AdapterKey,
-    string? VendorVehicleKey);
-
 public interface IFleetReadService
 {
     Task<IReadOnlyList<FleetVehicleAvailability>> GetIdleVehiclesAsync(
-        CancellationToken cancellationToken = default);
-
-    Task<VehicleAdapterIdentity?> GetVehicleAdapterIdentityAsync(
-        Guid vehicleId,
         CancellationToken cancellationToken = default);
 
     Task<Guid?> ResolveVehicleIdAsync(
