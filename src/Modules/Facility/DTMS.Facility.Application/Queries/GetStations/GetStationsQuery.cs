@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Queries.GetStations;
+namespace DTMS.Facility.Application.Queries.GetStations;
 
 // Read-side projection of Station.Actions[intent] — flat data carrier.
 public sealed record StationActionDto(
@@ -52,7 +52,7 @@ public class GetStationsQueryHandler : IQueryHandler<GetStationsQuery, List<Stat
     }
 
     private static IReadOnlyDictionary<string, StationActionDto>? ProjectActions(
-        IReadOnlyDictionary<string, AMR.DeliveryPlanning.Facility.Domain.ValueObjects.StationAction>? actions)
+        IReadOnlyDictionary<string, DTMS.Facility.Domain.ValueObjects.StationAction>? actions)
     {
         if (actions is null || actions.Count == 0)
             return null;

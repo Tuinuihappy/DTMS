@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Facility.Domain.ValueObjects;
+namespace DTMS.Facility.Domain.ValueObjects;
 
 // One executable action a robot performs at a station — keyed in
 // Station.Actions by an "intent" string (e.g. "lift", "drop", "charge",

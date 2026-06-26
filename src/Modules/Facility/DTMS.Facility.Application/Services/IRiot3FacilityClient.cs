@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Facility.Application.Services;
+namespace DTMS.Facility.Application.Services;
 
 public interface IRiot3FacilityClient
 {

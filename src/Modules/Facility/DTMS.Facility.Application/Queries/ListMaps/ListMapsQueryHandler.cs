@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Queries.ListMaps;
+namespace DTMS.Facility.Application.Queries.ListMaps;
 
 internal sealed class ListMapsQueryHandler : IQueryHandler<ListMapsQuery, IReadOnlyList<MapSummaryDto>>
 {

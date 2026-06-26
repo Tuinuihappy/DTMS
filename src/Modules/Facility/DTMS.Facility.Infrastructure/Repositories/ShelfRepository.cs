@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
-using AMR.DeliveryPlanning.Facility.Domain.Enums;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
-using AMR.DeliveryPlanning.Facility.Infrastructure.Data;
+using DTMS.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Enums;
+using DTMS.Facility.Domain.Repositories;
+using DTMS.Facility.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Facility.Infrastructure.Repositories;
+namespace DTMS.Facility.Infrastructure.Repositories;
 
 public class ShelfRepository : IShelfRepository
 {

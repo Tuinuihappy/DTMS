@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Facility.Domain.Events;
+using DTMS.Facility.Domain.Events;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Facility.Domain.Entities;
+namespace DTMS.Facility.Domain.Entities;
 
 public class Map : AggregateRoot<Guid>
 {

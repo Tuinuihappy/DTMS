@@ -1,11 +1,11 @@
-using AMR.DeliveryPlanning.Facility.Infrastructure.Data;
+using DTMS.Facility.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Facility.Infrastructure.Migrations
+namespace DTMS.Facility.Infrastructure.Migrations
 {
     /// <inheritdoc />
     [DbContext(typeof(FacilityDbContext))]

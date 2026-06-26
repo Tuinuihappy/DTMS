@@ -9,7 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DTMS.Transport.Manual\DTMS.Transport.Manual.csproj" />
     <ProjectReference Include="..\..\..\DTMS.SharedKernel\DTMS.SharedKernel.csproj" />
-    <ProjectReference Include="..\..\Facility\AMR.DeliveryPlanning.Facility.Application\AMR.DeliveryPlanning.Facility.Application.csproj" />
+    <ProjectReference Include="..\..\Facility\DTMS.Facility.Application\DTMS.Facility.Application.csproj" />
     <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.Domain\AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
   </ItemGroup>
 

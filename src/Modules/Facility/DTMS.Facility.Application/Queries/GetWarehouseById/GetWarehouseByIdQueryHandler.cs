@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
-using AMR.DeliveryPlanning.Facility.Domain.ValueObjects;
+using DTMS.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.ValueObjects;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Queries.GetWarehouseById;
+namespace DTMS.Facility.Application.Queries.GetWarehouseById;
 
 internal sealed class GetWarehouseByIdQueryHandler
     : IQueryHandler<GetWarehouseByIdQuery, WarehouseDetailDto>

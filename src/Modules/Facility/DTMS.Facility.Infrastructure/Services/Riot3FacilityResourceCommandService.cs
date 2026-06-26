@@ -1,9 +1,9 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
-using AMR.DeliveryPlanning.Facility.Domain.Services;
+using DTMS.Facility.Domain.Services;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Facility.Infrastructure.Services;
+namespace DTMS.Facility.Infrastructure.Services;
 
 public class Riot3FacilityResourceCommandService : IFacilityResourceCommandService
 {

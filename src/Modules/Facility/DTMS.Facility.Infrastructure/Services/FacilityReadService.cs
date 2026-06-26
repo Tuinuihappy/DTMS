@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Facility.Application.Services;
-using AMR.DeliveryPlanning.Facility.Infrastructure.Data;
+using DTMS.Facility.Application.Services;
+using DTMS.Facility.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Facility.Infrastructure.Services;
+namespace DTMS.Facility.Infrastructure.Services;
 
 public sealed class FacilityReadService : IFacilityReadService
 {

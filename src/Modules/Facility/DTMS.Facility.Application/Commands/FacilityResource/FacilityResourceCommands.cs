@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
-using AMR.DeliveryPlanning.Facility.Domain.Services;
+using DTMS.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Services;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.FacilityResource;
+namespace DTMS.Facility.Application.Commands.FacilityResource;
 
 public record RegisterFacilityResourceCommand(
     Guid MapId,

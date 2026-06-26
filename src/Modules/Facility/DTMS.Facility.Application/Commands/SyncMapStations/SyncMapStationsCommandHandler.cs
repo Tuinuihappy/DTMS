@@ -1,12 +1,12 @@
 using System.Collections.Concurrent;
-using AMR.DeliveryPlanning.Facility.Application.Services;
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
-using AMR.DeliveryPlanning.Facility.Domain.ValueObjects;
+using DTMS.Facility.Application.Services;
+using DTMS.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.ValueObjects;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.SyncMapStations;
+namespace DTMS.Facility.Application.Commands.SyncMapStations;
 
 internal sealed class SyncMapStationsCommandHandler
     : ICommandHandler<SyncMapStationsCommand, SyncMapStationsResult>

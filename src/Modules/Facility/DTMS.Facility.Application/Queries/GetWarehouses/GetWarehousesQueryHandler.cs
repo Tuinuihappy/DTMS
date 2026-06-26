@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Queries.GetWarehouses;
+namespace DTMS.Facility.Application.Queries.GetWarehouses;
 
 internal sealed class GetWarehousesQueryHandler
     : IQueryHandler<GetWarehousesQuery, IReadOnlyList<WarehouseListItemDto>>

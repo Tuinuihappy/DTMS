@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.CreateMap;
+namespace DTMS.Facility.Application.Commands.CreateMap;
 
 public class CreateMapCommandValidator : AbstractValidator<CreateMapCommand>
 {

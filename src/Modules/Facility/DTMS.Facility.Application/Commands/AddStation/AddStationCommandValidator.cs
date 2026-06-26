@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.AddStation;
+namespace DTMS.Facility.Application.Commands.AddStation;
 
 public class AddStationCommandValidator : AbstractValidator<AddStationCommand>
 {

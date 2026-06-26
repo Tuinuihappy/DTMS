@@ -144,7 +144,7 @@ else
 // Configure MediatR — scan all module Application assemblies
 builder.Services.AddMediatR(cfg =>
 {
-    cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Facility.Application.Queries.GetRouteCost.GetRouteCostQuery).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(DTMS.Facility.Application.Queries.GetRouteCost.GetRouteCostQuery).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Fleet.Application.Consumers.VehicleStateChangedConsumer).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly);
@@ -154,7 +154,7 @@ builder.Services.AddMediatR(cfg =>
 });
 
 // Register FluentValidation validators from all module Application assemblies
-builder.Services.AddValidatorsFromAssembly(typeof(AMR.DeliveryPlanning.Facility.Application.Queries.GetRouteCost.GetRouteCostQuery).Assembly);
+builder.Services.AddValidatorsFromAssembly(typeof(DTMS.Facility.Application.Queries.GetRouteCost.GetRouteCostQuery).Assembly);
 builder.Services.AddValidatorsFromAssembly(typeof(AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly);
 
 // Register all module services (DbContexts, Repositories, Domain Services, HttpClients)
@@ -490,7 +490,7 @@ var app = builder.Build();
             else
                 logger.LogInformation("Migration retry attempt {Attempt}/{Max}", attempt, maxAttempts);
 
-            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Facility.Infrastructure.Data.FacilityDbContext>(), logger, app.Environment);
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Facility.Infrastructure.Data.FacilityDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Fleet.Infrastructure.Data.FleetDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data.DeliveryOrderDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Planning.Infrastructure.Data.PlanningDbContext>(), logger, app.Environment);

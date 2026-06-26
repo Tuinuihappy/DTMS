@@ -1,12 +1,12 @@
-using AMR.DeliveryPlanning.Facility.Application.Commands.SyncMapStations;
-using AMR.DeliveryPlanning.Facility.Infrastructure.Data;
+using DTMS.Facility.Application.Commands.SyncMapStations;
+using DTMS.Facility.Infrastructure.Data;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Facility.Infrastructure.Services;
+namespace DTMS.Facility.Infrastructure.Services;
 
 /// <summary>
 /// Periodically dispatches <see cref="SyncMapStationsCommand"/> for every map with a

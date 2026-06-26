@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Facility.Application.Commands.AddStation;
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
+using DTMS.Facility.Application.Commands.AddStation;
+using DTMS.Facility.Domain.Entities;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.UpdateStation;
+namespace DTMS.Facility.Application.Commands.UpdateStation;
 
 // Patch-style command — only fields the caller sets are touched.
 // UpdateActions is a tri-state flag so callers can leave the existing

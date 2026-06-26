@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.RegisterShelf;
+namespace DTMS.Facility.Application.Commands.RegisterShelf;
 
 public record RegisterShelfCommand(
     Guid MapId,

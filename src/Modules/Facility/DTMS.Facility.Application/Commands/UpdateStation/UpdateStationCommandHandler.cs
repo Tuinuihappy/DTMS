@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Facility.Application.Commands;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Application.Commands;
+using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.UpdateStation;
+namespace DTMS.Facility.Application.Commands.UpdateStation;
 
 internal sealed class UpdateStationCommandHandler : ICommandHandler<UpdateStationCommand>
 {

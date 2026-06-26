@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Caching.Distributed;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Queries.GetRouteCost;
+namespace DTMS.Facility.Application.Queries.GetRouteCost;
 
 public record RouteCostDto(Guid FromStationId, Guid ToStationId, double Cost, double DistanceMm);
 

@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Facility.Domain.Events;
+namespace DTMS.Facility.Domain.Events;
 
 // Domain events emitted by the Warehouse aggregate. Used by:
 //   - Audit / integration event mapper (publish as integration events)

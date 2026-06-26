@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.SyncMapStations;
+namespace DTMS.Facility.Application.Commands.SyncMapStations;
 
 public record SyncMapStationsCommand(Guid MapId) : ICommand<SyncMapStationsResult>;
 

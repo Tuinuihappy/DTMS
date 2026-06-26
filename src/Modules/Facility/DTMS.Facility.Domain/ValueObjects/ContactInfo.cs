@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Facility.Domain.ValueObjects;
+namespace DTMS.Facility.Domain.ValueObjects;
 
 /// <summary>
 /// Primary contact at a warehouse — used by Manual operators to call

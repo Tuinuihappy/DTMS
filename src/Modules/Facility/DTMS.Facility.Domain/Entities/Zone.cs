@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Facility.Domain.ValueObjects;
+using DTMS.Facility.Domain.ValueObjects;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Facility.Domain.Entities;
+namespace DTMS.Facility.Domain.Entities;
 
 public class Zone : Entity<Guid>
 {

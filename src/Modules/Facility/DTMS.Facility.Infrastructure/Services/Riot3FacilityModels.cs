@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace AMR.DeliveryPlanning.Facility.Infrastructure.Services;
+namespace DTMS.Facility.Infrastructure.Services;
 
 public sealed class Riot3MapListResponse
 {

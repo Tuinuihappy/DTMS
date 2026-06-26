@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
-using AMR.DeliveryPlanning.Facility.Application.Services;
+using DTMS.Facility.Application.Services;
 using DoWarehouseLookupResult = AMR.DeliveryPlanning.DeliveryOrder.Application.Services.WarehouseLookupResult;
-using FacilityWarehouseLookupResult = AMR.DeliveryPlanning.Facility.Application.Services.WarehouseLookupResult;
+using FacilityWarehouseLookupResult = DTMS.Facility.Application.Services.WarehouseLookupResult;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
 

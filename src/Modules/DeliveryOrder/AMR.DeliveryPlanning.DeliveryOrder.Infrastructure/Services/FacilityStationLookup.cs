@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
-using AMR.DeliveryPlanning.Facility.Application.Services;
+using DTMS.Facility.Application.Services;
 using DoStationLookupResult = AMR.DeliveryPlanning.DeliveryOrder.Application.Services.StationLookupResult;
-using FacilityStationLookupResult = AMR.DeliveryPlanning.Facility.Application.Services.StationLookupResult;
+using FacilityStationLookupResult = DTMS.Facility.Application.Services.StationLookupResult;
 
 namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
 

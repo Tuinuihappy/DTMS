@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Facility.Application.Services;
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
-using AMR.DeliveryPlanning.Facility.Domain.ValueObjects;
+using DTMS.Facility.Application.Services;
+using DTMS.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.ValueObjects;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.ImportMapFromRiot3;
+namespace DTMS.Facility.Application.Commands.ImportMapFromRiot3;
 
 internal sealed class ImportMapFromRiot3CommandHandler
     : ICommandHandler<ImportMapFromRiot3Command, ImportMapFromRiot3Result>

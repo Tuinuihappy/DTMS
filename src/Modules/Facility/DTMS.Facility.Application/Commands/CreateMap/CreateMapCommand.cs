@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.CreateMap;
+namespace DTMS.Facility.Application.Commands.CreateMap;
 
 public record CreateMapCommand(
     string Name,

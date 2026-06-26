@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Facility.Domain.Enums;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Enums;
+using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Queries.GetShelfByRfid;
+namespace DTMS.Facility.Application.Queries.GetShelfByRfid;
 
 public record ShelfDto(
     Guid Id,

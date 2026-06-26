@@ -1,9 +1,9 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.Facility.Domain.Events;
-using AMR.DeliveryPlanning.Facility.Domain.ValueObjects;
+using DTMS.Facility.Domain.Events;
+using DTMS.Facility.Domain.ValueObjects;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Facility.Domain.Entities;
+namespace DTMS.Facility.Domain.Entities;
 
 /// <summary>
 /// First-class warehouse / site / delivery address aggregate. Promoted

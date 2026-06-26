@@ -1,11 +1,11 @@
-using AMR.DeliveryPlanning.Facility.Application.Commands;
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
-using AMR.DeliveryPlanning.Facility.Domain.ValueObjects;
+using DTMS.Facility.Application.Commands;
+using DTMS.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.ValueObjects;
 using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.AddStation;
+namespace DTMS.Facility.Application.Commands.AddStation;
 
 internal sealed class AddStationCommandHandler : ICommandHandler<AddStationCommand, Guid>
 {

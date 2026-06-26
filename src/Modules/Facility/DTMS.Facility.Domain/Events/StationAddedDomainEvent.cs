@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Facility.Domain.Events;
+namespace DTMS.Facility.Domain.Events;
 
 public record StationAddedDomainEvent(Guid MapId, Guid StationId) : IDomainEvent
 {

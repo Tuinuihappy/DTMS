@@ -364,7 +364,7 @@ public static class PlanningEndpoints
         orderTemplates.MapPost("/", async (
             CreateOrderTemplateRequest req,
             ISender sender,
-            AMR.DeliveryPlanning.Facility.Application.Services.IFacilityReadService facilityReadService) =>
+            DTMS.Facility.Application.Services.IFacilityReadService facilityReadService) =>
         {
             IReadOnlyList<OrderTemplateMission> missions;
             try
@@ -448,7 +448,7 @@ public static class PlanningEndpoints
                 Guid id,
                 UpdateOrderTemplateRequest req,
                 ISender sender,
-                AMR.DeliveryPlanning.Facility.Application.Services.IFacilityReadService facilityReadService) =>
+                DTMS.Facility.Application.Services.IFacilityReadService facilityReadService) =>
             {
                 IReadOnlyList<OrderTemplateMission> missions;
                 try
@@ -562,7 +562,7 @@ internal static partial class StationCodeHelpers
     public static async Task<StationCodeResolution> ResolveStationCodeAsync(
         string? code,
         string fieldName,
-        AMR.DeliveryPlanning.Facility.Application.Services.IFacilityReadService facilityReadService)
+        DTMS.Facility.Application.Services.IFacilityReadService facilityReadService)
     {
         if (string.IsNullOrWhiteSpace(code))
             return StationCodeResolution.Ok(null);

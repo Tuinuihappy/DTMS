@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace AMR.DeliveryPlanning.Facility.Infrastructure.Data;
+namespace DTMS.Facility.Infrastructure.Data;
 
 public class FacilityDbContextFactory : IDesignTimeDbContextFactory<FacilityDbContext>
 {

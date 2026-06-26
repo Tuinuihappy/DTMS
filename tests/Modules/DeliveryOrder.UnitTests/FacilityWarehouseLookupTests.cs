@@ -1,10 +1,10 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
-using AMR.DeliveryPlanning.Facility.Application.Services;
+using DTMS.Facility.Application.Services;
 using FluentAssertions;
 using NSubstitute;
 using DoLookup = AMR.DeliveryPlanning.DeliveryOrder.Application.Services.WarehouseLookupResult;
-using FacilityLookup = AMR.DeliveryPlanning.Facility.Application.Services.WarehouseLookupResult;
+using FacilityLookup = DTMS.Facility.Application.Services.WarehouseLookupResult;
 
 namespace DeliveryOrder.UnitTests;
 

@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Entities;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.AddStation;
+namespace DTMS.Facility.Application.Commands.AddStation;
 
 // Caller-facing shape for an action entry inside AddStationCommand.Actions.
 // Plain DTO mirroring StationAction value object so the Application layer

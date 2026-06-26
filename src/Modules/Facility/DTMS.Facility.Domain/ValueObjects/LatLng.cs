@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Facility.Domain.ValueObjects;
+namespace DTMS.Facility.Domain.ValueObjects;
 
 /// <summary>
 /// WGS84 geographic coordinate (decimal degrees). Used for warehouse

@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
-using AMR.DeliveryPlanning.Facility.Domain.ValueObjects;
+using DTMS.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.ValueObjects;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.UpdateWarehouse;
+namespace DTMS.Facility.Application.Commands.UpdateWarehouse;
 
 internal sealed class UpdateWarehouseCommandHandler : ICommandHandler<UpdateWarehouseCommand>
 {

@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Entities;
 
-namespace AMR.DeliveryPlanning.Facility.Domain.Repositories;
+namespace DTMS.Facility.Domain.Repositories;
 
 /// <summary>
 /// Persistence boundary for <see cref="Warehouse"/>. Concrete impl

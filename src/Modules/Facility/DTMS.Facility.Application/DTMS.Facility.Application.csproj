@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\AMR.DeliveryPlanning.Facility.Domain\AMR.DeliveryPlanning.Facility.Domain.csproj" />
+    <ProjectReference Include="..\DTMS.Facility.Domain\DTMS.Facility.Domain.csproj" />
     <ProjectReference Include="..\..\..\DTMS.SharedKernel\DTMS.SharedKernel.csproj" />
   </ItemGroup>
 

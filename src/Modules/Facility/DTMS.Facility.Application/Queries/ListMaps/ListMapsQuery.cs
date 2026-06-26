@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Queries.ListMaps;
+namespace DTMS.Facility.Application.Queries.ListMaps;
 
 public record ListMapsQuery() : IQuery<IReadOnlyList<MapSummaryDto>>;
 

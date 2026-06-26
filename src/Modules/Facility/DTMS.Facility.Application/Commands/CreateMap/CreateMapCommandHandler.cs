@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.CreateMap;
+namespace DTMS.Facility.Application.Commands.CreateMap;
 
 internal sealed class CreateMapCommandHandler : ICommandHandler<CreateMapCommand, Guid>
 {

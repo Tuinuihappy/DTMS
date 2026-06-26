@@ -19,11 +19,11 @@
     <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Presentation/AMR.DeliveryPlanning.Dispatch.Presentation.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Facility/">
-    <Project Path="src/Modules/Facility/AMR.DeliveryPlanning.Facility.Application/AMR.DeliveryPlanning.Facility.Application.csproj" />
-    <Project Path="src/Modules/Facility/AMR.DeliveryPlanning.Facility.Domain/AMR.DeliveryPlanning.Facility.Domain.csproj" />
-    <Project Path="src/Modules/Facility/AMR.DeliveryPlanning.Facility.Infrastructure/AMR.DeliveryPlanning.Facility.Infrastructure.csproj" />
+    <Project Path="src/Modules/Facility/DTMS.Facility.Application/DTMS.Facility.Application.csproj" />
+    <Project Path="src/Modules/Facility/DTMS.Facility.Domain/DTMS.Facility.Domain.csproj" />
+    <Project Path="src/Modules/Facility/DTMS.Facility.Infrastructure/DTMS.Facility.Infrastructure.csproj" />
     <Project Path="src/Modules/Facility/DTMS.Facility.IntegrationEvents/DTMS.Facility.IntegrationEvents.csproj" />
-    <Project Path="src/Modules/Facility/AMR.DeliveryPlanning.Facility.Presentation/AMR.DeliveryPlanning.Facility.Presentation.csproj" />
+    <Project Path="src/Modules/Facility/DTMS.Facility.Presentation/DTMS.Facility.Presentation.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Fleet/">
     <Project Path="src/Modules/Fleet/AMR.DeliveryPlanning.Fleet.Application/AMR.DeliveryPlanning.Fleet.Application.csproj" />

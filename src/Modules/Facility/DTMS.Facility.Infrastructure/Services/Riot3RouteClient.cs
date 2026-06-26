@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Facility.Infrastructure.Services;
+namespace DTMS.Facility.Infrastructure.Services;
 
 public interface IRiot3RouteClient
 {

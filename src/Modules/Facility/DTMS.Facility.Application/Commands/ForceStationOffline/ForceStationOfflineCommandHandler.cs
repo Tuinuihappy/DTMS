@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.ForceStationOffline;
+namespace DTMS.Facility.Application.Commands.ForceStationOffline;
 
 internal sealed class ForceStationOfflineCommandHandler : ICommandHandler<ForceStationOfflineCommand>
 {

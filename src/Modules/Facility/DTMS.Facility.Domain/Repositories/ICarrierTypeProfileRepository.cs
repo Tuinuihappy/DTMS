@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Entities;
 
-namespace AMR.DeliveryPlanning.Facility.Domain.Repositories;
+namespace DTMS.Facility.Domain.Repositories;
 
 public interface ICarrierTypeProfileRepository
 {

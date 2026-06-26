@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Facility.Domain.Enums;
+using DTMS.Facility.Domain.Enums;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Facility.Domain.Entities;
+namespace DTMS.Facility.Domain.Entities;
 
 public class Shelf : AggregateRoot<Guid>
 {

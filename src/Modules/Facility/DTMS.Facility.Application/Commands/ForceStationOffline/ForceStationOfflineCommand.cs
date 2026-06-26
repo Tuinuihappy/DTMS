@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.ForceStationOffline;
+namespace DTMS.Facility.Application.Commands.ForceStationOffline;
 
 public record ForceStationOfflineCommand(
     Guid StationId,

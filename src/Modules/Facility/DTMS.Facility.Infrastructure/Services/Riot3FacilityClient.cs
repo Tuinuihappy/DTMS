@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
-using AMR.DeliveryPlanning.Facility.Application.Services;
+using DTMS.Facility.Application.Services;
 
-namespace AMR.DeliveryPlanning.Facility.Infrastructure.Services;
+namespace DTMS.Facility.Infrastructure.Services;
 
 public sealed class Riot3FacilityClient : IRiot3FacilityClient
 {

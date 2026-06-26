@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.WarehouseLifecycle;
+namespace DTMS.Facility.Application.Commands.WarehouseLifecycle;
 
 // Lifecycle pair — co-located because each is < 30 lines and reasoning
 // about one without the other is rare. Soft-delete semantics: data

@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Facility.Domain.Entities;
+namespace DTMS.Facility.Domain.Entities;
 
 public enum FacilityResourceType { Door, AirShowerDoor, Elevator, Charger, Stopper, TrafficArea }
 

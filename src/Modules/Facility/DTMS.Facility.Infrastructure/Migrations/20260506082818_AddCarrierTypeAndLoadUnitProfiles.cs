@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Facility.Infrastructure.Migrations
+namespace DTMS.Facility.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class AddCarrierTypeAndLoadUnitProfiles : Migration

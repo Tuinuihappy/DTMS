@@ -1,5 +1,5 @@
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using DTMS.Transport.Manual.Application.Services;
 using DTMS.Transport.Manual.Domain.Repositories;

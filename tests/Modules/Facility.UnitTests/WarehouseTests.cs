@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
-using AMR.DeliveryPlanning.Facility.Domain.Events;
-using AMR.DeliveryPlanning.Facility.Domain.ValueObjects;
+using DTMS.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Events;
+using DTMS.Facility.Domain.ValueObjects;
 using FluentAssertions;
 
 namespace Facility.UnitTests;

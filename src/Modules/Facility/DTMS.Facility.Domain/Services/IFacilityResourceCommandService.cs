@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Facility.Domain.Services;
+namespace DTMS.Facility.Domain.Services;
 
 public interface IFacilityResourceCommandService
 {

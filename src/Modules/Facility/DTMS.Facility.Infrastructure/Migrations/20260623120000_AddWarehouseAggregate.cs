@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Facility.Infrastructure.Data;
+using DTMS.Facility.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Facility.Infrastructure.Migrations
+namespace DTMS.Facility.Infrastructure.Migrations
 {
     /// <summary>
     /// PHASE: 2.2 — first multi-mode transport schema addition (per ADR-002).

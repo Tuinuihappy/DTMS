@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Queries.GetCarrierTypeProfiles;
+namespace DTMS.Facility.Application.Queries.GetCarrierTypeProfiles;
 
 public record CarrierTypeProfileDto(
     Guid Id,

@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.Facility.Application.Commands.CreateWarehouse;
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Application.Commands.CreateWarehouse;
+using DTMS.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Repositories;
 using FluentAssertions;
 using NSubstitute;
 

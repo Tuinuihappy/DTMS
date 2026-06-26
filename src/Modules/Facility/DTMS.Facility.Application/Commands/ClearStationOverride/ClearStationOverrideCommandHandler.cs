@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.ClearStationOverride;
+namespace DTMS.Facility.Application.Commands.ClearStationOverride;
 
 internal sealed class ClearStationOverrideCommandHandler : ICommandHandler<ClearStationOverrideCommand>
 {

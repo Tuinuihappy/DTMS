@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.UpdateWarehouse;
+namespace DTMS.Facility.Application.Commands.UpdateWarehouse;
 
 /// <summary>
 /// Partial-update for a Warehouse. Every field is nullable — null means

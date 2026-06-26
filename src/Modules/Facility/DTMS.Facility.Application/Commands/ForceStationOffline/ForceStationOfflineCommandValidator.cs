@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.ForceStationOffline;
+namespace DTMS.Facility.Application.Commands.ForceStationOffline;
 
 public class ForceStationOfflineCommandValidator : AbstractValidator<ForceStationOfflineCommand>
 {

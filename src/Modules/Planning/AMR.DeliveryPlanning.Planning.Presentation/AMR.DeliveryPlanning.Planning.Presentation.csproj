@@ -2,7 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AMR.DeliveryPlanning.Planning.Application\AMR.DeliveryPlanning.Planning.Application.csproj" />
-    <ProjectReference Include="..\..\Facility\AMR.DeliveryPlanning.Facility.Application\AMR.DeliveryPlanning.Facility.Application.csproj" />
+    <ProjectReference Include="..\..\Facility\DTMS.Facility.Application\DTMS.Facility.Application.csproj" />
     <ProjectReference Include="..\..\..\DTMS.SharedKernel\DTMS.SharedKernel.csproj" />
   </ItemGroup>
 

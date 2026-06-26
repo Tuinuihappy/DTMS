@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Queries.GetWarehouseById;
+namespace DTMS.Facility.Application.Queries.GetWarehouseById;
 
 /// <summary>
 /// Full warehouse detail — includes the geofence WKT, full address,

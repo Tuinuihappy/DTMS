@@ -1,15 +1,15 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.Facility.Application.Commands.CreateWarehouse;
-using AMR.DeliveryPlanning.Facility.Application.Commands.UpdateWarehouse;
-using AMR.DeliveryPlanning.Facility.Application.Commands.WarehouseLifecycle;
-using AMR.DeliveryPlanning.Facility.Application.Queries.GetWarehouseById;
-using AMR.DeliveryPlanning.Facility.Application.Queries.GetWarehouses;
+using DTMS.Facility.Application.Commands.CreateWarehouse;
+using DTMS.Facility.Application.Commands.UpdateWarehouse;
+using DTMS.Facility.Application.Commands.WarehouseLifecycle;
+using DTMS.Facility.Application.Queries.GetWarehouseById;
+using DTMS.Facility.Application.Queries.GetWarehouses;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace AMR.DeliveryPlanning.Facility.Presentation;
+namespace DTMS.Facility.Presentation;
 
 /// <summary>
 /// Warehouse CRUD endpoints (Phase 2.7a). Kept in a separate file from

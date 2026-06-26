@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Facility.Infrastructure.Data;
+namespace DTMS.Facility.Infrastructure.Data;
 
 public class FacilityDbContext : DbContext
 {
@@ -80,8 +80,8 @@ public class FacilityDbContext : DbContext
                             (System.Text.Json.JsonSerializerOptions?)null),
                     v => string.IsNullOrEmpty(v)
                         ? null
-                        : (IReadOnlyDictionary<string, AMR.DeliveryPlanning.Facility.Domain.ValueObjects.StationAction>?)
-                          System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, AMR.DeliveryPlanning.Facility.Domain.ValueObjects.StationAction>>(
+                        : (IReadOnlyDictionary<string, DTMS.Facility.Domain.ValueObjects.StationAction>?)
+                          System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, DTMS.Facility.Domain.ValueObjects.StationAction>>(
                               v,
                               (System.Text.Json.JsonSerializerOptions?)null))
                 .HasColumnType("jsonb");

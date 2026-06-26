@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Queries.GetWarehouses;
+namespace DTMS.Facility.Application.Queries.GetWarehouses;
 
 /// <summary>
 /// Flat DTO for warehouse list responses. Mirrors the aggregate shape

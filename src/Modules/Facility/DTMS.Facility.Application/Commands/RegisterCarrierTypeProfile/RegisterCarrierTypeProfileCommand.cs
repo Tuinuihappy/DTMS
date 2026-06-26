@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.RegisterCarrierTypeProfile;
+namespace DTMS.Facility.Application.Commands.RegisterCarrierTypeProfile;
 
 public record RegisterCarrierTypeProfileCommand(
     string Code,

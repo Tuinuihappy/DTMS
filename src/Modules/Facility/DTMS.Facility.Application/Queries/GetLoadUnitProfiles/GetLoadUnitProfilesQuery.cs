@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Queries.GetLoadUnitProfiles;
+namespace DTMS.Facility.Application.Queries.GetLoadUnitProfiles;
 
 public record LoadUnitProfileDto(
     Guid Id,

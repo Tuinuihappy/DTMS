@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Facility.Domain.Events;
+namespace DTMS.Facility.Domain.Events;
 
 public record TopologyOverlayActivatedDomainEvent(Guid EventId, DateTime OccurredOn, Guid MapId, Guid OverlayId, string OverlayType) : IDomainEvent;
 public record TopologyOverlayExpiredDomainEvent(Guid EventId, DateTime OccurredOn, Guid MapId, Guid OverlayId) : IDomainEvent;

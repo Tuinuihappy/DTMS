@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Entities;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.ImportMapFromRiot3;
+namespace DTMS.Facility.Application.Commands.ImportMapFromRiot3;
 
 public record ImportMapFromRiot3Command(int Riot3MapId) : ICommand<ImportMapFromRiot3Result>;
 

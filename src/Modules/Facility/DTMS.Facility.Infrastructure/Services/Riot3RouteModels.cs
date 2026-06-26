@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace AMR.DeliveryPlanning.Facility.Infrastructure.Services;
+namespace DTMS.Facility.Infrastructure.Services;
 
 // NOTE: Response shapes are modelled from RIOT3 v4 API conventions.
 //       Verify against actual vendor spec before go-live.

@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Facility.Application.Services;
+namespace DTMS.Facility.Application.Services;
 
 // Vendor action config keyed by intent in StationVendorTarget.Actions
 // (e.g. "lift", "drop"). Plain data DTO so the Application layer does

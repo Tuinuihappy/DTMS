@@ -1,28 +1,28 @@
-using AMR.DeliveryPlanning.Facility.Application.Commands.AddStation;
-using AMR.DeliveryPlanning.Facility.Application.Commands.ClearStationOverride;
-using AMR.DeliveryPlanning.Facility.Application.Commands.CreateMap;
-using AMR.DeliveryPlanning.Facility.Application.Commands.ForceStationOffline;
-using AMR.DeliveryPlanning.Facility.Application.Commands.ImportMapFromRiot3;
-using AMR.DeliveryPlanning.Facility.Application.Commands.UpdateStation;
-using AMR.DeliveryPlanning.Facility.Application.Commands.FacilityResource;
-using AMR.DeliveryPlanning.Facility.Application.Commands.RegisterCarrierTypeProfile;
-using AMR.DeliveryPlanning.Facility.Application.Commands.ReleaseShelf;
-using AMR.DeliveryPlanning.Facility.Application.Commands.RegisterLoadUnitProfile;
-using AMR.DeliveryPlanning.Facility.Application.Commands.SyncMapStations;
-using AMR.DeliveryPlanning.Facility.Application.Commands.TopologyOverlay;
-using AMR.DeliveryPlanning.Facility.Application.Queries.GetCarrierTypeProfiles;
-using AMR.DeliveryPlanning.Facility.Application.Queries.GetLoadUnitProfiles;
-using AMR.DeliveryPlanning.Facility.Application.Queries.GetMapById;
-using AMR.DeliveryPlanning.Facility.Application.Queries.GetRouteCost;
-using AMR.DeliveryPlanning.Facility.Application.Queries.GetStations;
-using AMR.DeliveryPlanning.Facility.Application.Queries.ListMaps;
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
+using DTMS.Facility.Application.Commands.AddStation;
+using DTMS.Facility.Application.Commands.ClearStationOverride;
+using DTMS.Facility.Application.Commands.CreateMap;
+using DTMS.Facility.Application.Commands.ForceStationOffline;
+using DTMS.Facility.Application.Commands.ImportMapFromRiot3;
+using DTMS.Facility.Application.Commands.UpdateStation;
+using DTMS.Facility.Application.Commands.FacilityResource;
+using DTMS.Facility.Application.Commands.RegisterCarrierTypeProfile;
+using DTMS.Facility.Application.Commands.ReleaseShelf;
+using DTMS.Facility.Application.Commands.RegisterLoadUnitProfile;
+using DTMS.Facility.Application.Commands.SyncMapStations;
+using DTMS.Facility.Application.Commands.TopologyOverlay;
+using DTMS.Facility.Application.Queries.GetCarrierTypeProfiles;
+using DTMS.Facility.Application.Queries.GetLoadUnitProfiles;
+using DTMS.Facility.Application.Queries.GetMapById;
+using DTMS.Facility.Application.Queries.GetRouteCost;
+using DTMS.Facility.Application.Queries.GetStations;
+using DTMS.Facility.Application.Queries.ListMaps;
+using DTMS.Facility.Domain.Entities;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace AMR.DeliveryPlanning.Facility.Presentation;
+namespace DTMS.Facility.Presentation;
 
 public static class MapEndpoints
 {

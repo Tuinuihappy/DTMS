@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.CreateWarehouse;
+namespace DTMS.Facility.Application.Commands.CreateWarehouse;
 
 /// <summary>
 /// Create a new Warehouse (per ADR-002 — Phase 2.1/2.6 plumbing).

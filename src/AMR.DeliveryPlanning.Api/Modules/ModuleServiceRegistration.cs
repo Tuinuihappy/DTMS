@@ -11,12 +11,12 @@ using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Services;
-using AMR.DeliveryPlanning.Facility.Application.Services;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
-using AMR.DeliveryPlanning.Facility.Domain.Services;
-using AMR.DeliveryPlanning.Facility.Infrastructure.Data;
-using AMR.DeliveryPlanning.Facility.Infrastructure.Repositories;
-using AMR.DeliveryPlanning.Facility.Infrastructure.Services;
+using DTMS.Facility.Application.Services;
+using DTMS.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Services;
+using DTMS.Facility.Infrastructure.Data;
+using DTMS.Facility.Infrastructure.Repositories;
+using DTMS.Facility.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using AMR.DeliveryPlanning.Fleet.Application.Consumers;
 using AMR.DeliveryPlanning.Fleet.Application.Services;
@@ -151,7 +151,7 @@ public static class ModuleServiceRegistration
         })
         .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
         .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
-        services.AddHttpClient<AMR.DeliveryPlanning.Facility.Application.Services.IRiot3FacilityClient, Riot3FacilityClient>(client =>
+        services.AddHttpClient<DTMS.Facility.Application.Services.IRiot3FacilityClient, Riot3FacilityClient>(client =>
         {
             client.BaseAddress = new Uri(riot3BaseUrl);
             client.Timeout = TimeSpan.FromSeconds(15);

@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Queries.GetMapById;
+namespace DTMS.Facility.Application.Queries.GetMapById;
 
 internal sealed class GetMapByIdQueryHandler : IQueryHandler<GetMapByIdQuery, MapDto>
 {

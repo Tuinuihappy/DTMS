@@ -1,10 +1,10 @@
 using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
-using AMR.DeliveryPlanning.Facility.Domain.Repositories;
-using AMR.DeliveryPlanning.Facility.Domain.ValueObjects;
+using DTMS.Facility.Domain.Entities;
+using DTMS.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.ValueObjects;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Facility.Application.Commands.CreateWarehouse;
+namespace DTMS.Facility.Application.Commands.CreateWarehouse;
 
 internal sealed class CreateWarehouseCommandHandler : ICommandHandler<CreateWarehouseCommand, Guid>
 {

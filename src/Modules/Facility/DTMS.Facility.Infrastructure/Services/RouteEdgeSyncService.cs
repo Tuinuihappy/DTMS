@@ -1,11 +1,11 @@
-using AMR.DeliveryPlanning.Facility.Domain.Entities;
-using AMR.DeliveryPlanning.Facility.Infrastructure.Data;
+using DTMS.Facility.Domain.Entities;
+using DTMS.Facility.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Facility.Infrastructure.Services;
+namespace DTMS.Facility.Infrastructure.Services;
 
 /// <summary>
 /// Periodically pulls route costs from RIOT3 and upserts them into facility.RouteEdges.
