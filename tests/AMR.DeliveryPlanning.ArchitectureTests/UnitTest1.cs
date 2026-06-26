@@ -58,7 +58,7 @@ public class ModuleBoundaryTests
             Path.Combine(repoRoot, "src", "Modules", "Dispatch", "AMR.DeliveryPlanning.Dispatch.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Fleet", "AMR.DeliveryPlanning.Fleet.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Fleet", "AMR.DeliveryPlanning.Fleet.Application", "Consumers"),
-            Path.Combine(repoRoot, "src", "Modules", "Transport.Amr", "AMR.DeliveryPlanning.Transport.Amr.Feeder", "Webhooks")
+            Path.Combine(repoRoot, "src", "Modules", "Transport.Amr", "AMR.DeliveryPlanning.Transport.Amr", "Webhooks")
         };
 
         var violations = commandRoots

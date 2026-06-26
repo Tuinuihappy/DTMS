@@ -13,7 +13,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Feeder.Webhooks;
+namespace AMR.DeliveryPlanning.Transport.Amr.Webhooks;
 
 public static class Riot3Webhooks
 {

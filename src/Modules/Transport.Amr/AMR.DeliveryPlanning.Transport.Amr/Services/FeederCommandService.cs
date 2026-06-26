@@ -2,7 +2,7 @@ using AMR.DeliveryPlanning.Transport.Abstractions.Models;
 using AMR.DeliveryPlanning.Transport.Abstractions.Services;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Feeder.Services;
+namespace AMR.DeliveryPlanning.Transport.Amr.Services;
 
 public class FeederCommandService : IVehicleCommandService
 {

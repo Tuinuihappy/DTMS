@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Amr.Feeder.Options;
+namespace AMR.DeliveryPlanning.Transport.Amr.Options;
 
 /// <summary>
 /// Configuration for the RIOT3 reconciliation poller. The poller is the

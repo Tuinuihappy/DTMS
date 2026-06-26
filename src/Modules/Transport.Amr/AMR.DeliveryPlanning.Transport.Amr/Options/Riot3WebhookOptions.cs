@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Transport.Amr.Feeder.Options;
+namespace AMR.DeliveryPlanning.Transport.Amr.Options;
 
 /// <summary>
 /// Auth gates for the RIOT3 webhook endpoint. RIOT3 v4 has no built-in

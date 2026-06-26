@@ -2,7 +2,7 @@ using AMR.DeliveryPlanning.Dispatch.Application.Projections;
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Domain.Services;
-using AMR.DeliveryPlanning.Transport.Amr.Feeder.Options;
+using AMR.DeliveryPlanning.Transport.Amr.Options;
 using AMR.DeliveryPlanning.Transport.Amr.Models;
 using AMR.DeliveryPlanning.Transport.Amr.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,7 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Feeder.Services;
+namespace AMR.DeliveryPlanning.Transport.Amr.Services;
 
 /// <summary>
 /// Polls RIOT3 for envelope-dispatched trips that haven't reached a

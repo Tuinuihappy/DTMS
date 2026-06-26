@@ -5,7 +5,7 @@ using AMR.DeliveryPlanning.Transport.Amr.Services;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Transport.Amr.Feeder.Consumers;
+namespace AMR.DeliveryPlanning.Transport.Amr.Consumers;
 
 /// <summary>
 /// When a Trip reaches a terminal state (Completed / Failed / Cancelled),

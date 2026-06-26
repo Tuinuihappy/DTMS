@@ -540,10 +540,10 @@ public static class ModuleServiceRegistration
                 typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly,
                 typeof(AMR.DeliveryPlanning.Dispatch.Application.Commands.CreateEnvelopeTrip.CreateEnvelopeTripCommand).Assembly,
                 typeof(VehicleStateChangedConsumer).Assembly,
-                // VendorAdapter.Feeder hosts CaptureFinalSnapshotConsumer — must
+                // Transport.Amr hosts CaptureFinalSnapshotConsumer — must
                 // be scanned explicitly; otherwise terminal-state events go
                 // past it and the snapshot is never persisted.
-                typeof(AMR.DeliveryPlanning.Transport.Amr.Feeder.Consumers.CaptureFinalSnapshotConsumer).Assembly
+                typeof(AMR.DeliveryPlanning.Transport.Amr.Consumers.CaptureFinalSnapshotConsumer).Assembly
             );
 
             // T2 POC — opt-in Saga registration. While disabled the saga's

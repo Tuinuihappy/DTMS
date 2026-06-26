@@ -1,7 +1,6 @@
 using AMR.DeliveryPlanning.Transport.Abstractions.Services;
-using AMR.DeliveryPlanning.Transport.Amr.Feeder.Options;
-using AMR.DeliveryPlanning.Transport.Amr.Feeder.Services;
-using AMR.DeliveryPlanning.Transport.Amr.Feeder.Webhooks;
+using AMR.DeliveryPlanning.Transport.Amr.Options;
+using AMR.DeliveryPlanning.Transport.Amr.Webhooks;
 using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Data;
 using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Extensions;
 using AMR.DeliveryPlanning.Transport.Amr.Infrastructure.Services;
