@@ -117,11 +117,19 @@ services:
       HEALTHCHECK_PORT: 8080
 
   rabbitmq:
-    image: rabbitmq:3.13-management-alpine
+    # masstransit/rabbitmq:3.13 = official rabbitmq:3.13 + rabbitmq_delayed_message_exchange
+    # plugin pre-installed + enabled. Required because MassTransit's
+    # UseDelayedRedelivery (configured in ModuleServiceRegistration) declares
+    # an x-delayed-message exchange on retry-after-immediate-fail; vanilla
+    # rabbitmq:3.13 does not ship that exchange type and the declare fails
+    # with PRECONDITION_FAILED, leaving fault consumers in a Degraded state.
+    image: masstransit/rabbitmq:3.13
     container_name: dtms-rabbitmq
     ports:
       - "5672:5672"
       - "15672:15672"
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
     mem_limit: 512m
     logging: *default-logging
     environment:
@@ -532,3 +540,4 @@ services:
 volumes:
   pgdata:
   miniodata:
+  rabbitmqdata:
