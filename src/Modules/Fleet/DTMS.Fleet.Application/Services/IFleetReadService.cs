@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Fleet.Application.Services;
+namespace DTMS.Fleet.Application.Services;
 
 public sealed record FleetVehicleAvailability(
     Guid VehicleId,

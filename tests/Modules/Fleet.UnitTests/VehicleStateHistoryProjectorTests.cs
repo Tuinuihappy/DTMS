@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.Fleet.Application.Projections;
+using DTMS.Fleet.Application.Projections;
 using DTMS.Fleet.IntegrationEvents;
 using DTMS.SharedKernel.Projection;
 using FluentAssertions;

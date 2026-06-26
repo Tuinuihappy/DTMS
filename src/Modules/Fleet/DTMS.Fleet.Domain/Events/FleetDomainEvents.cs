@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Fleet.Domain.Enums;
+using DTMS.Fleet.Domain.Enums;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Fleet.Domain.Events;
+namespace DTMS.Fleet.Domain.Events;
 
 public record VehicleRegisteredDomainEvent(Guid VehicleId, string VehicleName) : IDomainEvent
 {

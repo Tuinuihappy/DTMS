@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Fleet.Application.Projections;
-using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
+using DTMS.Fleet.Application.Projections;
+using DTMS.Fleet.Infrastructure.Data;
 using DTMS.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Projections;
+namespace DTMS.Fleet.Infrastructure.Projections;
 
 public class VehicleStateHistoryProjectionStore : IVehicleStateHistoryProjectionStore
 {

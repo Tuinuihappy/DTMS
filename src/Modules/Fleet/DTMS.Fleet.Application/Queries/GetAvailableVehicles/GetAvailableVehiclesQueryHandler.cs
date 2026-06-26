@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
+using DTMS.Fleet.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Queries.GetAvailableVehicles;
+namespace DTMS.Fleet.Application.Queries.GetAvailableVehicles;
 
 internal sealed class GetAvailableVehiclesQueryHandler : IQueryHandler<GetAvailableVehiclesQuery, IReadOnlyList<VehicleDto>>
 {

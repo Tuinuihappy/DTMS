@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Fleet.Domain.Enums;
+using DTMS.Fleet.Domain.Enums;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Commands.UpdateVehicleState;
+namespace DTMS.Fleet.Application.Commands.UpdateVehicleState;
 
 public record UpdateVehicleStateCommand(
     Guid VehicleId,

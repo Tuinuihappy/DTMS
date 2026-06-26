@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Services;
+namespace DTMS.Fleet.Application.Services;
 
 public interface IFleetOutbox
 {

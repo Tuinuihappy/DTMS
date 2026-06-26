@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Fleet.Application.Services;
+namespace DTMS.Fleet.Application.Services;
 
 public record Riot3RobotInfo(
     string DeviceKey,

@@ -3,7 +3,7 @@ using DTMS.SharedKernel.Projection;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Projections;
+namespace DTMS.Fleet.Application.Projections;
 
 /// <summary>
 /// Phase P3.2 — Materializes per-vehicle state transitions from

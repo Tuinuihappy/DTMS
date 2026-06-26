@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Migrations
+namespace DTMS.Fleet.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class RemoveTenantId : Migration

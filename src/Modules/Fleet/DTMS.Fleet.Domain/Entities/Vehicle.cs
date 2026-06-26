@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Fleet.Domain.Enums;
-using AMR.DeliveryPlanning.Fleet.Domain.Events;
+using DTMS.Fleet.Domain.Enums;
+using DTMS.Fleet.Domain.Events;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Fleet.Domain.Entities;
+namespace DTMS.Fleet.Domain.Entities;
 
 public class Vehicle : AggregateRoot<Guid>
 {

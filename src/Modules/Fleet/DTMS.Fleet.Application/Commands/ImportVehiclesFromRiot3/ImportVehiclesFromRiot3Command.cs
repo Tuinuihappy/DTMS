@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Commands.ImportVehiclesFromRiot3;
+namespace DTMS.Fleet.Application.Commands.ImportVehiclesFromRiot3;
 
 public record ImportVehiclesFromRiot3Command(
     Dictionary<string, Guid> TypeKeyMappings,

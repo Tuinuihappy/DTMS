@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Projections;
+namespace DTMS.Fleet.Infrastructure.Projections;
 
 /// <summary>
 /// Phase P3.2 — Hour-bucketed snapshot of fleet utilization. Written by

@@ -39,8 +39,8 @@
     <ProjectReference Include="..\DTMS.SharedKernel\DTMS.SharedKernel.csproj" />
     <ProjectReference Include="..\Modules\Facility\DTMS.Facility.Presentation\DTMS.Facility.Presentation.csproj" />
     <ProjectReference Include="..\Modules\Facility\DTMS.Facility.Infrastructure\DTMS.Facility.Infrastructure.csproj" />
-    <ProjectReference Include="..\Modules\Fleet\AMR.DeliveryPlanning.Fleet.Presentation\AMR.DeliveryPlanning.Fleet.Presentation.csproj" />
-    <ProjectReference Include="..\Modules\Fleet\AMR.DeliveryPlanning.Fleet.Infrastructure\AMR.DeliveryPlanning.Fleet.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Fleet\DTMS.Fleet.Presentation\DTMS.Fleet.Presentation.csproj" />
+    <ProjectReference Include="..\Modules\Fleet\DTMS.Fleet.Infrastructure\DTMS.Fleet.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Presentation\AMR.DeliveryPlanning.DeliveryOrder.Presentation.csproj" />
     <ProjectReference Include="..\Modules\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Infrastructure\AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Planning\AMR.DeliveryPlanning.Planning.Presentation\AMR.DeliveryPlanning.Planning.Presentation.csproj" />

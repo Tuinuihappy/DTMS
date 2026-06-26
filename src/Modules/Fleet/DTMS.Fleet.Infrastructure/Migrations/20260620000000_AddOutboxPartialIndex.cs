@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
+using DTMS.Fleet.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Migrations
+namespace DTMS.Fleet.Infrastructure.Migrations
 {
     [DbContext(typeof(FleetDbContext))]
     [Migration("20260620000000_AddOutboxPartialIndex")]

@@ -1,9 +1,9 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
-using AMR.DeliveryPlanning.Fleet.Application.Services;
+using DTMS.Fleet.Application.Services;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Services;
+namespace DTMS.Fleet.Infrastructure.Services;
 
 public sealed class Riot3FleetClient : IRiot3FleetClient
 {

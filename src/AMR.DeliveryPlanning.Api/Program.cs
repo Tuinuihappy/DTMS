@@ -145,7 +145,7 @@ else
 builder.Services.AddMediatR(cfg =>
 {
     cfg.RegisterServicesFromAssembly(typeof(DTMS.Facility.Application.Queries.GetRouteCost.GetRouteCostQuery).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Fleet.Application.Consumers.VehicleStateChangedConsumer).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(DTMS.Fleet.Application.Consumers.VehicleStateChangedConsumer).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Dispatch.Application.Commands.CreateEnvelopeTrip.CreateEnvelopeTripCommand).Assembly);
@@ -491,7 +491,7 @@ var app = builder.Build();
                 logger.LogInformation("Migration retry attempt {Attempt}/{Max}", attempt, maxAttempts);
 
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Facility.Infrastructure.Data.FacilityDbContext>(), logger, app.Environment);
-            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Fleet.Infrastructure.Data.FleetDbContext>(), logger, app.Environment);
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Fleet.Infrastructure.Data.FleetDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data.DeliveryOrderDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Planning.Infrastructure.Data.PlanningDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Dispatch.Infrastructure.Data.DispatchDbContext>(), logger, app.Environment);

@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Fleet.Application.Services;
-using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
+using DTMS.Fleet.Application.Services;
+using DTMS.Fleet.Domain.Repositories;
 using DTMS.Fleet.IntegrationEvents;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Consumers;
+namespace DTMS.Fleet.Application.Consumers;
 
 public class VehicleStateChangedConsumer : IConsumer<VehicleStateChangedIntegrationEvent>
 {

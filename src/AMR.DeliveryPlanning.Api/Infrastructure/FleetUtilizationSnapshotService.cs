@@ -1,5 +1,5 @@
 using AMR.DeliveryPlanning.Api.Realtime.Pipeline;
-using AMR.DeliveryPlanning.Fleet.Application.Projections;
+using DTMS.Fleet.Application.Projections;
 
 namespace AMR.DeliveryPlanning.Api.Infrastructure;
 

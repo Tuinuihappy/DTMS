@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Fleet.Application.Services;
-using AMR.DeliveryPlanning.Fleet.Domain.Enums;
-using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
+using DTMS.Fleet.Application.Services;
+using DTMS.Fleet.Domain.Enums;
+using DTMS.Fleet.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Services;
+namespace DTMS.Fleet.Infrastructure.Services;
 
 public sealed class FleetReadService : IFleetReadService
 {

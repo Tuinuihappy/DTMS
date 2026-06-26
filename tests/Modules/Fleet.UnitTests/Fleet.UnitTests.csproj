@@ -23,8 +23,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Modules\Fleet\AMR.DeliveryPlanning.Fleet.Application\AMR.DeliveryPlanning.Fleet.Application.csproj" />
-    <ProjectReference Include="..\..\..\src\Modules\Fleet\AMR.DeliveryPlanning.Fleet.Domain\AMR.DeliveryPlanning.Fleet.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Fleet\DTMS.Fleet.Application\DTMS.Fleet.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Fleet\DTMS.Fleet.Domain\DTMS.Fleet.Domain.csproj" />
   </ItemGroup>
 
 </Project>

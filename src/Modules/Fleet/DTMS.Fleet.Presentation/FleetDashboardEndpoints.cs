@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Fleet.Application.Queries.GetFleetUtilization;
+using DTMS.Fleet.Application.Queries.GetFleetUtilization;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace AMR.DeliveryPlanning.Fleet.Presentation;
+namespace DTMS.Fleet.Presentation;
 
 /// <summary>
 /// Phase P3.2 — Fleet-side dashboard endpoints. Lives alongside the

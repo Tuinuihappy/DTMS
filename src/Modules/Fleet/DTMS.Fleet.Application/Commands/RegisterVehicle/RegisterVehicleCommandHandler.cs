@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Fleet.Domain.Entities;
-using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
+using DTMS.Fleet.Domain.Entities;
+using DTMS.Fleet.Domain.Repositories;
 using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Commands.RegisterVehicle;
+namespace DTMS.Fleet.Application.Commands.RegisterVehicle;
 
 internal sealed class RegisterVehicleCommandHandler : ICommandHandler<RegisterVehicleCommand, Guid>
 {

@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
+namespace DTMS.Fleet.Infrastructure.Data;
 
 // Persistence-only entity — not a domain concept.
 // Represents one row in fleet.VehicleGroupMembers join table.

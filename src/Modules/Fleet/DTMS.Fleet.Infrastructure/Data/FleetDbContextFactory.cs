@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
+namespace DTMS.Fleet.Infrastructure.Data;
 
 public class FleetDbContextFactory : IDesignTimeDbContextFactory<FleetDbContext>
 {

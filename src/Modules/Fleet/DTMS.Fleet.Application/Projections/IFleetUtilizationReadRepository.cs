@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Fleet.Application.Projections;
+namespace DTMS.Fleet.Application.Projections;
 
 public record FleetUtilizationBucketEntry(
     DateTime BucketHour,

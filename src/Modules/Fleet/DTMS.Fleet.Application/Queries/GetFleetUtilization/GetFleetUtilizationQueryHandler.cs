@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Fleet.Application.Projections;
+using DTMS.Fleet.Application.Projections;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Queries.GetFleetUtilization;
+namespace DTMS.Fleet.Application.Queries.GetFleetUtilization;
 
 public class GetFleetUtilizationQueryHandler
     : IQueryHandler<GetFleetUtilizationQuery, FleetUtilizationResponse>

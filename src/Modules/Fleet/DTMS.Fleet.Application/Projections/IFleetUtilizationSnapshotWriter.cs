@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Fleet.Application.Projections;
+namespace DTMS.Fleet.Application.Projections;
 
 /// <summary>
 /// Phase P3.2 — Background-service hook for snapshotting fleet

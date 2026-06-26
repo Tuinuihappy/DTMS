@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Fleet.Domain.Entities;
+using DTMS.Fleet.Domain.Entities;
 
-namespace AMR.DeliveryPlanning.Fleet.Domain.Repositories;
+namespace DTMS.Fleet.Domain.Repositories;
 
 public interface IVehicleRepository
 {

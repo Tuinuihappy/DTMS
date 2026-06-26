@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
+using DTMS.Fleet.Domain.Repositories;
 using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Commands.UpdateVehicleState;
+namespace DTMS.Fleet.Application.Commands.UpdateVehicleState;
 
 internal sealed class UpdateVehicleStateCommandHandler : ICommandHandler<UpdateVehicleStateCommand>
 {

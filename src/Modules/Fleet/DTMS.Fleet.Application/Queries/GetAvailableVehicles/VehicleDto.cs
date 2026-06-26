@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Fleet.Domain.Enums;
+using DTMS.Fleet.Domain.Enums;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Queries.GetAvailableVehicles;
+namespace DTMS.Fleet.Application.Queries.GetAvailableVehicles;
 
 public record VehicleDto(
     Guid Id,

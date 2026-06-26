@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Fleet.Application.Projections;
-using AMR.DeliveryPlanning.Fleet.Domain.Enums;
-using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
+using DTMS.Fleet.Application.Projections;
+using DTMS.Fleet.Domain.Enums;
+using DTMS.Fleet.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Projections;
+namespace DTMS.Fleet.Infrastructure.Projections;
 
 /// <summary>
 /// Phase P3.2 — Counts vehicles by state and UPSERTs a row into

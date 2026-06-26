@@ -18,13 +18,13 @@ using DTMS.Facility.Infrastructure.Data;
 using DTMS.Facility.Infrastructure.Repositories;
 using DTMS.Facility.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
-using AMR.DeliveryPlanning.Fleet.Application.Consumers;
-using AMR.DeliveryPlanning.Fleet.Application.Services;
-using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
-using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
-using AMR.DeliveryPlanning.Fleet.Infrastructure.Repositories;
-using AMR.DeliveryPlanning.Fleet.Infrastructure.Services;
-using FleetServices = AMR.DeliveryPlanning.Fleet.Infrastructure.Services;
+using DTMS.Fleet.Application.Consumers;
+using DTMS.Fleet.Application.Services;
+using DTMS.Fleet.Domain.Repositories;
+using DTMS.Fleet.Infrastructure.Data;
+using DTMS.Fleet.Infrastructure.Repositories;
+using DTMS.Fleet.Infrastructure.Services;
+using FleetServices = DTMS.Fleet.Infrastructure.Services;
 using AMR.DeliveryPlanning.Planning.Application.Services;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using AMR.DeliveryPlanning.Planning.Domain.Services;
@@ -186,12 +186,12 @@ public static class ModuleServiceRegistration
                 sp.GetRequiredService<FleetDomainEventMapper>())));
         services.AddScoped<IVehicleRepository, VehicleRepository>();
         // Phase P3.2 — Fleet projections (vehicle state history + utilization snapshots).
-        services.AddScoped<AMR.DeliveryPlanning.Fleet.Application.Projections.IVehicleStateHistoryProjectionStore,
-                           AMR.DeliveryPlanning.Fleet.Infrastructure.Projections.VehicleStateHistoryProjectionStore>();
-        services.AddScoped<AMR.DeliveryPlanning.Fleet.Application.Projections.IFleetUtilizationReadRepository,
-                           AMR.DeliveryPlanning.Fleet.Infrastructure.Projections.FleetUtilizationReadRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.Fleet.Application.Projections.IFleetUtilizationSnapshotWriter,
-                           AMR.DeliveryPlanning.Fleet.Infrastructure.Projections.FleetUtilizationSnapshotWriter>();
+        services.AddScoped<DTMS.Fleet.Application.Projections.IVehicleStateHistoryProjectionStore,
+                           DTMS.Fleet.Infrastructure.Projections.VehicleStateHistoryProjectionStore>();
+        services.AddScoped<DTMS.Fleet.Application.Projections.IFleetUtilizationReadRepository,
+                           DTMS.Fleet.Infrastructure.Projections.FleetUtilizationReadRepository>();
+        services.AddScoped<DTMS.Fleet.Application.Projections.IFleetUtilizationSnapshotWriter,
+                           DTMS.Fleet.Infrastructure.Projections.FleetUtilizationSnapshotWriter>();
         services.AddScoped<IVehicleTypeRepository, VehicleTypeRepository>();
         services.AddScoped<IChargingPolicyRepository, ChargingPolicyRepository>();
         services.AddScoped<IMaintenanceRecordRepository, MaintenanceRecordRepository>();

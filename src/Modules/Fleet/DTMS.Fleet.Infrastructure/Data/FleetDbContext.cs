@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Fleet.Domain.Entities;
-using AMR.DeliveryPlanning.Fleet.Infrastructure.Projections;
+using DTMS.Fleet.Domain.Entities;
+using DTMS.Fleet.Infrastructure.Projections;
 using DTMS.SharedKernel.Outbox;
 using DTMS.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
+namespace DTMS.Fleet.Infrastructure.Data;
 
 public class FleetDbContext : DbContext
 {

@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Queries.GetFleetUtilization;
+namespace DTMS.Fleet.Application.Queries.GetFleetUtilization;
 
 public record GetFleetUtilizationQuery(DateTime FromUtc, DateTime ToUtc) : IQuery<FleetUtilizationResponse>;
 

@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Fleet.Domain.Enums;
-using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
+using DTMS.Fleet.Domain.Enums;
+using DTMS.Fleet.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Queries.GetFleetKpi;
+namespace DTMS.Fleet.Application.Queries.GetFleetKpi;
 
 public record FleetKpiDto(
     int TotalVehicles,

@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Fleet.Domain.Entities;
-using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
-using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
+using DTMS.Fleet.Domain.Entities;
+using DTMS.Fleet.Domain.Repositories;
+using DTMS.Fleet.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Repositories;
+namespace DTMS.Fleet.Infrastructure.Repositories;
 
 public class MaintenanceRecordRepository : IMaintenanceRecordRepository
 {

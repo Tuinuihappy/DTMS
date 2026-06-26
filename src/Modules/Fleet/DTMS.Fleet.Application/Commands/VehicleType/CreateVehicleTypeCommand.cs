@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Commands.VehicleType;
+namespace DTMS.Fleet.Application.Commands.VehicleType;
 
 public record CreateVehicleTypeCommand(
     string TypeName,

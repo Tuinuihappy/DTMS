@@ -1,7 +1,7 @@
 using System.Text.Json;
 using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
-using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
+using DTMS.Fleet.Infrastructure.Data;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
 using DTMS.SharedKernel.Diagnostics;
 using DTMS.SharedKernel.Domain;

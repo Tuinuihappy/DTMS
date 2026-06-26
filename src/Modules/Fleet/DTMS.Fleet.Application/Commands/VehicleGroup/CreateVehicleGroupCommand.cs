@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Commands.VehicleGroup;
+namespace DTMS.Fleet.Application.Commands.VehicleGroup;
 
 public record CreateVehicleGroupCommand(string Name, string Description, List<string>? Tags) : ICommand<Guid>;
 

@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Fleet.Application.Services;
-using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
+using DTMS.Fleet.Application.Services;
+using DTMS.Fleet.Infrastructure.Data;
 using DTMS.SharedKernel.Domain;
 using DTMS.SharedKernel.Outbox;
 
-namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Services;
+namespace DTMS.Fleet.Infrastructure.Services;
 
 public class FleetOutbox : IFleetOutbox
 {

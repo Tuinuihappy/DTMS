@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Fleet.Domain.Entities;
+namespace DTMS.Fleet.Domain.Entities;
 
 public enum MaintenanceType { Scheduled, Corrective, Upgrade }
 

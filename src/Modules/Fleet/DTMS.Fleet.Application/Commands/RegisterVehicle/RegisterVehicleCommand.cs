@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Commands.RegisterVehicle;
+namespace DTMS.Fleet.Application.Commands.RegisterVehicle;
 
 public record RegisterVehicleCommand(
     string VehicleName,

@@ -19,7 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Transport.Abstractions\DTMS.Transport.Abstractions\DTMS.Transport.Abstractions.csproj" />
     <ProjectReference Include="..\DTMS.Transport.Amr\DTMS.Transport.Amr.csproj" />
-    <ProjectReference Include="..\..\Fleet\AMR.DeliveryPlanning.Fleet.Application\AMR.DeliveryPlanning.Fleet.Application.csproj" />
+    <ProjectReference Include="..\..\Fleet\DTMS.Fleet.Application\DTMS.Fleet.Application.csproj" />
   </ItemGroup>
 
 </Project>

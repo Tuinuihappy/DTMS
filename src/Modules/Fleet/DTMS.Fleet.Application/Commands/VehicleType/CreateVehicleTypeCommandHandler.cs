@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
+using DTMS.Fleet.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Commands.VehicleType;
+namespace DTMS.Fleet.Application.Commands.VehicleType;
 
 internal sealed class CreateVehicleTypeCommandHandler : ICommandHandler<CreateVehicleTypeCommand, Guid>
 {

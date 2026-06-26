@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Fleet.Domain.Enums;
+namespace DTMS.Fleet.Domain.Enums;
 
 public enum VehicleState
 {

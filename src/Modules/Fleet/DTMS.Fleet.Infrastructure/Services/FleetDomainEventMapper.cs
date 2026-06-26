@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Fleet.Domain.Events;
+using DTMS.Fleet.Domain.Events;
 using DTMS.Fleet.IntegrationEvents;
 using DTMS.SharedKernel.Domain;
 using DTMS.SharedKernel.Outbox;
 
-namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Services;
+namespace DTMS.Fleet.Infrastructure.Services;
 
 public class FleetDomainEventMapper : IDomainEventToIntegrationEventMapper
 {

@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Fleet.Infrastructure.Projections;
+namespace DTMS.Fleet.Infrastructure.Projections;
 
 /// <summary>
 /// Phase P3.2 — Per-vehicle state-transition log materialized by

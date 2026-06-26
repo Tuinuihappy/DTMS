@@ -1,19 +1,19 @@
-using AMR.DeliveryPlanning.Fleet.Application.Commands.ChargingPolicy;
-using AMR.DeliveryPlanning.Fleet.Application.Commands.ImportVehiclesFromRiot3;
-using AMR.DeliveryPlanning.Fleet.Application.Commands.Maintenance;
-using AMR.DeliveryPlanning.Fleet.Application.Commands.RegisterVehicle;
-using AMR.DeliveryPlanning.Fleet.Application.Commands.UpdateVehicleState;
-using AMR.DeliveryPlanning.Fleet.Application.Commands.VehicleGroup;
-using AMR.DeliveryPlanning.Fleet.Application.Commands.VehicleType;
-using AMR.DeliveryPlanning.Fleet.Application.Queries.GetAvailableVehicles;
-using AMR.DeliveryPlanning.Fleet.Application.Queries.GetFleetKpi;
-using AMR.DeliveryPlanning.Fleet.Domain.Entities;
+using DTMS.Fleet.Application.Commands.ChargingPolicy;
+using DTMS.Fleet.Application.Commands.ImportVehiclesFromRiot3;
+using DTMS.Fleet.Application.Commands.Maintenance;
+using DTMS.Fleet.Application.Commands.RegisterVehicle;
+using DTMS.Fleet.Application.Commands.UpdateVehicleState;
+using DTMS.Fleet.Application.Commands.VehicleGroup;
+using DTMS.Fleet.Application.Commands.VehicleType;
+using DTMS.Fleet.Application.Queries.GetAvailableVehicles;
+using DTMS.Fleet.Application.Queries.GetFleetKpi;
+using DTMS.Fleet.Domain.Entities;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace AMR.DeliveryPlanning.Fleet.Presentation;
+namespace DTMS.Fleet.Presentation;
 
 public static class VehicleEndpoints
 {

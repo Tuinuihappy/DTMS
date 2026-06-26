@@ -1,11 +1,11 @@
-using AMR.DeliveryPlanning.Fleet.Application.Services;
-using AMR.DeliveryPlanning.Fleet.Domain.Entities;
-using AMR.DeliveryPlanning.Fleet.Domain.Enums;
-using AMR.DeliveryPlanning.Fleet.Domain.Repositories;
+using DTMS.Fleet.Application.Services;
+using DTMS.Fleet.Domain.Entities;
+using DTMS.Fleet.Domain.Enums;
+using DTMS.Fleet.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Fleet.Application.Commands.ImportVehiclesFromRiot3;
+namespace DTMS.Fleet.Application.Commands.ImportVehiclesFromRiot3;
 
 internal sealed class ImportVehiclesFromRiot3CommandHandler
     : ICommandHandler<ImportVehiclesFromRiot3Command, ImportVehiclesFromRiot3Result>

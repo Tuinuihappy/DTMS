@@ -3,7 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AMR.DeliveryPlanning.Planning.Domain\AMR.DeliveryPlanning.Planning.Domain.csproj" />
     <ProjectReference Include="..\AMR.DeliveryPlanning.Planning.Application\AMR.DeliveryPlanning.Planning.Application.csproj" />
-    <ProjectReference Include="..\..\Fleet\AMR.DeliveryPlanning.Fleet.Application\AMR.DeliveryPlanning.Fleet.Application.csproj" />
+    <ProjectReference Include="..\..\Fleet\DTMS.Fleet.Application\DTMS.Fleet.Application.csproj" />
     <ProjectReference Include="..\..\Facility\DTMS.Facility.Application\DTMS.Facility.Application.csproj" />
   </ItemGroup>
 

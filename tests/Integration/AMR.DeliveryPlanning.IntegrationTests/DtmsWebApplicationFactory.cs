@@ -1,6 +1,6 @@
 using System.Net.Http.Json;
-using AMR.DeliveryPlanning.Fleet.Domain.Entities;
-using AMR.DeliveryPlanning.Fleet.Infrastructure.Data;
+using DTMS.Fleet.Domain.Entities;
+using DTMS.Fleet.Infrastructure.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Caching.Distributed;
