@@ -38,6 +38,18 @@ internal sealed class AmrDispatchStrategy : IDispatchStrategy
 
     public TransportMode Mode => TransportMode.Amr;
 
+    public IReadOnlyList<DispatchGroup> GroupItems(IReadOnlyList<DispatchGroupItem> items)
+        => items
+            .Where(i => i.PickupStationId.HasValue && i.DropStationId.HasValue)
+            .GroupBy(i => (Pickup: i.PickupStationId!.Value, Drop: i.DropStationId!.Value))
+            .Select(g => new DispatchGroup(
+                PickupStationId:   g.Key.Pickup,
+                DropStationId:     g.Key.Drop,
+                PickupWarehouseId: null,
+                DropWarehouseId:   null,
+                Items: g.ToList()))
+            .ToList();
+
     public async Task<Result<DispatchGroupOutcome>> DispatchGroupAsync(
         DispatchGroupRequest request,
         CancellationToken cancellationToken = default)

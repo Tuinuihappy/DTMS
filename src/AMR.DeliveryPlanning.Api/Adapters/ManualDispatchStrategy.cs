@@ -73,6 +73,18 @@ internal sealed class ManualDispatchStrategy : IDispatchStrategy
 
     public TransportMode Mode => TransportMode.Manual;
 
+    public IReadOnlyList<DispatchGroup> GroupItems(IReadOnlyList<DispatchGroupItem> items)
+        => items
+            .Where(i => i.PickupWarehouseId.HasValue && i.DropWarehouseId.HasValue)
+            .GroupBy(i => (Pickup: i.PickupWarehouseId!.Value, Drop: i.DropWarehouseId!.Value))
+            .Select(g => new DispatchGroup(
+                PickupStationId:   null,
+                DropStationId:     null,
+                PickupWarehouseId: g.Key.Pickup,
+                DropWarehouseId:   g.Key.Drop,
+                Items: g.ToList()))
+            .ToList();
+
     public async Task<Result<DispatchGroupOutcome>> DispatchGroupAsync(
         DispatchGroupRequest request,
         CancellationToken cancellationToken = default)

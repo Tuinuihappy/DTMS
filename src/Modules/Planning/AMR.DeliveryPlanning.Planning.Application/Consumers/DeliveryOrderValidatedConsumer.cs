@@ -74,21 +74,25 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         }
         var strategy = _strategyRegistry.Get(mode);
 
-        // Manual / Fleet orders carry null station Ids (warehouse-keyed
-        // resolution will come with the Phase 4 mode-aware grouping). For
-        // now treat them as a single group keyed at Guid.Empty — the stub
-        // strategy ignores the values and returns "not implemented" so the
-        // failure path below marks everything Failed coherently.
-        var stationGroups = evt.Items
-            .GroupBy(i => (
-                PickupStationId: i.PickupStationId ?? Guid.Empty,
-                DropStationId:   i.DropStationId   ?? Guid.Empty))
+        // Delegate grouping to the per-mode strategy — AMR groups by
+        // station pair, Manual by warehouse pair, Fleet (future) may
+        // split by carrier capacity. The consumer stays mode-agnostic;
+        // adding a new TransportMode means implementing GroupItems on
+        // the new strategy, no changes here.
+        var groupingInput = evt.Items
+            .Select(i => new DispatchGroupItem(
+                ItemId: i.ItemId,
+                PickupStationId:   i.PickupStationId,
+                DropStationId:     i.DropStationId,
+                PickupWarehouseId: i.PickupWarehouseId,
+                DropWarehouseId:   i.DropWarehouseId))
             .ToList();
+        var groups = strategy.GroupItems(groupingInput);
 
         _logger.LogInformation(
-            "[AutoPlan] Order {OrderId} with {ItemCount} item(s) in {GroupCount} station group(s) " +
+            "[AutoPlan] Order {OrderId} with {ItemCount} item(s) in {GroupCount} dispatch group(s) " +
             "(transport mode: {Mode}, SLA deadline: {Sla})",
-            evt.DeliveryOrderId, evt.Items.Count, stationGroups.Count,
+            evt.DeliveryOrderId, evt.Items.Count, groups.Count,
             evt.RequestedTransportMode ?? "(unspecified)",
             evt.LatestUtc?.ToString("o") ?? "(none)");
 
@@ -114,13 +118,13 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         // and proceeds without a JobId; the group still dispatches normally
         // but won't be retriable via /jobs/{id}/retry.
         var jobIdByGroup = new Dictionary<int, Guid>();
-        foreach (var (groupIndex, stationGroup) in stationGroups.Index())
+        foreach (var (groupIndex, group) in groups.Index())
         {
             var jobResult = await _sender.Send(new CreateJobAnchorCommand(
                 evt.DeliveryOrderId,
                 GroupIndex: groupIndex + 1,
-                stationGroup.Key.PickupStationId,
-                stationGroup.Key.DropStationId,
+                group.PickupStationId ?? Guid.Empty,
+                group.DropStationId   ?? Guid.Empty,
                 Priority: "Normal",
                 RequestedTransportMode: evt.RequestedTransportMode,
                 SlaDeadline: evt.LatestUtc), ct);
@@ -130,8 +134,10 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
             else
                 _logger.LogWarning(
                     "[AutoPlan] Job anchor failed for group {G} ({Pickup} → {Drop}): {Err}",
-                    groupIndex + 1, stationGroup.Key.PickupStationId,
-                    stationGroup.Key.DropStationId, jobResult.Error);
+                    groupIndex + 1,
+                    (object?)group.PickupStationId ?? group.PickupWarehouseId,
+                    (object?)group.DropStationId   ?? group.DropWarehouseId,
+                    jobResult.Error);
         }
 
         // Phase 2: Planning → Planned. Group + template resolution happen
@@ -152,9 +158,9 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         // MarkJobFailed call faults we log critical and rethrow — we cannot
         // leave the job stuck at Created silently (that was the OD-0374 bug).
         var successCount = 0;
-        foreach (var (groupIndex, stationGroup) in stationGroups.Index())
+        foreach (var (groupIndex, group) in groups.Index())
         {
-            var items = stationGroup.ToList();
+            var items = group.Items;
             var upperKey = EnvelopeUpperKey.Build(evt.DeliveryOrderId, groupIndex + 1);
             var jobId = jobIdByGroup.GetValueOrDefault(groupIndex);
 
@@ -168,31 +174,25 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
 
             _logger.LogInformation("[AutoPlan] Group {G}: {Count} item(s) ({Pickup} → {Drop}) Step=Dispatching",
                 groupIndex + 1, items.Count,
-                stationGroup.Key.PickupStationId, stationGroup.Key.DropStationId);
+                (object?)group.PickupStationId ?? group.PickupWarehouseId,
+                (object?)group.DropStationId   ?? group.DropWarehouseId);
 
             try
             {
-                // Phase 3c — dispatch routes through IDispatchStrategy
-                // resolved per mode. AMR delegates back to the existing
-                // DispatchByRouteAsync (OrderTemplate → RIOT3); Manual / Fleet
-                // route to their own stubs/impls. Same Result<DispatchGroupOutcome>
-                // shape so the success / orphan / vendor-rejected branches below
-                // stay mode-agnostic.
-                // Manual / Fleet strategies key off warehouse Ids — read
-                // them off the first item (the grouping key guarantees the
-                // station pair is shared; Phase 2.5 Path A guarantees the
-                // warehouse pair is too).
-                var firstGroupItem = items.First();
+                // Strategy already populated the pair fields for its mode:
+                // AMR fills PickupStationId/DropStationId, Manual fills the
+                // warehouse pair. Pass both through — DispatchGroupAsync
+                // implementations ignore the pair they don't use.
                 var envelopeResult = await strategy.DispatchGroupAsync(
                     new DispatchGroupRequest(
                         DeliveryOrderId: evt.DeliveryOrderId,
                         GroupIndex: groupIndex + 1,
-                        PickupStationId: stationGroup.Key.PickupStationId,
-                        DropStationId: stationGroup.Key.DropStationId,
+                        PickupStationId: group.PickupStationId ?? Guid.Empty,
+                        DropStationId:   group.DropStationId   ?? Guid.Empty,
                         UpperKey: upperKey,
                         JobId: jobId == Guid.Empty ? null : jobId,
-                        PickupWarehouseId: firstGroupItem.PickupWarehouseId,
-                        DropWarehouseId: firstGroupItem.DropWarehouseId,
+                        PickupWarehouseId: group.PickupWarehouseId,
+                        DropWarehouseId:   group.DropWarehouseId,
                         SlaDeadline: evt.LatestUtc),
                     ct);
 
@@ -221,8 +221,10 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                         "but trip persistence failed — reconciliation required";
                     _logger.LogError(
                         "[AutoPlan] ⚠ Group {G} ({Pickup} → {Drop}) orphan: {Reason} Step=MarkJobFailed-Orphan",
-                        groupIndex + 1, stationGroup.Key.PickupStationId,
-                        stationGroup.Key.DropStationId, orphanReason);
+                        groupIndex + 1,
+                        (object?)group.PickupStationId ?? group.PickupWarehouseId,
+                        (object?)group.DropStationId   ?? group.DropWarehouseId,
+                        orphanReason);
 
                     if (jobId != Guid.Empty)
                         await _sender.Send(new MarkJobFailedCommand(
@@ -232,29 +234,26 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                 {
                     _logger.LogWarning(
                         "[AutoPlan] ✗ Group {G} ({Pickup} → {Drop}) failed: {Reason} Step=MarkJobFailed-VendorRejected",
-                        groupIndex + 1, stationGroup.Key.PickupStationId,
-                        stationGroup.Key.DropStationId, envelopeResult.Error);
+                        groupIndex + 1,
+                        (object?)group.PickupStationId ?? group.PickupWarehouseId,
+                        (object?)group.DropStationId   ?? group.DropWarehouseId,
+                        envelopeResult.Error);
 
                     if (jobId != Guid.Empty)
                         await _sender.Send(new MarkJobFailedCommand(
                             jobId, envelopeResult.Error ?? "vendor rejected dispatch",
                             JobFailureCategory.VendorRejected), ct);
 
-                    // Mark this group's items Failed so the order's eventual
-                    // RecomputeStatusFromItems isn't blocked on them. Pass
-                    // BOTH location pairs — AMR items match by station,
-                    // Manual / Fleet match by warehouse (Bug A fix). The
-                    // first item in the group is representative since the
-                    // grouping key guarantees a shared station pair, and
-                    // warehouse pairs follow station pairs (or vice versa)
-                    // by Phase 2.5 Path A's validation rules.
-                    var firstItem = stationGroup.First();
+                    // Mark this group's items Failed using the strategy's
+                    // grouping key — AMR matches by station, Manual by
+                    // warehouse. Pass both pairs; the command's matcher
+                    // checks the non-null pair.
                     await _sender.Send(new MarkGroupItemsAsDispatchFailedCommand(
                         evt.DeliveryOrderId,
-                        stationGroup.Key.PickupStationId,
-                        stationGroup.Key.DropStationId,
-                        firstItem.PickupWarehouseId,
-                        firstItem.DropWarehouseId,
+                        group.PickupStationId ?? Guid.Empty,
+                        group.DropStationId   ?? Guid.Empty,
+                        group.PickupWarehouseId,
+                        group.DropWarehouseId,
                         envelopeResult.Error ?? "vendor rejected dispatch"), ct);
                 }
             }
@@ -305,17 +304,16 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
 
                 // Also mark the items Failed so the order doesn't sit forever
                 // on Pending items waiting for a Trip that will never exist.
-                // Pass both station + warehouse Ids (Bug A fix — Manual orders
-                // match by warehouse).
+                // Use the group's strategy-populated pair (station for AMR,
+                // warehouse for Manual).
                 try
                 {
-                    var firstItem = stationGroup.First();
                     await _sender.Send(new MarkGroupItemsAsDispatchFailedCommand(
                         evt.DeliveryOrderId,
-                        stationGroup.Key.PickupStationId,
-                        stationGroup.Key.DropStationId,
-                        firstItem.PickupWarehouseId,
-                        firstItem.DropWarehouseId,
+                        group.PickupStationId ?? Guid.Empty,
+                        group.DropStationId   ?? Guid.Empty,
+                        group.PickupWarehouseId,
+                        group.DropWarehouseId,
                         $"dispatch threw {ex.GetType().Name}"), ct);
                 }
                 catch (Exception markEx) when (markEx is not OperationCanceledException)
@@ -333,7 +331,7 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         {
             await _sender.Send(new MarkOrderDispatchedCommand(evt.DeliveryOrderId), ct);
             _logger.LogInformation("[AutoPlan] ═══ Order {OrderId} → Dispatched ({OK}/{Total} groups) ═══",
-                evt.DeliveryOrderId, successCount, stationGroups.Count);
+                evt.DeliveryOrderId, successCount, groups.Count);
         }
         else
         {
@@ -344,7 +342,7 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
             // explicit kick the order would sit at "Planned" with all
             // items Failed indefinitely (Bug #2 from manual E2E test).
             _logger.LogWarning("[AutoPlan] ═══ Order {OrderId}: all {Total} groups failed dispatch ═══",
-                evt.DeliveryOrderId, stationGroups.Count);
+                evt.DeliveryOrderId, groups.Count);
             await _sender.Send(new RecomputeOrderStatusCommand(evt.DeliveryOrderId), ct);
         }
     }

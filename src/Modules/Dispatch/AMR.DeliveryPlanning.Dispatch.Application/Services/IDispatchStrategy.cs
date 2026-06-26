@@ -25,6 +25,16 @@ public interface IDispatchStrategy
     TransportMode Mode { get; }
 
     /// <summary>
+    /// Decide how the order's items split into trip-eligible groups.
+    /// AMR groups by (PickupStationId, DropStationId); Manual groups
+    /// by (PickupWarehouseId, DropWarehouseId); Fleet (future) may
+    /// further split by carrier capacity. Returning N groups results
+    /// in N dispatch calls → N trips, with items in the same group
+    /// consolidated onto one trip.
+    /// </summary>
+    IReadOnlyList<DispatchGroup> GroupItems(IReadOnlyList<DispatchGroupItem> items);
+
+    /// <summary>
     /// Dispatch one station-group to the external system. Returns a
     /// structured result so the caller (Planning consumer) can distinguish
     /// vendor rejected vs. persistence failed vs. data invalid and mark
@@ -34,6 +44,33 @@ public interface IDispatchStrategy
         DispatchGroupRequest request,
         CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// Primitive projection of an order item that the strategy uses to
+/// decide grouping. Carries only the Ids strategies key off + the
+/// ItemId so the consumer can correlate back. Defined here (rather
+/// than reusing DeliveryOrder.IntegrationEvents.ItemSummaryDto) to
+/// keep Dispatch.Application free of that project reference.
+/// </summary>
+public sealed record DispatchGroupItem(
+    string ItemId,
+    Guid? PickupStationId,
+    Guid? DropStationId,
+    Guid? PickupWarehouseId,
+    Guid? DropWarehouseId);
+
+/// <summary>
+/// Result of <see cref="IDispatchStrategy.GroupItems"/>. Carries one
+/// pair (station OR warehouse, never both populated in practice) and
+/// the subset of items in this group. Consumer translates this into
+/// one <see cref="DispatchGroupRequest"/> per group.
+/// </summary>
+public sealed record DispatchGroup(
+    Guid? PickupStationId,
+    Guid? DropStationId,
+    Guid? PickupWarehouseId,
+    Guid? DropWarehouseId,
+    IReadOnlyList<DispatchGroupItem> Items);
 
 /// <summary>
 /// Inputs the consumer passes to <see cref="IDispatchStrategy.DispatchGroupAsync"/>.
