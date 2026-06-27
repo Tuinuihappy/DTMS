@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Api.Realtime.Hubs.Clients;
+namespace DTMS.Api.Realtime.Hubs.Clients;
 
 /// <summary>
 /// Typed SignalR client for <see cref="FleetHub"/>. Powers the live

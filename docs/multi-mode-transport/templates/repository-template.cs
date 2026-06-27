@@ -6,8 +6,8 @@
 // (implementation) with interface in Domain.
 //
 // Filename layout:
-//   src/Modules/{Module}/AMR.DeliveryPlanning.{Module}.Domain/Repositories/I{Entity}Repository.cs
-//   src/Modules/{Module}/AMR.DeliveryPlanning.{Module}.Infrastructure/Repositories/{Entity}Repository.cs
+//   src/Modules/{Module}/DTMS.{Module}.Domain/Repositories/I{Entity}Repository.cs
+//   src/Modules/{Module}/DTMS.{Module}.Infrastructure/Repositories/{Entity}Repository.cs
 //
 // Reference examples (read these first):
 //   src/Modules/Dispatch/.../Infrastructure/Repositories/TripRepository.cs
@@ -41,9 +41,9 @@
 // FILE 1: I{Entity}Repository.cs  (in Domain/Repositories/)
 // =============================================================================
 
-using AMR.DeliveryPlanning.{Module}.Domain.Entities;
+using DTMS.{Module}.Domain.Entities;
 
-namespace AMR.DeliveryPlanning.{Module}.Domain.Repositories;
+namespace DTMS.{Module}.Domain.Repositories;
 
 /// <summary>
 /// Persistence boundary for <see cref="{Entity}"/>.
@@ -88,13 +88,13 @@ public interface I{Entity}Repository
 // FILE 2: {Entity}Repository.cs  (in Infrastructure/Repositories/)
 // =============================================================================
 
-using AMR.DeliveryPlanning.{Module}.Domain.Entities;
-using AMR.DeliveryPlanning.{Module}.Domain.Enums;
-using AMR.DeliveryPlanning.{Module}.Domain.Repositories;
-using AMR.DeliveryPlanning.{Module}.Infrastructure.Data;
+using DTMS.{Module}.Domain.Entities;
+using DTMS.{Module}.Domain.Enums;
+using DTMS.{Module}.Domain.Repositories;
+using DTMS.{Module}.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.{Module}.Infrastructure.Repositories;
+namespace DTMS.{Module}.Infrastructure.Repositories;
 
 public class {Entity}Repository : I{Entity}Repository
 {

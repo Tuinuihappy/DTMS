@@ -4,7 +4,7 @@ using DTMS.Fleet.Infrastructure.Data;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace AMR.DeliveryPlanning.IntegrationTests;
+namespace DTMS.IntegrationTests;
 
 /// <summary>
 /// Phase 3 — Test #7: Capability-based vehicle assignment.

@@ -11,7 +11,7 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
+namespace DTMS.Api.Infrastructure.Outbox;
 
 public class OutboxProcessorService : BackgroundService, IOutboxProcessor
 {

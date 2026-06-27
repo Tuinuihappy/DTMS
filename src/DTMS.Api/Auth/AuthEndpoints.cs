@@ -4,7 +4,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
-namespace AMR.DeliveryPlanning.Api.Auth;
+namespace DTMS.Api.Auth;
 
 public static class AuthEndpoints
 {

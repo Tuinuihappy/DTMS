@@ -3,7 +3,7 @@ using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.Api.Auth;
+namespace DTMS.Api.Auth;
 
 public sealed class DevAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {

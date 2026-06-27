@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.Api.VendorHealth;
+namespace DTMS.Api.VendorHealth;
 
 public sealed class Riot3HealthPollerService : BackgroundService
 {

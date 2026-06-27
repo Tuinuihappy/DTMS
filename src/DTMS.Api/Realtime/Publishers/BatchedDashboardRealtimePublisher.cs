@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Api.Realtime.Pipeline;
+using DTMS.Api.Realtime.Pipeline;
 using DTMS.DeliveryOrder.Application.Projections;
 
-namespace AMR.DeliveryPlanning.Api.Realtime.Publishers;
+namespace DTMS.Api.Realtime.Publishers;
 
 /// <summary>
 /// Composition-root realisation of <see cref="IDashboardRealtimePublisher"/>.

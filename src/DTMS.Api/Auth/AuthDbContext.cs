@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Api.Auth;
+namespace DTMS.Api.Auth;
 
 public class AuthDbContext : DbContext
 {

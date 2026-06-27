@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Api.Middlewares;
+namespace DTMS.Api.Middlewares;
 
 public class ExceptionHandlingMiddleware
 {

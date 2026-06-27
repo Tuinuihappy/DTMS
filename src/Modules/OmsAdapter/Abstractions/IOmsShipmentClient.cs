@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Models;
+using DTMS.OmsAdapter.Abstractions.Models;
 
-namespace AMR.DeliveryPlanning.OmsAdapter.Abstractions;
+namespace DTMS.OmsAdapter.Abstractions;
 
 // Outbound notification to the upstream OMS. Implementations MUST throw
 // on non-2xx so the calling consumer can surface failure to MassTransit

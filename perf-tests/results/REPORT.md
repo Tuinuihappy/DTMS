@@ -20,20 +20,20 @@ Backend API holds up well under heavy synchronous load (~1k orders/s on a single
 ## Critical findings
 
 ### 🔴 1. `/health` endpoint blocks on RIOT3 vendor probe (5 s timeout)
-- **Where:** [src/AMR.DeliveryPlanning.Api/Program.cs:164-190](../src/AMR.DeliveryPlanning.Api/Program.cs#L164)
+- **Where:** [src/DTMS.Api/Program.cs:164-190](../src/DTMS.Api/Program.cs#L164)
 - **What happened:** Initial Scenario A had 64% errors on `/health` because each call pings RIOT3 (`10.204.212.28:12000`) with a 5 s timeout. Under load, every health request blocked for 5 s.
 - **Impact:** k8s liveness/readiness probes will fail-flap whenever RIOT3 is unreachable, restarting healthy pods. Same for any load balancer health check.
 - **Fix:** Move the `riot3` check off `/health` to `/health/vendors` only (already a separate endpoint). Keep `/health` to `self+postgres+redis+rabbitmq`. Or wrap vendor checks with `tags: ["vendors"]` and configure the default predicate to exclude them — partially in place, but `/health` (no predicate) still runs all checks.
 
 ### 🔴 2. Global rate limiter blocks legitimate burst traffic (100 req/min/IP)
-- **Where:** [src/AMR.DeliveryPlanning.Api/Program.cs:192-206](../src/AMR.DeliveryPlanning.Api/Program.cs#L192)
+- **Where:** [src/DTMS.Api/Program.cs:192-206](../src/DTMS.Api/Program.cs#L192)
 - **What happened:** Initial load test got 99.9% HTTP 429. All k6 traffic shared one IP partition (100 permits/min) with `QueueLimit=5`.
 - **Impact:** A burst of >100 req/min from one IP (e.g. a single workflow engine, vendor webhook, or batched UI fetch) gets 429. Bulk submit, autoplan webhook callbacks, and frontend SSR-on-demand pages can trip this.
 - **Fix applied for tests:** Externalised to env vars `RateLimit__PermitLimit / WindowSeconds / QueueLimit`. Default remains `100 req/min` — recommend raising to e.g. `1000 req/min` and adding a per-user / per-API-key partition rather than per-IP.
 
 ### 🟡 3. Outbox processor falls behind under sustained write load
 - **Observed:** After scenarios B + C, DB had 92,179 pending outbox messages and only 3,652 processed (~4% throughput parity).
-- **Where:** [OutboxProcessorService](../src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure/) (single background service)
+- **Where:** [OutboxProcessorService](../src/Modules/DeliveryOrder/DTMS.DeliveryOrder.Infrastructure/) (single background service)
 - **Impact:** Downstream consumers (planning, dispatch) get events minutes late. SLA risk service, validated consumer, and trip lifecycle consumers all lag.
 - **Fix:** Increase outbox batch size, add concurrent workers (one per module), or move outbox publish to a dedicated worker container that horizontally scales.
 

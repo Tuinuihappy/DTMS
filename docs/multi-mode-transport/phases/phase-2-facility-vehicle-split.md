@@ -16,10 +16,10 @@
 
 ### Step 1: Create Warehouse Aggregate
 
-**`src/Modules/Facility/AMR.DeliveryPlanning.Facility.Domain/Entities/Warehouse.cs`** (NEW):
+**`src/Modules/Facility/DTMS.Facility.Domain/Entities/Warehouse.cs`** (NEW):
 
 ```csharp
-namespace AMR.DeliveryPlanning.Facility.Domain.Entities;
+namespace DTMS.Facility.Domain.Entities;
 
 public class Warehouse
 {
@@ -55,23 +55,23 @@ public class Warehouse
 ### Step 3: Move AMR Entities to Transport.Amr
 
 ```bash
-git mv src/Modules/Facility/AMR.DeliveryPlanning.Facility.Domain/Entities/Map.cs \
-       src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr/Domain/Entities/AmrMap.cs
+git mv src/Modules/Facility/DTMS.Facility.Domain/Entities/Map.cs \
+       src/Modules/Transport.Amr/DTMS.Transport.Amr/Domain/Entities/AmrMap.cs
 
-git mv src/Modules/Facility/AMR.DeliveryPlanning.Facility.Domain/Entities/Station.cs \
-       src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr/Domain/Entities/AmrStation.cs
+git mv src/Modules/Facility/DTMS.Facility.Domain/Entities/Station.cs \
+       src/Modules/Transport.Amr/DTMS.Transport.Amr/Domain/Entities/AmrStation.cs
 
-git mv src/Modules/Facility/AMR.DeliveryPlanning.Facility.Domain/Entities/Coordinate.cs \
-       src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr/Domain/ValueObjects/Coordinate.cs
+git mv src/Modules/Facility/DTMS.Facility.Domain/Entities/Coordinate.cs \
+       src/Modules/Transport.Amr/DTMS.Transport.Amr/Domain/ValueObjects/Coordinate.cs
 
-git mv src/Modules/Facility/AMR.DeliveryPlanning.Facility.Domain/Entities/RouteEdge.cs \
-       src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr/Domain/Entities/AmrRouteEdge.cs
+git mv src/Modules/Facility/DTMS.Facility.Domain/Entities/RouteEdge.cs \
+       src/Modules/Transport.Amr/DTMS.Transport.Amr/Domain/Entities/AmrRouteEdge.cs
 
-git mv src/Modules/Facility/AMR.DeliveryPlanning.Facility.Domain/Entities/Zone.cs \
-       src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr/Domain/Entities/AmrZone.cs
+git mv src/Modules/Facility/DTMS.Facility.Domain/Entities/Zone.cs \
+       src/Modules/Transport.Amr/DTMS.Transport.Amr/Domain/Entities/AmrZone.cs
 
-git mv src/Modules/Facility/AMR.DeliveryPlanning.Facility.Domain/Entities/StationAction.cs \
-       src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr/Domain/ValueObjects/StationAction.cs
+git mv src/Modules/Facility/DTMS.Facility.Domain/Entities/StationAction.cs \
+       src/Modules/Transport.Amr/DTMS.Transport.Amr/Domain/ValueObjects/StationAction.cs
 ```
 
 ### Step 4: Rename Classes + Add FacilityId
@@ -112,8 +112,8 @@ public class AmrStation  // ← renamed from Station
 **Rename**:
 ```bash
 git mv src/Modules/Fleet src/Modules/Vehicle
-git mv src/Modules/Vehicle/AMR.DeliveryPlanning.Fleet.Domain \
-       src/Modules/Vehicle/AMR.DeliveryPlanning.Vehicle.Domain
+git mv src/Modules/Vehicle/DTMS.Fleet.Domain \
+       src/Modules/Vehicle/DTMS.Vehicle.Domain
 # ... rename all Fleet sub-projects to Vehicle
 ```
 
@@ -136,8 +136,8 @@ public enum VehicleStatus { Available, InUse, OutOfService }  // simplified
 
 **Move ChargingPolicy** → Transport.Amr:
 ```bash
-git mv src/Modules/Vehicle/AMR.DeliveryPlanning.Vehicle.Domain/Entities/ChargingPolicy.cs \
-       src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr/Domain/Entities/ChargingPolicy.cs
+git mv src/Modules/Vehicle/DTMS.Vehicle.Domain/Entities/ChargingPolicy.cs \
+       src/Modules/Transport.Amr/DTMS.Transport.Amr/Domain/Entities/ChargingPolicy.cs
 ```
 
 **Create AmrUnit** — `src/Modules/Transport.Amr/.../Domain/Entities/AmrUnit.cs` (NEW):
@@ -674,7 +674,7 @@ docker compose -f docker-compose.yml restart postgres
 dotnet build --configuration Release
 
 # Gate 2: Apply migrations
-dotnet run --project src/AMR.DeliveryPlanning.Api
+dotnet run --project src/DTMS.Api
 # (migrations apply on startup via Microsoft.EntityFrameworkCore Migrate())
 
 # Gate 3: Tests
@@ -712,7 +712,7 @@ public void Validate_StationIdRequirement(TransportMode mode, Guid? stationId, b
 public void FacilityModule_ShouldNotReferenceTransportAmr() {
     typeof(Warehouse).Assembly.GetReferencedAssemblies()
         .Select(a => a.Name)
-        .Should().NotContain("AMR.DeliveryPlanning.Transport.Amr");
+        .Should().NotContain("DTMS.Transport.Amr");
 }
 ```
 

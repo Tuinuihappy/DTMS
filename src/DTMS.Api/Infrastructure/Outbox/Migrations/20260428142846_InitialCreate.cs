@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Api.Infrastructure.Outbox.Migrations
+namespace DTMS.Api.Infrastructure.Outbox.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration

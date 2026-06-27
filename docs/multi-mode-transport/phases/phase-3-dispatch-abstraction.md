@@ -21,7 +21,7 @@
 **`src/Modules/Transport.Abstractions/.../Models/DispatchPlan.cs`** (NEW):
 
 ```csharp
-namespace AMR.DeliveryPlanning.Transport.Abstractions.Models;
+namespace DTMS.Transport.Abstractions.Models;
 
 public abstract class DispatchPlan
 {
@@ -54,7 +54,7 @@ public sealed record AppointVehicleHint(...);
 
 ### Step 2: Move OrderTemplate Missions to Transport.Amr
 
-**Current**: [OrderTemplate.cs](../../../src/Modules/Planning/AMR.DeliveryPlanning.Planning.Domain/Entities/OrderTemplate.cs) มี `Missions[]` ตาม RIOT3 spec — ต้องแยก
+**Current**: [OrderTemplate.cs](../../../src/Modules/Planning/DTMS.Planning.Domain/Entities/OrderTemplate.cs) มี `Missions[]` ตาม RIOT3 spec — ต้องแยก
 
 **Split**:
 
@@ -87,13 +87,13 @@ public class AmrDispatchPlanTemplate
 
 **Move** `ActionTemplate.cs` entirely → Transport.Amr (it's RIOT3-specific 100%):
 ```bash
-git mv src/Modules/Planning/AMR.DeliveryPlanning.Planning.Domain/Entities/ActionTemplate.cs \
-       src/Modules/Transport.Amr/AMR.DeliveryPlanning.Transport.Amr/Domain/Entities/ActionTemplate.cs
+git mv src/Modules/Planning/DTMS.Planning.Domain/Entities/ActionTemplate.cs \
+       src/Modules/Transport.Amr/DTMS.Transport.Amr/Domain/Entities/ActionTemplate.cs
 ```
 
 ### Step 3: Refactor Trip Aggregate (per ADR-003)
 
-**Strip vendor fields from Trip** — [Trip.cs](../../../src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Domain/Entities/Trip.cs):
+**Strip vendor fields from Trip** — [Trip.cs](../../../src/Modules/Dispatch/DTMS.Dispatch.Domain/Entities/Trip.cs):
 
 ```csharp
 public class Trip
@@ -190,7 +190,7 @@ public sealed class AmrDispatchStrategy : IDispatchStrategy
 
 ### Step 6: Refactor Pause/Resume/Cancel Handlers
 
-**[PauseTripCommandHandler.cs](../../../src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Application/Commands/PauseTrip/PauseTripCommandHandler.cs)** — ใช้ router:
+**[PauseTripCommandHandler.cs](../../../src/Modules/Dispatch/DTMS.Dispatch.Application/Commands/PauseTrip/PauseTripCommandHandler.cs)** — ใช้ router:
 
 ```csharp
 public async Task Handle(PauseTripCommand cmd, CancellationToken ct)
@@ -594,7 +594,7 @@ function RetryAttemptRow({ trip }: { trip: TripDto }) {
 ```bash
 # Migrations
 docker compose restart postgres
-dotnet run --project src/AMR.DeliveryPlanning.Api  # auto-applies migrations
+dotnet run --project src/DTMS.Api  # auto-applies migrations
 
 # Test gates
 dotnet build --configuration Release
@@ -612,7 +612,7 @@ dotnet test tests/Modules/Dispatch.UnitTests/UnitTest1.cs
 dotnet test tests/Modules/Transport.Amr.UnitTests/
 
 # Full webhook flow
-dotnet test tests/Integration/AMR.DeliveryPlanning.IntegrationTests/Riot3WebhookTests.cs
+dotnet test tests/Integration/DTMS.IntegrationTests/Riot3WebhookTests.cs
 ```
 
 ### NEW Tests

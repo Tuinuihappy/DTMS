@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Api.RobotPositions;
+namespace DTMS.Api.RobotPositions;
 
 public static class RobotPositionEndpoints
 {

@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using System.Net.Http.Headers;
 
-namespace AMR.DeliveryPlanning.IntegrationTests;
+namespace DTMS.IntegrationTests;
 
 public static class AuthHelper
 {

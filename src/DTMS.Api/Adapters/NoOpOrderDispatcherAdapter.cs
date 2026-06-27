@@ -1,7 +1,7 @@
 using DTMS.Planning.Application.Services;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Api.Adapters;
+namespace DTMS.Api.Adapters;
 
 // Dev/load-test seam — short-circuits the IRobotOrderDispatcher contract
 // without contacting RIOT3. Picked at composition time when

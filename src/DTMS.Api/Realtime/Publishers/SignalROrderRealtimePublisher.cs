@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Api.Realtime.Hubs;
-using AMR.DeliveryPlanning.Api.Realtime.Hubs.Clients;
+using DTMS.Api.Realtime.Hubs;
+using DTMS.Api.Realtime.Hubs.Clients;
 using DTMS.DeliveryOrder.Application.Projections;
 using Microsoft.AspNetCore.SignalR;
 
-namespace AMR.DeliveryPlanning.Api.Realtime.Publishers;
+namespace DTMS.Api.Realtime.Publishers;
 
 /// <summary>
 /// Composition-root realisation of <see cref="IOrderRealtimePublisher"/>.

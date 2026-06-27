@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Api.Realtime.Hubs.Clients;
+using DTMS.Api.Realtime.Hubs.Clients;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
-namespace AMR.DeliveryPlanning.Api.Realtime.Hubs;
+namespace DTMS.Api.Realtime.Hubs;
 
 /// <summary>
 /// Dashboard board-key subscriptions. Each dashboard page subscribes to

@@ -2,7 +2,7 @@ using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.Dispatch.IntegrationEvents;
-using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Exceptions;
+using DTMS.OmsAdapter.Abstractions.Exceptions;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 

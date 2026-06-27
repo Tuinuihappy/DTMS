@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Api.Realtime.Hubs.Clients;
+namespace DTMS.Api.Realtime.Hubs.Clients;
 
 /// <summary>
 /// Phase 4.6 — Typed SignalR client for <see cref="Hubs.ManualBoardHub"/>.

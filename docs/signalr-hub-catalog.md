@@ -42,7 +42,7 @@ for the projector-side rules.
 
 ## 3. OrderHub — `/hubs/orders`
 
-**Source:** [src/AMR.DeliveryPlanning.Api/Realtime/Hubs/OrderHub.cs](../src/AMR.DeliveryPlanning.Api/Realtime/Hubs/OrderHub.cs)
+**Source:** [src/DTMS.Api/Realtime/Hubs/OrderHub.cs](../src/DTMS.Api/Realtime/Hubs/OrderHub.cs)
 
 ### Client → server methods
 
@@ -74,7 +74,7 @@ const { connected } = useOrderHubSubscription(orderId, {
 
 ## 4. JobHub — `/hubs/jobs`
 
-**Source:** [JobHub.cs](../src/AMR.DeliveryPlanning.Api/Realtime/Hubs/JobHub.cs)
+**Source:** [JobHub.cs](../src/DTMS.Api/Realtime/Hubs/JobHub.cs)
 
 Two subscription flavours so the **Jobs queue page** (broad) and a
 **single Job drawer** (focused) can coexist without paying for each
@@ -102,7 +102,7 @@ other's traffic.
 
 ## 5. TripHub — `/hubs/trips`
 
-**Source:** [TripHub.cs](../src/AMR.DeliveryPlanning.Api/Realtime/Hubs/TripHub.cs)
+**Source:** [TripHub.cs](../src/DTMS.Api/Realtime/Hubs/TripHub.cs)
 
 | Method | Args | Group |
 |---|---|---|
@@ -119,9 +119,9 @@ other's traffic.
 
 ## 6. DashboardHub — `/hubs/dashboard`
 
-**Source:** [DashboardHub.cs](../src/AMR.DeliveryPlanning.Api/Realtime/Hubs/DashboardHub.cs)
+**Source:** [DashboardHub.cs](../src/DTMS.Api/Realtime/Hubs/DashboardHub.cs)
 
-Updates flow through [DashboardCounterBatcher](../src/AMR.DeliveryPlanning.Api/Realtime/Pipeline/DashboardCounterBatcher.cs):
+Updates flow through [DashboardCounterBatcher](../src/DTMS.Api/Realtime/Pipeline/DashboardCounterBatcher.cs):
 the projector calls `.Enqueue(boardKey, delta)` and the batcher drains
 every **250 ms**, fanning out one `CountersUpdated` call per board.
 
@@ -150,9 +150,9 @@ still feeling realtime.
 
 ## 7. FleetHub — `/hubs/fleet`
 
-**Source:** [FleetHub.cs](../src/AMR.DeliveryPlanning.Api/Realtime/Hubs/FleetHub.cs)
+**Source:** [FleetHub.cs](../src/DTMS.Api/Realtime/Hubs/FleetHub.cs)
 
-Updates flow through [FleetPositionThrottler](../src/AMR.DeliveryPlanning.Api/Realtime/Pipeline/FleetPositionThrottler.cs):
+Updates flow through [FleetPositionThrottler](../src/DTMS.Api/Realtime/Pipeline/FleetPositionThrottler.cs):
 latest-wins per `(floor, robot)` pair within the **1-second** window so a
 robot reporting at 10 Hz doesn't translate into 10 hub pushes.
 
@@ -188,8 +188,8 @@ Hub.MethodBody  (Subscribe/Unsubscribe only — no DB calls)
 
 | Filter | Source | Purpose |
 |---|---|---|
-| `TracingHubFilter` | [TracingHubFilter.cs](../src/AMR.DeliveryPlanning.Api/Realtime/Filters/TracingHubFilter.cs) | Activity span, `dtms.signalr.hub.*` metrics |
-| `RateLimitedHubFilter` | [RateLimitedHubFilter.cs](../src/AMR.DeliveryPlanning.Api/Realtime/Filters/RateLimitedHubFilter.cs) | Per-connection token bucket; cleanup on disconnect |
+| `TracingHubFilter` | [TracingHubFilter.cs](../src/DTMS.Api/Realtime/Filters/TracingHubFilter.cs) | Activity span, `dtms.signalr.hub.*` metrics |
+| `RateLimitedHubFilter` | [RateLimitedHubFilter.cs](../src/DTMS.Api/Realtime/Filters/RateLimitedHubFilter.cs) | Per-connection token bucket; cleanup on disconnect |
 
 ---
 
@@ -202,7 +202,7 @@ Hub.MethodBody  (Subscribe/Unsubscribe only — no DB calls)
 | `dtms.signalr.hub.connections_total` | Counter | hub |
 | `dtms.signalr.hub.rate_limited_total` | Counter | hub, method |
 
-Wired in [Program.cs](../src/AMR.DeliveryPlanning.Api/Program.cs) via
+Wired in [Program.cs](../src/DTMS.Api/Program.cs) via
 `.AddMeter("DTMS.SignalR")` on the OTel `WithMetrics` builder.
 
 ---

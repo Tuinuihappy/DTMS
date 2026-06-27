@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Npgsql;
 
-namespace AMR.DeliveryPlanning.Api.Infrastructure.Health;
+namespace DTMS.Api.Infrastructure.Health;
 
 // Phase B Step B2 — postgres readiness probe that REUSES the singleton
 // NpgsqlDataSource (registered in ModuleServiceRegistration.AddAllModules)

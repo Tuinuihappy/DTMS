@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
 
-namespace AMR.DeliveryPlanning.IntegrationTests;
+namespace DTMS.IntegrationTests;
 
 /// <summary>
 /// Custom WebApplicationFactory backed by a real PostgreSQL Testcontainer.
@@ -34,8 +34,8 @@ public class DtmsWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseSetting("ConnectionStrings:DefaultConnection", _postgres.GetConnectionString());
         builder.UseSetting("RabbitMq:Host", "localhost");
         builder.UseSetting("Jwt:Secret", "super-secret-key-for-testing-minimum-32-characters!");
-        builder.UseSetting("Jwt:Issuer", "AMR.DeliveryPlanning");
-        builder.UseSetting("Jwt:Audience", "AMR.DeliveryPlanning.Api");
+        builder.UseSetting("Jwt:Issuer", "DTMS");
+        builder.UseSetting("Jwt:Audience", "DTMS.Api");
 
         builder.ConfigureServices(services =>
         {

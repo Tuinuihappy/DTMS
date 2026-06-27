@@ -5,7 +5,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace AMR.DeliveryPlanning.IntegrationTests;
+namespace DTMS.IntegrationTests;
 
 /// <summary>
 /// Phase 3 — Test #6: Outbox infrastructure.

@@ -1,11 +1,11 @@
-using AMR.DeliveryPlanning.OmsAdapter.Abstractions;
-using AMR.DeliveryPlanning.OmsAdapter.Infrastructure.Options;
-using AMR.DeliveryPlanning.OmsAdapter.Infrastructure.Services;
+using DTMS.OmsAdapter.Abstractions;
+using DTMS.OmsAdapter.Infrastructure.Options;
+using DTMS.OmsAdapter.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.OmsAdapter;
+namespace DTMS.OmsAdapter;
 
 public static class OmsAdapterServiceRegistration
 {

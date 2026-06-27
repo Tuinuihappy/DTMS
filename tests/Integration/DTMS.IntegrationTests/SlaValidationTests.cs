@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 
-namespace AMR.DeliveryPlanning.IntegrationTests;
+namespace DTMS.IntegrationTests;
 
 /// <summary>
 /// Phase 3 — Test #4: SLA validation on order submission.

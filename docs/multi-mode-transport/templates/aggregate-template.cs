@@ -2,7 +2,7 @@
 // DOMAIN AGGREGATE ROOT TEMPLATE
 // =============================================================================
 //
-// Filename: src/Modules/{Module}/AMR.DeliveryPlanning.{Module}.Domain/Entities/{Name}.cs
+// Filename: src/Modules/{Module}/DTMS.{Module}.Domain/Entities/{Name}.cs
 //
 // Use this template when creating a new domain aggregate root.
 //
@@ -23,11 +23,11 @@
 // DELETE THIS COMMENT BLOCK before committing.
 // =============================================================================
 
-using AMR.DeliveryPlanning.{Module}.Domain.Enums;
-using AMR.DeliveryPlanning.{Module}.Domain.Events;
+using DTMS.{Module}.Domain.Enums;
+using DTMS.{Module}.Domain.Events;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.{Module}.Domain.Entities;
+namespace DTMS.{Module}.Domain.Entities;
 
 /// <summary>
 /// {1-2 sentence description of what this aggregate represents and why it exists.

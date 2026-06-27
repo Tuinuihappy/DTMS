@@ -202,5 +202,5 @@ without them, but they should be reconsidered before scaling beyond P1:
 ## 11. References
 
 - [Martin Fowler — What do you mean by Event-Driven?](https://martinfowler.com/articles/201701-event-driven.html)
-- DTMS Outbox: [`src/AMR.DeliveryPlanning.SharedKernel/Outbox/`](../src/AMR.DeliveryPlanning.SharedKernel/Outbox/)
+- DTMS Outbox: [`src/DTMS.SharedKernel/Outbox/`](../src/DTMS.SharedKernel/Outbox/)
 - DTMS Domain Events: [`src/Modules/*/Domain/Events/`](../src/Modules/)

@@ -16,7 +16,7 @@ Phase 4 (Manual mode) ต้องเก็บ POD evidence จาก operator m
 - **Exception photos** — กรณีมีปัญหา (cargo damaged, address wrong) — 0-N per exception
 
 Existing infrastructure:
-- [`ProofOfDelivery.cs`](../../../src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Domain/Entities/ProofOfDelivery.cs) entity มีอยู่ — เก็บ `PhotoUrl`, `SignatureData`, `ScannedIds`
+- [`ProofOfDelivery.cs`](../../../src/Modules/Dispatch/DTMS.Dispatch.Domain/Entities/ProofOfDelivery.cs) entity มีอยู่ — เก็บ `PhotoUrl`, `SignatureData`, `ScannedIds`
 - Schema มี URL columns (strings) อยู่แล้ว — file storage ตัดสินยังไงไม่ได้ระบุ
 - ไม่มี object storage abstraction ใน codebase ปัจจุบัน
 - Local dev = Docker compose stack (Postgres + RabbitMQ + Redis); no MinIO yet
@@ -638,5 +638,5 @@ Total Y1 cost: ~$140 (very reasonable)
 - AWS S3 best practices: https://docs.aws.amazon.com/s3/latest/userguide/best-practices.html
 - MinIO docs: https://min.io/docs/minio/linux/index.html
 - ImageSharp: https://docs.sixlabors.com/articles/imagesharp/
-- Existing entity: [ProofOfDelivery.cs](../../../src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Domain/Entities/ProofOfDelivery.cs)
+- Existing entity: [ProofOfDelivery.cs](../../../src/Modules/Dispatch/DTMS.Dispatch.Domain/Entities/ProofOfDelivery.cs)
 - [Phase 4 — POD capture flow](../phases/phase-4-transport-manual.md#step-5-mobile-api-endpoints)

@@ -23,7 +23,7 @@ graph TB
     end
 
     subgraph "Composition Root"
-        API[AMR.DeliveryPlanning.Api]
+        API[DTMS.Api]
     end
 
     DO --> FAC

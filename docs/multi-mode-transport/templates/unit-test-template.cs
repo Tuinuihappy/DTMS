@@ -33,11 +33,11 @@
 // DELETE THIS COMMENT BLOCK before committing.
 // =============================================================================
 
-using AMR.DeliveryPlanning.{Module}.Application.Commands.{CommandName};
-using AMR.DeliveryPlanning.{Module}.Application.Services;
-using AMR.DeliveryPlanning.{Module}.Domain.Entities;
-using AMR.DeliveryPlanning.{Module}.Domain.Enums;
-using AMR.DeliveryPlanning.{Module}.Domain.Repositories;
+using DTMS.{Module}.Application.Commands.{CommandName};
+using DTMS.{Module}.Application.Services;
+using DTMS.{Module}.Domain.Entities;
+using DTMS.{Module}.Domain.Enums;
+using DTMS.{Module}.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;

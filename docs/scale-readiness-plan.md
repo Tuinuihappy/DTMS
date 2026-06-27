@@ -66,7 +66,7 @@ Without this, every other improvement is masked by event-publish backpressure. S
 ### Files to change
 
 ```
-src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/
+src/DTMS.Api/Infrastructure/Outbox/
 ├── OutboxProcessorService.cs           # rewrite: parallel modules, SKIP LOCKED, batched
 ├── OutboxOptions.cs                    # NEW: bind to appsettings
 └── OutboxModule.cs                     # NEW: per-module dispatcher abstraction
@@ -105,7 +105,7 @@ CREATE INDEX CONCURRENTLY "IX_OutboxMessages_Pending"
 
 Together, parts 1+2 unblock Phase D (multi-replica outbox workers — SKIP LOCKED prevents row contention) AND raise single-replica throughput (parallel publish saturates IBus connection pool).
 
-Rewrite the dispatcher loop. Original code at [OutboxProcessorService.cs:79](../src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/OutboxProcessorService.cs#L79) iterated modules sequentially with `foreach`. New shape:
+Rewrite the dispatcher loop. Original code at [OutboxProcessorService.cs:79](../src/DTMS.Api/Infrastructure/Outbox/OutboxProcessorService.cs#L79) iterated modules sequentially with `foreach`. New shape:
 
 ```csharp
 // Pseudo — one tick:
@@ -165,7 +165,7 @@ Defer this until after A4 — there's no point instrumenting a loop we're about 
 
 **Surfaced by the 2026-06-20 acceptance run.** With A1+A2+A3 active at `BatchSize=500, PollIntervalSeconds=1, PublishConcurrency=8`, the *theoretical* drain ceiling is `500 × 6 modules / 1s = 3000 events/s`. Observed: ~143 events/s.
 
-Root cause: [`OutboxProcessorService.ProcessUnpublishedEventsAsync`](../src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/OutboxProcessorService.cs#L59) iterates the 6 module DbContexts **sequentially with `await`**. At full batch + SKIP LOCKED tx + parallel publish + SaveChanges + count, each module's tick is ~500-800ms. 6 × 700ms = ~4.2s per cycle even though the configured poll is 1s. Effective per-module rate ≈ 100-150/s.
+Root cause: [`OutboxProcessorService.ProcessUnpublishedEventsAsync`](../src/DTMS.Api/Infrastructure/Outbox/OutboxProcessorService.cs#L59) iterates the 6 module DbContexts **sequentially with `await`**. At full batch + SKIP LOCKED tx + parallel publish + SaveChanges + count, each module's tick is ~500-800ms. 6 × 700ms = ~4.2s per cycle even though the configured poll is 1s. Effective per-module rate ≈ 100-150/s.
 
 **Fix shape:**
 ```csharp
@@ -308,7 +308,7 @@ Switch from `AddDbContext` → `AddDbContextPool` for all 8 DbContexts. Caveat: 
 
 ### Step B2 — Fix raw NpgsqlConnection in health check (15 min)
 
-[Program.cs:243](../src/AMR.DeliveryPlanning.Api/Program.cs#L243) opens a raw connection per `/health` call. Replace with EF context probe or use the shared `NpgsqlDataSource`:
+[Program.cs:243](../src/DTMS.Api/Program.cs#L243) opens a raw connection per `/health` call. Replace with EF context probe or use the shared `NpgsqlDataSource`:
 ```csharp
 var conn = await dataSource.OpenConnectionAsync(ct);
 await using (conn) {
@@ -458,12 +458,12 @@ Phase A made outbox fast; Phase D made it independently scalable. After Phase B 
 
 ### Shipped approach — same image + env flag (simpler than original spec)
 
-Original spec called for a separate `AMR.DeliveryPlanning.Worker` project. Actual implementation uses the **migrator pattern** that already exists in compose — same Docker image, single flag `Outbox:RunInThisProcess` (default true) gates the `IHostedService` registration. Mirrors the established pattern, avoids code duplication, ships in hours instead of days.
+Original spec called for a separate `DTMS.Worker` project. Actual implementation uses the **migrator pattern** that already exists in compose — same Docker image, single flag `Outbox:RunInThisProcess` (default true) gates the `IHostedService` registration. Mirrors the established pattern, avoids code duplication, ships in hours instead of days.
 
 ### Files changed
 
-- `src/AMR.DeliveryPlanning.Api/Modules/ModuleServiceRegistration.cs` — conditional `services.AddHostedService<OutboxProcessorService>()` based on flag (IOutboxProcessor singleton stays so `/admin/replay` still works from API)
-- `src/AMR.DeliveryPlanning.Api/Adapters/CompositionLogger.cs` — boot log emits `Outbox:RunInThisProcess = True/False` so container role is visible from a single log grep
+- `src/DTMS.Api/Modules/ModuleServiceRegistration.cs` — conditional `services.AddHostedService<OutboxProcessorService>()` based on flag (IOutboxProcessor singleton stays so `/admin/replay` still works from API)
+- `src/DTMS.Api/Adapters/CompositionLogger.cs` — boot log emits `Outbox:RunInThisProcess = True/False` so container role is visible from a single log grep
 - `docker-compose.yml` — new `outbox-worker` service using the same `dtms-api` image with `Outbox__RunInThisProcess=true` hardcoded; api default kept true (backwards-compat for plain `docker compose up -d`), overridden to false via `.env.test` for split-load-test config
 - `.env.test` / `.env.test.example` — add `Outbox__RunInThisProcess=false`
 
@@ -549,11 +549,11 @@ Currently `DeliveryOrderConfirmedIntegrationEventV1` triggers 3 separate SignalR
 // One subscriber on ProjectionCommitted does the SignalR push
 ```
 
-This is the same pattern [DashboardCounterBatcher](../src/AMR.DeliveryPlanning.Api/Realtime/DashboardCounterBatcher.cs) uses with its 250ms coalescing window — extend that pattern to OrderHub / JobHub / TripHub.
+This is the same pattern [DashboardCounterBatcher](../src/DTMS.Api/Realtime/DashboardCounterBatcher.cs) uses with its 250ms coalescing window — extend that pattern to OrderHub / JobHub / TripHub.
 
 ### Step F3 — Rate limiter exclusions — 🟢 shipped 2026-06-22 ([4828232](https://github.com/Tuinuihappy/DTMS/commit/4828232))
 
-Bypass added at [Program.cs](../src/AMR.DeliveryPlanning.Api/Program.cs) — `/health`, `/hubs`, `/metrics` skip the per-IP partitioned rate limiter via `GetNoLimiter("bypass-infra")`. Business paths (`/api/*`) still rate-limit per IP unchanged.
+Bypass added at [Program.cs](../src/DTMS.Api/Program.cs) — `/health`, `/hubs`, `/metrics` skip the per-IP partitioned rate limiter via `GetNoLimiter("bypass-infra")`. Business paths (`/api/*`) still rate-limit per IP unchanged.
 
 Verified with curl spam test (PermitLimit=5/60s):
 - `/health/ready` × 30 → 30 ok / **0 × 429** (bypass working)
@@ -563,7 +563,7 @@ Critical prerequisite for K8s rollout — without F3 the G1 drain protocol's rec
 
 ### Step F3 — Rate limiter exclusions (original plan, 15 min)
 
-[Program.cs:317-336](../src/AMR.DeliveryPlanning.Api/Program.cs#L317) — exclude `/health`, `/health/ready`, `/hubs`, `/metrics`:
+[Program.cs:317-336](../src/DTMS.Api/Program.cs#L317) — exclude `/health`, `/health/ready`, `/hubs`, `/metrics`:
 
 ```csharp
 options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
@@ -598,7 +598,7 @@ options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =
 docker-compose.yml                                # add prometheus + grafana services
 infra/prometheus.yml                              # NEW: scrape config
 infra/grafana/dashboards/dtms-overview.json       # NEW: starter dashboard
-src/AMR.DeliveryPlanning.Api/Program.cs           # add OpenTelemetry .NET metrics export
+src/DTMS.Api/Program.cs           # add OpenTelemetry .NET metrics export
 ```
 
 ### Steps

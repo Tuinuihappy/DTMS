@@ -142,5 +142,5 @@ Next levers beyond Phase A/B/D:
 - [REPORT.md](REPORT.md) → [REPORT-acceptance.md](REPORT-acceptance.md) → [REPORT-acceptance-final.md](REPORT-acceptance-final.md) → [REPORT-phase-b.md](REPORT-phase-b.md) — earlier runs
 - **This file** — fifth k6 run today (Phase A + B + D + dual NoOp + .env.test)
 - [`docker-compose.yml`](../../docker-compose.yml) — outbox-worker service definition
-- [`Outbox__RunInThisProcess` flag in CompositionLogger](../../src/AMR.DeliveryPlanning.Api/Adapters/CompositionLogger.cs)
+- [`Outbox__RunInThisProcess` flag in CompositionLogger](../../src/DTMS.Api/Adapters/CompositionLogger.cs)
 - [`k6-scenario-b-phase-d.txt`](../k6-scenario-b-phase-d.txt) — raw k6 output

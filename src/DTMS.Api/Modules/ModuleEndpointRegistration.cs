@@ -6,7 +6,7 @@ using DTMS.Planning.Presentation;
 using DTMS.Transport.Amr.Webhooks;
 using DTMS.Transport.Manual.Presentation;
 
-namespace AMR.DeliveryPlanning.Api.Modules;
+namespace DTMS.Api.Modules;
 
 /// <summary>
 /// Maps all module Minimal API endpoints onto the application pipeline.

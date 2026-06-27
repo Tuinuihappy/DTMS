@@ -2,7 +2,7 @@ using System.Security.Claims;
 using DTMS.Transport.Manual.Application.Services;
 using DTMS.Transport.Manual.Domain.Enums;
 
-namespace AMR.DeliveryPlanning.Api.Auth;
+namespace DTMS.Api.Auth;
 
 // Phase 4.2 — Runs after authentication on every /api/operator/*
 // request. Upserts the DTMS Operator row to match the JWT claims

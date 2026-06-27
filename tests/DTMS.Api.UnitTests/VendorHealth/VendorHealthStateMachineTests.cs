@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Api.VendorHealth;
+using DTMS.Api.VendorHealth;
 using FluentAssertions;
 
-namespace AMR.DeliveryPlanning.Api.UnitTests.VendorHealth;
+namespace DTMS.Api.UnitTests.VendorHealth;
 
 public class VendorHealthStateMachineTests
 {

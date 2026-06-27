@@ -5,7 +5,7 @@ namespace DTMS.Transport.Manual.Infrastructure.Push;
 // Phase 4.3 — One-shot helper so an ops user can generate VAPID keys
 // without leaving the project. Invoked via:
 //
-//   dotnet run --project src/AMR.DeliveryPlanning.Api -- --generate-vapid-keys
+//   dotnet run --project src/DTMS.Api -- --generate-vapid-keys
 //
 // (wired in Program.cs near the top). Prints to stdout — operator
 // pastes into appsettings.Development.json or .env. Public key is NOT

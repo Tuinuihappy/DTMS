@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace AMR.DeliveryPlanning.OmsAdapter.Abstractions.Models;
+namespace DTMS.OmsAdapter.Abstractions.Models;
 
 // Wire-shape for upstream OMS POST /api/shipments. JsonPropertyName is
 // explicit so the contract survives serializer-option drift across the

@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Api.Realtime.Hubs;
-using AMR.DeliveryPlanning.Api.Realtime.Hubs.Clients;
+using DTMS.Api.Realtime.Hubs;
+using DTMS.Api.Realtime.Hubs.Clients;
 using DTMS.Dispatch.Application.Projections;
 using Microsoft.AspNetCore.SignalR;
 
-namespace AMR.DeliveryPlanning.Api.Realtime.Publishers;
+namespace DTMS.Api.Realtime.Publishers;
 
 public sealed class SignalRTripRealtimePublisher : ITripRealtimePublisher
 {

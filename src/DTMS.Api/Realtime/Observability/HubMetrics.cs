@@ -1,6 +1,6 @@
 using System.Diagnostics.Metrics;
 
-namespace AMR.DeliveryPlanning.Api.Realtime.Observability;
+namespace DTMS.Api.Realtime.Observability;
 
 /// <summary>
 /// OpenTelemetry-compatible metrics for SignalR hubs. Mirrored on the

@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Api.Infrastructure.Reconciliation;
+namespace DTMS.Api.Infrastructure.Reconciliation;
 
 /// <summary>
 /// Runtime knobs for <see cref="PlanningReconciliationService"/>. Bound to

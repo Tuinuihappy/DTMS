@@ -4,7 +4,7 @@ using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Api.Adapters;
+namespace DTMS.Api.Adapters;
 
 /// <summary>
 /// Composition-root bridge: lets Dispatch.Application's

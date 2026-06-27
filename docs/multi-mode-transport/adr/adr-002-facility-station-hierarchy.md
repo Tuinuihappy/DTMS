@@ -7,7 +7,7 @@
 
 ## Context
 
-ปัจจุบัน `Station` entity ที่ [Station.cs](../../../src/Modules/Facility/AMR.DeliveryPlanning.Facility.Domain/Entities/Station.cs) เป็น **AMR-specific โดยพฤตินัย** แต่ตั้งอยู่ใน Facility module ที่ควรเป็น mode-agnostic:
+ปัจจุบัน `Station` entity ที่ [Station.cs](../../../src/Modules/Facility/DTMS.Facility.Domain/Entities/Station.cs) เป็น **AMR-specific โดยพฤตินัย** แต่ตั้งอยู่ใน Facility module ที่ควรเป็น mode-agnostic:
 
 ```csharp
 public class Station {
@@ -375,4 +375,4 @@ GROUP BY m.id, m.name;
 ## References
 
 - DDD: Bounded Context separation (Eric Evans)
-- DTMS existing `IStationLookup`: [FacilityStationLookup.cs](../../../src/Modules/Facility/AMR.DeliveryPlanning.Facility.Infrastructure/Services/FacilityStationLookup.cs)
+- DTMS existing `IStationLookup`: [FacilityStationLookup.cs](../../../src/Modules/Facility/DTMS.Facility.Infrastructure/Services/FacilityStationLookup.cs)

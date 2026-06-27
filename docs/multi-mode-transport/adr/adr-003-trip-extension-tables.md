@@ -7,7 +7,7 @@
 
 ## Context
 
-ปัจจุบัน [Trip.cs](../../../src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Domain/Entities/Trip.cs) ฝัง RIOT3-specific fields:
+ปัจจุบัน [Trip.cs](../../../src/Modules/Dispatch/DTMS.Dispatch.Domain/Entities/Trip.cs) ฝัง RIOT3-specific fields:
 
 ```csharp
 public class Trip {
@@ -416,4 +416,4 @@ Phase 3 Migration Sequence:
 - DDD aggregate boundary (Eric Evans)
 - Per-tenant extension tables pattern (multi-tenant SaaS)
 - EF Core relationships: https://learn.microsoft.com/ef/core/modeling/relationships
-- Existing Trip aggregate: [Trip.cs](../../../src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Domain/Entities/Trip.cs)
+- Existing Trip aggregate: [Trip.cs](../../../src/Modules/Dispatch/DTMS.Dispatch.Domain/Entities/Trip.cs)

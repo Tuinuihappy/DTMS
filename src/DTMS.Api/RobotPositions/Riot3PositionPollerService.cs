@@ -2,7 +2,7 @@ using DTMS.Facility.Infrastructure.Data;
 using DTMS.Fleet.Application.Services;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Api.RobotPositions;
+namespace DTMS.Api.RobotPositions;
 
 /// <summary>
 /// Polls RIOT3 once per second for the live robot snapshot and reconciles it

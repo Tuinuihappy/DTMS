@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 
-namespace AMR.DeliveryPlanning.Api.Realtime.Drain;
+namespace DTMS.Api.Realtime.Drain;
 
 // G1 Phase 1 — reject NEW SignalR connections + invocations while draining.
 // Belt-and-suspenders alongside the DrainHealthCheck:

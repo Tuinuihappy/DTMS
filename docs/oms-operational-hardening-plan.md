@@ -13,10 +13,10 @@ Phase 1–4 + B3/B4 ครอบคลุม "happy + retry + manual recovery" p
 | Risk | สภาพปัจจุบัน |
 |------|---------------|
 | **No-one notices when OMS dies** | Fault consumer เขียน audit + log warning — operator ต้องเปิด detail-drawer ดูเอง |
-| **Retry storm** | MassTransit ใช้ default `Immediate(5)` (ไม่มี `UseMessageRetry` explicit ที่ [ModuleServiceRegistration.cs:341](../src/AMR.DeliveryPlanning.Api/Modules/ModuleServiceRegistration.cs#L341)) → OMS down 5 นาที = ทุก message dead-letter ทันที |
+| **Retry storm** | MassTransit ใช้ default `Immediate(5)` (ไม่มี `UseMessageRetry` explicit ที่ [ModuleServiceRegistration.cs:341](../src/DTMS.Api/Modules/ModuleServiceRegistration.cs#L341)) → OMS down 5 นาที = ทุก message dead-letter ทันที |
 | **No metric visibility** | "OMS ตอบ 5xx กี่ครั้งเมื่อวาน?" ต้อง grep log container |
 | **Bulk recovery ช้า** | OMS down 2 ชม. → 50 shipment fail → operator กด Resend ทีละ order |
-| **Timeline gap** | OMS notify outcomes ไม่อยู่ใน `OrderActivity` ([OrderActivityProjector.cs:30](../src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Application/Projections/OrderActivityProjector.cs#L30) gap note) |
+| **Timeline gap** | OMS notify outcomes ไม่อยู่ใน `OrderActivity` ([OrderActivityProjector.cs:30](../src/Modules/DeliveryOrder/DTMS.DeliveryOrder.Application/Projections/OrderActivityProjector.cs#L30) gap note) |
 | **JWT expiry blind** | Token exp ก.ย. 2027 — vanish ไม่มี warning |
 
 **Cross-cutting nature:** Alerting backbone + retry policy ที่ออกแบบในแผนนี้ออกแบบให้ **reusable** กับ adapter อื่น (VendorAdapter outages, Trip stuck > 30 min, etc.) ไม่ใช่ OMS-only
@@ -27,11 +27,11 @@ Phase 1–4 + B3/B4 ครอบคลุม "happy + retry + manual recovery" p
 
 | Question | Answer | เหตุผล |
 |----------|--------|--------|
-| Alerting channel | Slack webhook + SignalR ops hub | reuse SignalR infra ที่มี ([Realtime/](../src/AMR.DeliveryPlanning.Api/Realtime/)); Slack สำหรับ off-hours persistence |
+| Alerting channel | Slack webhook + SignalR ops hub | reuse SignalR infra ที่มี ([Realtime/](../src/DTMS.Api/Realtime/)); Slack สำหรับ off-hours persistence |
 | Alert dedup | In-memory coalescing per (Kind, 60s window) | OMS outage = node ตัวเดียวเห็นภาพรวมพอ; ย้าย Redis ถ้า scale-out |
 | Retry policy | MassTransit `UseMessageRetry` + `UseDelayedRedelivery` | Exponential backoff + redelivery delays → ทน OMS down 30 นาทีได้ |
 | Metrics | OpenTelemetry meter `DTMS.OmsAdapter` | match pattern `DTMS.SignalR` meter ([signalr-hub-catalog.md §9](signalr-hub-catalog.md)) |
-| Circuit breaker | Polly `AddStandardResilienceHandler` | reuse pattern จาก [VendorAdapter ResilienceExtensions.cs](../src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Infrastructure/Extensions/ResilienceExtensions.cs) |
+| Circuit breaker | Polly `AddStandardResilienceHandler` | reuse pattern จาก [VendorAdapter ResilienceExtensions.cs](../src/Modules/VendorAdapter/DTMS.VendorAdapter.Infrastructure/Extensions/ResilienceExtensions.cs) |
 | Timeline integration | New integration event `UpstreamOmsNotifyOutcomeIntegrationEvent` | match existing projector subscription pattern (no direct audit→projector coupling) |
 | Bulk replay | Admin endpoint `POST /api/admin/oms/replay?since={ts}` | gated by admin role; query `OrderAuditEvent` table directly |
 
@@ -44,7 +44,7 @@ Phase 1–4 + B3/B4 ครอบคลุม "happy + retry + manual recovery" p
 ### Files
 
 ```
-src/AMR.DeliveryPlanning.Api/Realtime/
+src/DTMS.Api/Realtime/
 ├── Hubs/
 │   ├── OpsAlertsHub.cs                        # /hubs/ops-alerts (ใหม่)
 │   └── Clients/IOpsAlertClient.cs             # AlertRaised(payload)
@@ -52,18 +52,18 @@ src/AMR.DeliveryPlanning.Api/Realtime/
     ├── SignalROpsAlertPublisher.cs            # implements IOpsAlertPublisher
     └── CoalescingOpsAlertPublisher.cs         # decorator: dedup per (Kind, 60s)
 
-src/AMR.DeliveryPlanning.SharedKernel/Ops/
+src/DTMS.SharedKernel/Ops/
 ├── IOpsAlertPublisher.cs                      # cross-cutting interface
 ├── OpsAlert.cs                                # record (Kind, Severity, Title, Detail, OrderId?, TripId?, DeepLink?)
 └── ISlackAlertSink.cs                         # HTTP webhook contract
 
-src/AMR.DeliveryPlanning.Api/Infrastructure/Slack/
+src/DTMS.Api/Infrastructure/Slack/
 └── SlackAlertSink.cs                          # POST to Slack incoming webhook
 ```
 
 ### Wiring
 
-แก้ [TripStartedOmsNotifyFaultConsumer.cs](../src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Application/Consumers/TripStartedOmsNotifyFaultConsumer.cs) (+ 4 fault consumers ที่เหลือจาก B4):
+แก้ [TripStartedOmsNotifyFaultConsumer.cs](../src/Modules/DeliveryOrder/DTMS.DeliveryOrder.Application/Consumers/TripStartedOmsNotifyFaultConsumer.cs) (+ 4 fault consumers ที่เหลือจาก B4):
 
 ```csharp
 // หลังเขียน audit row → push alert (non-blocking, swallow errors)
@@ -120,7 +120,7 @@ catch (Exception ex)
 
 ### Change
 
-แก้ [ModuleServiceRegistration.cs](../src/AMR.DeliveryPlanning.Api/Modules/ModuleServiceRegistration.cs#L300-L311):
+แก้ [ModuleServiceRegistration.cs](../src/DTMS.Api/Modules/ModuleServiceRegistration.cs#L300-L311):
 
 ```csharp
 bus.UsingRabbitMq((context, cfg) =>
@@ -261,7 +261,7 @@ services.AddHttpClient<IOmsShipmentClient, HttpOmsShipmentClient>(...)
 
 ## Phase E — OMS events → OrderActivity timeline (P2) ⬜
 
-**Goal:** ปิด gap ใน [OrderActivityProjector.cs:30](../src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Application/Projections/OrderActivityProjector.cs#L30) — OMS notify outcomes โผล่ใน unified timeline
+**Goal:** ปิด gap ใน [OrderActivityProjector.cs:30](../src/Modules/DeliveryOrder/DTMS.DeliveryOrder.Application/Projections/OrderActivityProjector.cs#L30) — OMS notify outcomes โผล่ใน unified timeline
 
 ### New integration event
 
@@ -279,7 +279,7 @@ public record UpstreamOmsNotifyOutcomeIntegrationEvent(
 ### Wiring
 
 - Raise ใน 5 main consumers + 5 fault consumers + 5 resend handlers (15 emit points)
-- Subscribe ใน [OrderActivityProjector.cs](../src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Application/Projections/OrderActivityProjector.cs) เพิ่ม `IConsumer<UpstreamOmsNotifyOutcomeIntegrationEvent>`
+- Subscribe ใน [OrderActivityProjector.cs](../src/Modules/DeliveryOrder/DTMS.DeliveryOrder.Application/Projections/OrderActivityProjector.cs) เพิ่ม `IConsumer<UpstreamOmsNotifyOutcomeIntegrationEvent>`
 - Map → `OrderActivityRow` with `Category="OmsNotify"`, `Source="System"`
 
 ### Acceptance

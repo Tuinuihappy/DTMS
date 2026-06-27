@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.OmsAdapter.Infrastructure.Options;
+namespace DTMS.OmsAdapter.Infrastructure.Options;
 
 public sealed class UpstreamOmsOptions
 {

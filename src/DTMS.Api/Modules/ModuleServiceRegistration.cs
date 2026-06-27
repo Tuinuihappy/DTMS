@@ -1,5 +1,5 @@
-using AMR.DeliveryPlanning.Api.Auth;
-using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
+using DTMS.Api.Auth;
+using DTMS.Api.Infrastructure.Outbox;
 using DTMS.DeliveryOrder.Application.Options;
 using DTMS.DeliveryOrder.Application.Services;
 using DTMS.DeliveryOrder.Domain.Repositories;
@@ -33,15 +33,15 @@ using DTMS.Planning.Infrastructure.Repositories;
 using DTMS.Planning.Infrastructure.Services;
 using DTMS.SharedKernel.Messaging;
 using DTMS.SharedKernel.Outbox;
-using AMR.DeliveryPlanning.OmsAdapter;
-using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Exceptions;
+using DTMS.OmsAdapter;
+using DTMS.OmsAdapter.Abstractions.Exceptions;
 using DTMS.Transport.Amr.Infrastructure;
 using DTMS.Transport.Amr.Infrastructure.Extensions;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 
-namespace AMR.DeliveryPlanning.Api.Modules;
+namespace DTMS.Api.Modules;
 
 /// <summary>
 /// Registers all module services (DbContexts, Repositories, Domain Services) into the DI container.
@@ -215,11 +215,11 @@ public static class ModuleServiceRegistration
         // would fail to resolve otherwise), but the poller itself is gated
         // — worker container's store stays empty, which is fine because no
         // map UI is served from the worker.
-        services.AddSingleton<AMR.DeliveryPlanning.Api.RobotPositions.IRobotPositionStore,
-                              AMR.DeliveryPlanning.Api.RobotPositions.InMemoryRobotPositionStore>();
+        services.AddSingleton<DTMS.Api.RobotPositions.IRobotPositionStore,
+                              DTMS.Api.RobotPositions.InMemoryRobotPositionStore>();
         if (runVendorPollers)
         {
-            services.AddHostedService<AMR.DeliveryPlanning.Api.RobotPositions.Riot3PositionPollerService>();
+            services.AddHostedService<DTMS.Api.RobotPositions.Riot3PositionPollerService>();
         }
 
         // ── Transport.Manual Module (Phase 4.1 + 4.2) ─────────────────
@@ -241,7 +241,7 @@ public static class ModuleServiceRegistration
                            DTMS.Transport.Manual.Infrastructure.Repositories.ManualTripExtensionRepository>();
         services.AddScoped<DTMS.Transport.Manual.Application.Services.IOperatorSyncService,
                            DTMS.Transport.Manual.Application.Services.OperatorSyncService>();
-        services.AddScoped<AMR.DeliveryPlanning.Api.Auth.OperatorSyncMiddleware>();
+        services.AddScoped<DTMS.Api.Auth.OperatorSyncMiddleware>();
 
         // Phase 4.3 — Object storage (MinIO) for POD photos (ADR-015).
         services.Configure<DTMS.Transport.Manual.Infrastructure.Storage.ObjectStorageOptions>(
@@ -288,9 +288,9 @@ public static class ModuleServiceRegistration
                     sp.GetRequiredService<DeliveryOrderDomainEventMapper>())));
         services.AddHttpContextAccessor();
         services.AddScoped<DTMS.DeliveryOrder.Application.Services.ICurrentUserAccessor,
-                           AMR.DeliveryPlanning.Api.Auth.HttpContextCurrentUserAccessor>();
+                           DTMS.Api.Auth.HttpContextCurrentUserAccessor>();
         services.AddScoped<DTMS.Planning.Application.Services.ICurrentUserAccessor,
-                           AMR.DeliveryPlanning.Api.Auth.HttpContextCurrentUserAccessor>();
+                           DTMS.Api.Auth.HttpContextCurrentUserAccessor>();
         services.AddScoped<IDeliveryOrderRepository, DeliveryOrderRepository>();
         services.AddScoped<FacilityStationLookup>();
         services.AddScoped<IStationLookup, CachedStationLookup>();
@@ -321,7 +321,7 @@ public static class ModuleServiceRegistration
         // Phase P1 — SignalR-backed realtime publisher. Projector pushes to
         // OrderHub's "order:{id:N}" group after each successful timeline row.
         services.AddSingleton<DTMS.DeliveryOrder.Application.Projections.IOrderRealtimePublisher,
-                              AMR.DeliveryPlanning.Api.Realtime.Publishers.SignalROrderRealtimePublisher>();
+                              DTMS.Api.Realtime.Publishers.SignalROrderRealtimePublisher>();
         // Phase P2 — unified order activity timeline projection.
         services.AddScoped<DTMS.DeliveryOrder.Application.Projections.IOrderActivityReadRepository,
                            DTMS.DeliveryOrder.Infrastructure.Projections.OrderActivityReadRepository>();
@@ -338,7 +338,7 @@ public static class ModuleServiceRegistration
         // DashboardCounterBatcher (P0.B11) so frontend receives one
         // CountersUpdated push per board per 250 ms window.
         services.AddSingleton<DTMS.DeliveryOrder.Application.Projections.IDashboardRealtimePublisher,
-                              AMR.DeliveryPlanning.Api.Realtime.Publishers.BatchedDashboardRealtimePublisher>();
+                              DTMS.Api.Realtime.Publishers.BatchedDashboardRealtimePublisher>();
         // Phase P4 — denormalized order list/search view projection.
         services.AddScoped<DTMS.DeliveryOrder.Application.Projections.IOrderListViewReadRepository,
                            DTMS.DeliveryOrder.Infrastructure.Projections.OrderListViewReadRepository>();
@@ -364,7 +364,7 @@ public static class ModuleServiceRegistration
         // Phase P1 — projection infrastructure for the Planning module.
         // Same shape as DeliveryOrder's wiring: store + read repo per module.
         services.AddSingleton<DTMS.Planning.Application.Projections.IJobRealtimePublisher,
-                              AMR.DeliveryPlanning.Api.Realtime.Publishers.SignalRJobRealtimePublisher>();
+                              DTMS.Api.Realtime.Publishers.SignalRJobRealtimePublisher>();
         services.AddScoped<DTMS.Planning.Application.Projections.IJobStatusHistoryReadRepository,
                            DTMS.Planning.Infrastructure.Projections.JobStatusHistoryReadRepository>();
         services.AddScoped<DTMS.Planning.Application.Projections.IJobStatusHistoryProjectionStore,
@@ -384,17 +384,17 @@ public static class ModuleServiceRegistration
         // logs every skip at INF so it's never silent.
         var riot3Enabled = configuration.GetValue<bool>("VendorAdapter:Riot3:Enabled", true);
         if (riot3Enabled)
-            services.AddScoped<IRobotOrderDispatcher, AMR.DeliveryPlanning.Api.Adapters.Riot3OrderDispatcherAdapter>();
+            services.AddScoped<IRobotOrderDispatcher, DTMS.Api.Adapters.Riot3OrderDispatcherAdapter>();
         else
-            services.AddScoped<IRobotOrderDispatcher, AMR.DeliveryPlanning.Api.Adapters.NoOpOrderDispatcherAdapter>();
+            services.AddScoped<IRobotOrderDispatcher, DTMS.Api.Adapters.NoOpOrderDispatcherAdapter>();
 
         // Log which vendor adapters got picked at boot so it's visible without
         // having to trigger an order first. Single line at INF level.
-        services.AddHostedService<AMR.DeliveryPlanning.Api.Adapters.CompositionLogger>();
+        services.AddHostedService<DTMS.Api.Adapters.CompositionLogger>();
         services.AddScoped<DTMS.Dispatch.Application.Services.IVendorEnvelopeOperationService,
-            AMR.DeliveryPlanning.Api.Adapters.Riot3VendorEnvelopeOperationAdapter>();
+            DTMS.Api.Adapters.Riot3VendorEnvelopeOperationAdapter>();
         services.AddScoped<DTMS.Dispatch.Application.Services.IVendorRobotOperationService,
-            AMR.DeliveryPlanning.Api.Adapters.Riot3VendorRobotOperationAdapter>();
+            DTMS.Api.Adapters.Riot3VendorRobotOperationAdapter>();
 
         // ── Phase 1 foundation: strategy registry + vendor operations router ──
         // Both auto-discover their adapters via IEnumerable<> injection. Adding
@@ -412,13 +412,13 @@ public static class ModuleServiceRegistration
         // OrderTemplate → RIOT3 envelope flow) but goes through the strategy
         // contract so Manual / Fleet can plug their own implementations in.
         services.AddScoped<DTMS.Dispatch.Application.Services.IDispatchStrategy,
-            AMR.DeliveryPlanning.Api.Adapters.AmrDispatchStrategy>();
+            DTMS.Api.Adapters.AmrDispatchStrategy>();
         // Phase 3c — Manual strategy stub. Returns Failure with a clear
         // "not yet implemented" reason so Manual orders end up at Failed
         // (visible in the UI) instead of Confirmed-forever. Phase 4 swaps
         // the body for the real operator-assignment flow.
         services.AddScoped<DTMS.Dispatch.Application.Services.IDispatchStrategy,
-            AMR.DeliveryPlanning.Api.Adapters.ManualDispatchStrategy>();
+            DTMS.Api.Adapters.ManualDispatchStrategy>();
         services.AddScoped<IDispatchOrderTemplateService, DispatchOrderTemplateService>();
         services.Configure<DTMS.Planning.Application.Options.DispatchOptions>(
             configuration.GetSection(DTMS.Planning.Application.Options.DispatchOptions.SectionName));
@@ -432,7 +432,7 @@ public static class ModuleServiceRegistration
         services.AddHostedService<SlaRiskBackgroundService>();
         // Phase P3.2 — hourly fleet utilization snapshot (ticks every minute,
         // writes to FleetUtilizationHourly).
-        services.AddHostedService<AMR.DeliveryPlanning.Api.Infrastructure.FleetUtilizationSnapshotService>();
+        services.AddHostedService<DTMS.Api.Infrastructure.FleetUtilizationSnapshotService>();
 
         // ── Dispatch Module ───────────────────────────────────────────
         services.AddScoped<DispatchDomainEventMapper>();
@@ -444,7 +444,7 @@ public static class ModuleServiceRegistration
         services.AddScoped<ITripRepository, TripRepository>();
         // Phase P1 — projection infrastructure for the Dispatch module.
         services.AddSingleton<DTMS.Dispatch.Application.Projections.ITripRealtimePublisher,
-                              AMR.DeliveryPlanning.Api.Realtime.Publishers.SignalRTripRealtimePublisher>();
+                              DTMS.Api.Realtime.Publishers.SignalRTripRealtimePublisher>();
         services.AddScoped<DTMS.Dispatch.Application.Projections.ITripStatusHistoryReadRepository,
                            DTMS.Dispatch.Infrastructure.Projections.TripStatusHistoryReadRepository>();
         services.AddScoped<DTMS.Dispatch.Application.Projections.ITripStatusHistoryProjectionStore,
@@ -468,13 +468,13 @@ public static class ModuleServiceRegistration
         services.AddScoped<DTMS.Dispatch.Domain.Repositories.ITripMissionEventRepository,
             DTMS.Dispatch.Infrastructure.Repositories.TripMissionEventRepository>();
         services.AddScoped<DTMS.Dispatch.Application.Services.ITripRetryDispatcher,
-            AMR.DeliveryPlanning.Api.Adapters.PlanningTripRetryDispatcher>();
+            DTMS.Api.Adapters.PlanningTripRetryDispatcher>();
         // Composition-root seam — lets ReissueTripCommandHandler check the
         // parent Order's status without taking a direct ref on
         // DeliveryOrder.Application. Fixes the scenario-5 bug where a
         // Cancelled-order's Trip could still be retried.
         services.AddScoped<DTMS.Dispatch.Application.Services.IDeliveryOrderStatusReader,
-            AMR.DeliveryPlanning.Api.Adapters.DeliveryOrderStatusReader>();
+            DTMS.Api.Adapters.DeliveryOrderStatusReader>();
         services.AddScoped<IShelfManifestRepository, ShelfManifestRepository>();
 
         // ── VendorAdapter Module ──────────────────────────────────────
@@ -525,14 +525,14 @@ public static class ModuleServiceRegistration
         // log line during host shutdown). Registered before AddMassTransit
         // so it's resolvable when the bus calls IBusObserver instances.
         services.AddSingleton<
-            AMR.DeliveryPlanning.Api.Infrastructure.Diagnostics.BusShutdownTimingObserver>();
+            DTMS.Api.Infrastructure.Diagnostics.BusShutdownTimingObserver>();
 
         services.AddMassTransit(bus =>
         {
             // G2 — wire the bus observer so PreStop/PostStop timings flow
             // into WorkflowMetrics + structured logs during shutdown.
             bus.AddBusObserver<
-                AMR.DeliveryPlanning.Api.Infrastructure.Diagnostics.BusShutdownTimingObserver>();
+                DTMS.Api.Infrastructure.Diagnostics.BusShutdownTimingObserver>();
 
             // Auto-scan consumers from all module Application assemblies
             bus.AddConsumers(
@@ -637,9 +637,9 @@ public static class ModuleServiceRegistration
         // Outbox infrastructure
         services.AddDbContext<OutboxDbContext>(o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));
         services
-            .AddOptions<AMR.DeliveryPlanning.Api.Infrastructure.Outbox.OutboxOptions>()
+            .AddOptions<DTMS.Api.Infrastructure.Outbox.OutboxOptions>()
             .Bind(configuration.GetSection(
-                AMR.DeliveryPlanning.Api.Infrastructure.Outbox.OutboxOptions.SectionName));
+                DTMS.Api.Infrastructure.Outbox.OutboxOptions.SectionName));
         services.AddSingleton<IOutboxProcessor, OutboxProcessorService>();
 
         // Phase D — OutboxProcessor as IHostedService is conditional. Default

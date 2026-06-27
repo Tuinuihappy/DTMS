@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Api.VendorHealth;
+namespace DTMS.Api.VendorHealth;
 
 public enum ProbeOutcomeKind
 {

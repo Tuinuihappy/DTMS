@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Api.Realtime.Hubs;
-using AMR.DeliveryPlanning.Api.Realtime.Hubs.Clients;
+using DTMS.Api.Realtime.Hubs;
+using DTMS.Api.Realtime.Hubs.Clients;
 using Microsoft.AspNetCore.SignalR;
 
-namespace AMR.DeliveryPlanning.Api.VendorHealth;
+namespace DTMS.Api.VendorHealth;
 
 /// <summary>
 /// Subscribes to <see cref="IVendorHealthStore.StatusChanged"/> and pushes

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 
-namespace AMR.DeliveryPlanning.Api.Realtime.Drain;
+namespace DTMS.Api.Realtime.Drain;
 
 // G1 + Phase F1 follow-up — auto-join every new hub connection to a
 // per-pod group ("pod:{hostname}"). The drain broadcast in

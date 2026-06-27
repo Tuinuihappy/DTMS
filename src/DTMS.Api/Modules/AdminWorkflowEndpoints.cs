@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.Api.Realtime.Drain;
+using DTMS.Api.Realtime.Drain;
 using DTMS.DeliveryOrder.Application.Commands.ReplanStuckOrder;
 using DTMS.Dispatch.Application.Commands.ForceCompleteTrip;
 using DTMS.Dispatch.Application.Commands.ForceDropCompletedTrip;
@@ -8,7 +8,7 @@ using DTMS.SharedKernel.Auth;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
-namespace AMR.DeliveryPlanning.Api.Modules;
+namespace DTMS.Api.Modules;
 
 /// <summary>
 /// T1.7 — admin-only recovery endpoints for the workflow pipeline. Sits next

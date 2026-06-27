@@ -3,7 +3,7 @@ using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.Api.VendorHealth;
+namespace DTMS.Api.VendorHealth;
 
 public sealed class Riot3HealthProbe : IRiot3HealthProbe
 {

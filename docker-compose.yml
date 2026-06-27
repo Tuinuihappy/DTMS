@@ -230,7 +230,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=amr_delivery_planning;Username=postgres;Password=postgres
-    command: ["dotnet", "AMR.DeliveryPlanning.Api.dll", "--migrate-only"]
+    command: ["dotnet", "DTMS.Api.dll", "--migrate-only"]
 
   api:
     build:
@@ -301,7 +301,7 @@ services:
       # so single-host docker-compose stays in-memory (no Redis round-trip
       # cost). Flip to true via .env.test when running scale tests or in
       # production where API has > 1 replica. Conditional wire is at
-      # src/AMR.DeliveryPlanning.Api/Program.cs around AddStackExchangeRedis.
+      # src/DTMS.Api/Program.cs around AddStackExchangeRedis.
       - SignalR__UseRedisBackplane=${SignalR__UseRedisBackplane:-false}
       # Override rate limiter for load testing — defaults to 100 req/min/IP
       - RateLimit__PermitLimit=${RateLimit__PermitLimit:-100}
@@ -394,7 +394,7 @@ services:
       # set to a public hostname in production.
       - ObjectStorage__PublicEndpoint=${ObjectStorage__PublicEndpoint:-http://localhost:9000}
       # Phase 4.3 — Web Push (VAPID) per ADR-013. Generate once via
-      # `dotnet run --project src/AMR.DeliveryPlanning.Api -- --generate-vapid-keys`
+      # `dotnet run --project src/DTMS.Api -- --generate-vapid-keys`
       # or any web-push-libs CLI; the keypair is non-secret on the public
       # side (PWA bakes the public key into its SW registration) and must
       # match what's served to subscribers. Subject = mailto:ops@dtms or

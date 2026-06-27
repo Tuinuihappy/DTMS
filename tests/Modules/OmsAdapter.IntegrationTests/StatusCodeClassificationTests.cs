@@ -1,5 +1,5 @@
-using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Exceptions;
-using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Models;
+using DTMS.OmsAdapter.Abstractions.Exceptions;
+using DTMS.OmsAdapter.Abstractions.Models;
 using FluentAssertions;
 using WireMock.RequestBuilders;
 using WireMock.ResponseBuilders;

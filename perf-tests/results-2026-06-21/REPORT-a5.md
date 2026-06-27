@@ -7,7 +7,7 @@
 ## Setup
 
 Code change: single new file
-[`src/Modules/Planning/AMR.DeliveryPlanning.Planning.Application/Consumers/DeliveryOrderValidatedConsumerDefinition.cs`](../../src/Modules/Planning/AMR.DeliveryPlanning.Planning.Application/Consumers/DeliveryOrderValidatedConsumerDefinition.cs)
+[`src/Modules/Planning/DTMS.Planning.Application/Consumers/DeliveryOrderValidatedConsumerDefinition.cs`](../../src/Modules/Planning/DTMS.Planning.Application/Consumers/DeliveryOrderValidatedConsumerDefinition.cs)
 
 ```csharp
 public sealed class DeliveryOrderValidatedConsumerDefinition
@@ -100,6 +100,6 @@ Further drain improvements require either:
 
 ## Files referenced
 
-- [`DeliveryOrderValidatedConsumerDefinition.cs`](../../src/Modules/Planning/AMR.DeliveryPlanning.Planning.Application/Consumers/DeliveryOrderValidatedConsumerDefinition.cs) — the new ConsumerDefinition
+- [`DeliveryOrderValidatedConsumerDefinition.cs`](../../src/Modules/Planning/DTMS.Planning.Application/Consumers/DeliveryOrderValidatedConsumerDefinition.cs) — the new ConsumerDefinition
 - Earlier acceptance reports: [REPORT-acceptance.md](../results-2026-06-20/REPORT-acceptance.md), [REPORT-acceptance-final.md](../results-2026-06-20/REPORT-acceptance-final.md), [REPORT-phase-b.md](../results-2026-06-20/REPORT-phase-b.md), [REPORT-phase-d.md](../results-2026-06-20/REPORT-phase-d.md) — 4-run baseline
 - [`k6-scenario-b-a5.txt`](../k6-scenario-b-a5.txt) — raw k6 output

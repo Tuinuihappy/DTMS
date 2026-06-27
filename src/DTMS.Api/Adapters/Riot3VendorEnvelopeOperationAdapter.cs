@@ -4,7 +4,7 @@ using DTMS.SharedKernel.Messaging;
 using DTMS.Transport.Amr.Models;
 using DTMS.Transport.Amr.Services;
 
-namespace AMR.DeliveryPlanning.Api.Adapters;
+namespace DTMS.Api.Adapters;
 
 // Composition-root bridge: forwards Dispatch.Application's vendor-agnostic
 // envelope operations to the concrete RIOT3 client. Lives in the API

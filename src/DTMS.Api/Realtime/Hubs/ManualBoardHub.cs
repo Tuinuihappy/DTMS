@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Api.Realtime.Hubs.Clients;
+using DTMS.Api.Realtime.Hubs.Clients;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
-namespace AMR.DeliveryPlanning.Api.Realtime.Hubs;
+namespace DTMS.Api.Realtime.Hubs;
 
 /// <summary>
 /// Phase 4.6 — Dispatcher /dispatch/manual page subscribes here for

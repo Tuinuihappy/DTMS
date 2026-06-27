@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
-using AMR.DeliveryPlanning.Api.Realtime.Hubs;
-using AMR.DeliveryPlanning.Api.Realtime.Hubs.Clients;
+using DTMS.Api.Realtime.Hubs;
+using DTMS.Api.Realtime.Hubs.Clients;
 using Microsoft.AspNetCore.SignalR;
 
-namespace AMR.DeliveryPlanning.Api.Realtime.Pipeline;
+namespace DTMS.Api.Realtime.Pipeline;
 
 /// <summary>
 /// Throttle robot position updates so high-frequency upstream signals

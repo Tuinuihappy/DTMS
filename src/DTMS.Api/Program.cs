@@ -1,12 +1,12 @@
 using System.Text;
 using System.Threading.RateLimiting;
 using FluentValidation;
-using AMR.DeliveryPlanning.Api.Auth;
-using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
-using AMR.DeliveryPlanning.Api.Middlewares;
-using AMR.DeliveryPlanning.Api.Modules;
-using AMR.DeliveryPlanning.Api.RobotPositions;
-using AMR.DeliveryPlanning.Api.VendorHealth;
+using DTMS.Api.Auth;
+using DTMS.Api.Infrastructure.Outbox;
+using DTMS.Api.Middlewares;
+using DTMS.Api.Modules;
+using DTMS.Api.RobotPositions;
+using DTMS.Api.VendorHealth;
 using DTMS.SharedKernel.Auth;
 using DTMS.SharedKernel.Projection;
 using Microsoft.AspNetCore.Authentication;
@@ -25,7 +25,7 @@ using OpenTelemetry.Trace;
 using Serilog;
 
 // Phase 4.3 — one-shot VAPID keypair generator. Run via:
-//   dotnet run --project src/AMR.DeliveryPlanning.Api -- --generate-vapid-keys
+//   dotnet run --project src/DTMS.Api -- --generate-vapid-keys
 // Prints the keypair + exits before any host setup. Operator pastes
 // the values into appsettings.Development.json or .env.
 if (args.Contains("--generate-vapid-keys"))
@@ -59,7 +59,7 @@ builder.Host.UseSerilog((context, configuration) =>
 // Add services to the container.
 builder.Services.AddOpenApi(options =>
 {
-    options.AddOperationTransformer<AMR.DeliveryPlanning.Api.OpenApi.IdempotencyKeyOperationTransformer>();
+    options.AddOperationTransformer<DTMS.Api.OpenApi.IdempotencyKeyOperationTransformer>();
 });
 builder.Services.AddAuthorization(o =>
 {
@@ -107,8 +107,8 @@ else
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtSettings?.Issuer ?? "AMR.DeliveryPlanning",
-            ValidAudience = jwtSettings?.Audience ?? "AMR.DeliveryPlanning.Api",
+            ValidIssuer = jwtSettings?.Issuer ?? "DTMS",
+            ValidAudience = jwtSettings?.Audience ?? "DTMS.Api",
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(
                     jwtSettings?.Secret
@@ -163,7 +163,7 @@ builder.Services.AddAllModules(builder.Configuration);
 // OpenTelemetry
 var otelEndpoint = builder.Configuration["OpenTelemetry:Endpoint"] ?? "http://localhost:4317";
 builder.Services.AddOpenTelemetry()
-    .ConfigureResource(r => r.AddService("AMR.DeliveryPlanning.Api"))
+    .ConfigureResource(r => r.AddService("DTMS.Api"))
     .WithTracing(tracing => tracing
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
@@ -192,16 +192,16 @@ builder.Services.AddSingleton<DTMS.SharedKernel.Diagnostics.WorkflowMetrics>();
 // inside AddMassTransit. Both emit log lines so ops see the breakdown
 // even before Phase G's Prometheus scrape + Grafana panel lands.
 builder.Services.AddHostedService<
-    AMR.DeliveryPlanning.Api.Infrastructure.Diagnostics.ShutdownPhaseRecorder>();
+    DTMS.Api.Infrastructure.Diagnostics.ShutdownPhaseRecorder>();
 
 // T1.4 — Planning reconciliation watchdog. Bound to the PlanningWatchdog
 // config section so ops can toggle Enabled at runtime via appsettings or env.
 builder.Services
-    .AddOptions<AMR.DeliveryPlanning.Api.Infrastructure.Reconciliation.PlanningWatchdogOptions>()
+    .AddOptions<DTMS.Api.Infrastructure.Reconciliation.PlanningWatchdogOptions>()
     .Bind(builder.Configuration.GetSection(
-        AMR.DeliveryPlanning.Api.Infrastructure.Reconciliation.PlanningWatchdogOptions.SectionName));
+        DTMS.Api.Infrastructure.Reconciliation.PlanningWatchdogOptions.SectionName));
 builder.Services.AddHostedService<
-    AMR.DeliveryPlanning.Api.Infrastructure.Reconciliation.PlanningReconciliationService>();
+    DTMS.Api.Infrastructure.Reconciliation.PlanningReconciliationService>();
 
 // P0 — projection foundation (idempotency, replay stub, metrics singleton).
 // Per-module IProjectionInboxRepository implementations register inside
@@ -246,27 +246,27 @@ var redisConn = builder.Configuration.GetConnectionString("Redis") ?? "localhost
 // P0 Day 4 — observability singletons + throttling background services
 // must register BEFORE AddSignalR so the filter types can resolve
 // HubMetrics from DI.
-builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Observability.HubMetrics>();
-builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Filters.TracingHubFilter>();
-builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Filters.RateLimitedHubFilter>();
+builder.Services.AddSingleton<DTMS.Api.Realtime.Observability.HubMetrics>();
+builder.Services.AddSingleton<DTMS.Api.Realtime.Filters.TracingHubFilter>();
+builder.Services.AddSingleton<DTMS.Api.Realtime.Filters.RateLimitedHubFilter>();
 // G1 Phase 1 — pod drain coordination. Singleton state shared between the
 // admin endpoint (POST /api/v1/admin/drain-start), the readiness health
 // check (flips /health/ready to 503), and the hub filter (rejects new
 // connections/invocations during drain).
 builder.Services.AddSingleton<
-    AMR.DeliveryPlanning.Api.Realtime.Drain.IConnectionDrainService,
-    AMR.DeliveryPlanning.Api.Realtime.Drain.ConnectionDrainService>();
-builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Drain.DrainAwareHubFilter>();
+    DTMS.Api.Realtime.Drain.IConnectionDrainService,
+    DTMS.Api.Realtime.Drain.ConnectionDrainService>();
+builder.Services.AddSingleton<DTMS.Api.Realtime.Drain.DrainAwareHubFilter>();
 // Phase F1 follow-up — auto-join every new connection to a per-pod
 // group so the drain broadcast can target only THIS pod's clients
 // (not the whole cluster via the Redis backplane).
-builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Drain.PodGroupHubFilter>();
+builder.Services.AddSingleton<DTMS.Api.Realtime.Drain.PodGroupHubFilter>();
 // Batchers register as both singleton (so projectors can inject and
 // enqueue) AND as a hosted service (so the drain loop runs).
-builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Pipeline.DashboardCounterBatcher>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<AMR.DeliveryPlanning.Api.Realtime.Pipeline.DashboardCounterBatcher>());
-builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Realtime.Pipeline.FleetPositionThrottler>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<AMR.DeliveryPlanning.Api.Realtime.Pipeline.FleetPositionThrottler>());
+builder.Services.AddSingleton<DTMS.Api.Realtime.Pipeline.DashboardCounterBatcher>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DTMS.Api.Realtime.Pipeline.DashboardCounterBatcher>());
+builder.Services.AddSingleton<DTMS.Api.Realtime.Pipeline.FleetPositionThrottler>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DTMS.Api.Realtime.Pipeline.FleetPositionThrottler>());
 
 // CORS for browser→hub direct connection. Same-origin reverse-proxy setups
 // (Nginx fronting both frontend + backend) wouldn't need this — but the
@@ -305,10 +305,10 @@ var signalRBuilder = builder.Services.AddSignalR(options =>
         // rate-limit check). Rate limit is innermost so a rejected call
         // never reaches the hub method body — and only counts once in
         // the metrics.
-        options.AddFilter<AMR.DeliveryPlanning.Api.Realtime.Drain.DrainAwareHubFilter>();
-        options.AddFilter<AMR.DeliveryPlanning.Api.Realtime.Drain.PodGroupHubFilter>();
-        options.AddFilter<AMR.DeliveryPlanning.Api.Realtime.Filters.TracingHubFilter>();
-        options.AddFilter<AMR.DeliveryPlanning.Api.Realtime.Filters.RateLimitedHubFilter>();
+        options.AddFilter<DTMS.Api.Realtime.Drain.DrainAwareHubFilter>();
+        options.AddFilter<DTMS.Api.Realtime.Drain.PodGroupHubFilter>();
+        options.AddFilter<DTMS.Api.Realtime.Filters.TracingHubFilter>();
+        options.AddFilter<DTMS.Api.Realtime.Filters.RateLimitedHubFilter>();
     })
     .AddMessagePackProtocol();
 
@@ -377,16 +377,16 @@ builder.Services.AddTransient<RiotHealthCheckFromStore>();
 
 // Phase B Step B2 — health-check class reuses the singleton NpgsqlDataSource
 // so /health/ready stops opening its own raw connection per probe.
-builder.Services.AddSingleton<AMR.DeliveryPlanning.Api.Infrastructure.Health.NpgsqlDataSourceHealthCheck>();
+builder.Services.AddSingleton<DTMS.Api.Infrastructure.Health.NpgsqlDataSourceHealthCheck>();
 
 builder.Services.AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy("Service is running"))
-    .AddCheck<AMR.DeliveryPlanning.Api.Infrastructure.Health.NpgsqlDataSourceHealthCheck>(
+    .AddCheck<DTMS.Api.Infrastructure.Health.NpgsqlDataSourceHealthCheck>(
         "postgres", tags: ["ready"])
     // G1 Phase 1 — readiness flips to Unhealthy as soon as drain begins,
     // so the K8s service mesh stops routing new traffic. Liveness (/health)
     // stays Healthy so kubelet doesn't restart the draining pod.
-    .AddCheck<AMR.DeliveryPlanning.Api.Realtime.Drain.DrainHealthCheck>(
+    .AddCheck<DTMS.Api.Realtime.Drain.DrainHealthCheck>(
         "drain", tags: ["ready"])
     .AddCheck("redis", () =>
     {
@@ -609,13 +609,13 @@ static async Task ApplyMigrationsAsync(DbContext db, Microsoft.Extensions.Loggin
         // it means a new DbContext was added without running 'dotnet ef migrations add'.
         throw new InvalidOperationException(
             $"Production startup aborted: {dbName} has no EF migrations. " +
-            "Run: dotnet ef migrations add InitialCreate --project <InfraProject> --startup-project src/AMR.DeliveryPlanning.Api");
+            "Run: dotnet ef migrations add InitialCreate --project <InfraProject> --startup-project src/DTMS.Api");
     }
     else
     {
         logger.LogWarning(
             "{Context} has no EF migrations — using EnsureCreated (dev fallback). " +
-            "Run: dotnet ef migrations add InitialCreate --project <InfraProject> --startup-project src/AMR.DeliveryPlanning.Api",
+            "Run: dotnet ef migrations add InitialCreate --project <InfraProject> --startup-project src/DTMS.Api",
             dbName);
         var created = await db.Database.EnsureCreatedAsync();
         if (!created)
@@ -650,7 +650,7 @@ if (app.Environment.IsDevelopment())
     });
     app.UseSwaggerUI(options =>
     {
-        options.SwaggerEndpoint("/openapi/v1.json", "AMR.DeliveryPlanning.Api v1");
+        options.SwaggerEndpoint("/openapi/v1.json", "DTMS.Api v1");
         options.RoutePrefix = "swagger";
         options.DocumentTitle = "AMR Delivery Planning API";
     });
@@ -675,7 +675,7 @@ app.UseAuthorization();
 // claims; the middleware then upserts the DTMS-side Operator row.
 app.UseWhen(
     ctx => ctx.Request.Path.StartsWithSegments("/api/operator"),
-    branch => branch.UseMiddleware<AMR.DeliveryPlanning.Api.Auth.OperatorSyncMiddleware>());
+    branch => branch.UseMiddleware<DTMS.Api.Auth.OperatorSyncMiddleware>());
 
 // Liveness probe (always 200 if process is up). G1 Phase 1 — excludes the
 // "drain" check so a draining pod stays liveness-Healthy and kubelet
@@ -751,13 +751,13 @@ app.MapVendorHealth();
 // to the hub their UI subscribes to — lazy connection keeps idle WS count
 // low. Auth enforced via [Authorize] on the hub classes; JWT comes in on
 // the access_token query param (see OnMessageReceived in JwtBearer setup).
-app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.OrderHub>("/hubs/orders");
-app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.JobHub>("/hubs/jobs");
-app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.TripHub>("/hubs/trips");
-app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.DashboardHub>("/hubs/dashboard");
-app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.FleetHub>("/hubs/fleet");
+app.MapHub<DTMS.Api.Realtime.Hubs.OrderHub>("/hubs/orders");
+app.MapHub<DTMS.Api.Realtime.Hubs.JobHub>("/hubs/jobs");
+app.MapHub<DTMS.Api.Realtime.Hubs.TripHub>("/hubs/trips");
+app.MapHub<DTMS.Api.Realtime.Hubs.DashboardHub>("/hubs/dashboard");
+app.MapHub<DTMS.Api.Realtime.Hubs.FleetHub>("/hubs/fleet");
 // Phase 4.6 — dispatcher Manual operator board realtime hints.
-app.MapHub<AMR.DeliveryPlanning.Api.Realtime.Hubs.ManualBoardHub>("/hubs/manual-board");
+app.MapHub<DTMS.Api.Realtime.Hubs.ManualBoardHub>("/hubs/manual-board");
 
 app.Run();
 

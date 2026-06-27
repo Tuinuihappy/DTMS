@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace AMR.DeliveryPlanning.Api.VendorHealth;
+namespace DTMS.Api.VendorHealth;
 
 public sealed class InMemoryVendorHealthStore : IVendorHealthStore
 {

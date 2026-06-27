@@ -2,7 +2,7 @@ using DTMS.Planning.Application.Services;
 using DTMS.Transport.Amr.Services;
 using Microsoft.Extensions.Configuration;
 
-namespace AMR.DeliveryPlanning.Api.Adapters;
+namespace DTMS.Api.Adapters;
 
 // Logs the composition-root swaps and Phase D worker-mode flag at startup
 // so operators / load-testers can confirm container role + vendor isolation

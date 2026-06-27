@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
-using AMR.DeliveryPlanning.Api.Realtime.Observability;
+using DTMS.Api.Realtime.Observability;
 using Microsoft.AspNetCore.SignalR;
 
-namespace AMR.DeliveryPlanning.Api.Realtime.Filters;
+namespace DTMS.Api.Realtime.Filters;
 
 /// <summary>
 /// Per-connection rate limiting for hub method invocations. Defends

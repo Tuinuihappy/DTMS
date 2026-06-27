@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.Api.Adapters;
+using DTMS.Api.Adapters;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.Dispatch.Application.Services;
 using DTMS.Planning.Application.Services;
@@ -7,7 +7,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
-namespace AMR.DeliveryPlanning.Api.UnitTests;
+namespace DTMS.Api.UnitTests;
 
 // Phase 3c — AmrDispatchStrategy is the production AMR entry point.
 // The Planning consumer resolves it through IDispatchStrategyRegistry

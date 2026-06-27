@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
+namespace DTMS.Api.Infrastructure.Outbox;
 
 public class OutboxDbContextFactory : IDesignTimeDbContextFactory<OutboxDbContext>
 {

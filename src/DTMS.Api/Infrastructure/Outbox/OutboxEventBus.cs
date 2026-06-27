@@ -2,7 +2,7 @@ using DTMS.SharedKernel.Domain;
 using DTMS.SharedKernel.Messaging;
 using DTMS.SharedKernel.Outbox;
 
-namespace AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
+namespace DTMS.Api.Infrastructure.Outbox;
 
 public class OutboxEventBus : IEventBus
 {

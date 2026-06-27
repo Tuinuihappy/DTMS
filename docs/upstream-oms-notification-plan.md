@@ -69,7 +69,7 @@ Content-Type: application/json
 
 ```
 src/Modules/OmsAdapter/
-├── AMR.DeliveryPlanning.OmsAdapter.csproj
+├── DTMS.OmsAdapter.csproj
 ├── Abstractions/
 │   ├── IOmsShipmentClient.cs              # Task NotifyShipmentStartedAsync(notif, ct)
 │   └── Models/

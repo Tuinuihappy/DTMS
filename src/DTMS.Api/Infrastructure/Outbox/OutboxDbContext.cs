@@ -1,7 +1,7 @@
 using DTMS.SharedKernel.Outbox;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
+namespace DTMS.Api.Infrastructure.Outbox;
 
 public class OutboxDbContext : DbContext
 {

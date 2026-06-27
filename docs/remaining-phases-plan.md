@@ -38,7 +38,7 @@ Backlog (do-when-needed):
 
 `Order=Dispatched + Trip=Cancelled` ค้างตลอดกาล — ตัวอย่างจาก prod data 3 orders เป็นแบบนี้
 
-**Root cause**: [TripCancelledConsumer.cs](../src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Application/Consumers/TripCancelledConsumer.cs) ปลด items เป็น `Pending` เพื่อรอ retry — แต่ถ้าไม่มีใคร retry ก็ค้างไปตลอด
+**Root cause**: [TripCancelledConsumer.cs](../src/Modules/DeliveryOrder/DTMS.DeliveryOrder.Application/Consumers/TripCancelledConsumer.cs) ปลด items เป็น `Pending` เพื่อรอ retry — แต่ถ้าไม่มีใคร retry ก็ค้างไปตลอด
 
 ## Design — เลือก hybrid (B + A)
 

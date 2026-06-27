@@ -106,4 +106,4 @@ The **acceptance threshold needs recalibration** based on what we now know about
 - [REPORT-acceptance.md](REPORT-acceptance.md) — second run (full pipeline + NoOp, sequential modules)
 - **This file** — third run (A4 + extended NoOp + .env.test safety)
 - [`.env.test.example`](../../.env.test.example) — safe load-test config template
-- [`OutboxProcessorService.cs`](../../src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/OutboxProcessorService.cs#L59) — A4 Task.WhenAll loop
+- [`OutboxProcessorService.cs`](../../src/DTMS.Api/Infrastructure/Outbox/OutboxProcessorService.cs#L59) — A4 Task.WhenAll loop

@@ -17,7 +17,7 @@ using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using System.Net.Http.Json;
 
-namespace AMR.DeliveryPlanning.IntegrationTests;
+namespace DTMS.IntegrationTests;
 
 /// <summary>
 /// T1.2 — end-to-end integration test for DeliveryOrderValidatedConsumer.

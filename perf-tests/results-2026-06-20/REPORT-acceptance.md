@@ -130,6 +130,6 @@ Dispatch consumer accepted the fake orderKey and persisted it on `Trip.VendorReq
 
 - [REPORT.md](REPORT.md) — first run (vendor enabled, finding #2 surfaced outbox drain bottleneck)
 - [`docs/scale-readiness-plan.md`](../../docs/scale-readiness-plan.md) — Phase A spec + acceptance threshold
-- [`src/AMR.DeliveryPlanning.Api/Adapters/NoOpOrderDispatcherAdapter.cs`](../../src/AMR.DeliveryPlanning.Api/Adapters/NoOpOrderDispatcherAdapter.cs) — NoOp impl
-- [`src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/OutboxProcessorService.cs`](../../src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/OutboxProcessorService.cs#L74) — sequential module loop (next bottleneck)
+- [`src/DTMS.Api/Adapters/NoOpOrderDispatcherAdapter.cs`](../../src/DTMS.Api/Adapters/NoOpOrderDispatcherAdapter.cs) — NoOp impl
+- [`src/DTMS.Api/Infrastructure/Outbox/OutboxProcessorService.cs`](../../src/DTMS.Api/Infrastructure/Outbox/OutboxProcessorService.cs#L74) — sequential module loop (next bottleneck)
 - [`k6-scenario-b-acceptance.txt`](../k6-scenario-b-acceptance.txt) — raw k6 output of this run

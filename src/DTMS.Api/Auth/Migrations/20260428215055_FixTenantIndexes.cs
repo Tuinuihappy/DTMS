@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Api.Auth.Migrations
+namespace DTMS.Api.Auth.Migrations
 {
     /// <inheritdoc />
     public partial class FixTenantIndexes : Migration

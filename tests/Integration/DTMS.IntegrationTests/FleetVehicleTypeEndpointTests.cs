@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 
-namespace AMR.DeliveryPlanning.IntegrationTests;
+namespace DTMS.IntegrationTests;
 
 public class FleetVehicleTypeEndpointTests : IClassFixture<DtmsWebApplicationFactory>
 {

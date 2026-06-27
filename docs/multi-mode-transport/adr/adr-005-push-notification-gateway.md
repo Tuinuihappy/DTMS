@@ -70,7 +70,7 @@ services.AddScoped<IPushNotificationGateway>(sp =>
 Define typed notifications (not free-form strings) — type-safe + versionable:
 
 ```csharp
-namespace AMR.DeliveryPlanning.Transport.Manual.Application.Notifications;
+namespace DTMS.Transport.Manual.Application.Notifications;
 
 public interface INotification
 {

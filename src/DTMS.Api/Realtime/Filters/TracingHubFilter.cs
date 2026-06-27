@@ -1,8 +1,8 @@
 using System.Diagnostics;
-using AMR.DeliveryPlanning.Api.Realtime.Observability;
+using DTMS.Api.Realtime.Observability;
 using Microsoft.AspNetCore.SignalR;
 
-namespace AMR.DeliveryPlanning.Api.Realtime.Filters;
+namespace DTMS.Api.Realtime.Filters;
 
 /// <summary>
 /// Cross-cutting tracing + metrics for every hub method invocation.

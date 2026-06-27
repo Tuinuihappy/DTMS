@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Api.Auth;
+namespace DTMS.Api.Auth;
 
 /// <summary>
 /// Resolves the authenticated principal via <see cref="IHttpContextAccessor"/>.

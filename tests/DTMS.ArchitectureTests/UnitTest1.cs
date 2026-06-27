@@ -1,6 +1,6 @@
 ﻿using System.Text.RegularExpressions;
 
-namespace AMR.DeliveryPlanning.ArchitectureTests;
+namespace DTMS.ArchitectureTests;
 
 public class ModuleBoundaryTests
 {

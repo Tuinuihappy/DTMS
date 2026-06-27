@@ -4,7 +4,7 @@ using DTMS.Planning.Application.Services;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Api.Adapters;
+namespace DTMS.Api.Adapters;
 
 // Composition-root bridge: AMR-mode implementation of IDispatchStrategy.
 // Lives in API/Adapters (not Dispatch.Application) because it calls into

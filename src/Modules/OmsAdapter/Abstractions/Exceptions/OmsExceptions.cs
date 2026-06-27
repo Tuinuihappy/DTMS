@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace AMR.DeliveryPlanning.OmsAdapter.Abstractions.Exceptions;
+namespace DTMS.OmsAdapter.Abstractions.Exceptions;
 
 // Classification of upstream-OMS HTTP failures. Both inherit
 // HttpRequestException so existing catch sites stay correct, but the

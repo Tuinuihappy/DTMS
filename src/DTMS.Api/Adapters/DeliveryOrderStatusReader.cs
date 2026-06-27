@@ -2,7 +2,7 @@ using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using DTMS.Dispatch.Application.Services;
 using MediatR;
 
-namespace AMR.DeliveryPlanning.Api.Adapters;
+namespace DTMS.Api.Adapters;
 
 /// <summary>
 /// Composition-root bridge for Dispatch handlers that need to look up

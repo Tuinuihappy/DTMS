@@ -1167,7 +1167,7 @@ public async Task OperatorMobileApi_SyncBatch_ReplaysOfflineEvents() { ... }
 ```bash
 # AMR flow must not break
 dotnet test --filter "FullyQualifiedName~Transport.Amr"
-dotnet test tests/Integration/AMR.DeliveryPlanning.IntegrationTests/Riot3WebhookTests.cs
+dotnet test tests/Integration/DTMS.IntegrationTests/Riot3WebhookTests.cs
 ```
 
 ### Architecture Tests

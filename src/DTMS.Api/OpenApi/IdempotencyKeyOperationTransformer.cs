@@ -2,7 +2,7 @@ using DTMS.DeliveryOrder.Presentation.Idempotency;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 
-namespace AMR.DeliveryPlanning.Api.OpenApi;
+namespace DTMS.Api.OpenApi;
 
 /// <summary>
 /// OpenAPI transformer that documents the required <c>Idempotency-Key</c> header

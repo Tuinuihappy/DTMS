@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Api.Realtime.Hubs;
+using DTMS.Api.Realtime.Hubs;
 using Microsoft.AspNetCore.SignalR;
 
-namespace AMR.DeliveryPlanning.Api.Realtime.Drain;
+namespace DTMS.Api.Realtime.Drain;
 
 // G1 Phase 1 — singleton drain coordinator. Three jobs:
 //   1. Flip IsDraining once (first writer wins via Interlocked) so

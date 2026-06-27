@@ -31,7 +31,7 @@ Headline:
   - `deliveryorder.OutboxMessages` = **600,258** total, **589,711 pending (98.2%)**, only **10,547 processed**
   - `dispatch.OutboxMessages` = ~129 pending
 - **Prior run (2026-06-06):** 92k pending vs 3.6k processed (~4% parity) — already flagged in [perf-tests/results/REPORT.md](../results/REPORT.md). Now it's **worse**: 1.75% parity.
-- **Where:** [src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure/](../../src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure/) — single `OutboxProcessorService` per module
+- **Where:** [src/Modules/DeliveryOrder/DTMS.DeliveryOrder.Infrastructure/](../../src/Modules/DeliveryOrder/DTMS.DeliveryOrder.Infrastructure/) — single `OutboxProcessorService` per module
 - **Impact at scale:**
   - Planning, dispatch, SLA-risk, validated-consumer and trip-lifecycle consumers receive events minutes-to-hours late.
   - SignalR UI updates lag the source-of-truth (we observed the frontend continuing to update for >10 minutes after k6 stopped, because outbox was still flushing).
@@ -92,7 +92,7 @@ Headline:
 
 ### ℹ️ 5. POST `/delivery-orders/upstream` does not return `id` in body
 - **Observed:** Scenario C tried to chain `POST → GET /{id}` but `r.json('id')` was always null, so the GET branch never executed (latency_get = 0ms in summary).
-- **Where:** Look at the upstream POST handler in [src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Presentation/](../../src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Presentation/).
+- **Where:** Look at the upstream POST handler in [src/Modules/DeliveryOrder/DTMS.DeliveryOrder.Presentation/](../../src/Modules/DeliveryOrder/DTMS.DeliveryOrder.Presentation/).
 - **Impact:** Cosmetic for testing, but real for upstream OMS integration — they cannot follow up on the created order without parsing `Location` header or re-querying by `orderRef`.
 - **Recommended fix:** Return `{ id, orderRef, status }` minimal response body, or set `Location: /api/v1/delivery-orders/{id}`. If already returning `Location`, update [scenario-c-mixed.js:80](../scenario-c-mixed.js#L80) to use `r.headers.Location` instead of `r.json('id')`.
 

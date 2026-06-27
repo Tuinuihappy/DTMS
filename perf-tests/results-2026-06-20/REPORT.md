@@ -104,7 +104,7 @@ Steady-state **~10 events/s** drain. At 500k pending → **~14h** to drain that 
 
 ### 📋 Finding #3 — Root cause: hardcoded `PollingInterval=5s` × `BatchSize=50`
 
-In [OutboxProcessorService.cs:22](../../src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/OutboxProcessorService.cs#L22):
+In [OutboxProcessorService.cs:22](../../src/DTMS.Api/Infrastructure/Outbox/OutboxProcessorService.cs#L22):
 
 ```csharp
 private static readonly TimeSpan PollingInterval = TimeSpan.FromSeconds(5);
@@ -137,7 +137,7 @@ The `Submit → Validate → Confirm` transitions happen in-process synchronousl
 
 ### 🟡 Finding #5 — `RateLimit__PermitLimit=100` default is too tight for any meaningful load test
 
-Same gotcha as 2026-06-16. The default rate limit is fine for production (per-IP throttling) but blocks all useful perf testing. Documented in [Program.cs:347-348](../../src/AMR.DeliveryPlanning.Api/Program.cs#L347):
+Same gotcha as 2026-06-16. The default rate limit is fine for production (per-IP throttling) but blocks all useful perf testing. Documented in [Program.cs:347-348](../../src/DTMS.Api/Program.cs#L347):
 
 > *"... `RateLimit__PermitLimit` / `RateLimit__WindowSeconds` / `RateLimit__QueueLimit` for load tests (e.g. PermitLimit=100000, WindowSeconds=1)."*
 
@@ -176,7 +176,7 @@ Recommend adding a `make perf-test` target (or similar) that exports these env v
 
 - [`docs/scale-readiness-plan.md`](../../docs/scale-readiness-plan.md) — Phase A plan + Step A3 spec
 - [`docs/crash-recovery-workflow-resilience-plan.md`](../../docs/crash-recovery-workflow-resilience-plan.md) — T1 + outbox metrics context
-- [`src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/OutboxProcessorService.cs`](../../src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/OutboxProcessorService.cs) — `PollingInterval` constant (line 22)
-- [`src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/OutboxOptions.cs`](../../src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/OutboxOptions.cs) — current options class (target for Step A3 expansion)
+- [`src/DTMS.Api/Infrastructure/Outbox/OutboxProcessorService.cs`](../../src/DTMS.Api/Infrastructure/Outbox/OutboxProcessorService.cs) — `PollingInterval` constant (line 22)
+- [`src/DTMS.Api/Infrastructure/Outbox/OutboxOptions.cs`](../../src/DTMS.Api/Infrastructure/Outbox/OutboxOptions.cs) — current options class (target for Step A3 expansion)
 - [`perf-tests/k6-scenario-b-run.txt`](../k6-scenario-b-run.txt) — raw k6 output of the passing run
 - [`perf-tests/results-2026-06-16/REPORT.md`](../results-2026-06-16/REPORT.md) — baseline comparison

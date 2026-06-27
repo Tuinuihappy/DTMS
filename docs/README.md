@@ -511,8 +511,8 @@ Add to: Header
 Local development:
 
 ```bash
-dotnet user-secrets set "VendorAdapter:Riot3:ApiKey" "app <RIOT3_APP_TOKEN>" --project src/AMR.DeliveryPlanning.Api/AMR.DeliveryPlanning.Api.csproj
-dotnet user-secrets set "VendorAdapter:Riot3:BaseUrl" "http://10.204.212.28:12000" --project src/AMR.DeliveryPlanning.Api/AMR.DeliveryPlanning.Api.csproj
+dotnet user-secrets set "VendorAdapter:Riot3:ApiKey" "app <RIOT3_APP_TOKEN>" --project src/DTMS.Api/DTMS.Api.csproj
+dotnet user-secrets set "VendorAdapter:Riot3:BaseUrl" "http://10.204.212.28:12000" --project src/DTMS.Api/DTMS.Api.csproj
 ```
 
 CI or shell-based runs:

@@ -3,7 +3,7 @@ using DTMS.SharedKernel.Messaging;
 using DTMS.Transport.Amr.Models;
 using DTMS.Transport.Amr.Services;
 
-namespace AMR.DeliveryPlanning.Api.Adapters;
+namespace DTMS.Api.Adapters;
 
 // Composition-root bridge: maps Planning.Application's vendor-agnostic
 // ResolvedOrder into the RIOT3-specific Riot3OrderRequest, then forwards

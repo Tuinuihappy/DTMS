@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace AMR.DeliveryPlanning.Api.RobotPositions;
+namespace DTMS.Api.RobotPositions;
 
 /// <summary>
 /// Lock-free snapshot keyed by RIOT3 deviceKey. Writes are full-replace from

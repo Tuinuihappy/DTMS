@@ -1,10 +1,10 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
-using AMR.DeliveryPlanning.Api.Realtime.Hubs;
-using AMR.DeliveryPlanning.Api.Realtime.Hubs.Clients;
+using DTMS.Api.Realtime.Hubs;
+using DTMS.Api.Realtime.Hubs.Clients;
 using Microsoft.AspNetCore.SignalR;
 
-namespace AMR.DeliveryPlanning.Api.Realtime.Pipeline;
+namespace DTMS.Api.Realtime.Pipeline;
 
 /// <summary>
 /// Buffers dashboard counter deltas in memory and flushes them to the

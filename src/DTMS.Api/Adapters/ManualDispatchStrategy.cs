@@ -12,7 +12,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.Api.Adapters;
+namespace DTMS.Api.Adapters;
 
 // Phase 4.4 — Real ManualDispatchStrategy (replaces the Phase 3c stub).
 //

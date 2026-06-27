@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 
-namespace AMR.DeliveryPlanning.Api.Auth;
+namespace DTMS.Api.Auth;
 
 // Phase 4.2 — Authorization policies for the operator PWA endpoints.
 // Roles come from the External Auth JWT's 'role' claim (per ADR-014);

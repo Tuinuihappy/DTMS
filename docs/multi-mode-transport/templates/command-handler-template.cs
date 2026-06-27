@@ -29,7 +29,7 @@
 
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.{Module}.Application.Commands.{CommandName};
+namespace DTMS.{Module}.Application.Commands.{CommandName};
 
 /// <summary>
 /// {1-line description of intent}
@@ -47,13 +47,13 @@ public record {CommandName}Command(
 // FILE 2: {CommandName}CommandHandler.cs
 // =============================================================================
 
-using AMR.DeliveryPlanning.{Module}.Application.Services;
-using AMR.DeliveryPlanning.{Module}.Domain.Entities;
-using AMR.DeliveryPlanning.{Module}.Domain.Repositories;
+using DTMS.{Module}.Application.Services;
+using DTMS.{Module}.Domain.Entities;
+using DTMS.{Module}.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.{Module}.Application.Commands.{CommandName};
+namespace DTMS.{Module}.Application.Commands.{CommandName};
 
 /// <summary>
 /// {2-4 sentence description of what this handler does, the business intent,
@@ -150,7 +150,7 @@ public class {CommandName}CommandHandler : ICommandHandler<{CommandName}Command>
 
 // using FluentValidation;
 //
-// namespace AMR.DeliveryPlanning.{Module}.Application.Commands.{CommandName};
+// namespace DTMS.{Module}.Application.Commands.{CommandName};
 //
 // public class {CommandName}CommandValidator : AbstractValidator<{CommandName}Command>
 // {

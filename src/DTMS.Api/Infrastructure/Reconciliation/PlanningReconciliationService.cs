@@ -9,7 +9,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.Api.Infrastructure.Reconciliation;
+namespace DTMS.Api.Infrastructure.Reconciliation;
 
 /// <summary>
 /// T1.4 — safety net for the Planning workflow. Scans for orders that are

@@ -31,10 +31,10 @@
 | `dispatch.Trips` | **0 rows** | **0 rows** |
 | Outbox pending | 0 | 0 |
 
-[`DeliveryOrderValidatedConsumer`](../src/Modules/Planning/AMR.DeliveryPlanning.Planning.Application/Consumers/DeliveryOrderValidatedConsumer.cs) ทำ 6 steps แบบ procedural ใน separate transactions: `MarkPlanning → CreateJobAnchor × N → MarkPlanned → DispatchByRoute → MarkJobDispatched → MarkOrderDispatched`. Crash หลัง `MarkOrderPlanned` ก่อน `DispatchByRoute` complete — MassTransit ack message ไปแล้ว → ไม่ redeliver
+[`DeliveryOrderValidatedConsumer`](../src/Modules/Planning/DTMS.Planning.Application/Consumers/DeliveryOrderValidatedConsumer.cs) ทำ 6 steps แบบ procedural ใน separate transactions: `MarkPlanning → CreateJobAnchor × N → MarkPlanned → DispatchByRoute → MarkJobDispatched → MarkOrderDispatched`. Crash หลัง `MarkOrderPlanned` ก่อน `DispatchByRoute` complete — MassTransit ack message ไปแล้ว → ไม่ redeliver
 
 **Root causes 3 ชั้น:**
-1. **MassTransit setup เปล่า** — ไม่มี `UseMessageRetry`, `UseInMemoryOutbox`, `UseDelayedRedelivery`, `PrefetchCount` ([ModuleServiceRegistration.cs:318-343](../src/AMR.DeliveryPlanning.Api/Modules/ModuleServiceRegistration.cs#L318-L343))
+1. **MassTransit setup เปล่า** — ไม่มี `UseMessageRetry`, `UseInMemoryOutbox`, `UseDelayedRedelivery`, `PrefetchCount` ([ModuleServiceRegistration.cs:318-343](../src/DTMS.Api/Modules/ModuleServiceRegistration.cs#L318-L343))
 2. **No graceful shutdown** — default 5s shutdown ASP.NET Core, bus discard in-flight messages
 3. **No watchdog** — ไม่มี process ตรวจ Order=Planned ที่ไม่มี Trip
 
@@ -116,7 +116,7 @@ Plan แก้ในระดับ enterprise 3 tier ตามขนาด blas
 - **State table**: schema ใหม่ `orchestration.DeliveryOrderSagas` (แยก schema เพื่อไม่ผูก Planning migrations)
   - Columns: `CorrelationId (=OrderId)`, `CurrentState`, `JobId`, `TripId`, `VendorMissionId`, `LastFaultMessage`, `RetryCount`, `RowVersion` (optimistic concurrency), `UpdatedAtUtc`
 - **Events**: `DeliveryOrderConfirmedIntegrationEventV1`, `JobCreatedEvent`, `TripDispatchedEvent`, `JobDispatchFailedEvent`, `Riot3MissionAcceptedEvent`, `Riot3MissionCompletedEvent` + `Schedule<TimeoutExpired>` per waiting state (30 min default)
-- **Idempotency per step**: business key `OrderId+StepName` persist ผ่าน [`IdempotentProjector`](../src/AMR.DeliveryPlanning.SharedKernel/Projection/IdempotentProjector.cs) pattern — reuse `ProjectionInbox` table หรือ clone schema เป็น `orchestration.SagaStepInbox`
+- **Idempotency per step**: business key `OrderId+StepName` persist ผ่าน [`IdempotentProjector`](../src/DTMS.SharedKernel/Projection/IdempotentProjector.cs) pattern — reuse `ProjectionInbox` table หรือ clone schema เป็น `orchestration.SagaStepInbox`
 - **Compensation**: `Planning` rollback = release Job anchor; `Dispatching` rollback = cancel Trip; `AwaitingVendorAck` rollback = cancel RIOT3 mission. แต่ละ compensation เป็น message อิสระ + idempotent
 - **Bulkhead + timeout vendor**: Polly `AddResiliencePipeline("riot3", … .AddTimeout(10s).AddConcurrencyLimiter(20))` ใน vendor adapter
 
@@ -295,12 +295,12 @@ Tier 3 is gated on observable thresholds; readings below show none are met yet.
 
 ## 9. Critical files for implementation
 
-- [src/AMR.DeliveryPlanning.Api/Modules/ModuleServiceRegistration.cs](../src/AMR.DeliveryPlanning.Api/Modules/ModuleServiceRegistration.cs) — MassTransit bus config (T1.1)
-- [src/Modules/Planning/AMR.DeliveryPlanning.Planning.Application/Consumers/DeliveryOrderValidatedConsumer.cs](../src/Modules/Planning/AMR.DeliveryPlanning.Planning.Application/Consumers/DeliveryOrderValidatedConsumer.cs) — wrap dispatch (T1.2), eventual decommission ใน T2
-- [src/AMR.DeliveryPlanning.Api/Program.cs](../src/AMR.DeliveryPlanning.Api/Program.cs) — graceful shutdown + metrics registration (T1.3, T1.6)
+- [src/DTMS.Api/Modules/ModuleServiceRegistration.cs](../src/DTMS.Api/Modules/ModuleServiceRegistration.cs) — MassTransit bus config (T1.1)
+- [src/Modules/Planning/DTMS.Planning.Application/Consumers/DeliveryOrderValidatedConsumer.cs](../src/Modules/Planning/DTMS.Planning.Application/Consumers/DeliveryOrderValidatedConsumer.cs) — wrap dispatch (T1.2), eventual decommission ใน T2
+- [src/DTMS.Api/Program.cs](../src/DTMS.Api/Program.cs) — graceful shutdown + metrics registration (T1.3, T1.6)
 - [docker-compose.yml](../docker-compose.yml) — stop_grace_period (T1.3)
-- [src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Feeder/Services/Riot3ReconciliationService.cs](../src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Feeder/Services/Riot3ReconciliationService.cs) — reference pattern สำหรับ T1.4 watchdog
-- [src/AMR.DeliveryPlanning.SharedKernel/Projection/IdempotentProjector.cs](../src/AMR.DeliveryPlanning.SharedKernel/Projection/IdempotentProjector.cs) — reference pattern สำหรับ saga step inbox ใน T2
+- [src/Modules/VendorAdapter/DTMS.VendorAdapter.Feeder/Services/Riot3ReconciliationService.cs](../src/Modules/VendorAdapter/DTMS.VendorAdapter.Feeder/Services/Riot3ReconciliationService.cs) — reference pattern สำหรับ T1.4 watchdog
+- [src/DTMS.SharedKernel/Projection/IdempotentProjector.cs](../src/DTMS.SharedKernel/Projection/IdempotentProjector.cs) — reference pattern สำหรับ saga step inbox ใน T2
 
 ---
 

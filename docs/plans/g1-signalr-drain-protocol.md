@@ -22,9 +22,9 @@ Read once before starting:
 
 - [`crash-recovery-workflow-resilience-plan.md`](../crash-recovery-workflow-resilience-plan.md) §11 G1 — the gap statement
 - [`chaos-test-results.md`](../chaos-test-results.md) Phase 5 section — pattern for "deferred but documented" features
-- [`src/AMR.DeliveryPlanning.Api/Modules/AdminWorkflowEndpoints.cs`](../../src/AMR.DeliveryPlanning.Api/Modules/AdminWorkflowEndpoints.cs) — the existing admin route group we'll extend
-- [`src/AMR.DeliveryPlanning.Api/Program.cs`](../../src/AMR.DeliveryPlanning.Api/Program.cs) section around `AddHealthChecks` — where the readiness probe sits
-- [`src/AMR.DeliveryPlanning.Api/Realtime/`](../../src/AMR.DeliveryPlanning.Api/Realtime/) — the SignalR hub setup (we'll add a `Drain/` folder beside the existing observability + filter folders)
+- [`src/DTMS.Api/Modules/AdminWorkflowEndpoints.cs`](../../src/DTMS.Api/Modules/AdminWorkflowEndpoints.cs) — the existing admin route group we'll extend
+- [`src/DTMS.Api/Program.cs`](../../src/DTMS.Api/Program.cs) section around `AddHealthChecks` — where the readiness probe sits
+- [`src/DTMS.Api/Realtime/`](../../src/DTMS.Api/Realtime/) — the SignalR hub setup (we'll add a `Drain/` folder beside the existing observability + filter folders)
 
 Decision check before coding (don't skip — getting these wrong wastes ~half a day):
 
@@ -44,8 +44,8 @@ Decision check before coding (don't skip — getting these wrong wastes ~half a 
 
 Files:
 
-- New: `src/AMR.DeliveryPlanning.Api/Realtime/Drain/IConnectionDrainService.cs`
-- New: `src/AMR.DeliveryPlanning.Api/Realtime/Drain/ConnectionDrainService.cs`
+- New: `src/DTMS.Api/Realtime/Drain/IConnectionDrainService.cs`
+- New: `src/DTMS.Api/Realtime/Drain/ConnectionDrainService.cs`
 
 Shape:
 
@@ -148,7 +148,7 @@ Register in `Program.cs` `AddHealthChecks()` chain — tag it `"ready"` so it's 
 
 So a client racing to reconnect to a draining pod gets immediately rejected and reroutes to another pod.
 
-File: `src/AMR.DeliveryPlanning.Api/Realtime/Drain/DrainAwareHubFilter.cs`
+File: `src/DTMS.Api/Realtime/Drain/DrainAwareHubFilter.cs`
 
 ```csharp
 public sealed class DrainAwareHubFilter : IHubFilter
@@ -185,7 +185,7 @@ builder.Services.AddSignalR(o => { ... })
 
 ### 1.4 Endpoint — `POST /admin/drain-start` (~1h)
 
-Add to `src/AMR.DeliveryPlanning.Api/Modules/AdminWorkflowEndpoints.cs` next to `/replan`:
+Add to `src/DTMS.Api/Modules/AdminWorkflowEndpoints.cs` next to `/replan`:
 
 ```csharp
 group.MapPost("/drain-start", async (
@@ -348,7 +348,7 @@ connection.onclose(() => setBanner('Disconnected — refresh page'));  // only a
 
 ### 4.1 Integration test class (~2h)
 
-File: `tests/Integration/AMR.DeliveryPlanning.IntegrationTests/SignalRDrainTests.cs`
+File: `tests/Integration/DTMS.IntegrationTests/SignalRDrainTests.cs`
 
 ```csharp
 public class SignalRDrainTests : IClassFixture<DtmsWebApplicationFactory>
@@ -520,7 +520,7 @@ Shipped in ~6h of focused work over a single afternoon.
 
 | Phase | Status | Commit / artefact |
 |---|---|---|
-| 1.1–1.4 Backend infrastructure | ✅ shipped | [6f321cb](https://github.com/Tuinuihappy/DTMS/commit/6f321cb) — `src/AMR.DeliveryPlanning.Api/Realtime/Drain/` |
+| 1.1–1.4 Backend infrastructure | ✅ shipped | [6f321cb](https://github.com/Tuinuihappy/DTMS/commit/6f321cb) — `src/DTMS.Api/Realtime/Drain/` |
 | 2.1 Hub enumeration | ✅ inlined (5 hubs hardcoded — see ConnectionDrainService.cs) | 6f321cb |
 | 2.2 `IDrainBroadcaster` abstraction | ⏸ deferred — not needed for 5 hubs; revisit if count grows | — |
 | 2.3 Connection counter | ⏸ deferred — would shave the SignalR tail of shutdown; baseline 49s is non-SignalR work | — |

@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Api.Realtime.Drain;
+namespace DTMS.Api.Realtime.Drain;
 
 // G1 Phase 1 — pod drain coordination. Lives in DI as a singleton so the
 // admin endpoint, the health check, and the hub filter all read the same

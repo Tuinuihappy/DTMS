@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Api.RobotPositions;
+namespace DTMS.Api.RobotPositions;
 
 /// <summary>
 /// Singleton in-memory snapshot of the latest known robot positions per map.

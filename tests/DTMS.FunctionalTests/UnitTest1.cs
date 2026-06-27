@@ -1,4 +1,4 @@
-﻿namespace AMR.DeliveryPlanning.FunctionalTests;
+﻿namespace DTMS.FunctionalTests;
 
 public class UnitTest1
 {

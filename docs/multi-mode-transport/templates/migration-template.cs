@@ -30,7 +30,7 @@
 // Verification (before PR):
 //   1. dotnet build --configuration Release
 //   2. Reset local DB: docker compose down -v && docker compose up -d postgres
-//   3. dotnet run --project src/AMR.DeliveryPlanning.Api
+//   3. dotnet run --project src/DTMS.Api
 //      → verify auto-applies cleanly, no errors
 //   4. Check __EFMigrationsHistory: this MigrationId should appear exactly once
 //   5. dotnet test (full suite)
@@ -38,13 +38,13 @@
 // DELETE THIS COMMENT BLOCK before committing the migration.
 // =============================================================================
 
-using AMR.DeliveryPlanning.{Module}.Infrastructure.Data;       // ← adjust to your module's DbContext namespace
+using DTMS.{Module}.Infrastructure.Data;       // ← adjust to your module's DbContext namespace
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.{Module}.Infrastructure.Migrations
+namespace DTMS.{Module}.Infrastructure.Migrations
 {
     /// <summary>
     /// PHASE: {1 | 2 | 3 | 4 | 5}

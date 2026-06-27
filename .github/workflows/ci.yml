@@ -69,14 +69,14 @@ jobs:
       - name: Integration Tests
         run: >
           dotnet test --no-build --configuration Release
-          tests/Integration/AMR.DeliveryPlanning.IntegrationTests/
+          tests/Integration/DTMS.IntegrationTests/
           --logger "trx;LogFileName=integration-tests.trx"
           --results-directory ./test-results
 
       - name: Architecture Tests
         run: >
           dotnet test --no-build --configuration Release
-          tests/AMR.DeliveryPlanning.ArchitectureTests/
+          tests/DTMS.ArchitectureTests/
           --logger "trx;LogFileName=architecture-tests.trx"
           --results-directory ./test-results
 

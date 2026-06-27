@@ -1,11 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
-using AMR.DeliveryPlanning.OmsAdapter.Abstractions;
-using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Exceptions;
-using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Models;
+using DTMS.OmsAdapter.Abstractions;
+using DTMS.OmsAdapter.Abstractions.Exceptions;
+using DTMS.OmsAdapter.Abstractions.Models;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.OmsAdapter.Infrastructure.Services;
+namespace DTMS.OmsAdapter.Infrastructure.Services;
 
 internal sealed class HttpOmsShipmentClient : IOmsShipmentClient
 {

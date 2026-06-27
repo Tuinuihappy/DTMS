@@ -4,7 +4,7 @@
 
 ## Background
 
-The `AMR.DeliveryPlanning.IntegrationTests` project had a long-standing compile error (missing `NSubstitute` reference + a constructor-signature mismatch in `DomainEventMapperTests`) that blocked the whole project from building. Because nothing compiled, **none of these tests ever ran in CI**.
+The `DTMS.IntegrationTests` project had a long-standing compile error (missing `NSubstitute` reference + a constructor-signature mismatch in `DomainEventMapperTests`) that blocked the whole project from building. Because nothing compiled, **none of these tests ever ran in CI**.
 
 Fixed during T1 work (commits [`5119e3f`](https://github.com/Tuinuihappy/DTMS/commit/5119e3f) and [`92df8ab`](https://github.com/Tuinuihappy/DTMS/commit/92df8ab)):
 - Added `NSubstitute` to the test csproj
@@ -109,11 +109,11 @@ To reproduce locally:
 
 ```bash
 # Requires Docker running (Testcontainers PostgreSQL)
-dotnet build tests/Integration/AMR.DeliveryPlanning.IntegrationTests/AMR.DeliveryPlanning.IntegrationTests.csproj
-dotnet test  tests/Integration/AMR.DeliveryPlanning.IntegrationTests/AMR.DeliveryPlanning.IntegrationTests.csproj
+dotnet build tests/Integration/DTMS.IntegrationTests/DTMS.IntegrationTests.csproj
+dotnet test  tests/Integration/DTMS.IntegrationTests/DTMS.IntegrationTests.csproj
 
 # Run a single class to triage
-dotnet test  tests/Integration/AMR.DeliveryPlanning.IntegrationTests/AMR.DeliveryPlanning.IntegrationTests.csproj \
+dotnet test  tests/Integration/DTMS.IntegrationTests/DTMS.IntegrationTests.csproj \
   --filter "FullyQualifiedName~OutboxTests"
 ```
 

@@ -1,7 +1,7 @@
 using DTMS.SharedKernel.Diagnostics;
 using MassTransit;
 
-namespace AMR.DeliveryPlanning.Api.Infrastructure.Diagnostics;
+namespace DTMS.Api.Infrastructure.Diagnostics;
 
 // G2 (crash-recovery-workflow-resilience-plan.md §11) — measures the
 // "bus" phase of host shutdown: time MassTransit spends draining its

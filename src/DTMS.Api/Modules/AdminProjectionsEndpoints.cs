@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Api.Modules;
+namespace DTMS.Api.Modules;
 
 /// <summary>
 /// Observability endpoint for the projection pipeline. Aggregates per-projector

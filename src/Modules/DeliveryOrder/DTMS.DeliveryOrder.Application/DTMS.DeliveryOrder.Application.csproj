@@ -17,7 +17,7 @@
     <ProjectReference Include="..\..\Planning\DTMS.Planning.Domain\DTMS.Planning.Domain.csproj" />
     <ProjectReference Include="..\DTMS.DeliveryOrder.IntegrationEvents\DTMS.DeliveryOrder.IntegrationEvents.csproj" />
     <!-- TripStartedOmsNotifyConsumer dispatches POST to upstream OMS via IOmsShipmentClient. -->
-    <ProjectReference Include="..\..\OmsAdapter\AMR.DeliveryPlanning.OmsAdapter.csproj" />
+    <ProjectReference Include="..\..\OmsAdapter\DTMS.OmsAdapter.csproj" />
   </ItemGroup>
 
   <ItemGroup>

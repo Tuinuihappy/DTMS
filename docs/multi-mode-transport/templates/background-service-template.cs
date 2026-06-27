@@ -12,11 +12,11 @@
 // Filename: src/Modules/{Module}/.../Application/BackgroundServices/{Name}Service.cs
 //
 // Reference examples (read these first):
-//   src/AMR.DeliveryPlanning.Api/Infrastructure/Reconciliation/PlanningReconciliationService.cs
+//   src/DTMS.Api/Infrastructure/Reconciliation/PlanningReconciliationService.cs
 //     ↑ canonical pattern: hot-reload options, scoped per-tick, dedup map, error swallow
-//   src/AMR.DeliveryPlanning.Api/Infrastructure/Outbox/OutboxProcessorService.cs
+//   src/DTMS.Api/Infrastructure/Outbox/OutboxProcessorService.cs
 //     ↑ pattern: continuous processing, backoff on error
-//   src/Modules/VendorAdapter/AMR.DeliveryPlanning.VendorAdapter.Feeder/Services/Riot3ReconciliationService.cs
+//   src/Modules/VendorAdapter/DTMS.VendorAdapter.Feeder/Services/Riot3ReconciliationService.cs
 //     ↑ pattern: per-mode background service (will move to Transport.Amr in Phase 1)
 //
 // Critical conventions (from existing services):
@@ -31,14 +31,14 @@
 // DELETE THIS COMMENT BLOCK before committing.
 // =============================================================================
 
-using AMR.DeliveryPlanning.{Module}.Infrastructure.Data;
+using DTMS.{Module}.Infrastructure.Data;
 using DTMS.SharedKernel.Diagnostics;       // remove if no metrics
 using MassTransit;                                          // remove if no event publish
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 
-namespace AMR.DeliveryPlanning.{Module}.Application.BackgroundServices;
+namespace DTMS.{Module}.Application.BackgroundServices;
 
 /// <summary>
 /// {Purpose in 2-4 sentences:
@@ -204,7 +204,7 @@ public sealed class {Name}Service : BackgroundService
 // COMPANION: Options class with hot-reload binding
 // =============================================================================
 
-namespace AMR.DeliveryPlanning.{Module}.Application.BackgroundServices;
+namespace DTMS.{Module}.Application.BackgroundServices;
 
 public sealed class {Name}Options
 {

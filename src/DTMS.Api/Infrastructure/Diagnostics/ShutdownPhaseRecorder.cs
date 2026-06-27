@@ -1,7 +1,7 @@
 using DTMS.SharedKernel.Diagnostics;
 using Microsoft.Extensions.Hosting;
 
-namespace AMR.DeliveryPlanning.Api.Infrastructure.Diagnostics;
+namespace DTMS.Api.Infrastructure.Diagnostics;
 
 // G2 (crash-recovery-workflow-resilience-plan.md §11) — records the
 // "total" shutdown phase metric + writes structured log lines so ops

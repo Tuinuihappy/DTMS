@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Api.RobotPositions;
+namespace DTMS.Api.RobotPositions;
 
 // Public DTO carried by both the in-memory store and the GET endpoint.
 // `MapId` is the DTMS Guid (resolved from RIOT3's int mapId via Map.VendorRef),

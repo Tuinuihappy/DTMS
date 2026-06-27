@@ -2,7 +2,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using FxHealthStatus = Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus;
 
-namespace AMR.DeliveryPlanning.Api.VendorHealth;
+namespace DTMS.Api.VendorHealth;
 
 /// <summary>
 /// Polls the registered "ready"-tagged IHealthChecks (postgres / redis /

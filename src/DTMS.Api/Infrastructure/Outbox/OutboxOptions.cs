@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
+namespace DTMS.Api.Infrastructure.Outbox;
 
 /// <summary>
 /// Runtime knobs for <see cref="OutboxProcessorService"/>. Bound to the

@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Api.Realtime.Pipeline;
+using DTMS.Api.Realtime.Pipeline;
 using DTMS.Fleet.Application.Projections;
 
-namespace AMR.DeliveryPlanning.Api.Infrastructure;
+namespace DTMS.Api.Infrastructure;
 
 /// <summary>
 /// Phase P3.2 — Hosted background service that refreshes the current

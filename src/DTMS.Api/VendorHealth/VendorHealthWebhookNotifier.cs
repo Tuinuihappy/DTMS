@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.Api.VendorHealth;
+namespace DTMS.Api.VendorHealth;
 
 /// <summary>
 /// Subscribes to <see cref="IVendorHealthStore.StatusChanged"/> and POSTs

@@ -1,5 +1,5 @@
-using AMR.DeliveryPlanning.Api.Realtime.Hubs;
-using AMR.DeliveryPlanning.Api.Realtime.Hubs.Clients;
+using DTMS.Api.Realtime.Hubs;
+using DTMS.Api.Realtime.Hubs.Clients;
 using DTMS.Transport.Manual.Application.Commands.Admin.ApproveGeofenceOverride;
 using DTMS.Transport.Manual.Application.Commands.Admin.DenyGeofenceOverride;
 using DTMS.Transport.Manual.Application.Commands.Admin.ReassignManualTrip;
@@ -8,7 +8,7 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 
-namespace AMR.DeliveryPlanning.Api.Modules;
+namespace DTMS.Api.Modules;
 
 // Phase 4.6 — Dispatcher console admin surface for Manual mode.
 // Mounted under /api/v1/admin to share the existing admin auth policy

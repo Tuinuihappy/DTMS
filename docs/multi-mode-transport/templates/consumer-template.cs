@@ -34,14 +34,14 @@
 // DELETE THIS COMMENT BLOCK before committing.
 // =============================================================================
 
-using AMR.DeliveryPlanning.{Module}.Domain.Entities;
-using AMR.DeliveryPlanning.{Module}.Domain.Repositories;
-using AMR.DeliveryPlanning.{SourceModule}.IntegrationEvents;       // event being consumed
+using DTMS.{Module}.Domain.Entities;
+using DTMS.{Module}.Domain.Repositories;
+using DTMS.{SourceModule}.IntegrationEvents;       // event being consumed
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.{Module}.Application.Consumers;
+namespace DTMS.{Module}.Application.Consumers;
 
 /// <summary>
 /// {Purpose in 3-5 sentences:

@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace AMR.DeliveryPlanning.Api.Realtime.Drain;
+namespace DTMS.Api.Realtime.Drain;
 
 // G1 Phase 1 — readiness flip during pod drain. Tagged "ready" so it's
 // part of /health/ready (which K8s service mesh polls to decide routing)

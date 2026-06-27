@@ -1,5 +1,5 @@
-using AMR.DeliveryPlanning.OmsAdapter.Abstractions;
-using AMR.DeliveryPlanning.OmsAdapter.Infrastructure.Services;
+using DTMS.OmsAdapter.Abstractions;
+using DTMS.OmsAdapter.Infrastructure.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using WireMock.Server;
 

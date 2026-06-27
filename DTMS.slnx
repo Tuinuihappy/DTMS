@@ -1,6 +1,6 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/AMR.DeliveryPlanning.Api/AMR.DeliveryPlanning.Api.csproj" />
+    <Project Path="src/DTMS.Api/DTMS.Api.csproj" />
     <Project Path="src/DTMS.SharedKernel/DTMS.SharedKernel.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />
@@ -39,9 +39,7 @@
     <Project Path="src/Modules/Planning/DTMS.Planning.IntegrationEvents/DTMS.Planning.IntegrationEvents.csproj" />
     <Project Path="src/Modules/Planning/DTMS.Planning.Presentation/DTMS.Planning.Presentation.csproj" />
   </Folder>
-  <Folder Name="/src/Modules/OmsAdapter/">
-    <Project Path="src/Modules/OmsAdapter/AMR.DeliveryPlanning.OmsAdapter.csproj" />
-  </Folder>
+  <Folder Name="/src/Modules/OmsAdapter/" />
   <Folder Name="/src/Modules/Transport.Abstractions/">
     <Project Path="src/Modules/Transport.Abstractions/DTMS.Transport.Abstractions/DTMS.Transport.Abstractions.csproj" />
   </Folder>
@@ -56,9 +54,9 @@
     <Project Path="src/Modules/Transport.Manual/DTMS.Transport.Manual.Presentation/DTMS.Transport.Manual.Presentation.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/AMR.DeliveryPlanning.Api.UnitTests/AMR.DeliveryPlanning.Api.UnitTests.csproj" />
-    <Project Path="tests/AMR.DeliveryPlanning.ArchitectureTests/AMR.DeliveryPlanning.ArchitectureTests.csproj" />
-    <Project Path="tests/AMR.DeliveryPlanning.FunctionalTests/AMR.DeliveryPlanning.FunctionalTests.csproj" />
+    <Project Path="tests/DTMS.Api.UnitTests/DTMS.Api.UnitTests.csproj" />
+    <Project Path="tests/DTMS.ArchitectureTests/DTMS.ArchitectureTests.csproj" />
+    <Project Path="tests/DTMS.FunctionalTests/DTMS.FunctionalTests.csproj" />
   </Folder>
   <Folder Name="/tests/Modules/">
     <Project Path="tests/Modules/DeliveryOrder.IntegrationTests/DeliveryOrder.IntegrationTests.csproj" />

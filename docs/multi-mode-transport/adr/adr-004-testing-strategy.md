@@ -281,9 +281,9 @@ public class KerryProviderIntegrationTests : IClassFixture<WireMockFixture>
 ```csharp
 // in tests/ArchitectureTests/ModuleBoundaryTests.cs
 private static readonly string[] AllowedCrossModuleReferences = {
-    "AMR.DeliveryPlanning.Dispatch.IntegrationEvents",  // events cross module by design
-    "AMR.DeliveryPlanning.VendorAdapter.Outbox",         // shared outbox infrastructure
-    "AMR.DeliveryPlanning.Transport.Abstractions"        // shared contracts
+    "DTMS.Dispatch.IntegrationEvents",  // events cross module by design
+    "DTMS.VendorAdapter.Outbox",         // shared outbox infrastructure
+    "DTMS.Transport.Abstractions"        // shared contracts
 };
 ```
 

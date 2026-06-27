@@ -10,7 +10,7 @@
 // Folder layout:
 //   tests/Modules/{Module}.IntegrationTests/         ← per-module integration
 //   OR
-//   tests/Integration/AMR.DeliveryPlanning.IntegrationTests/  ← cross-module e2e
+//   tests/Integration/DTMS.IntegrationTests/  ← cross-module e2e
 //
 // Reference examples:
 //   tests/Integration/.../Riot3WebhookTests.cs              (webhook → outbox flow)
@@ -32,12 +32,12 @@
 
 using System.Net;
 using System.Net.Http.Json;
-using AMR.DeliveryPlanning.{Module}.Infrastructure.Data;
+using DTMS.{Module}.Infrastructure.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace AMR.DeliveryPlanning.IntegrationTests;
+namespace DTMS.IntegrationTests;
 
 /// <summary>
 /// {Phase reference} — {Test category} for {Feature under test}.

@@ -16,7 +16,7 @@ using DTMS.SharedKernel.Domain;
 using FluentAssertions;
 using NSubstitute;
 
-namespace AMR.DeliveryPlanning.IntegrationTests;
+namespace DTMS.IntegrationTests;
 
 public class DomainEventMapperTests
 {

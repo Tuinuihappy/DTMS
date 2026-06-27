@@ -95,11 +95,11 @@ cp docs/multi-mode-transport/templates/unit-test-template.cs \
 
 # Integration test (real DB + HTTP):
 cp docs/multi-mode-transport/templates/integration-test-template.cs \
-   tests/Integration/AMR.DeliveryPlanning.IntegrationTests/OperatorAssignmentIntegrationTests.cs
+   tests/Integration/DTMS.IntegrationTests/OperatorAssignmentIntegrationTests.cs
 
 # Verify:
 dotnet test tests/Modules/Transport.Manual.UnitTests/
-dotnet test tests/Integration/AMR.DeliveryPlanning.IntegrationTests/ --filter "FullyQualifiedName~OperatorAssignment"
+dotnet test tests/Integration/DTMS.IntegrationTests/ --filter "FullyQualifiedName~OperatorAssignment"
 ```
 
 ### สำหรับ Consumer (cross-module event handler)
@@ -180,7 +180,7 @@ cp docs/multi-mode-transport/templates/migration-designer-template.cs \
 # 5. Verify:
 docker compose down -v && docker compose up -d postgres
 dotnet build --configuration Release
-dotnet run --project src/AMR.DeliveryPlanning.Api
+dotnet run --project src/DTMS.Api
 # ตรวจ __EFMigrationsHistory ว่ามี MigrationId นี้ + ไม่มี duplicate
 ```
 
@@ -237,7 +237,7 @@ These conventions are consistent across all DTMS modules — templates encode th
 
 - [ADR-008: Migration Strategy](../adr/adr-008-migration-strategy.md) — สาเหตุที่ต้อง manual migrations + conventions
 - Existing migrations as reference:
-  - [Dispatch migrations](../../../src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Infrastructure/Migrations/)
-  - [Facility migrations](../../../src/Modules/Facility/AMR.DeliveryPlanning.Facility.Infrastructure/Migrations/)
+  - [Dispatch migrations](../../../src/Modules/Dispatch/DTMS.Dispatch.Infrastructure/Migrations/)
+  - [Facility migrations](../../../src/Modules/Facility/DTMS.Facility.Infrastructure/Migrations/)
 - Existing ADRs as reference: see [adr/ folder](../adr/)
 - ADR origin (Michael Nygard): https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions

@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.Api.Adapters;
+using DTMS.Api.Adapters;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.Dispatch.Application.Services;
 using DTMS.Dispatch.Domain.Entities;
@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
-namespace AMR.DeliveryPlanning.Api.UnitTests;
+namespace DTMS.Api.UnitTests;
 
 // Phase 4.4 — Real ManualDispatchStrategy. Pins the contract that the
 // Planning consumer depends on:
