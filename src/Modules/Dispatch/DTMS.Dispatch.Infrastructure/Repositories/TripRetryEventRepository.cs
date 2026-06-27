@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
+using DTMS.Dispatch.Domain.Entities;
+using DTMS.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories;
+namespace DTMS.Dispatch.Infrastructure.Repositories;
 
 public sealed class TripRetryEventRepository : ITripRetryEventRepository
 {

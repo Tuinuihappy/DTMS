@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
+namespace DTMS.Dispatch.Infrastructure.Data;
 
 public class DispatchDbContextFactory : IDesignTimeDbContextFactory<DispatchDbContext>
 {

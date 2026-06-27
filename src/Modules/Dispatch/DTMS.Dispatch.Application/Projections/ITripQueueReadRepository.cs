@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
+using DTMS.Dispatch.Domain.Enums;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Projections;
+namespace DTMS.Dispatch.Application.Projections;
 
 /// <summary>
 /// Read-side abstraction for the operator Trips list. Composes a

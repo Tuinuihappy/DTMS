@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.CreateEnvelopeTrip;
+namespace DTMS.Dispatch.Application.Commands.CreateEnvelopeTrip;
 
 /// <summary>
 /// Create a Trip row for an envelope-dispatched order. No legs/tasks are

@@ -1,6 +1,6 @@
 using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.DeliveryOrder.Infrastructure.Data;
-using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
+using DTMS.Dispatch.Infrastructure.Data;
 using DTMS.Fleet.Infrastructure.Data;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
 using DTMS.SharedKernel.Projection;

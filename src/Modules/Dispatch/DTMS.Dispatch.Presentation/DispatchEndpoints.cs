@@ -1,27 +1,27 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.AcknowledgeRobotPass;
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.BulkCancelTrips;
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.CancelTrip;
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.CapturePoD;
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.PauseTrip;
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.RaiseException;
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip;
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.ResolveException;
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.ResumeTrip;
-using AMR.DeliveryPlanning.Dispatch.Application.Projections;
-using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripById;
-using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripDetails;
-using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripItems;
-using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripRetryHistory;
-using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripsByOrder;
-using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripsQueue;
-using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripStatusHistory;
-using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
+using DTMS.Dispatch.Application.Commands.AcknowledgeRobotPass;
+using DTMS.Dispatch.Application.Commands.BulkCancelTrips;
+using DTMS.Dispatch.Application.Commands.CancelTrip;
+using DTMS.Dispatch.Application.Commands.CapturePoD;
+using DTMS.Dispatch.Application.Commands.PauseTrip;
+using DTMS.Dispatch.Application.Commands.RaiseException;
+using DTMS.Dispatch.Application.Commands.ReissueTrip;
+using DTMS.Dispatch.Application.Commands.ResolveException;
+using DTMS.Dispatch.Application.Commands.ResumeTrip;
+using DTMS.Dispatch.Application.Projections;
+using DTMS.Dispatch.Application.Queries.GetTripById;
+using DTMS.Dispatch.Application.Queries.GetTripDetails;
+using DTMS.Dispatch.Application.Queries.GetTripItems;
+using DTMS.Dispatch.Application.Queries.GetTripRetryHistory;
+using DTMS.Dispatch.Application.Queries.GetTripsByOrder;
+using DTMS.Dispatch.Application.Queries.GetTripsQueue;
+using DTMS.Dispatch.Application.Queries.GetTripStatusHistory;
+using DTMS.Dispatch.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace AMR.DeliveryPlanning.Dispatch.Presentation;
+namespace DTMS.Dispatch.Presentation;
 
 public static class DispatchEndpoints
 {

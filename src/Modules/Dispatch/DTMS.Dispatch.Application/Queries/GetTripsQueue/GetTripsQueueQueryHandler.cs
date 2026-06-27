@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Projections;
+using DTMS.Dispatch.Application.Projections;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripsQueue;
+namespace DTMS.Dispatch.Application.Queries.GetTripsQueue;
 
 public class GetTripsQueueQueryHandler : IQueryHandler<GetTripsQueueQuery, TripsQueueResult>
 {

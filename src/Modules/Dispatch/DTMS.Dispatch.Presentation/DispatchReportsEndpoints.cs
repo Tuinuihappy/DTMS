@@ -1,13 +1,13 @@
 using System.Globalization;
 using System.Text;
-using AMR.DeliveryPlanning.Dispatch.Application.Projections;
-using AMR.DeliveryPlanning.Dispatch.Application.Queries.GetVehiclePerformanceReport;
+using DTMS.Dispatch.Application.Projections;
+using DTMS.Dispatch.Application.Queries.GetVehiclePerformanceReport;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace AMR.DeliveryPlanning.Dispatch.Presentation;
+namespace DTMS.Dispatch.Presentation;
 
 /// <summary>
 /// Phase P5.3 — Reports backed by Dispatch projections. Lives in a

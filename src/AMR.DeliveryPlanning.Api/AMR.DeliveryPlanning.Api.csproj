@@ -45,8 +45,8 @@
     <ProjectReference Include="..\Modules\DeliveryOrder\DTMS.DeliveryOrder.Infrastructure\DTMS.DeliveryOrder.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Planning\AMR.DeliveryPlanning.Planning.Presentation\AMR.DeliveryPlanning.Planning.Presentation.csproj" />
     <ProjectReference Include="..\Modules\Planning\AMR.DeliveryPlanning.Planning.Infrastructure\AMR.DeliveryPlanning.Planning.Infrastructure.csproj" />
-    <ProjectReference Include="..\Modules\Dispatch\AMR.DeliveryPlanning.Dispatch.Presentation\AMR.DeliveryPlanning.Dispatch.Presentation.csproj" />
-    <ProjectReference Include="..\Modules\Dispatch\AMR.DeliveryPlanning.Dispatch.Infrastructure\AMR.DeliveryPlanning.Dispatch.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Dispatch\DTMS.Dispatch.Presentation\DTMS.Dispatch.Presentation.csproj" />
+    <ProjectReference Include="..\Modules\Dispatch\DTMS.Dispatch.Infrastructure\DTMS.Dispatch.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Transport.Amr\DTMS.Transport.Amr.Infrastructure\DTMS.Transport.Amr.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Transport.Manual\DTMS.Transport.Manual.Infrastructure\DTMS.Transport.Manual.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Transport.Manual\DTMS.Transport.Manual.Application\DTMS.Transport.Manual.Application.csproj" />

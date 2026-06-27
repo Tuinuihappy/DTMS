@@ -1,12 +1,12 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.AcknowledgeRobotPass;
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.CancelTrip;
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.PauseTrip;
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.ResumeTrip;
-using AMR.DeliveryPlanning.Dispatch.Application.Services;
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
-using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
-using AMR.DeliveryPlanning.Dispatch.Domain.Events;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Application.Commands.AcknowledgeRobotPass;
+using DTMS.Dispatch.Application.Commands.CancelTrip;
+using DTMS.Dispatch.Application.Commands.PauseTrip;
+using DTMS.Dispatch.Application.Commands.ResumeTrip;
+using DTMS.Dispatch.Application.Services;
+using DTMS.Dispatch.Domain.Entities;
+using DTMS.Dispatch.Domain.Enums;
+using DTMS.Dispatch.Domain.Events;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -637,7 +637,7 @@ public class ReissueTripGuardTests
         var handler = NewHandler(cancelled, orderStatus: "Cancelled");
 
         var result = await handler.Handle(
-            new AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
+            new DTMS.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
                 cancelled.Id, "Manual", null, null),
             default);
 
@@ -658,7 +658,7 @@ public class ReissueTripGuardTests
         var handler = NewHandler(cancelled, orderStatus: status);
 
         var result = await handler.Handle(
-            new AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
+            new DTMS.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
                 cancelled.Id, "Manual", null, null),
             default);
 
@@ -673,7 +673,7 @@ public class ReissueTripGuardTests
         var handler = NewHandler(cancelled, orderStatus: "Confirmed");
 
         var result = await handler.Handle(
-            new AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
+            new DTMS.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
                 cancelled.Id, "Manual", "ops", "valid retry"),
             default);
 
@@ -687,7 +687,7 @@ public class ReissueTripGuardTests
         var handler = NewHandler(cancelled, orderStatus: null);
 
         var result = await handler.Handle(
-            new AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
+            new DTMS.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
                 cancelled.Id, "Manual", null, null),
             default);
 
@@ -704,7 +704,7 @@ public class ReissueTripGuardTests
         var handler = NewHandler(failed, orderStatus: "Confirmed");
 
         var result = await handler.Handle(
-            new AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
+            new DTMS.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
                 failed.Id, "Manual", "ops", "retry after reopen"),
             default);
 
@@ -719,7 +719,7 @@ public class ReissueTripGuardTests
         var handler = NewHandler(failed, orderStatus: "Failed");
 
         var result = await handler.Handle(
-            new AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
+            new DTMS.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommand(
                 failed.Id, "Manual", null, null),
             default);
 
@@ -750,7 +750,7 @@ public class ReissueTripGuardTests
         return t;
     }
 
-    private static AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommandHandler
+    private static DTMS.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommandHandler
         NewHandler(Trip trip, string? orderStatus)
     {
         return new(
@@ -758,7 +758,7 @@ public class ReissueTripGuardTests
             new StubRetryEventRepository(),
             new StubRetryDispatcher(),
             new StubOrderStatusReader(orderStatus),
-            NullLogger<AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommandHandler>.Instance);
+            NullLogger<DTMS.Dispatch.Application.Commands.ReissueTrip.ReissueTripCommandHandler>.Instance);
     }
 }
 

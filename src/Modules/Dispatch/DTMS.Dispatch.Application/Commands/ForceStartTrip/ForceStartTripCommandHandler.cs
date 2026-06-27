@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.Dispatch.Domain.Services;
+using DTMS.Dispatch.Domain.Enums;
+using DTMS.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Domain.Services;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.ForceStartTrip;
+namespace DTMS.Dispatch.Application.Commands.ForceStartTrip;
 
 public class ForceStartTripCommandHandler : ICommandHandler<ForceStartTripCommand>
 {

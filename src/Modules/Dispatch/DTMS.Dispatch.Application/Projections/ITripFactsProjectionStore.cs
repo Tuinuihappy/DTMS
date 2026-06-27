@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Dispatch.Application.Projections;
+namespace DTMS.Dispatch.Application.Projections;
 
 /// <summary>
 /// Phase P5.2 — Write side of bi.TripFacts. Unlike OrderFacts there is

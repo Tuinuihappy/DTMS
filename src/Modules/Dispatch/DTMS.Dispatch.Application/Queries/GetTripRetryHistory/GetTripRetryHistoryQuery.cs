@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripRetryHistory;
+namespace DTMS.Dispatch.Application.Queries.GetTripRetryHistory;
 
 /// <summary>
 /// Returns every Trip in a retry chain for the given trip's group

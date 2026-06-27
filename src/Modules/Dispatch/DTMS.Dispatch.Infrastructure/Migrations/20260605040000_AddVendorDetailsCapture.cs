@@ -1,11 +1,11 @@
 using System;
-using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
+using DTMS.Dispatch.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
+namespace DTMS.Dispatch.Infrastructure.Migrations
 {
     /// <summary>
     /// Persist vendor (RIOT3) trip details so DTMS doesn't have to query

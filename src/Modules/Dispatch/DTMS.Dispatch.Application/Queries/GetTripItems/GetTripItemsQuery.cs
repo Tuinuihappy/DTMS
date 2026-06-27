@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripItems;
+namespace DTMS.Dispatch.Application.Queries.GetTripItems;
 
 /// <summary>
 /// BFF (Backend-for-Frontend) endpoint — embeds the parent Trip's

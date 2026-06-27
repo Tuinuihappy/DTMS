@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Dispatch.Application.Projections;
+namespace DTMS.Dispatch.Application.Projections;
 
 public record TripStatusHistoryEntry(
     Guid EventId,

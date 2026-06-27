@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Domain.Entities;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripById;
+namespace DTMS.Dispatch.Application.Queries.GetTripById;
 
 public record GetTripByIdQuery(Guid TripId) : IQuery<Trip>;
 

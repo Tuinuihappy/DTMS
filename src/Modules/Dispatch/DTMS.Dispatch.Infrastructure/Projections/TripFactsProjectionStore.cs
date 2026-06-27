@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Projections;
-using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
+using DTMS.Dispatch.Application.Projections;
+using DTMS.Dispatch.Infrastructure.Data;
 using DTMS.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections;
+namespace DTMS.Dispatch.Infrastructure.Projections;
 
 public class TripFactsProjectionStore : ITripFactsProjectionStore
 {

@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Services;
-using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Application.Services;
+using DTMS.Dispatch.Domain.Enums;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.ForceDropCompletedTrip;
+namespace DTMS.Dispatch.Application.Commands.ForceDropCompletedTrip;
 
 public class ForceDropCompletedTripCommandHandler : ICommandHandler<ForceDropCompletedTripCommand>
 {

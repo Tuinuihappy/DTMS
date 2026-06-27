@@ -1,6 +1,6 @@
 using AMR.DeliveryPlanning.Api.Realtime.Hubs;
 using AMR.DeliveryPlanning.Api.Realtime.Hubs.Clients;
-using AMR.DeliveryPlanning.Dispatch.Application.Projections;
+using DTMS.Dispatch.Application.Projections;
 using Microsoft.AspNetCore.SignalR;
 
 namespace AMR.DeliveryPlanning.Api.Realtime.Publishers;

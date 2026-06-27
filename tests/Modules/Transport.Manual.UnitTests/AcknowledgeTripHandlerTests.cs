@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.Dispatch.Domain.Services;
+using DTMS.Dispatch.Domain.Entities;
+using DTMS.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Domain.Services;
 using DTMS.Dispatch.IntegrationEvents;
 using DTMS.Transport.Manual.Application.Commands.AcknowledgeTrip;
 using DTMS.Transport.Manual.Domain.Entities;
@@ -77,7 +77,7 @@ public class AcknowledgeTripHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         ext.AcknowledgedAt.Should().NotBeNull();
-        trip.Status.Should().Be(AMR.DeliveryPlanning.Dispatch.Domain.Enums.TripStatus.InProgress);
+        trip.Status.Should().Be(DTMS.Dispatch.Domain.Enums.TripStatus.InProgress);
         await _trips.Received(1).UpdateAsync(trip, Arg.Any<CancellationToken>());
     }
 

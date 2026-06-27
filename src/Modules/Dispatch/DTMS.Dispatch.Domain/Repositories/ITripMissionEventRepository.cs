@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
+using DTMS.Dispatch.Domain.Entities;
 
-namespace AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+namespace DTMS.Dispatch.Domain.Repositories;
 
 /// <summary>
 /// Per-mission audit events. Append-only from the caller's perspective —

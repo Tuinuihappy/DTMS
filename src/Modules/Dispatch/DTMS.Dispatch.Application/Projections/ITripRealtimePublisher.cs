@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Dispatch.Application.Projections;
+namespace DTMS.Dispatch.Application.Projections;
 
 /// <summary>
 /// Phase P1 — abstraction so TripStatusHistoryProjector can push timeline

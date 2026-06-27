@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripsByOrder;
+namespace DTMS.Dispatch.Application.Queries.GetTripsByOrder;
 
 /// <summary>
 /// Lists every Trip belonging to a delivery order (all attempts, all

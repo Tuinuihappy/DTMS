@@ -1,7 +1,7 @@
 using DTMS.Dispatch.IntegrationEvents;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Dispatch.Domain.Events;
+namespace DTMS.Dispatch.Domain.Events;
 
 // VendorVehicleKey carries the deviceKey RIOT3 echoes on TASK_PROCESSING
 // (already captured on the Trip aggregate by the time this event fires).

@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\AMR.DeliveryPlanning.Dispatch.Domain\AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
-    <ProjectReference Include="..\AMR.DeliveryPlanning.Dispatch.Application\AMR.DeliveryPlanning.Dispatch.Application.csproj" />
+    <ProjectReference Include="..\DTMS.Dispatch.Domain\DTMS.Dispatch.Domain.csproj" />
+    <ProjectReference Include="..\DTMS.Dispatch.Application\DTMS.Dispatch.Application.csproj" />
     <ProjectReference Include="..\..\Facility\DTMS.Facility.Application\DTMS.Facility.Application.csproj" />
     <ProjectReference Include="..\..\Transport.Abstractions\DTMS.Transport.Abstractions\DTMS.Transport.Abstractions.csproj" />
   </ItemGroup>

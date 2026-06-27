@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
-using AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections;
+using DTMS.Dispatch.Domain.Entities;
+using DTMS.Dispatch.Infrastructure.Projections;
 using DTMS.SharedKernel.Outbox;
 using DTMS.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
+namespace DTMS.Dispatch.Infrastructure.Data;
 
 public class DispatchDbContext : DbContext
 {

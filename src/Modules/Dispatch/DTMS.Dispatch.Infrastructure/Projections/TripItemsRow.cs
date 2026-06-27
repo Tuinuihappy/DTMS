@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections;
+namespace DTMS.Dispatch.Infrastructure.Projections;
 
 /// <summary>
 /// Phase P5.3 read model — one row per (TripId, ItemPk) binding.

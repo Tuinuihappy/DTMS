@@ -1,6 +1,6 @@
 using DTMS.Dispatch.IntegrationEvents;
 
-namespace AMR.DeliveryPlanning.Dispatch.Domain.Services;
+namespace DTMS.Dispatch.Domain.Services;
 
 // Phase P5.3 — Bounded-context bridge. Dispatch needs to enrich
 // TripStartedDomainEvent with the snapshot of items bound to a trip,

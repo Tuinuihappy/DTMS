@@ -27,7 +27,7 @@
     <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\DTMS.DeliveryOrder.Domain\DTMS.DeliveryOrder.Domain.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\DTMS.DeliveryOrder.Infrastructure\DTMS.DeliveryOrder.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\DTMS.DeliveryOrder.Presentation\DTMS.DeliveryOrder.Presentation.csproj" />
-    <ProjectReference Include="..\..\..\src\Modules\Dispatch\AMR.DeliveryPlanning.Dispatch.Domain\AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Dispatch\DTMS.Dispatch.Domain\DTMS.Dispatch.Domain.csproj" />
   </ItemGroup>
 
 </Project>

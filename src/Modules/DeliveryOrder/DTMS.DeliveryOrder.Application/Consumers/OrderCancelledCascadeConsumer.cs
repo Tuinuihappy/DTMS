@@ -1,7 +1,7 @@
 using DTMS.DeliveryOrder.IntegrationEvents;
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.CancelTrip;
-using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Application.Commands.CancelTrip;
+using DTMS.Dispatch.Domain.Enums;
+using DTMS.Dispatch.Domain.Repositories;
 using MassTransit;
 using MediatR;
 using Microsoft.Extensions.Logging;

@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Services;
+namespace DTMS.Dispatch.Application.Services;
 
 /// <summary>
 /// Distinguishes the three vendor-side outcomes of an envelope-level

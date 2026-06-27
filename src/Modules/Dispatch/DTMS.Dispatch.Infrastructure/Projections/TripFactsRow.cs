@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections;
+namespace DTMS.Dispatch.Infrastructure.Projections;
 
 /// <summary>
 /// Phase P5.2 — BI fact table for Trip lifecycle. One row per Trip,

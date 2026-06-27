@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
-using AMR.DeliveryPlanning.Dispatch.Domain.Events;
+using DTMS.Dispatch.Domain.Enums;
+using DTMS.Dispatch.Domain.Events;
 using DTMS.Dispatch.IntegrationEvents;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Dispatch.Domain.Entities;
+namespace DTMS.Dispatch.Domain.Entities;
 
 // Envelope-dispatched trip. RIOT3 is the source of truth for execution;
 // DTMS just mirrors task lifecycle via the webhook → MarkVendor* path.

@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Projections;
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.Dispatch.Domain.Services;
+using DTMS.Dispatch.Application.Projections;
+using DTMS.Dispatch.Domain.Entities;
+using DTMS.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Domain.Services;
 using DTMS.Transport.Amr.Options;
 using DTMS.Transport.Amr.Models;
 using DTMS.Transport.Amr.Services;
@@ -210,7 +210,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     return Transition.Cancelled;
 
                 case "PROCESSING":
-                    if (trip.Status == AMR.DeliveryPlanning.Dispatch.Domain.Enums.TripStatus.Created)
+                    if (trip.Status == DTMS.Dispatch.Domain.Enums.TripStatus.Created)
                     {
                         // Same as the webhook: capture the vendor deviceKey
                         // string as-is. No Fleet resolver call here.
@@ -223,7 +223,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
                             items: itemSnapshots);
                         return Transition.Started;
                     }
-                    if (trip.Status == AMR.DeliveryPlanning.Dispatch.Domain.Enums.TripStatus.Paused)
+                    if (trip.Status == DTMS.Dispatch.Domain.Enums.TripStatus.Paused)
                     {
                         // Vendor resumed and we missed the HANG/HELD_TO_CONTINUE
                         // webhook — sync back to InProgress so operator commands
@@ -239,11 +239,11 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     // InProgress. Created/Paused/terminal states are no-ops.
                     // Capture pause flavour so the resume command picks the
                     // right CONTINUE_FROM_* — see Riot3Webhooks for context.
-                    if (trip.Status == AMR.DeliveryPlanning.Dispatch.Domain.Enums.TripStatus.InProgress)
+                    if (trip.Status == DTMS.Dispatch.Domain.Enums.TripStatus.InProgress)
                     {
                         var pauseSource = state == "HANG"
-                            ? AMR.DeliveryPlanning.Dispatch.Domain.Enums.VendorPauseSource.Hang
-                            : AMR.DeliveryPlanning.Dispatch.Domain.Enums.VendorPauseSource.Held;
+                            ? DTMS.Dispatch.Domain.Enums.VendorPauseSource.Hang
+                            : DTMS.Dispatch.Domain.Enums.VendorPauseSource.Held;
                         trip.Pause(pauseSource);
                         return Transition.Paused;
                     }

@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
+using DTMS.Dispatch.Domain.Entities;
 
-namespace AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+namespace DTMS.Dispatch.Domain.Repositories;
 
 /// <summary>
 /// Append-only audit log for trip retries. Write-only from the domain's

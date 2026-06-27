@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
+namespace DTMS.Dispatch.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class RemoveTenantId : Migration

@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.ForcePickupCompletedTrip;
+namespace DTMS.Dispatch.Application.Commands.ForcePickupCompletedTrip;
 
 // Admin override for trips missing the pickup sub-task webhook. Runs the
 // same Trip.MarkVendorPickedUp the vendor webhook would have. Does NOT

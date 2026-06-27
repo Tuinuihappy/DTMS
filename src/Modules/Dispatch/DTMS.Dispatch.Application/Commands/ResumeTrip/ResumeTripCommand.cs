@@ -1,5 +1,5 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.ResumeTrip;
+namespace DTMS.Dispatch.Application.Commands.ResumeTrip;
 
 public record ResumeTripCommand(Guid TripId) : ICommand;

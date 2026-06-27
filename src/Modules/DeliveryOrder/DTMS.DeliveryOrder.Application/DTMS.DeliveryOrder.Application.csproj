@@ -6,8 +6,8 @@
     <ProjectReference Include="..\..\Dispatch\DTMS.Dispatch.IntegrationEvents\DTMS.Dispatch.IntegrationEvents.csproj" />
     <!-- Option A cascade: CancelOrderCascadeConsumer dispatches CancelTripCommand
          (cross-module) so we need Dispatch.Application + Dispatch.Domain refs. -->
-    <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.Application\AMR.DeliveryPlanning.Dispatch.Application.csproj" />
-    <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.Domain\AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
+    <ProjectReference Include="..\..\Dispatch\DTMS.Dispatch.Application\DTMS.Dispatch.Application.csproj" />
+    <ProjectReference Include="..\..\Dispatch\DTMS.Dispatch.Domain\DTMS.Dispatch.Domain.csproj" />
     <!-- Phase P4 OrderListView projector subscribes to Job lifecycle events
          to recompute the order's "has active job" derived flag. -->
     <ProjectReference Include="..\..\Planning\DTMS.Planning.IntegrationEvents\DTMS.Planning.IntegrationEvents.csproj" />

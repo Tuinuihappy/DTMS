@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Dispatch.IntegrationEvents;
 using DTMS.Facility.Domain.Repositories;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Consumers;
+namespace DTMS.Dispatch.Application.Consumers;
 
 /// <summary>
 /// Releases a shelf back to Available when its trip is completed.

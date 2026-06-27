@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.RaiseException;
+namespace DTMS.Dispatch.Application.Commands.RaiseException;
 
 public class RaiseExceptionCommandHandler : ICommandHandler<RaiseExceptionCommand, Guid>
 {

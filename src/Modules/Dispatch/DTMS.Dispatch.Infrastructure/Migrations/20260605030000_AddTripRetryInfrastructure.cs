@@ -1,11 +1,11 @@
 using System;
-using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
+using DTMS.Dispatch.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
+namespace DTMS.Dispatch.Infrastructure.Migrations
 {
     /// <summary>
     /// Trip-level retry infrastructure: route context on Trip

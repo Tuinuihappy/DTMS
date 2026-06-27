@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.CapturePoD;
+namespace DTMS.Dispatch.Application.Commands.CapturePoD;
 
 public record CapturePodCommand(
     Guid TripId,

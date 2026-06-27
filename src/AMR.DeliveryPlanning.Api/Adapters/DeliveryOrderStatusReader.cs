@@ -1,5 +1,5 @@
 using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
-using AMR.DeliveryPlanning.Dispatch.Application.Services;
+using DTMS.Dispatch.Application.Services;
 using MediatR;
 
 namespace AMR.DeliveryPlanning.Api.Adapters;

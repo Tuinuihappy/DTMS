@@ -1,6 +1,6 @@
 using DTMS.DeliveryOrder.Domain.Enums;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Services;
+namespace DTMS.Dispatch.Application.Services;
 
 /// <summary>
 /// Resolves the right vendor-operation adapter for a given transport

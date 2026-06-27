@@ -12,11 +12,11 @@
     <Project Path="src/Modules/DeliveryOrder/DTMS.DeliveryOrder.Presentation/DTMS.DeliveryOrder.Presentation.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Dispatch/">
-    <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Application/AMR.DeliveryPlanning.Dispatch.Application.csproj" />
-    <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Domain/AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
-    <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Infrastructure/AMR.DeliveryPlanning.Dispatch.Infrastructure.csproj" />
+    <Project Path="src/Modules/Dispatch/DTMS.Dispatch.Application/DTMS.Dispatch.Application.csproj" />
+    <Project Path="src/Modules/Dispatch/DTMS.Dispatch.Domain/DTMS.Dispatch.Domain.csproj" />
+    <Project Path="src/Modules/Dispatch/DTMS.Dispatch.Infrastructure/DTMS.Dispatch.Infrastructure.csproj" />
     <Project Path="src/Modules/Dispatch/DTMS.Dispatch.IntegrationEvents/DTMS.Dispatch.IntegrationEvents.csproj" />
-    <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Presentation/AMR.DeliveryPlanning.Dispatch.Presentation.csproj" />
+    <Project Path="src/Modules/Dispatch/DTMS.Dispatch.Presentation/DTMS.Dispatch.Presentation.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Facility/">
     <Project Path="src/Modules/Facility/DTMS.Facility.Application/DTMS.Facility.Application.csproj" />

@@ -1,6 +1,6 @@
 using DTMS.Dispatch.IntegrationEvents;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Projections;
+namespace DTMS.Dispatch.Application.Projections;
 
 /// <summary>
 /// Phase P5.3 — Write-side abstraction for the dispatch.TripItems read

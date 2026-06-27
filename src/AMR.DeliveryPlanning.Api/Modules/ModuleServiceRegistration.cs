@@ -7,10 +7,10 @@ using DTMS.DeliveryOrder.Infrastructure.Data;
 using DTMS.DeliveryOrder.Infrastructure.Repositories;
 using DTMS.DeliveryOrder.Infrastructure.Services;
 using DTMS.DeliveryOrder.Presentation.Idempotency;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
-using AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories;
-using AMR.DeliveryPlanning.Dispatch.Infrastructure.Services;
+using DTMS.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Infrastructure.Data;
+using DTMS.Dispatch.Infrastructure.Repositories;
+using DTMS.Dispatch.Infrastructure.Services;
 using DTMS.Facility.Application.Services;
 using DTMS.Facility.Domain.Repositories;
 using DTMS.Facility.Domain.Services;
@@ -306,7 +306,7 @@ public static class ModuleServiceRegistration
         // populate TripStartedIntegrationEvent.Items without taking a
         // hard dependency on DeliveryOrderDbContext. Implementation lives
         // here (in DeliveryOrder.Infrastructure) where the data is.
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Services.ITripItemSnapshotProvider,
+        services.AddScoped<DTMS.Dispatch.Domain.Services.ITripItemSnapshotProvider,
                            DTMS.DeliveryOrder.Infrastructure.Services.DeliveryOrderTripItemSnapshotProvider>();
         // Phase P1 — projection infrastructure for the DeliveryOrder module.
         // Read repo serves the status-history query endpoint.
@@ -391,9 +391,9 @@ public static class ModuleServiceRegistration
         // Log which vendor adapters got picked at boot so it's visible without
         // having to trigger an order first. Single line at INF level.
         services.AddHostedService<AMR.DeliveryPlanning.Api.Adapters.CompositionLogger>();
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IVendorEnvelopeOperationService,
+        services.AddScoped<DTMS.Dispatch.Application.Services.IVendorEnvelopeOperationService,
             AMR.DeliveryPlanning.Api.Adapters.Riot3VendorEnvelopeOperationAdapter>();
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IVendorRobotOperationService,
+        services.AddScoped<DTMS.Dispatch.Application.Services.IVendorRobotOperationService,
             AMR.DeliveryPlanning.Api.Adapters.Riot3VendorRobotOperationAdapter>();
 
         // ── Phase 1 foundation: strategy registry + vendor operations router ──
@@ -403,21 +403,21 @@ public static class ModuleServiceRegistration
         // here. The router is what Pause/Resume/Cancel handlers will use once
         // Phase 3 refactors them away from the static IVendorEnvelopeOperationService
         // binding above; for now both registrations co-exist (no behaviour change).
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IDispatchStrategyRegistry,
-            AMR.DeliveryPlanning.Dispatch.Application.Services.DispatchStrategyRegistry>();
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IVendorOperationsRouter,
-            AMR.DeliveryPlanning.Dispatch.Application.Services.VendorOperationsRouter>();
+        services.AddScoped<DTMS.Dispatch.Application.Services.IDispatchStrategyRegistry,
+            DTMS.Dispatch.Application.Services.DispatchStrategyRegistry>();
+        services.AddScoped<DTMS.Dispatch.Application.Services.IVendorOperationsRouter,
+            DTMS.Dispatch.Application.Services.VendorOperationsRouter>();
         // Phase 3c — AMR strategy wired into production. Routes through
         // IDispatchOrderTemplateService.DispatchByRouteAsync (the existing
         // OrderTemplate → RIOT3 envelope flow) but goes through the strategy
         // contract so Manual / Fleet can plug their own implementations in.
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IDispatchStrategy,
+        services.AddScoped<DTMS.Dispatch.Application.Services.IDispatchStrategy,
             AMR.DeliveryPlanning.Api.Adapters.AmrDispatchStrategy>();
         // Phase 3c — Manual strategy stub. Returns Failure with a clear
         // "not yet implemented" reason so Manual orders end up at Failed
         // (visible in the UI) instead of Confirmed-forever. Phase 4 swaps
         // the body for the real operator-assignment flow.
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IDispatchStrategy,
+        services.AddScoped<DTMS.Dispatch.Application.Services.IDispatchStrategy,
             AMR.DeliveryPlanning.Api.Adapters.ManualDispatchStrategy>();
         services.AddScoped<IDispatchOrderTemplateService, DispatchOrderTemplateService>();
         services.Configure<AMR.DeliveryPlanning.Planning.Application.Options.DispatchOptions>(
@@ -443,37 +443,37 @@ public static class ModuleServiceRegistration
                 sp.GetRequiredService<DispatchDomainEventMapper>())));
         services.AddScoped<ITripRepository, TripRepository>();
         // Phase P1 — projection infrastructure for the Dispatch module.
-        services.AddSingleton<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripRealtimePublisher,
+        services.AddSingleton<DTMS.Dispatch.Application.Projections.ITripRealtimePublisher,
                               AMR.DeliveryPlanning.Api.Realtime.Publishers.SignalRTripRealtimePublisher>();
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripStatusHistoryReadRepository,
-                           AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripStatusHistoryReadRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripStatusHistoryProjectionStore,
-                           AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripStatusHistoryProjectionStore>();
+        services.AddScoped<DTMS.Dispatch.Application.Projections.ITripStatusHistoryReadRepository,
+                           DTMS.Dispatch.Infrastructure.Projections.TripStatusHistoryReadRepository>();
+        services.AddScoped<DTMS.Dispatch.Application.Projections.ITripStatusHistoryProjectionStore,
+                           DTMS.Dispatch.Infrastructure.Projections.TripStatusHistoryProjectionStore>();
         // Phase P5.2 — BI fact table for trips (bi.TripFacts).
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripFactsReadRepository,
-                           AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripFactsReadRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripFactsProjectionStore,
-                           AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripFactsProjectionStore>();
+        services.AddScoped<DTMS.Dispatch.Application.Projections.ITripFactsReadRepository,
+                           DTMS.Dispatch.Infrastructure.Projections.TripFactsReadRepository>();
+        services.AddScoped<DTMS.Dispatch.Application.Projections.ITripFactsProjectionStore,
+                           DTMS.Dispatch.Infrastructure.Projections.TripFactsProjectionStore>();
         // Phase P5.3 — TripItems read model (Trip ↔ Item binding).
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripItemsReadRepository,
-                           AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripItemsReadRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripItemsProjectionStore,
-                           AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripItemsProjectionStore>();
+        services.AddScoped<DTMS.Dispatch.Application.Projections.ITripItemsReadRepository,
+                           DTMS.Dispatch.Infrastructure.Projections.TripItemsReadRepository>();
+        services.AddScoped<DTMS.Dispatch.Application.Projections.ITripItemsProjectionStore,
+                           DTMS.Dispatch.Infrastructure.Projections.TripItemsProjectionStore>();
         // Operator Trips list (GET /api/v1/dispatch/trips). Reads dispatch.Trips
         // joined to dispatch.TripItems for the OrderRef column.
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Projections.ITripQueueReadRepository,
-                           AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections.TripQueueReadRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Repositories.ITripRetryEventRepository,
-            AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories.TripRetryEventRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Repositories.ITripMissionEventRepository,
-            AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories.TripMissionEventRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.ITripRetryDispatcher,
+        services.AddScoped<DTMS.Dispatch.Application.Projections.ITripQueueReadRepository,
+                           DTMS.Dispatch.Infrastructure.Projections.TripQueueReadRepository>();
+        services.AddScoped<DTMS.Dispatch.Domain.Repositories.ITripRetryEventRepository,
+            DTMS.Dispatch.Infrastructure.Repositories.TripRetryEventRepository>();
+        services.AddScoped<DTMS.Dispatch.Domain.Repositories.ITripMissionEventRepository,
+            DTMS.Dispatch.Infrastructure.Repositories.TripMissionEventRepository>();
+        services.AddScoped<DTMS.Dispatch.Application.Services.ITripRetryDispatcher,
             AMR.DeliveryPlanning.Api.Adapters.PlanningTripRetryDispatcher>();
         // Composition-root seam — lets ReissueTripCommandHandler check the
         // parent Order's status without taking a direct ref on
         // DeliveryOrder.Application. Fixes the scenario-5 bug where a
         // Cancelled-order's Trip could still be retried.
-        services.AddScoped<AMR.DeliveryPlanning.Dispatch.Application.Services.IDeliveryOrderStatusReader,
+        services.AddScoped<DTMS.Dispatch.Application.Services.IDeliveryOrderStatusReader,
             AMR.DeliveryPlanning.Api.Adapters.DeliveryOrderStatusReader>();
         services.AddScoped<IShelfManifestRepository, ShelfManifestRepository>();
 
@@ -538,7 +538,7 @@ public static class ModuleServiceRegistration
             bus.AddConsumers(
                 typeof(DTMS.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly,
                 typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly,
-                typeof(AMR.DeliveryPlanning.Dispatch.Application.Commands.CreateEnvelopeTrip.CreateEnvelopeTripCommand).Assembly,
+                typeof(DTMS.Dispatch.Application.Commands.CreateEnvelopeTrip.CreateEnvelopeTripCommand).Assembly,
                 typeof(VehicleStateChangedConsumer).Assembly,
                 // Transport.Amr hosts CaptureFinalSnapshotConsumer — must
                 // be scanned explicitly; otherwise terminal-state events go

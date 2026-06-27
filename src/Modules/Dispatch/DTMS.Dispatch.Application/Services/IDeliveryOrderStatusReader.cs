@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Dispatch.Application.Services;
+namespace DTMS.Dispatch.Application.Services;
 
 /// <summary>
 /// Minimal cross-module seam letting Dispatch handlers see the parent

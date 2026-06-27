@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Domain.Entities;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.CreateEnvelopeTrip;
+namespace DTMS.Dispatch.Application.Commands.CreateEnvelopeTrip;
 
 public class CreateEnvelopeTripCommandHandler : ICommandHandler<CreateEnvelopeTripCommand, Guid>
 {

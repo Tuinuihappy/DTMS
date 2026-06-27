@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Projections;
+using DTMS.Dispatch.Application.Projections;
 using DTMS.Dispatch.IntegrationEvents;
 using DTMS.SharedKernel.Projection;
 using FluentAssertions;

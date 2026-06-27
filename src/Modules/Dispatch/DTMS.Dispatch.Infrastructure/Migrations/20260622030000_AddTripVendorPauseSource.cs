@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
+using DTMS.Dispatch.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Migrations
+namespace DTMS.Dispatch.Infrastructure.Migrations
 {
     /// <summary>
     /// Adds VendorPauseSource to dispatch.Trips so the resume handler knows

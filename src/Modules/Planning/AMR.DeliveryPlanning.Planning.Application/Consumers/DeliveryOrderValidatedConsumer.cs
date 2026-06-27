@@ -5,7 +5,7 @@ using DTMS.DeliveryOrder.Application.Commands.MarkOrderPlanning;
 using DTMS.DeliveryOrder.Application.Commands.RecomputeOrderStatus;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.IntegrationEvents;
-using AMR.DeliveryPlanning.Dispatch.Application.Services;
+using DTMS.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobAnchor;
 using AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobDispatched;
 using AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobFailed;

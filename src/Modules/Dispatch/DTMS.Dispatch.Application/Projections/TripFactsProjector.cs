@@ -4,7 +4,7 @@ using DTMS.SharedKernel.Projection;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Projections;
+namespace DTMS.Dispatch.Application.Projections;
 
 /// <summary>
 /// Phase P5.2 — Materializes the bi.TripFacts BI fact table.

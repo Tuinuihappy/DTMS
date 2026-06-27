@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Services;
+using DTMS.Dispatch.Application.Services;
 using AMR.DeliveryPlanning.Planning.Application.Services;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;

@@ -1,5 +1,5 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.AcknowledgeRobotPass;
+namespace DTMS.Dispatch.Application.Commands.AcknowledgeRobotPass;
 
 public record AcknowledgeRobotPassCommand(Guid TripId) : ICommand;

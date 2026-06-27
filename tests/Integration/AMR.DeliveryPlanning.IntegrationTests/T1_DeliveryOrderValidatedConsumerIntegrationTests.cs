@@ -1,6 +1,6 @@
 using DTMS.DeliveryOrder.Infrastructure.Data;
 using DTMS.DeliveryOrder.IntegrationEvents;
-using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
+using DTMS.Dispatch.Infrastructure.Data;
 using AMR.DeliveryPlanning.Planning.Application.Consumers;
 using AMR.DeliveryPlanning.Planning.Application.Services;
 using AMR.DeliveryPlanning.Planning.Domain.Enums;

@@ -2,8 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Transport.Abstractions\DTMS.Transport.Abstractions\DTMS.Transport.Abstractions.csproj" />
-    <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.Domain\AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
-    <ProjectReference Include="..\..\Dispatch\AMR.DeliveryPlanning.Dispatch.Application\AMR.DeliveryPlanning.Dispatch.Application.csproj" />
+    <ProjectReference Include="..\..\Dispatch\DTMS.Dispatch.Domain\DTMS.Dispatch.Domain.csproj" />
+    <ProjectReference Include="..\..\Dispatch\DTMS.Dispatch.Application\DTMS.Dispatch.Application.csproj" />
     <ProjectReference Include="..\..\Dispatch\DTMS.Dispatch.IntegrationEvents\DTMS.Dispatch.IntegrationEvents.csproj" />
     <ProjectReference Include="..\..\Facility\DTMS.Facility.Application\DTMS.Facility.Application.csproj" />
     <ProjectReference Include="..\..\Fleet\DTMS.Fleet.IntegrationEvents\DTMS.Fleet.IntegrationEvents.csproj" />

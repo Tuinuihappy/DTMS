@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Projections;
-using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
+using DTMS.Dispatch.Application.Projections;
+using DTMS.Dispatch.Domain.Enums;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripsQueue;
+namespace DTMS.Dispatch.Application.Queries.GetTripsQueue;
 
 /// <summary>
 /// Paginated operator Trips list. Mirrors the GetJobsQueue shape so the

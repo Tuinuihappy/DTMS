@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Projections;
+using DTMS.Dispatch.Application.Projections;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Queries.GetVehiclePerformanceReport;
+namespace DTMS.Dispatch.Application.Queries.GetVehiclePerformanceReport;
 
 /// <summary>
 /// Phase #10 — Vehicle performance report. Groups <c>bi.TripFacts</c>

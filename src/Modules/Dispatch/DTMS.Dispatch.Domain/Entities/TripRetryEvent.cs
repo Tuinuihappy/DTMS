@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Dispatch.Domain.Entities;
+namespace DTMS.Dispatch.Domain.Entities;
 
 /// <summary>
 /// Immutable audit record of a Trip retry. One row written each time

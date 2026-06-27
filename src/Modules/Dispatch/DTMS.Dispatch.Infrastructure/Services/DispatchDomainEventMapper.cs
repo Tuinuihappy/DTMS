@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Events;
+using DTMS.Dispatch.Domain.Events;
 using DTMS.Dispatch.IntegrationEvents;
 using DTMS.SharedKernel.Auth;
 using DTMS.SharedKernel.Domain;
 using DTMS.SharedKernel.Outbox;
 
-namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Services;
+namespace DTMS.Dispatch.Infrastructure.Services;
 
 // Phase P0 (2026-06-14) — mapper enriches Trip lifecycle integration events
 // with TriggeredBy + CorrelationId from the ambient ICurrentActorContext.

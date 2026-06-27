@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Projections;
+using DTMS.Dispatch.Application.Projections;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripStatusHistory;
+namespace DTMS.Dispatch.Application.Queries.GetTripStatusHistory;
 
 public class GetTripStatusHistoryQueryHandler
     : IQueryHandler<GetTripStatusHistoryQuery, TripStatusHistoryResponse>

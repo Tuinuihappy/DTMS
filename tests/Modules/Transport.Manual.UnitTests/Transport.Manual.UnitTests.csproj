@@ -24,7 +24,7 @@
     <ProjectReference Include="..\..\..\src\Modules\Transport.Manual\DTMS.Transport.Manual\DTMS.Transport.Manual.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Transport.Manual\DTMS.Transport.Manual.Application\DTMS.Transport.Manual.Application.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Facility\DTMS.Facility.Domain\DTMS.Facility.Domain.csproj" />
-    <ProjectReference Include="..\..\..\src\Modules\Dispatch\AMR.DeliveryPlanning.Dispatch.Domain\AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Dispatch\DTMS.Dispatch.Domain\DTMS.Dispatch.Domain.csproj" />
   </ItemGroup>
 
 </Project>

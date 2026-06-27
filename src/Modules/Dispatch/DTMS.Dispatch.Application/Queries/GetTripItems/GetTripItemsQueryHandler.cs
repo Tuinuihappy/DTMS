@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Projections;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Application.Projections;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripItems;
+namespace DTMS.Dispatch.Application.Queries.GetTripItems;
 
 public class GetTripItemsQueryHandler : IQueryHandler<GetTripItemsQuery, TripItemsResponse>
 {

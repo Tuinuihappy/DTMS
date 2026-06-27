@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Projections;
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.Dispatch.Domain.Services;
+using DTMS.Dispatch.Application.Projections;
+using DTMS.Dispatch.Domain.Entities;
+using DTMS.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Domain.Services;
 using DTMS.Dispatch.IntegrationEvents;
 using DTMS.Fleet.IntegrationEvents;
 using DTMS.SharedKernel;
@@ -36,7 +36,7 @@ public static class Riot3Webhooks
             ITripMissionEventRepository missionEventRepository,
             ITripItemSnapshotProvider tripItemSnapshotProvider,
             DTMS.Facility.Application.Services.IFacilityReadService facilityReadService,
-            AMR.DeliveryPlanning.Dispatch.Application.Services.IDeliveryOrderStatusReader orderReader,
+            DTMS.Dispatch.Application.Services.IDeliveryOrderStatusReader orderReader,
             ITripRealtimePublisher realtimePublisher,
             ILogger<Riot3NotifyPayload> logger,
             CancellationToken cancellationToken) =>
@@ -192,8 +192,8 @@ public static class Riot3Webhooks
                     // them returns E639999 "multi-level template fill error".
                     var hangReason = payload.Task?.HangReason;
                     var pauseSource = eventType == "TASK_HANG"
-                        ? AMR.DeliveryPlanning.Dispatch.Domain.Enums.VendorPauseSource.Hang
-                        : AMR.DeliveryPlanning.Dispatch.Domain.Enums.VendorPauseSource.Held;
+                        ? DTMS.Dispatch.Domain.Enums.VendorPauseSource.Hang
+                        : DTMS.Dispatch.Domain.Enums.VendorPauseSource.Held;
                     trip.Pause(pauseSource);
                     logger.LogInformation("[EnvelopeWebhook] Trip {TripId} paused by vendor (upperKey {UpperKey}) event={Event} source={Source} reason={Reason}",
                         trip.Id, upperKey, eventType, pauseSource, hangReason ?? "(none)");
@@ -256,7 +256,7 @@ public static class Riot3Webhooks
         ITripRepository tripRepository,
         ITripMissionEventRepository missionEventRepository,
         DTMS.Facility.Application.Services.IFacilityReadService facilityReadService,
-        AMR.DeliveryPlanning.Dispatch.Application.Services.IDeliveryOrderStatusReader orderReader,
+        DTMS.Dispatch.Application.Services.IDeliveryOrderStatusReader orderReader,
         ITripRealtimePublisher realtimePublisher,
         ILogger logger,
         CancellationToken cancellationToken)

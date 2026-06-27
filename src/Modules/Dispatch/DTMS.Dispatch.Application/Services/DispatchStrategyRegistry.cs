@@ -1,6 +1,6 @@
 using DTMS.DeliveryOrder.Domain.Enums;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Services;
+namespace DTMS.Dispatch.Application.Services;
 
 /// <summary>
 /// Default implementation: indexes injected <see cref="IDispatchStrategy"/>

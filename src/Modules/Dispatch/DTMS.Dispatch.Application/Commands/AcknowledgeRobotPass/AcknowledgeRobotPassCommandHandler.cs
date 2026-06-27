@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Services;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Application.Services;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.AcknowledgeRobotPass;
+namespace DTMS.Dispatch.Application.Commands.AcknowledgeRobotPass;
 
 // Operator-initiated robot checkpoint acknowledgment (RIOT3 PASS). Unlike
 // Pause/Resume — which mutate Trip.Status — this command is a nudge: the

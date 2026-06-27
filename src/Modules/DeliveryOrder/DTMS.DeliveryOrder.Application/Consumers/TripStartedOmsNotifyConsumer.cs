@@ -2,7 +2,7 @@ using System.Diagnostics;
 using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Repositories;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.OmsAdapter.Abstractions;
 using AMR.DeliveryPlanning.OmsAdapter.Abstractions.Models;

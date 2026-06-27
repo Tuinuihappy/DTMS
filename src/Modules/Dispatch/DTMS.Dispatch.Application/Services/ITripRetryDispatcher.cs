@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Services;
+namespace DTMS.Dispatch.Application.Services;
 
 /// <summary>
 /// Module-agnostic seam used by the trip retry handler to invoke the

@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
+using DTMS.Dispatch.Domain.Enums;
 
-namespace AMR.DeliveryPlanning.Dispatch.Domain.Entities;
+namespace DTMS.Dispatch.Domain.Entities;
 
 // Phase 3b — AMR-specific data lifted off the Trip core. Manual / Fleet
 // trips simply leave the navigation null; AMR trips persist one row per

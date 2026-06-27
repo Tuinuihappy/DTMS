@@ -34,7 +34,7 @@ public class ModuleBoundaryTests
         {
             Path.Combine(repoRoot, "src", "Modules", "DeliveryOrder", "DTMS.DeliveryOrder.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Planning", "AMR.DeliveryPlanning.Planning.Application", "Commands"),
-            Path.Combine(repoRoot, "src", "Modules", "Dispatch", "AMR.DeliveryPlanning.Dispatch.Application", "Commands"),
+            Path.Combine(repoRoot, "src", "Modules", "Dispatch", "DTMS.Dispatch.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Fleet", "DTMS.Fleet.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Fleet", "DTMS.Fleet.Application", "Consumers"),
             Path.Combine(repoRoot, "src", "Modules", "Transport.Amr", "DTMS.Transport.Amr", "Webhooks")
@@ -67,7 +67,7 @@ public class ModuleBoundaryTests
         {
             Path.Combine(repoRoot, "src", "Modules", "DeliveryOrder", "DTMS.DeliveryOrder.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Planning", "AMR.DeliveryPlanning.Planning.Application", "Commands"),
-            Path.Combine(repoRoot, "src", "Modules", "Dispatch", "AMR.DeliveryPlanning.Dispatch.Application", "Commands"),
+            Path.Combine(repoRoot, "src", "Modules", "Dispatch", "DTMS.Dispatch.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Fleet", "DTMS.Fleet.Application", "Commands")
         };
 

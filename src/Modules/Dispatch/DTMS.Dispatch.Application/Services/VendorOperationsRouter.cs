@@ -1,6 +1,6 @@
 using DTMS.DeliveryOrder.Domain.Enums;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Services;
+namespace DTMS.Dispatch.Application.Services;
 
 /// <summary>
 /// Default router implementation. Discovers all

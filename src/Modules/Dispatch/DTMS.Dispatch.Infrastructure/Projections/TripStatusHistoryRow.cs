@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Dispatch.Infrastructure.Projections;
+namespace DTMS.Dispatch.Infrastructure.Projections;
 
 /// <summary>
 /// Phase P1 read-model row materialized by <c>TripStatusHistoryProjector</c>

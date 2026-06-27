@@ -1,5 +1,5 @@
 using System.Text.Json;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Dispatch.IntegrationEvents;
 using DTMS.Transport.Amr.Services;
 using MassTransit;

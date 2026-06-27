@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Domain.Enums;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.ForcePickupCompletedTrip;
+namespace DTMS.Dispatch.Application.Commands.ForcePickupCompletedTrip;
 
 public class ForcePickupCompletedTripCommandHandler : ICommandHandler<ForcePickupCompletedTripCommand>
 {

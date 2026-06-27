@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Dispatch.Domain.Entities;
+namespace DTMS.Dispatch.Domain.Entities;
 
 // Phase 3d (Bug #2 — first-write-wins on VehicleKey) — captures every
 // vehicleKey RIOT3 reports across a Trip's lifetime, in order. Replaces

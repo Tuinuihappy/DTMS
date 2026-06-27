@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.CapturePoD;
+namespace DTMS.Dispatch.Application.Commands.CapturePoD;
 
 public class CapturePodCommandHandler : ICommandHandler<CapturePodCommand, Guid>
 {

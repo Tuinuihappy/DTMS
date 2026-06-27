@@ -1,13 +1,13 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Services;
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
-using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Application.Services;
+using DTMS.Dispatch.Domain.Entities;
+using DTMS.Dispatch.Domain.Enums;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
-using ITripRetryEventRepository = AMR.DeliveryPlanning.Dispatch.Domain.Repositories.ITripRetryEventRepository;
+using ITripRetryEventRepository = DTMS.Dispatch.Domain.Repositories.ITripRetryEventRepository;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.ReissueTrip;
+namespace DTMS.Dispatch.Application.Commands.ReissueTrip;
 
 public class ReissueTripCommandHandler : ICommandHandler<ReissueTripCommand, Guid>
 {

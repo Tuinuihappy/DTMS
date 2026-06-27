@@ -1,8 +1,8 @@
 using DTMS.DeliveryOrder.Domain.Events;
 using DTMS.DeliveryOrder.Infrastructure.Services;
 using DTMS.DeliveryOrder.IntegrationEvents;
-using AMR.DeliveryPlanning.Dispatch.Domain.Events;
-using AMR.DeliveryPlanning.Dispatch.Infrastructure.Services;
+using DTMS.Dispatch.Domain.Events;
+using DTMS.Dispatch.Infrastructure.Services;
 using DTMS.Dispatch.IntegrationEvents;
 using DTMS.Fleet.Domain.Enums;
 using DTMS.Fleet.Domain.Events;

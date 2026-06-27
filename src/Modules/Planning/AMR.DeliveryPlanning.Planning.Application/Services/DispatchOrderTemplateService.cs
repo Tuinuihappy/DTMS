@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.CreateEnvelopeTrip;
+using DTMS.Dispatch.Application.Commands.CreateEnvelopeTrip;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using MediatR;

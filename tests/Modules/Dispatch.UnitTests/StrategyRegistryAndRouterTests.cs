@@ -1,6 +1,6 @@
 using DTMS.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.Dispatch.Application.Services;
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
+using DTMS.Dispatch.Application.Services;
+using DTMS.Dispatch.Domain.Entities;
 using DTMS.SharedKernel.Messaging;
 using FluentAssertions;
 using NSubstitute;

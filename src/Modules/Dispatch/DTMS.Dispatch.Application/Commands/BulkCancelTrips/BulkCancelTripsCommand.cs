@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.BulkCancelTrips;
+namespace DTMS.Dispatch.Application.Commands.BulkCancelTrips;
 
 // Backend Phase 2 — dispatcher-facing bulk cancel for the trips table.
 // Mirrors BulkCancelDeliveryOrders shape so the frontend can reuse the

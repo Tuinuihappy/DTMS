@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.ForceCompleteTrip;
+namespace DTMS.Dispatch.Application.Commands.ForceCompleteTrip;
 
 // Admin override for trips stuck at InProgress/Paused because the vendor's
 // TASK_FINISHED webhook was dropped or never fired. Bypasses the vendor —

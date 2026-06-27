@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.ForceDropCompletedTrip;
+namespace DTMS.Dispatch.Application.Commands.ForceDropCompletedTrip;
 
 // Admin override for trips missing the drop sub-task webhook. Runs the
 // same Trip.MarkVendorDropCompleted the vendor webhook would have —

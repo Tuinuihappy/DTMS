@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripStatusHistory;
+namespace DTMS.Dispatch.Application.Queries.GetTripStatusHistory;
 
 public record GetTripStatusHistoryQuery(Guid TripId) : IQuery<TripStatusHistoryResponse>;
 

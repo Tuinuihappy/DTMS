@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Services;
-using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Application.Services;
+using DTMS.Dispatch.Domain.Enums;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.PauseTrip;
+namespace DTMS.Dispatch.Application.Commands.PauseTrip;
 
 // Operator-initiated pause. Unlike cancel, pause's intent is "freeze for
 // later resume" — if the vendor doesn't have the order anymore, there's

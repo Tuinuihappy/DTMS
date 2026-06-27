@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripDetails;
+namespace DTMS.Dispatch.Application.Queries.GetTripDetails;
 
 public class GetTripDetailsQueryHandler : IQueryHandler<GetTripDetailsQuery, TripDetailsDto>
 {

@@ -1,5 +1,5 @@
 using DTMS.DeliveryOrder.Infrastructure.Data;
-using AMR.DeliveryPlanning.Dispatch.Domain.Services;
+using DTMS.Dispatch.Domain.Services;
 using DTMS.Dispatch.IntegrationEvents;
 using Microsoft.EntityFrameworkCore;
 

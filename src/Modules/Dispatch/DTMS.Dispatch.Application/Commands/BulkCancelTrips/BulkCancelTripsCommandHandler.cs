@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Dispatch.Application.Commands.CancelTrip;
+using DTMS.Dispatch.Application.Commands.CancelTrip;
 using DTMS.SharedKernel.Messaging;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Commands.BulkCancelTrips;
+namespace DTMS.Dispatch.Application.Commands.BulkCancelTrips;
 
 // Sequential dispatch of CancelTripCommand per id so domain rules
 // (status guard, vendor RIOT3 cancel side effect) stay identical to

@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Queries.GetTripDetails;
+namespace DTMS.Dispatch.Application.Queries.GetTripDetails;
 
 /// <summary>
 /// Returns the full operator-facing view of a Trip: aggregate state,

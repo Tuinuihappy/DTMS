@@ -1,7 +1,7 @@
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Dispatch.Application.Services;
+namespace DTMS.Dispatch.Application.Services;
 
 /// <summary>
 /// Per-mode dispatch contract — given a station/warehouse pair + order

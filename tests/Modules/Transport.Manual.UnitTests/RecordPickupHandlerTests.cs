@@ -1,6 +1,6 @@
 using DTMS.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
-using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Domain.Entities;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Facility.Domain.Entities;
 using DTMS.Facility.Domain.Repositories;
 using DTMS.Facility.Domain.ValueObjects;
