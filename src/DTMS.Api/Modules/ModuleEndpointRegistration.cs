@@ -2,6 +2,7 @@ using DTMS.DeliveryOrder.Presentation;
 using DTMS.Dispatch.Presentation;
 using DTMS.Facility.Presentation;
 using DTMS.Fleet.Presentation;
+using DTMS.Iam.Presentation;
 using DTMS.Planning.Presentation;
 using DTMS.Transport.Amr.Webhooks;
 using DTMS.Transport.Manual.Presentation;
@@ -32,6 +33,7 @@ public static class ModuleEndpointRegistration
         app.MapRiot3Webhooks();
         app.MapOperatorEndpoints();   // Phase 4.2 — /api/operator/* (Manual transport mode)
         app.MapAdminManualOperatorEndpoints();   // Phase 4.6 — /api/v1/admin/manual/*
+        app.MapIamEndpoints();   // Permission System Phase B — /api/v1/iam/*
 
         return app;
     }

@@ -114,12 +114,17 @@ public static class ModuleServiceRegistration
             .Build();
         services.AddSingleton<Npgsql.NpgsqlDataSource>(npgsqlDataSource);
 
-        // ── Iam Module (permission system, ADR-014 Phase A) ───────────
-        // Permission storage + role→permission mapping live here. Read-only
-        // at runtime; mappings come from migration seeds until the Admin
-        // UI lands in Phase B.
+        // ── Iam Module (permission system, ADR-014 Phase A + B) ───────
+        // Permission storage + role→permission mapping + admin CRUD +
+        // audit log. Hot-path lookup goes through PermissionRepository
+        // (cached at the ClaimsTransformer layer); RoleRepository +
+        // AuditLogRepository back the /api/v1/iam/* admin endpoints.
         services.AddDbContext<IamDbContext>(o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));
         services.AddScoped<IPermissionRepository, PermissionRepository>();
+        services.AddScoped<DTMS.Iam.Application.Repositories.IRoleRepository,
+                           DTMS.Iam.Infrastructure.Repositories.RoleRepository>();
+        services.AddScoped<DTMS.Iam.Application.Repositories.IAuditLogRepository,
+                           DTMS.Iam.Infrastructure.Repositories.AuditLogRepository>();
 
         // ── Facility Module ───────────────────────────────────────────
         services.AddDbContext<FacilityDbContext>(o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));

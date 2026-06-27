@@ -1,9 +1,12 @@
+using DTMS.Iam.Domain.Entities;
+
 namespace DTMS.Iam.Application.Repositories;
 
 /// <summary>
-/// Read-only lookup for what permissions a role is granted. Phase A
-/// has no write surface — mappings are seeded via migrations until
-/// Phase B (Admin UI) lands.
+/// Read + admin write surface for the permission catalog. The hot-path
+/// <see cref="GetPermissionCodesForRoleAsync"/> backs PermissionClaimsTransformer
+/// (cached); the CRUD methods back the Phase B admin UI and write straight
+/// through (the cache flushes naturally on TTL within 5 minutes).
 /// </summary>
 public interface IPermissionRepository
 {
@@ -14,4 +17,14 @@ public interface IPermissionRepository
     /// </summary>
     Task<IReadOnlyList<string>> GetPermissionCodesForRoleAsync(
         string role, CancellationToken ct = default);
+
+    Task<IReadOnlyList<Permission>> ListAllAsync(CancellationToken ct = default);
+
+    Task<Permission?> GetByCodeAsync(string code, CancellationToken ct = default);
+
+    Task AddAsync(Permission permission, CancellationToken ct = default);
+
+    Task UpdateAsync(Permission permission, CancellationToken ct = default);
+
+    Task DeleteAsync(string code, CancellationToken ct = default);
 }

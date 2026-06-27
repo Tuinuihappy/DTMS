@@ -22,10 +22,18 @@ public sealed class Permission
         if (!code.StartsWith("dtms:", StringComparison.Ordinal))
             throw new ArgumentException(
                 "Permission code must start with 'dtms:' prefix.", nameof(code));
+        if (code.Length > 120)
+            throw new ArgumentException("Permission code must be 120 characters or fewer.", nameof(code));
 
         Code = code;
         Description = description ?? string.Empty;
         Module = module ?? string.Empty;
         CreatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateMetadata(string description, string module)
+    {
+        Description = description ?? string.Empty;
+        Module = module ?? string.Empty;
     }
 }

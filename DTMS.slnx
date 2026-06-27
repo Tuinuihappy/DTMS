@@ -29,6 +29,7 @@
     <Project Path="src/Modules/Iam/DTMS.Iam.Application/DTMS.Iam.Application.csproj" />
     <Project Path="src/Modules/Iam/DTMS.Iam.Domain/DTMS.Iam.Domain.csproj" />
     <Project Path="src/Modules/Iam/DTMS.Iam.Infrastructure/DTMS.Iam.Infrastructure.csproj" />
+    <Project Path="src/Modules/Iam/DTMS.Iam.Presentation/DTMS.Iam.Presentation.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Fleet/">
     <Project Path="src/Modules/Fleet/DTMS.Fleet.Application/DTMS.Fleet.Application.csproj" />
