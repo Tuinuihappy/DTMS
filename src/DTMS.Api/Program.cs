@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.RateLimiting;
 using FluentValidation;
@@ -38,8 +39,6 @@ if (args.Contains("--generate-vapid-keys"))
 }
 
 var builder = WebApplication.CreateBuilder(args);
-var devAuthBypassEnabled = builder.Environment.IsDevelopment()
-    && builder.Configuration.GetValue<bool>("Auth:Disable");
 
 // T1.3 — extend shutdown window so MassTransit consumers and in-flight HTTP
 // requests can drain before SIGKILL. Default is 5s which is far too short
@@ -73,72 +72,50 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(
         new System.Text.Json.Serialization.JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.SnakeCaseUpper)));
 
-// Configure authentication. Auth:Disable is honored only in Development and
-// supplies a tenant claim so tenant-scoped APIs still behave realistically.
-if (devAuthBypassEnabled)
+// Configure authentication. Per ADR-014, External Auth (at
+// http://10.204.212.28:15000) owns identity; DTMS only validates the
+// tokens it issues. The public RSA key + expected iss/aud live in
+// the Jwt config section.
 {
-    builder.Services.AddAuthentication(options =>
-    {
-        options.DefaultAuthenticateScheme = DevAuthenticationHandler.SchemeName;
-        options.DefaultChallengeScheme = DevAuthenticationHandler.SchemeName;
-    })
-    .AddScheme<AuthenticationSchemeOptions, DevAuthenticationHandler>(
-        DevAuthenticationHandler.SchemeName,
-        _ => { })
-    // Phase 4.2 — operator endpoints still need real claim extraction
-    // (so the sync middleware sees employeeCode/role), even when admin
-    // endpoints are bypassed. Mock scheme decodes JWT without sig check.
-    .AddScheme<AuthenticationSchemeOptions, OperatorMockJwtAuthenticationHandler>(
-        OperatorMockJwtAuthenticationHandler.SchemeName,
-        _ => { });
-}
-else
-{
-    var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>();
-    builder.Services.AddAuthentication(options =>
-    {
-        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    }).AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
+    var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
+        ?? throw new InvalidOperationException("Jwt config section missing.");
+    if (string.IsNullOrWhiteSpace(jwtSettings.PublicKey))
+        throw new InvalidOperationException("Jwt:PublicKey is not configured. Set the External Auth RSA public key.");
+
+    var rsa = RSA.Create();
+    rsa.ImportRSAPublicKey(Convert.FromBase64String(jwtSettings.PublicKey.Replace("\r", "").Replace("\n", "")), out _);
+
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtSettings?.Issuer ?? "DTMS",
-            ValidAudience = jwtSettings?.Audience ?? "DTMS.Api",
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(
-                    jwtSettings?.Secret
-                    ?? throw new InvalidOperationException("Jwt:Secret is not configured. Set it via environment variable or dotnet user-secrets.")))
-        };
-        // SignalR cannot send custom Authorization headers on the
-        // WebSocket upgrade. Browsers pass the JWT via ?access_token=...
-        // on the negotiate + connection URLs, so re-hydrate the token
-        // into ctx.Token when the request targets a /hubs/* path.
-        options.Events = new JwtBearerEvents
-        {
-            OnMessageReceived = ctx =>
+            options.TokenValidationParameters = new TokenValidationParameters
             {
-                var accessToken = ctx.Request.Query["access_token"];
-                if (!string.IsNullOrEmpty(accessToken) &&
-                    ctx.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = jwtSettings.Issuer,
+                ValidAudience = jwtSettings.Audience,
+                IssuerSigningKey = new RsaSecurityKey(rsa)
+            };
+            // SignalR cannot send custom Authorization headers on the
+            // WebSocket upgrade. Browsers pass the JWT via ?access_token=...
+            // on the negotiate + connection URLs, so re-hydrate the token
+            // into ctx.Token when the request targets a /hubs/* path.
+            options.Events = new JwtBearerEvents
+            {
+                OnMessageReceived = ctx =>
                 {
-                    ctx.Token = accessToken;
+                    var accessToken = ctx.Request.Query["access_token"];
+                    if (!string.IsNullOrEmpty(accessToken) &&
+                        ctx.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                    {
+                        ctx.Token = accessToken;
+                    }
+                    return Task.CompletedTask;
                 }
-                return Task.CompletedTask;
-            }
-        };
-    })
-    // Phase 4.2 — Operator PWA mock JWT scheme. Validates structure +
-    // expiry but skips signature verification (the External Auth team
-    // hasn't supplied JWKS yet per ADR-014). Swap this with a real
-    // JwtBearer scheme pointing at the JWKS endpoint when available.
-    .AddScheme<AuthenticationSchemeOptions, OperatorMockJwtAuthenticationHandler>(
-        OperatorMockJwtAuthenticationHandler.SchemeName,
-        _ => { });
+            };
+        });
 }
 
 // Configure MediatR — scan all module Application assemblies
@@ -495,7 +472,6 @@ var app = builder.Build();
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.DeliveryOrder.Infrastructure.Data.DeliveryOrderDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Planning.Infrastructure.Data.PlanningDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Dispatch.Infrastructure.Data.DispatchDbContext>(), logger, app.Environment);
-            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AuthDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<OutboxDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Transport.Amr.Infrastructure.Data.VendorAdapterDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Transport.Manual.Infrastructure.Data.TransportManualDbContext>(), logger, app.Environment);
@@ -517,9 +493,6 @@ var app = builder.Build();
 
 // Seed ActionCatalog defaults (upsert — safe to run every startup)
 await SeedActionCatalogAsync(app.Services);
-
-// Seed default admin user
-await AuthEndpoints.SeedDefaultUserAsync(app.Services);
 
 // --migrate-only — when set the process exits cleanly after migrations
 // + seeds. Used by the dtms-migrator compose service to apply schema
@@ -730,9 +703,6 @@ app.MapGet("/health/status/vendors", async (HealthCheckService svc) =>
 .WithTags("Health")
 .WithSummary("Vendors")
 .WithDescription("Checks external vendor connectivity: RIOT3.");
-
-// Map auth endpoint (anonymous)
-app.MapAuthEndpoints();
 
 // Map all module Minimal API endpoints (require auth)
 app.MapAllModuleEndpoints();

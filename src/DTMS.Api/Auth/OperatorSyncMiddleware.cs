@@ -29,13 +29,12 @@ public sealed class OperatorSyncMiddleware : IMiddleware
 
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
-        // Only act on authenticated requests carrying the OperatorJwt
-        // identity. Other schemes pass through untouched.
+        // Only act on authenticated requests that hit /api/operator/*.
+        // Other paths (admin endpoints, hubs, etc.) pass through untouched
+        // so we don't pay the operator-sync overhead per request.
         var user = context.User;
         if (user?.Identity?.IsAuthenticated != true ||
-            !string.Equals(user.Identity.AuthenticationType,
-                           OperatorMockJwtAuthenticationHandler.SchemeName,
-                           StringComparison.Ordinal))
+            !context.Request.Path.StartsWithSegments("/api/operator", StringComparison.OrdinalIgnoreCase))
         {
             await next(context);
             return;

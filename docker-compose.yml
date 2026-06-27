@@ -291,8 +291,6 @@ services:
       - RabbitMq__Host=rabbitmq
       - RabbitMq__Username=guest
       - RabbitMq__Password=guest
-      - Auth__Disable=true
-      - Auth__DevTenantId=00000000-0000-0000-0000-000000000001
       # CORS origins for SignalR hubs + cross-origin browser fetches.
       # Comma-separated, scheme://host:port only (no trailing slash).
       # Override via .env to add staging/prod UI hosts.
@@ -376,10 +374,6 @@ services:
       - VendorAdapter__Riot3__Webhook__UrlSecrets__0=${VendorAdapter__Riot3__Webhook__UrlSecrets__0:-}
       - VendorAdapter__Riot3__Webhook__UrlSecrets__1=${VendorAdapter__Riot3__Webhook__UrlSecrets__1:-}
       - OpenTelemetry__Endpoint=http://jaeger:4317
-      # HMAC signing secret for self-issued JWTs. Provide via .env (see
-      # .env.example). Default is a dev-only placeholder — overriding in
-      # any non-dev environment is mandatory.
-      - Jwt__Secret=${Jwt__Secret:-dev-only-secret-min-32-chars-placeholder!}
       # Phase 4.3 — MinIO object storage for Manual mode POD photos
       # (per ADR-015). UseSsl false because the dev container is plain
       # HTTP; flip to true + use a public hostname in production.
@@ -455,8 +449,6 @@ services:
       - RabbitMq__Host=rabbitmq
       - RabbitMq__Username=guest
       - RabbitMq__Password=guest
-      - Auth__Disable=true
-      - Auth__DevTenantId=00000000-0000-0000-0000-000000000001
       # Worker container takes the same outbox tuning as the api container —
       # tested on the same .env.test flags. Override per-worker if you want
       # asymmetric tuning between api and worker (rare).
@@ -516,11 +508,6 @@ services:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
       - DTMS_API_BASE_URL=${DTMS_API_BASE_URL:-http://10.204.212.28:15000}
-      # Dev-only: skip the external auth service and mint a self-signed
-      # session JWT for any submitted username. Must match the backend
-      # Jwt__Secret so the token is verifiable if Auth__Disable is off.
-      - DTMS_AUTH_BYPASS=${DTMS_AUTH_BYPASS:-false}
-      - DTMS_JWT_SECRET=${DTMS_JWT_SECRET:-dev-only-secret-min-32-chars-placeholder!}
       # Base URL of the local .NET API for proxied feature endpoints
       # (delivery-orders etc). Defaults to the in-network compose host.
       - DTMS_BACKEND_URL=${DTMS_BACKEND_URL:-http://dtms-api:8080}

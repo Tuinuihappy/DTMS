@@ -111,9 +111,6 @@ public static class ModuleServiceRegistration
             .Build();
         services.AddSingleton<Npgsql.NpgsqlDataSource>(npgsqlDataSource);
 
-        // ── Auth Module ────────────────────────────────────────────────
-        services.AddDbContext<AuthDbContext>(o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));
-
         // ── Facility Module ───────────────────────────────────────────
         services.AddDbContext<FacilityDbContext>(o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));
         services.AddScoped<IMapRepository, MapRepository>();
