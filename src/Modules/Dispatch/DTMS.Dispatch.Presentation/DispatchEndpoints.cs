@@ -16,6 +16,7 @@ using DTMS.Dispatch.Application.Queries.GetTripsByOrder;
 using DTMS.Dispatch.Application.Queries.GetTripsQueue;
 using DTMS.Dispatch.Application.Queries.GetTripStatusHistory;
 using DTMS.Dispatch.Domain.Enums;
+using DTMS.Iam.Application.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -69,14 +70,14 @@ public static class DispatchEndpoints
             var result = await sender.Send(new GetTripsQueueQuery(
                 statuses, search, vehicleKey, fromUtc, toUtc, sortBy, sortDesc, page, pageSize));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:trip:read");
 
         // GET /api/v1/dispatch/trips/{id} — Get trip details
         group.MapGet("/trips/{id:guid}", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new GetTripByIdQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
-        });
+        }).RequirePermission("dtms:trip:read");
 
         // GET /api/v1/dispatch/trips/{id}/status-history — Phase P1 (b12)
         // Structured status-transition timeline from TripStatusHistoryProjector.
@@ -86,7 +87,7 @@ public static class DispatchEndpoints
         {
             var result = await sender.Send(new GetTripStatusHistoryQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:trip:read");
 
         // GET /api/v1/dispatch/trips/{id}/details — Full operator view: trip
         // state + vendor snapshot fields + per-mission timeline. Append
@@ -96,7 +97,7 @@ public static class DispatchEndpoints
         {
             var result = await sender.Send(new GetTripDetailsQuery(id, includeRaw ?? false));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
-        });
+        }).RequirePermission("dtms:trip:read");
 
         // GET /api/v1/dispatch/trips/{id}/items — Phase P5.3 — items
         // bound to this trip plus each item's owning order context.
@@ -108,7 +109,7 @@ public static class DispatchEndpoints
         {
             var result = await sender.Send(new GetTripItemsQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:trip:read");
 
         // GET /api/v1/dispatch/orders/{orderId}/trips — list every Trip of an
         // order (all attempts, sorted Attempt#, Created asc) so the operator
@@ -117,7 +118,7 @@ public static class DispatchEndpoints
         {
             var result = await sender.Send(new GetTripsByOrderQuery(orderId));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
-        });
+        }).RequirePermission("dtms:trip:read");
 
         // GET /api/v1/dispatch/trips/{id}/retry-history — every attempt of the
         // same (Pickup, Drop) group on the same order, each tagged with the
@@ -127,28 +128,28 @@ public static class DispatchEndpoints
         {
             var result = await sender.Send(new GetTripRetryHistoryQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
-        });
+        }).RequirePermission("dtms:trip:read");
 
         // GET /api/v1/dispatch/vehicles/{vehicleId}/trips — Get active trips for a vehicle
         group.MapGet("/vehicles/{vehicleId:guid}/trips", async (Guid vehicleId, ISender sender) =>
         {
             var result = await sender.Send(new GetActiveTripsByVehicleQuery(vehicleId));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:trip:read");
 
         // POST /api/v1/dispatch/trips/{id}/pause
         group.MapPost("/trips/{id:guid}/pause", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new PauseTripCommand(id));
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:trip:pause");
 
         // POST /api/v1/dispatch/trips/{id}/resume
         group.MapPost("/trips/{id:guid}/resume", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new ResumeTripCommand(id));
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:trip:pause");
 
         // POST /api/v1/dispatch/trips/{id}/acknowledge-robot-pass — operator
         // confirms a robot waiting at a checkpoint may proceed (RIOT3 PASS).
@@ -158,14 +159,14 @@ public static class DispatchEndpoints
         {
             var result = await sender.Send(new AcknowledgeRobotPassCommand(id));
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:trip:acknowledge");
 
         // POST /api/v1/dispatch/trips/{id}/cancel
         group.MapPost("/trips/{id:guid}/cancel", async (Guid id, string reason, ISender sender) =>
         {
             var result = await sender.Send(new CancelTripCommand(id, reason));
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:trip:cancel");
 
         // POST /api/v1/dispatch/trips/bulk-cancel — Backend Phase 2
         // Body: { tripIds: [guid...], reason: string }
@@ -185,7 +186,7 @@ public static class DispatchEndpoints
             return bulk.Failures.Count > 0
                 ? Results.Json(bulk, statusCode: 207)
                 : Results.Ok(bulk);
-        });
+        }).RequirePermission("dtms:trip:cancel");
 
         // POST /api/v1/dispatch/trips/{id}/retry — reissue a Cancelled trip.
         // Failed trips reject with a hint to reopen the order first.
@@ -201,7 +202,7 @@ public static class DispatchEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/dispatch/trips/{result.Value}", new { newTripId = result.Value })
                 : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:trip:retry");
 
         // POST /api/v1/dispatch/trips/{id}/exceptions — Raise an exception
         group.MapPost("/trips/{id:guid}/exceptions", async (Guid id, RaiseExceptionRequest req, ISender sender) =>
@@ -210,7 +211,7 @@ public static class DispatchEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/dispatch/trips/{id}/exceptions/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:trip:exception");
 
         // POST /api/v1/dispatch/trips/{tripId}/exceptions/{exceptionId}/resolve
         group.MapPost("/trips/{tripId:guid}/exceptions/{exceptionId:guid}/resolve",
@@ -218,7 +219,7 @@ public static class DispatchEndpoints
             {
                 var result = await sender.Send(new ResolveExceptionCommand(tripId, exceptionId, req.Resolution, req.ResolvedBy));
                 return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-            });
+            }).RequirePermission("dtms:trip:exception");
 
         // POST /api/v1/dispatch/trips/{id}/pod — Capture Proof of Delivery
         group.MapPost("/trips/{id:guid}/pod", async (Guid id, CapturePodRequest req, ISender sender) =>
@@ -227,7 +228,7 @@ public static class DispatchEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/dispatch/trips/{id}/pod/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:trip:pod");
     }
 }
 
