@@ -24,8 +24,8 @@
 #      new traffic).
 #
 # Cross-reference:
-#   - Drain endpoint:   src/AMR.DeliveryPlanning.Api/Modules/AdminWorkflowEndpoints.cs
-#   - Drain service:    src/AMR.DeliveryPlanning.Api/Realtime/Drain/
+#   - Drain endpoint:   src/DTMS.Api/Modules/AdminWorkflowEndpoints.cs
+#   - Drain service:    src/DTMS.Api/Realtime/Drain/
 #   - Plan:             docs/plans/g1-signalr-drain-protocol.md
 #   - Frontend pair:    frontend/lib/realtime/signalr-client.ts (Phase 3)
 #   - Measurement:      scripts/chaos/m2-drain-exit-time.ps1
