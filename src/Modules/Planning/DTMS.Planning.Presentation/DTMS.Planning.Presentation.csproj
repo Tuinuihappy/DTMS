@@ -4,6 +4,7 @@
     <ProjectReference Include="..\DTMS.Planning.Application\DTMS.Planning.Application.csproj" />
     <ProjectReference Include="..\..\Facility\DTMS.Facility.Application\DTMS.Facility.Application.csproj" />
     <ProjectReference Include="..\..\..\DTMS.SharedKernel\DTMS.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\Iam\DTMS.Iam.Application\DTMS.Iam.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>
