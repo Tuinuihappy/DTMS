@@ -230,6 +230,9 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=amr_delivery_planning;Username=postgres;Password=postgres
+      # Migrator shares Program.cs which requires Jwt__PublicKey at startup
+      # before --migrate-only branches off — keep parity with api/worker.
+      - Jwt__PublicKey=${Jwt__PublicKey:?Jwt__PublicKey must be set in .env from External Auth team}
     command: ["dotnet", "DTMS.Api.dll", "--migrate-only"]
 
   api:
@@ -307,6 +310,10 @@ services:
       - RateLimit__QueueLimit=${RateLimit__QueueLimit:-5}
       - VendorAdapter__Riot3__BaseUrl=http://10.204.212.28:12000
       - VendorAdapter__Riot3__ApiKey=${VendorAdapter__Riot3__ApiKey:-}
+      # External Auth RSA public key (PKCS#1 base64). Required — startup
+      # fails if missing. Per ADR-014, DTMS only verifies JWTs issued by
+      # External Auth and never signs its own.
+      - Jwt__PublicKey=${Jwt__PublicKey:?Jwt__PublicKey must be set in .env from External Auth team}
       # Vendor outbound kill switch. true = production-shape (Riot3OrderDispatcherAdapter,
       # real RIOT3 calls). false = NoOpOrderDispatcherAdapter (orders reach DTMS
       # Dispatched without contacting RIOT) — for load tests / dev without
@@ -479,6 +486,9 @@ services:
       - VendorAdapter__Riot3__Enabled=${VendorAdapter__Riot3__Enabled:-true}
       - VendorAdapter__Riot3__BaseUrl=http://10.204.212.28:12000
       - VendorAdapter__Riot3__ApiKey=${VendorAdapter__Riot3__ApiKey:-}
+      # Worker shares Program.cs which requires Jwt__PublicKey at startup
+      # even though it doesn't serve HTTP — keep parity with api.
+      - Jwt__PublicKey=${Jwt__PublicKey:?Jwt__PublicKey must be set in .env from External Auth team}
 
   # TMS dashboard (Next.js 16 standalone). Currently renders from mock
   # data so it doesn't depend on the .NET API — opt-in via the `prod`

@@ -89,23 +89,38 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
+            // External Auth ships custom claims (EmployeeId, Email) using
+            // their short names. The framework default rewrites these to
+            // WS-Federation URIs which breaks ctx.User.FindFirst("EmployeeId").
+            options.MapInboundClaims = false;
+
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 // Phase 0: External Auth's JWT has no iss/aud claims, so
-                // we validate signature + expiry only. Phase 1 will turn
+                // we validate signature + expiry only. Phase 1A will turn
                 // these back on once External Auth includes those claims.
                 ValidateIssuer = false,
                 ValidateAudience = false,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new RsaSecurityKey(rsa)
+                IssuerSigningKey = new RsaSecurityKey(rsa),
+
+                // Pin the WS-Federation URIs External Auth uses so role/name
+                // checks don't silently break if a future framework version
+                // changes its defaults.
+                NameClaimType = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+                RoleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+
+                // Tighten the default 5-min clock skew — leaked tokens stay
+                // usable for at most 30 seconds past their exp.
+                ClockSkew = TimeSpan.FromSeconds(30),
             };
-            // SignalR cannot send custom Authorization headers on the
-            // WebSocket upgrade. Browsers pass the JWT via ?access_token=...
-            // on the negotiate + connection URLs, so re-hydrate the token
-            // into ctx.Token when the request targets a /hubs/* path.
             options.Events = new JwtBearerEvents
             {
+                // SignalR cannot send custom Authorization headers on the
+                // WebSocket upgrade. Browsers pass the JWT via ?access_token=...
+                // on the negotiate + connection URLs, so re-hydrate the token
+                // into ctx.Token when the request targets a /hubs/* path.
                 OnMessageReceived = ctx =>
                 {
                     var accessToken = ctx.Request.Query["access_token"];
@@ -115,7 +130,22 @@ builder.Services.ConfigureHttpJsonOptions(options =>
                         ctx.Token = accessToken;
                     }
                     return Task.CompletedTask;
-                }
+                },
+                // Surface the actual rejection reason so ops can tell
+                // "expired token" apart from "wrong signature" without
+                // turning on Debug logging for the whole auth namespace.
+                OnAuthenticationFailed = ctx =>
+                {
+                    var logger = ctx.HttpContext.RequestServices
+                        .GetRequiredService<ILoggerFactory>()
+                        .CreateLogger("Auth");
+                    logger.LogWarning(
+                        "JWT rejected on {Method} {Path}: {Reason}",
+                        ctx.HttpContext.Request.Method,
+                        ctx.HttpContext.Request.Path,
+                        ctx.Exception.Message);
+                    return Task.CompletedTask;
+                },
             };
         });
 }
@@ -188,8 +218,9 @@ builder.Services.AddHostedService<
 builder.Services.AddProjectionFoundation();
 
 // P0 — ICurrentActorContext: resolves "who triggered this transition" so
-// projectors can stamp TriggeredBy on history rows. HTTP path reads the
-// JWT name claim; MassTransit consumers + background services push an
+// projectors can stamp TriggeredBy on history rows. HTTP path prefers
+// EmployeeId (stable across username changes) and falls back to the JWT
+// name claim; MassTransit consumers + background services push an
 // explicit ActorContext via BeginScope (wired in P0.B7 / consumer filter).
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddActorContext(sp =>
@@ -199,7 +230,8 @@ builder.Services.AddActorContext(sp =>
     {
         var ctx = http.HttpContext;
         if (ctx is null) return null;
-        var userId = ctx.User.Identity?.Name;
+        var userId = ctx.User.FindFirst("EmployeeId")?.Value
+                  ?? ctx.User.Identity?.Name;
         var traceId = ctx.TraceIdentifier;
         return new ActorContext(
             UserId: string.IsNullOrWhiteSpace(userId) ? null : userId,
