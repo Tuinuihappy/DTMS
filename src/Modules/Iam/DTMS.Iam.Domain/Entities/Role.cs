@@ -23,6 +23,13 @@ public sealed class Role
             throw new ArgumentException("Role name is required.", nameof(name));
         if (name.Length > 50)
             throw new ArgumentException("Role name must be 50 characters or fewer.", nameof(name));
+        // URL path safety — '/' would be percent-decoded by Next.js before
+        // route matching and break /roles/{name}/permissions. Other URL
+        // special chars (?, #, %) likewise misbehave; reject them all here
+        // rather than tracking down 404s later.
+        if (name.IndexOfAny(new[] { '/', '?', '#', '%', '\\', ' ' }) >= 0)
+            throw new ArgumentException(
+                "Role name cannot contain '/', '?', '#', '%', '\\', or spaces.", nameof(name));
 
         Name = name;
         Description = description ?? string.Empty;
