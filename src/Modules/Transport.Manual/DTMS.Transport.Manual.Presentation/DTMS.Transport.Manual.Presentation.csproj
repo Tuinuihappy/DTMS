@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DTMS.Transport.Manual.Application\DTMS.Transport.Manual.Application.csproj" />
+    <ProjectReference Include="..\..\Iam\DTMS.Iam.Application\DTMS.Iam.Application.csproj" />
   </ItemGroup>
 
 </Project>
