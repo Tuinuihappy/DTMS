@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DTMS.Fleet.Application\DTMS.Fleet.Application.csproj" />
+    <ProjectReference Include="..\..\Iam\DTMS.Iam.Application\DTMS.Iam.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

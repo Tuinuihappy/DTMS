@@ -8,6 +8,7 @@ using DTMS.Fleet.Application.Commands.VehicleType;
 using DTMS.Fleet.Application.Queries.GetAvailableVehicles;
 using DTMS.Fleet.Application.Queries.GetFleetKpi;
 using DTMS.Fleet.Domain.Entities;
+using DTMS.Iam.Application.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -27,47 +28,47 @@ public static class VehicleEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/fleet/vehicle-types/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:vehicle:write");
 
         // ── Vehicles ───────────────────────────────────────────────────────
         group.MapPost("/vehicles", async (RegisterVehicleCommand command, ISender sender) =>
         {
             var result = await sender.Send(command);
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:vehicle:write");
 
         group.MapPut("/vehicles/{id:guid}/state", async (Guid id, UpdateVehicleStateCommand command, ISender sender) =>
         {
             if (id != command.VehicleId) return Results.BadRequest("ID mismatch");
             var result = await sender.Send(command);
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:vehicle:write");
 
         group.MapGet("/vehicles/available", async (ISender sender) =>
         {
             var result = await sender.Send(new GetAvailableVehiclesQuery());
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:vehicle:read");
 
         group.MapPost("/vehicles/import-from-riot3", async (ImportVehiclesFromRiot3Command command, ISender sender) =>
         {
             var result = await sender.Send(command);
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:vehicle:import");
 
         // ── Fleet KPI ──────────────────────────────────────────────────────
         group.MapGet("/kpi", async (ISender sender) =>
         {
             var result = await sender.Send(new GetFleetKpiQuery());
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:vehicle:read");
 
         // ── Charging Policies ──────────────────────────────────────────────
         group.MapPost("/charging-policies", async (UpsertChargingPolicyCommand command, ISender sender) =>
         {
             var result = await sender.Send(command);
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:fleet:charging-policy:write");
 
         // ── Maintenance ────────────────────────────────────────────────────
         group.MapPost("/vehicles/{vehicleId:guid}/maintenance",
@@ -78,14 +79,14 @@ public static class VehicleEndpoints
                 return result.IsSuccess
                     ? Results.Created($"/api/v1/fleet/vehicles/{vehicleId}/maintenance/{result.Value}", result.Value)
                     : Results.BadRequest(result.Error);
-            });
+            }).RequirePermission("dtms:vehicle:maintenance");
 
         group.MapPost("/vehicles/{vehicleId:guid}/maintenance/{recordId:guid}/complete",
             async (Guid vehicleId, Guid recordId, CompleteMaintenanceRequest req, ISender sender) =>
             {
                 var result = await sender.Send(new CompleteMaintenanceCommand(vehicleId, recordId, req.Outcome));
                 return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-            });
+            }).RequirePermission("dtms:vehicle:maintenance");
 
         // ── Vehicle Groups ─────────────────────────────────────────────────
         group.MapPost("/groups", async (CreateVehicleGroupCommand command, ISender sender) =>
@@ -94,21 +95,21 @@ public static class VehicleEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/fleet/groups/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:fleet:group:write");
 
         group.MapPost("/groups/{groupId:guid}/vehicles/{vehicleId:guid}",
             async (Guid groupId, Guid vehicleId, ISender sender) =>
             {
                 var result = await sender.Send(new AddVehicleToGroupCommand(groupId, vehicleId));
                 return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-            });
+            }).RequirePermission("dtms:fleet:group:write");
 
         group.MapDelete("/groups/{groupId:guid}/vehicles/{vehicleId:guid}",
             async (Guid groupId, Guid vehicleId, ISender sender) =>
             {
                 var result = await sender.Send(new RemoveVehicleFromGroupCommand(groupId, vehicleId));
                 return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-            });
+            }).RequirePermission("dtms:fleet:group:write");
     }
 }
 

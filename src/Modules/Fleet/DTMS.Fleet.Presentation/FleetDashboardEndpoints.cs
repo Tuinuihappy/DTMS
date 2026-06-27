@@ -1,4 +1,5 @@
 using DTMS.Fleet.Application.Queries.GetFleetUtilization;
+using DTMS.Iam.Application.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -29,6 +30,6 @@ public static class FleetDashboardEndpoints
 
             var result = await sender.Send(new GetFleetUtilizationQuery(from, to));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:dashboard:read");
     }
 }
