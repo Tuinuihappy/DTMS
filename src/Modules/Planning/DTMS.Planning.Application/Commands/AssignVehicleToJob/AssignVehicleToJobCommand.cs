@@ -1,5 +1,5 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.AssignVehicleToJob;
+namespace DTMS.Planning.Application.Commands.AssignVehicleToJob;
 
 public record AssignVehicleToJobCommand(Guid JobId) : ICommand;

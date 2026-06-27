@@ -1,8 +1,8 @@
 using DTMS.Facility.Application.Services;
-using AMR.DeliveryPlanning.Planning.Domain.Services;
+using DTMS.Planning.Domain.Services;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Services;
+namespace DTMS.Planning.Infrastructure.Services;
 
 public class SimpleRouteCostCalculator : IRouteCostCalculator
 {

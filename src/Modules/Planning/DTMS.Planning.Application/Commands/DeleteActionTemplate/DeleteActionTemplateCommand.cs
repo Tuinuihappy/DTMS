@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.DeleteActionTemplate;
+namespace DTMS.Planning.Application.Commands.DeleteActionTemplate;
 
 // Hard-delete the template. Preferred for catalog cleanup. Future-Phase-1C
 // will add a "referenced-by OrderTemplate" check before allowing delete.

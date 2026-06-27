@@ -1,5 +1,5 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.SetOrderTemplateActive;
+namespace DTMS.Planning.Application.Commands.SetOrderTemplateActive;
 
 public record SetOrderTemplateActiveCommand(Guid Id, bool IsActive) : ICommand;

@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobsQueue;
-using AMR.DeliveryPlanning.Planning.Domain.Entities;
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Application.Queries.GetJobsQueue;
+using DTMS.Planning.Domain.Entities;
+using DTMS.Planning.Domain.Enums;
+using DTMS.Planning.Domain.Repositories;
 using FluentAssertions;
 using NSubstitute;
 

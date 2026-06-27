@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Planning.Application.Queries.GetActionTemplates;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Application.Queries.GetActionTemplates;
+using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Queries.GetActionTemplateById;
+namespace DTMS.Planning.Application.Queries.GetActionTemplateById;
 
 public record GetActionTemplateByIdQuery(Guid Id) : IQuery<ActionTemplateDto>;
 

@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Planning.Domain.Services;
+using DTMS.Planning.Domain.Services;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Queries.GetCostModel;
+namespace DTMS.Planning.Application.Queries.GetCostModel;
 
 public record GetCostModelQuery(string? VehicleTypeKey = null) : IQuery<CostModelConfig>;
 

@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\AMR.DeliveryPlanning.Planning.Domain\AMR.DeliveryPlanning.Planning.Domain.csproj" />
+    <ProjectReference Include="..\DTMS.Planning.Domain\DTMS.Planning.Domain.csproj" />
     <ProjectReference Include="..\..\..\DTMS.SharedKernel\DTMS.SharedKernel.csproj" />
     <ProjectReference Include="..\..\DeliveryOrder\DTMS.DeliveryOrder.IntegrationEvents\DTMS.DeliveryOrder.IntegrationEvents.csproj" />
     <ProjectReference Include="..\..\DeliveryOrder\DTMS.DeliveryOrder.Application\DTMS.DeliveryOrder.Application.csproj" />

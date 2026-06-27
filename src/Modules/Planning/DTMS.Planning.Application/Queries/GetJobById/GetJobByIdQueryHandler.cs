@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Queries.GetJobById;
+namespace DTMS.Planning.Application.Queries.GetJobById;
 
 public class GetJobByIdQueryHandler : IQueryHandler<GetJobByIdQuery, JobDto>
 {

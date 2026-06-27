@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Services;
+namespace DTMS.Planning.Application.Services;
 
 // Vendor-agnostic seam for sending a ResolvedOrder out to the robot fleet.
 // Planning.Application owns the input shape; the API host project wires up

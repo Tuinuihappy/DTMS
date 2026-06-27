@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
+using DTMS.Planning.Domain.Enums;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.UpdateActionTemplate;
+namespace DTMS.Planning.Application.Commands.UpdateActionTemplate;
 
 // Full replacement: vendor-action quartet + meta + name. Renaming runs a
 // catalog-wide uniqueness check (case-insensitive). OrderTemplate refs that

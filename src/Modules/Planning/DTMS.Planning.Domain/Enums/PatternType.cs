@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Planning.Domain.Enums;
+namespace DTMS.Planning.Domain.Enums;
 
 public enum PatternType
 {

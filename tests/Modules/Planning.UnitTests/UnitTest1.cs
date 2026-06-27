@@ -1,5 +1,5 @@
-using AMR.DeliveryPlanning.Planning.Domain.Entities;
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
+using DTMS.Planning.Domain.Entities;
+using DTMS.Planning.Domain.Enums;
 using FluentAssertions;
 
 namespace Planning.UnitTests;
@@ -924,7 +924,7 @@ public class OrderTemplateTests
 public class OrderTemplateResolverTests
 {
     // In-memory IActionTemplateRepository so tests stay free of EF / Postgres.
-    private sealed class StubActionRepo : AMR.DeliveryPlanning.Planning.Domain.Repositories.IActionTemplateRepository
+    private sealed class StubActionRepo : DTMS.Planning.Domain.Repositories.IActionTemplateRepository
     {
         private readonly Dictionary<string, ActionTemplate> _byName;
         public StubActionRepo(params ActionTemplate[] templates)
@@ -978,7 +978,7 @@ public class OrderTemplateResolverTests
                     })
             });
 
-        var resolver = new AMR.DeliveryPlanning.Planning.Application.Services.OrderTemplateResolver(
+        var resolver = new DTMS.Planning.Application.Services.OrderTemplateResolver(
             new StubActionRepo());
         var resolved = await resolver.ResolveAsync(template);
 
@@ -1015,7 +1015,7 @@ public class OrderTemplateResolverTests
                 OrderTemplateMission.CreateActByReference(2, "agv", "Lift")
             });
 
-        var resolver = new AMR.DeliveryPlanning.Planning.Application.Services.OrderTemplateResolver(
+        var resolver = new DTMS.Planning.Application.Services.OrderTemplateResolver(
             new StubActionRepo(lift));
         var resolved = await resolver.ResolveAsync(template);
 
@@ -1045,7 +1045,7 @@ public class OrderTemplateResolverTests
             structureType: "sequence", transportOrderPriority: 1,
             missions: new[] { OrderTemplateMission.CreateActByReference(1, "agv", "Fancy") });
 
-        var resolver = new AMR.DeliveryPlanning.Planning.Application.Services.OrderTemplateResolver(
+        var resolver = new DTMS.Planning.Application.Services.OrderTemplateResolver(
             new StubActionRepo(fancy));
         var resolved = await resolver.ResolveAsync(template);
 
@@ -1065,7 +1065,7 @@ public class OrderTemplateResolverTests
             structureType: "sequence", transportOrderPriority: 1,
             missions: new[] { OrderTemplateMission.CreateActByReference(1, "agv", "Missing") });
 
-        var resolver = new AMR.DeliveryPlanning.Planning.Application.Services.OrderTemplateResolver(
+        var resolver = new DTMS.Planning.Application.Services.OrderTemplateResolver(
             new StubActionRepo());
 
         var act = async () => await resolver.ResolveAsync(template);
@@ -1091,13 +1091,13 @@ public class OrderTemplateResolverTests
                 OrderTemplateMission.CreateActByReference(2, "agv", "Lift")
             });
 
-        var resolver = new AMR.DeliveryPlanning.Planning.Application.Services.OrderTemplateResolver(counter);
+        var resolver = new DTMS.Planning.Application.Services.OrderTemplateResolver(counter);
         await resolver.ResolveAsync(template);
 
         counter.GetByNameCalls.Should().Be(1);
     }
 
-    private sealed class CountingRepo : AMR.DeliveryPlanning.Planning.Domain.Repositories.IActionTemplateRepository
+    private sealed class CountingRepo : DTMS.Planning.Domain.Repositories.IActionTemplateRepository
     {
         public int GetByNameCalls { get; private set; }
         private readonly ActionTemplate _template;
@@ -1197,8 +1197,8 @@ public class DispatchOrderTemplateServiceTests
         var resolver = new StubResolver();
         var dispatcher = new StubDispatcher();
 
-        var svc = new AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService(
-            repo, resolver, dispatcher, new StubSender(), Microsoft.Extensions.Logging.Abstractions.NullLogger<AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
+        var svc = new DTMS.Planning.Application.Services.DispatchOrderTemplateService(
+            repo, resolver, dispatcher, new StubSender(), Microsoft.Extensions.Logging.Abstractions.NullLogger<DTMS.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
 
         var result = await svc.DispatchByRouteAsync(Guid.NewGuid(), pickup, drop, upperKey: "trip-1");
 
@@ -1210,12 +1210,12 @@ public class DispatchOrderTemplateServiceTests
     [Fact]
     public async Task DispatchByRoute_EmptyUpperKey_ReturnsFailure()
     {
-        var svc = new AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService(
+        var svc = new DTMS.Planning.Application.Services.DispatchOrderTemplateService(
             new StubTemplateRepo(matching: null),
             new StubResolver(),
             new StubDispatcher(),
             new StubSender(),
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<DTMS.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
 
         var result = await svc.DispatchByRouteAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), upperKey: "  ");
 
@@ -1231,12 +1231,12 @@ public class DispatchOrderTemplateServiceTests
         var template = TemplateFor(pickup, drop, "WH-A_to_Pack-1");
         var dispatcher = new StubDispatcher { ReturnVendorKey = "RIOT-ORDER-123" };
 
-        var svc = new AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService(
+        var svc = new DTMS.Planning.Application.Services.DispatchOrderTemplateService(
             new StubTemplateRepo(matching: template),
             new StubResolver(),
             dispatcher,
             new StubSender(),
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<DTMS.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
 
         var result = await svc.DispatchByRouteAsync(Guid.NewGuid(), pickup, drop, upperKey: "trip-abc");
 
@@ -1254,12 +1254,12 @@ public class DispatchOrderTemplateServiceTests
         var template = TemplateFor(Guid.NewGuid(), Guid.NewGuid());
         var dispatcher = new StubDispatcher { ReturnVendorKey = "K" };
 
-        var svc = new AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService(
+        var svc = new DTMS.Planning.Application.Services.DispatchOrderTemplateService(
             new StubTemplateRepo(matching: template),
             new StubResolver(),
             dispatcher,
             new StubSender(),
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<DTMS.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
 
         await svc.DispatchByRouteAsync(Guid.NewGuid(), template.PickupStationId!.Value, template.DropStationId!.Value,
             upperKey: "trip", priorityOverride: 99);
@@ -1274,12 +1274,12 @@ public class DispatchOrderTemplateServiceTests
         var resolver = new StubResolver { AppointVehicleKey = "robot-7" };
         var dispatcher = new StubDispatcher { ReturnVendorKey = "K" };
 
-        var svc = new AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService(
+        var svc = new DTMS.Planning.Application.Services.DispatchOrderTemplateService(
             new StubTemplateRepo(matching: template),
             resolver,
             dispatcher,
             new StubSender(),
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<DTMS.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
 
         await svc.DispatchByRouteAsync(Guid.NewGuid(), template.PickupStationId!.Value, template.DropStationId!.Value,
             upperKey: "trip", appointVehicleKeyOverride: "   ");
@@ -1293,12 +1293,12 @@ public class DispatchOrderTemplateServiceTests
         var template = TemplateFor(Guid.NewGuid(), Guid.NewGuid());
         var dispatcher = new StubDispatcher { FailWith = "vendor rejected: capacity" };
 
-        var svc = new AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService(
+        var svc = new DTMS.Planning.Application.Services.DispatchOrderTemplateService(
             new StubTemplateRepo(matching: template),
             new StubResolver(),
             dispatcher,
             new StubSender(),
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<AMR.DeliveryPlanning.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<DTMS.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
 
         var result = await svc.DispatchByRouteAsync(Guid.NewGuid(), template.PickupStationId!.Value, template.DropStationId!.Value, upperKey: "trip");
 
@@ -1306,7 +1306,7 @@ public class DispatchOrderTemplateServiceTests
         result.Error.Should().Contain("vendor rejected");
     }
 
-    private sealed class StubTemplateRepo : AMR.DeliveryPlanning.Planning.Domain.Repositories.IOrderTemplateRepository
+    private sealed class StubTemplateRepo : DTMS.Planning.Domain.Repositories.IOrderTemplateRepository
     {
         private readonly OrderTemplate? _matching;
         public StubTemplateRepo(OrderTemplate? matching) => _matching = matching;
@@ -1323,18 +1323,18 @@ public class DispatchOrderTemplateServiceTests
         public Task SaveChangesAsync(CancellationToken c = default) => Task.CompletedTask;
     }
 
-    private sealed class StubResolver : AMR.DeliveryPlanning.Planning.Application.Services.IOrderTemplateResolver
+    private sealed class StubResolver : DTMS.Planning.Application.Services.IOrderTemplateResolver
     {
         public string? AppointVehicleKey { get; set; }
-        public Task<AMR.DeliveryPlanning.Planning.Application.Services.ResolvedOrder> ResolveAsync(
+        public Task<DTMS.Planning.Application.Services.ResolvedOrder> ResolveAsync(
             OrderTemplate template, CancellationToken c = default)
         {
-            var resolved = new AMR.DeliveryPlanning.Planning.Application.Services.ResolvedOrder(
+            var resolved = new DTMS.Planning.Application.Services.ResolvedOrder(
                 Name: template.Name,
                 Priority: template.Priority,
                 StructureType: template.StructureType,
                 TransportOrderPriority: template.TransportOrderPriority,
-                Missions: Array.Empty<AMR.DeliveryPlanning.Planning.Application.Services.ResolvedMission>(),
+                Missions: Array.Empty<DTMS.Planning.Application.Services.ResolvedMission>(),
                 AppointVehicleKey: AppointVehicleKey ?? template.AppointVehicleKey,
                 AppointVehicleName: template.AppointVehicleName,
                 AppointVehicleGroupKey: template.AppointVehicleGroupKey,
@@ -1373,18 +1373,18 @@ public class DispatchOrderTemplateServiceTests
             => throw new NotImplementedException();
     }
 
-    private sealed class StubDispatcher : AMR.DeliveryPlanning.Planning.Application.Services.IRobotOrderDispatcher
+    private sealed class StubDispatcher : DTMS.Planning.Application.Services.IRobotOrderDispatcher
     {
         public bool Called { get; private set; }
         public string? LastUpperKey { get; private set; }
-        public AMR.DeliveryPlanning.Planning.Application.Services.ResolvedOrder? LastSentOrder { get; private set; }
+        public DTMS.Planning.Application.Services.ResolvedOrder? LastSentOrder { get; private set; }
         public string? ReturnVendorKey { get; set; }
         public string? FailWith { get; set; }
 
         public Task<DTMS.SharedKernel.Messaging.Result<
-            AMR.DeliveryPlanning.Planning.Application.Services.RobotOrderDispatchResult>> SendAsync(
+            DTMS.Planning.Application.Services.RobotOrderDispatchResult>> SendAsync(
             string upperKey,
-            AMR.DeliveryPlanning.Planning.Application.Services.ResolvedOrder order,
+            DTMS.Planning.Application.Services.ResolvedOrder order,
             CancellationToken cancellationToken = default)
         {
             Called = true;
@@ -1392,10 +1392,10 @@ public class DispatchOrderTemplateServiceTests
             LastSentOrder = order;
             return Task.FromResult(FailWith is not null
                 ? DTMS.SharedKernel.Messaging.Result<
-                    AMR.DeliveryPlanning.Planning.Application.Services.RobotOrderDispatchResult>.Failure(FailWith)
+                    DTMS.Planning.Application.Services.RobotOrderDispatchResult>.Failure(FailWith)
                 : DTMS.SharedKernel.Messaging.Result<
-                    AMR.DeliveryPlanning.Planning.Application.Services.RobotOrderDispatchResult>.Success(
-                        new AMR.DeliveryPlanning.Planning.Application.Services.RobotOrderDispatchResult(
+                    DTMS.Planning.Application.Services.RobotOrderDispatchResult>.Success(
+                        new DTMS.Planning.Application.Services.RobotOrderDispatchResult(
                             ReturnVendorKey!, "{\"stub\":true}")));
         }
     }

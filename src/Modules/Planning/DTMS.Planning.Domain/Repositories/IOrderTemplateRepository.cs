@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Planning.Domain.Entities;
+using DTMS.Planning.Domain.Entities;
 
-namespace AMR.DeliveryPlanning.Planning.Domain.Repositories;
+namespace DTMS.Planning.Domain.Repositories;
 
 public interface IOrderTemplateRepository
 {

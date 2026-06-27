@@ -10,7 +10,7 @@ namespace AMR.DeliveryPlanning.Api.Auth;
 // satisfies all of them with one implementation.
 public sealed class HttpContextCurrentUserAccessor :
     DTMS.DeliveryOrder.Application.Services.ICurrentUserAccessor,
-    AMR.DeliveryPlanning.Planning.Application.Services.ICurrentUserAccessor
+    DTMS.Planning.Application.Services.ICurrentUserAccessor
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
 

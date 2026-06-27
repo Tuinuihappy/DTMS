@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.AssignPackagesToJob;
+namespace DTMS.Planning.Application.Commands.AssignPackagesToJob;
 
 public record AssignPackagesToJobCommand(Guid JobId, List<string> PackageBarcodes) : ICommand<bool>;
 

@@ -25,12 +25,12 @@ using DTMS.Fleet.Infrastructure.Data;
 using DTMS.Fleet.Infrastructure.Repositories;
 using DTMS.Fleet.Infrastructure.Services;
 using FleetServices = DTMS.Fleet.Infrastructure.Services;
-using AMR.DeliveryPlanning.Planning.Application.Services;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
-using AMR.DeliveryPlanning.Planning.Domain.Services;
-using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
-using AMR.DeliveryPlanning.Planning.Infrastructure.Repositories;
-using AMR.DeliveryPlanning.Planning.Infrastructure.Services;
+using DTMS.Planning.Application.Services;
+using DTMS.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Services;
+using DTMS.Planning.Infrastructure.Data;
+using DTMS.Planning.Infrastructure.Repositories;
+using DTMS.Planning.Infrastructure.Services;
 using DTMS.SharedKernel.Messaging;
 using DTMS.SharedKernel.Outbox;
 using AMR.DeliveryPlanning.OmsAdapter;
@@ -289,7 +289,7 @@ public static class ModuleServiceRegistration
         services.AddHttpContextAccessor();
         services.AddScoped<DTMS.DeliveryOrder.Application.Services.ICurrentUserAccessor,
                            AMR.DeliveryPlanning.Api.Auth.HttpContextCurrentUserAccessor>();
-        services.AddScoped<AMR.DeliveryPlanning.Planning.Application.Services.ICurrentUserAccessor,
+        services.AddScoped<DTMS.Planning.Application.Services.ICurrentUserAccessor,
                            AMR.DeliveryPlanning.Api.Auth.HttpContextCurrentUserAccessor>();
         services.AddScoped<IDeliveryOrderRepository, DeliveryOrderRepository>();
         services.AddScoped<FacilityStationLookup>();
@@ -363,17 +363,17 @@ public static class ModuleServiceRegistration
         services.AddScoped<IJobRepository, JobRepository>();
         // Phase P1 — projection infrastructure for the Planning module.
         // Same shape as DeliveryOrder's wiring: store + read repo per module.
-        services.AddSingleton<AMR.DeliveryPlanning.Planning.Application.Projections.IJobRealtimePublisher,
+        services.AddSingleton<DTMS.Planning.Application.Projections.IJobRealtimePublisher,
                               AMR.DeliveryPlanning.Api.Realtime.Publishers.SignalRJobRealtimePublisher>();
-        services.AddScoped<AMR.DeliveryPlanning.Planning.Application.Projections.IJobStatusHistoryReadRepository,
-                           AMR.DeliveryPlanning.Planning.Infrastructure.Projections.JobStatusHistoryReadRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.Planning.Application.Projections.IJobStatusHistoryProjectionStore,
-                           AMR.DeliveryPlanning.Planning.Infrastructure.Projections.JobStatusHistoryProjectionStore>();
+        services.AddScoped<DTMS.Planning.Application.Projections.IJobStatusHistoryReadRepository,
+                           DTMS.Planning.Infrastructure.Projections.JobStatusHistoryReadRepository>();
+        services.AddScoped<DTMS.Planning.Application.Projections.IJobStatusHistoryProjectionStore,
+                           DTMS.Planning.Infrastructure.Projections.JobStatusHistoryProjectionStore>();
         // Phase P5.2 — BI fact table for jobs (bi.JobFacts).
-        services.AddScoped<AMR.DeliveryPlanning.Planning.Application.Projections.IJobFactsReadRepository,
-                           AMR.DeliveryPlanning.Planning.Infrastructure.Projections.JobFactsReadRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.Planning.Application.Projections.IJobFactsProjectionStore,
-                           AMR.DeliveryPlanning.Planning.Infrastructure.Projections.JobFactsProjectionStore>();
+        services.AddScoped<DTMS.Planning.Application.Projections.IJobFactsReadRepository,
+                           DTMS.Planning.Infrastructure.Projections.JobFactsReadRepository>();
+        services.AddScoped<DTMS.Planning.Application.Projections.IJobFactsProjectionStore,
+                           DTMS.Planning.Infrastructure.Projections.JobFactsProjectionStore>();
         services.AddScoped<IActionTemplateRepository, ActionTemplateRepository>();
         services.AddScoped<IOrderTemplateRepository, OrderTemplateRepository>();
         services.AddScoped<IOrderTemplateResolver, OrderTemplateResolver>();
@@ -420,8 +420,8 @@ public static class ModuleServiceRegistration
         services.AddScoped<DTMS.Dispatch.Application.Services.IDispatchStrategy,
             AMR.DeliveryPlanning.Api.Adapters.ManualDispatchStrategy>();
         services.AddScoped<IDispatchOrderTemplateService, DispatchOrderTemplateService>();
-        services.Configure<AMR.DeliveryPlanning.Planning.Application.Options.DispatchOptions>(
-            configuration.GetSection(AMR.DeliveryPlanning.Planning.Application.Options.DispatchOptions.SectionName));
+        services.Configure<DTMS.Planning.Application.Options.DispatchOptions>(
+            configuration.GetSection(DTMS.Planning.Application.Options.DispatchOptions.SectionName));
         services.AddScoped<ICostModelService, DbCostModelService>();
         services.AddScoped<IVehicleSelector, GreedyVehicleSelector>();
         services.AddScoped<SimpleRouteCostCalculator>();
@@ -505,7 +505,7 @@ public static class ModuleServiceRegistration
         // T2 POC — Saga DbContext. Registered unconditionally so its
         // migrations are always applied; whether the Saga actually receives
         // events is gated on the Workflow:UseSaga feature flag below.
-        services.AddDbContext<AMR.DeliveryPlanning.Planning.Infrastructure.Data.OrchestrationDbContext>(
+        services.AddDbContext<DTMS.Planning.Infrastructure.Data.OrchestrationDbContext>(
             opts => opts.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));
 
         var useSaga = configuration.GetValue<bool>("Workflow:UseSaga");
@@ -518,7 +518,7 @@ public static class ModuleServiceRegistration
         if (useSaga)
         {
             services.AddHostedService<
-                AMR.DeliveryPlanning.Planning.Infrastructure.Sagas.OrchestrationSchemaInitializer>();
+                DTMS.Planning.Infrastructure.Sagas.OrchestrationSchemaInitializer>();
         }
 
         // G2 — bus shutdown timing observer (records `bus` phase metric +
@@ -537,7 +537,7 @@ public static class ModuleServiceRegistration
             // Auto-scan consumers from all module Application assemblies
             bus.AddConsumers(
                 typeof(DTMS.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly,
-                typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly,
+                typeof(DTMS.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly,
                 typeof(DTMS.Dispatch.Application.Commands.CreateEnvelopeTrip.CreateEnvelopeTripCommand).Assembly,
                 typeof(VehicleStateChangedConsumer).Assembly,
                 // Transport.Amr hosts CaptureFinalSnapshotConsumer — must
@@ -554,13 +554,13 @@ public static class ModuleServiceRegistration
             if (useSaga)
             {
                 bus.AddSagaStateMachine<
-                        AMR.DeliveryPlanning.Planning.Infrastructure.Sagas.DeliveryOrderSagaStateMachine,
-                        AMR.DeliveryPlanning.Planning.Infrastructure.Sagas.DeliveryOrderSagaInstance>()
+                        DTMS.Planning.Infrastructure.Sagas.DeliveryOrderSagaStateMachine,
+                        DTMS.Planning.Infrastructure.Sagas.DeliveryOrderSagaInstance>()
                     .EntityFrameworkRepository(r =>
                     {
                         r.ConcurrencyMode = ConcurrencyMode.Optimistic;
                         r.ExistingDbContext<
-                            AMR.DeliveryPlanning.Planning.Infrastructure.Data.OrchestrationDbContext>();
+                            DTMS.Planning.Infrastructure.Data.OrchestrationDbContext>();
                         r.UsePostgres();
                     });
             }

@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Planning.Application.Services;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Application.Services;
+using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.InstantiateOrderTemplate;
+namespace DTMS.Planning.Application.Commands.InstantiateOrderTemplate;
 
 internal sealed class InstantiateOrderTemplateCommandHandler
     : ICommandHandler<InstantiateOrderTemplateCommand, InstantiateOrderTemplateResult>

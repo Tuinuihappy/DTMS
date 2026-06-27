@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.DeleteOrderTemplate;
+namespace DTMS.Planning.Application.Commands.DeleteOrderTemplate;
 
 internal sealed class DeleteOrderTemplateCommandHandler : ICommandHandler<DeleteOrderTemplateCommand>
 {

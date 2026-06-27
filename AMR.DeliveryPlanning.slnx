@@ -33,11 +33,11 @@
     <Project Path="src/Modules/Fleet/DTMS.Fleet.Presentation/DTMS.Fleet.Presentation.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Planning/">
-    <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.Application/AMR.DeliveryPlanning.Planning.Application.csproj" />
-    <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.Domain/AMR.DeliveryPlanning.Planning.Domain.csproj" />
-    <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.Infrastructure/AMR.DeliveryPlanning.Planning.Infrastructure.csproj" />
+    <Project Path="src/Modules/Planning/DTMS.Planning.Application/DTMS.Planning.Application.csproj" />
+    <Project Path="src/Modules/Planning/DTMS.Planning.Domain/DTMS.Planning.Domain.csproj" />
+    <Project Path="src/Modules/Planning/DTMS.Planning.Infrastructure/DTMS.Planning.Infrastructure.csproj" />
     <Project Path="src/Modules/Planning/DTMS.Planning.IntegrationEvents/DTMS.Planning.IntegrationEvents.csproj" />
-    <Project Path="src/Modules/Planning/AMR.DeliveryPlanning.Planning.Presentation/AMR.DeliveryPlanning.Planning.Presentation.csproj" />
+    <Project Path="src/Modules/Planning/DTMS.Planning.Presentation/DTMS.Planning.Presentation.csproj" />
   </Folder>
   <Folder Name="/src/Modules/OmsAdapter/">
     <Project Path="src/Modules/OmsAdapter/AMR.DeliveryPlanning.OmsAdapter.csproj" />

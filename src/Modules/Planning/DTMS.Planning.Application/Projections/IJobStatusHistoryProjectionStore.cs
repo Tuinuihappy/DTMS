@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Planning.Application.Projections;
+namespace DTMS.Planning.Application.Projections;
 
 /// <summary>
 /// Write-side abstraction consumed by <c>JobStatusHistoryProjector</c>.

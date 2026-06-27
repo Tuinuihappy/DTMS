@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Planning.Application.Queries.GetActionTemplates;
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
+using DTMS.Planning.Application.Queries.GetActionTemplates;
+using DTMS.Planning.Domain.Enums;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.CreateActionTemplate;
+namespace DTMS.Planning.Application.Commands.CreateActionTemplate;
 
 // Mirrors the RIOT3 "New action template" form:
 //   Template name + Action template (= ActionCategory) + ID + param0 + param1 + param_str

@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Planning.Application.Queries.GetActionTemplates;
-using AMR.DeliveryPlanning.Planning.Application.Services;
-using AMR.DeliveryPlanning.Planning.Domain.Entities;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Application.Queries.GetActionTemplates;
+using DTMS.Planning.Application.Services;
+using DTMS.Planning.Domain.Entities;
+using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.CreateActionTemplate;
+namespace DTMS.Planning.Application.Commands.CreateActionTemplate;
 
 internal sealed class CreateActionTemplateCommandHandler : ICommandHandler<CreateActionTemplateCommand, ActionTemplateDto>
 {

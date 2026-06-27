@@ -1,5 +1,5 @@
-using AMR.DeliveryPlanning.Planning.Domain.Entities;
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
+using DTMS.Planning.Domain.Entities;
+using DTMS.Planning.Domain.Enums;
 using FluentAssertions;
 
 namespace Planning.UnitTests;

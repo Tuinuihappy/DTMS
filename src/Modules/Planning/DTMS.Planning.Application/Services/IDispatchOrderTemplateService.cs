@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Services;
+namespace DTMS.Planning.Application.Services;
 
 // Convenience seam over the 3-step envelope dispatch chain
 // (route lookup → resolver → vendor dispatcher) so the Planning consumer

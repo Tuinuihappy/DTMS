@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Queries.GetJobStatusHistory;
+namespace DTMS.Planning.Application.Queries.GetJobStatusHistory;
 
 public record GetJobStatusHistoryQuery(Guid JobId) : IQuery<JobStatusHistoryResponse>;
 

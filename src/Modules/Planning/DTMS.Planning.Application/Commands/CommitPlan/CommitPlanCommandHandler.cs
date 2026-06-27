@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.CommitPlan;
+namespace DTMS.Planning.Application.Commands.CommitPlan;
 
 public class CommitPlanCommandHandler : ICommandHandler<CommitPlanCommand>
 {

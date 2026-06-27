@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Planning.Domain.Enums;
+namespace DTMS.Planning.Domain.Enums;
 
 // DTMS-local coarse category for an ActionTemplate (STD vs ACT). Distinct
 // from the RIOT3 wire `actionType` string (e.g. "standardRobotsCustom"),

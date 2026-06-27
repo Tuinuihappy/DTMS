@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.CreateCrossDockJobs;
+namespace DTMS.Planning.Application.Commands.CreateCrossDockJobs;
 
 /// <summary>
 /// Creates linked inbound + outbound Cross-Dock jobs.

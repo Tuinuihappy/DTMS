@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplates;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Application.Queries.GetOrderTemplates;
+using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplateById;
+namespace DTMS.Planning.Application.Queries.GetOrderTemplateById;
 
 public record GetOrderTemplateByIdQuery(Guid Id) : IQuery<OrderTemplateDto>;
 

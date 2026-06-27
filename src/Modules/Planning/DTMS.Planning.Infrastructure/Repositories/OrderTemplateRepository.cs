@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Planning.Domain.Entities;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
-using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
+using DTMS.Planning.Domain.Entities;
+using DTMS.Planning.Domain.Repositories;
+using DTMS.Planning.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Repositories;
+namespace DTMS.Planning.Infrastructure.Repositories;
 
 public class OrderTemplateRepository : IOrderTemplateRepository
 {

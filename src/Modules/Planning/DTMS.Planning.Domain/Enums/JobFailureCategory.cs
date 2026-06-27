@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Planning.Domain.Enums;
+namespace DTMS.Planning.Domain.Enums;
 
 /// <summary>
 /// Classification of why a Job entered <see cref="JobStatus.Failed"/> or

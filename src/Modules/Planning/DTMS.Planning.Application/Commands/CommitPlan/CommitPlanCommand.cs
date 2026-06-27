@@ -1,5 +1,5 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.CommitPlan;
+namespace DTMS.Planning.Application.Commands.CommitPlan;
 
 public record CommitPlanCommand(Guid JobId) : ICommand;

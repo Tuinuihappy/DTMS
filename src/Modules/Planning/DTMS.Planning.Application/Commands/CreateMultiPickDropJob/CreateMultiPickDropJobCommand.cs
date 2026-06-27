@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.CreateMultiPickDropJob;
+namespace DTMS.Planning.Application.Commands.CreateMultiPickDropJob;
 
 public record PickupDeliveryPair(Guid PickupStationId, Guid DropStationId, double Weight);
 

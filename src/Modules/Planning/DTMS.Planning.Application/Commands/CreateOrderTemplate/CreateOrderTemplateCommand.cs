@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplates;
-using AMR.DeliveryPlanning.Planning.Domain.Entities;
+using DTMS.Planning.Application.Queries.GetOrderTemplates;
+using DTMS.Planning.Domain.Entities;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.CreateOrderTemplate;
+namespace DTMS.Planning.Application.Commands.CreateOrderTemplate;
 
 // Internal application-layer command shape. The Presentation layer parses
 // the RIOT3-shaped wire format into this richer (already-validated) model

@@ -147,7 +147,7 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(DTMS.Facility.Application.Queries.GetRouteCost.GetRouteCostQuery).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(DTMS.Fleet.Application.Consumers.VehicleStateChangedConsumer).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(DTMS.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(DTMS.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(DTMS.Dispatch.Application.Commands.CreateEnvelopeTrip.CreateEnvelopeTripCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(DTMS.Transport.Manual.Application.Commands.AcknowledgeTrip.AcknowledgeTripCommand).Assembly);
     cfg.AddOpenBehavior(typeof(DTMS.SharedKernel.Behaviors.ValidationBehavior<,>));
@@ -493,7 +493,7 @@ var app = builder.Build();
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Facility.Infrastructure.Data.FacilityDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Fleet.Infrastructure.Data.FleetDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.DeliveryOrder.Infrastructure.Data.DeliveryOrderDbContext>(), logger, app.Environment);
-            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AMR.DeliveryPlanning.Planning.Infrastructure.Data.PlanningDbContext>(), logger, app.Environment);
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Planning.Infrastructure.Data.PlanningDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Dispatch.Infrastructure.Data.DispatchDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<AuthDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<OutboxDbContext>(), logger, app.Environment);

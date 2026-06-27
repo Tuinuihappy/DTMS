@@ -1,8 +1,8 @@
 using DTMS.Dispatch.IntegrationEvents;
-using AMR.DeliveryPlanning.Planning.Application.Consumers;
-using AMR.DeliveryPlanning.Planning.Domain.Entities;
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Application.Consumers;
+using DTMS.Planning.Domain.Entities;
+using DTMS.Planning.Domain.Enums;
+using DTMS.Planning.Domain.Repositories;
 using FluentAssertions;
 using MassTransit;
 using Microsoft.Extensions.Logging.Abstractions;

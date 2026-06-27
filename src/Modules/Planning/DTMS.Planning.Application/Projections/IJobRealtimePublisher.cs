@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Planning.Application.Projections;
+namespace DTMS.Planning.Application.Projections;
 
 /// <summary>
 /// Phase P1 — abstraction so JobStatusHistoryProjector can push timeline

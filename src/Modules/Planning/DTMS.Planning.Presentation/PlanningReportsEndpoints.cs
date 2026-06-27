@@ -1,13 +1,13 @@
 using System.Globalization;
 using System.Text;
-using AMR.DeliveryPlanning.Planning.Application.Projections;
-using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobFailuresReport;
+using DTMS.Planning.Application.Projections;
+using DTMS.Planning.Application.Queries.GetJobFailuresReport;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace AMR.DeliveryPlanning.Planning.Presentation;
+namespace DTMS.Planning.Presentation;
 
 /// <summary>
 /// Phase #9 — Reports backed by Planning projections (bi.JobFacts).

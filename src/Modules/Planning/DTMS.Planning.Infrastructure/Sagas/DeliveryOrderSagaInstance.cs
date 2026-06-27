@@ -1,6 +1,6 @@
 using MassTransit;
 
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Sagas;
+namespace DTMS.Planning.Infrastructure.Sagas;
 
 /// <summary>
 /// T2 — persisted row for the order-to-trip orchestration. Implements

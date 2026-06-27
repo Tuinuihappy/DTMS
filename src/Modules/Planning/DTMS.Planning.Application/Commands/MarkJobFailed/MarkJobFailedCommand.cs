@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
+using DTMS.Planning.Domain.Enums;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobFailed;
+namespace DTMS.Planning.Application.Commands.MarkJobFailed;
 
 /// <summary>
 /// Phase b8 — Called from DeliveryOrderValidatedConsumer when envelope

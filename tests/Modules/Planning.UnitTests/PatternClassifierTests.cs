@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
-using AMR.DeliveryPlanning.Planning.Domain.Services;
-using AMR.DeliveryPlanning.Planning.Infrastructure.Services;
+using DTMS.Planning.Domain.Enums;
+using DTMS.Planning.Domain.Services;
+using DTMS.Planning.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 

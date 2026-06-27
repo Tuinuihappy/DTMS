@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Planning.Domain.Services;
+namespace DTMS.Planning.Domain.Services;
 
 public record CostModelConfig(
     double TravelDistanceWeight = 1.0,

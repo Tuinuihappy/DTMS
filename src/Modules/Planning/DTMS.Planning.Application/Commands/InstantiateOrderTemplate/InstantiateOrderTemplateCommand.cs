@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Planning.Application.Services;
+using DTMS.Planning.Application.Services;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.InstantiateOrderTemplate;
+namespace DTMS.Planning.Application.Commands.InstantiateOrderTemplate;
 
 // Take a stored OrderTemplate, expand every ActionTemplateName reference
 // against the catalog, and POST the result to RIOT3 as a new order.

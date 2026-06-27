@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Sagas;
+namespace DTMS.Planning.Infrastructure.Sagas;
 
 /// <summary>
 /// T2 — explicit state of the order-to-trip orchestration. Stored on every

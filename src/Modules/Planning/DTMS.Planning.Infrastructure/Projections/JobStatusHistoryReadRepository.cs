@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Planning.Application.Projections;
-using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
+using DTMS.Planning.Application.Projections;
+using DTMS.Planning.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Projections;
+namespace DTMS.Planning.Infrastructure.Projections;
 
 public class JobStatusHistoryReadRepository : IJobStatusHistoryReadRepository
 {

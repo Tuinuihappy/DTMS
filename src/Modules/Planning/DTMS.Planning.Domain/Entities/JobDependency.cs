@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Planning.Domain.Entities;
+namespace DTMS.Planning.Domain.Entities;
 
 /// <summary>
 /// Represents a dependency between two jobs (e.g., Cross-Dock: inbound must complete before outbound starts).

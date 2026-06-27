@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Planning.Domain.Entities;
+namespace DTMS.Planning.Domain.Entities;
 
 /// <summary>
 /// A recurring route template for Milk-Run deliveries.

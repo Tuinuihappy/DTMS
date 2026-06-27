@@ -14,7 +14,7 @@
     <!-- T1.8 — ReplanStuckOrderCommandHandler checks Job.VendorOrderKey
          before re-publishing so a replay never racing against a job whose
          upperKey RIOT3 already accepted (the OD-0381 duplicate-key loop). -->
-    <ProjectReference Include="..\..\Planning\AMR.DeliveryPlanning.Planning.Domain\AMR.DeliveryPlanning.Planning.Domain.csproj" />
+    <ProjectReference Include="..\..\Planning\DTMS.Planning.Domain\DTMS.Planning.Domain.csproj" />
     <ProjectReference Include="..\DTMS.DeliveryOrder.IntegrationEvents\DTMS.DeliveryOrder.IntegrationEvents.csproj" />
     <!-- TripStartedOmsNotifyConsumer dispatches POST to upstream OMS via IOmsShipmentClient. -->
     <ProjectReference Include="..\..\OmsAdapter\AMR.DeliveryPlanning.OmsAdapter.csproj" />

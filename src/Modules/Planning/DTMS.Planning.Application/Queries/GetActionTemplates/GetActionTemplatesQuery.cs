@@ -1,9 +1,9 @@
 using System.Text.Json.Serialization;
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Enums;
+using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Queries.GetActionTemplates;
+namespace DTMS.Planning.Application.Queries.GetActionTemplates;
 
 // Response shape mirrors the RIOT3 payload — actionName + actionType +
 // actionParameters[] — plus DTMS metadata (Id, IsActive, audit timestamps)

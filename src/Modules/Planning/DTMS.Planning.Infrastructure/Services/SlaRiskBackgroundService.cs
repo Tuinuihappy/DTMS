@@ -1,11 +1,11 @@
-using AMR.DeliveryPlanning.Planning.Application.Commands.ReplanJob;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Application.Commands.ReplanJob;
+using DTMS.Planning.Domain.Repositories;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Services;
+namespace DTMS.Planning.Infrastructure.Services;
 
 public class SlaRiskBackgroundService : BackgroundService
 {

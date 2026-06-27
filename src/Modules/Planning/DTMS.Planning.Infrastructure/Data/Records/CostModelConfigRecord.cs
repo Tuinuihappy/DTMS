@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Data.Records;
+namespace DTMS.Planning.Infrastructure.Data.Records;
 
 // Persistence record — not a domain entity.
 // null VehicleTypeKey = the global default config row.

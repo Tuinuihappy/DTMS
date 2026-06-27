@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.Planning.Application.Services;
+using DTMS.Planning.Application.Services;
 using DTMS.SharedKernel.Messaging;
 
 namespace AMR.DeliveryPlanning.Api.Adapters;

@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Planning.Application.Services;
+namespace DTMS.Planning.Application.Services;
 
 /// <summary>
 /// Resolves the authenticated principal's display name for audit fields

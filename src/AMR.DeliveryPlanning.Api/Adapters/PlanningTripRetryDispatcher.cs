@@ -1,6 +1,6 @@
 using DTMS.Dispatch.Application.Services;
-using AMR.DeliveryPlanning.Planning.Application.Services;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Application.Services;
+using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 

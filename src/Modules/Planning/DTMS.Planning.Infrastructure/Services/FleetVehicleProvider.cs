@@ -1,7 +1,7 @@
 using DTMS.Fleet.Application.Services;
-using AMR.DeliveryPlanning.Planning.Domain.Services;
+using DTMS.Planning.Domain.Services;
 
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Services;
+namespace DTMS.Planning.Infrastructure.Services;
 
 public class FleetVehicleProvider : IFleetVehicleProvider
 {

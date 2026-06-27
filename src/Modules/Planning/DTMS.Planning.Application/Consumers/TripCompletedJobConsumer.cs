@@ -1,9 +1,9 @@
 using DTMS.Dispatch.IntegrationEvents;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Repositories;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Consumers;
+namespace DTMS.Planning.Application.Consumers;
 
 /// <summary>
 /// Phase b9 — Mirror Trip lifecycle on the Job. TripCompleted is the

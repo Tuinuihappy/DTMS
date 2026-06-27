@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.Planning.Domain.Services;
-using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
-using AMR.DeliveryPlanning.Planning.Infrastructure.Data.Records;
+using DTMS.Planning.Domain.Services;
+using DTMS.Planning.Infrastructure.Data;
+using DTMS.Planning.Infrastructure.Data.Records;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Services;
+namespace DTMS.Planning.Infrastructure.Services;
 
 public class DbCostModelService : ICostModelService
 {

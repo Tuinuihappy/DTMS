@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Planning.Application.Projections;
+namespace DTMS.Planning.Application.Projections;
 
 public record JobStatusHistoryEntry(
     Guid EventId,

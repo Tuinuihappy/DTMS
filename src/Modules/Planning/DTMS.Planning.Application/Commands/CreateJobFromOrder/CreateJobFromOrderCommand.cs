@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder;
+namespace DTMS.Planning.Application.Commands.CreateJobFromOrder;
 
 public record CreateJobFromOrderCommand(
     Guid DeliveryOrderId,

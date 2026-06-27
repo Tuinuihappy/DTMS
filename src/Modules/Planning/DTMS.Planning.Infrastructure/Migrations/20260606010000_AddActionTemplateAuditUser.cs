@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
+using DTMS.Planning.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
+namespace DTMS.Planning.Infrastructure.Migrations
 {
     /// <inheritdoc />
     [DbContext(typeof(PlanningDbContext))]

@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Planning.Domain.Events;
+using DTMS.Planning.Domain.Events;
 using DTMS.Planning.IntegrationEvents;
 using DTMS.SharedKernel.Auth;
 using DTMS.SharedKernel.Domain;
 using DTMS.SharedKernel.Outbox;
 
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Services;
+namespace DTMS.Planning.Infrastructure.Services;
 
 // Phase P0 (2026-06-14) — Job lifecycle integration events get enriched
 // with TriggeredBy + CorrelationId. Most Job transitions are

@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobAnchor;
+namespace DTMS.Planning.Application.Commands.CreateJobAnchor;
 
 /// <summary>
 /// Phase b8 — Create a lightweight Job (1 Leg pickup→drop, cost=0) as an

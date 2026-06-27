@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobById;
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
+using DTMS.Planning.Application.Queries.GetJobById;
+using DTMS.Planning.Domain.Enums;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Queries.GetJobsQueue;
+namespace DTMS.Planning.Application.Queries.GetJobsQueue;
 
 /// <summary>
 /// Phase b10-frontend.2 — paginated operator queue across every order.

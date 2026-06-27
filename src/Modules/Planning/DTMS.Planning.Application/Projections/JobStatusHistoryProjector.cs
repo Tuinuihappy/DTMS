@@ -4,7 +4,7 @@ using DTMS.SharedKernel.Projection;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Projections;
+namespace DTMS.Planning.Application.Projections;
 
 /// <summary>
 /// Phase P1 — Materializes Job status transitions into the

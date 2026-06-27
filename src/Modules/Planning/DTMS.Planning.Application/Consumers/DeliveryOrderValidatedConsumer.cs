@@ -6,10 +6,10 @@ using DTMS.DeliveryOrder.Application.Commands.RecomputeOrderStatus;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.IntegrationEvents;
 using DTMS.Dispatch.Application.Services;
-using AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobAnchor;
-using AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobDispatched;
-using AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobFailed;
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
+using DTMS.Planning.Application.Commands.CreateJobAnchor;
+using DTMS.Planning.Application.Commands.MarkJobDispatched;
+using DTMS.Planning.Application.Commands.MarkJobFailed;
+using DTMS.Planning.Domain.Enums;
 using DTMS.Planning.IntegrationEvents;
 using DTMS.SharedKernel;
 using DTMS.SharedKernel.Diagnostics;
@@ -17,7 +17,7 @@ using MassTransit;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Consumers;
+namespace DTMS.Planning.Application.Consumers;
 
 /// <summary>
 /// Auto Planning Pipeline (envelope-only — legacy job/leg/task path

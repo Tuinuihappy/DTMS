@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.RetryJob;
+namespace DTMS.Planning.Application.Commands.RetryJob;
 
 /// <summary>
 /// Phase b8 — Operator-initiated retry of a Failed Job. Resets the Job to

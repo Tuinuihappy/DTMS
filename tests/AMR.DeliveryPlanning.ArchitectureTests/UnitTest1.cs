@@ -33,7 +33,7 @@ public class ModuleBoundaryTests
         var commandRoots = new[]
         {
             Path.Combine(repoRoot, "src", "Modules", "DeliveryOrder", "DTMS.DeliveryOrder.Application", "Commands"),
-            Path.Combine(repoRoot, "src", "Modules", "Planning", "AMR.DeliveryPlanning.Planning.Application", "Commands"),
+            Path.Combine(repoRoot, "src", "Modules", "Planning", "DTMS.Planning.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Dispatch", "DTMS.Dispatch.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Fleet", "DTMS.Fleet.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Fleet", "DTMS.Fleet.Application", "Consumers"),
@@ -66,7 +66,7 @@ public class ModuleBoundaryTests
         var commandRoots = new[]
         {
             Path.Combine(repoRoot, "src", "Modules", "DeliveryOrder", "DTMS.DeliveryOrder.Application", "Commands"),
-            Path.Combine(repoRoot, "src", "Modules", "Planning", "AMR.DeliveryPlanning.Planning.Application", "Commands"),
+            Path.Combine(repoRoot, "src", "Modules", "Planning", "DTMS.Planning.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Dispatch", "DTMS.Dispatch.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Fleet", "DTMS.Fleet.Application", "Commands")
         };

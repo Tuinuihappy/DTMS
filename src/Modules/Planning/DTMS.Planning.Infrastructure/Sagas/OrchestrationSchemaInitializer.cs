@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
+using DTMS.Planning.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Sagas;
+namespace DTMS.Planning.Infrastructure.Sagas;
 
 /// <summary>
 /// T2 POC — minimal schema bootstrap. When the saga feature flag is on,

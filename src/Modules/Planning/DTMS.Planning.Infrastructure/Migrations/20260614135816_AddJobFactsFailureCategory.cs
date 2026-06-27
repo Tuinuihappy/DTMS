@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Migrations
+namespace DTMS.Planning.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class AddJobFactsFailureCategory : Migration

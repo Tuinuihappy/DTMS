@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Planning.Application.Projections;
+using DTMS.Planning.Application.Projections;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Queries.GetJobStatusHistory;
+namespace DTMS.Planning.Application.Queries.GetJobStatusHistory;
 
 public class GetJobStatusHistoryQueryHandler
     : IQueryHandler<GetJobStatusHistoryQuery, JobStatusHistoryResponse>

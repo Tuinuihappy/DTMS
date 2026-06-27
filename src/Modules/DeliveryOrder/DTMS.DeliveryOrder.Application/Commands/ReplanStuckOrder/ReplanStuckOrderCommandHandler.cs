@@ -5,7 +5,7 @@ using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.DeliveryOrder.IntegrationEvents;
 using DTMS.Dispatch.Domain.Enums;
 using DTMS.Dispatch.Domain.Repositories;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using MassTransit;
 using Microsoft.Extensions.Logging;

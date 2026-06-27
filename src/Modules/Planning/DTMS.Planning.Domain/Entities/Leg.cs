@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Planning.Domain.Entities;
+namespace DTMS.Planning.Domain.Entities;
 
 public class Leg : Entity<Guid>
 {

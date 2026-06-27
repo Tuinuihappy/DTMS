@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobDispatched;
+namespace DTMS.Planning.Application.Commands.MarkJobDispatched;
 
 /// <summary>
 /// Phase b8 — Called from DeliveryOrderValidatedConsumer after a successful

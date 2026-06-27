@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.Planning.Domain.Entities;
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
-using AMR.DeliveryPlanning.Planning.Domain.Services;
+using DTMS.Planning.Domain.Entities;
+using DTMS.Planning.Domain.Enums;
+using DTMS.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Services;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.ConsolidateOrders;
+namespace DTMS.Planning.Application.Commands.ConsolidateOrders;
 
 public class ConsolidateOrdersCommandHandler : ICommandHandler<ConsolidateOrdersCommand, Guid>
 {

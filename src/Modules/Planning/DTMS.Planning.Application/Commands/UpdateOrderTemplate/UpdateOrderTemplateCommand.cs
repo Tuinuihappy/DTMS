@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Planning.Domain.Entities;
+using DTMS.Planning.Domain.Entities;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.UpdateOrderTemplate;
+namespace DTMS.Planning.Application.Commands.UpdateOrderTemplate;
 
 // Update everything except Name (rename is a separate concern due to its
 // uniqueness check and the ripple risk into OrderGroup references later).

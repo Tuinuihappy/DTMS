@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Data;
+namespace DTMS.Planning.Infrastructure.Data;
 
 public class PlanningDbContextFactory : IDesignTimeDbContextFactory<PlanningDbContext>
 {

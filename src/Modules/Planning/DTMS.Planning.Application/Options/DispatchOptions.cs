@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Planning.Application.Options;
+namespace DTMS.Planning.Application.Options;
 
 /// <summary>
 /// Planning-side dispatch behaviour switches. The envelope-dispatch flag

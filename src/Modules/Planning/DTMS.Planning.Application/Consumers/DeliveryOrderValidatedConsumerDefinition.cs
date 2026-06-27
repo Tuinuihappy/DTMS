@@ -1,6 +1,6 @@
 using MassTransit;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Consumers;
+namespace DTMS.Planning.Application.Consumers;
 
 // Phase A Step A5 — concurrency tuning for the heaviest consumer in the
 // auto-pipeline. MassTransit's auto-configuration (cfg.ConfigureEndpoints

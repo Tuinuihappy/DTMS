@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.Planning.Domain.Entities;
+using DTMS.Planning.Domain.Entities;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Services;
+namespace DTMS.Planning.Application.Services;
 
 // Output of OrderTemplate resolution — what we would POST to RIOT3 /api/v4/orders
 // after expanding every ActionTemplateName reference into inline action params.

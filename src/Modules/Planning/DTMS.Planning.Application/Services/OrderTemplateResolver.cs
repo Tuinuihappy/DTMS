@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Planning.Domain.Entities;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Entities;
+using DTMS.Planning.Domain.Repositories;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Services;
+namespace DTMS.Planning.Application.Services;
 
 public sealed class OrderTemplateResolver : IOrderTemplateResolver
 {

@@ -1,11 +1,11 @@
-using AMR.DeliveryPlanning.Planning.Application.Services;
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Application.Services;
+using DTMS.Planning.Domain.Enums;
+using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.RetryJob;
+namespace DTMS.Planning.Application.Commands.RetryJob;
 
 public class RetryJobCommandHandler : ICommandHandler<RetryJobCommand, RetryJobResult>
 {

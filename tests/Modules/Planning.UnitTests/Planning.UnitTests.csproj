@@ -23,9 +23,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Modules\Planning\AMR.DeliveryPlanning.Planning.Application\AMR.DeliveryPlanning.Planning.Application.csproj" />
-    <ProjectReference Include="..\..\..\src\Modules\Planning\AMR.DeliveryPlanning.Planning.Domain\AMR.DeliveryPlanning.Planning.Domain.csproj" />
-    <ProjectReference Include="..\..\..\src\Modules\Planning\AMR.DeliveryPlanning.Planning.Infrastructure\AMR.DeliveryPlanning.Planning.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Planning\DTMS.Planning.Application\DTMS.Planning.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Planning\DTMS.Planning.Domain\DTMS.Planning.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Planning\DTMS.Planning.Infrastructure\DTMS.Planning.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

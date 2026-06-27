@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
+using DTMS.Planning.Domain.Enums;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Planning.Domain.Entities;
+namespace DTMS.Planning.Domain.Entities;
 
 // Mirrors the RIOT3 "action template" catalog entry — the named recipe a robot
 // executes for one ACT mission. Each template captures the vendor's

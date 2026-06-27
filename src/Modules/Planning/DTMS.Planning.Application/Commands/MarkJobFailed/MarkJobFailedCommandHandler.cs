@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.MarkJobFailed;
+namespace DTMS.Planning.Application.Commands.MarkJobFailed;
 
 public class MarkJobFailedCommandHandler : ICommandHandler<MarkJobFailedCommand>
 {

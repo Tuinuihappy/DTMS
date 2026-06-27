@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Planning.Domain.Entities;
+namespace DTMS.Planning.Domain.Entities;
 
 // Mirrors the RIOT3 /api/v4/order/order-templates payload shape:
 //   { name, priority, transportOrder { structureType, priority, missions[] },

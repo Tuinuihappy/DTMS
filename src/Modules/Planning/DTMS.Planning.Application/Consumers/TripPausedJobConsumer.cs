@@ -1,9 +1,9 @@
 using DTMS.Dispatch.IntegrationEvents;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Repositories;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Consumers;
+namespace DTMS.Planning.Application.Consumers;
 
 /// <summary>
 /// Phase #1 — Mirror Trip pause onto the linked Job so the Jobs queue

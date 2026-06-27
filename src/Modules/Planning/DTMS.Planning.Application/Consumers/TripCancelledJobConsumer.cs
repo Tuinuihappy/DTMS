@@ -1,9 +1,9 @@
 using DTMS.Dispatch.IntegrationEvents;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Repositories;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Consumers;
+namespace DTMS.Planning.Application.Consumers;
 
 /// <summary>
 /// Phase b9 — Vendor or operator cancelled the trip. Job is set to

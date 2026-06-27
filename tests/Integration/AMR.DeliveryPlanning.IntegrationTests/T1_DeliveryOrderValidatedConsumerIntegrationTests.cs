@@ -1,10 +1,10 @@
 using DTMS.DeliveryOrder.Infrastructure.Data;
 using DTMS.DeliveryOrder.IntegrationEvents;
 using DTMS.Dispatch.Infrastructure.Data;
-using AMR.DeliveryPlanning.Planning.Application.Consumers;
-using AMR.DeliveryPlanning.Planning.Application.Services;
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
-using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
+using DTMS.Planning.Application.Consumers;
+using DTMS.Planning.Application.Services;
+using DTMS.Planning.Domain.Enums;
+using DTMS.Planning.Infrastructure.Data;
 using DTMS.SharedKernel.Diagnostics;
 using DTMS.SharedKernel.Messaging;
 using FluentAssertions;
@@ -351,7 +351,7 @@ public class T1_DeliveryOrderValidatedConsumerIntegrationTests : IClassFixture<D
     /// in-memory snapshots from inside the consumer's scope.
     /// </summary>
     private async Task<(DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder Order,
-                       List<AMR.DeliveryPlanning.Planning.Domain.Entities.Job> Jobs)>
+                       List<DTMS.Planning.Domain.Entities.Job> Jobs)>
         ReadStateAsync(TestContext ctx)
     {
         using var scope = _factory.Services.CreateScope();

@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Planning.Application.Projections;
+using DTMS.Planning.Application.Projections;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Queries.GetJobFailuresReport;
+namespace DTMS.Planning.Application.Queries.GetJobFailuresReport;
 
 /// <summary>
 /// Phase #9 — Job failures broken down by structured

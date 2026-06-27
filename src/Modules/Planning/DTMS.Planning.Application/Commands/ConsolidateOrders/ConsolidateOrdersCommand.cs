@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.ConsolidateOrders;
+namespace DTMS.Planning.Application.Commands.ConsolidateOrders;
 
 public record ConsolidateOrdersCommand(
     List<Guid> OrderIds,

@@ -1,7 +1,7 @@
 using AMR.DeliveryPlanning.Api.Adapters;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.Dispatch.Application.Services;
-using AMR.DeliveryPlanning.Planning.Application.Services;
+using DTMS.Planning.Application.Services;
 using DTMS.SharedKernel.Messaging;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;

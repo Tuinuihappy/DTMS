@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Projections;
+namespace DTMS.Planning.Infrastructure.Projections;
 
 /// <summary>
 /// Phase P5.2 — BI fact table for Job lifecycle. One row per Job,

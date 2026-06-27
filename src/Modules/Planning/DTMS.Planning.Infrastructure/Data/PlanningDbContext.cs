@@ -1,12 +1,12 @@
-using AMR.DeliveryPlanning.Planning.Domain.Entities;
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
-using AMR.DeliveryPlanning.Planning.Infrastructure.Data.Records;
-using AMR.DeliveryPlanning.Planning.Infrastructure.Projections;
+using DTMS.Planning.Domain.Entities;
+using DTMS.Planning.Domain.Enums;
+using DTMS.Planning.Infrastructure.Data.Records;
+using DTMS.Planning.Infrastructure.Projections;
 using DTMS.SharedKernel.Outbox;
 using DTMS.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Data;
+namespace DTMS.Planning.Infrastructure.Data;
 
 public class PlanningDbContext : DbContext
 {

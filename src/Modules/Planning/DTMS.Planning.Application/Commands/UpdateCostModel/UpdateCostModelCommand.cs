@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Planning.Domain.Services;
+using DTMS.Planning.Domain.Services;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.UpdateCostModel;
+namespace DTMS.Planning.Application.Commands.UpdateCostModel;
 
 public record UpdateCostModelCommand(
     double TravelDistanceWeight,

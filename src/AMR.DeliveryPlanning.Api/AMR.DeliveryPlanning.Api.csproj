@@ -43,8 +43,8 @@
     <ProjectReference Include="..\Modules\Fleet\DTMS.Fleet.Infrastructure\DTMS.Fleet.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\DeliveryOrder\DTMS.DeliveryOrder.Presentation\DTMS.DeliveryOrder.Presentation.csproj" />
     <ProjectReference Include="..\Modules\DeliveryOrder\DTMS.DeliveryOrder.Infrastructure\DTMS.DeliveryOrder.Infrastructure.csproj" />
-    <ProjectReference Include="..\Modules\Planning\AMR.DeliveryPlanning.Planning.Presentation\AMR.DeliveryPlanning.Planning.Presentation.csproj" />
-    <ProjectReference Include="..\Modules\Planning\AMR.DeliveryPlanning.Planning.Infrastructure\AMR.DeliveryPlanning.Planning.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Planning\DTMS.Planning.Presentation\DTMS.Planning.Presentation.csproj" />
+    <ProjectReference Include="..\Modules\Planning\DTMS.Planning.Infrastructure\DTMS.Planning.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Dispatch\DTMS.Dispatch.Presentation\DTMS.Dispatch.Presentation.csproj" />
     <ProjectReference Include="..\Modules\Dispatch\DTMS.Dispatch.Infrastructure\DTMS.Dispatch.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Transport.Amr\DTMS.Transport.Amr.Infrastructure\DTMS.Transport.Amr.Infrastructure.csproj" />

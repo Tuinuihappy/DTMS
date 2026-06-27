@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Planning.Infrastructure.Sagas;
+using DTMS.Planning.Infrastructure.Sagas;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Data;
+namespace DTMS.Planning.Infrastructure.Data;
 
 /// <summary>
 /// T2 — dedicated DbContext for saga persistence. Lives in the

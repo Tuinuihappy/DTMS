@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Planning.Domain.Enums;
-using AMR.DeliveryPlanning.Planning.Domain.Events;
+using DTMS.Planning.Domain.Enums;
+using DTMS.Planning.Domain.Events;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.Planning.Domain.Entities;
+namespace DTMS.Planning.Domain.Entities;
 
 public class Job : AggregateRoot<Guid>
 {

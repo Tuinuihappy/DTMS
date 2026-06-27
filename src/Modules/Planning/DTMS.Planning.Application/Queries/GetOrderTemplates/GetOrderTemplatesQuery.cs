@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Planning.Domain.Entities;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Entities;
+using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Queries.GetOrderTemplates;
+namespace DTMS.Planning.Application.Queries.GetOrderTemplates;
 
 // Wire shape mirrors RIOT3 POST /order-templates body:
 //   { name, priority, transportOrder { structureType, priority, missions[] },

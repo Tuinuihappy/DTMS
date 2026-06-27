@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.Planning.Application.Queries.GetJobById;
+using DTMS.Planning.Application.Queries.GetJobById;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Queries.GetJobsByOrder;
+namespace DTMS.Planning.Application.Queries.GetJobsByOrder;
 
 /// <summary>
 /// Phase b10 — list every Job that belongs to a delivery order, sorted by

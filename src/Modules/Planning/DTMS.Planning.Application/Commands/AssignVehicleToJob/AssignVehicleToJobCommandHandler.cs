@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
-using AMR.DeliveryPlanning.Planning.Domain.Services;
+using DTMS.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Services;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Commands.AssignVehicleToJob;
+namespace DTMS.Planning.Application.Commands.AssignVehicleToJob;
 
 public class AssignVehicleToJobCommandHandler : ICommandHandler<AssignVehicleToJobCommand>
 {

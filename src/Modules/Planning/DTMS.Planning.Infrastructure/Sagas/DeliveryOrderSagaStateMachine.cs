@@ -3,7 +3,7 @@ using DTMS.Planning.IntegrationEvents;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Planning.Infrastructure.Sagas;
+namespace DTMS.Planning.Infrastructure.Sagas;
 
 /// <summary>
 /// T2 Phase 2 step 1 — Saga state machine that will eventually replace the

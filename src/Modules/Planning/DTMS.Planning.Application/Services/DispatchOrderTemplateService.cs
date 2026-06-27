@@ -1,10 +1,10 @@
 using DTMS.Dispatch.Application.Commands.CreateEnvelopeTrip;
-using AMR.DeliveryPlanning.Planning.Domain.Repositories;
+using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.Planning.Application.Services;
+namespace DTMS.Planning.Application.Services;
 
 public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
 {
