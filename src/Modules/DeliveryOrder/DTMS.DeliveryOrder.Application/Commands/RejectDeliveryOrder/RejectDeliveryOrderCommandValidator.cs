@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.RejectDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.RejectDeliveryOrder;
 
 public class RejectDeliveryOrderCommandValidator : AbstractValidator<RejectDeliveryOrderCommand>
 {

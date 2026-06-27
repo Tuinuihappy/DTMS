@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
+namespace DTMS.DeliveryOrder.Infrastructure.Data;
 
 public class DeliveryOrderDbContextFactory : IDesignTimeDbContextFactory<DeliveryOrderDbContext>
 {

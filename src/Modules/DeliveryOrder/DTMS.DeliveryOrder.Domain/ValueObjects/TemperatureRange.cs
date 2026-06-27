@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+namespace DTMS.DeliveryOrder.Domain.ValueObjects;
 
 /// <summary>
 /// Temperature range (°C) that an item must stay within during transport.

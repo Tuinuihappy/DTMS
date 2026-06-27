@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
+using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 
 public record DimensionsDto(double LengthMm, double WidthMm, double HeightMm);
 

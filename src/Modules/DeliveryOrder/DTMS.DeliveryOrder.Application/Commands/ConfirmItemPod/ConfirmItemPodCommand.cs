@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ConfirmItemPod;
+namespace DTMS.DeliveryOrder.Application.Commands.ConfirmItemPod;
 
 /// <summary>
 /// POD (Proof of Delivery) scan for a single item at a given checkpoint.

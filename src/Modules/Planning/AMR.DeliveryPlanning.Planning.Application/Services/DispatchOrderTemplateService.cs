@@ -133,7 +133,7 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
             // completed trip. The consumer also falls back to (pickup, drop)
             // matching if this binding fails, so we log and proceed.
             var assignResult = await _sender.Send(
-                new AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AssignItemsToTrip.AssignItemsToTripCommand(
+                new DTMS.DeliveryOrder.Application.Commands.AssignItemsToTrip.AssignItemsToTripCommand(
                     deliveryOrderId, tripId, attemptNumber, pickupStationId, dropStationId),
                 cancellationToken);
             if (!assignResult.IsSuccess)

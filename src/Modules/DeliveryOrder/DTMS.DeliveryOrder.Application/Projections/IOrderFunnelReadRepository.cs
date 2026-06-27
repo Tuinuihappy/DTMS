@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
+namespace DTMS.DeliveryOrder.Application.Projections;
 
 public record OrderFunnelBucketEntry(
     DateTime BucketHour,

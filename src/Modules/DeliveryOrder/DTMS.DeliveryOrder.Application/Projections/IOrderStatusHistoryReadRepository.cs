@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
+namespace DTMS.DeliveryOrder.Application.Projections;
 
 /// <summary>
 /// Read side of the OrderStatusHistory projection — consumed by the

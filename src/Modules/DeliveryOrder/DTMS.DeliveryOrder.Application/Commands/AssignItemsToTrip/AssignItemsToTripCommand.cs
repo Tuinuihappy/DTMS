@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AssignItemsToTrip;
+namespace DTMS.DeliveryOrder.Application.Commands.AssignItemsToTrip;
 
 /// <summary>
 /// Bind every item of a delivery order whose (PickupStationId,

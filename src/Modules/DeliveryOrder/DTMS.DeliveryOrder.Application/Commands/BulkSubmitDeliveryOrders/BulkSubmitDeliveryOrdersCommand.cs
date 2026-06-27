@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
+using DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
+using DTMS.DeliveryOrder.Application.QualityIssues;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkSubmitDeliveryOrders;
+namespace DTMS.DeliveryOrder.Application.Commands.BulkSubmitDeliveryOrders;
 
 public record BulkSubmitDeliveryOrdersCommand(List<CreateDraftDeliveryOrderCommand> Orders) : ICommand<BulkSubmitResult>;
 

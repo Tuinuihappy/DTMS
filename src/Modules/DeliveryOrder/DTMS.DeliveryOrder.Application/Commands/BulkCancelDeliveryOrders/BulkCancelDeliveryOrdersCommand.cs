@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkCancelDeliveryOrders;
+namespace DTMS.DeliveryOrder.Application.Commands.BulkCancelDeliveryOrders;
 
 // Backend Phase 2 — operator-driven bulk cancel from the orders table.
 // Mirrors the BulkSubmit shape: per-id partial-failure result with a 207

@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.MarkOrderPlanned;
+namespace DTMS.DeliveryOrder.Application.Commands.MarkOrderPlanned;
 
 /// <summary>
 /// Planning → Planned. Fired by the Planning consumer after the groups

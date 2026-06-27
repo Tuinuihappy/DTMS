@@ -1,5 +1,5 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
-using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
+using DTMS.DeliveryOrder.Domain.Events;
+using DTMS.DeliveryOrder.Infrastructure.Services;
 using DTMS.DeliveryOrder.IntegrationEvents;
 using DTMS.SharedKernel.Auth;
 using FluentAssertions;

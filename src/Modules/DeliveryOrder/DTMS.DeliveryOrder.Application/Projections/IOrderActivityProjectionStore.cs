@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
+namespace DTMS.DeliveryOrder.Application.Projections;
 
 /// <summary>
 /// Phase P2 write-side abstraction consumed by <c>OrderActivityProjector</c>.

@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
+using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderItems;
+namespace DTMS.DeliveryOrder.Application.Queries.GetOrderItems;
 
 public record GetOrderItemsQuery(Guid OrderId, ItemStatus? Status = null)
     : IQuery<IReadOnlyList<ItemDto>>;

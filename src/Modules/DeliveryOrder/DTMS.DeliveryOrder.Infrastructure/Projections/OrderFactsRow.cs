@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections;
+namespace DTMS.DeliveryOrder.Infrastructure.Projections;
 
 /// <summary>
 /// Phase P5 — Reporting/BI fact table. One row per DeliveryOrder, with

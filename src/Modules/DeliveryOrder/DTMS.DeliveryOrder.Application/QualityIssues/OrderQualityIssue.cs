@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
+namespace DTMS.DeliveryOrder.Application.QualityIssues;
 
 /// <summary>
 /// Non-blocking quality finding on a delivery order. Surfaced in the response

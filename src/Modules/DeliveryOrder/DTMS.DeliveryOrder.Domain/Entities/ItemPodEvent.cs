@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
+namespace DTMS.DeliveryOrder.Domain.Entities;
 
 /// <summary>
 /// One operator POD scan against an Item. An Item has at most one

@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderTimeline;
+namespace DTMS.DeliveryOrder.Application.Queries.GetOrderTimeline;
 
 public record TimelineEntryDto(Guid Id, string EventType, string? Details, string? ActorId, DateTime OccurredAt);
 

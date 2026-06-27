@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
+using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.SharedKernel.Messaging;
-using CommandItemDto = AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder.ItemDto;
-using ServiceWindowDto = AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder.ServiceWindowDto;
+using CommandItemDto = DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder.ItemDto;
+using ServiceWindowDto = DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder.ServiceWindowDto;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.UpdateDraftDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.UpdateDraftDeliveryOrder;
 
 public record UpdateDraftDeliveryOrderCommand(
     Guid OrderId,

@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AmendDeliveryOrder;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+using DTMS.DeliveryOrder.Application.Commands.AmendDeliveryOrder;
+using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.ValueObjects;
 using FluentAssertions;
-using DomainEntities = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
+using DomainEntities = DTMS.DeliveryOrder.Domain.Entities;
 
 namespace DeliveryOrder.UnitTests;
 

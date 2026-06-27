@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+namespace DTMS.DeliveryOrder.Domain.ValueObjects;
 
 /// <summary>
 /// Item quantity bound to a canonical <see cref="UnitOfMeasure"/>. The

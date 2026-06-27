@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.RedispatchDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.RedispatchDeliveryOrder;
 
 /// <summary>
 /// Re-trigger the Planning dispatch loop for a Confirmed order whose

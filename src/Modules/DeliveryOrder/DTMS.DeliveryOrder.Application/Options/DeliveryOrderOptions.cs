@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Options;
+namespace DTMS.DeliveryOrder.Application.Options;
 
 public class DeliveryOrderOptions
 {

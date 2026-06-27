@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
+using DTMS.DeliveryOrder.Application.QualityIssues;
+using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.SharedKernel.Messaging;
-using DetailDto = AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder.DeliveryOrderDetailDto;
+using DetailDto = DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder.DeliveryOrderDetailDto;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
 
 public record CreateUpstreamDeliveryOrderCommand(
     string OrderRef,

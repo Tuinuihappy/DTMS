@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CancelDeliveryOrder;
+using DTMS.DeliveryOrder.Application.Commands.CancelDeliveryOrder;
 using DTMS.SharedKernel.Messaging;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkCancelDeliveryOrders;
+namespace DTMS.DeliveryOrder.Application.Commands.BulkCancelDeliveryOrders;
 
 // Sequential dispatch of CancelDeliveryOrderCommand per id so the
 // per-row Result semantics + domain invariants are preserved exactly.

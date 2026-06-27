@@ -4,7 +4,7 @@ using DTMS.SharedKernel.Projection;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
+namespace DTMS.DeliveryOrder.Application.Projections;
 
 /// <summary>
 /// Phase P3 — Hour-bucketed status counters for the operator dashboard.

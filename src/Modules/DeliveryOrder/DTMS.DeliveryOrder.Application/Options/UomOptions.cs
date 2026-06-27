@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Enums;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Options;
+namespace DTMS.DeliveryOrder.Application.Options;
 
 /// <summary>
 /// Boundary translation table for upstream UOM strings. Keyed by canonical

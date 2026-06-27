@@ -5,7 +5,7 @@ using DTMS.SharedKernel.Projection;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
+namespace DTMS.DeliveryOrder.Application.Projections;
 
 /// <summary>
 /// Phase P2 — Materializes unified per-order activity into the

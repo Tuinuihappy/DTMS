@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderFunnel;
+using DTMS.DeliveryOrder.Application.Queries.GetOrderFunnel;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Presentation;
+namespace DTMS.DeliveryOrder.Presentation;
 
 /// <summary>
 /// Phase P3 — Dashboard read-model endpoints. Cross-aggregate views that

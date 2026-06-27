@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Options;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Application.Options;
+using DTMS.DeliveryOrder.Domain.Enums;
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
+namespace DTMS.DeliveryOrder.Application.Services;
 
 public class UomNormalizer : IUomNormalizer
 {

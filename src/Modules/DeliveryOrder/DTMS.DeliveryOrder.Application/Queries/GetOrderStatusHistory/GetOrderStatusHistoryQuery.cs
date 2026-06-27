@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderStatusHistory;
+namespace DTMS.DeliveryOrder.Application.Queries.GetOrderStatusHistory;
 
 public record GetOrderStatusHistoryQuery(Guid OrderId) : IQuery<OrderStatusHistoryResponse>;
 

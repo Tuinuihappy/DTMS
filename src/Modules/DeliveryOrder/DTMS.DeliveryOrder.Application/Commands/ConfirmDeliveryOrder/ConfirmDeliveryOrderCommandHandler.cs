@@ -1,13 +1,13 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Options;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Application.Options;
+using DTMS.DeliveryOrder.Application.QualityIssues;
+using DTMS.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ConfirmDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.ConfirmDeliveryOrder;
 
 public class ConfirmDeliveryOrderCommandHandler : ICommandHandler<ConfirmDeliveryOrderCommand, ConfirmDeliveryOrderResult>
 {

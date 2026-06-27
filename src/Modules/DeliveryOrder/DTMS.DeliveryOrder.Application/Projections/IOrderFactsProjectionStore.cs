@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
+namespace DTMS.DeliveryOrder.Application.Projections;
 
 /// <summary>
 /// Phase P5 — Write side of the bi.OrderFacts projection. One mutator

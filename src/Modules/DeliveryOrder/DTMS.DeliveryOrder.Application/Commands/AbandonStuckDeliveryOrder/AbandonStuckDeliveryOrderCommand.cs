@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AbandonStuckDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.AbandonStuckDeliveryOrder;
 
 /// <summary>
 /// Operator escape hatch (Phase b11 / Option B) for orders left at

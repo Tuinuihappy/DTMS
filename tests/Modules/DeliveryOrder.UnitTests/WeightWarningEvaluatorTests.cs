@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+using DTMS.DeliveryOrder.Application.QualityIssues;
+using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.ValueObjects;
 using FluentAssertions;
-using DomainEntities = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
+using DomainEntities = DTMS.DeliveryOrder.Domain.Entities;
 
 namespace DeliveryOrder.UnitTests;
 
@@ -96,7 +96,7 @@ public class DeliveryOrderFallbackWeightTests
         order.Confirm(weightFallbackKg: 250.0);
 
         var evt = order.DomainEvents
-            .OfType<AMR.DeliveryPlanning.DeliveryOrder.Domain.Events.DeliveryOrderConfirmedDomainEvent>()
+            .OfType<DTMS.DeliveryOrder.Domain.Events.DeliveryOrderConfirmedDomainEvent>()
             .Single();
         evt.Items.Single().WeightKg.Should().Be(250.0);
     }
@@ -120,7 +120,7 @@ public class DeliveryOrderFallbackWeightTests
         order.Confirm(weightFallbackKg: 250.0);
 
         var evt = order.DomainEvents
-            .OfType<AMR.DeliveryPlanning.DeliveryOrder.Domain.Events.DeliveryOrderConfirmedDomainEvent>()
+            .OfType<DTMS.DeliveryOrder.Domain.Events.DeliveryOrderConfirmedDomainEvent>()
             .Single();
         evt.Items.Single().WeightKg.Should().Be(42.0);
     }

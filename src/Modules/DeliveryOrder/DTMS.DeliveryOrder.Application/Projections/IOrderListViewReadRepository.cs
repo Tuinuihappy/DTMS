@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Repositories;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
+namespace DTMS.DeliveryOrder.Application.Projections;
 
 public record OrderListViewFilters(
     OrderStatus? Status,

@@ -1,11 +1,11 @@
 using System;
-using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
+using DTMS.DeliveryOrder.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
+namespace DTMS.DeliveryOrder.Infrastructure.Migrations
 {
     /// <summary>
     /// Bind each Item to the Trip that dispatched it. Enables item-level

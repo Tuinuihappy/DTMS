@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
+namespace DTMS.DeliveryOrder.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class AddTags : Migration

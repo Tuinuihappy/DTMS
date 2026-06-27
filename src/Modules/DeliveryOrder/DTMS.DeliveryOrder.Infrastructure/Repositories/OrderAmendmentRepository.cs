@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
-using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
+using DTMS.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Repositories;
+namespace DTMS.DeliveryOrder.Infrastructure.Repositories;
 
 public class OrderAmendmentRepository : IOrderAmendmentRepository
 {

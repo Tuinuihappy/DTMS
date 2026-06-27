@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
-using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
+using DTMS.DeliveryOrder.Application.Projections;
+using DTMS.DeliveryOrder.Infrastructure.Data;
 using DTMS.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections;
+namespace DTMS.DeliveryOrder.Infrastructure.Projections;
 
 public class OrderActivityProjectionStore : IOrderActivityProjectionStore
 {

@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Events;
+using DTMS.DeliveryOrder.Domain.ValueObjects;
 using FluentAssertions;
-using DeliveryOrderAggregate = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder;
+using DeliveryOrderAggregate = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder;
 
 namespace DeliveryOrder.UnitTests;
 

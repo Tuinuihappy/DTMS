@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
+using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderStatusHistory;
+namespace DTMS.DeliveryOrder.Application.Queries.GetOrderStatusHistory;
 
 public class GetOrderStatusHistoryQueryHandler
     : IQueryHandler<GetOrderStatusHistoryQuery, OrderStatusHistoryResponse>

@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Presentation.Idempotency;
+namespace DTMS.DeliveryOrder.Presentation.Idempotency;
 
 /// <summary>
 /// Endpoint metadata marker attached by <see cref="RequireIdempotencyKeyExtensions.RequireIdempotencyKey"/>.

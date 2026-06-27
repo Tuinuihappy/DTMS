@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
+using DTMS.DeliveryOrder.Domain.Events;
 using DTMS.DeliveryOrder.IntegrationEvents;
 using DTMS.SharedKernel.Auth;
 using DTMS.SharedKernel.Domain;
 using DTMS.SharedKernel.Outbox;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
+namespace DTMS.DeliveryOrder.Infrastructure.Services;
 
 // Phase P0 (2026-06-14) — mapper enriches every published integration
 // event with TriggeredBy + CorrelationId from the ambient

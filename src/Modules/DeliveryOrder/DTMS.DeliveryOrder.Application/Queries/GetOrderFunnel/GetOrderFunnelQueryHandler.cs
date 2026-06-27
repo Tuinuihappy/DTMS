@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
+using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderFunnel;
+namespace DTMS.DeliveryOrder.Application.Queries.GetOrderFunnel;
 
 public class GetOrderFunnelQueryHandler
     : IQueryHandler<GetOrderFunnelQuery, OrderFunnelResponse>

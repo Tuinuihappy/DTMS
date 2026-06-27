@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.HoldDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.HoldDeliveryOrder;
 
 public class HoldDeliveryOrderCommandValidator : AbstractValidator<HoldDeliveryOrderCommand>
 {

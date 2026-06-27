@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
+using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrdersReport;
+namespace DTMS.DeliveryOrder.Application.Queries.GetOrdersReport;
 
 public class GetOrdersReportQueryHandler
     : IQueryHandler<GetOrdersReportQuery, OrdersReportResponse>

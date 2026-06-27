@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Presentation.Idempotency;
+namespace DTMS.DeliveryOrder.Presentation.Idempotency;
 
 /// <summary>
 /// Snapshot of a previously-served mutation response, keyed by Idempotency-Key.

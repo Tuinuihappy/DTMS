@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
+using DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AmendDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.AmendDeliveryOrder;
 
 public record AmendDeliveryOrderCommand(
     Guid OrderId,

@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+namespace DTMS.DeliveryOrder.Domain.ValueObjects;
 
 /// <summary>
 /// Time window during which the order must be picked up and delivered.

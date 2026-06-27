@@ -5,11 +5,11 @@
   </Folder>
   <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/DeliveryOrder/">
-    <Project Path="src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Application/AMR.DeliveryPlanning.DeliveryOrder.Application.csproj" />
-    <Project Path="src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Domain/AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj" />
-    <Project Path="src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure/AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.csproj" />
+    <Project Path="src/Modules/DeliveryOrder/DTMS.DeliveryOrder.Application/DTMS.DeliveryOrder.Application.csproj" />
+    <Project Path="src/Modules/DeliveryOrder/DTMS.DeliveryOrder.Domain/DTMS.DeliveryOrder.Domain.csproj" />
+    <Project Path="src/Modules/DeliveryOrder/DTMS.DeliveryOrder.Infrastructure/DTMS.DeliveryOrder.Infrastructure.csproj" />
     <Project Path="src/Modules/DeliveryOrder/DTMS.DeliveryOrder.IntegrationEvents/DTMS.DeliveryOrder.IntegrationEvents.csproj" />
-    <Project Path="src/Modules/DeliveryOrder/AMR.DeliveryPlanning.DeliveryOrder.Presentation/AMR.DeliveryPlanning.DeliveryOrder.Presentation.csproj" />
+    <Project Path="src/Modules/DeliveryOrder/DTMS.DeliveryOrder.Presentation/DTMS.DeliveryOrder.Presentation.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Dispatch/">
     <Project Path="src/Modules/Dispatch/AMR.DeliveryPlanning.Dispatch.Application/AMR.DeliveryPlanning.Dispatch.Application.csproj" />

@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Entities;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
+namespace DTMS.DeliveryOrder.Application.QualityIssues;
 
 /// <summary>
 /// Inspects an order's items and emits a warning for each one that lacks a

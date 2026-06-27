@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Enums;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+namespace DTMS.DeliveryOrder.Domain.Repositories;
 
 public record DeliveryOrderSearchFilters(
     OrderStatus? Status,

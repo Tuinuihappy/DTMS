@@ -1,6 +1,6 @@
-using DomainItem = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.Item;
+using DomainItem = DTMS.DeliveryOrder.Domain.Entities.Item;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AmendDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.AmendDeliveryOrder;
 
 // Strongly-typed amendment snapshot. Decoupled from the read/write command
 // DTOs on purpose — the snapshot must remain interpretable even if those

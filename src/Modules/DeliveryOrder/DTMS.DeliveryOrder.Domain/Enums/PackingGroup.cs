@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+namespace DTMS.DeliveryOrder.Domain.Enums;
 
 /// <summary>
 /// UN dangerous-goods Packing Group — degree of hazard within a hazard class.

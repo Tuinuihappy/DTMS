@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Presentation.Idempotency;
+using DTMS.DeliveryOrder.Presentation.Idempotency;
 using FluentAssertions;
 
 namespace DeliveryOrder.UnitTests;

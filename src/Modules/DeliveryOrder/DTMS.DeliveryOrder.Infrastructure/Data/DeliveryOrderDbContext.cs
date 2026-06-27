@@ -1,12 +1,12 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
-using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections;
+using DTMS.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.ValueObjects;
+using DTMS.DeliveryOrder.Infrastructure.Projections;
 using DTMS.SharedKernel.Outbox;
 using DTMS.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
+namespace DTMS.DeliveryOrder.Infrastructure.Data;
 
 public class DeliveryOrderDbContext : DbContext
 {

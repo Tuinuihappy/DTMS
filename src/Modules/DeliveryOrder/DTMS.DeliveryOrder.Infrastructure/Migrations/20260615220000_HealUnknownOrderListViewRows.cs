@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Migrations
+namespace DTMS.DeliveryOrder.Infrastructure.Migrations
 {
     /// <summary>
     /// Phase P4.5 follow-up — heal rows the old (P4) projector materialized

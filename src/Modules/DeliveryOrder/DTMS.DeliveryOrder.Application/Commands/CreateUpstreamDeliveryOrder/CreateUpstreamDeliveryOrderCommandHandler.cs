@@ -1,16 +1,16 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Options;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+using DTMS.DeliveryOrder.Application.Options;
+using DTMS.DeliveryOrder.Application.QualityIssues;
+using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
+using DTMS.DeliveryOrder.Application.Services;
+using DTMS.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Domain.ValueObjects;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
 
 public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateUpstreamDeliveryOrderCommand, UpstreamOrderAckDto>
 {
@@ -100,11 +100,11 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         // isn't supplied; Manual / Fleet upstream payloads (when those
         // modes go live) supply the mode and the same PickupLocationCode
         // field is interpreted as a warehouse code.
-        var mode = order.RequestedTransportMode ?? AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums.TransportMode.Amr;
+        var mode = order.RequestedTransportMode ?? DTMS.DeliveryOrder.Domain.Enums.TransportMode.Amr;
         IReadOnlyDictionary<string, Guid>? stationMap = null;
         IReadOnlyDictionary<string, Guid>? warehouseMap = null;
 
-        if (mode == AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums.TransportMode.Amr)
+        if (mode == DTMS.DeliveryOrder.Domain.Enums.TransportMode.Amr)
         {
             var stationResult = await _stationValidation.BuildStationMapAsync(order.Items, cancellationToken);
             if (stationResult.IsFailure)

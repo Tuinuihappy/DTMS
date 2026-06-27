@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
-using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
+using DTMS.DeliveryOrder.Application.Projections;
+using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections;
+namespace DTMS.DeliveryOrder.Infrastructure.Projections;
 
 /// <summary>
 /// Phase P4 — read-side query against the OrderListView denormalized

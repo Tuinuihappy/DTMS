@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReplanStuckOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.ReplanStuckOrder;
 
 /// <summary>
 /// T1.7 — admin recovery for orders stuck after a partial workflow failure.

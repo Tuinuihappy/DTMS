@@ -9,7 +9,7 @@ namespace AMR.DeliveryPlanning.Api.Auth;
 // declares its own copy to avoid cross-module references; the API host
 // satisfies all of them with one implementation.
 public sealed class HttpContextCurrentUserAccessor :
-    AMR.DeliveryPlanning.DeliveryOrder.Application.Services.ICurrentUserAccessor,
+    DTMS.DeliveryOrder.Application.Services.ICurrentUserAccessor,
     AMR.DeliveryPlanning.Planning.Application.Services.ICurrentUserAccessor
 {
     private readonly IHttpContextAccessor _httpContextAccessor;

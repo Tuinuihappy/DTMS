@@ -32,7 +32,7 @@ public class ModuleBoundaryTests
         var repoRoot = FindRepoRoot();
         var commandRoots = new[]
         {
-            Path.Combine(repoRoot, "src", "Modules", "DeliveryOrder", "AMR.DeliveryPlanning.DeliveryOrder.Application", "Commands"),
+            Path.Combine(repoRoot, "src", "Modules", "DeliveryOrder", "DTMS.DeliveryOrder.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Planning", "AMR.DeliveryPlanning.Planning.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Dispatch", "AMR.DeliveryPlanning.Dispatch.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Fleet", "DTMS.Fleet.Application", "Commands"),
@@ -65,7 +65,7 @@ public class ModuleBoundaryTests
         var repoRoot = FindRepoRoot();
         var commandRoots = new[]
         {
-            Path.Combine(repoRoot, "src", "Modules", "DeliveryOrder", "AMR.DeliveryPlanning.DeliveryOrder.Application", "Commands"),
+            Path.Combine(repoRoot, "src", "Modules", "DeliveryOrder", "DTMS.DeliveryOrder.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Planning", "AMR.DeliveryPlanning.Planning.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Dispatch", "AMR.DeliveryPlanning.Dispatch.Application", "Commands"),
             Path.Combine(repoRoot, "src", "Modules", "Fleet", "DTMS.Fleet.Application", "Commands")

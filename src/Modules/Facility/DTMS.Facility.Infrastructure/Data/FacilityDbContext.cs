@@ -221,7 +221,7 @@ public class FacilityDbContext : DbContext
             // untyped overload returns a non-generic PropertyBuilder which
             // would force HasConversion to take Type arguments instead of
             // the strongly-typed Func<T,U> lambdas we want.
-            b.Property<List<AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums.TransportMode>>("_serviceModes")
+            b.Property<List<DTMS.DeliveryOrder.Domain.Enums.TransportMode>>("_serviceModes")
                 .HasField("_serviceModes")
                 .UsePropertyAccessMode(PropertyAccessMode.Field)
                 .HasColumnName("ServiceModes")
@@ -232,7 +232,7 @@ public class FacilityDbContext : DbContext
                         (System.Text.Json.JsonSerializerOptions?)null),
                     v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(
                             v, (System.Text.Json.JsonSerializerOptions?)null)!
-                        .Select(s => Enum.Parse<AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums.TransportMode>(s))
+                        .Select(s => Enum.Parse<DTMS.DeliveryOrder.Domain.Enums.TransportMode>(s))
                         .ToList())
                 .IsRequired();
             // Hide the public read-only navigation (it's IReadOnlyCollection

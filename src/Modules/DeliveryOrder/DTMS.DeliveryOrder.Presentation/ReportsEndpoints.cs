@@ -1,14 +1,14 @@
 using System.Globalization;
 using System.Text;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrdersReport;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetReports;
+using DTMS.DeliveryOrder.Application.Projections;
+using DTMS.DeliveryOrder.Application.Queries.GetOrdersReport;
+using DTMS.DeliveryOrder.Application.Queries.GetReports;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Presentation;
+namespace DTMS.DeliveryOrder.Presentation;
 
 /// <summary>
 /// Phase P5 — Reporting/BI endpoints backed by the <c>bi.OrderFacts</c>

@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrdersReport;
+namespace DTMS.DeliveryOrder.Application.Queries.GetOrdersReport;
 
 /// <summary>
 /// Phase P5 — Orders by Priority/Status report. Pivots the

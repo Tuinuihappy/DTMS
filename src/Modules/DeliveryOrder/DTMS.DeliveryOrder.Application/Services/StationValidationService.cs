@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
+namespace DTMS.DeliveryOrder.Application.Services;
 
 public class StationValidationService : IStationValidationService
 {

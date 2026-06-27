@@ -1,12 +1,12 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetItem;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.SearchItems;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Application.Queries.GetItem;
+using DTMS.DeliveryOrder.Application.Queries.SearchItems;
+using DTMS.DeliveryOrder.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Presentation;
+namespace DTMS.DeliveryOrder.Presentation;
 
 public static class ItemEndpoints
 {

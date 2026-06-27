@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Presentation.Idempotency;
+namespace DTMS.DeliveryOrder.Presentation.Idempotency;
 
 public static class RequireIdempotencyKeyExtensions
 {

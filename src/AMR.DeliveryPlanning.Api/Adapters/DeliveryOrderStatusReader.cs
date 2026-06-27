@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
+using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using AMR.DeliveryPlanning.Dispatch.Application.Services;
 using MediatR;
 

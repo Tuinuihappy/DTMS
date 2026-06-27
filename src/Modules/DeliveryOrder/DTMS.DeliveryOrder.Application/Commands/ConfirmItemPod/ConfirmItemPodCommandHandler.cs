@@ -1,11 +1,11 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ConfirmItemPod;
+namespace DTMS.DeliveryOrder.Application.Commands.ConfirmItemPod;
 
 public class ConfirmItemPodCommandHandler : ICommandHandler<ConfirmItemPodCommand, ConfirmItemPodResult>
 {

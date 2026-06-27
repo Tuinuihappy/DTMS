@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CancelDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.CancelDeliveryOrder;
 
 public class CancelDeliveryOrderCommandHandler : ICommandHandler<CancelDeliveryOrderCommand>
 {

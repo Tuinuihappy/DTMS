@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
+using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetReports;
+namespace DTMS.DeliveryOrder.Application.Queries.GetReports;
 
 /// <summary>
 /// Phase P5.3 — SLA breach rate report. Counts orders whose

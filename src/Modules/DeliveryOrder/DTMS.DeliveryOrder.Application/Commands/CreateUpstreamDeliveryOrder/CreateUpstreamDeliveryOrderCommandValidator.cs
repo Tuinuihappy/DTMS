@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
+using DTMS.DeliveryOrder.Domain.Enums;
 using FluentValidation;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
 
 public class CreateUpstreamDeliveryOrderCommandValidator : AbstractValidator<CreateUpstreamDeliveryOrderCommand>
 {

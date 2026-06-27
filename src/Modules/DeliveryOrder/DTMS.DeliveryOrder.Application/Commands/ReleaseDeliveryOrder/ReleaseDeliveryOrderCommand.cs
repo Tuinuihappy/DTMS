@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ConfirmDeliveryOrder;
+using DTMS.DeliveryOrder.Application.Commands.ConfirmDeliveryOrder;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReleaseDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.ReleaseDeliveryOrder;
 
 // Release re-enters Confirmed and re-fires DeliveryOrderConfirmedIntegrationEvent, so the
 // response shape mirrors Confirm: caller may want to surface the same quality warnings

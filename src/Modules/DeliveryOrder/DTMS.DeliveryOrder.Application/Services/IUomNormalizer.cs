@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Enums;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
+namespace DTMS.DeliveryOrder.Application.Services;
 
 /// <summary>
 /// Translates upstream UOM strings (canonical names, aliases, or junk) into

@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
+namespace DTMS.DeliveryOrder.Application.Services;
 
 /// <summary>
 /// Outcome of a station lookup. ManualOverrideActive=true means an operator has forced this station offline

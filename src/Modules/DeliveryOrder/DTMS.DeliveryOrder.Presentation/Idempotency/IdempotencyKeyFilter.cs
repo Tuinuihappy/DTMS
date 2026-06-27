@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Presentation.Idempotency;
+namespace DTMS.DeliveryOrder.Presentation.Idempotency;
 
 /// <summary>
 /// Best-effort endpoint filter for <c>Idempotency-Key</c> on mutation endpoints.

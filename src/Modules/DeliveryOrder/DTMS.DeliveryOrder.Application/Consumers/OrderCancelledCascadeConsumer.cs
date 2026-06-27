@@ -6,7 +6,7 @@ using MassTransit;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Consumers;
+namespace DTMS.DeliveryOrder.Application.Consumers;
 
 /// <summary>
 /// Cascade an order-level Cancel down to every in-flight Trip. Reads

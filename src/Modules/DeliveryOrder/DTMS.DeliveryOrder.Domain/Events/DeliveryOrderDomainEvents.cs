@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
+namespace DTMS.DeliveryOrder.Domain.Events;
 
 public record ItemHazmatDto(string ClassCode, string? PackingGroup);
 

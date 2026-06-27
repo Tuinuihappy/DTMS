@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
+using DTMS.DeliveryOrder.Application.QualityIssues;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
 
 public record SubmitDeliveryOrderCommand(Guid OrderId) : ICommand<SubmitDeliveryOrderResult>;
 

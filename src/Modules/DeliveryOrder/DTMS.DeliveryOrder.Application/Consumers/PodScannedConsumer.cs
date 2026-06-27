@@ -1,10 +1,10 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.Dispatch.IntegrationEvents;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Consumers;
+namespace DTMS.DeliveryOrder.Application.Consumers;
 
 /// <summary>
 /// Listens for PodCapturedIntegrationEvent and matches scanned upstream ItemIds

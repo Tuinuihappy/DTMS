@@ -1,9 +1,9 @@
 using System.Text.Json;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
+using DTMS.DeliveryOrder.Application.Services;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
+namespace DTMS.DeliveryOrder.Infrastructure.Services;
 
 public class CachedStationLookup : IStationLookup
 {

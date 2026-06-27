@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetOrderFunnel;
+namespace DTMS.DeliveryOrder.Application.Queries.GetOrderFunnel;
 
 /// <summary>
 /// Phase P3 — hourly funnel buckets across an inclusive-exclusive UTC

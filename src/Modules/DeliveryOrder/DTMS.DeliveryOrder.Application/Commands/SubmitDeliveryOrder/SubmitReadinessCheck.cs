@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Entities;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
 
 /// <summary>
 /// Entity-level submit-readiness check used by /submit endpoint to verify a draft

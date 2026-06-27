@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections;
+namespace DTMS.DeliveryOrder.Infrastructure.Projections;
 
 /// <summary>
 /// Phase P4 — Denormalized read-model row for the operator list / search

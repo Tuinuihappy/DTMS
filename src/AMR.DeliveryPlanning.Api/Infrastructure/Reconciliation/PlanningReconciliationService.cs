@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReplanStuckOrder;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
+using DTMS.DeliveryOrder.Application.Commands.ReplanStuckOrder;
+using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Infrastructure.Data;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
 using AMR.DeliveryPlanning.Planning.Infrastructure.Data;
 using DTMS.SharedKernel.Diagnostics;

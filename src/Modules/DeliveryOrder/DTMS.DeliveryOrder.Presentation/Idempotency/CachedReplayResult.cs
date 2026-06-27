@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Presentation.Idempotency;
+namespace DTMS.DeliveryOrder.Presentation.Idempotency;
 
 /// <summary>
 /// Replays a previously cached mutation response when the same Idempotency-Key

@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.AbandonStuckDeliveryOrder;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Consumers;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+using DTMS.DeliveryOrder.Application.Commands.AbandonStuckDeliveryOrder;
+using DTMS.DeliveryOrder.Application.Consumers;
+using DTMS.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Domain.ValueObjects;
 using AMR.DeliveryPlanning.Dispatch.Domain.Entities;
 using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
@@ -12,7 +12,7 @@ using FluentAssertions;
 using MassTransit;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using DomainOrder = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder;
+using DomainOrder = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder;
 
 namespace DeliveryOrder.UnitTests;
 

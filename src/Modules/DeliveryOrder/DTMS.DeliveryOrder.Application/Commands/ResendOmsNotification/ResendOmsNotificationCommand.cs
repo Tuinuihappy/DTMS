@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ResendOmsNotification;
+namespace DTMS.DeliveryOrder.Application.Commands.ResendOmsNotification;
 
 /// <summary>
 /// Operator-driven manual resend of the upstream-OMS shipment notification

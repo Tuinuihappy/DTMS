@@ -1,12 +1,12 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+using DTMS.DeliveryOrder.Application.Services;
+using DTMS.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.ValueObjects;
 using FluentAssertions;
 using NSubstitute;
 // Alias avoids the "DeliveryOrder is namespace" ambiguity — our test
 // namespace and the aggregate type share the segment.
-using DeliveryOrderAggregate = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder;
+using DeliveryOrderAggregate = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder;
 
 namespace DeliveryOrder.UnitTests;
 

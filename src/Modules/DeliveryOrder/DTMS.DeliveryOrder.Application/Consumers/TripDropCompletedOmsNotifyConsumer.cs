@@ -1,7 +1,7 @@
 using System.Diagnostics;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Application.Projections;
+using DTMS.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using DTMS.Dispatch.IntegrationEvents;
 using AMR.DeliveryPlanning.OmsAdapter.Abstractions;
@@ -11,7 +11,7 @@ using MassTransit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Consumers;
+namespace DTMS.DeliveryOrder.Application.Consumers;
 
 /// <summary>
 /// Notifies the upstream OMS that a shipment has arrived at the drop

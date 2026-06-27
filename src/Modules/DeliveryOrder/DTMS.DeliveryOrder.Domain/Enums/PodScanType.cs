@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+namespace DTMS.DeliveryOrder.Domain.Enums;
 
 /// <summary>
 /// Where on the chain-of-custody a POD scan was recorded.

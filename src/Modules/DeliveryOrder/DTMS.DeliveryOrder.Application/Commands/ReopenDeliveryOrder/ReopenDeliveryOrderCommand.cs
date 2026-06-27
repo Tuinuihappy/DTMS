@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReopenDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.ReopenDeliveryOrder;
 
 /// <summary>
 /// Move a Failed delivery order back to Confirmed so an operator can

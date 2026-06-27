@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
+namespace DTMS.DeliveryOrder.Domain.Entities;
 
 // ServiceWindowChange is the only type in active use.
 // PriorityChange, LocationChange, CombinedChange, Cancel, Hold, Release, StatusTransition

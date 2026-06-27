@@ -1,11 +1,11 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.QualityIssues;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+using DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
+using DTMS.DeliveryOrder.Application.QualityIssues;
+using DTMS.DeliveryOrder.Application.Services;
+using DTMS.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Domain.ValueObjects;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.BulkSubmitDeliveryOrders;
+namespace DTMS.DeliveryOrder.Application.Commands.BulkSubmitDeliveryOrders;
 
 public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmitDeliveryOrdersCommand, BulkSubmitResult>
 {
@@ -105,11 +105,11 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         // station codes; Manual / Fleet resolve warehouse codes.
         foreach (var order in pendingOrders)
         {
-            var mode = order.RequestedTransportMode ?? AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums.TransportMode.Amr;
+            var mode = order.RequestedTransportMode ?? DTMS.DeliveryOrder.Domain.Enums.TransportMode.Amr;
             IReadOnlyDictionary<string, Guid>? stationMap = null;
             IReadOnlyDictionary<string, Guid>? warehouseMap = null;
 
-            if (mode == AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums.TransportMode.Amr)
+            if (mode == DTMS.DeliveryOrder.Domain.Enums.TransportMode.Amr)
             {
                 var stationResult = await _stationValidation.BuildStationMapAsync(order.Items, cancellationToken);
                 if (stationResult.IsFailure)

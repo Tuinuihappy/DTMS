@@ -4,7 +4,7 @@ using System.Text.Json;
 using MediatR;
 using Microsoft.Extensions.Caching.Distributed;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Presentation.Idempotency;
+namespace DTMS.DeliveryOrder.Presentation.Idempotency;
 
 /// <summary>
 /// Builds a stable SHA256 hash of a mutation request for Idempotency-Key

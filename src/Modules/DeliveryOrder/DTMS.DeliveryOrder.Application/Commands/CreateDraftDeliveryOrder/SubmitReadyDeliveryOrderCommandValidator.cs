@@ -1,7 +1,7 @@
 using FluentValidation;
 using FluentValidation.Results;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 
 /// <summary>
 /// Strict checks applied to a CreateDraft-shaped command when the caller is about

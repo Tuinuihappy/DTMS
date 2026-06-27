@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
+using DTMS.DeliveryOrder.Infrastructure.Data;
 using AMR.DeliveryPlanning.Dispatch.Domain.Services;
 using DTMS.Dispatch.IntegrationEvents;
 using Microsoft.EntityFrameworkCore;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
+namespace DTMS.DeliveryOrder.Infrastructure.Services;
 
 // Phase P5.3 — Implements the Dispatch-side bridge by querying the
 // DeliveryOrder read side. Lives in DeliveryOrder.Infrastructure (data

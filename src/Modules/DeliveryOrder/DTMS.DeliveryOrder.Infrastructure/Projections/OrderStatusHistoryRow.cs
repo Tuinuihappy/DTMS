@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections;
+namespace DTMS.DeliveryOrder.Infrastructure.Projections;
 
 /// <summary>
 /// Phase P1 read-model row materialized by <c>OrderStatusHistoryProjector</c>

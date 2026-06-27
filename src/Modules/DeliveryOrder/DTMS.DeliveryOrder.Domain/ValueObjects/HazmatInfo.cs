@@ -1,8 +1,8 @@
 using System.Text.RegularExpressions;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+namespace DTMS.DeliveryOrder.Domain.ValueObjects;
 
 /// <summary>
 /// Dangerous-goods classification attached to an <see cref="Entities.Item"/>.

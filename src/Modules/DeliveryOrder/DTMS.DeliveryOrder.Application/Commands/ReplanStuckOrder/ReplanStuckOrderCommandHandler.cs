@@ -1,8 +1,9 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Options;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Application.Options;
+using DTMS.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.DeliveryOrder.IntegrationEvents;
+using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
@@ -10,7 +11,7 @@ using MassTransit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.ReplanStuckOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.ReplanStuckOrder;
 
 /// <summary>
 /// T1.7 handler. Builds and publishes
@@ -83,9 +84,9 @@ public class ReplanStuckOrderCommandHandler : ICommandHandler<ReplanStuckOrderCo
         // the workflow is making progress and replay would double-dispatch.
         var trips = await _tripRepository.GetByDeliveryOrderIdAsync(order.Id, cancellationToken);
         var hasActiveTrip = trips.Any(t =>
-            t.Status is Dispatch.Domain.Enums.TripStatus.Created
-                or Dispatch.Domain.Enums.TripStatus.InProgress
-                or Dispatch.Domain.Enums.TripStatus.Paused);
+            t.Status is TripStatus.Created
+                or TripStatus.InProgress
+                or TripStatus.Paused);
         if (hasActiveTrip)
             return Result<ReplanStuckOrderResult>.Failure(
                 "Cannot replan — at least one trip on this order is still active. " +

@@ -1,4 +1,4 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
+using DTMS.DeliveryOrder.Infrastructure.Data;
 using DTMS.DeliveryOrder.IntegrationEvents;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
 using AMR.DeliveryPlanning.Planning.Application.Consumers;
@@ -60,7 +60,7 @@ public class T1_DeliveryOrderValidatedConsumerIntegrationTests : IClassFixture<D
 
         var (order, jobs) = await ReadStateAsync(ctx);
         order.Status.Should().Be(
-            AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums.OrderStatus.Dispatched,
+            DTMS.DeliveryOrder.Domain.Enums.OrderStatus.Dispatched,
             "single group dispatched successfully → Order advances to Dispatched");
         jobs.Should().ContainSingle();
         jobs[0].Status.Should().Be(JobStatus.Dispatched);
@@ -101,7 +101,7 @@ public class T1_DeliveryOrderValidatedConsumerIntegrationTests : IClassFixture<D
         // Items in the failed group were marked dispatch-failed → order moves
         // off "stuck Planned" toward Failed or PartiallyCompleted.
         order.Status.Should().NotBe(
-            AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums.OrderStatus.Planned,
+            DTMS.DeliveryOrder.Domain.Enums.OrderStatus.Planned,
             "the whole point of T1.2 is the order is no longer stuck at Planned after a vendor throw");
     }
 
@@ -134,7 +134,7 @@ public class T1_DeliveryOrderValidatedConsumerIntegrationTests : IClassFixture<D
         jobs[0].TripId.Should().Be(stableTripId,
             "T1.5 MarkJobDispatched idempotency — same TripId is a no-op, never repoint");
         order.Status.Should().Be(
-            AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums.OrderStatus.Dispatched);
+            DTMS.DeliveryOrder.Domain.Enums.OrderStatus.Dispatched);
     }
 
     // ─── Scenario 4: multi-group with mixed success ───────────────────────
@@ -184,7 +184,7 @@ public class T1_DeliveryOrderValidatedConsumerIntegrationTests : IClassFixture<D
         // successCount >= 1 → Order should reach Dispatched. The failed group's
         // items are marked Failed; the successful group's items carry on.
         order.Status.Should().Be(
-            AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums.OrderStatus.Dispatched,
+            DTMS.DeliveryOrder.Domain.Enums.OrderStatus.Dispatched,
             "at least one group succeeded → order advances despite the other failing");
     }
 
@@ -350,7 +350,7 @@ public class T1_DeliveryOrderValidatedConsumerIntegrationTests : IClassFixture<D
     /// use fresh scopes so we see committed values not change-tracker
     /// in-memory snapshots from inside the consumer's scope.
     /// </summary>
-    private async Task<(AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder Order,
+    private async Task<(DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder Order,
                        List<AMR.DeliveryPlanning.Planning.Domain.Entities.Job> Jobs)>
         ReadStateAsync(TestContext ctx)
     {

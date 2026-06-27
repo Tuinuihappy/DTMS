@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+namespace DTMS.DeliveryOrder.Domain.Enums;
 
 /// <summary>
 /// Higher-level grouping of <see cref="OrderStatus"/> values used by query

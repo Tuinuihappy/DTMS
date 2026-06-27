@@ -23,10 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Application\AMR.DeliveryPlanning.DeliveryOrder.Application.csproj" />
-    <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Domain\AMR.DeliveryPlanning.DeliveryOrder.Domain.csproj" />
-    <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Infrastructure\AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.csproj" />
-    <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\AMR.DeliveryPlanning.DeliveryOrder.Presentation\AMR.DeliveryPlanning.DeliveryOrder.Presentation.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\DTMS.DeliveryOrder.Application\DTMS.DeliveryOrder.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\DTMS.DeliveryOrder.Domain\DTMS.DeliveryOrder.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\DTMS.DeliveryOrder.Infrastructure\DTMS.DeliveryOrder.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\DeliveryOrder\DTMS.DeliveryOrder.Presentation\DTMS.DeliveryOrder.Presentation.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Dispatch\AMR.DeliveryPlanning.Dispatch.Domain\AMR.DeliveryPlanning.Dispatch.Domain.csproj" />
   </ItemGroup>
 

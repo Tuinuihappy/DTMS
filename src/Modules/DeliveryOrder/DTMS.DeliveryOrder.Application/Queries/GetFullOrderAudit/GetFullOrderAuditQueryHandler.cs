@@ -1,7 +1,7 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Projections;
+using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetFullOrderAudit;
+namespace DTMS.DeliveryOrder.Application.Queries.GetFullOrderAudit;
 
 /// <summary>
 /// Phase P2 — Transparent swap of the legacy 4-source UNION query to a

@@ -1,6 +1,6 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Options;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Application.Options;
+using DTMS.DeliveryOrder.Application.Services;
+using DTMS.DeliveryOrder.Domain.Enums;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 

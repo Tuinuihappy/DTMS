@@ -1,19 +1,19 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Events;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Events;
+using DTMS.DeliveryOrder.Domain.ValueObjects;
 using FluentAssertions;
 
 namespace DeliveryOrder.UnitTests;
 
 public class DeliveryOrderTests
 {
-    private static AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder CreateOrder(
+    private static DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder CreateOrder(
         string orderRef = "Test Order") =>
-        AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             orderRef, Priority.Normal, serviceWindow: null);
 
     private static void AddTestItem(
-        AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder order,
+        DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder order,
         int itemSeq, string pickup, string drop, string sku,
         double? weightKg = 10.0, double quantity = 5, UnitOfMeasure uom = UnitOfMeasure.EA) =>
         order.AddItem(
@@ -355,7 +355,7 @@ public class DeliveryOrderTests
     {
         var before = DateTime.UtcNow;
 
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.CreateFromUpstream(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.CreateFromUpstream(
             "UPS-001", Priority.High, ServiceWindow.Create(earliestUtc: null, latestUtc: DateTime.UtcNow.AddHours(2)),
             SourceSystem.Sap, createdBy: "sap-user");
 
@@ -383,7 +383,7 @@ public class DeliveryOrderTests
     [Fact]
     public void UpdateDraft_CanChangeRequestedByAndNotes()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "UPD-001", Priority.Normal, serviceWindow: null,
             sourceSystem: SourceSystem.Manual, createdBy: null);
 
@@ -398,7 +398,7 @@ public class DeliveryOrderTests
     [Fact]
     public void Confirm_DomainEventCarriesSubmittedAt()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "EVT-001", Priority.High, serviceWindow: ServiceWindow.Create(earliestUtc: null, latestUtc: DateTime.UtcNow.AddHours(4)),
             sourceSystem: SourceSystem.Manual, createdBy: null);
         AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
@@ -467,7 +467,7 @@ public class DeliveryOrderTests
     {
         var earliest = DateTime.UtcNow.AddHours(2);
         var latest = DateTime.UtcNow.AddHours(8);
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "WIN-001", Priority.Normal,
             serviceWindow: ServiceWindow.Create(earliest, latest),
             sourceSystem: SourceSystem.Manual, createdBy: null);
@@ -502,7 +502,7 @@ public class DeliveryOrderTests
     {
         // P1-8 dropped the Deadline backward-compat alias. With no ServiceWindow
         // at all, both Earliest and Latest must be null in the emitted event.
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "NO-WINDOW", Priority.Normal, serviceWindow: null,
             sourceSystem: SourceSystem.Manual, createdBy: null);
         AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
@@ -864,7 +864,7 @@ public class DeliveryOrderTests
     [Fact]
     public void Create_WithoutMode_DefaultsToAmr()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "TM-001", Priority.Normal, serviceWindow: null);
 
         order.RequestedTransportMode.Should().Be(TransportMode.Amr);
@@ -873,7 +873,7 @@ public class DeliveryOrderTests
     [Fact]
     public void Create_WithExplicitMode_PersistsValue()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "TM-002", Priority.Normal, serviceWindow: null,
             requestedTransportMode: TransportMode.Fleet);
 
@@ -883,7 +883,7 @@ public class DeliveryOrderTests
     [Fact]
     public void Create_WithNullMode_LeavesNull()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "TM-003", Priority.Normal, serviceWindow: null,
             requestedTransportMode: null);
 
@@ -893,7 +893,7 @@ public class DeliveryOrderTests
     [Fact]
     public void CreateFromUpstream_WithoutMode_DefaultsToAmr()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.CreateFromUpstream(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.CreateFromUpstream(
             "TM-UPS", Priority.High,
             ServiceWindow.Create(earliestUtc: null, latestUtc: DateTime.UtcNow.AddHours(2)),
             SourceSystem.Sap);
@@ -904,7 +904,7 @@ public class DeliveryOrderTests
     [Fact]
     public void UpdateDraft_CanChangeTransportMode()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "TM-UPD", Priority.Normal, serviceWindow: null,
             requestedTransportMode: TransportMode.Amr);
 
@@ -917,7 +917,7 @@ public class DeliveryOrderTests
     [Fact]
     public void Confirm_DomainEventCarriesRequestedTransportMode()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "TM-CONF", Priority.Normal, serviceWindow: null,
             requestedTransportMode: TransportMode.Fleet);
         AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
@@ -931,10 +931,10 @@ public class DeliveryOrderTests
 
     // ── PartiallyCompleted finalize logic ─────────────────────────────────
 
-    private static AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder
+    private static DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder
         OrderInProgress(int itemCount = 3, string refPrefix = "PC")
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             $"{refPrefix}-{Guid.NewGuid():N}", Priority.Normal, serviceWindow: null);
         for (var i = 1; i <= itemCount; i++)
             AddTestItem(order, itemSeq: i, "WH-01", "STORE-05", $"SKU-{i:000}");
@@ -1019,7 +1019,7 @@ public class DeliveryOrderTests
     {
         // Envelope flow: order is Confirmed (skipped legacy planning) when
         // vendor reports finished. All items get marked Delivered.
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "ENV-1", Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
         AddTestItem(order, itemSeq: 2, "WH-A", "Pack-1", "SKU-2");
@@ -1039,7 +1039,7 @@ public class DeliveryOrderTests
     {
         // Multi-group envelope orders fire TripCompleted multiple times.
         // Second call must be a no-op, not throw.
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "ENV-IDM", Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
         order.Submit();
@@ -1058,7 +1058,7 @@ public class DeliveryOrderTests
     [Fact]
     public void MarkVendorCompleted_FromCancelled_Throws()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "ENV-X", Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
         order.Cancel("oops");
@@ -1071,7 +1071,7 @@ public class DeliveryOrderTests
     [Fact]
     public void MarkVendorFailed_FromConfirmed_MovesToFailed()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "ENV-FAIL", Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
         order.Submit();
@@ -1088,7 +1088,7 @@ public class DeliveryOrderTests
     [Fact]
     public void MarkVendorFailed_AlreadyFailed_IsIdempotent()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "ENV-FAIL-IDM", Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
         order.Submit();
@@ -1104,7 +1104,7 @@ public class DeliveryOrderTests
     [Fact]
     public void MarkVendorFailed_FromCompleted_Throws()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "ENV-CONFLICT", Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
         order.Submit();
@@ -1122,7 +1122,7 @@ public class DeliveryOrderTests
     [Fact]
     public void Reopen_FromFailed_TransitionsToConfirmedAndFiresEvent()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "ENV-REOPEN", Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
         order.Submit();
@@ -1139,7 +1139,7 @@ public class DeliveryOrderTests
     [Fact]
     public void Reopen_FromConfirmed_Throws()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "ENV-REOPEN-BAD", Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
         order.Submit();
@@ -1154,7 +1154,7 @@ public class DeliveryOrderTests
     [Fact]
     public void Reopen_FromCancelled_Throws()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "ENV-REOPEN-CXL", Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
         order.Cancel("operator stopped");
@@ -1166,9 +1166,9 @@ public class DeliveryOrderTests
 
     // ── Option A: 4-state envelope flow transitions ─────────────────────
 
-    private static AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder ConfirmedOrder(string orderRef = "ENV-A")
+    private static DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder ConfirmedOrder(string orderRef = "ENV-A")
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             orderRef, Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
         order.Submit();
@@ -1305,7 +1305,7 @@ public class DeliveryOrderTests
     [Fact]
     public void MarkGroupItemsAsDispatchFailed_MarksOnlyMatchingPair()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "MG-FAIL", Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "DOCK-1", "SKU-A1");
         AddTestItem(order, itemSeq: 2, "WH-A", "DOCK-1", "SKU-A2");
@@ -1329,7 +1329,7 @@ public class DeliveryOrderTests
     {
         // Multi-group: group A vendor fails at dispatch, group B succeeds.
         // After B's items deliver, Order = PartiallyCompleted.
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "MG-PARTIAL", Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "DOCK-1", "SKU-A");
         AddTestItem(order, itemSeq: 2, "WH-B", "DOCK-2", "SKU-B");
@@ -1364,7 +1364,7 @@ public class DeliveryOrderTests
     {
         // Both groups fail at the vendor → both groups' items → Failed.
         // RecomputeStatusFromItems then transitions Order = Failed.
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "MG-ALLFAIL", Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "DOCK-1", "SKU-A");
         AddTestItem(order, itemSeq: 2, "WH-B", "DOCK-2", "SKU-B");
@@ -1390,11 +1390,11 @@ public class DeliveryOrderTests
 
     /// <summary>Builds a Confirmed order with a single (pickup, drop) station pair.
     /// Used by tests that need the whole order to be finalize-able from one trip.</summary>
-    private static (AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder Order,
+    private static (DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder Order,
                     (Guid Pickup, Guid Drop) GroupA)
         SingleGroupOrder()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "SG-" + Guid.NewGuid().ToString("N")[..6],
             Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "DOCK-1", "SKU-A1");
@@ -1409,12 +1409,12 @@ public class DeliveryOrderTests
 
     /// <summary>Builds a Confirmed order with N items spread across two
     /// (pickup, drop) station pairs. Returns the order and the two pair tuples.</summary>
-    private static (AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder Order,
+    private static (DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder Order,
                     (Guid Pickup, Guid Drop) GroupA,
                     (Guid Pickup, Guid Drop) GroupB)
         MultiGroupOrder()
     {
-        var order = AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "MG-" + Guid.NewGuid().ToString("N")[..6],
             Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "DOCK-1", "SKU-A1");

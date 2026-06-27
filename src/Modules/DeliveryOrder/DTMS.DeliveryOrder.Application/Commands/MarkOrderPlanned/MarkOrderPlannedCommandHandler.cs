@@ -1,8 +1,8 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.MarkOrderPlanned;
+namespace DTMS.DeliveryOrder.Application.Commands.MarkOrderPlanned;
 
 public class MarkOrderPlannedCommandHandler : ICommandHandler<MarkOrderPlannedCommand>
 {

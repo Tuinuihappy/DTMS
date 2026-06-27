@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+namespace DTMS.DeliveryOrder.Domain.Enums;
 
 public enum ItemStatus
 {

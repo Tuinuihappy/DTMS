@@ -1,11 +1,11 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Caching.Distributed;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 
 public record DimensionsDto(double LengthMm, double WidthMm, double HeightMm, double VolumeCBM);
 
@@ -117,10 +117,10 @@ public record GetDeliveryOrdersQuery(
 
 public class GetDeliveryOrdersQueryHandler : IQueryHandler<GetDeliveryOrdersQuery, PagedResult<DeliveryOrderListDto>>
 {
-    private readonly AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderListViewReadRepository _listRepo;
+    private readonly DTMS.DeliveryOrder.Application.Projections.IOrderListViewReadRepository _listRepo;
 
     public GetDeliveryOrdersQueryHandler(
-        AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderListViewReadRepository listRepo)
+        DTMS.DeliveryOrder.Application.Projections.IOrderListViewReadRepository listRepo)
         => _listRepo = listRepo;
 
     public async Task<Result<PagedResult<DeliveryOrderListDto>>> Handle(GetDeliveryOrdersQuery request, CancellationToken cancellationToken)
@@ -130,7 +130,7 @@ public class GetDeliveryOrdersQueryHandler : IQueryHandler<GetDeliveryOrdersQuer
         // unchanged so callers don't notice the swap; new optional
         // filters (HasFailedTrip / HasActiveJob) light up automatically
         // when the caller passes them.
-        var filters = new AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.OrderListViewFilters(
+        var filters = new DTMS.DeliveryOrder.Application.Projections.OrderListViewFilters(
             request.Status,
             request.Bucket,
             request.Priority,
@@ -155,7 +155,7 @@ public class GetDeliveryOrdersQueryHandler : IQueryHandler<GetDeliveryOrdersQuer
     }
 
     private static DeliveryOrderListDto MapEntryToListDto(
-        AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.OrderListViewEntry e)
+        DTMS.DeliveryOrder.Application.Projections.OrderListViewEntry e)
     {
         return new DeliveryOrderListDto(
             Id: e.OrderId,
@@ -205,11 +205,11 @@ public class GetDeliveryOrderStatsQueryHandler : IQueryHandler<GetDeliveryOrderS
         Converters = { new JsonStringEnumConverter() },
     };
 
-    private readonly AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderListViewReadRepository _listRepo;
+    private readonly DTMS.DeliveryOrder.Application.Projections.IOrderListViewReadRepository _listRepo;
     private readonly IDistributedCache _cache;
 
     public GetDeliveryOrderStatsQueryHandler(
-        AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderListViewReadRepository listRepo,
+        DTMS.DeliveryOrder.Application.Projections.IOrderListViewReadRepository listRepo,
         IDistributedCache cache)
     {
         _listRepo = listRepo;

@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
+namespace DTMS.DeliveryOrder.Domain.Entities;
 
 public class OrderAuditEvent : Entity<Guid>
 {

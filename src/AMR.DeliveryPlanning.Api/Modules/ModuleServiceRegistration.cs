@@ -1,12 +1,12 @@
 using AMR.DeliveryPlanning.Api.Auth;
 using AMR.DeliveryPlanning.Api.Infrastructure.Outbox;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Options;
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
-using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Data;
-using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Repositories;
-using AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
-using AMR.DeliveryPlanning.DeliveryOrder.Presentation.Idempotency;
+using DTMS.DeliveryOrder.Application.Options;
+using DTMS.DeliveryOrder.Application.Services;
+using DTMS.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Infrastructure.Data;
+using DTMS.DeliveryOrder.Infrastructure.Repositories;
+using DTMS.DeliveryOrder.Infrastructure.Services;
+using DTMS.DeliveryOrder.Presentation.Idempotency;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Data;
 using AMR.DeliveryPlanning.Dispatch.Infrastructure.Repositories;
@@ -287,7 +287,7 @@ public static class ModuleServiceRegistration
                 new DomainEventOutboxSaveChangesInterceptor(
                     sp.GetRequiredService<DeliveryOrderDomainEventMapper>())));
         services.AddHttpContextAccessor();
-        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Services.ICurrentUserAccessor,
+        services.AddScoped<DTMS.DeliveryOrder.Application.Services.ICurrentUserAccessor,
                            AMR.DeliveryPlanning.Api.Auth.HttpContextCurrentUserAccessor>();
         services.AddScoped<AMR.DeliveryPlanning.Planning.Application.Services.ICurrentUserAccessor,
                            AMR.DeliveryPlanning.Api.Auth.HttpContextCurrentUserAccessor>();
@@ -307,48 +307,48 @@ public static class ModuleServiceRegistration
         // hard dependency on DeliveryOrderDbContext. Implementation lives
         // here (in DeliveryOrder.Infrastructure) where the data is.
         services.AddScoped<AMR.DeliveryPlanning.Dispatch.Domain.Services.ITripItemSnapshotProvider,
-                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services.DeliveryOrderTripItemSnapshotProvider>();
+                           DTMS.DeliveryOrder.Infrastructure.Services.DeliveryOrderTripItemSnapshotProvider>();
         // Phase P1 — projection infrastructure for the DeliveryOrder module.
         // Read repo serves the status-history query endpoint.
         // Projection store backs OrderStatusHistoryProjector: combines inbox
         // dedup + history write + SaveChanges into a single transaction.
         // Both are concrete-typed per module so adding the Planning + Dispatch
         // analogs in upcoming P1 work won't conflict in DI.
-        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderStatusHistoryReadRepository,
-                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderStatusHistoryReadRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderStatusHistoryProjectionStore,
-                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderStatusHistoryProjectionStore>();
+        services.AddScoped<DTMS.DeliveryOrder.Application.Projections.IOrderStatusHistoryReadRepository,
+                           DTMS.DeliveryOrder.Infrastructure.Projections.OrderStatusHistoryReadRepository>();
+        services.AddScoped<DTMS.DeliveryOrder.Application.Projections.IOrderStatusHistoryProjectionStore,
+                           DTMS.DeliveryOrder.Infrastructure.Projections.OrderStatusHistoryProjectionStore>();
         // Phase P1 — SignalR-backed realtime publisher. Projector pushes to
         // OrderHub's "order:{id:N}" group after each successful timeline row.
-        services.AddSingleton<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderRealtimePublisher,
+        services.AddSingleton<DTMS.DeliveryOrder.Application.Projections.IOrderRealtimePublisher,
                               AMR.DeliveryPlanning.Api.Realtime.Publishers.SignalROrderRealtimePublisher>();
         // Phase P2 — unified order activity timeline projection.
-        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderActivityReadRepository,
-                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderActivityReadRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderActivityProjectionStore,
-                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderActivityProjectionStore>();
+        services.AddScoped<DTMS.DeliveryOrder.Application.Projections.IOrderActivityReadRepository,
+                           DTMS.DeliveryOrder.Infrastructure.Projections.OrderActivityReadRepository>();
+        services.AddScoped<DTMS.DeliveryOrder.Application.Projections.IOrderActivityProjectionStore,
+                           DTMS.DeliveryOrder.Infrastructure.Projections.OrderActivityProjectionStore>();
         // Phase P3 — hour-bucketed order funnel projection (dashboard).
-        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderFunnelReadRepository,
-                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderFunnelReadRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderFunnelProjectionStore,
-                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderFunnelProjectionStore>();
+        services.AddScoped<DTMS.DeliveryOrder.Application.Projections.IOrderFunnelReadRepository,
+                           DTMS.DeliveryOrder.Infrastructure.Projections.OrderFunnelReadRepository>();
+        services.AddScoped<DTMS.DeliveryOrder.Application.Projections.IOrderFunnelProjectionStore,
+                           DTMS.DeliveryOrder.Infrastructure.Projections.OrderFunnelProjectionStore>();
         // Phase P3 — dashboard realtime publisher. OrderFunnelProjector
         // enqueues "data changed" hints via this interface; the
         // composition-root implementation forwards into the existing
         // DashboardCounterBatcher (P0.B11) so frontend receives one
         // CountersUpdated push per board per 250 ms window.
-        services.AddSingleton<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IDashboardRealtimePublisher,
+        services.AddSingleton<DTMS.DeliveryOrder.Application.Projections.IDashboardRealtimePublisher,
                               AMR.DeliveryPlanning.Api.Realtime.Publishers.BatchedDashboardRealtimePublisher>();
         // Phase P4 — denormalized order list/search view projection.
-        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderListViewReadRepository,
-                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderListViewReadRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderListViewProjectionStore,
-                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderListViewProjectionStore>();
+        services.AddScoped<DTMS.DeliveryOrder.Application.Projections.IOrderListViewReadRepository,
+                           DTMS.DeliveryOrder.Infrastructure.Projections.OrderListViewReadRepository>();
+        services.AddScoped<DTMS.DeliveryOrder.Application.Projections.IOrderListViewProjectionStore,
+                           DTMS.DeliveryOrder.Infrastructure.Projections.OrderListViewProjectionStore>();
         // Phase P5 — BI fact table for reports (bi.OrderFacts).
-        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderFactsReadRepository,
-                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderFactsReadRepository>();
-        services.AddScoped<AMR.DeliveryPlanning.DeliveryOrder.Application.Projections.IOrderFactsProjectionStore,
-                           AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Projections.OrderFactsProjectionStore>();
+        services.AddScoped<DTMS.DeliveryOrder.Application.Projections.IOrderFactsReadRepository,
+                           DTMS.DeliveryOrder.Infrastructure.Projections.OrderFactsReadRepository>();
+        services.AddScoped<DTMS.DeliveryOrder.Application.Projections.IOrderFactsProjectionStore,
+                           DTMS.DeliveryOrder.Infrastructure.Projections.OrderFactsProjectionStore>();
         services.Configure<DeliveryOrderOptions>(
             configuration.GetSection(DeliveryOrderOptions.SectionName));
         services.Configure<UomOptions>(configuration.GetSection(UomOptions.SectionName));
@@ -536,7 +536,7 @@ public static class ModuleServiceRegistration
 
             // Auto-scan consumers from all module Application assemblies
             bus.AddConsumers(
-                typeof(AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly,
+                typeof(DTMS.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly,
                 typeof(AMR.DeliveryPlanning.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly,
                 typeof(AMR.DeliveryPlanning.Dispatch.Application.Commands.CreateEnvelopeTrip.CreateEnvelopeTripCommand).Assembly,
                 typeof(VehicleStateChangedConsumer).Assembly,

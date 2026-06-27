@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Queries.GetFullOrderAudit;
+namespace DTMS.DeliveryOrder.Application.Queries.GetFullOrderAudit;
 
 /// <summary>
 /// Consolidated audit log for one DeliveryOrder. Pulls from four sources

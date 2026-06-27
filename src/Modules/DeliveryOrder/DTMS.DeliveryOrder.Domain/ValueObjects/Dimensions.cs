@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Domain;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.ValueObjects;
+namespace DTMS.DeliveryOrder.Domain.ValueObjects;
 
 public class Dimensions : ValueObject
 {

@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.RecomputeOrderStatus;
+namespace DTMS.DeliveryOrder.Application.Commands.RecomputeOrderStatus;
 
 /// <summary>
 /// Forces a refresh of the Order's derived status from its items

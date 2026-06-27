@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.UnassignItemsFromTrip;
+namespace DTMS.DeliveryOrder.Application.Commands.UnassignItemsFromTrip;
 
 /// <summary>
 /// Release a Trip's items so the next retry can rebind them. Fired when

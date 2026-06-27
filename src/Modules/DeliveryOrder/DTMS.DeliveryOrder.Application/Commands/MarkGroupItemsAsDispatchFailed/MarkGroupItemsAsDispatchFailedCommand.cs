@@ -1,6 +1,6 @@
 using DTMS.SharedKernel.Messaging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.MarkGroupItemsAsDispatchFailed;
+namespace DTMS.DeliveryOrder.Application.Commands.MarkGroupItemsAsDispatchFailed;
 
 /// <summary>
 /// Mark items of a (Pickup, Drop) group as Failed when the dispatcher

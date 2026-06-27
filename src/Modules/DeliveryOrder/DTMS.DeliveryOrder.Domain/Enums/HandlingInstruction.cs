@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Domain.Enums;
+namespace DTMS.DeliveryOrder.Domain.Enums;
 
 /// <summary>
 /// Physical / mechanical handling rules an AMR (or a human escort) must

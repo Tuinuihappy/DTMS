@@ -1,4 +1,4 @@
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
+namespace DTMS.DeliveryOrder.Application.Services;
 
 /// <summary>
 /// Outcome of a warehouse lookup. Mirrors <see cref="StationLookupResult"/>

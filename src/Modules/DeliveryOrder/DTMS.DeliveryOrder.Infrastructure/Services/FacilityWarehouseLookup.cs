@@ -1,9 +1,9 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Application.Services;
+using DTMS.DeliveryOrder.Application.Services;
 using DTMS.Facility.Application.Services;
-using DoWarehouseLookupResult = AMR.DeliveryPlanning.DeliveryOrder.Application.Services.WarehouseLookupResult;
+using DoWarehouseLookupResult = DTMS.DeliveryOrder.Application.Services.WarehouseLookupResult;
 using FacilityWarehouseLookupResult = DTMS.Facility.Application.Services.WarehouseLookupResult;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Infrastructure.Services;
+namespace DTMS.DeliveryOrder.Infrastructure.Services;
 
 /// <summary>
 /// Adapter that satisfies <see cref="IWarehouseLookup"/> (DeliveryOrder.Application

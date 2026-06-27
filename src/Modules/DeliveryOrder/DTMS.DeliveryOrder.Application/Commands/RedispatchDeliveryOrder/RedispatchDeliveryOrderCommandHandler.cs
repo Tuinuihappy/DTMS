@@ -1,11 +1,12 @@
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Entities;
-using AMR.DeliveryPlanning.DeliveryOrder.Domain.Repositories;
+using DTMS.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Repositories;
+using AMR.DeliveryPlanning.Dispatch.Domain.Enums;
 using AMR.DeliveryPlanning.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace AMR.DeliveryPlanning.DeliveryOrder.Application.Commands.RedispatchDeliveryOrder;
+namespace DTMS.DeliveryOrder.Application.Commands.RedispatchDeliveryOrder;
 
 public class RedispatchDeliveryOrderCommandHandler : ICommandHandler<RedispatchDeliveryOrderCommand>
 {
@@ -42,9 +43,9 @@ public class RedispatchDeliveryOrderCommandHandler : ICommandHandler<RedispatchD
         // would queue duplicate vendor orders for the same items.
         var trips = await _tripRepository.GetByDeliveryOrderIdAsync(order.Id, cancellationToken);
         var hasActiveTrip = trips.Any(t =>
-            t.Status is Dispatch.Domain.Enums.TripStatus.Created
-                or Dispatch.Domain.Enums.TripStatus.InProgress
-                or Dispatch.Domain.Enums.TripStatus.Paused);
+            t.Status is TripStatus.Created
+                or TripStatus.InProgress
+                or TripStatus.Paused);
         if (hasActiveTrip)
             return Result.Failure(
                 "Cannot redispatch — at least one trip on this order is still active. " +
