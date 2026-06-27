@@ -59,6 +59,7 @@ builder.Host.UseSerilog((context, configuration) =>
 builder.Services.AddOpenApi(options =>
 {
     options.AddOperationTransformer<DTMS.Api.OpenApi.IdempotencyKeyOperationTransformer>();
+    options.AddDocumentTransformer<DTMS.Api.OpenApi.BearerSecuritySchemeTransformer>();
 });
 builder.Services.AddAuthorization(o =>
 {
@@ -90,12 +91,13 @@ builder.Services.ConfigureHttpJsonOptions(options =>
         {
             options.TokenValidationParameters = new TokenValidationParameters
             {
-                ValidateIssuer = true,
-                ValidateAudience = true,
+                // Phase 0: External Auth's JWT has no iss/aud claims, so
+                // we validate signature + expiry only. Phase 1 will turn
+                // these back on once External Auth includes those claims.
+                ValidateIssuer = false,
+                ValidateAudience = false,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
-                ValidIssuer = jwtSettings.Issuer,
-                ValidAudience = jwtSettings.Audience,
                 IssuerSigningKey = new RsaSecurityKey(rsa)
             };
             // SignalR cannot send custom Authorization headers on the
