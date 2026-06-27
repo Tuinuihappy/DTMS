@@ -37,13 +37,9 @@ public class Map : AggregateRoot<Guid>
 
     public void AddStation(Station station)
     {
-        // Add business rules e.g., coordinate must be within map bounds
-        if (station.Coordinate.X < 0 || station.Coordinate.X > Width ||
-            station.Coordinate.Y < 0 || station.Coordinate.Y > Height)
-        {
-            throw new ArgumentException("Station coordinate is out of map bounds.");
-        }
-
+        // Spatial validity (bounds, collisions, routability) is owned by
+        // RIOT3 — DTMS mirrors whatever RIOT3 publishes verbatim, so no
+        // coordinate check here.
         _stations.Add(station);
         AddDomainEvent(new StationAddedDomainEvent(this.Id, station.Id));
     }
