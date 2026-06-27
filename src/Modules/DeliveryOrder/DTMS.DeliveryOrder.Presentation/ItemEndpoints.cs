@@ -1,6 +1,7 @@
 using DTMS.DeliveryOrder.Application.Queries.GetItem;
 using DTMS.DeliveryOrder.Application.Queries.SearchItems;
 using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.Iam.Application.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -34,13 +35,13 @@ public static class ItemEndpoints
                 page, pageSize));
 
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:order:item:read");
 
         // GET /api/v1/items/{itemId}
         group.MapGet("/{itemId:guid}", async (Guid itemId, ISender sender) =>
         {
             var result = await sender.Send(new GetItemQuery(itemId));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
-        });
+        }).RequirePermission("dtms:order:item:read");
     }
 }

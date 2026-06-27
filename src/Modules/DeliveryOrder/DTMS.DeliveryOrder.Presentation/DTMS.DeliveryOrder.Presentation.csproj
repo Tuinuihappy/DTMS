@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DTMS.DeliveryOrder.Application\DTMS.DeliveryOrder.Application.csproj" />
     <ProjectReference Include="..\..\..\DTMS.SharedKernel\DTMS.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\Iam\DTMS.Iam.Application\DTMS.Iam.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

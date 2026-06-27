@@ -3,6 +3,7 @@ using System.Text;
 using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.DeliveryOrder.Application.Queries.GetOrdersReport;
 using DTMS.DeliveryOrder.Application.Queries.GetReports;
+using DTMS.Iam.Application.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -35,7 +36,7 @@ public static class ReportsEndpoints
             var result = await sender.Send(new GetOrdersReportQuery(
                 from, to, priority, finalStatus, sourceSystem));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:report:read");
 
         // ── P5.3 — 3 OrderFacts-backed reports + lead-time histogram ───
         //
@@ -49,7 +50,7 @@ public static class ReportsEndpoints
             var (from, to) = ResolveWindow(fromUtc, toUtc, defaultDays: 7);
             var result = await sender.Send(new GetSlaBreachReportQuery(from, to));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:report:read");
 
         group.MapGet("/top-failures", async (
             DateTime? fromUtc, DateTime? toUtc, int? limit, ISender sender) =>
@@ -57,7 +58,7 @@ public static class ReportsEndpoints
             var (from, to) = ResolveWindow(fromUtc, toUtc, defaultDays: 7);
             var result = await sender.Send(new GetTopFailuresReportQuery(from, to, limit ?? 20));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:report:read");
 
         group.MapGet("/lead-time", async (
             DateTime? fromUtc, DateTime? toUtc, ISender sender) =>
@@ -65,7 +66,7 @@ public static class ReportsEndpoints
             var (from, to) = ResolveWindow(fromUtc, toUtc, defaultDays: 7);
             var result = await sender.Send(new GetLeadTimeReportQuery(from, to));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:report:read");
 
         // GET /api/v1/reports/orders-export
         // Streams CSV of every OrderFacts row in the window. The repo
@@ -84,7 +85,7 @@ public static class ReportsEndpoints
             http.Response.Headers.ContentDisposition =
                 $"attachment; filename=\"orders-{from:yyyyMMdd}-{to:yyyyMMdd}.csv\"";
             await WriteCsvAsync(http.Response.Body, rows, ct);
-        });
+        }).RequirePermission("dtms:report:export");
     }
 
     private static (DateTime from, DateTime to) ResolveWindow(

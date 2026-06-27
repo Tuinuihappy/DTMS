@@ -1,4 +1,5 @@
 using DTMS.DeliveryOrder.Application.Queries.GetOrderFunnel;
+using DTMS.Iam.Application.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -30,6 +31,6 @@ public static class DashboardEndpoints
 
             var result = await sender.Send(new GetOrderFunnelQuery(from, to));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        });
+        }).RequirePermission("dtms:dashboard:read");
     }
 }
