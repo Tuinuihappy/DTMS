@@ -55,6 +55,11 @@ COPY src/Modules/Dispatch/DTMS.Dispatch.Infrastructure/DTMS.Dispatch.Infrastruct
 COPY src/Modules/Dispatch/DTMS.Dispatch.Presentation/DTMS.Dispatch.Presentation.csproj src/Modules/Dispatch/DTMS.Dispatch.Presentation/
 COPY src/Modules/Dispatch/DTMS.Dispatch.IntegrationEvents/DTMS.Dispatch.IntegrationEvents.csproj src/Modules/Dispatch/DTMS.Dispatch.IntegrationEvents/
 
+# Iam (Permission System Phase A — ADR-014)
+COPY src/Modules/Iam/DTMS.Iam.Domain/DTMS.Iam.Domain.csproj src/Modules/Iam/DTMS.Iam.Domain/
+COPY src/Modules/Iam/DTMS.Iam.Application/DTMS.Iam.Application.csproj src/Modules/Iam/DTMS.Iam.Application/
+COPY src/Modules/Iam/DTMS.Iam.Infrastructure/DTMS.Iam.Infrastructure.csproj src/Modules/Iam/DTMS.Iam.Infrastructure/
+
 # OmsAdapter
 COPY src/Modules/OmsAdapter/DTMS.OmsAdapter.csproj src/Modules/OmsAdapter/
 

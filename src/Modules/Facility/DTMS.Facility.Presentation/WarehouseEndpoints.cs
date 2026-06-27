@@ -4,6 +4,7 @@ using DTMS.Facility.Application.Commands.UpdateWarehouse;
 using DTMS.Facility.Application.Commands.WarehouseLifecycle;
 using DTMS.Facility.Application.Queries.GetWarehouseById;
 using DTMS.Facility.Application.Queries.GetWarehouses;
+using DTMS.Iam.Application.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -54,7 +55,7 @@ public static class WarehouseEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/facility/warehouses/{result.Value}", new { id = result.Value })
                 : Results.BadRequest(new { error = result.Error });
-        });
+        }).RequirePermission("dtms:facility:warehouse:write");
 
         // GET /api/v1/facility/warehouses?serviceMode=Amr&excludeInactive=true
         // The picker UI (Phase 2.7b) calls this on every dropdown open;
@@ -70,7 +71,7 @@ public static class WarehouseEndpoints
                 : null;
             var result = await sender.Send(new GetWarehousesQuery(mode, excludeInactive ?? true));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(new { error = result.Error });
-        });
+        }).RequirePermission("dtms:facility:warehouse:read");
 
         // GET /api/v1/facility/warehouses/{id}
         // Full detail — used by edit form and Phase 4 geofence editor.
@@ -78,7 +79,7 @@ public static class WarehouseEndpoints
         {
             var result = await sender.Send(new GetWarehouseByIdQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(new { error = result.Error });
-        });
+        }).RequirePermission("dtms:facility:warehouse:read");
 
         // PATCH /api/v1/facility/warehouses/{id}
         // Partial update — every field optional except Id. Frontend sends
@@ -105,7 +106,7 @@ public static class WarehouseEndpoints
 
             var result = await sender.Send(command);
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(new { error = result.Error });
-        });
+        }).RequirePermission("dtms:facility:warehouse:write");
 
         // POST /api/v1/facility/warehouses/{id}/deactivate
         // Soft-delete — picker UIs hide it but in-flight trips still resolve.
@@ -113,14 +114,14 @@ public static class WarehouseEndpoints
         {
             var result = await sender.Send(new DeactivateWarehouseCommand(id));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(new { error = result.Error });
-        });
+        }).RequirePermission("dtms:facility:warehouse:write");
 
         // POST /api/v1/facility/warehouses/{id}/reactivate
         group.MapPost("/{id:guid}/reactivate", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new ReactivateWarehouseCommand(id));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(new { error = result.Error });
-        });
+        }).RequirePermission("dtms:facility:warehouse:write");
     }
 
     // Case-insensitive enum parse — operator UIs sometimes lowercase

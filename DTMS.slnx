@@ -25,6 +25,11 @@
     <Project Path="src/Modules/Facility/DTMS.Facility.IntegrationEvents/DTMS.Facility.IntegrationEvents.csproj" />
     <Project Path="src/Modules/Facility/DTMS.Facility.Presentation/DTMS.Facility.Presentation.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Iam/">
+    <Project Path="src/Modules/Iam/DTMS.Iam.Application/DTMS.Iam.Application.csproj" />
+    <Project Path="src/Modules/Iam/DTMS.Iam.Domain/DTMS.Iam.Domain.csproj" />
+    <Project Path="src/Modules/Iam/DTMS.Iam.Infrastructure/DTMS.Iam.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Fleet/">
     <Project Path="src/Modules/Fleet/DTMS.Fleet.Application/DTMS.Fleet.Application.csproj" />
     <Project Path="src/Modules/Fleet/DTMS.Fleet.Domain/DTMS.Fleet.Domain.csproj" />

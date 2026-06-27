@@ -17,6 +17,9 @@ using DTMS.Facility.Domain.Services;
 using DTMS.Facility.Infrastructure.Data;
 using DTMS.Facility.Infrastructure.Repositories;
 using DTMS.Facility.Infrastructure.Services;
+using DTMS.Iam.Application.Repositories;
+using DTMS.Iam.Infrastructure.Data;
+using DTMS.Iam.Infrastructure.Repositories;
 using Microsoft.Extensions.Logging;
 using DTMS.Fleet.Application.Consumers;
 using DTMS.Fleet.Application.Services;
@@ -110,6 +113,13 @@ public static class ModuleServiceRegistration
             .EnableDynamicJson()
             .Build();
         services.AddSingleton<Npgsql.NpgsqlDataSource>(npgsqlDataSource);
+
+        // ── Iam Module (permission system, ADR-014 Phase A) ───────────
+        // Permission storage + role→permission mapping live here. Read-only
+        // at runtime; mappings come from migration seeds until the Admin
+        // UI lands in Phase B.
+        services.AddDbContext<IamDbContext>(o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));
+        services.AddScoped<IPermissionRepository, PermissionRepository>();
 
         // ── Facility Module ───────────────────────────────────────────
         services.AddDbContext<FacilityDbContext>(o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));

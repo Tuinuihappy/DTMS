@@ -69,6 +69,18 @@ builder.Services.AddAuthorization(o =>
     // and vice versa.
     o.AddOperatorPolicies();
 });
+
+// Permission System Phase A — register the per-request claims transformer
+// that pulls role→permission mappings from iam.RolePermissions and the
+// handler that evaluates `.RequirePermission("dtms:...")`. The transformer
+// uses IMemoryCache (registered below) for a 5-minute hot path.
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<
+    Microsoft.AspNetCore.Authentication.IClaimsTransformation,
+    DTMS.Iam.Application.Authorization.PermissionClaimsTransformer>();
+builder.Services.AddSingleton<
+    Microsoft.AspNetCore.Authorization.IAuthorizationHandler,
+    DTMS.Iam.Application.Authorization.PermissionAuthorizationHandler>();
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(
         new System.Text.Json.Serialization.JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.SnakeCaseUpper)));
@@ -501,6 +513,7 @@ var app = builder.Build();
             else
                 logger.LogInformation("Migration retry attempt {Attempt}/{Max}", attempt, maxAttempts);
 
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Iam.Infrastructure.Data.IamDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Facility.Infrastructure.Data.FacilityDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Fleet.Infrastructure.Data.FleetDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.DeliveryOrder.Infrastructure.Data.DeliveryOrderDbContext>(), logger, app.Environment);

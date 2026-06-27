@@ -1,11 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\DTMS.Facility.Application\DTMS.Facility.Application.csproj" />
-    <ProjectReference Include="..\..\Iam\DTMS.Iam.Application\DTMS.Iam.Application.csproj" />
+    <ProjectReference Include="..\DTMS.Iam.Domain\DTMS.Iam.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <!-- FrameworkReference brings in IMemoryCache, IClaimsTransformation,
+         IAuthorizationHandler, IEndpointConventionBuilder, and the Logging
+         abstractions transitively — no separate PackageReferences needed. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
