@@ -243,6 +243,7 @@ builder.Services.AddProjectionFoundation();
 // S.2's SystemClientAuthMiddleware sets ctx.Items["principal"] —
 // until then every authenticated request is a user.
 builder.Services.AddHttpContextAccessor();
+
 builder.Services.AddActorContext(sp =>
 {
     var http = sp.GetRequiredService<IHttpContextAccessor>();
@@ -252,11 +253,16 @@ builder.Services.AddActorContext(sp =>
         if (ctx is null) return null;
 
         var employeeId = ctx.User.FindFirst("EmployeeId")?.Value
+                      ?? ctx.User.FindFirst("employeeCode")?.Value
                       ?? ctx.User.Identity?.Name;
-        var displayName = ctx.User.FindFirst("name")?.Value
-                       ?? ctx.User.FindFirst("DisplayName")?.Value
-                       ?? employeeId
-                       ?? "anonymous";
+        // DisplayName comes from the JWT's "displayName" claim — the IDP
+        // mirrors it in the /auth/login response body too (same value).
+        // OperatorSyncMiddleware uses the same claim key for the PWA scheme.
+        // Leave empty if absent; mapper collapses to null on the wire and
+        // the audit chip renders ActorId-only.
+        var displayName = ctx.User.FindFirst("displayName")?.Value
+                       ?? ctx.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value
+                       ?? string.Empty;
 
         // SystemPrincipal lands here after S.2 wires the middleware.
         // We probe by type name to keep DTMS.Api free of an Iam module
