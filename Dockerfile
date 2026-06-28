@@ -19,6 +19,7 @@ COPY Directory.Packages.props ./
 # Copy all project files for restore
 COPY src/DTMS.Api/DTMS.Api.csproj src/DTMS.Api/
 COPY src/DTMS.SharedKernel/DTMS.SharedKernel.csproj src/DTMS.SharedKernel/
+COPY src/DTMS.Infrastructure/DTMS.Infrastructure.csproj src/DTMS.Infrastructure/
 
 # Facility
 COPY src/Modules/Facility/DTMS.Facility.Domain/DTMS.Facility.Domain.csproj src/Modules/Facility/DTMS.Facility.Domain/
