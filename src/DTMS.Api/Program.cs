@@ -235,6 +235,13 @@ builder.Services.AddProjectionFoundation();
 // EmployeeId (stable across username changes) and falls back to the JWT
 // name claim; MassTransit consumers + background services push an
 // explicit ActorContext via BeginScope (wired in P0.B7 / consumer filter).
+//
+// S.1 — resolver now also stamps Channel (ManualWeb / OperatorPwa /
+// SystemApi / InternalJob), Type (User vs System), and DisplayName so
+// the audit pipeline can distinguish a web action from a PWA tap from
+// a federated source-system callback. The SystemApi branch fires once
+// S.2's SystemClientAuthMiddleware sets ctx.Items["principal"] —
+// until then every authenticated request is a user.
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddActorContext(sp =>
 {
@@ -243,13 +250,59 @@ builder.Services.AddActorContext(sp =>
     {
         var ctx = http.HttpContext;
         if (ctx is null) return null;
-        var userId = ctx.User.FindFirst("EmployeeId")?.Value
-                  ?? ctx.User.Identity?.Name;
-        var traceId = ctx.TraceIdentifier;
+
+        var employeeId = ctx.User.FindFirst("EmployeeId")?.Value
+                      ?? ctx.User.Identity?.Name;
+        var displayName = ctx.User.FindFirst("name")?.Value
+                       ?? ctx.User.FindFirst("DisplayName")?.Value
+                       ?? employeeId
+                       ?? "anonymous";
+
+        // SystemPrincipal lands here after S.2 wires the middleware.
+        // We probe by type name to keep DTMS.Api free of an Iam module
+        // dependency at the composition root.
+        var principalItem = ctx.Items["principal"];
+        var systemKey = principalItem is null
+            ? null
+            : (principalItem.GetType().Name == "SystemPrincipal"
+                ? principalItem.GetType().GetProperty("Key")?.GetValue(principalItem) as string
+                : null);
+
+        string principalId;
+        DTMS.SharedKernel.Auth.PrincipalType type;
+        DTMS.SharedKernel.Auth.SourceChannel channel;
+        if (systemKey is not null)
+        {
+            principalId = $"system:{systemKey}";
+            type = DTMS.SharedKernel.Auth.PrincipalType.System;
+            channel = DTMS.SharedKernel.Auth.SourceChannel.SystemApi;
+        }
+        else
+        {
+            principalId = string.IsNullOrWhiteSpace(employeeId)
+                ? string.Empty
+                : $"user:{employeeId}";
+            type = DTMS.SharedKernel.Auth.PrincipalType.User;
+            channel = ctx.Request.Path.StartsWithSegments("/api/operator")
+                ? DTMS.SharedKernel.Auth.SourceChannel.OperatorPwa
+                : DTMS.SharedKernel.Auth.SourceChannel.ManualWeb;
+        }
+
+        // Prefer the W3C trace id so cross-service correlation works
+        // when the call originated upstream; fall back to ASP.NET's
+        // per-request TraceIdentifier. Only land in CorrelationId when
+        // it parses as a Guid (the legacy column type) — non-Guid trace
+        // ids still flow through structured logs.
+        var traceId = System.Diagnostics.Activity.Current?.TraceId.ToString()
+                   ?? ctx.TraceIdentifier;
+
         return new ActorContext(
-            UserId: string.IsNullOrWhiteSpace(userId) ? null : userId,
-            Source: "http",
-            CorrelationId: Guid.TryParse(traceId, out var g) ? g : null);
+            principalId: principalId,
+            type: type,
+            displayName: displayName,
+            channel: channel,
+            onBehalfOf: null,
+            correlationId: Guid.TryParse(traceId, out var g) ? g : null);
     };
 });
 
