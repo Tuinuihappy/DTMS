@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/DTMS.Api/DTMS.Api.csproj" />
+    <Project Path="src/DTMS.Infrastructure/DTMS.Infrastructure.csproj" />
     <Project Path="src/DTMS.SharedKernel/DTMS.SharedKernel.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\DTMS.SharedKernel\DTMS.SharedKernel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- FrameworkReference brings IHostedService, IMemoryCache, ILogger,
+         IServiceProvider, IOptions, and the full Microsoft.Extensions.*
+         abstraction stack — same approach as DTMS.Iam.Application. We sit
+         in the DTMS API process, so this is the right tradeoff vs. picking
+         a dozen individual Microsoft.Extensions.*.Abstractions packages. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+
+    <!-- Redis client for L2 cache, pub/sub invalidation, and distributed
+         circuit-breaker Lua scripts. -->
+    <PackageReference Include="StackExchange.Redis" />
+
+    <!-- EF Core for PartitionMaintenanceService's raw SQL execution.
+         Relational brings ExecuteSqlRawAsync + GetDbConnection extensions. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

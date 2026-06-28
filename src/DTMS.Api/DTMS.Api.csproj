@@ -37,6 +37,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DTMS.SharedKernel\DTMS.SharedKernel.csproj" />
+    <ProjectReference Include="..\DTMS.Infrastructure\DTMS.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Facility\DTMS.Facility.Presentation\DTMS.Facility.Presentation.csproj" />
     <ProjectReference Include="..\Modules\Facility\DTMS.Facility.Infrastructure\DTMS.Facility.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Fleet\DTMS.Fleet.Presentation\DTMS.Fleet.Presentation.csproj" />

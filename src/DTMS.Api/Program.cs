@@ -8,6 +8,7 @@ using DTMS.Api.Middlewares;
 using DTMS.Api.Modules;
 using DTMS.Api.RobotPositions;
 using DTMS.Api.VendorHealth;
+using DTMS.Infrastructure;
 using DTMS.SharedKernel.Auth;
 using DTMS.SharedKernel.Projection;
 using Microsoft.AspNetCore.Authentication;
@@ -344,6 +345,22 @@ if (useRedisBackplane)
         options.Configuration.AbortOnConnectFail = false;
     });
 }
+
+// Phase S.0 — shared scale infrastructure. Single IConnectionMultiplexer
+// for the whole app (DTMS.Infrastructure tiered cache, distributed
+// circuit breaker, and the source-system pub/sub channels that S.2-S.3
+// add). The health check and SignalR backplane still create their own
+// transient connections — they predate this singleton and have their
+// own lifecycle requirements (health check needs to fail-fast on Connect).
+builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(_ =>
+{
+    var cfg = StackExchange.Redis.ConfigurationOptions.Parse(redisConn);
+    cfg.AbortOnConnectFail = false;
+    cfg.ClientName = "dtms-api-infra";
+    return StackExchange.Redis.ConnectionMultiplexer.Connect(cfg);
+});
+builder.Services.AddDtmsTieredCache();
+builder.Services.AddDtmsDistributedCircuitBreaker();
 var rabbitConfig = builder.Configuration.GetSection("RabbitMq");
 var rabbitHost = rabbitConfig["Host"] ?? "localhost";
 var rabbitUser = rabbitConfig["Username"] ?? "guest";
