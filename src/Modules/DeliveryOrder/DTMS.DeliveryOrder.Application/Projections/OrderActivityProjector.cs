@@ -120,17 +120,20 @@ public class OrderActivityProjector :
             // Submitted for upstream-originated) — surface so the timeline
             // explains why the next transition may be missing.
             details: $"Entered as {ctx.Message.Status}",
-            actorId: ctx.Message.TriggeredBy);
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<DeliveryOrderSubmittedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
             "OrderSubmitted", details: null,
-            actorId: ctx.Message.TriggeredBy);
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<DeliveryOrderValidatedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
             "OrderValidated", details: null,
-            actorId: ctx.Message.TriggeredBy);
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<DeliveryOrderConfirmedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
@@ -138,44 +141,64 @@ public class OrderActivityProjector :
 
     public Task Consume(ConsumeContext<DeliveryOrderDispatchedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
-            "OrderDispatched", details: null);
+            "OrderDispatched", details: null,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<DeliveryOrderInProgressIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
-            "OrderInProgress", details: null);
+            "OrderInProgress", details: null,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<DeliveryOrderCompletedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
-            "OrderCompleted", details: null);
+            "OrderCompleted", details: null,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<DeliveryOrderPartiallyCompletedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
             "OrderPartiallyCompleted",
-            details: $"{ctx.Message.DeliveredCount}/{ctx.Message.TotalItems} delivered");
+            details: $"{ctx.Message.DeliveredCount}/{ctx.Message.TotalItems} delivered",
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<DeliveryOrderFailedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
-            "OrderFailed", ctx.Message.Reason);
+            "OrderFailed", ctx.Message.Reason,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<DeliveryOrderCancelledIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
-            "OrderCancelled", ctx.Message.Reason);
+            "OrderCancelled", ctx.Message.Reason,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<DeliveryOrderRejectedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
-            "OrderRejected", ctx.Message.Reason);
+            "OrderRejected", ctx.Message.Reason,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<DeliveryOrderHeldIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
-            "OrderHeld", ctx.Message.Reason);
+            "OrderHeld", ctx.Message.Reason,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<DeliveryOrderReleasedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
-            "OrderReleased", details: null);
+            "OrderReleased", details: null,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<DeliveryOrderAmendedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatAmendment,
-            "OrderAmended", ctx.Message.Reason);
+            "OrderAmended", ctx.Message.Reason,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     // ── Trip execution handlers ──────────────────────────────────────────
 
@@ -274,7 +297,9 @@ public class OrderActivityProjector :
         string? details,
         Guid? relatedTripId = null,
         int? attemptNumber = null,
-        string? actorId = null)
+        string? actorId = null,
+        string? channel = null,
+        string? displayName = null)
         where TEvent : class, IIntegrationEvent
     {
         var evt = ctx.Message;
@@ -307,7 +332,8 @@ public class OrderActivityProjector :
             await _store.AppendAsync(
                 Name, evt.EventId, orderId, category, eventType,
                 details, actorId, evt.OccurredOn,
-                relatedTripId, attemptNumber, ct);
+                relatedTripId, attemptNumber,
+                channel, displayName, ct);
 
             _metrics.RecordProjected(Name, typeof(TEvent).Name);
             _metrics.RecordLag(Name, evt.OccurredOn);
@@ -326,7 +352,9 @@ public class OrderActivityProjector :
                     ActorId: actorId,
                     OccurredAt: evt.OccurredOn,
                     RelatedTripId: relatedTripId,
-                    AttemptNumber: attemptNumber),
+                    AttemptNumber: attemptNumber,
+                    Channel: channel,
+                    DisplayName: displayName),
                 ct);
 
             _logger.LogInformation(

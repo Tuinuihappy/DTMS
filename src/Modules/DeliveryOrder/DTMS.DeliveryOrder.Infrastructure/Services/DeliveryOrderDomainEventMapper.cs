@@ -27,8 +27,15 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
         // SaveChanges call shares the same trigger context — important so
         // a multi-event aggregate (Reopen → Released + Confirmed) reads
         // as a single operator action in the audit timeline.
-        var triggeredBy = _actor.Current.TriggeredBy;
-        var correlationId = _actor.Current.CorrelationId;
+        var actor = _actor.Current;
+        var triggeredBy = actor.TriggeredBy;
+        var correlationId = actor.CorrelationId;
+        // S.1 follow-up — pass channel as string so downstream JSON-only
+        // consumers don't need to depend on the SharedKernel enum type.
+        // Empty/whitespace DisplayName collapses to null on the wire so
+        // the read DTO can render a placeholder consistently.
+        var channel = actor.Channel.ToString();
+        var displayName = string.IsNullOrWhiteSpace(actor.DisplayName) ? null : actor.DisplayName;
 
         return domainEvent switch
         {
@@ -49,50 +56,58 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             [
                 new DeliveryOrderCancelledIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             DeliveryOrderFailedDomainEvent evt =>
             [
                 new DeliveryOrderFailedIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             DeliveryOrderCompletedDomainEvent evt =>
             [
                 new DeliveryOrderCompletedIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             DeliveryOrderPartiallyCompletedDomainEvent evt =>
             [
                 new DeliveryOrderPartiallyCompletedIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId,
                     evt.DeliveredCount, evt.NotDeliveredCount, evt.TotalItems,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             DeliveryOrderAmendedDomainEvent evt =>
             [
                 new DeliveryOrderAmendedIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             DeliveryOrderHeldDomainEvent evt =>
             [
                 new DeliveryOrderHeldIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             DeliveryOrderReleasedDomainEvent evt =>
             [
                 new DeliveryOrderReleasedIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             DeliveryOrderRejectedDomainEvent evt =>
             [
                 new DeliveryOrderRejectedIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
 
             // Phase P4.5 — surface early lifecycle to the OrderListView
@@ -114,19 +129,22 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
                         i.Temperature is { } tr ? new ItemTemperatureSummaryDto(tr.MinC, tr.MaxC) : null,
                         i.HandlingInstructions,
                         i.PickupWarehouseId, i.DropWarehouseId)).ToList(),
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             DeliveryOrderSubmittedDomainEvent evt =>
             [
                 new DeliveryOrderSubmittedIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             DeliveryOrderValidatedDomainEvent evt =>
             [
                 new DeliveryOrderValidatedIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             // internal-only — no cross-module publishing needed
             DeliveryOrderDraftedDomainEvent         => [],
@@ -139,7 +157,8 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             [
                 new DeliveryOrderDraftUpdatedIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             // Option A: Planning + Planned are sub-second transitions —
             // surface in audit but don't broadcast to other modules.
@@ -151,13 +170,15 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
             [
                 new DeliveryOrderDispatchedIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             DeliveryOrderInProgressDomainEvent evt =>
             [
                 new DeliveryOrderInProgressIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             // Reopen is an admin action that brings Failed → Confirmed for
             // retry. We intentionally do NOT re-fire DeliveryOrderConfirmed

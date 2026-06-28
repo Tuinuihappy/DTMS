@@ -30,4 +30,10 @@ public sealed record FullAuditEntryDto(
     DateTime OccurredAt,
     // Trip-level events carry these so the UI can link / group:
     Guid? RelatedTripId,
-    int? AttemptNumber);
+    int? AttemptNumber,
+    // S.1 follow-up — Channel (ManualWeb / OperatorPwa / SystemApi /
+    // InternalJob) and DisplayName lifted from ActorContext at write
+    // time. Null for rows projected from pre-1.2 events or backfilled
+    // from the four legacy sources; UI degrades gracefully.
+    string? Channel = null,
+    string? DisplayName = null);

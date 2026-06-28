@@ -20,11 +20,13 @@ public class OrderActivityProjectionStore : IOrderActivityProjectionStore
         string projectorName, Guid eventId, Guid orderId,
         string category, string eventType, string? details, string? actorId,
         DateTime occurredAt, Guid? relatedTripId, int? attemptNumber,
+        string? channel = null, string? displayName = null,
         CancellationToken cancellationToken = default)
     {
         _db.OrderActivity.Add(new OrderActivityRow(
             eventId, orderId, category, eventType,
-            details, actorId, occurredAt, relatedTripId, attemptNumber));
+            details, actorId, occurredAt, relatedTripId, attemptNumber,
+            channel, displayName));
         _db.ProjectionInbox.Add(
             new InboxMessage(projectorName, eventId, DateTime.UtcNow));
         await _db.SaveChangesAsync(cancellationToken);

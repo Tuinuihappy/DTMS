@@ -10,15 +10,31 @@ public class OrderAuditEvent : Entity<Guid>
     public string? ActorId { get; private set; }
     public DateTime OccurredAt { get; private set; }
 
+    // Phase S.1 follow-up — channel + display name lifted from the
+    // ambient ActorContext at write time so the audit drawer can show
+    // "ManualWeb · Titichai Poojaratkoon" instead of bare "86347852".
+    // Nullable so old call sites (and consumer-side notify rows that
+    // pre-date S.1) stay valid; new sites opt in via the extended ctor.
+    public string? Channel { get; private set; }
+    public string? DisplayName { get; private set; }
+
     private OrderAuditEvent() { }
 
-    public OrderAuditEvent(Guid orderId, string eventType, string? details = null, string? actorId = null)
+    public OrderAuditEvent(
+        Guid orderId,
+        string eventType,
+        string? details = null,
+        string? actorId = null,
+        string? channel = null,
+        string? displayName = null)
     {
         Id = Guid.NewGuid();
         DeliveryOrderId = orderId;
         EventType = eventType;
         Details = details;
         ActorId = actorId;
+        Channel = channel;
+        DisplayName = displayName;
         OccurredAt = DateTime.UtcNow;
     }
 }

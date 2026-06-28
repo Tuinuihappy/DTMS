@@ -244,10 +244,27 @@ function AuditEntryRow({
                 {entry.details}
               </p>
             )}
-            {entry.actorId && (
-              <p className="mt-1 inline-flex items-center gap-1 text-[10.5px] text-[var(--color-ink-400)]">
+            {(entry.actorId || entry.channel || entry.displayName) && (
+              <p className="mt-1 inline-flex flex-wrap items-center gap-1.5 text-[10.5px] text-[var(--color-ink-400)]">
                 <User className="h-2.5 w-2.5" strokeWidth={2.4} />
-                <span className="font-mono">{entry.actorId}</span>
+                {entry.displayName && (
+                  <span className="text-[var(--color-ink-600)]">
+                    {entry.displayName}
+                  </span>
+                )}
+                {entry.actorId && (
+                  <span className="font-mono">{entry.actorId}</span>
+                )}
+                {entry.channel && (
+                  <span
+                    className={cn(
+                      "rounded px-1 py-[1px] text-[9px] font-semibold uppercase tracking-wider",
+                      channelChipClass(entry.channel),
+                    )}
+                  >
+                    {channelLabel(entry.channel)}
+                  </span>
+                )}
               </p>
             )}
           </div>
@@ -270,6 +287,35 @@ function labelFor(s: SourceFilter): string {
     TripRetry: "Retry",
     Amendment: "Amend",
   }[s];
+}
+
+// S.1 follow-up — render Channel enum values as short readable chips
+// next to the actor line. Server emits the C# enum name verbatim
+// ("ManualWeb", etc.); keep the switch tolerant so unknown values
+// (legacy / future) still display rather than crash.
+function channelLabel(channel: string): string {
+  switch (channel) {
+    case "ManualWeb": return "Web";
+    case "OperatorPwa": return "PWA";
+    case "SystemApi": return "System";
+    case "InternalJob": return "Job";
+    default: return channel;
+  }
+}
+
+function channelChipClass(channel: string): string {
+  switch (channel) {
+    case "ManualWeb":
+      return "bg-[var(--color-pastel-sky)] text-[var(--color-pastel-sky-ink)]";
+    case "OperatorPwa":
+      return "bg-[var(--color-pastel-mint)] text-[var(--color-pastel-mint-ink)]";
+    case "SystemApi":
+      return "bg-[var(--color-pastel-lavender)] text-[var(--color-pastel-lavender-ink)]";
+    case "InternalJob":
+      return "bg-[var(--color-ink-100)] text-[var(--color-ink-700)]";
+    default:
+      return "bg-[var(--color-ink-100)] text-[var(--color-ink-700)]";
+  }
 }
 
 function sourceVisual(source: string): {

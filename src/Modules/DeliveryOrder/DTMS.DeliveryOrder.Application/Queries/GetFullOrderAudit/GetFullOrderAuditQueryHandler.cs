@@ -42,7 +42,9 @@ public class GetFullOrderAuditQueryHandler : IQueryHandler<GetFullOrderAuditQuer
                 ActorId: e.ActorId,
                 OccurredAt: e.OccurredAt,
                 RelatedTripId: e.RelatedTripId,
-                AttemptNumber: e.AttemptNumber))
+                AttemptNumber: e.AttemptNumber,
+                Channel: e.Channel,
+                DisplayName: e.DisplayName))
             .ToList();
 
         return Result<FullOrderAuditDto>.Success(

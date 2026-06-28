@@ -406,6 +406,10 @@ export type FullAuditEntryDto = {
   occurredAt: string;
   relatedTripId: string | null;
   attemptNumber: number | null;
+  // S.1 follow-up — populated from ActorContext at write time.
+  // Null on rows projected from pre-1.2 events (backfilled history).
+  channel: string | null;
+  displayName: string | null;
 };
 
 export type FullOrderAuditDto = {

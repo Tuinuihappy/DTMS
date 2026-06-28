@@ -14,55 +14,77 @@ namespace DTMS.DeliveryOrder.IntegrationEvents;
 // other tables. Populated by DeliveryOrderDomainEventMapper from the ambient
 // ICurrentActorContext at outbox-emit time. Nullable so projectors that
 // don't care can ignore them.
+//
+// Schema 1.2 (Phase S.1 follow-up, 2026-06-28) — adds Channel + DisplayName
+// from the same ActorContext snapshot so the audit timeline can distinguish
+// ManualWeb / OperatorPwa / SystemApi / InternalJob and show a readable
+// name next to the bare employee id. Nullable for the same reason —
+// pre-1.2 events still project.
 
 public record DeliveryOrderCancelledIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    string SchemaVersion = "1.1") : IIntegrationEvent;
+    string? Channel = null,
+    string? DisplayName = null,
+    string SchemaVersion = "1.2") : IIntegrationEvent;
 
 public record DeliveryOrderFailedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    string SchemaVersion = "1.1") : IIntegrationEvent;
+    string? Channel = null,
+    string? DisplayName = null,
+    string SchemaVersion = "1.2") : IIntegrationEvent;
 
 public record DeliveryOrderCompletedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    string SchemaVersion = "1.1") : IIntegrationEvent;
+    string? Channel = null,
+    string? DisplayName = null,
+    string SchemaVersion = "1.2") : IIntegrationEvent;
 
 public record DeliveryOrderPartiallyCompletedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
     int DeliveredCount, int NotDeliveredCount, int TotalItems,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    string SchemaVersion = "1.1") : IIntegrationEvent;
+    string? Channel = null,
+    string? DisplayName = null,
+    string SchemaVersion = "1.2") : IIntegrationEvent;
 
 public record DeliveryOrderAmendedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    string SchemaVersion = "1.1") : IIntegrationEvent;
+    string? Channel = null,
+    string? DisplayName = null,
+    string SchemaVersion = "1.2") : IIntegrationEvent;
 
 public record DeliveryOrderHeldIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    string SchemaVersion = "1.1") : IIntegrationEvent;
+    string? Channel = null,
+    string? DisplayName = null,
+    string SchemaVersion = "1.2") : IIntegrationEvent;
 
 public record DeliveryOrderReleasedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    string SchemaVersion = "1.1") : IIntegrationEvent;
+    string? Channel = null,
+    string? DisplayName = null,
+    string SchemaVersion = "1.2") : IIntegrationEvent;
 
 public record DeliveryOrderRejectedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    string SchemaVersion = "1.1") : IIntegrationEvent;
+    string? Channel = null,
+    string? DisplayName = null,
+    string SchemaVersion = "1.2") : IIntegrationEvent;
 
 // Option A: 4-state envelope flow visibility. Planning + Planned are
 // internal-only (sub-second transitions, no value to downstream).
@@ -72,13 +94,17 @@ public record DeliveryOrderDispatchedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    string SchemaVersion = "1.1") : IIntegrationEvent;
+    string? Channel = null,
+    string? DisplayName = null,
+    string SchemaVersion = "1.2") : IIntegrationEvent;
 
 public record DeliveryOrderInProgressIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    string SchemaVersion = "1.1") : IIntegrationEvent;
+    string? Channel = null,
+    string? DisplayName = null,
+    string SchemaVersion = "1.2") : IIntegrationEvent;
 
 // Phase P4.5 (2026-06-15) — early-lifecycle events so the OrderListView
 // projection can materialize rows for Draft / Submitted / Validated orders
@@ -109,19 +135,25 @@ public record DeliveryOrderCreatedIntegrationEventV1(
     IReadOnlyList<ItemSummaryDto> Items,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    string SchemaVersion = "1.0") : IIntegrationEvent;
+    string? Channel = null,
+    string? DisplayName = null,
+    string SchemaVersion = "1.2") : IIntegrationEvent;
 
 public record DeliveryOrderSubmittedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    string SchemaVersion = "1.0") : IIntegrationEvent;
+    string? Channel = null,
+    string? DisplayName = null,
+    string SchemaVersion = "1.2") : IIntegrationEvent;
 
 public record DeliveryOrderValidatedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    string SchemaVersion = "1.0") : IIntegrationEvent;
+    string? Channel = null,
+    string? DisplayName = null,
+    string SchemaVersion = "1.2") : IIntegrationEvent;
 
 // Phase P4.6 (2026-06-25) — Draft replace via PUT carries no status change,
 // but mutates items + totals + service window + notes / transport mode.
@@ -131,4 +163,6 @@ public record DeliveryOrderDraftUpdatedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    string SchemaVersion = "1.0") : IIntegrationEvent;
+    string? Channel = null,
+    string? DisplayName = null,
+    string SchemaVersion = "1.2") : IIntegrationEvent;

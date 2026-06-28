@@ -10,7 +10,9 @@ public record OrderActivityEntry(
     string? ActorId,
     DateTime OccurredAt,
     Guid? RelatedTripId,
-    int? AttemptNumber);
+    int? AttemptNumber,
+    string? Channel = null,
+    string? DisplayName = null);
 
 public interface IOrderActivityReadRepository
 {

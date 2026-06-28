@@ -35,6 +35,13 @@ public class OrderActivityRow
     public Guid? RelatedTripId { get; private set; }
     public int? AttemptNumber { get; private set; }
 
+    // Phase S.1 follow-up — channel + display name carried from the
+    // ActorContext snapshot on the wire (IntegrationEventV1 schema 1.2).
+    // Nullable so rows projected from legacy 1.0/1.1 events (and the
+    // backfill SQL) stay valid; the read query surfaces them when present.
+    public string? Channel { get; private set; }
+    public string? DisplayName { get; private set; }
+
     private OrderActivityRow() { }   // EF
 
     public OrderActivityRow(
@@ -42,7 +49,8 @@ public class OrderActivityRow
         string category, string eventType,
         string? details, string? actorId,
         DateTime occurredAt,
-        Guid? relatedTripId, int? attemptNumber)
+        Guid? relatedTripId, int? attemptNumber,
+        string? channel = null, string? displayName = null)
     {
         if (eventId == Guid.Empty)
             throw new ArgumentException("EventId is required.", nameof(eventId));
@@ -67,5 +75,7 @@ public class OrderActivityRow
         OccurredAt = occurredAt;
         RelatedTripId = relatedTripId;
         AttemptNumber = attemptNumber;
+        Channel = channel;
+        DisplayName = displayName;
     }
 }

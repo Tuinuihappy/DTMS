@@ -22,6 +22,7 @@ public class OrderActivityReadRepository : IOrderActivityReadRepository
         return rows.Select(r => new OrderActivityEntry(
             r.Id, r.EventId, r.OrderId, r.Category, r.EventType,
             r.Details, r.ActorId, r.OccurredAt,
-            r.RelatedTripId, r.AttemptNumber)).ToList();
+            r.RelatedTripId, r.AttemptNumber,
+            r.Channel, r.DisplayName)).ToList();
     }
 }
