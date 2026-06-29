@@ -83,6 +83,13 @@ builder.Services.AddScoped<
 builder.Services.AddSingleton<
     Microsoft.AspNetCore.Authorization.IAuthorizationHandler,
     DTMS.Iam.Application.Authorization.PermissionAuthorizationHandler>();
+// Phase S.3.1a — sibling handler that resolves the permission code from
+// the request's {key} route value at enforcement time. Registered as a
+// singleton because it carries no per-request state (the route value is
+// read from the injected IHttpContextAccessor inside the handler call).
+builder.Services.AddSingleton<
+    Microsoft.AspNetCore.Authorization.IAuthorizationHandler,
+    DTMS.Iam.Application.Authorization.SourceSystemPermissionHandler>();
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(
         new System.Text.Json.Serialization.JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.SnakeCaseUpper)));

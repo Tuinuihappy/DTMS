@@ -62,12 +62,13 @@ public static class SourceSystemDeliveryOrderEndpoints
                 : Results.BadRequest(new { error = result.Error });
         })
             .RequireIdempotencyKey()
-            // Hardcoded to OMS for the MVP — when SAP/ERP go live, either
-            // (a) add per-system endpoint groups so the permission code is
-            // literal, or (b) introduce a custom IAuthorizationRequirement
-            // that derives the permission code from the URL key. (a) is
-            // simpler if there are ≤3 systems; (b) scales.
-            .RequirePermissionForSourceSystem("dtms:source:oms:order:write");
+            // Phase S.3.1a — permission code derives from the URL {key}
+            // segment at enforcement time, so adding a new SystemClient
+            // (sap, erp, wms-acme, ...) requires no code change here —
+            // only the matching permission row in iam.SystemClientPermissions
+            // and the corresponding credential. Handler validates the slug
+            // before substitution to prevent permission-string injection.
+            .RequirePermissionFromRouteKey(StandardSystemPermissions.OrderWriteTemplate);
     }
 
     private static bool TryMapSourceSystem(string urlKey, out SourceSystem mapped)
