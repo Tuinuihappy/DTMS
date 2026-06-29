@@ -24,16 +24,29 @@ public interface ITieredCache
     /// Cache-aside with cross-pod stampede protection. On miss, acquires
     /// a Redis SETNX lock at <paramref name="lockKey"/> so only one pod
     /// in the cluster calls <paramref name="factory"/>; the others wait
-    /// (bounded by <paramref name="lockTimeout"/>) and read the value
-    /// the winner wrote. Use for expensive factories — external token
-    /// fetch, large query — where N pods × M concurrent requests would
-    /// otherwise stampede the backing system.
+    /// up to <paramref name="waitTimeout"/> and read the value the winner
+    /// wrote. Use for expensive factories — external token fetch, large
+    /// query — where N pods × M concurrent requests would otherwise
+    /// stampede the backing system.
     /// </summary>
+    /// <param name="lockTimeout">
+    /// SETNX expiry for the lock key. Caller MUST size this at or above
+    /// the realistic worst-case factory duration. If the factory runs
+    /// longer than this, the lock evicts and a second caller becomes a
+    /// concurrent winner — two factory executions and a race on the
+    /// final write.
+    /// </param>
+    /// <param name="waitTimeout">
+    /// Upper bound on how long losers poll for the winner's published
+    /// value. Should be at least <paramref name="lockTimeout"/> so a
+    /// slow factory doesn't time out its own waiters.
+    /// </param>
     Task<T> GetOrSetWithLockAsync<T>(
         string key,
         string lockKey,
         Func<CancellationToken, Task<T>> factory,
         TimeSpan ttl,
         TimeSpan lockTimeout,
+        TimeSpan waitTimeout,
         CancellationToken ct = default) where T : class;
 }

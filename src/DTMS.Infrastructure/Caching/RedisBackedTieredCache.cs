@@ -83,6 +83,7 @@ public sealed class RedisBackedTieredCache : ITieredCache
         Func<CancellationToken, Task<T>> factory,
         TimeSpan ttl,
         TimeSpan lockTimeout,
+        TimeSpan waitTimeout,
         CancellationToken ct = default) where T : class
     {
         var hit = await GetAsync<T>(key, ct);
@@ -116,9 +117,15 @@ public sealed class RedisBackedTieredCache : ITieredCache
             }
         }
 
-        // Lock contended — poll with jitter until the winner publishes.
-        // Bounded retry: 10 × ~75ms = ~750ms worst case before we give up.
-        for (int i = 0; i < 10; i++)
+        // Lock contended — poll with jitter until the winner publishes
+        // or waitTimeout elapses. Each iteration also checks whether the
+        // lock has been released without a value being set, which means
+        // the winner's factory threw; we break early in that case so the
+        // caller sees a TimeoutException promptly instead of waiting the
+        // full window. (We don't take over as the new holder here to
+        // avoid unbounded recursion on a deterministic factory failure.)
+        var deadline = Environment.TickCount64 + (long)waitTimeout.TotalMilliseconds;
+        while (Environment.TickCount64 < deadline)
         {
             int jitter = 50 + System.Random.Shared.Next(50);
             await Task.Delay(TimeSpan.FromMilliseconds(jitter), ct);
@@ -126,10 +133,17 @@ public sealed class RedisBackedTieredCache : ITieredCache
             var late = await GetAsync<T>(key, ct);
             if (late is not null)
                 return late;
+
+            // Lock released without a value cached → previous holder
+            // failed. No point waiting further on this attempt.
+            bool lockStillHeld = await db.KeyExistsAsync(lockKey);
+            if (!lockStillHeld)
+                break;
         }
 
         throw new TimeoutException(
-            $"Cache fill timed out for key '{key}' after waiting on lock '{lockKey}'.");
+            $"Cache fill timed out for key '{key}' after {waitTimeout.TotalMilliseconds}ms " +
+            $"waiting on lock '{lockKey}'.");
     }
 
     private async Task PublishInvalidationAsync(string key)
