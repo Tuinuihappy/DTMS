@@ -228,6 +228,10 @@ public class DispatchDbContext : DbContext
             builder.Property(e => e.RetryCount).HasDefaultValue(0);
             builder.HasIndex(e => e.ProcessedOnUtc);
             builder.HasIndex(e => e.NextRetryAtUtc);
+            // Phase S.3 — PartitionKey is mapped only on the central
+            // OutboxDbContext; this module's table doesn't have the
+            // column.
+            builder.Ignore(e => e.PartitionKey);
         });
 
         // ── Phase P1 — projection_inbox (idempotency bookkeeping) ──────

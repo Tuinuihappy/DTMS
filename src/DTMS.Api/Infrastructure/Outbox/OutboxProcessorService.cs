@@ -82,9 +82,14 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
         // (an Exception escaping the body would cancel the rest of WhenAll
         // and surface as a noisy "Error processing outbox messages" log
         // every poll until the offending module recovers).
+        // Phase S.3 — central OutboxDbContext is owned by
+        // MultiPartitionOutboxProcessor going forward (it routes
+        // PartitionKey-tagged rows to per-system workers). The legacy
+        // processor stays in charge of the per-module outbox tables,
+        // each of which holds NULL-partition-key domain events going
+        // out via MassTransit.
         var modules = new (DbContext db, string source)[]
         {
-            (scope.ServiceProvider.GetRequiredService<OutboxDbContext>(), "outbox"),
             (scope.ServiceProvider.GetRequiredService<DeliveryOrderDbContext>(), DeliveryOrderDbContext.Schema),
             (scope.ServiceProvider.GetRequiredService<PlanningDbContext>(), PlanningDbContext.Schema),
             (scope.ServiceProvider.GetRequiredService<DispatchDbContext>(), DispatchDbContext.Schema),

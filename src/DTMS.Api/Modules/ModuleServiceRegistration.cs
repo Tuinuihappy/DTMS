@@ -695,6 +695,19 @@ public static class ModuleServiceRegistration
         if (runOutboxHere)
             services.AddHostedService<OutboxProcessorService>();
 
+        // Phase S.3 — partitioned outbox drain for federated source
+        // callbacks. Same RunInThisProcess gate as the legacy processor
+        // above so the dedicated outbox-worker container drains both
+        // queues without the api container double-processing. The
+        // dispatcher resolves per-iteration scope — replace
+        // LoggingSourceCallbackDispatcher with HttpSourceCallbackDispatcher
+        // in S.3.1 when the real HTTP callback path lands.
+        services.AddScoped<
+            DTMS.Iam.Application.Callbacks.ISourceCallbackDispatcher,
+            DTMS.Iam.Infrastructure.Callbacks.LoggingSourceCallbackDispatcher>();
+        if (runOutboxHere)
+            services.AddHostedService<DTMS.Api.Infrastructure.Outbox.MultiPartitionOutboxProcessor>();
+
         // Redis distributed cache
         var redisConnection = configuration.GetConnectionString("Redis") ?? "localhost:6379";
         services.AddStackExchangeRedisCache(o => o.Configuration = redisConnection);

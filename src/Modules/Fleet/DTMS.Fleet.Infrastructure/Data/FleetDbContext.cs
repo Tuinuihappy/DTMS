@@ -118,6 +118,10 @@ public class FleetDbContext : DbContext
             b.Property(e => e.RetryCount).HasDefaultValue(0);
             b.HasIndex(e => e.ProcessedOnUtc);
             b.HasIndex(e => e.NextRetryAtUtc);
+            // Phase S.3 — PartitionKey is mapped only on the central
+            // OutboxDbContext; module outbox tables don't have the
+            // column.
+            b.Ignore(e => e.PartitionKey);
         });
 
         // ── Phase P3.2 — projection_inbox + read models ────────────────

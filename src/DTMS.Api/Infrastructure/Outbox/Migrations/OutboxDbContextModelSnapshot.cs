@@ -42,6 +42,10 @@ namespace DTMS.Api.Infrastructure.Outbox.Migrations
                     b.Property<DateTime>("OccurredOnUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("PartitionKey")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<DateTime?>("ProcessedOnUtc")
                         .HasColumnType("timestamp with time zone");
 

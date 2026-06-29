@@ -211,6 +211,10 @@ public class PlanningDbContext : DbContext
             b.Property(e => e.RetryCount).HasDefaultValue(0);
             b.HasIndex(e => e.ProcessedOnUtc);
             b.HasIndex(e => e.NextRetryAtUtc);
+            // Phase S.3 — PartitionKey is mapped only on the central
+            // OutboxDbContext; this module's table doesn't have the
+            // column.
+            b.Ignore(e => e.PartitionKey);
         });
 
         // ── Phase P1 — projection_inbox (idempotency bookkeeping) ──────

@@ -10,17 +10,26 @@ public class OutboxMessage
     public string? Error { get; private set; }
     public int RetryCount { get; private set; }
     public DateTime? NextRetryAtUtc { get; private set; }
+    /// <summary>
+    /// Phase S.3 — when set, picks the row out of the default
+    /// processor's queue and routes it to a per-system worker in
+    /// <c>MultiPartitionOutboxProcessor</c>. NULL means "domain
+    /// event, dispatch via MassTransit through the legacy
+    /// <c>OutboxProcessorService</c>".
+    /// </summary>
+    public string? PartitionKey { get; private set; }
 
     public bool HasReachedMaxRetries => RetryCount >= OutboxRetryPolicy.MaxRetries;
 
     private OutboxMessage() { } // For EF Core
 
-    public OutboxMessage(Guid id, string type, string content, DateTime occurredOnUtc)
+    public OutboxMessage(Guid id, string type, string content, DateTime occurredOnUtc, string? partitionKey = null)
     {
         Id = id;
         Type = type;
         Content = content;
         OccurredOnUtc = occurredOnUtc;
+        PartitionKey = partitionKey;
     }
 
     public void MarkAsProcessed(DateTime processedOnUtc)

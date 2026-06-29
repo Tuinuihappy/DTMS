@@ -3,6 +3,12 @@
   <ItemGroup>
     <ProjectReference Include="..\DTMS.Iam.Application\DTMS.Iam.Application.csproj" />
     <ProjectReference Include="..\DTMS.Iam.Domain\DTMS.Iam.Domain.csproj" />
+    <!-- Phase S.3 — Iam.Infrastructure hosts the MultiPartitionOutboxProcessor
+         + PerSystemHttpClient which depend on the IDistributedCircuitBreaker
+         (S.0) abstraction. The interface lives in SharedKernel; the Redis impl
+         in DTMS.Infrastructure. Reference the impl here so the hosted services
+         resolve. -->
+    <ProjectReference Include="..\..\..\DTMS.Infrastructure\DTMS.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -12,6 +18,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="StackExchange.Redis" />
   </ItemGroup>
 
   <PropertyGroup>
