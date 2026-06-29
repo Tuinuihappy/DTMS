@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -86,7 +87,26 @@ public sealed class SystemClientAuthMiddleware : IMiddleware
             return;
         }
 
-        context.Items[PrincipalItemKey] = new SystemPrincipal(client.Key, client.DisplayName);
+        var principal = new SystemPrincipal(client.Key, client.DisplayName);
+        context.Items[PrincipalItemKey] = principal;
+
+        // Phase S.2.3 — load permission codes and stamp them as claims
+        // on a fresh ClaimsPrincipal so .RequirePermission(...) works
+        // for system callers exactly like it does for user callers.
+        // IClaimsTransformation runs before this middleware (it's keyed
+        // to the JwtBearer scheme), so we transform directly here
+        // instead of plumbing system principals through that pipeline.
+        var permCodes = await _clients.GetPermissionCodesAsync(client.Key, context.RequestAborted);
+        var identity = new ClaimsIdentity(
+            authenticationType: "SystemApiKey",
+            nameType: ClaimTypes.Name,
+            roleType: ClaimTypes.Role);
+        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, principal.PrincipalId));
+        identity.AddClaim(new Claim(ClaimTypes.Name, principal.DisplayName));
+        foreach (var code in permCodes)
+            identity.AddClaim(new Claim(PermissionClaimsTransformer.PermissionClaimType, code));
+        context.User = new ClaimsPrincipal(identity);
+
         await next(context);
     }
 

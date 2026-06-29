@@ -8,6 +8,7 @@ using DTMS.Api.Middlewares;
 using DTMS.Api.Modules;
 using DTMS.Api.RobotPositions;
 using DTMS.Api.VendorHealth;
+using DTMS.Iam.Application.Authorization;
 using DTMS.Infrastructure;
 using DTMS.SharedKernel.Auth;
 using DTMS.SharedKernel.Projection;
@@ -790,6 +791,24 @@ app.UseRateLimiter();
 app.UseCors(HubsCorsPolicy);
 
 app.UseAuthentication();
+
+// Phase S.2 — federated source-system auth + request log. MUST run
+// BEFORE UseAuthorization so SystemClientAuthMiddleware can stamp
+// context.User with the system principal + permission claims before
+// the endpoint policy is evaluated. Branched at the path level so
+// user traffic on /api/v1/delivery-orders etc. never pays the
+// SystemClient lookup overhead. Auth runs first so SystemPrincipal
+// lands in HttpContext.Items before the logging middleware reads it;
+// logging stamps duration/status AFTER next() so the row reflects
+// the final response.
+app.UseWhen(
+    ctx => ctx.Request.Path.StartsWithSegments("/api/v1/source"),
+    branch =>
+    {
+        branch.UseMiddleware<DTMS.Api.Middlewares.SystemClientAuthMiddleware>();
+        branch.UseMiddleware<DTMS.Api.Middlewares.SystemRequestLoggingMiddleware>();
+    });
+
 app.UseAuthorization();
 
 // Phase 4.2 — Operator PWA sync. Mounted only on /api/operator/* so it
@@ -799,20 +818,6 @@ app.UseAuthorization();
 app.UseWhen(
     ctx => ctx.Request.Path.StartsWithSegments("/api/operator"),
     branch => branch.UseMiddleware<DTMS.Api.Auth.OperatorSyncMiddleware>());
-
-// Phase S.2 — federated source-system auth + request log. Branched
-// at the path level so user traffic on /api/v1/delivery-orders etc.
-// never pays the SystemClient lookup overhead. Auth runs first so
-// SystemPrincipal lands in HttpContext.Items before the logging
-// middleware reads it; logging stamps duration/status AFTER next()
-// runs so the row reflects the final response.
-app.UseWhen(
-    ctx => ctx.Request.Path.StartsWithSegments("/api/v1/source"),
-    branch =>
-    {
-        branch.UseMiddleware<DTMS.Api.Middlewares.SystemClientAuthMiddleware>();
-        branch.UseMiddleware<DTMS.Api.Middlewares.SystemRequestLoggingMiddleware>();
-    });
 
 // Liveness probe (always 200 if process is up). G1 Phase 1 — excludes the
 // "drain" check so a draining pod stays liveness-Healthy and kubelet
@@ -892,6 +897,27 @@ app.MapHub<DTMS.Api.Realtime.Hubs.DashboardHub>("/hubs/dashboard");
 app.MapHub<DTMS.Api.Realtime.Hubs.FleetHub>("/hubs/fleet");
 // Phase 4.6 — dispatcher Manual operator board realtime hints.
 app.MapHub<DTMS.Api.Realtime.Hubs.ManualBoardHub>("/hubs/manual-board");
+
+// Phase S.2 smoke test endpoint — returns the authenticated source
+// system's principal id + display name. Guarded by the new system-side
+// permission policy so a system that holds `dtms:source:oms:order:read`
+// (or a wildcard above it) passes and any other system gets 403.
+// Will be removed once the real S.2.2 endpoint group lands.
+app.MapGet("/api/v1/source/{key}/whoami",
+    (HttpContext ctx, string key) =>
+    {
+        if (ctx.Items[DTMS.Api.Middlewares.SystemClientAuthMiddleware.PrincipalItemKey]
+            is not DTMS.Iam.Application.Authorization.SystemPrincipal sp)
+            return Results.Unauthorized();
+        return Results.Ok(new
+        {
+            principalId = sp.PrincipalId,
+            displayName = sp.DisplayName,
+            permissions = ctx.User.FindAll("permission").Select(c => c.Value).ToArray(),
+        });
+    }).RequirePermissionForSourceSystem("dtms:source:oms:order:read");
+
+// (using directive added at the top of Program.cs)
 
 app.Run();
 

@@ -23,4 +23,22 @@ public static class RequirePermissionExtensions
             .RequireAuthenticatedUser()
             .AddRequirements(new PermissionRequirement(permission)));
     }
+
+    /// <summary>
+    /// Phase S.2 variant for federated source-system endpoints. Does
+    /// NOT pin the policy to the Bearer scheme — the policy trusts the
+    /// <c>HttpContext.User</c> that <see cref="DTMS.Api.Middlewares"/>
+    /// <c>SystemClientAuthMiddleware</c> set, including its
+    /// already-stamped permission claims. Apply only to endpoints
+    /// mounted under <c>/api/v1/source/{key}/*</c>; using it on a
+    /// user-facing endpoint would bypass the Bearer scheme guard.
+    /// </summary>
+    public static TBuilder RequirePermissionForSourceSystem<TBuilder>(
+        this TBuilder builder, string permission)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        return builder.RequireAuthorization(policy => policy
+            .RequireAuthenticatedUser()
+            .AddRequirements(new PermissionRequirement(permission)));
+    }
 }
