@@ -24,10 +24,14 @@ public static class InfrastructureServiceCollectionExtensions
     /// Registers <see cref="ITieredCache"/> + the cross-pod invalidation
     /// subscriber. Requires <see cref="IConnectionMultiplexer"/> already
     /// registered. <see cref="IMemoryCache"/> is added if absent.
+    /// <see cref="PodIdentity"/> is added as a singleton so the cache
+    /// writer and subscriber agree on the sender id used to filter local
+    /// echoes from peer-published invalidations.
     /// </summary>
     public static IServiceCollection AddDtmsTieredCache(this IServiceCollection services)
     {
         services.AddMemoryCache();
+        services.AddSingleton<PodIdentity>();
         services.AddSingleton<ITieredCache, RedisBackedTieredCache>();
         services.AddHostedService<CacheInvalidationSubscriber>();
         return services;

@@ -16,15 +16,18 @@ public sealed class RedisBackedTieredCache : ITieredCache
 
     private readonly IConnectionMultiplexer _redis;
     private readonly IMemoryCache _local;
+    private readonly PodIdentity _pod;
     private readonly ILogger<RedisBackedTieredCache> _log;
 
     public RedisBackedTieredCache(
         IConnectionMultiplexer redis,
         IMemoryCache local,
+        PodIdentity pod,
         ILogger<RedisBackedTieredCache> log)
     {
         _redis = redis;
         _local = local;
+        _pod = pod;
         _log = log;
     }
 
@@ -52,6 +55,13 @@ public sealed class RedisBackedTieredCache : ITieredCache
 
         var l1Ttl = ttl < L1Ttl ? ttl : L1Ttl;
         _local.Set(key, value, l1Ttl);
+
+        // Broadcast peer-side invalidation so other replicas drop their
+        // stale L1 copy of this key. We publish AFTER L2 is written so a
+        // peer that responds to the message and re-reads sees the new
+        // value, not the previous. Subscribers on this same pod filter
+        // out the echo via the sender pod id.
+        await PublishInvalidationAsync(key);
     }
 
     public async Task InvalidateAsync(string key, CancellationToken ct = default)
@@ -61,10 +71,10 @@ public sealed class RedisBackedTieredCache : ITieredCache
         var db = _redis.GetDatabase();
         await db.KeyDeleteAsync(key);
 
-        // Broadcast — peers drop their L1 copies. We already dropped ours
-        // locally above; the subscriber on this pod will no-op the echo.
-        var sub = _redis.GetSubscriber();
-        await sub.PublishAsync(RedisChannel.Literal(InvalidationChannel), key);
+        // Broadcast — peers drop their L1 copies. Our own L1 was already
+        // removed above; the subscriber on this pod filters the echo by
+        // sender id.
+        await PublishInvalidationAsync(key);
     }
 
     public async Task<T> GetOrSetWithLockAsync<T>(
@@ -122,6 +132,14 @@ public sealed class RedisBackedTieredCache : ITieredCache
             $"Cache fill timed out for key '{key}' after waiting on lock '{lockKey}'.");
     }
 
+    private async Task PublishInvalidationAsync(string key)
+    {
+        var payload = JsonSerializer.Serialize(
+            new InvalidationMessage(key, _pod.Id), JsonOpts);
+        var sub = _redis.GetSubscriber();
+        await sub.PublishAsync(RedisChannel.Literal(InvalidationChannel), payload);
+    }
+
     private T? Deserialize<T>(string raw) where T : class
     {
         try
@@ -136,4 +154,6 @@ public sealed class RedisBackedTieredCache : ITieredCache
             return null;
         }
     }
+
+    public sealed record InvalidationMessage(string Key, string PodId);
 }
