@@ -64,15 +64,37 @@ public static class InfrastructureServiceCollectionExtensions
 
     /// <summary>
     /// Registers a partition-maintenance background service for the
-    /// given <typeparamref name="TContext"/>. Requires
-    /// <c>AddDbContextFactory&lt;TContext&gt;()</c> to be called by the
-    /// owning module.
+    /// given <typeparamref name="TContext"/>. The owning module must
+    /// register <c>AddDbContextFactory&lt;TContext&gt;()</c> first; this
+    /// helper asserts the registration up-front so a misconfiguration
+    /// surfaces at <c>Program.cs</c> wiring time rather than at host
+    /// startup with a less obvious "cannot resolve IDbContextFactory"
+    /// stack trace.
     /// </summary>
     public static IServiceCollection AddDtmsPartitionMaintenance<TContext>(
         this IServiceCollection services,
         Action<PartitionMaintenanceOptions<TContext>> configure)
         where TContext : DbContext
     {
+        bool factoryRegistered = false;
+        foreach (var d in services)
+        {
+            if (d.ServiceType == typeof(IDbContextFactory<TContext>))
+            {
+                factoryRegistered = true;
+                break;
+            }
+        }
+        if (!factoryRegistered)
+        {
+            throw new InvalidOperationException(
+                $"AddDtmsPartitionMaintenance<{typeof(TContext).Name}> requires " +
+                $"AddDbContextFactory<{typeof(TContext).Name}>() to be registered first. " +
+                "DTMS modules historically register AddDbContext (scoped) only; the " +
+                "partition service uses a factory so its background loop can own its " +
+                "own DbContext lifetime independent of any request scope.");
+        }
+
         services.Configure(configure);
         services.AddHostedService<PartitionMaintenanceService<TContext>>();
         return services;
