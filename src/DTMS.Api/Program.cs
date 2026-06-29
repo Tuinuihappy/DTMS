@@ -264,24 +264,23 @@ builder.Services.AddActorContext(sp =>
                        ?? ctx.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value
                        ?? string.Empty;
 
-        // SystemPrincipal lands here after S.2 wires the middleware.
-        // We probe by type name to keep DTMS.Api free of an Iam module
-        // dependency at the composition root.
-        var principalItem = ctx.Items["principal"];
-        var systemKey = principalItem is null
-            ? null
-            : (principalItem.GetType().Name == "SystemPrincipal"
-                ? principalItem.GetType().GetProperty("Key")?.GetValue(principalItem) as string
-                : null);
-
+        // SystemPrincipal lands here after SystemClientAuthMiddleware
+        // (Phase S.2). DTMS.Api already references the Iam projects via
+        // ModuleServiceRegistration so the typed cast is cheaper than
+        // the reflection probe used during S.1 stub-out.
         string principalId;
         DTMS.SharedKernel.Auth.PrincipalType type;
         DTMS.SharedKernel.Auth.SourceChannel channel;
-        if (systemKey is not null)
+        if (ctx.Items["principal"] is DTMS.Iam.Application.Authorization.SystemPrincipal sp)
         {
-            principalId = $"system:{systemKey}";
+            principalId = sp.PrincipalId;
             type = DTMS.SharedKernel.Auth.PrincipalType.System;
             channel = DTMS.SharedKernel.Auth.SourceChannel.SystemApi;
+            // Prefer the system's stored DisplayName over whatever the
+            // JWT layer wrote — system requests are unauthenticated as
+            // a user so JWT-claim displayName will be empty/null anyway.
+            if (!string.IsNullOrWhiteSpace(sp.DisplayName))
+                displayName = sp.DisplayName;
         }
         else
         {
@@ -420,6 +419,34 @@ builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(_ =>
 });
 builder.Services.AddDtmsTieredCache();
 builder.Services.AddDtmsDistributedCircuitBreaker();
+
+// Phase S.2 — batched writer for iam.SystemRequestLog. The drain
+// service flushes via SystemRequestLogSink (registered in
+// ModuleServiceRegistration alongside the IamDbContext factory).
+builder.Services.AddDtmsBatchedLog<DTMS.Iam.Domain.Entities.SystemRequestLogEntry>();
+
+// Phase S.2 — partition maintenance for iam.SystemRequestLog. The
+// migration pre-seeds 3 months of partitions; this background service
+// rolls forward every 6h and drops anything older than 3 months.
+builder.Services.AddDtmsPartitionMaintenance<DTMS.Iam.Infrastructure.Data.IamDbContext>(opts =>
+{
+    opts.Targets = new[]
+    {
+        new DTMS.Infrastructure.Database.PartitionTarget(
+            // Unquoted — the service Postgres-quotes both segments
+            // when emitting DDL so PascalCase table names survive.
+            SchemaAndTable: "iam.SystemRequestLog",
+            TimeColumn: "OccurredAt",
+            AdvanceMonths: 2,
+            RetainMonths: 3),
+    };
+});
+
+// Phase S.2 — register the two middlewares as transient (IMiddleware
+// convention so DI resolves them per-request and we can inject scoped
+// repos). app.UseWhen wires them into the pipeline below.
+builder.Services.AddTransient<DTMS.Api.Middlewares.SystemClientAuthMiddleware>();
+builder.Services.AddTransient<DTMS.Api.Middlewares.SystemRequestLoggingMiddleware>();
 var rabbitConfig = builder.Configuration.GetSection("RabbitMq");
 var rabbitHost = rabbitConfig["Host"] ?? "localhost";
 var rabbitUser = rabbitConfig["Username"] ?? "guest";
@@ -772,6 +799,20 @@ app.UseAuthorization();
 app.UseWhen(
     ctx => ctx.Request.Path.StartsWithSegments("/api/operator"),
     branch => branch.UseMiddleware<DTMS.Api.Auth.OperatorSyncMiddleware>());
+
+// Phase S.2 — federated source-system auth + request log. Branched
+// at the path level so user traffic on /api/v1/delivery-orders etc.
+// never pays the SystemClient lookup overhead. Auth runs first so
+// SystemPrincipal lands in HttpContext.Items before the logging
+// middleware reads it; logging stamps duration/status AFTER next()
+// runs so the row reflects the final response.
+app.UseWhen(
+    ctx => ctx.Request.Path.StartsWithSegments("/api/v1/source"),
+    branch =>
+    {
+        branch.UseMiddleware<DTMS.Api.Middlewares.SystemClientAuthMiddleware>();
+        branch.UseMiddleware<DTMS.Api.Middlewares.SystemRequestLoggingMiddleware>();
+    });
 
 // Liveness probe (always 200 if process is up). G1 Phase 1 — excludes the
 // "drain" check so a draining pod stays liveness-Healthy and kubelet

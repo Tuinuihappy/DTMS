@@ -119,12 +119,40 @@ public static class ModuleServiceRegistration
         // audit log. Hot-path lookup goes through PermissionRepository
         // (cached at the ClaimsTransformer layer); RoleRepository +
         // AuditLogRepository back the /api/v1/iam/* admin endpoints.
-        services.AddDbContext<IamDbContext>(o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));
+        // Phase S.2 — register the scoped context AND a singleton
+        // factory side-by-side. optionsLifetime: Singleton is what
+        // unlocks the dual registration: a scoped DbContext consumer
+        // and the singleton PartitionMaintenanceService factory can
+        // share the same DbContextOptions instance. Without that flag,
+        // ServiceProvider validation fails ("cannot consume scoped
+        // DbContextOptions from singleton factory").
+        services.AddDbContext<IamDbContext>(
+            o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql),
+            contextLifetime: ServiceLifetime.Scoped,
+            optionsLifetime: ServiceLifetime.Singleton);
+        services.AddDbContextFactory<IamDbContext>(
+            lifetime: ServiceLifetime.Singleton);
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<DTMS.Iam.Application.Repositories.IRoleRepository,
                            DTMS.Iam.Infrastructure.Repositories.RoleRepository>();
         services.AddScoped<DTMS.Iam.Application.Repositories.IAuditLogRepository,
                            DTMS.Iam.Infrastructure.Repositories.AuditLogRepository>();
+
+        // Phase S.2 — federated source-system integration.
+        services.AddScoped<DTMS.Iam.Application.Repositories.ISystemClientRepository,
+                           DTMS.Iam.Infrastructure.Repositories.SystemClientRepository>();
+        services.AddScoped<DTMS.Iam.Application.Repositories.ISystemCredentialRepository,
+                           DTMS.Iam.Infrastructure.Repositories.SystemCredentialRepository>();
+        // CachedCredentialReader takes ITieredCache (singleton) but
+        // depends on the scoped ISystemCredentialRepository on cache
+        // miss — register scoped so the dependency chain resolves.
+        services.AddScoped<DTMS.Iam.Application.Authorization.CachedCredentialReader>();
+        // Sink resolved per drain-batch scope by BatchedLogDrainService;
+        // sink ctor takes the scoped IamDbContext for one bulk INSERT
+        // per flush.
+        services.AddScoped<
+            DTMS.SharedKernel.Logging.IBatchedLogSink<DTMS.Iam.Domain.Entities.SystemRequestLogEntry>,
+            DTMS.Iam.Infrastructure.Logging.SystemRequestLogSink>();
 
         // ── Facility Module ───────────────────────────────────────────
         services.AddDbContext<FacilityDbContext>(o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));

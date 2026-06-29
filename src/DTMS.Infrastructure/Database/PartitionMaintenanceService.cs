@@ -89,16 +89,26 @@ public sealed class PartitionMaintenanceService<TContext> : BackgroundService
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
         var (schema, bareTable) = SplitIdentifier(t.SchemaAndTable);
-        var thisMonth = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        // Snapshot DateTime.UtcNow once — reading Year and Month
+        // separately would otherwise race the month-boundary tick
+        // (canonical "monthly cron broken on Dec 31" footgun).
+        var now = DateTime.UtcNow;
+        var thisMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
 
         for (int i = 0; i <= t.AdvanceMonths; i++)
         {
             var from = thisMonth.AddMonths(i);
             var to = thisMonth.AddMonths(i + 1);
             var partName = $"{bareTable}_{from:yyyyMM}";
-            var qualifiedPart = $"{schema}.{partName}";
+            // Postgres-quote both segments so PascalCase table names
+            // ("SystemRequestLog") aren't silently lowercased by the
+            // parser. Schema + bareTable have already passed the
+            // identifier validator so the only chars inside the quotes
+            // are [A-Za-z0-9_].
+            var qualifiedPart = $"\"{schema}\".\"{partName}\"";
+            var qualifiedParent = $"\"{schema}\".\"{bareTable}\"";
             var sql = $@"
-                CREATE TABLE IF NOT EXISTS {qualifiedPart} PARTITION OF {t.SchemaAndTable}
+                CREATE TABLE IF NOT EXISTS {qualifiedPart} PARTITION OF {qualifiedParent}
                 FOR VALUES FROM ('{from:yyyy-MM-dd}') TO ('{to:yyyy-MM-dd}');";
             await db.Database.ExecuteSqlRawAsync(sql, ct);
         }
@@ -141,7 +151,7 @@ public sealed class PartitionMaintenanceService<TContext> : BackgroundService
         foreach (var p in names)
         {
             ValidateBareIdentifier(p);
-            var dropSql = $"DROP TABLE IF EXISTS {schema}.{p};";
+            var dropSql = $"DROP TABLE IF EXISTS \"{schema}\".\"{p}\";";
             await db.Database.ExecuteSqlRawAsync(dropSql, ct);
             _log.LogInformation(
                 "Dropped expired partition {Schema}.{Partition} (cutoff {Cutoff})",

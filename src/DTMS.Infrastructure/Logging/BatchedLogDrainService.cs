@@ -30,8 +30,11 @@ public sealed class BatchedLogDrainService<T> : BackgroundService
         _log = log;
     }
 
+    private CancellationToken _hostStopping = CancellationToken.None;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        _hostStopping = stoppingToken;
         var buffer = new List<T>(_opts.MaxBatchSize);
 
         while (!stoppingToken.IsCancellationRequested)
@@ -126,7 +129,14 @@ public sealed class BatchedLogDrainService<T> : BackgroundService
         if (remaining.Count == 0)
             return;
 
-        using var shutdownCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        // Linked to the host stopping token so a force-kill (SIGTERM
+        // grace expiring) propagates into the flush — without the link,
+        // the orphaned 5s timer would keep us pinned past the host
+        // shutdown deadline and lose entries anyway when the OS sends
+        // SIGKILL. Capped at 5s so we never exceed the host's grace.
+        using var shutdownCts = CancellationTokenSource
+            .CreateLinkedTokenSource(_hostStopping);
+        shutdownCts.CancelAfter(TimeSpan.FromSeconds(5));
         try
         {
             await FlushSafelyAsync(remaining, shutdownCts.Token);

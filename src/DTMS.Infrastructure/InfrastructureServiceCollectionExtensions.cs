@@ -8,6 +8,7 @@ using DTMS.SharedKernel.Resilience;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using StackExchange.Redis;
 
@@ -53,15 +54,37 @@ public static class InfrastructureServiceCollectionExtensions
     /// implementation separately — without one the drain service starts
     /// but every flush will throw.
     /// </summary>
+    /// <remarks>
+    /// Idempotent per <typeparamref name="T"/>: calling this method
+    /// twice for the same entry type is a no-op on the second call.
+    /// Without the guard, two modules registering the same T would
+    /// install two <see cref="BatchedLogDrainService{T}"/> instances
+    /// racing TryRead on a channel marked <c>SingleReader=true</c> —
+    /// undefined behaviour.
+    /// </remarks>
     public static IServiceCollection AddDtmsBatchedLog<T>(
         this IServiceCollection services,
         Action<BatchedLogWriterOptions<T>>? configure = null)
     {
+        // Probe by writer singleton — if it's there, the trio (options +
+        // writer + drain) was already installed by a prior call.
+        bool alreadyRegistered = false;
+        foreach (var d in services)
+        {
+            if (d.ServiceType == typeof(BatchedLogWriter<T>))
+            {
+                alreadyRegistered = true;
+                break;
+            }
+        }
+        if (alreadyRegistered)
+            return services;
+
         var opts = new BatchedLogWriterOptions<T>();
         configure?.Invoke(opts);
-        services.AddSingleton(opts);
-        services.AddSingleton<BatchedLogWriter<T>>();
-        services.AddSingleton<IBatchedLogWriter<T>>(sp => sp.GetRequiredService<BatchedLogWriter<T>>());
+        services.TryAddSingleton(opts);
+        services.TryAddSingleton<BatchedLogWriter<T>>();
+        services.TryAddSingleton<IBatchedLogWriter<T>>(sp => sp.GetRequiredService<BatchedLogWriter<T>>());
         services.AddHostedService<BatchedLogDrainService<T>>();
         return services;
     }
