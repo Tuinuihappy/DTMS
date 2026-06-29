@@ -20,6 +20,11 @@ public static class ModuleEndpointRegistration
         app.MapWarehouseEndpoints();   // Phase 2.7a — separate file from MapEndpoints to keep AMR vs Warehouse surfaces distinct
         app.MapFleetEndpoints();
         app.MapDeliveryOrderEndpoints();
+        // Phase S.2.2 — federated source-system endpoint group at
+        // /api/v1/source/{key}/* (separate from the admin-side
+        // /api/v1/delivery-orders/upstream so the system auth +
+        // request-log middleware applies cleanly).
+        app.MapSourceSystemDeliveryOrderEndpoints();
         app.MapItemEndpoints();
         app.MapDashboardEndpoints();
         app.MapFleetDashboardEndpoints();
