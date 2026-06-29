@@ -33,4 +33,40 @@ public sealed class SystemClientRepository : ISystemClientRepository
             .ToListAsync(ct);
         return codes;
     }
+
+    // ── Phase S.4 admin CRUD ────────────────────────────────────────────
+
+    public async Task<IReadOnlyList<SystemClient>> ListAllAsync(CancellationToken ct = default)
+        => await _db.SystemClients.AsNoTracking().OrderBy(s => s.Key).ToListAsync(ct);
+
+    public async Task AddWithPermissionsAsync(
+        SystemClient client,
+        IReadOnlyList<string> permissionCodes,
+        string grantedBy,
+        CancellationToken ct = default)
+    {
+        // Wrap in execution-strategy because the IamDbContext is
+        // EnableRetryOnFailure-equipped — an explicit transaction
+        // outside the strategy would throw.
+        var strategy = _db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
+            _db.SystemClients.Add(client);
+            foreach (var code in permissionCodes.Distinct(StringComparer.Ordinal))
+            {
+                _db.SystemClientPermissions.Add(
+                    new Domain.Entities.SystemClientPermission(client.Key, code, grantedBy));
+            }
+            await _db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        });
+    }
+
+    public async Task UpdateAsync(SystemClient client, CancellationToken ct = default)
+    {
+        _db.SystemClients.Update(client);
+        await _db.SaveChangesAsync(ct);
+    }
 }

@@ -3,11 +3,13 @@ using DTMS.Iam.Domain.Entities;
 namespace DTMS.Iam.Application.Repositories;
 
 /// <summary>
-/// Read-side access to <see cref="SystemClient"/> + the principal's
-/// permission set. Admin CRUD lands in a separate write-side
-/// repository (Phase S.4); this interface covers the hot paths that
-/// the auth middleware + permission transformer hit per request, so
-/// it stays narrow.
+/// Persistence access for <see cref="SystemClient"/> + the principal's
+/// permission set. Hot-path readers (auth middleware, claims
+/// transformer) hit <see cref="GetByKeyAsync"/> +
+/// <see cref="GetPermissionCodesAsync"/>; admin CRUD (Phase S.4)
+/// adds the write methods alongside the read ones — one interface per
+/// aggregate keeps DI flat and avoids two-context fan-out under one
+/// admin request.
 /// </summary>
 public interface ISystemClientRepository
 {
@@ -25,4 +27,25 @@ public interface ISystemClientRepository
     /// the claims transformer expands them at enforcement time.
     /// </summary>
     Task<IReadOnlyList<string>> GetPermissionCodesAsync(string systemKey, CancellationToken ct = default);
+
+    // ── Phase S.4 admin CRUD ────────────────────────────────────────────
+
+    /// <summary>All systems including deactivated. Admin list view.</summary>
+    Task<IReadOnlyList<SystemClient>> ListAllAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Persist a new <see cref="SystemClient"/> + its auto-seeded
+    /// standard permissions atomically. The caller passes the
+    /// permission codes (resolved from
+    /// <see cref="DTMS.Iam.Application.Authorization.StandardSystemPermissions"/>)
+    /// — keeping the substitution at the call site so the repo doesn't
+    /// import the Authorization namespace.
+    /// </summary>
+    Task AddWithPermissionsAsync(SystemClient client, IReadOnlyList<string> permissionCodes, string grantedBy, CancellationToken ct = default);
+
+    /// <summary>
+    /// Replace the tracked entity with the in-memory state — used after
+    /// metadata edits or Activate/Deactivate via the domain methods.
+    /// </summary>
+    Task UpdateAsync(SystemClient client, CancellationToken ct = default);
 }

@@ -31,12 +31,22 @@ public sealed class SystemClient
             throw new ArgumentException("Key is required.", nameof(key));
         if (key.Length > 50)
             throw new ArgumentException("Key must be 50 characters or fewer.", nameof(key));
-        // URL path safety — same reasoning as Role.Name. The key lands
-        // in /api/v1/source/{key}/* so anything that would percent-encode
-        // or terminate the path segment is rejected here.
-        if (key.IndexOfAny(new[] { '/', '?', '#', '%', '\\', ' ' }) >= 0)
-            throw new ArgumentException(
-                "Key cannot contain '/', '?', '#', '%', '\\', or spaces.", nameof(key));
+        // Phase S.3.1a tightened this from "no path-breaking chars" to
+        // a strict slug: the key gets interpolated into permission codes
+        // (dtms:source:{key}:order:write) at endpoint enforcement time,
+        // so any character that could land in those codes must be
+        // alphanumeric-and-dash or admin could craft a Key that grants
+        // unintended access (e.g. 'oms:*').
+        foreach (var c in key)
+        {
+            var ok = (c >= 'a' && c <= 'z')
+                  || (c >= '0' && c <= '9')
+                  || c == '-';
+            if (!ok)
+                throw new ArgumentException(
+                    "Key must contain only lowercase letters, digits, and '-' (no underscores, dots, colons, uppercase, or spaces).",
+                    nameof(key));
+        }
         if (string.IsNullOrWhiteSpace(displayName))
             throw new ArgumentException("DisplayName is required.", nameof(displayName));
 
