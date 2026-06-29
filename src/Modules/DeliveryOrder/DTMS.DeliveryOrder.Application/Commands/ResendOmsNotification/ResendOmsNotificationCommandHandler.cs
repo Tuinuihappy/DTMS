@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.OmsAdapter.Abstractions;
@@ -61,6 +62,16 @@ public class ResendOmsNotificationCommandHandler
         {
             return Result<ResendOmsNotificationResult>.Failure(
                 "Order has no OrderRef — only upstream-originated orders can be resent to OMS.");
+        }
+
+        // S.3.1b-followup guard — legacy adapter is OMS-only. Sap/Erp
+        // orders carry an OrderRef too but route through the S.3.1b
+        // SystemEventSubscriptions pipeline; resending them here would
+        // wrongly POST to OMS.
+        if (order.SourceSystem != SourceSystem.Oms)
+        {
+            return Result<ResendOmsNotificationResult>.Failure(
+                $"Order is from {order.SourceSystem}, not OMS. Use the federated callback admin tools (Phase S.3.1b) to manage non-OMS notifications.");
         }
 
         var trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);

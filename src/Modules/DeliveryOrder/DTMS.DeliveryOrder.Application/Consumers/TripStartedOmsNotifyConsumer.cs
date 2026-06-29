@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Dispatch.IntegrationEvents;
@@ -90,6 +91,20 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
         {
             _logger.LogDebug("[OmsNotify] Order {OrderId} has no OrderRef — non-upstream, skipping",
                 order.Id);
+            return;
+        }
+
+        // S.3.1b-followup guard — only OMS-sourced orders go through this
+        // legacy adapter. Sap/Erp orders carry an OrderRef too, so the
+        // gate above alone would leak them into the OMS POST. The
+        // federated S.3.1b pipeline handles non-OMS sources via the
+        // SystemEventSubscriptions table; legacy stays OMS-only by
+        // design.
+        if (order.SourceSystem != SourceSystem.Oms)
+        {
+            _logger.LogDebug(
+                "[OmsNotify] Order {OrderId} source={Source} — not OMS, skipping legacy adapter (S.3.1b handles routing)",
+                order.Id, order.SourceSystem);
             return;
         }
 

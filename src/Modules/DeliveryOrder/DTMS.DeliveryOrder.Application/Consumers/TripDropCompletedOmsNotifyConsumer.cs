@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.DeliveryOrder.Domain.Entities;
+using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Dispatch.IntegrationEvents;
@@ -83,6 +84,17 @@ public class TripDropCompletedOmsNotifyConsumer : IConsumer<TripDropCompletedInt
         {
             _logger.LogDebug("[OmsArrived] Order {OrderId} has no OrderRef — non-upstream, skipping",
                 order.Id);
+            return;
+        }
+
+        // S.3.1b-followup guard — see TripStartedOmsNotifyConsumer for
+        // the full rationale. Legacy adapter handles OMS only; Sap/Erp
+        // route through the S.3.1b SystemEventSubscriptions pipeline.
+        if (order.SourceSystem != SourceSystem.Oms)
+        {
+            _logger.LogDebug(
+                "[OmsArrived] Order {OrderId} source={Source} — not OMS, skipping legacy adapter",
+                order.Id, order.SourceSystem);
             return;
         }
 
