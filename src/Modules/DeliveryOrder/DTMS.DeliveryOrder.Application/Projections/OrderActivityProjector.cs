@@ -333,7 +333,8 @@ public class OrderActivityProjector :
                 Name, evt.EventId, orderId, category, eventType,
                 details, actorId, evt.OccurredOn,
                 relatedTripId, attemptNumber,
-                channel, displayName, ct);
+                cancellationToken: ct,
+                channel: channel, displayName: displayName);
 
             _metrics.RecordProjected(Name, typeof(TEvent).Name);
             _metrics.RecordLag(Name, evt.OccurredOn);

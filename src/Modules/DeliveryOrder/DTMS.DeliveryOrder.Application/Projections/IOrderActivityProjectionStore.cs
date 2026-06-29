@@ -20,7 +20,7 @@ public interface IOrderActivityProjectionStore
         DateTime occurredAt,
         Guid? relatedTripId,
         int? attemptNumber,
+        CancellationToken cancellationToken = default,
         string? channel = null,
-        string? displayName = null,
-        CancellationToken cancellationToken = default);
+        string? displayName = null);
 }
