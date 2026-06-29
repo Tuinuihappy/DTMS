@@ -41,12 +41,27 @@ public sealed class OrderCancelledCallbackFanoutConsumer
         var ct = ctx.CancellationToken;
         var eventType = CallbackEventTypes.OrderCancelledV1;
 
-        var subs = await _lookup.GetSubscribersAsync(eventType, ct);
+        // Phase S.3.1b follow-up — source-routed delivery (see sibling
+        // OrderDeliveredCallbackFanoutConsumer for the rationale).
+        var source = ctx.Message.SourceSystem;
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            _log.LogDebug(
+                "Order {OrderId} has no SourceSystem; no external callback to route.",
+                ctx.Message.DeliveryOrderId);
+            return;
+        }
+
+        var allSubs = await _lookup.GetSubscribersAsync(eventType, ct);
+        var subs = allSubs
+            .Where(s => string.Equals(s.SystemKey, source, StringComparison.OrdinalIgnoreCase))
+            .ToList();
         if (subs.Count == 0)
         {
             _log.LogDebug(
-                "No subscribers for {EventType}; skipping fan-out for order {OrderId}",
-                eventType, ctx.Message.DeliveryOrderId);
+                "Source system {Source} has no enabled subscription for {EventType}; " +
+                "skipping fan-out for order {OrderId}",
+                source, eventType, ctx.Message.DeliveryOrderId);
             return;
         }
 

@@ -475,7 +475,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         if (delivered == total)
         {
             Status = OrderStatus.Completed;
-            AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+            AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, SourceSystem));
         }
         else if (delivered == 0)
         {
@@ -747,7 +747,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             throw new InvalidOperationException($"Cannot cancel an order in {Status} status.");
 
         Status = OrderStatus.Cancelled;
-        AddDomainEvent(new DeliveryOrderCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+        AddDomainEvent(new DeliveryOrderCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason, SourceSystem));
     }
 
     /// <summary>
@@ -828,7 +828,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
                 item.UpdateStatus(ItemStatus.Delivered);
 
         Status = OrderStatus.Completed;
-        AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+        AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, SourceSystem));
     }
 
     // Envelope-flow failure: vendor reported the order failed. Idempotent.
@@ -871,7 +871,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         else
         {
             Status = OrderStatus.Completed;
-            AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+            AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, SourceSystem));
         }
     }
 

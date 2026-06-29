@@ -20,6 +20,12 @@ namespace DTMS.DeliveryOrder.IntegrationEvents;
 // ManualWeb / OperatorPwa / SystemApi / InternalJob and show a readable
 // name next to the bare employee id. Nullable for the same reason —
 // pre-1.2 events still project.
+//
+// Schema 1.3 (Phase S.3.1b follow-up, 2026-06-29) — adds SourceSystem
+// on Cancelled + Completed so the fan-out consumer can route the
+// callback to the order's originating system. Nullable to keep older
+// queued events readable and to mean "no external system to notify"
+// for user-created orders.
 
 public record DeliveryOrderCancelledIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
@@ -27,7 +33,8 @@ public record DeliveryOrderCancelledIntegrationEventV1(
     Guid? CorrelationId = null,
     string? Channel = null,
     string? DisplayName = null,
-    string SchemaVersion = "1.2") : IIntegrationEvent;
+    string? SourceSystem = null,
+    string SchemaVersion = "1.3") : IIntegrationEvent;
 
 public record DeliveryOrderFailedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
@@ -43,7 +50,8 @@ public record DeliveryOrderCompletedIntegrationEventV1(
     Guid? CorrelationId = null,
     string? Channel = null,
     string? DisplayName = null,
-    string SchemaVersion = "1.2") : IIntegrationEvent;
+    string? SourceSystem = null,
+    string SchemaVersion = "1.3") : IIntegrationEvent;
 
 public record DeliveryOrderPartiallyCompletedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,

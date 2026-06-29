@@ -57,7 +57,8 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
                 new DeliveryOrderCancelledIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason,
                     TriggeredBy: triggeredBy, CorrelationId: correlationId,
-                    Channel: channel, DisplayName: displayName)
+                    Channel: channel, DisplayName: displayName,
+                    SourceSystem: evt.SourceSystem?.ToString())
             ],
             DeliveryOrderFailedDomainEvent evt =>
             [
@@ -71,7 +72,8 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
                 new DeliveryOrderCompletedIntegrationEventV1(
                     evt.EventId, evt.OccurredOn, evt.OrderId,
                     TriggeredBy: triggeredBy, CorrelationId: correlationId,
-                    Channel: channel, DisplayName: displayName)
+                    Channel: channel, DisplayName: displayName,
+                    SourceSystem: evt.SourceSystem?.ToString())
             ],
             DeliveryOrderPartiallyCompletedDomainEvent evt =>
             [
