@@ -730,6 +730,9 @@ public static class ModuleServiceRegistration
         services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
                                 DTMS.Iam.Infrastructure.Callbacks.OmsShipmentDeliveredFormatter>(
             DTMS.Iam.Infrastructure.Callbacks.OmsShipmentDeliveredFormatter.FormatKey);
+        services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
+                                DTMS.Iam.Infrastructure.Callbacks.OmsShipmentCancelledFormatter>(
+            DTMS.Iam.Infrastructure.Callbacks.OmsShipmentCancelledFormatter.FormatKey);
 
         if (runOutboxHere)
             services.AddHostedService<DTMS.Api.Infrastructure.Outbox.MultiPartitionOutboxProcessor>();
