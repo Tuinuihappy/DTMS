@@ -19,17 +19,28 @@ public class OutboxMessage
     /// </summary>
     public string? PartitionKey { get; private set; }
 
+    /// <summary>
+    /// Phase S.3.1b — populated by the fan-out producer with the source
+    /// integration event's <c>MessageId</c>. Paired with
+    /// <see cref="PartitionKey"/> by a partial unique index so a consumer
+    /// retry (which re-emits the same event) cannot enqueue duplicate
+    /// callback rows for the same (system, event) pair. NULL for the
+    /// legacy domain-event path; the partial index ignores NULL rows.
+    /// </summary>
+    public Guid? CorrelationId { get; private set; }
+
     public bool HasReachedMaxRetries => RetryCount >= OutboxRetryPolicy.MaxRetries;
 
     private OutboxMessage() { } // For EF Core
 
-    public OutboxMessage(Guid id, string type, string content, DateTime occurredOnUtc, string? partitionKey = null)
+    public OutboxMessage(Guid id, string type, string content, DateTime occurredOnUtc, string? partitionKey = null, Guid? correlationId = null)
     {
         Id = id;
         Type = type;
         Content = content;
         OccurredOnUtc = occurredOnUtc;
         PartitionKey = partitionKey;
+        CorrelationId = correlationId;
     }
 
     public void MarkAsProcessed(DateTime processedOnUtc)

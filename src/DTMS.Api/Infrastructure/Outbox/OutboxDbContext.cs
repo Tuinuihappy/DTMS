@@ -22,6 +22,7 @@ public class OutboxDbContext : DbContext
             e.Property(m => m.OccurredOnUtc).IsRequired();
             e.Property(m => m.RetryCount).HasDefaultValue(0);
             e.Property(m => m.PartitionKey).HasMaxLength(50);
+            e.Property(m => m.CorrelationId);
             e.HasIndex(m => m.ProcessedOnUtc);
             e.HasIndex(m => m.NextRetryAtUtc);
         });

@@ -39,6 +39,7 @@ public static class ModuleEndpointRegistration
         app.MapOperatorEndpoints();   // Phase 4.2 — /api/operator/* (Manual transport mode)
         app.MapAdminManualOperatorEndpoints();   // Phase 4.6 — /api/v1/admin/manual/*
         app.MapIamEndpoints();   // Permission System Phase B — /api/v1/iam/*
+        app.MapSystemSubscriptionEndpoints();   // Phase S.3.1b — /api/v1/iam/systems/{key}/subscriptions
 
         return app;
     }

@@ -9,6 +9,15 @@
          in DTMS.Infrastructure. Reference the impl here so the hosted services
          resolve. -->
     <ProjectReference Include="..\..\..\DTMS.Infrastructure\DTMS.Infrastructure.csproj" />
+    <!-- Phase S.3.1b — per-system payload formatters live here. They
+         map DeliveryOrder integration events to their corresponding
+         external system's wire schema. Reference the IntegrationEvents
+         assembly only — Iam intentionally does NOT depend on
+         DeliveryOrder.Application/Domain/Infrastructure. The fan-out
+         CONSUMER that consumes the integration event + writes to the
+         outbox lives in DTMS.Api (where OutboxDbContext is registered),
+         so that side is not a layering concern for this csproj. -->
+    <ProjectReference Include="..\..\DeliveryOrder\DTMS.DeliveryOrder.IntegrationEvents\DTMS.DeliveryOrder.IntegrationEvents.csproj" />
   </ItemGroup>
 
   <ItemGroup>

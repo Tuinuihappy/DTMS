@@ -18,6 +18,9 @@ public class IamDbContext : DbContext
     public DbSet<SystemCredential> SystemCredentials { get; set; } = null!;
     public DbSet<SystemRequestLogEntry> SystemRequestLog { get; set; } = null!;
 
+    // Phase S.3.1b — outbound callback subscriptions.
+    public DbSet<SystemEventSubscription> SystemEventSubscriptions { get; set; } = null!;
+
     public IamDbContext(DbContextOptions<IamDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -108,6 +111,19 @@ public class IamDbContext : DbContext
             b.Property(c => c.CircuitFailureThreshold).HasDefaultValue(5);
             b.Property(c => c.CircuitDurationSeconds).HasDefaultValue(30);
             b.Property(c => c.UpdatedAt).IsRequired();
+        });
+
+        modelBuilder.Entity<SystemEventSubscription>(b =>
+        {
+            b.ToTable("SystemEventSubscriptions");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.SystemKey).HasMaxLength(50).IsRequired();
+            b.Property(s => s.EventType).HasMaxLength(128).IsRequired();
+            b.Property(s => s.PayloadFormatKey).HasMaxLength(64).IsRequired();
+            b.Property(s => s.Enabled).IsRequired().HasDefaultValue(true);
+            b.Property(s => s.CreatedAtUtc).IsRequired();
+            b.Property(s => s.UpdatedAtUtc).IsRequired();
+            b.HasIndex(s => new { s.SystemKey, s.EventType }).IsUnique();
         });
 
         modelBuilder.Entity<SystemRequestLogEntry>(b =>

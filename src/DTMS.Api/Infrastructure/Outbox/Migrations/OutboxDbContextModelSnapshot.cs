@@ -33,6 +33,9 @@ namespace DTMS.Api.Infrastructure.Outbox.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("CorrelationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Error")
                         .HasColumnType("text");
 

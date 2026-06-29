@@ -583,7 +583,12 @@ public static class ModuleServiceRegistration
                 // Transport.Amr hosts CaptureFinalSnapshotConsumer — must
                 // be scanned explicitly; otherwise terminal-state events go
                 // past it and the snapshot is never persisted.
-                typeof(DTMS.Transport.Amr.Consumers.CaptureFinalSnapshotConsumer).Assembly
+                typeof(DTMS.Transport.Amr.Consumers.CaptureFinalSnapshotConsumer).Assembly,
+                // Phase S.3.1b — DTMS.Api hosts the fan-out consumer for
+                // outbound callbacks (next to OutboxDbContext which it
+                // writes to). Must be scanned explicitly because the
+                // consumer is in the api assembly, not a module.
+                typeof(DTMS.Api.Infrastructure.Callbacks.OrderDeliveredCallbackFanoutConsumer).Assembly
             );
 
             // T2 POC — opt-in Saga registration. While disabled the saga's
@@ -698,13 +703,34 @@ public static class ModuleServiceRegistration
         // Phase S.3 — partitioned outbox drain for federated source
         // callbacks. Same RunInThisProcess gate as the legacy processor
         // above so the dedicated outbox-worker container drains both
-        // queues without the api container double-processing. The
-        // dispatcher resolves per-iteration scope — replace
-        // LoggingSourceCallbackDispatcher with HttpSourceCallbackDispatcher
-        // in S.3.1 when the real HTTP callback path lands.
-        services.AddScoped<
-            DTMS.Iam.Application.Callbacks.ISourceCallbackDispatcher,
-            DTMS.Iam.Infrastructure.Callbacks.LoggingSourceCallbackDispatcher>();
+        // queues without the api container double-processing.
+        //
+        // Phase S.3.1b swaps in the real HTTP dispatcher (replaces the
+        // S.3 LoggingSourceCallbackDispatcher dev stub). Per-system
+        // HttpClient with sane defaults — the per-credential timeout
+        // overrides on the request itself.
+        services.AddHttpClient<DTMS.Iam.Application.Callbacks.ISourceCallbackDispatcher,
+                               DTMS.Iam.Infrastructure.Callbacks.HttpSourceCallbackDispatcher>(c =>
+            {
+                // Hard ceiling — actual per-call timeout comes from
+                // SystemCredential.CallbackTimeoutMs. This protects us
+                // from a misconfigured credential or a connection that
+                // hangs before TLS completes.
+                c.Timeout = TimeSpan.FromSeconds(30);
+            });
+
+        // Phase S.3.1b — subscription registry: repo + cached lookup +
+        // OMS payload formatter (keyed by PayloadFormatKey on the
+        // subscription row). Add a new system later = add a new
+        // AddKeyedScoped here with its key + impl, plus a DB row.
+        services.AddScoped<DTMS.Iam.Application.Repositories.ISystemEventSubscriptionRepository,
+                           DTMS.Iam.Infrastructure.Repositories.SystemEventSubscriptionRepository>();
+        services.AddScoped<DTMS.Iam.Application.Callbacks.ISubscriptionLookup,
+                           DTMS.Iam.Infrastructure.Callbacks.CachedSubscriptionLookup>();
+        services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
+                                DTMS.Iam.Infrastructure.Callbacks.OmsShipmentDeliveredFormatter>(
+            DTMS.Iam.Infrastructure.Callbacks.OmsShipmentDeliveredFormatter.FormatKey);
+
         if (runOutboxHere)
             services.AddHostedService<DTMS.Api.Infrastructure.Outbox.MultiPartitionOutboxProcessor>();
 

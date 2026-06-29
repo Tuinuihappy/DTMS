@@ -36,10 +36,12 @@ public class VendorAdapterDbContext : DbContext
             b.Property(e => e.RetryCount).HasDefaultValue(0);
             b.HasIndex(e => e.ProcessedOnUtc);
             b.HasIndex(e => e.NextRetryAtUtc);
-            // Phase S.3 — PartitionKey is mapped only on the central
-            // OutboxDbContext (outbox schema). Module outbox tables
-            // don't have the column; ignore so EF doesn't SELECT it.
+            // Phase S.3 / S.3.1b — PartitionKey + CorrelationId are
+            // mapped only on the central OutboxDbContext (outbox schema).
+            // Module outbox tables don't have the columns; ignore so EF
+            // doesn't SELECT them.
             b.Ignore(e => e.PartitionKey);
+            b.Ignore(e => e.CorrelationId);
         });
     }
 }
