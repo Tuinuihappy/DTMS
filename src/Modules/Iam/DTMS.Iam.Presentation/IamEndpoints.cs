@@ -24,6 +24,31 @@ public static class IamEndpoints
         MapPermissionEndpoints(group);
         MapRoleEndpoints(group);
         MapAuditLogEndpoints(group);
+        MapPrincipalEndpoints(group);
+    }
+
+    // ── Principal self-introspection (Phase S.6) ─────────────────────────
+    // Returns the calling principal's effective permission set so the
+    // frontend can gate menu items + page guards client-side. Backend is
+    // still the authoritative enforcer — these are claims the framework
+    // already stamped via PermissionClaimsTransformer + the SystemClient
+    // permission lookup, so we just project them onto JSON.
+    private static void MapPrincipalEndpoints(RouteGroupBuilder group)
+    {
+        group.MapGet("/me/permissions", (HttpContext ctx) =>
+        {
+            var perms = ctx.User
+                .FindAll(PermissionClaimsTransformer.PermissionClaimType)
+                .Select(c => c.Value)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(c => c, StringComparer.Ordinal)
+                .ToArray();
+
+            return Results.Ok(new PrincipalPermissionsDto(perms));
+        });
+        // No .RequirePermission(...) — RequireAuthorization on the group
+        // already forces authenticated user. Any authenticated principal
+        // can read its own permission set; that's the point of the endpoint.
     }
 
     // ── Permissions catalog ──────────────────────────────────────────────
@@ -268,3 +293,5 @@ public record CreateRoleRequest(string Name, string? Description);
 public record AuditLogEntryDto(
     Guid Id, DateTime OccurredAt, string ActorEmployeeId, string Action,
     string? Role, string? PermissionCode, string? Details);
+
+public record PrincipalPermissionsDto(IReadOnlyList<string> Permissions);

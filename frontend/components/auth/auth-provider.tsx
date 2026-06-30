@@ -11,6 +11,8 @@ import {
 } from "react";
 import type { JwtClaims } from "@/lib/auth/jwt";
 import { PROFILE_STORAGE_KEY, type AuthUser } from "@/lib/auth/session";
+import { getMyPermissions } from "@/lib/api/iam-systems";
+import { matches } from "@/lib/api/iam";
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -19,6 +21,15 @@ type LoginResult = { ok: true } | { ok: false; message: string };
 type AuthContextValue = {
   user: AuthUser | null;
   status: AuthStatus;
+  // Phase S.6 — UI-side permission gating. `permissions` is the raw set
+  // of codes the backend stamped on this principal (including wildcards
+  // like `dtms:*`). `hasPermission` matches with the same logic the
+  // backend's PermissionAuthorizationHandler uses, so a wildcard grant
+  // covers everything under it. `null` while still loading — UI should
+  // wait or show a loading state rather than incorrectly assume "no
+  // permissions".
+  permissions: string[] | null;
+  hasPermission: (code: string) => boolean;
   login: (username: string, password: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
 };
@@ -66,6 +77,10 @@ export function AuthProvider({
   const [status, setStatus] = useState<AuthStatus>(
     initialClaims ? "authenticated" : "unauthenticated",
   );
+  // null = loading / no fetch attempted yet; [] = fetched, no permissions
+  // (legitimately empty set). UI gates should treat null as "wait" and []
+  // as "deny everything except wildcard grants".
+  const [permissions, setPermissions] = useState<string[] | null>(null);
 
   // After mount, merge in the richer profile (displayName, photo) cached
   // in localStorage on the previous login. Server-rendered initialClaims
@@ -78,6 +93,29 @@ export function AuthProvider({
       setUser(cached);
     }
   }, [initialClaims]);
+
+  // Phase S.6 — fetch the principal's effective permission set whenever
+  // identity becomes authenticated. Re-fetch on identity change (logout
+  // then login as a different user clears the previous set first).
+  useEffect(() => {
+    if (status !== "authenticated") {
+      setPermissions(null);
+      return;
+    }
+    const ctrl = new AbortController();
+    getMyPermissions(ctrl.signal)
+      .then((perms) => setPermissions(perms))
+      .catch(() => setPermissions([]));   // network/auth failure: deny by default
+    return () => ctrl.abort();
+  }, [status, user?.employeeCode]);
+
+  const hasPermission = useCallback(
+    (code: string) => {
+      if (permissions === null) return false;   // still loading — gate hides
+      return permissions.some((held) => matches(held, code));
+    },
+    [permissions],
+  );
 
   const login = useCallback<AuthContextValue["login"]>(
     async (username, password) => {
@@ -133,8 +171,8 @@ export function AuthProvider({
   }, [router]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, status, login, logout }),
-    [user, status, login, logout],
+    () => ({ user, status, permissions, hasPermission, login, logout }),
+    [user, status, permissions, hasPermission, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

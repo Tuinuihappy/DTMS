@@ -23,6 +23,7 @@ import {
   Route,
   RotateCcw,
   ScrollText,
+  Server,
   ShieldCheck,
   Truck,
   Users,
@@ -36,6 +37,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { useShell } from "@/components/shell/shell-context";
+import { useAuth } from "@/components/auth/auth-provider";
 import { cn } from "@/lib/utils";
 
 type RailChild = {
@@ -43,6 +45,10 @@ type RailChild = {
   label: string;
   href: string;
   hint?: string;
+  // Phase S.6 — when set, the child is rendered only if the current
+  // principal holds the permission (wildcard-matched). Items without
+  // `requires` are visible to everyone.
+  requires?: string;
 };
 
 type RailAction = {
@@ -189,6 +195,16 @@ const actions: RailAction[] = [
         label: "Audit log",
         href: "/admin/audit-log",
         hint: "Who changed what, when",
+      },
+      {
+        // Phase S.6 — federated source-system admin (SystemClient +
+        // SystemEventSubscription CRUD). Gated behind iam:system:read so
+        // operators without admin-on-systems don't see the entry.
+        icon: <Server className="h-3.5 w-3.5" strokeWidth={2.1} />,
+        label: "Systems",
+        href: "/admin/systems",
+        hint: "Source systems & callbacks",
+        requires: "dtms:iam:system:read",
       },
     ],
   },
@@ -512,7 +528,17 @@ function RailGroup({
   expanded: boolean;
   onChildNavigate?: () => void;
 }) {
-  const children = action.children ?? [];
+  const { hasPermission, permissions } = useAuth();
+  // Phase S.6 — filter children that declare `requires`. While
+  // permissions are still loading (null), HIDE gated children to avoid
+  // flicker (they appear once the fetch resolves). Ungated children
+  // remain visible throughout.
+  const allChildren = action.children ?? [];
+  const children = allChildren.filter(
+    (c) => !c.requires || (permissions !== null && hasPermission(c.requires)),
+  );
+  // If every child is gated out, the whole group is invisible.
+  const hidden = allChildren.length > 0 && children.length === 0;
   const pathname = usePathname();
   const hasActiveChild = children.some((c) => pathname?.startsWith(c.href));
 
@@ -544,6 +570,11 @@ function RailGroup({
     hasActiveChild &&
       "ring-2 ring-[var(--color-brand-200)] dark:ring-[var(--color-brand-500)]/40 bg-white dark:bg-white/[0.1] text-[var(--color-ink-900)]",
   );
+
+  // Phase S.6 — group with no visible children = render nothing. Parent
+  // motion.li wrapper still mounts so the staggered animation index is
+  // stable across reloads, but visually the group disappears.
+  if (hidden) return null;
 
   return (
     <div
