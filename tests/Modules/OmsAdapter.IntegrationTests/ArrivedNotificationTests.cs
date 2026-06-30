@@ -25,7 +25,7 @@ public class ArrivedNotificationTests : IClassFixture<HttpOmsShipmentClientFixtu
                 .UsingPost())
             .RespondWith(Response.Create().WithStatusCode(200));
 
-        await _fx.Client.NotifyShipmentArrivedAsync(shipmentId, lots, CancellationToken.None);
+        await _fx.Client.NotifyShipmentArrivedAsync(_fx.Target,shipmentId, lots, CancellationToken.None);
 
         var log = _fx.Server.LogEntries.Single();
         log.RequestMessage.Path.Should().Be($"/api/shipments/{shipmentId}/arrived");
@@ -46,7 +46,7 @@ public class ArrivedNotificationTests : IClassFixture<HttpOmsShipmentClientFixtu
                 .UsingPost())
             .RespondWith(Response.Create().WithStatusCode(500));
 
-        var act = () => _fx.Client.NotifyShipmentArrivedAsync(
+        var act = () => _fx.Client.NotifyShipmentArrivedAsync(_fx.Target,
             shipmentId, new[] { new OmsLot("LOT-X") }, CancellationToken.None);
 
         await act.Should().ThrowAsync<HttpRequestException>();
@@ -55,7 +55,7 @@ public class ArrivedNotificationTests : IClassFixture<HttpOmsShipmentClientFixtu
     [Fact]
     public async Task NotifyShipmentArrivedAsync_EmptyShipmentId_ThrowsArgumentException()
     {
-        var act = () => _fx.Client.NotifyShipmentArrivedAsync(
+        var act = () => _fx.Client.NotifyShipmentArrivedAsync(_fx.Target,
             "", Array.Empty<OmsLot>(), CancellationToken.None);
 
         // Defensive client-side validation — never let a malformed

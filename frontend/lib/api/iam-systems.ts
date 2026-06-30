@@ -22,6 +22,9 @@ export type CredentialSummary = {
   callbackAuthScheme: string | null;
   callbackTimeoutMs: number;
   updatedAt: string;
+  // Phase S.6 follow-up — when CallbackAuthScheme=bearer + token is a JWT
+  // with an exp claim, backend decodes it. Null otherwise.
+  callbackTokenExpiresAt: string | null;
 };
 
 export type SubscriptionSummary = {

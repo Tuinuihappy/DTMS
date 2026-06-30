@@ -272,11 +272,16 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
           </button>
         </div>
         {data.credential?.hasCallbackBaseUrl ? (
-          <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
-            <DefRow label="Base URL" value={data.credential.callbackBaseUrl ?? "—"} mono />
-            <DefRow label="Auth scheme" value={data.credential.callbackAuthScheme ?? "—"} mono />
-            <DefRow label="Timeout (ms)" value={String(data.credential.callbackTimeoutMs)} />
-          </dl>
+          <>
+            <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
+              <DefRow label="Base URL" value={data.credential.callbackBaseUrl ?? "—"} mono />
+              <DefRow label="Auth scheme" value={data.credential.callbackAuthScheme ?? "—"} mono />
+              <DefRow label="Timeout (ms)" value={String(data.credential.callbackTimeoutMs)} />
+            </dl>
+            {data.credential.callbackTokenExpiresAt && (
+              <TokenExpiryBadge expiresAt={data.credential.callbackTokenExpiresAt} />
+            )}
+          </>
         ) : (
           <p className="mt-3 text-[12px] text-[var(--color-ink-400)]">
             No callback URL set. DTMS will not call this system back when its orders complete.
@@ -364,6 +369,50 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
 }
 
 // ── Subcomponents ───────────────────────────────────────────────────────
+
+/**
+ * Phase S.6 follow-up — surfaces the JWT `exp` claim DTMS decoded from
+ * the stored bearer token. Color-coded by remaining time:
+ *
+ *  > 30 days   → neutral info
+ *  ≤ 30 days   → amber warning
+ *  ≤ 7 days    → red warning
+ *  past exp    → red "EXPIRED" badge
+ *
+ * Operators rotate the OMS-issued bearer token by calling OMS to mint
+ * a new one + saving it via "Configure callback". This badge is the
+ * heads-up they need to do that before traffic starts 401-ing.
+ */
+function TokenExpiryBadge({ expiresAt }: { expiresAt: string }) {
+  const expDate = new Date(expiresAt);
+  const now = new Date();
+  const msRemaining = expDate.getTime() - now.getTime();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const daysRemaining = Math.floor(msRemaining / dayMs);
+
+  let color: string;
+  let label: string;
+  if (msRemaining < 0) {
+    color = "border-rose-400 bg-rose-50 text-rose-800 dark:border-rose-500/40 dark:bg-rose-950/30 dark:text-rose-300";
+    label = `EXPIRED ${Math.abs(daysRemaining)}d ago — rotate immediately`;
+  } else if (daysRemaining <= 7) {
+    color = "border-rose-400 bg-rose-50 text-rose-800 dark:border-rose-500/40 dark:bg-rose-950/30 dark:text-rose-300";
+    label = `Expires in ${daysRemaining} day${daysRemaining === 1 ? "" : "s"} — rotate soon`;
+  } else if (daysRemaining <= 30) {
+    color = "border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-300";
+    label = `Expires in ${daysRemaining} days`;
+  } else {
+    color = "border-[var(--color-ink-200)] bg-[var(--color-surface-1)] text-[var(--color-ink-600)]";
+    label = `Expires in ${daysRemaining} days (${expDate.toLocaleDateString()})`;
+  }
+
+  return (
+    <div className={`mt-3 inline-flex items-center gap-2 rounded border px-3 py-1.5 text-[11.5px] ${color}`}>
+      <span className="font-semibold">Outbound token:</span>
+      <span>{label}</span>
+    </div>
+  );
+}
 
 function DefRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (

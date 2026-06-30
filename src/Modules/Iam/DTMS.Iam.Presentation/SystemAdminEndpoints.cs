@@ -132,7 +132,8 @@ public static class SystemAdminEndpoints
                         CallbackBaseUrl: cred.CallbackBaseUrl,
                         CallbackAuthScheme: cred.CallbackAuthScheme,
                         CallbackTimeoutMs: cred.CallbackTimeoutMs,
-                        UpdatedAt: cred.UpdatedAt)));
+                        UpdatedAt: cred.UpdatedAt,
+                        CallbackTokenExpiresAt: TryReadJwtExpiry(cred.CallbackAuthConfig))));
             }).RequirePermission("dtms:iam:system:read");
 
         // ── Patch metadata ────────────────────────────────────────────
@@ -347,6 +348,52 @@ public static class SystemAdminEndpoints
         => ctx.User.FindFirst("sub")?.Value
            ?? ctx.User.Identity?.Name
            ?? "unknown";
+
+    /// <summary>
+    /// Phase S.6 follow-up — best-effort JWT expiry extraction. Decodes
+    /// the payload (segment 2) of a Bearer-style token stored under
+    /// <c>{"token":"<jwt>"}</c> in <c>SystemCredentials.CallbackAuthConfig</c>
+    /// and returns the <c>exp</c> claim as UTC. Used to render
+    /// "expires in N days" warnings on the system detail page.
+    ///
+    /// Returns null for any of: empty config, malformed JSON, non-JWT
+    /// token, missing <c>exp</c> claim. We do NOT verify the signature
+    /// — the OMS issuer holds that key, and a tampered token would just
+    /// fail at OMS-side validation. This decode is for UX surfacing only.
+    /// </summary>
+    private static DateTime? TryReadJwtExpiry(string? callbackAuthConfig)
+    {
+        if (string.IsNullOrWhiteSpace(callbackAuthConfig)) return null;
+        try
+        {
+            using var configDoc = System.Text.Json.JsonDocument.Parse(callbackAuthConfig);
+            if (!configDoc.RootElement.TryGetProperty("token", out var tokenEl)) return null;
+            if (tokenEl.ValueKind != System.Text.Json.JsonValueKind.String) return null;
+            var jwt = tokenEl.GetString();
+            if (string.IsNullOrWhiteSpace(jwt)) return null;
+
+            var parts = jwt.Split('.');
+            if (parts.Length < 2) return null;
+
+            // base64url → base64 (RFC 7515): replace -/_ with +/, re-pad
+            var payloadB64 = parts[1].Replace('-', '+').Replace('_', '/');
+            switch (payloadB64.Length % 4) { case 2: payloadB64 += "=="; break; case 3: payloadB64 += "="; break; }
+            var payloadBytes = Convert.FromBase64String(payloadB64);
+
+            using var payloadDoc = System.Text.Json.JsonDocument.Parse(payloadBytes);
+            if (!payloadDoc.RootElement.TryGetProperty("exp", out var expEl)) return null;
+            if (expEl.ValueKind != System.Text.Json.JsonValueKind.Number) return null;
+            var expSeconds = expEl.GetInt64();
+            return DateTimeOffset.FromUnixTimeSeconds(expSeconds).UtcDateTime;
+        }
+        catch
+        {
+            // Any decode/parse failure → silently fall through to null.
+            // The UI shows "no expiry info" rather than an error toast —
+            // this is auxiliary information, not a hard requirement.
+            return null;
+        }
+    }
 }
 
 // ── DTOs ───────────────────────────────────────────────────────────────
@@ -400,7 +447,12 @@ public sealed record CredentialSummary(
     string? CallbackBaseUrl,
     string? CallbackAuthScheme,
     int CallbackTimeoutMs,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    // Phase S.6 follow-up — when CallbackAuthScheme=bearer and the stored
+    // token is a JWT with an `exp` claim, decode it and surface the expiry
+    // so the UI can warn operators before OMS auth starts failing. Null
+    // when no callback configured, not a JWT, or no exp claim.
+    DateTime? CallbackTokenExpiresAt);
 
 public sealed record SubscriptionSummary(string EventType, string PayloadFormatKey, bool Enabled);
 

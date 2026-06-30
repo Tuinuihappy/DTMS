@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using DTMS.OmsAdapter.Abstractions;
 using DTMS.OmsAdapter.Abstractions.Exceptions;
@@ -20,9 +21,18 @@ internal sealed class HttpOmsShipmentClient : IOmsShipmentClient
         _logger = logger;
     }
 
-    public async Task NotifyShipmentStartedAsync(OmsShipmentNotification notification, CancellationToken cancellationToken)
+    public async Task NotifyShipmentStartedAsync(
+        OmsCallbackTarget target,
+        OmsShipmentNotification notification,
+        CancellationToken cancellationToken)
     {
-        using var response = await _http.PostAsJsonAsync(ShipmentsPath, notification, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, BuildUri(target.BaseUrl, ShipmentsPath))
+        {
+            Content = JsonContent.Create(notification),
+        };
+        ApplyAuth(request, target.BearerToken);
+
+        using var response = await SendWithTimeoutAsync(request, target.Timeout, cancellationToken);
 
         if (response.IsSuccessStatusCode)
         {
@@ -52,7 +62,11 @@ internal sealed class HttpOmsShipmentClient : IOmsShipmentClient
         ThrowMappedException(response.StatusCode, body);
     }
 
-    public async Task NotifyShipmentArrivedAsync(string shipmentId, IReadOnlyList<OmsLot> lots, CancellationToken cancellationToken)
+    public async Task NotifyShipmentArrivedAsync(
+        OmsCallbackTarget target,
+        string shipmentId,
+        IReadOnlyList<OmsLot> lots,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(shipmentId))
             throw new ArgumentException("shipmentId is required", nameof(shipmentId));
@@ -63,7 +77,13 @@ internal sealed class HttpOmsShipmentClient : IOmsShipmentClient
         var path = $"{ShipmentsPath}/{Uri.EscapeDataString(shipmentId)}/arrived";
         var body = new OmsArrivedNotification(lots);
 
-        using var response = await _http.PostAsJsonAsync(path, body, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, BuildUri(target.BaseUrl, path))
+        {
+            Content = JsonContent.Create(body),
+        };
+        ApplyAuth(request, target.BearerToken);
+
+        using var response = await SendWithTimeoutAsync(request, target.Timeout, cancellationToken);
 
         if (response.IsSuccessStatusCode)
         {
@@ -79,6 +99,33 @@ internal sealed class HttpOmsShipmentClient : IOmsShipmentClient
             path, shipmentId, (int)response.StatusCode, errBody);
 
         ThrowMappedException(response.StatusCode, errBody);
+    }
+
+    private static Uri BuildUri(string baseUrl, string relativePath)
+        => new(new Uri(baseUrl.EndsWith('/') ? baseUrl : baseUrl + "/"), relativePath);
+
+    private static void ApplyAuth(HttpRequestMessage request, string? bearerToken)
+    {
+        if (string.IsNullOrWhiteSpace(bearerToken)) return;
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+    }
+
+    private async Task<HttpResponseMessage> SendWithTimeoutAsync(
+        HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        if (timeout <= TimeSpan.Zero) timeout = TimeSpan.FromSeconds(10);
+        using var timeoutCts = new CancellationTokenSource(timeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+        try
+        {
+            return await _http.SendAsync(request, linked.Token);
+        }
+        catch (TaskCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            throw new OmsTransientException(
+                HttpStatusCode.RequestTimeout,
+                $"OMS call timed out after {timeout.TotalMilliseconds}ms.");
+        }
     }
 
     // Map HTTP status to permanent vs transient. MassTransit fast-fails

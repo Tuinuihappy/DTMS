@@ -29,7 +29,7 @@ public class StartedNotificationTests : IClassFixture<HttpOmsShipmentClientFixtu
         _fx.Server.Given(Request.Create().WithPath("/api/shipments").UsingPost())
             .RespondWith(Response.Create().WithStatusCode(200));
 
-        await _fx.Client.NotifyShipmentStartedAsync(notification, CancellationToken.None);
+        await _fx.Client.NotifyShipmentStartedAsync(_fx.Target,notification, CancellationToken.None);
 
         var log = _fx.Server.LogEntries.Single();
         log.RequestMessage.Path.Should().Be("/api/shipments");
@@ -47,7 +47,7 @@ public class StartedNotificationTests : IClassFixture<HttpOmsShipmentClientFixtu
             .RespondWith(Response.Create().WithStatusCode(201));
 
         // 2xx is "success" — 201 is just as valid as 200.
-        await _fx.Client.NotifyShipmentStartedAsync(SampleNotification(), CancellationToken.None);
+        await _fx.Client.NotifyShipmentStartedAsync(_fx.Target,SampleNotification(), CancellationToken.None);
         _fx.Server.LogEntries.Should().ContainSingle();
     }
 
@@ -61,7 +61,7 @@ public class StartedNotificationTests : IClassFixture<HttpOmsShipmentClientFixtu
         // Option A behavior: 409 means "OMS already has this shipmentId" —
         // never throw, never dead-letter. A retry that re-fires the same
         // shipmentId must succeed without operator follow-up.
-        await _fx.Client.NotifyShipmentStartedAsync(SampleNotification(), CancellationToken.None);
+        await _fx.Client.NotifyShipmentStartedAsync(_fx.Target,SampleNotification(), CancellationToken.None);
         _fx.Server.LogEntries.Should().ContainSingle();
     }
 
@@ -72,7 +72,7 @@ public class StartedNotificationTests : IClassFixture<HttpOmsShipmentClientFixtu
         _fx.Server.Given(Request.Create().WithPath("/api/shipments").UsingPost())
             .RespondWith(Response.Create().WithStatusCode(500).WithBody("boom"));
 
-        var act = () => _fx.Client.NotifyShipmentStartedAsync(SampleNotification(), CancellationToken.None);
+        var act = () => _fx.Client.NotifyShipmentStartedAsync(_fx.Target,SampleNotification(), CancellationToken.None);
 
         // 5xx MUST throw so the MassTransit Fault consumer picks it up and
         // writes the *NotifyFailed audit row. Swallowing would leave the
@@ -87,7 +87,7 @@ public class StartedNotificationTests : IClassFixture<HttpOmsShipmentClientFixtu
         _fx.Server.Given(Request.Create().WithPath("/api/shipments").UsingPost())
             .RespondWith(Response.Create().WithStatusCode(503));
 
-        var act = () => _fx.Client.NotifyShipmentStartedAsync(SampleNotification(), CancellationToken.None);
+        var act = () => _fx.Client.NotifyShipmentStartedAsync(_fx.Target,SampleNotification(), CancellationToken.None);
 
         await act.Should().ThrowAsync<HttpRequestException>();
     }

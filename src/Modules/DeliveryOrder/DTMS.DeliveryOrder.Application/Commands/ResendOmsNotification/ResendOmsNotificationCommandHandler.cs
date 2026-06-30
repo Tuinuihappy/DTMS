@@ -21,6 +21,7 @@ public class ResendOmsNotificationCommandHandler
 
     private readonly UpstreamOmsOptions _options;
     private readonly IOmsShipmentClient _client;
+    private readonly IOmsCallbackTargetResolver _targetResolver;
     private readonly ITripRepository _tripRepository;
     private readonly IDeliveryOrderRepository _orderRepository;
     private readonly IOrderAuditEventRepository _auditRepository;
@@ -30,6 +31,7 @@ public class ResendOmsNotificationCommandHandler
     public ResendOmsNotificationCommandHandler(
         IOptions<UpstreamOmsOptions> options,
         IOmsShipmentClient client,
+        IOmsCallbackTargetResolver targetResolver,
         ITripRepository tripRepository,
         IDeliveryOrderRepository orderRepository,
         IOrderAuditEventRepository auditRepository,
@@ -38,6 +40,7 @@ public class ResendOmsNotificationCommandHandler
     {
         _options = options.Value;
         _client = client;
+        _targetResolver = targetResolver;
         _tripRepository = tripRepository;
         _orderRepository = orderRepository;
         _auditRepository = auditRepository;
@@ -118,10 +121,17 @@ public class ResendOmsNotificationCommandHandler
             DeliveryBy: vendorVehicleName,
             Lots: lots.Select(id => new OmsLot(id)).ToList());
 
+        var target = await _targetResolver.ResolveAsync("oms", cancellationToken);
+        if (target is null)
+        {
+            return Result<ResendOmsNotificationResult>.Failure(
+                "OMS callback target is not configured. Set CallbackBaseUrl on the 'oms' system credential (via /admin/systems/oms → Configure callback) or set UpstreamOms__BaseUrl env.");
+        }
+
         var sw = Stopwatch.StartNew();
         try
         {
-            await _client.NotifyShipmentStartedAsync(payload, cancellationToken);
+            await _client.NotifyShipmentStartedAsync(target, payload, cancellationToken);
         }
         catch (OmsPermanentException ex)
         {

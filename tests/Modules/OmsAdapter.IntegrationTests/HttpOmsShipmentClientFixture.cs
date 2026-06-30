@@ -18,12 +18,17 @@ public sealed class HttpOmsShipmentClientFixture : IDisposable
 {
     public WireMockServer Server { get; }
     public IOmsShipmentClient Client { get; }
+    // Phase S.6 follow-up — methods now take a per-call target instead of
+    // pinning BaseAddress at construction. Tests use this fixture's
+    // WireMock URL with no bearer token.
+    public OmsCallbackTarget Target { get; }
 
     public HttpOmsShipmentClientFixture()
     {
         Server = WireMockServer.Start();
-        var http = new HttpClient { BaseAddress = new Uri(Server.Url!) };
+        var http = new HttpClient();
         Client = new HttpOmsShipmentClient(http, NullLogger<HttpOmsShipmentClient>.Instance);
+        Target = new OmsCallbackTarget(Server.Url!, BearerToken: null, Timeout: TimeSpan.FromSeconds(10));
     }
 
     public void Dispose()

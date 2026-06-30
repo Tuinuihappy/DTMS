@@ -12,6 +12,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Phase S.6 follow-up — OMS outbound URL+token migrated from env
+         (UpstreamOms__*) to iam.SystemCredentials.CallbackBaseUrl /
+         .CallbackAuthConfig. The resolver reads through CachedCredentialReader
+         (Iam.Application), falling back to UpstreamOmsOptions for
+         backward compat while ops moves config from .env to UI. -->
+    <ProjectReference Include="..\Iam\DTMS.Iam.Application\DTMS.Iam.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- B3 — WireMock integration tests reach into HttpOmsShipmentClient
          (internal sealed) so they can exercise the actual HTTP wire shape
          the OMS receives, not just the public IOmsShipmentClient surface. -->

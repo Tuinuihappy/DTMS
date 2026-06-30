@@ -42,7 +42,7 @@ public class StatusCodeClassificationTests : IClassFixture<HttpOmsShipmentClient
         _fx.Server.Given(Request.Create().WithPath("/api/shipments").UsingPost())
             .RespondWith(Response.Create().WithStatusCode(statusCode).WithBody("bad data"));
 
-        var act = () => _fx.Client.NotifyShipmentStartedAsync(SampleNotification(), CancellationToken.None);
+        var act = () => _fx.Client.NotifyShipmentStartedAsync(_fx.Target,SampleNotification(), CancellationToken.None);
 
         var ex = await act.Should().ThrowAsync<OmsPermanentException>();
         ex.Which.StatusCode.Should().Be((System.Net.HttpStatusCode)statusCode);
@@ -64,7 +64,7 @@ public class StatusCodeClassificationTests : IClassFixture<HttpOmsShipmentClient
                 .UsingPost())
             .RespondWith(Response.Create().WithStatusCode(statusCode).WithBody("LotNo not found: rr."));
 
-        var act = () => _fx.Client.NotifyShipmentArrivedAsync(
+        var act = () => _fx.Client.NotifyShipmentArrivedAsync(_fx.Target,
             shipmentId, new[] { new OmsLot("rr") }, CancellationToken.None);
 
         var ex = await act.Should().ThrowAsync<OmsPermanentException>();
@@ -85,7 +85,7 @@ public class StatusCodeClassificationTests : IClassFixture<HttpOmsShipmentClient
         _fx.Server.Given(Request.Create().WithPath("/api/shipments").UsingPost())
             .RespondWith(Response.Create().WithStatusCode(statusCode));
 
-        var act = () => _fx.Client.NotifyShipmentStartedAsync(SampleNotification(), CancellationToken.None);
+        var act = () => _fx.Client.NotifyShipmentStartedAsync(_fx.Target,SampleNotification(), CancellationToken.None);
 
         var ex = await act.Should().ThrowAsync<OmsTransientException>();
         ex.Which.StatusCode.Should().Be((System.Net.HttpStatusCode)statusCode);
@@ -104,7 +104,7 @@ public class StatusCodeClassificationTests : IClassFixture<HttpOmsShipmentClient
         _fx.Server.Given(Request.Create().WithPath("/api/shipments").UsingPost())
             .RespondWith(Response.Create().WithStatusCode(statusCode));
 
-        var act = () => _fx.Client.NotifyShipmentStartedAsync(SampleNotification(), CancellationToken.None);
+        var act = () => _fx.Client.NotifyShipmentStartedAsync(_fx.Target,SampleNotification(), CancellationToken.None);
 
         var ex = await act.Should().ThrowAsync<OmsTransientException>();
         ex.Which.StatusCode.Should().Be((System.Net.HttpStatusCode)statusCode);
@@ -124,7 +124,7 @@ public class StatusCodeClassificationTests : IClassFixture<HttpOmsShipmentClient
                 .UsingPost())
             .RespondWith(Response.Create().WithStatusCode(statusCode));
 
-        var act = () => _fx.Client.NotifyShipmentArrivedAsync(
+        var act = () => _fx.Client.NotifyShipmentArrivedAsync(_fx.Target,
             shipmentId, new[] { new OmsLot("LOT-A") }, CancellationToken.None);
 
         var ex = await act.Should().ThrowAsync<OmsTransientException>();
@@ -141,7 +141,7 @@ public class StatusCodeClassificationTests : IClassFixture<HttpOmsShipmentClient
         _fx.Server.Given(Request.Create().WithPath("/api/shipments").UsingPost())
             .RespondWith(Response.Create().WithStatusCode(404).WithBody("nope"));
 
-        var act = () => _fx.Client.NotifyShipmentStartedAsync(SampleNotification(), CancellationToken.None);
+        var act = () => _fx.Client.NotifyShipmentStartedAsync(_fx.Target,SampleNotification(), CancellationToken.None);
 
         await act.Should().ThrowAsync<HttpRequestException>();
     }
@@ -153,7 +153,7 @@ public class StatusCodeClassificationTests : IClassFixture<HttpOmsShipmentClient
         _fx.Server.Given(Request.Create().WithPath("/api/shipments").UsingPost())
             .RespondWith(Response.Create().WithStatusCode(503));
 
-        var act = () => _fx.Client.NotifyShipmentStartedAsync(SampleNotification(), CancellationToken.None);
+        var act = () => _fx.Client.NotifyShipmentStartedAsync(_fx.Target,SampleNotification(), CancellationToken.None);
 
         await act.Should().ThrowAsync<HttpRequestException>();
     }
@@ -168,7 +168,7 @@ public class StatusCodeClassificationTests : IClassFixture<HttpOmsShipmentClient
         _fx.Server.Given(Request.Create().WithPath("/api/shipments").UsingPost())
             .RespondWith(Response.Create().WithStatusCode(409).WithBody("already registered"));
 
-        await _fx.Client.NotifyShipmentStartedAsync(SampleNotification(), CancellationToken.None);
+        await _fx.Client.NotifyShipmentStartedAsync(_fx.Target,SampleNotification(), CancellationToken.None);
         _fx.Server.LogEntries.Should().ContainSingle();
     }
 }

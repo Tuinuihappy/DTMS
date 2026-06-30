@@ -31,6 +31,7 @@ public class TripDropCompletedOmsNotifyConsumer : IConsumer<TripDropCompletedInt
 
     private readonly UpstreamOmsOptions _options;
     private readonly IOmsShipmentClient _client;
+    private readonly IOmsCallbackTargetResolver _targetResolver;
     private readonly ITripRepository _tripRepository;
     private readonly IDeliveryOrderRepository _orderRepository;
     private readonly IOrderAuditEventRepository _auditRepository;
@@ -40,6 +41,7 @@ public class TripDropCompletedOmsNotifyConsumer : IConsumer<TripDropCompletedInt
     public TripDropCompletedOmsNotifyConsumer(
         IOptions<UpstreamOmsOptions> options,
         IOmsShipmentClient client,
+        IOmsCallbackTargetResolver targetResolver,
         ITripRepository tripRepository,
         IDeliveryOrderRepository orderRepository,
         IOrderAuditEventRepository auditRepository,
@@ -48,6 +50,7 @@ public class TripDropCompletedOmsNotifyConsumer : IConsumer<TripDropCompletedInt
     {
         _options = options.Value;
         _client = client;
+        _targetResolver = targetResolver;
         _tripRepository = tripRepository;
         _orderRepository = orderRepository;
         _auditRepository = auditRepository;
@@ -122,10 +125,19 @@ public class TripDropCompletedOmsNotifyConsumer : IConsumer<TripDropCompletedInt
 
         var lotPayload = lots.Select(id => new OmsLot(id)).ToList();
 
+        var target = await _targetResolver.ResolveAsync("oms", ct);
+        if (target is null)
+        {
+            _logger.LogInformation(
+                "[OmsArrived] No callback target resolved for 'oms' (neither SystemCredentials.CallbackBaseUrl nor UpstreamOms__BaseUrl set) — skipping Trip {TripId}",
+                evt.TripId);
+            return;
+        }
+
         var sw = Stopwatch.StartNew();
         try
         {
-            await _client.NotifyShipmentArrivedAsync(shipmentId, lotPayload, ct);
+            await _client.NotifyShipmentArrivedAsync(target, shipmentId, lotPayload, ct);
         }
         catch (Exception ex)
         {
