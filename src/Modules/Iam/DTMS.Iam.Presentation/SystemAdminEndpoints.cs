@@ -223,16 +223,36 @@ public static class SystemAdminEndpoints
                     return Results.Conflict(new { error = $"No credential row for '{key}'. POST to /api/v1/iam/systems first." });
 
                 // For the bearer scheme we accept either a plaintext
-                // token (server JSON-encodes it) or null to clear
-                // outbound auth entirely.
+                // token (server JSON-encodes it), null to clear outbound
+                // auth entirely, OR blank-while-scheme-unchanged to keep
+                // the existing token — the frontend's "Leave blank to
+                // keep current value" hint relies on the third path so
+                // operators can rotate URL/timeout without re-pasting a
+                // 600-char JWT every time.
                 string? authConfigJson = null;
                 if (req.CallbackAuthScheme is { Length: > 0 } scheme)
                 {
                     if (scheme.ToLowerInvariant() != "bearer")
                         return Results.BadRequest(new { error = "Only 'bearer' callback auth scheme supported in MVP." });
                     if (string.IsNullOrWhiteSpace(req.CallbackBearerToken))
-                        return Results.BadRequest(new { error = "callbackBearerToken required when callbackAuthScheme is set." });
-                    authConfigJson = JsonSerializer.Serialize(new { token = req.CallbackBearerToken });
+                    {
+                        // Preserve the existing token when the request
+                        // leaves the field blank — but only if there IS
+                        // a token to preserve. Otherwise (first-time
+                        // configure with no token) reject with a clear
+                        // message rather than silently saving an empty
+                        // bearer config that would 401 on every call.
+                        if (string.IsNullOrWhiteSpace(cred.CallbackAuthConfig))
+                            return Results.BadRequest(new
+                            {
+                                error = "callbackBearerToken required when setting bearer scheme for the first time — no existing token to preserve.",
+                            });
+                        authConfigJson = cred.CallbackAuthConfig;
+                    }
+                    else
+                    {
+                        authConfigJson = JsonSerializer.Serialize(new { token = req.CallbackBearerToken });
+                    }
                 }
 
                 cred.SetCallback(
