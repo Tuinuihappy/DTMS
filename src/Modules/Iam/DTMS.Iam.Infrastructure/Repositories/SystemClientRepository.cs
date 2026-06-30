@@ -48,12 +48,22 @@ public sealed class SystemClientRepository : ISystemClientRepository
         // Wrap in execution-strategy because the IamDbContext is
         // EnableRetryOnFailure-equipped — an explicit transaction
         // outside the strategy would throw.
+        //
+        // Two SaveChanges inside one tx: SystemClient is persisted +
+        // committed to its row first so the permission rows' FK to
+        // SystemClients(Key) can resolve. We don't model the
+        // SystemClient → SystemClientPermissions relationship via
+        // navigation properties (S.2 design — they're separate
+        // aggregates), so EF's change tracker can't order the inserts
+        // by itself.
         var strategy = _db.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
         {
             await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
             _db.SystemClients.Add(client);
+            await _db.SaveChangesAsync(ct);
+
             foreach (var code in permissionCodes.Distinct(StringComparer.Ordinal))
             {
                 _db.SystemClientPermissions.Add(

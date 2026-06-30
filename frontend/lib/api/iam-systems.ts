@@ -243,6 +243,32 @@ export async function getMyPermissions(signal?: AbortSignal): Promise<string[]> 
   return data.permissions ?? [];
 }
 
+// ── Test key (Phase S.6 UX — verify a freshly-minted key works) ──────────
+
+export type TestApiKeyResult =
+  | { ok: true; principalId?: string; displayName?: string; permissions?: string[] }
+  | { ok: false; status?: number; message?: string };
+
+/**
+ * Probe the backend with a freshly-minted plaintext to confirm it
+ * authenticates correctly. Exercises the same /api/v1/source/{key}/whoami
+ * the production inbound path uses — no cache surprises. Posts the
+ * plaintext through the Next route handler so it stays server-side and
+ * doesn't leak into browser network logs (DevTools shows only the proxy
+ * call, not the upstream `Authorization: ApiKey ...` header).
+ */
+export async function testApiKey(key: string, apiKey: string): Promise<TestApiKeyResult> {
+  const res = await fetch(`/api/admin/iam/systems/${encodeURIComponent(key)}/test-key`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ apiKey }),
+  });
+  // Route handler always returns 200 with an `ok` field — even on
+  // upstream failures — so we can render the result inline without
+  // dealing with thrown exceptions for expected "key didn't work" cases.
+  return (await res.json()) as TestApiKeyResult;
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────
 
 // Duplicated from iam.ts (private there). Could be lifted to a shared

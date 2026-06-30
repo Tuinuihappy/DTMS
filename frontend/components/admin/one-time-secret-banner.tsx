@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Eye, EyeOff, X } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, Copy, Eye, EyeOff, ShieldCheck, X } from "lucide-react";
+import { testApiKey } from "@/lib/api/iam-systems";
 
 /**
  * Phase S.6 — banner that shows a freshly minted plaintext secret ONCE
@@ -10,6 +11,9 @@ import { Check, Copy, Eye, EyeOff, X } from "lucide-react";
  *
  * - Plaintext is masked by default; reveal with the Eye toggle
  * - Copy button writes to clipboard with a 2s "Copied!" confirmation
+ * - "Test key" button verifies the new key against the backend's
+ *   /source/{key}/whoami probe in one click — gives instant feedback
+ *   so the operator doesn't have to context-switch to Swagger
  * - Dismissable; once dismissed the plaintext is gone from React state
  * - Warning text ("Save this now — won't show again") sits above the box
  *
@@ -21,15 +25,26 @@ export function OneTimeSecretBanner({
   title,
   secret,
   helpText,
+  testKeyForSystem,
   onDismiss,
 }: {
   title: string;
   secret: string;
   helpText?: string;
+  // When set, surfaces a "Test this key" button that calls
+  // /api/admin/iam/systems/{testKeyForSystem}/test-key. Pass the
+  // system slug the secret was minted for.
+  testKeyForSystem?: string;
   onDismiss: () => void;
 }) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [testState, setTestState] = useState<
+    | { kind: "idle" }
+    | { kind: "testing" }
+    | { kind: "ok"; message: string }
+    | { kind: "fail"; message: string }
+  >({ kind: "idle" });
 
   const masked = secret.length <= 12 ? "•".repeat(secret.length) : secret.slice(0, 8) + "•".repeat(20) + secret.slice(-4);
 
@@ -40,6 +55,31 @@ export function OneTimeSecretBanner({
       setTimeout(() => setCopied(false), 2000);
     } catch {
       /* clipboard not available — user can still reveal + select */
+    }
+  };
+
+  const onTest = async () => {
+    if (!testKeyForSystem) return;
+    setTestState({ kind: "testing" });
+    try {
+      const result = await testApiKey(testKeyForSystem, secret);
+      if (result.ok) {
+        setTestState({
+          kind: "ok",
+          message: `Authenticated as ${result.principalId ?? testKeyForSystem}${
+            result.permissions ? ` · ${result.permissions.length} permissions` : ""
+          }`,
+        });
+      } else {
+        setTestState({
+          kind: "fail",
+          message: `Backend rejected the key${result.status ? ` (HTTP ${result.status})` : ""}${
+            result.message ? `: ${result.message}` : ""
+          }`,
+        });
+      }
+    } catch (e) {
+      setTestState({ kind: "fail", message: (e as Error).message });
     }
   };
 
@@ -54,8 +94,17 @@ export function OneTimeSecretBanner({
             Save this value now — it will not be shown again. Storing it
             anywhere else is the only way to recover it.
           </p>
+          <p className="mt-1.5 text-[11.5px] font-semibold text-amber-900 dark:text-amber-200">
+            This key is permanent — use it forever. Do NOT rotate routinely.
+          </p>
+          <p className="mt-0.5 text-[11px] text-amber-700/90 dark:text-amber-400/90">
+            Only click Rotate when (a) the key was leaked, (b) a person who
+            held it left, or (c) a compliance policy requires it. Otherwise
+            paste this value into your password manager + the source-system
+            integration once, and use it indefinitely.
+          </p>
           {helpText && (
-            <p className="mt-1 text-[11px] text-amber-700/80 dark:text-amber-400/80">{helpText}</p>
+            <p className="mt-1.5 text-[11px] text-amber-700/80 dark:text-amber-400/80">{helpText}</p>
           )}
 
           <div className="mt-3 flex items-stretch gap-2">
@@ -82,6 +131,32 @@ export function OneTimeSecretBanner({
               {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             </button>
           </div>
+
+          {testKeyForSystem && (
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onTest}
+                disabled={testState.kind === "testing"}
+                className="inline-flex items-center gap-1 rounded border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/40 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-900"
+              >
+                <ShieldCheck className="h-3 w-3" strokeWidth={2.2} />
+                {testState.kind === "testing" ? "Testing…" : "Test this key"}
+              </button>
+              {testState.kind === "ok" && (
+                <span className="inline-flex items-center gap-1 text-[11.5px] text-emerald-700 dark:text-emerald-300">
+                  <CheckCircle2 className="h-3 w-3" strokeWidth={2.2} />
+                  {testState.message}
+                </span>
+              )}
+              {testState.kind === "fail" && (
+                <span className="inline-flex items-center gap-1 text-[11.5px] text-rose-700 dark:text-rose-300">
+                  <AlertCircle className="h-3 w-3" strokeWidth={2.2} />
+                  {testState.message}
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <button
           type="button"

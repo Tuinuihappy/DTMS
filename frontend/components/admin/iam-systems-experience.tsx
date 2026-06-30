@@ -93,7 +93,16 @@ export function IamSystemsExperience() {
   };
 
   const handleRotate = async (key: string) => {
-    if (!confirm(`Rotate the API key for "${key}"? The current key stops working immediately.`)) return;
+    if (secret) {
+      setError(`A freshly issued key for "${secret.key}" is still visible — copy it before rotating any system again.`);
+      return;
+    }
+    if (!confirm(
+      `Rotate the API key for "${key}"?\n\n` +
+      `• The current key stops working the moment you click OK.\n` +
+      `• A NEW key will be shown ONCE in a banner — copy it then test it.\n` +
+      `• Do NOT rotate again until you have copied + verified the new key.`,
+    )) return;
     markBusy(key);
     try {
       const res: RotateCredentialResponse = await rotateCredential(key);
@@ -160,10 +169,11 @@ export function IamSystemsExperience() {
               : `New API key for "${secret.key}" — copy now (old key revoked)`
           }
           secret={secret.apiKey}
+          testKeyForSystem={secret.key}
           helpText={
             secret.kind === "created"
-              ? 'Send this key to the source-system operator. They use it as `Authorization: ApiKey <value>` on every inbound POST.'
-              : `Rotated at ${secret.rotatedAt}. The previous key is no longer accepted.`
+              ? 'Send this key to the source-system operator. They use it as `Authorization: ApiKey <value>` on every inbound POST. Click "Test this key" to verify it authenticates before sharing.'
+              : `Rotated at ${secret.rotatedAt}. The previous key is no longer accepted. Click "Test this key" to confirm the new value works.`
           }
           onDismiss={() => setSecret(null)}
         />
@@ -251,10 +261,10 @@ export function IamSystemsExperience() {
                         )}
                         <button
                           type="button"
-                          disabled={busy}
+                          disabled={busy || secret !== null}
                           onClick={() => handleRotate(s.key)}
-                          className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)] disabled:opacity-50 dark:bg-white/[0.05]"
-                          title="Rotate API key"
+                          className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white/[0.05]"
+                          title={secret ? "Copy + test the visible key first" : "Rotate API key"}
                         >
                           <KeyRound className="h-3 w-3" strokeWidth={2.2} />
                           Rotate

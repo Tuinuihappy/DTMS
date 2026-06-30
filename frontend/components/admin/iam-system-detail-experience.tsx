@@ -86,7 +86,16 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
   };
 
   const onRotate = async () => {
-    if (!confirm(`Rotate the API key? The current key stops working immediately.`)) return;
+    if (rotatedKey) {
+      setError("A freshly rotated key is still visible above — copy it before rotating again.");
+      return;
+    }
+    if (!confirm(
+      `Rotate the API key for "${systemKey}"?\n\n` +
+      `• The current key stops working the moment you click OK.\n` +
+      `• A NEW key will be shown ONCE in a banner — copy it then test it.\n` +
+      `• Do NOT rotate again until you have copied + verified the new key.`,
+    )) return;
     setBusy(true);
     try {
       const r = await rotateCredential(systemKey);
@@ -193,7 +202,8 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
         <OneTimeSecretBanner
           title={`New API key for "${data.key}" — copy now (old key revoked)`}
           secret={rotatedKey.apiKey}
-          helpText={`Rotated at ${rotatedKey.rotatedAt}. Send this to the operator immediately.`}
+          testKeyForSystem={data.key}
+          helpText={`Rotated at ${rotatedKey.rotatedAt}. Click "Test this key" to confirm it authenticates, then send to the operator. Do NOT click Rotate again until you've copied + tested.`}
           onDismiss={() => setRotatedKey(null)}
         />
       )}
@@ -224,13 +234,20 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
           <button
             type="button"
             onClick={onRotate}
-            disabled={busy}
-            className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+            disabled={busy || rotatedKey !== null}
+            title={rotatedKey ? "Copy + test the visible key first before rotating again" : undefined}
+            className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <KeyRound className="h-3 w-3" strokeWidth={2.2} />
             Rotate key
           </button>
         </div>
+        <p className="mt-1 text-[11px] text-[var(--color-ink-500)]">
+          The current key works forever. Rotate <em>only</em> when the key
+          was leaked, someone who held it left, or a policy mandates it —
+          rotating revokes the existing key immediately and you must
+          re-distribute the new one to the source system.
+        </p>
         {data.credential ? (
           <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
             <DefRow label="Auth scheme (inbound)" value={data.credential.authScheme} mono />
