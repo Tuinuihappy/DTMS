@@ -266,6 +266,48 @@ public static class SystemAdminEndpoints
                 return Results.NoContent();
             }).RequirePermission("dtms:iam:system:write");
 
+        // ── Hard delete (only when inactive) ─────────────────────────
+        // Soft delete via /deactivate is the routine path. Hard delete
+        // is the rare cleanup operation (test data, GDPR purge, retired
+        // system that will never be onboarded again under the same key).
+        // We gate on IsActive=false to force operators to stop traffic
+        // first — admin clicking DELETE in production by mistake would
+        // otherwise blow the system off the auth surface mid-request.
+        //
+        // Cascade in the Iam schema removes SystemCredentials,
+        // SystemClientPermissions, and SystemEventSubscriptions; cross-
+        // module historical data (DeliveryOrders.SourceSystem, outbox
+        // PartitionKey, audit log entries) is preserved as denormalized
+        // string references with no FK, so deleting the system row does
+        // not break audit timelines or order history.
+        group.MapDelete("/{key}",
+            async (string key, HttpContext ctx,
+                   ISystemClientRepository systems,
+                   IAuditLogRepository audit,
+                   CancellationToken ct) =>
+            {
+                var client = await systems.GetByKeyAsync(key, ct);
+                if (client is null) return Results.NotFound();
+                if (client.IsActive)
+                    return Results.Conflict(new
+                    {
+                        error = "Deactivate the system first. Hard delete is only allowed once the row is Inactive and no traffic is flowing.",
+                    });
+
+                await systems.RemoveAsync(client, ct);
+                await audit.AppendAsync(new PermissionAuditEntry(
+                    actorEmployeeId: ActorOrUnknown(ctx),
+                    action: "system-hard-deleted",
+                    permissionCode: null,
+                    details: JsonSerializer.Serialize(new
+                    {
+                        systemKey = key,
+                        displayName = client.DisplayName,
+                    })), ct);
+
+                return Results.NoContent();
+            }).RequirePermission("dtms:iam:system:write");
+
         // ── Rotate inbound api-key ────────────────────────────────────
         group.MapPost("/{key}/credential/rotate",
             async (string key, HttpContext ctx,

@@ -20,3 +20,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
     inbound: req,
   });
 }
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ key: string }> }) {
+  const { key } = await params;
+  return proxyToBackend({
+    method: "DELETE",
+    path: `/api/v1/iam/systems/${encodeURIComponent(key)}`,
+    inbound: req,
+  });
+}

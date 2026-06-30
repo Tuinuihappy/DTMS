@@ -79,4 +79,10 @@ public sealed class SystemClientRepository : ISystemClientRepository
         _db.SystemClients.Update(client);
         await _db.SaveChangesAsync(ct);
     }
+
+    public async Task RemoveAsync(SystemClient client, CancellationToken ct = default)
+    {
+        _db.SystemClients.Remove(client);
+        await _db.SaveChangesAsync(ct);
+    }
 }

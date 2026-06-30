@@ -162,6 +162,13 @@ export async function setCallback(
   if (!res.ok) throw new Error(await readError(res));
 }
 
+export async function deleteSystem(key: string): Promise<void> {
+  const res = await fetch(`/api/admin/iam/systems/${encodeURIComponent(key)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(await readError(res));
+}
+
 export async function rotateCredential(key: string): Promise<RotateCredentialResponse> {
   const res = await fetch(
     `/api/admin/iam/systems/${encodeURIComponent(key)}/credential/rotate`,

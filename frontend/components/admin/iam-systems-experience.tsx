@@ -1,12 +1,13 @@
 "use client";
 
-import { AlertCircle, KeyRound, Plus, Power, PowerOff, RefreshCw, X } from "lucide-react";
+import { AlertCircle, KeyRound, Plus, Power, PowerOff, RefreshCw, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   activateSystem,
   createSystem,
   deactivateSystem,
+  deleteSystem,
   listSystems,
   rotateCredential,
   type CreatedSystemResponse,
@@ -84,6 +85,28 @@ export function IamSystemsExperience() {
     markBusy(key);
     try {
       await deactivateSystem(key);
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      clearBusy(key);
+    }
+  };
+
+  const handleDelete = async (key: string) => {
+    if (!confirm(
+      `Hard delete system "${key}"?\n\n` +
+      `• Removes the SystemClient row + cascades to its credential, ` +
+      `permissions, and subscriptions.\n` +
+      `• Historical orders, outbox entries, and audit log references ` +
+      `survive — they carry the key as a string, not a foreign key.\n` +
+      `• The key value becomes available for re-onboarding under a ` +
+      `fresh identity if you ever recreate it.\n\n` +
+      `Only do this for retired systems / test cleanup.`,
+    )) return;
+    markBusy(key);
+    try {
+      await deleteSystem(key);
       await load();
     } catch (e) {
       setError((e as Error).message);
@@ -269,6 +292,20 @@ export function IamSystemsExperience() {
                           <KeyRound className="h-3 w-3" strokeWidth={2.2} />
                           Rotate
                         </button>
+                        {/* Delete shown only on inactive rows. Active = must
+                            Deactivate first (backend enforces 409 anyway). */}
+                        {!s.isActive && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => handleDelete(s.key)}
+                            className="inline-flex items-center gap-1 rounded border border-rose-300 bg-white px-2 py-1 text-[11px] text-rose-600 hover:bg-rose-50 disabled:opacity-50 dark:bg-white/[0.04]"
+                            title="Hard delete system (irreversible)"
+                          >
+                            <Trash2 className="h-3 w-3" strokeWidth={2.2} />
+                            Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

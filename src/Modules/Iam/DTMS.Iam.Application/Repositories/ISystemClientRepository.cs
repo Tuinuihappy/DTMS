@@ -48,4 +48,14 @@ public interface ISystemClientRepository
     /// metadata edits or Activate/Deactivate via the domain methods.
     /// </summary>
     Task UpdateAsync(SystemClient client, CancellationToken ct = default);
+
+    /// <summary>
+    /// Hard delete. FK cascade in the Iam schema removes SystemCredential,
+    /// SystemClientPermissions, and SystemEventSubscriptions rows that
+    /// reference this Key. Cross-module data (DeliveryOrders.SourceSystem,
+    /// outbox.OutboxMessages.PartitionKey, audit log entries) carry the
+    /// key as a denormalized string — by design they have no FK and are
+    /// preserved as historical fact when the SystemClient is removed.
+    /// </summary>
+    Task RemoveAsync(SystemClient client, CancellationToken ct = default);
 }
