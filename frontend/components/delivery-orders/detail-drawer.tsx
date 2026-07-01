@@ -5,7 +5,6 @@ import {
   Ban,
   Box,
   Calendar,
-  Check,
   ChevronRight,
   Clock,
   Copy,
@@ -43,7 +42,6 @@ import { PriorityBadge, StatusBadge, TransportModeBadge } from "./badges";
 
 type Action =
   | "submit"
-  | "confirm"
   | "delete"
   | "reopen"
   | "redispatch"
@@ -255,7 +253,7 @@ export function OrderDetailDrawer({
                     <MetaCell
                       icon={<Hash className="h-3 w-3" strokeWidth={2.2} />}
                       label="Source"
-                      value={data.sourceSystem}
+                      value={data.sourceSystemDisplayName ?? data.sourceSystem}
                     />
                     <MetaCell
                       icon={<User className="h-3 w-3" strokeWidth={2.2} />}
@@ -545,15 +543,9 @@ export function OrderDetailDrawer({
                       Submit
                     </DrawerActionButton>
                   )}
-                  {can(data.orderStatus, ["Submitted", "Validated"]) && (
-                    <DrawerActionButton
-                      tone="success"
-                      icon={<Check className="h-3.5 w-3.5" strokeWidth={2.4} />}
-                      onClick={() => onAction("confirm", data.id)}
-                    >
-                      Confirm
-                    </DrawerActionButton>
-                  )}
+                  {/* Phase P5 — the standalone Confirm button was retired.
+                      Submit auto-confirms atomically, so the Submitted /
+                      Validated states no longer occur durably. */}
                   {/* Cancel mirrors the backend guard: any non-terminal,
                       non-already-cancelled state. For in-flight states
                       (Dispatched / InProgress), the cancel cascades to

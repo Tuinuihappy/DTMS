@@ -3,7 +3,6 @@ using DTMS.DeliveryOrder.Application.Commands.AmendDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.BulkCancelDeliveryOrders;
 using DTMS.DeliveryOrder.Application.Commands.BulkSubmitDeliveryOrders;
 using DTMS.DeliveryOrder.Application.Commands.CancelDeliveryOrder;
-using DTMS.DeliveryOrder.Application.Commands.ConfirmDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.ConfirmItemPod;
 using DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
@@ -34,7 +33,6 @@ using Microsoft.AspNetCore.Routing;
 namespace DTMS.DeliveryOrder.Presentation;
 
 public record CancelOrderRequest(string Reason);
-public record ConfirmOrderRequest(string? ConfirmedBy = null);
 public record RejectOrderRequest(string Reason, string? RejectedBy = null);
 public record HoldOrderRequest(string Reason, string? HeldBy = null);
 public record ReleaseOrderRequest(string? ReleasedBy = null);
@@ -72,12 +70,11 @@ public static class DeliveryOrderEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequireIdempotencyKey().RequirePermission("dtms:order:submit");
 
-        // POST /api/v1/delivery-orders/{id}/confirm — manual confirm (Validated → Confirmed)
-        group.MapPost("/{id:guid}/confirm", async (Guid id, [FromBody] ConfirmOrderRequest? body, ISender sender) =>
-        {
-            var result = await sender.Send(new ConfirmDeliveryOrderCommand(id, body?.ConfirmedBy));
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:confirm");
+        // POST /api/v1/delivery-orders/{id}/confirm was removed in Phase P5.
+        // Submit now auto-confirms atomically (Draft → Confirmed in one
+        // handler call, mirroring the system path), so a separate manual
+        // confirmation step no longer exists. The `dtms:order:confirm`
+        // permission is dropped alongside it in the same phase migration.
 
         // POST /api/v1/delivery-orders/{id}/reject — reject (Submitted|Validated|Confirmed → Rejected)
         group.MapPost("/{id:guid}/reject", async (Guid id, [FromBody] RejectOrderRequest body, ISender sender) =>
@@ -204,17 +201,12 @@ public static class DeliveryOrderEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequireIdempotencyKey().RequirePermission("dtms:order:notify-oms");
 
-        // POST /api/v1/delivery-orders/upstream — auto pipeline for upstream sources (SAP/ERP/OMS)
-        // Submitted → Validated → Confirmed in one transaction.
-        // Idempotent on (SourceSystem, OrderRef) at DB-level; Idempotency-Key is the
-        // transport-level guard for client retries.
-        group.MapPost("/upstream", async (CreateUpstreamDeliveryOrderCommand command, ISender sender) =>
-        {
-            var result = await sender.Send(command);
-            return result.IsSuccess
-                ? Results.Created($"/api/v1/delivery-orders/{result.Value.Order.Id}", result.Value)
-                : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:upstream");
+        // POST /api/v1/delivery-orders/upstream was removed in Phase P4 of
+        // the SourceSystem migration. External systems now hit the federated
+        // /api/v1/source/delivery-orders endpoint, which authenticates via
+        // SystemClientAuthMiddleware and stamps SourceSystemKey from the JWT
+        // sub claim (Phase S.8e P3 dropped the URL {key} segment). The
+        // dtms:order:upstream permission is retired alongside it.
 
         // POST /api/v1/delivery-orders/bulk
         group.MapPost("/bulk", async (BulkSubmitDeliveryOrdersCommand command, ISender sender) =>

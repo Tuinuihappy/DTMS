@@ -1,9 +1,12 @@
 using DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
+using DTMS.DeliveryOrder.Application.Options;
 using DTMS.DeliveryOrder.Application.QualityIssues;
+using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Services;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.DeliveryOrder.Domain.ValueObjects;
 using DTMS.SharedKernel.Messaging;
+using Microsoft.Extensions.Options;
 
 namespace DTMS.DeliveryOrder.Application.Commands.BulkSubmitDeliveryOrders;
 
@@ -13,17 +16,23 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
     private readonly IStationValidationService _stationValidation;
     private readonly IUomNormalizer _uomNormalizer;
     private readonly ICurrentUserAccessor _currentUser;
+    private readonly IOrderOriginResolver _originResolver;
+    private readonly DeliveryOrderOptions _options;
 
     public BulkSubmitDeliveryOrdersCommandHandler(
         IDeliveryOrderRepository repo,
         IStationValidationService stationValidation,
         IUomNormalizer uomNormalizer,
-        ICurrentUserAccessor currentUser)
+        ICurrentUserAccessor currentUser,
+        IOrderOriginResolver originResolver,
+        IOptions<DeliveryOrderOptions> options)
     {
         _repo = repo;
         _stationValidation = stationValidation;
         _uomNormalizer = uomNormalizer;
         _currentUser = currentUser;
+        _originResolver = originResolver;
+        _options = options.Value;
     }
 
     public async Task<Result<BulkSubmitResult>> Handle(BulkSubmitDeliveryOrdersCommand request, CancellationToken cancellationToken)
@@ -33,6 +42,11 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
 
         var succeeded = new List<BulkSubmitSuccess>();
         var failures = new List<BulkSubmitFailure>();
+
+        // Phase P4 — one origin resolve for the whole batch (cheap:
+        // cached / claim-first) + one JWT read for RequestedBy.
+        var origin = await _originResolver.GetManualAsync(cancellationToken);
+        var actor = _currentUser.GetCurrentUserName();
 
         // validate and build orders first (sequential — shares DbContext safely)
         var pendingOrders = new List<Domain.Entities.DeliveryOrder>();
@@ -50,14 +64,13 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
             Domain.Entities.DeliveryOrder order;
             try
             {
-                var serviceWindow = cmd.ServiceWindow is { } sw
-                    ? Domain.ValueObjects.ServiceWindow.Create(sw.EarliestUtc, sw.LatestUtc)
-                    : null;
+                var serviceWindow = Domain.ValueObjects.ServiceWindow.Create(
+                    cmd.ServiceWindow.EarliestUtc, cmd.ServiceWindow.LatestUtc);
 
                 order = Domain.Entities.DeliveryOrder.Create(
                     cmd.OrderRef, cmd.Priority, serviceWindow,
-                    Domain.Enums.SourceSystem.Manual, _currentUser.GetCurrentUserName(),
-                    cmd.RequestedBy, cmd.Notes, cmd.RequestedTransportMode);
+                    origin.Key, origin.DisplayName,
+                    actor, actor, cmd.Notes, cmd.RequestedTransportMode);
 
                 var uomFailureForOrder = false;
                 foreach (var (pkg, idx) in cmd.Items.Select((p, i) => (p, i + 1)))
@@ -130,16 +143,23 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                 warehouseMap = warehouseResult.Value;
             }
 
+            // Phase P5 — atomic Submit + Validate + Confirm per order.
+            // Mirrors the single-submit handler and the system path so
+            // every order that clears validation is durably Confirmed
+            // when the bulk call returns.
             order.RaiseCreatedEvent();
             order.Submit();
             order.MarkAsValidated(stationMap, warehouseMap);
+            order.Confirm(_options.WeightFallbackKg);
             var warnings = WeightWarningEvaluator.Evaluate(order.Items);
-            succeeded.Add(new BulkSubmitSuccess(order.Id, warnings));
+            succeeded.Add(new BulkSubmitSuccess(
+                DeliveryOrderMapper.MapToDetailDto(order), warnings));
         }
 
         if (succeeded.Count > 0)
         {
-            var orders = pendingOrders.Where(o => succeeded.Any(s => s.OrderId == o.Id));
+            var succeededIds = new HashSet<Guid>(succeeded.Select(s => s.Order.Id));
+            var orders = pendingOrders.Where(o => succeededIds.Contains(o.Id));
             await _repo.AddRangeAsync(orders, cancellationToken);
             await _repo.SaveChangesAsync(cancellationToken);
         }

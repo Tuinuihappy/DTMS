@@ -7,7 +7,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SectionLabel } from "@/components/primitives/section-label";
 import {
   abandonStuckOrder,
-  confirmOrder,
   deleteOrder,
   getOrder,
   getOrderStats,
@@ -325,7 +324,6 @@ function ExperienceInner() {
         action:
           | "edit"
           | "submit"
-          | "confirm"
           | "delete"
           | "reopen"
           | "redispatch"
@@ -674,7 +672,6 @@ function ExperienceInner() {
         | "edit"
         | "reorder"
         | "submit"
-        | "confirm"
         | "delete"
         | "reopen"
         | "redispatch"
@@ -777,13 +774,11 @@ function ExperienceInner() {
       const previousOrders = orders;
       const previousTotal = totalCount;
 
-      let nextStatus: OrderStatus | null = null;
-      if (action === "submit") nextStatus = "Submitted";
-      if (action === "confirm") nextStatus = "Confirmed";
-      if (nextStatus) {
-        const ns = nextStatus;
-        setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, orderStatus: ns } : o)));
-      }
+      // Phase P5 — submit auto-confirms atomically on the backend, so
+      // the optimistic hop straight to "Confirmed" is honest (no more
+      // intermediate Submitted → Validated stops that the UI used to
+      // paint over).
+      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, orderStatus: "Confirmed" as OrderStatus } : o)));
       setSelected((prev) => {
         const n = new Set(prev);
         n.delete(id);
@@ -791,14 +786,14 @@ function ExperienceInner() {
       });
       setBusy(true);
       try {
-        if (action === "submit") await submitOrder(id);
-        else await confirmOrder(id);
+        const result = await submitOrder(id);
+        // Use the returned order verbatim so the list mirrors the
+        // authoritative server state (submittedAt, weight totals, etc.)
+        // without a follow-up round-trip.
+        setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...result.order } : o)));
         toast.push({
           tone: "success",
-          message:
-            action === "submit"
-              ? `Submitted ${target.orderRef}`
-              : `Confirmed ${target.orderRef}`,
+          message: `Confirmed ${target.orderRef}`,
         });
         setTimeout(() => {
           fetchOrders({ silent: true });
@@ -835,30 +830,24 @@ function ExperienceInner() {
     runActionRef.current = runAction;
   }, [runAction]);
 
-  const handleBulk = useCallback(
-    async (action: "submit" | "confirm") => {
-      const ids = Array.from(selected);
-      if (ids.length === 0) return;
-      setBusy(true);
-      const results = await Promise.allSettled(
-        ids.map((id) => (action === "submit" ? submitOrder(id) : confirmOrder(id))),
-      );
-      const ok = results.filter((r) => r.status === "fulfilled").length;
-      const fail = results.length - ok;
-      toast.push({
-        tone: fail === 0 ? "success" : fail === ok ? "error" : "info",
-        message:
-          fail === 0
-            ? `${action === "submit" ? "Submitted" : "Confirmed"} ${ok} orders`
-            : `${ok} succeeded · ${fail} failed`,
-      });
-      setSelected(new Set());
-      setBusy(false);
-      fetchOrders({ silent: true });
-      fetchStats();
-    },
-    [selected, toast, fetchOrders, fetchStats],
-  );
+  // Phase P5 — bulk "confirm" merged into bulk submit (submit auto-
+  // confirms). The confirm button was removed from BulkActionBar.
+  const handleBulkSubmit = useCallback(async () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    setBusy(true);
+    const results = await Promise.allSettled(ids.map((id) => submitOrder(id)));
+    const ok = results.filter((r) => r.status === "fulfilled").length;
+    const fail = results.length - ok;
+    toast.push({
+      tone: fail === 0 ? "success" : fail === ok ? "error" : "info",
+      message: fail === 0 ? `Confirmed ${ok} orders` : `${ok} succeeded · ${fail} failed`,
+    });
+    setSelected(new Set());
+    setBusy(false);
+    fetchOrders({ silent: true });
+    fetchStats();
+  }, [selected, toast, fetchOrders, fetchStats]);
 
   // Bulk cancel — shares the cancel dialog with the single-row path but
   // captures every selected order at once (snapshot taken from current
@@ -1309,8 +1298,7 @@ function ExperienceInner() {
       <BulkActionBar
         count={selected.size}
         onClear={() => setSelected(new Set())}
-        onSubmitAll={() => handleBulk("submit")}
-        onConfirmAll={() => handleBulk("confirm")}
+        onSubmitAll={handleBulkSubmit}
         onDeleteAll={handleBulkDelete}
         busy={busy}
       />

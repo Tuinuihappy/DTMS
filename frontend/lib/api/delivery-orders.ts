@@ -21,7 +21,11 @@ export type OrderStatus =
   | "Rejected";
 
 export type Priority = "Low" | "Normal" | "High" | "Critical";
-export type SourceSystem = "Manual" | "Sap" | "Erp" | "Oms";
+// Phase P5 — broadened from a closed union to plain string. Admins can
+// register new SystemClients (wms-acme, tms-bravo, ...) without a FE
+// deploy; the API stamps the lowercase iam.SystemClients.Key slug and
+// the UI renders it as-is (or via sourceSystemDisplayName when present).
+export type SourceSystem = string;
 export type TransportMode = "Amr" | "Manual" | "Fleet";
 export type Uom = "KG" | "G" | "LB" | "EA" | "BOX" | "PALLET" | "CASE";
 export type HandlingInstruction =
@@ -40,6 +44,8 @@ export type DeliveryOrderListDto = {
   id: string;
   orderRef: string;
   sourceSystem: SourceSystem;
+  // Phase P5 snapshot — captured at create-time; nullable for legacy rows.
+  sourceSystemDisplayName: string | null;
   priority: Priority;
   orderStatus: OrderStatus;
   serviceWindow: ServiceWindowDto | null;
@@ -165,8 +171,10 @@ function upperSnakeFromPascal(s: string): string {
     .toUpperCase();
 }
 
+// Phase P5 — sourceSystem is intentionally NOT in this list: it's now a
+// raw lowercase slug (from iam.SystemClients.Key) with no PascalCase
+// normalization needed. The other fields remain closed enums.
 const ENUM_FIELDS: Array<keyof DeliveryOrderListDto | keyof ItemDto> = [
-  "sourceSystem",
   "priority",
   "orderStatus",
   "requestedTransportMode",
@@ -202,15 +210,16 @@ function normalizeOrder<T extends Record<string, unknown>>(o: T): T {
 
 export type PackingGroup = "I" | "II" | "III";
 
+// Phase P4/P5 — requestedBy is now server-side (JWT name), not client-
+// supplied. The field was removed from CreateDraftDeliveryOrderCommand.
 export type CreateOrderPayload = {
   orderRef: string;
   priority: Priority;
-  requestedBy?: string;
   notes?: string;
   requestedTransportMode?: TransportMode;
   requiresDropPod?: boolean | null;
   requiresPickupPod?: boolean | null;
-  serviceWindow?: { earliestUtc?: string; latestUtc?: string };
+  serviceWindow: { earliestUtc?: string; latestUtc?: string };
   items: Array<{
     itemId: string;
     description?: string;
@@ -484,20 +493,28 @@ export async function bulkCancelOrders(
   return (await res.json()) as BulkCancelOrdersResult;
 }
 
-export async function submitOrder(id: string): Promise<void> {
+// Phase P5 — submit auto-confirms atomically on the backend (Draft →
+// Confirmed in one command). The response carries the confirmed order
+// plus any weight-warning quality issues, mirroring the system path's
+// UpstreamOrderAckDto. Callers can update local state directly from the
+// returned order instead of firing a follow-up GET.
+export type SubmitOrderResult = {
+  order: DeliveryOrderDetailDto;
+  warnings: Array<{ code: string; message: string }>;
+};
+
+export async function submitOrder(id: string): Promise<SubmitOrderResult> {
   const res = await fetch(`/api/delivery-orders/${id}/submit`, {
     method: "POST",
     headers: mutationHeaders(),
   });
-  if (!res.ok && res.status !== 204) await unwrap(res);
-}
-
-export async function confirmOrder(id: string): Promise<void> {
-  const res = await fetch(`/api/delivery-orders/${id}/confirm`, {
-    method: "POST",
-    headers: mutationHeaders(),
-  });
-  if (!res.ok && res.status !== 204) await unwrap(res);
+  if (!res.ok) await unwrap(res);
+  const raw = (await res.json()) as SubmitOrderResult;
+  // Backend serializes enums as UPPER_SNAKE (NORMAL, CONFIRMED, ...) but
+  // the UI's badge maps + type unions expect PascalCase (Normal,
+  // Confirmed). Run the same normalizer other endpoints use so the
+  // returned order can be spread into list/detail state directly.
+  return { ...raw, order: normalizeOrder(raw.order) };
 }
 
 export async function rejectOrder(

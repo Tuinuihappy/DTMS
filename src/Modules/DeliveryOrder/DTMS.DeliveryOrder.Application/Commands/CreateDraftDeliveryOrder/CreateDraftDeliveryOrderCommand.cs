@@ -27,12 +27,20 @@ public record ItemDto(
     TemperatureRangeDto? Temperature = null,
     IReadOnlyList<HandlingInstruction>? HandlingInstructions = null);
 
+// Phase P4: RequestedBy removed from the wire. UI callers cannot supply
+// it — the handler stamps CurrentUser.Name into both CreatedBy and
+// RequestedBy. Reintroduce only if an "on behalf of" flow is added,
+// and even then read the actor from an ambient context, not a body field.
+//
+// Phase P5: ServiceWindow is required — symmetric with the system path
+// (CreateUpstreamDeliveryOrderCommand). The domain has always modelled
+// service windows as first-class scheduling input; the previous nullable
+// shape only reflected a UI convenience that let users defer that field.
 public record CreateDraftDeliveryOrderCommand(
     string OrderRef,
-    ServiceWindowDto? ServiceWindow,
+    ServiceWindowDto ServiceWindow,
     List<ItemDto> Items,
     Priority Priority = Priority.Normal,
-    string? RequestedBy = null,
     string? Notes = null,
     TransportMode? RequestedTransportMode = TransportMode.Amr,
     bool? RequiresDropPod = null,

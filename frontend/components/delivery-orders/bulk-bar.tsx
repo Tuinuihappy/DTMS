@@ -1,21 +1,23 @@
 "use client";
 
-import { Check, Send, Trash2, X } from "lucide-react";
+import { Send, Trash2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
 
+// Phase P5 — the standalone Confirm bulk action was removed. Submit
+// auto-confirms atomically on the backend, so "Submit N orders" is the
+// only forward-transition bulk button; Cancel is still present because
+// cancellation is a different intent that operates on confirmed orders.
 export function BulkActionBar({
   count,
   onClear,
   onSubmitAll,
-  onConfirmAll,
   onDeleteAll,
   busy,
 }: {
   count: number;
   onClear: () => void;
   onSubmitAll: () => void;
-  onConfirmAll: () => void;
   onDeleteAll: () => void;
   busy: boolean;
 }) {
@@ -42,13 +44,9 @@ export function BulkActionBar({
             </span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <BulkBtn onClick={onSubmitAll} disabled={busy}>
+            <BulkBtn onClick={onSubmitAll} disabled={busy} tone="success">
               <Send className="h-3.5 w-3.5" strokeWidth={2.4} />
               <span className="hidden sm:inline">Submit</span>
-            </BulkBtn>
-            <BulkBtn onClick={onConfirmAll} disabled={busy} tone="success">
-              <Check className="h-3.5 w-3.5" strokeWidth={2.4} />
-              <span className="hidden sm:inline">Confirm</span>
             </BulkBtn>
             <BulkBtn onClick={onDeleteAll} disabled={busy} tone="coral">
               <Trash2 className="h-3.5 w-3.5" strokeWidth={2.4} />

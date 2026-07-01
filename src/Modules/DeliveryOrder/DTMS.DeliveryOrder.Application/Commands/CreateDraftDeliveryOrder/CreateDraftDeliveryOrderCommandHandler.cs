@@ -1,6 +1,5 @@
 using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Services;
-using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.DeliveryOrder.Domain.ValueObjects;
 using DTMS.SharedKernel.Messaging;
@@ -13,33 +12,43 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
     private readonly IDeliveryOrderRepository _repository;
     private readonly IUomNormalizer _uomNormalizer;
     private readonly ICurrentUserAccessor _currentUser;
+    private readonly IOrderOriginResolver _originResolver;
     private readonly ILogger<CreateDraftDeliveryOrderCommandHandler> _logger;
 
     public CreateDraftDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
         IUomNormalizer uomNormalizer,
         ICurrentUserAccessor currentUser,
+        IOrderOriginResolver originResolver,
         ILogger<CreateDraftDeliveryOrderCommandHandler> logger)
     {
         _repository = repository;
         _uomNormalizer = uomNormalizer;
         _currentUser = currentUser;
+        _originResolver = originResolver;
         _logger = logger;
     }
 
     public async Task<Result<DeliveryOrderDetailDto>> Handle(CreateDraftDeliveryOrderCommand request, CancellationToken cancellationToken)
     {
-        var serviceWindow = request.ServiceWindow is { } sw
-            ? Domain.ValueObjects.ServiceWindow.Create(sw.EarliestUtc, sw.LatestUtc)
-            : null;
+        var serviceWindow = Domain.ValueObjects.ServiceWindow.Create(
+            request.ServiceWindow.EarliestUtc, request.ServiceWindow.LatestUtc);
+
+        // Phase P4 — origin snapshot always resolves to the 'manual'
+        // SystemClient row (throws if the P1 seed is missing).
+        // RequestedBy is set from the JWT name — the UI wire no longer
+        // carries either field.
+        var origin = await _originResolver.GetManualAsync(cancellationToken);
+        var actor = _currentUser.GetCurrentUserName();
 
         var order = Domain.Entities.DeliveryOrder.Create(
             request.OrderRef,
             request.Priority,
             serviceWindow,
-            SourceSystem.Manual,
-            _currentUser.GetCurrentUserName(),
-            request.RequestedBy,
+            origin.Key,
+            origin.DisplayName,
+            actor,
+            actor,
             request.Notes,
             request.RequestedTransportMode);
 

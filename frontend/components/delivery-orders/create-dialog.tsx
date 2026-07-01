@@ -58,7 +58,6 @@ type ItemFormState = {
 type FormState = {
   orderRef: string;
   priority: Priority;
-  requestedBy: string;
   notes: string;
   transport: TransportMode;
   requiresDropPod: boolean;
@@ -107,7 +106,6 @@ function blankForm(): FormState {
   return {
     orderRef: `DO-${stamp}`,
     priority: "Normal",
-    requestedBy: "",
     notes: "",
     transport: "Amr",
     requiresDropPod: false,
@@ -124,7 +122,6 @@ function formFromOrder(o: DeliveryOrderDetailDto): FormState {
   return {
     orderRef: o.orderRef,
     priority: o.priority,
-    requestedBy: o.requestedBy ?? "",
     notes: o.notes ?? "",
     transport: o.requestedTransportMode ?? "Amr",
     requiresDropPod: o.requiresDropPod ?? false,
@@ -169,15 +166,19 @@ function buildPayload(form: FormState): CreateOrderPayload {
   return {
     orderRef: form.orderRef.trim(),
     priority: form.priority,
-    requestedBy: form.requestedBy.trim() || undefined,
     notes: form.notes.trim() || undefined,
     requestedTransportMode: form.transport,
     requiresDropPod: form.requiresDropPod,
     requiresPickupPod: form.requiresPickupPod,
-    serviceWindow:
-      form.windowEarliest || form.windowLatest
-        ? { earliestUtc: toIso(form.windowEarliest), latestUtc: toIso(form.windowLatest) }
-        : undefined,
+    // Phase P5 — ServiceWindow is required. The canAdvance guard on
+    // step 0 already blocks submission with neither bound present, so
+    // by the time we reach the payload builder at least one bound is
+    // set. Passing an all-null ServiceWindow would 400 at the backend
+    // validator ("must have at least one bound") — same error, later.
+    serviceWindow: {
+      earliestUtc: toIso(form.windowEarliest),
+      latestUtc: toIso(form.windowLatest),
+    },
     items: form.items.map((it) => {
       const hasDims = it.lengthMm && it.widthMm && it.heightMm;
       const hasTemp = it.minC !== "" || it.maxC !== "";
@@ -313,6 +314,9 @@ export function CreateOrderDialog({
   const canAdvance =
     step === 0
       ? form.orderRef.trim().length > 0 &&
+        // Phase P5 — ServiceWindow is required (matches the system API).
+        // At least one bound (earliest OR latest) must be provided.
+        (form.windowEarliest.length > 0 || form.windowLatest.length > 0) &&
         // If both window times are set, latest must be >= earliest.
         (!form.windowEarliest ||
           !form.windowLatest ||
@@ -594,7 +598,7 @@ export function CreateOrderDialog({
                       {/* Service window */}
                       <div className="rounded-2xl border border-white/60 bg-white/40 p-4 dark:border-white/[0.06] dark:bg-white/[0.03]">
                         <div className="mb-3 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-500)]">
-                          Service window <span className="text-[var(--color-ink-400)] normal-case tracking-normal">· optional</span>
+                          Service window <span className="text-[var(--color-coral)] normal-case tracking-normal">· required</span>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                           <Field label="Earliest" compact>
@@ -628,16 +632,12 @@ export function CreateOrderDialog({
                           )}
                       </div>
 
-                      <Field label="Requested by">
-                        <input
-                          value={form.requestedBy}
-                          onChange={(e) =>
-                            setForm({ ...form, requestedBy: e.target.value })
-                          }
-                          placeholder="Name or employee code"
-                          className={inputCls}
-                        />
-                      </Field>
+                      {/* Phase P4/P5 — "Requested by" field removed. The
+                          server stamps CreatedBy AND RequestedBy from the
+                          logged-in user's JWT name claim. Add an "on behalf
+                          of" input here only if the workflow ever needs it,
+                          and even then read the actor from an audit-safe
+                          source rather than a free-text box. */}
 
                       <Field label="Notes">
                         <textarea

@@ -2,7 +2,6 @@
 
 import {
   ArrowRight,
-  Check,
   ChevronRight,
   Copy,
   MoreHorizontal,
@@ -35,7 +34,7 @@ import {
   resolveEmptyStateVariant,
 } from "@/components/primitives/data-table";
 
-type RowAction = "edit" | "reorder" | "submit" | "confirm" | "delete";
+type RowAction = "edit" | "reorder" | "submit" | "delete";
 
 export type SortColumn =
   | "createdDate"
@@ -47,14 +46,14 @@ export type SortDir = "asc" | "desc";
 
 const EDITABLE: OrderStatus[] = ["Draft"];
 const SUBMITTABLE: OrderStatus[] = ["Draft"];
-const CONFIRMABLE: OrderStatus[] = ["Submitted", "Validated"];
-const DELETABLE: OrderStatus[] = ["Draft", "Submitted", "Validated"];
+// Phase P5 — DELETABLE dropped Submitted/Validated because those states
+// no longer occur durably: submit auto-confirms atomically.
+const DELETABLE: OrderStatus[] = ["Draft"];
 
 function allowedActions(o: DeliveryOrderListDto): RowAction[] {
   const out: RowAction[] = [];
   if (EDITABLE.includes(o.orderStatus)) out.push("edit");
   if (SUBMITTABLE.includes(o.orderStatus)) out.push("submit");
-  if (CONFIRMABLE.includes(o.orderStatus)) out.push("confirm");
   if (DELETABLE.includes(o.orderStatus)) out.push("delete");
   // Reorder is always available — the source order is unchanged, and a
   // fresh draft can be made from any past order regardless of status.
@@ -406,15 +405,6 @@ function RowMenu({
           >
             <Send className="h-3.5 w-3.5" strokeWidth={2.2} />
             Submit
-          </MenuItem>
-        )}
-        {actions.includes("confirm") && (
-          <MenuItem
-            tone="success"
-            onClick={() => { setOpen(false); onAction("confirm", order); }}
-          >
-            <Check className="h-3.5 w-3.5" strokeWidth={2.2} />
-            Confirm
           </MenuItem>
         )}
         {actions.includes("delete") && (

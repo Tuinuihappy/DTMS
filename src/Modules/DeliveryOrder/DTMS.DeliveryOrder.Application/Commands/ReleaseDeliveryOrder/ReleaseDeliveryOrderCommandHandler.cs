@@ -1,4 +1,3 @@
-using DTMS.DeliveryOrder.Application.Commands.ConfirmDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Options;
 using DTMS.DeliveryOrder.Application.QualityIssues;
 using DTMS.DeliveryOrder.Domain.Entities;
@@ -10,7 +9,7 @@ using Microsoft.Extensions.Options;
 
 namespace DTMS.DeliveryOrder.Application.Commands.ReleaseDeliveryOrder;
 
-public class ReleaseDeliveryOrderCommandHandler : ICommandHandler<ReleaseDeliveryOrderCommand, ConfirmDeliveryOrderResult>
+public class ReleaseDeliveryOrderCommandHandler : ICommandHandler<ReleaseDeliveryOrderCommand, ReleaseDeliveryOrderResult>
 {
     private readonly IDeliveryOrderRepository _repository;
     private readonly IOrderAuditEventRepository _auditRepo;
@@ -29,11 +28,11 @@ public class ReleaseDeliveryOrderCommandHandler : ICommandHandler<ReleaseDeliver
         _logger = logger;
     }
 
-    public async Task<Result<ConfirmDeliveryOrderResult>> Handle(ReleaseDeliveryOrderCommand request, CancellationToken cancellationToken)
+    public async Task<Result<ReleaseDeliveryOrderResult>> Handle(ReleaseDeliveryOrderCommand request, CancellationToken cancellationToken)
     {
         var order = await _repository.GetByIdAsync(request.OrderId, cancellationToken);
         if (order is null)
-            return Result<ConfirmDeliveryOrderResult>.Failure($"Order {request.OrderId} not found.");
+            return Result<ReleaseDeliveryOrderResult>.Failure($"Order {request.OrderId} not found.");
 
         try
         {
@@ -52,17 +51,17 @@ public class ReleaseDeliveryOrderCommandHandler : ICommandHandler<ReleaseDeliver
             _logger.LogInformation("[Release] Order {OrderId} '{OrderRef}' released back to Confirmed ({WarningCount} warning(s)).",
                 order.Id, order.OrderRef, warnings.Count);
 
-            return Result<ConfirmDeliveryOrderResult>.Success(new ConfirmDeliveryOrderResult(order.Id, warnings));
+            return Result<ReleaseDeliveryOrderResult>.Success(new ReleaseDeliveryOrderResult(order.Id, warnings));
         }
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning("[Release] Order {OrderId} release failed: {Error}.", request.OrderId, ex.Message);
-            return Result<ConfirmDeliveryOrderResult>.Failure(ex.Message);
+            return Result<ReleaseDeliveryOrderResult>.Failure(ex.Message);
         }
         catch (DbUpdateConcurrencyException)
         {
             _logger.LogWarning("[Release] Concurrency conflict on Order {OrderId}.", request.OrderId);
-            return Result<ConfirmDeliveryOrderResult>.Failure("The order was modified by another process. Please retry.");
+            return Result<ReleaseDeliveryOrderResult>.Failure("The order was modified by another process. Please retry.");
         }
     }
 }

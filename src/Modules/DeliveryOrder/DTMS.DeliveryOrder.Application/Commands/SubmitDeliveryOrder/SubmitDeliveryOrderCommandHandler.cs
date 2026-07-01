@@ -1,4 +1,6 @@
+using DTMS.DeliveryOrder.Application.Options;
 using DTMS.DeliveryOrder.Application.QualityIssues;
+using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Services;
 using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Enums;
@@ -6,6 +8,7 @@ using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace DTMS.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
 
@@ -14,17 +17,20 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
     private readonly IDeliveryOrderRepository _repository;
     private readonly IOrderAuditEventRepository _auditRepo;
     private readonly IStationValidationService _stationValidation;
+    private readonly DeliveryOrderOptions _options;
     private readonly ILogger<SubmitDeliveryOrderCommandHandler> _logger;
 
     public SubmitDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
         IOrderAuditEventRepository auditRepo,
         IStationValidationService stationValidation,
+        IOptions<DeliveryOrderOptions> options,
         ILogger<SubmitDeliveryOrderCommandHandler> logger)
     {
         _repository = repository;
         _auditRepo = auditRepo;
         _stationValidation = stationValidation;
+        _options = options.Value;
         _logger = logger;
     }
 
@@ -66,12 +72,19 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
 
         try
         {
+            // Phase P5 — atomic Submit + Validate + Confirm, mirroring the
+            // system path. Validated becomes a transient state that lasts
+            // one method dispatch; no order is durably persisted at
+            // Validated any more, so downstream consumers (Planning saga)
+            // that already listen on DeliveryOrderConfirmedIntegrationEventV1
+            // don't need to distinguish "system submit" from "user submit".
             order.Submit();
             order.MarkAsValidated(stationMap, warehouseMap);
+            order.Confirm(_options.WeightFallbackKg);
 
             await _auditRepo.AddAsync(new OrderAuditEvent(
                 order.Id, "OrderSubmitted",
-                $"Order '{order.OrderRef}' submitted and validated with priority {order.Priority}"), cancellationToken);
+                $"Order '{order.OrderRef}' submitted, validated, and confirmed with priority {order.Priority}"), cancellationToken);
 
             var warnings = WeightWarningEvaluator.Evaluate(order.Items);
             foreach (var w in warnings)
@@ -79,10 +92,12 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
 
             await _repository.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("[Submit] Order {OrderId} '{OrderRef}' submitted and validated ({WarningCount} warning(s)) — awaiting confirmation.",
+            _logger.LogInformation("[Submit] Order {OrderId} '{OrderRef}' submitted → confirmed ({WarningCount} warning(s)).",
                 order.Id, order.OrderRef, warnings.Count);
 
-            return Result<SubmitDeliveryOrderResult>.Success(new SubmitDeliveryOrderResult(order.Id, warnings));
+            return Result<SubmitDeliveryOrderResult>.Success(new SubmitDeliveryOrderResult(
+                DeliveryOrderMapper.MapToDetailDto(order),
+                warnings));
         }
         catch (InvalidOperationException ex)
         {
