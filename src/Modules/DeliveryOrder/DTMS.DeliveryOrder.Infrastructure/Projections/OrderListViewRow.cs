@@ -34,6 +34,10 @@ public class OrderListViewRow
     // ── Filter columns ─────────────────────────────────────────────────
     public string Status { get; private set; } = string.Empty;
     public string SourceSystem { get; private set; } = string.Empty;
+    // Phase P5 snapshot column — mirrors DeliveryOrder.SourceSystemDisplayName.
+    // Nullable because projection rows written pre-P5 don't have it; the
+    // P5 normalize migration backfills via JOIN with iam.SystemClients.
+    public string? SourceSystemDisplayName { get; private set; }
     public string Priority { get; private set; } = string.Empty;
     public string? TransportMode { get; private set; }
 
@@ -68,7 +72,9 @@ public class OrderListViewRow
     private OrderListViewRow() { }   // EF
 
     public OrderListViewRow(
-        Guid orderId, string orderRef, string status, string sourceSystem, string priority,
+        Guid orderId, string orderRef, string status,
+        string sourceSystem, string? sourceSystemDisplayName,
+        string priority,
         string? transportMode,
         string? requestedBy, string? createdBy, string? notes,
         int totalItems, double totalQuantity, double totalWeightKg,
@@ -86,6 +92,7 @@ public class OrderListViewRow
         OrderRef = orderRef;
         Status = status;
         SourceSystem = sourceSystem;
+        SourceSystemDisplayName = sourceSystemDisplayName;
         Priority = priority;
         TransportMode = transportMode;
         RequestedBy = requestedBy;
@@ -130,6 +137,7 @@ public class OrderListViewRow
     public void RefreshFromAggregate(
         string status,
         string sourceSystem,
+        string? sourceSystemDisplayName,
         string priority,
         string? transportMode,
         string? requestedBy,
@@ -148,6 +156,7 @@ public class OrderListViewRow
     {
         Status = status;
         SourceSystem = sourceSystem;
+        SourceSystemDisplayName = sourceSystemDisplayName;
         Priority = priority;
         TransportMode = transportMode;
         RequestedBy = requestedBy;

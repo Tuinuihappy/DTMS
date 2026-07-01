@@ -357,7 +357,7 @@ public class DeliveryOrderTests
 
         var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.CreateFromUpstream(
             "UPS-001", Priority.High, ServiceWindow.Create(earliestUtc: null, latestUtc: DateTime.UtcNow.AddHours(2)),
-            SourceSystem.Sap, createdBy: "sap-user");
+            sourceSystemKey: "sap", sourceSystemDisplayName: "SAP", createdBy: "sap-user");
 
         order.Status.Should().Be(OrderStatus.Submitted);
         order.SubmittedAt.Should().NotBeNull();
@@ -385,7 +385,7 @@ public class DeliveryOrderTests
     {
         var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "UPD-001", Priority.Normal, serviceWindow: null,
-            sourceSystem: SourceSystem.Manual, createdBy: null);
+            sourceSystemKey: "manual", sourceSystemDisplayName: "Manual", createdBy: null);
 
         order.UpdateDraft("UPD-001", Priority.High, serviceWindow: null,
             requestedBy: "qa-batch", notes: "rerun after recall");
@@ -400,7 +400,7 @@ public class DeliveryOrderTests
     {
         var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "EVT-001", Priority.High, serviceWindow: ServiceWindow.Create(earliestUtc: null, latestUtc: DateTime.UtcNow.AddHours(4)),
-            sourceSystem: SourceSystem.Manual, createdBy: null);
+            sourceSystemKey: "manual", sourceSystemDisplayName: "Manual", createdBy: null);
         AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
         order.Submit();
         order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
@@ -470,7 +470,7 @@ public class DeliveryOrderTests
         var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "WIN-001", Priority.Normal,
             serviceWindow: ServiceWindow.Create(earliest, latest),
-            sourceSystem: SourceSystem.Manual, createdBy: null);
+            sourceSystemKey: "manual", sourceSystemDisplayName: "Manual", createdBy: null);
         AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
         order.Submit();
         order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
@@ -504,7 +504,7 @@ public class DeliveryOrderTests
         // at all, both Earliest and Latest must be null in the emitted event.
         var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "NO-WINDOW", Priority.Normal, serviceWindow: null,
-            sourceSystem: SourceSystem.Manual, createdBy: null);
+            sourceSystemKey: "manual", sourceSystemDisplayName: "Manual", createdBy: null);
         AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
         order.Submit();
         order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
@@ -896,7 +896,7 @@ public class DeliveryOrderTests
         var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.CreateFromUpstream(
             "TM-UPS", Priority.High,
             ServiceWindow.Create(earliestUtc: null, latestUtc: DateTime.UtcNow.AddHours(2)),
-            SourceSystem.Sap);
+            sourceSystemKey: "sap", sourceSystemDisplayName: "SAP");
 
         order.RequestedTransportMode.Should().Be(TransportMode.Amr);
     }

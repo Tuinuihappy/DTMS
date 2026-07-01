@@ -19,6 +19,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
     private readonly IStationValidationService _stationValidation;
     private readonly IUomNormalizer _uomNormalizer;
     private readonly ICurrentUserAccessor _currentUser;
+    private readonly IOrderOriginResolver _originResolver;
     private readonly DeliveryOrderOptions _options;
     private readonly ILogger<CreateUpstreamDeliveryOrderCommandHandler> _logger;
 
@@ -28,6 +29,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         IStationValidationService stationValidation,
         IUomNormalizer uomNormalizer,
         ICurrentUserAccessor currentUser,
+        IOrderOriginResolver originResolver,
         IOptions<DeliveryOrderOptions> options,
         ILogger<CreateUpstreamDeliveryOrderCommandHandler> logger)
     {
@@ -36,18 +38,33 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         _stationValidation = stationValidation;
         _uomNormalizer = uomNormalizer;
         _currentUser = currentUser;
+        _originResolver = originResolver;
         _options = options.Value;
         _logger = logger;
     }
 
     public async Task<Result<UpstreamOrderAckDto>> Handle(CreateUpstreamDeliveryOrderCommand request, CancellationToken cancellationToken)
     {
-        // Idempotency check — if (SourceSystem, OrderRef) already exists, return existing ack
-        var existing = await _repository.GetByRefAsync(request.SourceSystem, request.OrderRef, cancellationToken);
+        // Phase P4 — resolve the origin snapshot before the idempotency
+        // lookup. Middleware has already vetted the URL {key} is active,
+        // but a race with admin delete could return null here — treat as
+        // a hard failure. Handler-side check is defense in depth; the
+        // usual outcome is a claim-first hit that skips the DB.
+        var origin = await _originResolver.GetByKeyAsync(request.SourceSystemKey, cancellationToken);
+        if (origin is null)
+        {
+            _logger.LogWarning("[Upstream] Unknown source key '{Key}' at handler entry (raced with admin delete?).",
+                request.SourceSystemKey);
+            return Result<UpstreamOrderAckDto>.Failure(
+                $"Unknown source system '{request.SourceSystemKey}'.");
+        }
+
+        // Idempotency check — if (SourceSystemKey, OrderRef) already exists, return existing ack
+        var existing = await _repository.GetByRefAsync(request.SourceSystemKey, request.OrderRef, cancellationToken);
         if (existing is not null)
         {
-            _logger.LogInformation("[Upstream] Order '{OrderRef}' from {SourceSystem} already exists with id {OrderId} — returning existing.",
-                request.OrderRef, request.SourceSystem, existing.Id);
+            _logger.LogInformation("[Upstream] Order '{OrderRef}' from {SourceSystemKey} already exists with id {OrderId} — returning existing.",
+                request.OrderRef, request.SourceSystemKey, existing.Id);
             // GetByRefAsync doesn't include Items — refetch the full graph for the DetailDto.
             var full = await _repository.GetByIdAsNoTrackingAsync(existing.Id, cancellationToken);
             return Result<UpstreamOrderAckDto>.Success(
@@ -62,7 +79,8 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
 
             order = Domain.Entities.DeliveryOrder.CreateFromUpstream(
                 request.OrderRef, request.Priority, serviceWindow,
-                request.SourceSystem, _currentUser.GetCurrentUserName(),
+                origin.Key, origin.DisplayName,
+                origin.DisplayName,
                 request.RequestedBy, request.Notes,
                 request.RequestedTransportMode);
 
@@ -141,7 +159,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
             await _repository.AddAsync(order, cancellationToken);
             await _auditRepo.AddAsync(new OrderAuditEvent(
                 order.Id, "OrderUpstreamIngested",
-                $"Order '{order.OrderRef}' ingested from {order.SourceSystem} by {order.CreatedBy ?? "system"} — auto-confirmed and queued for planning"), cancellationToken);
+                $"Order '{order.OrderRef}' ingested from {order.SourceSystemKey} by {order.CreatedBy ?? "system"} — auto-confirmed and queued for planning"), cancellationToken);
 
             var warnings = WeightWarningEvaluator.Evaluate(order.Items);
             foreach (var w in warnings)
@@ -149,8 +167,8 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
 
             await _repository.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("[Upstream] Order {OrderId} '{OrderRef}' from {SourceSystem} auto-pipelined to Confirmed ({WarningCount} warning(s)).",
-                order.Id, order.OrderRef, order.SourceSystem, warnings.Count);
+            _logger.LogInformation("[Upstream] Order {OrderId} '{OrderRef}' from {SourceSystemKey} auto-pipelined to Confirmed ({WarningCount} warning(s)).",
+                order.Id, order.OrderRef, order.SourceSystemKey, warnings.Count);
 
             return Result<UpstreamOrderAckDto>.Success(
                 new UpstreamOrderAckDto(DeliveryOrderMapper.MapToDetailDto(order), warnings));
@@ -167,9 +185,9 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         }
         catch (DbUpdateException)
         {
-            // Likely unique-index violation from a concurrent insert of the same (SourceSystem, OrderRef).
+            // Likely unique-index violation from a concurrent insert of the same (SourceSystemKey, OrderRef).
             // Re-query: if the row now exists, treat as idempotent success; otherwise surface the original error.
-            var raced = await _repository.GetByRefAsync(request.SourceSystem, request.OrderRef, cancellationToken);
+            var raced = await _repository.GetByRefAsync(request.SourceSystemKey, request.OrderRef, cancellationToken);
             if (raced is null) throw;
 
             _logger.LogInformation("[Upstream] Order '{OrderRef}' raced with concurrent insert — returning existing id {OrderId}.",

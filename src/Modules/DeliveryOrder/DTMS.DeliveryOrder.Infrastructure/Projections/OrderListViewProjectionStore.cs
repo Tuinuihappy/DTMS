@@ -48,7 +48,9 @@ public class OrderListViewProjectionStore : IOrderListViewProjectionStore
 
         var search = BuildSearchText(order);
         var status = order.Status.ToString();
-        var sourceSystem = order.SourceSystem.ToString();
+        // Projection stores the lowercase SystemClient key directly.
+        var sourceSystem = order.SourceSystemKey;
+        var sourceSystemDisplayName = order.SourceSystemDisplayName;
         var priority = order.Priority.ToString();
         var transportMode = order.RequestedTransportMode?.ToString();
         var swEarliest = order.ServiceWindow?.EarliestUtc;
@@ -58,7 +60,9 @@ public class OrderListViewProjectionStore : IOrderListViewProjectionStore
         if (row is null)
         {
             _db.OrderListView.Add(new OrderListViewRow(
-                order.Id, order.OrderRef, status, sourceSystem, priority, transportMode,
+                order.Id, order.OrderRef, status,
+                sourceSystem, sourceSystemDisplayName,
+                priority, transportMode,
                 order.RequestedBy, order.CreatedBy, order.Notes,
                 order.TotalItems, order.TotalQuantity, order.TotalWeightKg,
                 order.RequiresDropPod, order.RequiresPickupPod,
@@ -69,7 +73,8 @@ public class OrderListViewProjectionStore : IOrderListViewProjectionStore
         }
 
         row.RefreshFromAggregate(
-            status, sourceSystem, priority, transportMode,
+            status, sourceSystem, sourceSystemDisplayName,
+            priority, transportMode,
             order.RequestedBy, order.CreatedBy, order.Notes,
             order.TotalItems, order.TotalQuantity, order.TotalWeightKg,
             order.RequiresDropPod, order.RequiresPickupPod,
@@ -114,7 +119,9 @@ public class OrderListViewProjectionStore : IOrderListViewProjectionStore
     // projector.
     private const string UpsertSql = """
         INSERT INTO deliveryorder."OrderListView" (
-            "OrderId", "OrderRef", "Status", "SourceSystem", "Priority", "TransportMode",
+            "OrderId", "OrderRef", "Status",
+            "SourceSystem", "SourceSystemDisplayName",
+            "Priority", "TransportMode",
             "HasFailedTrip", "HasActiveJob", "LatestTripId", "LatestJobStatus",
             "RequestedBy", "CreatedBy", "Notes",
             "TotalItems", "TotalQuantity", "TotalWeightKg",
@@ -127,7 +134,8 @@ public class OrderListViewProjectionStore : IOrderListViewProjectionStore
             o."Id",
             o."OrderRef",
             o."Status",
-            o."SourceSystem",
+            o."SourceSystemKey",
+            o."SourceSystemDisplayName",
             o."Priority",
             o."RequestedTransportMode",
             COALESCE(lt."TripStatus" IN ('Failed','Cancelled'), false),
@@ -173,6 +181,7 @@ public class OrderListViewProjectionStore : IOrderListViewProjectionStore
             "OrderRef" = EXCLUDED."OrderRef",
             "Status" = EXCLUDED."Status",
             "SourceSystem" = EXCLUDED."SourceSystem",
+            "SourceSystemDisplayName" = EXCLUDED."SourceSystemDisplayName",
             "Priority" = EXCLUDED."Priority",
             "TransportMode" = EXCLUDED."TransportMode",
             "HasFailedTrip" = EXCLUDED."HasFailedTrip",

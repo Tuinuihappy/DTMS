@@ -15,7 +15,8 @@ public class OrderSnapshotV1Tests
             serviceWindow: ServiceWindow.Create(
                 earliestUtc: new DateTime(2026, 6, 1, 9, 0, 0, DateTimeKind.Utc),
                 latestUtc:   new DateTime(2026, 6, 1, 17, 0, 0, DateTimeKind.Utc)),
-            sourceSystem: SourceSystem.Manual,
+            sourceSystemKey: "manual",
+            sourceSystemDisplayName: "Manual",
             createdBy: "ops-user",
             requestedBy: "production-line-3",
             notes: "VIP shipment");
@@ -90,7 +91,7 @@ public class OrderSnapshotV1Tests
     {
         var order = DomainEntities.DeliveryOrder.Create(
             "NO-WINDOW", Priority.Normal, serviceWindow: null,
-            sourceSystem: SourceSystem.Manual, createdBy: null);
+            sourceSystemKey: "manual", sourceSystemDisplayName: "Manual", createdBy: null);
 
         var snap = OrderSnapshotV1.From(order);
 

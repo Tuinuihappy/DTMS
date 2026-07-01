@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using DTMS.DeliveryOrder.Application.Projections;
+using DTMS.DeliveryOrder.Domain;
 using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Domain.Repositories;
@@ -70,10 +71,10 @@ public class ResendOmsArrivedNotificationCommandHandler
         // S.3.1b-followup guard — legacy adapter is OMS-only. Sap/Erp
         // orders carry an OrderRef too but route through the S.3.1b
         // SystemEventSubscriptions pipeline.
-        if (order.SourceSystem != SourceSystem.Oms)
+        if (!string.Equals(order.SourceSystemKey, WellKnownSourceSystems.Oms, StringComparison.Ordinal))
         {
             return Result<ResendOmsArrivedNotificationResult>.Failure(
-                $"Order is from {order.SourceSystem}, not OMS. Use the federated callback admin tools (Phase S.3.1b) to manage non-OMS notifications.");
+                $"Order is from {order.SourceSystemKey}, not OMS. Use the federated callback admin tools (Phase S.3.1b) to manage non-OMS notifications.");
         }
 
         var trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);

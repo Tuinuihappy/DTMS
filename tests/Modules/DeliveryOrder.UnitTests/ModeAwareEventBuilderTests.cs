@@ -46,7 +46,7 @@ public class ModeAwareEventBuilderTests
     {
         var order = DeliveryOrderAggregate.Create(
             "EVT-MANUAL", Priority.Normal, serviceWindow: null,
-            sourceSystem: SourceSystem.Manual,
+            sourceSystemKey: "manual", sourceSystemDisplayName: "Manual",
             createdBy: "test", requestedBy: null, notes: null,
             requestedTransportMode: TransportMode.Manual);
         order.AddItem(
@@ -124,7 +124,7 @@ public class ModeAwareEventBuilderTests
         // Guid.Empty would look like a real (corrupt) Id.
         var order = DeliveryOrderAggregate.Create(
             "EVT-CR-MANUAL", Priority.Normal, serviceWindow: null,
-            sourceSystem: SourceSystem.Manual,
+            sourceSystemKey: "manual", sourceSystemDisplayName: "Manual",
             createdBy: "test", requestedBy: null, notes: null,
             requestedTransportMode: TransportMode.Manual);
         order.AddItem(

@@ -48,7 +48,7 @@ public class MarkGroupItemsDispatchFailedTests
     {
         var order = DeliveryOrderAggregate.Create(
             "MGD-MANUAL", Priority.Normal, serviceWindow: null,
-            sourceSystem: SourceSystem.Manual,
+            sourceSystemKey: "manual", sourceSystemDisplayName: "Manual",
             createdBy: "test", requestedBy: null, notes: null,
             requestedTransportMode: TransportMode.Manual);
         order.AddItem(

@@ -2,15 +2,23 @@ using DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using DTMS.DeliveryOrder.Application.QualityIssues;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.SharedKernel.Messaging;
+using Priority = DTMS.DeliveryOrder.Domain.Enums.Priority;
+using TransportMode = DTMS.DeliveryOrder.Domain.Enums.TransportMode;
 using DetailDto = DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder.DeliveryOrderDetailDto;
 
 namespace DTMS.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
 
+// Phase P4: SourceSystem enum replaced with SourceSystemKey string.
+// Phase S.8e (P3): the endpoint at /api/v1/source/delivery-orders sets
+// SourceSystemKey from the SystemPrincipal that
+// SystemClientAuthMiddleware stamps out of the JWT sub claim — no wire
+// field carries it. RequestedBy stays on the wire because external
+// callers legitimately pass the human on their side (unlike the UI path).
 public record CreateUpstreamDeliveryOrderCommand(
     string OrderRef,
     ServiceWindowDto ServiceWindow,
     List<ItemDto> Items,
-    SourceSystem SourceSystem,
+    string SourceSystemKey,
     Priority Priority = Priority.Normal,
     string? RequestedBy = null,
     string? Notes = null,

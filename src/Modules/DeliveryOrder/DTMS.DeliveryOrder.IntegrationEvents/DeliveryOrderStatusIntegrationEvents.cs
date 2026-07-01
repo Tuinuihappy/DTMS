@@ -26,6 +26,13 @@ namespace DTMS.DeliveryOrder.IntegrationEvents;
 // callback to the order's originating system. Nullable to keep older
 // queued events readable and to mean "no external system to notify"
 // for user-created orders.
+//
+// Schema 1.4 (Phase P3 of SourceSystem migration, 2026-07-01) — the
+// SourceSystem field now carries the lowercase SystemClient.Key slug
+// (e.g. "oms") instead of the enum PascalCase name ("Oms"). Wire shape
+// unchanged (still nullable string). Downstream fan-out consumers
+// (OrderCancelledCallbackFanoutConsumer, OrderDeliveredCallbackFanoutConsumer)
+// already compare with StringComparison.OrdinalIgnoreCase — safe.
 
 public record DeliveryOrderCancelledIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
@@ -34,7 +41,7 @@ public record DeliveryOrderCancelledIntegrationEventV1(
     string? Channel = null,
     string? DisplayName = null,
     string? SourceSystem = null,
-    string SchemaVersion = "1.3") : IIntegrationEvent;
+    string SchemaVersion = "1.4") : IIntegrationEvent;
 
 public record DeliveryOrderFailedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
@@ -51,7 +58,7 @@ public record DeliveryOrderCompletedIntegrationEventV1(
     string? Channel = null,
     string? DisplayName = null,
     string? SourceSystem = null,
-    string SchemaVersion = "1.3") : IIntegrationEvent;
+    string SchemaVersion = "1.4") : IIntegrationEvent;
 
 public record DeliveryOrderPartiallyCompletedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId,

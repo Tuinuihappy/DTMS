@@ -42,10 +42,16 @@ public record ItemDto(
     PodEventDto? PickupPod,
     PodEventDto? DropPod);
 
+// Phase P5: SourceSystem is now a string (lowercase iam.SystemClients.Key
+// slug — e.g. "oms", "manual", "wms-acme"). SourceSystemDisplayName is
+// the snapshot captured at create time so admin renames don't retro-
+// update historical rows. Both fields go to the wire as-is; FE broadens
+// its `SourceSystem` union type to `string`.
 public record DeliveryOrderListDto(
     Guid Id,
     string OrderRef,
-    SourceSystem SourceSystem,
+    string SourceSystem,
+    string? SourceSystemDisplayName,
     Priority Priority,
     OrderStatus OrderStatus,
     ServiceWindowDto? ServiceWindow,
@@ -65,7 +71,8 @@ public record DeliveryOrderListDto(
 public record DeliveryOrderDetailDto(
     Guid Id,
     string OrderRef,
-    SourceSystem SourceSystem,
+    string SourceSystem,
+    string? SourceSystemDisplayName,
     Priority Priority,
     OrderStatus OrderStatus,
     ServiceWindowDto? ServiceWindow,
@@ -160,7 +167,13 @@ public class GetDeliveryOrdersQueryHandler : IQueryHandler<GetDeliveryOrdersQuer
         return new DeliveryOrderListDto(
             Id: e.OrderId,
             OrderRef: e.OrderRef,
-            SourceSystem: Enum.TryParse<SourceSystem>(e.SourceSystem, out var src) ? src : SourceSystem.Manual,
+            // Phase P5 — SourceSystem is now a raw string on the wire.
+            // The projection column stores the same lowercase key the
+            // entity's SourceSystemKey carries (see the P5 normalization
+            // migration 20260630050000 which back-cases legacy PascalCase
+            // rows in OrderListView + OrderFacts). No Enum.TryParse.
+            SourceSystem: e.SourceSystem,
+            SourceSystemDisplayName: e.SourceSystemDisplayName,
             Priority: Enum.TryParse<Priority>(e.Priority, out var pri) ? pri : Domain.Enums.Priority.Normal,
             OrderStatus: Enum.TryParse<OrderStatus>(e.Status, out var st) ? st : OrderStatus.Draft,
             ServiceWindow: e.ServiceWindowLatestUtc.HasValue || e.ServiceWindowEarliestUtc.HasValue
@@ -269,7 +282,8 @@ internal static class DeliveryOrderMapper
         new(
             order.Id,
             order.OrderRef,
-            order.SourceSystem,
+            order.SourceSystemKey,
+            order.SourceSystemDisplayName,
             order.Priority,
             order.Status,
             order.ServiceWindow is { } sw ? new ServiceWindowDto(sw.EarliestUtc, sw.LatestUtc) : null,
@@ -290,7 +304,8 @@ internal static class DeliveryOrderMapper
         new(
             order.Id,
             order.OrderRef,
-            order.SourceSystem,
+            order.SourceSystemKey,
+            order.SourceSystemDisplayName,
             order.Priority,
             order.Status,
             order.ServiceWindow is { } sw ? new ServiceWindowDto(sw.EarliestUtc, sw.LatestUtc) : null,

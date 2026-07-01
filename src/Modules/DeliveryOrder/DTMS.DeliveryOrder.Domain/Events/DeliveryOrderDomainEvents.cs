@@ -64,14 +64,15 @@ public record DeliveryOrderConfirmedDomainEvent(
     IReadOnlyList<ItemEventDto> Items,
     string? RequestedTransportMode = null) : IDomainEvent;
 public record DeliveryOrderRejectedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string Reason) : IDomainEvent;
-// Phase S.3.1b follow-up — SourceSystem propagated so the IAM fan-out
+// Phase S.3.1b follow-up — source key propagated so the IAM fan-out
 // consumer can route the callback back to the order's originating
 // system without taking a cross-module dependency on the DeliveryOrder
 // repository. Nullable so calls that don't yet pass it (and any
-// already-queued events) keep working — null routes to "no callback"
-// (the source-routed model treats user-created orders as having no
-// external system to notify).
-public record DeliveryOrderCancelledDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string Reason, SourceSystem? SourceSystem = null) : IDomainEvent;
+// already-queued events) keep working — null routes to "no callback".
+// Phase P3 (SourceSystem migration): field changed from
+// SourceSystem? enum to string? SourceSystemKey — value is the
+// lowercase iam.SystemClients.Key slug (matches URL {key} segment).
+public record DeliveryOrderCancelledDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string Reason, string? SourceSystemKey = null) : IDomainEvent;
 public record DeliveryOrderPlanningStartedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
 public record DeliveryOrderPlannedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
 public record DeliveryOrderDispatchedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
@@ -88,7 +89,7 @@ public record TripItemsPickedDomainEvent(Guid EventId, DateTime OccurredOn, Guid
 public record TripItemsDroppedOffDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, Guid TripId, int DroppedCount) : IDomainEvent;
 public record ItemPodRecordedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, Guid ItemId, PodScanType ScanType, string ScannedBy, string Method) : IDomainEvent;
 public record DeliveryOrderAmendedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string Reason) : IDomainEvent;
-public record DeliveryOrderCompletedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, SourceSystem? SourceSystem = null) : IDomainEvent;
+public record DeliveryOrderCompletedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string? SourceSystemKey = null) : IDomainEvent;
 public record DeliveryOrderPartiallyCompletedDomainEvent(
     Guid EventId,
     DateTime OccurredOn,

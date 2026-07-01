@@ -8,7 +8,14 @@ namespace DTMS.DeliveryOrder.Domain.Entities;
 public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 {
     public string OrderRef { get; private set; } = string.Empty;
-    public SourceSystem SourceSystem { get; private set; }
+
+    // Origin identity — soft-FK to iam.SystemClients. Slug is lowercase
+    // (validated by SystemClient.Key). DisplayName is a snapshot taken
+    // at create time so admin renames don't retro-update historical rows
+    // (audit immutability).
+    public string SourceSystemKey { get; private set; } = string.Empty;
+    public string SourceSystemDisplayName { get; private set; } = string.Empty;
+
     public Priority Priority { get; private set; }
     public OrderStatus Status { get; private set; }
     public ServiceWindow? ServiceWindow { get; private set; }
@@ -49,8 +56,16 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     void IAuditable.SetCreatedAt(DateTime createdAt) => CreatedDate = createdAt;
     void IAuditable.SetUpdatedAt(DateTime updatedAt) => UpdatedDate = updatedAt;
 
+    /// <summary>
+    /// Create a Draft order. Origin key + display come from
+    /// <c>IOrderOriginResolver</c> in production — never accept them from
+    /// the wire. The defaults let unit tests construct orders without
+    /// wiring a resolver; production handlers pass explicit values.
+    /// </summary>
     public static DeliveryOrder Create(string orderRef, Priority priority,
-        ServiceWindow? serviceWindow, SourceSystem sourceSystem = SourceSystem.Manual,
+        ServiceWindow? serviceWindow,
+        string sourceSystemKey = WellKnownSourceSystems.Manual,
+        string sourceSystemDisplayName = "Manual",
         string? createdBy = null, string? requestedBy = null, string? notes = null,
         TransportMode? requestedTransportMode = Enums.TransportMode.Amr)
     {
@@ -61,7 +76,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             Priority = priority,
             ServiceWindow = serviceWindow,
             Status = OrderStatus.Draft,
-            SourceSystem = sourceSystem,
+            SourceSystemKey = sourceSystemKey,
+            SourceSystemDisplayName = sourceSystemDisplayName,
             CreatedBy = createdBy,
             RequestedBy = requestedBy,
             Notes = notes,
@@ -74,13 +90,19 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         return order;
     }
 
+    /// <summary>
+    /// Create an already-Submitted order from an upstream system. Rejects
+    /// the 'manual' key because that slug identifies the UI path — which
+    /// must go through Draft + Submit separately.
+    /// </summary>
     public static DeliveryOrder CreateFromUpstream(string orderRef, Priority priority,
-        ServiceWindow? serviceWindow, SourceSystem sourceSystem, string? createdBy = null,
-        string? requestedBy = null, string? notes = null,
+        ServiceWindow? serviceWindow,
+        string sourceSystemKey, string sourceSystemDisplayName,
+        string? createdBy = null, string? requestedBy = null, string? notes = null,
         TransportMode? requestedTransportMode = Enums.TransportMode.Amr)
     {
-        if (sourceSystem == SourceSystem.Manual)
-            throw new InvalidOperationException("Upstream orders cannot have Manual source system.");
+        if (string.Equals(sourceSystemKey, WellKnownSourceSystems.Manual, StringComparison.Ordinal))
+            throw new InvalidOperationException("Upstream orders cannot use the 'manual' source key.");
 
         var order = new DeliveryOrder
         {
@@ -90,7 +112,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             ServiceWindow = serviceWindow,
             Status = OrderStatus.Submitted,
             SubmittedAt = DateTime.UtcNow,
-            SourceSystem = sourceSystem,
+            SourceSystemKey = sourceSystemKey,
+            SourceSystemDisplayName = sourceSystemDisplayName,
             CreatedBy = createdBy,
             RequestedBy = requestedBy,
             Notes = notes,
@@ -163,7 +186,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
         AddDomainEvent(new DeliveryOrderCreatedDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id,
-            OrderRef, SourceSystem.ToString(), Status.ToString(), Priority.ToString(),
+            OrderRef, SourceSystemKey, Status.ToString(), Priority.ToString(),
             RequestedTransportMode?.ToString(),
             RequestedBy, CreatedBy, Notes,
             ServiceWindow?.EarliestUtc, ServiceWindow?.LatestUtc, SubmittedAt,
@@ -475,7 +498,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         if (delivered == total)
         {
             Status = OrderStatus.Completed;
-            AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, SourceSystem));
+            AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, SourceSystemKey));
         }
         else if (delivered == 0)
         {
@@ -747,7 +770,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             throw new InvalidOperationException($"Cannot cancel an order in {Status} status.");
 
         Status = OrderStatus.Cancelled;
-        AddDomainEvent(new DeliveryOrderCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason, SourceSystem));
+        AddDomainEvent(new DeliveryOrderCancelledDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason, SourceSystemKey));
     }
 
     /// <summary>
@@ -828,7 +851,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
                 item.UpdateStatus(ItemStatus.Delivered);
 
         Status = OrderStatus.Completed;
-        AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, SourceSystem));
+        AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, SourceSystemKey));
     }
 
     // Envelope-flow failure: vendor reported the order failed. Idempotent.
@@ -871,7 +894,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         else
         {
             Status = OrderStatus.Completed;
-            AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, SourceSystem));
+            AddDomainEvent(new DeliveryOrderCompletedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, SourceSystemKey));
         }
     }
 

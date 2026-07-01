@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using DTMS.DeliveryOrder.Application.Projections;
+using DTMS.DeliveryOrder.Domain;
 using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Domain.Repositories;
@@ -105,11 +106,11 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
         // federated S.3.1b pipeline handles non-OMS sources via the
         // SystemEventSubscriptions table; legacy stays OMS-only by
         // design.
-        if (order.SourceSystem != SourceSystem.Oms)
+        if (!string.Equals(order.SourceSystemKey, WellKnownSourceSystems.Oms, StringComparison.Ordinal))
         {
             _logger.LogDebug(
                 "[OmsNotify] Order {OrderId} source={Source} — not OMS, skipping legacy adapter (S.3.1b handles routing)",
-                order.Id, order.SourceSystem);
+                order.Id, order.SourceSystemKey);
             return;
         }
 

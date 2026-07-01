@@ -45,9 +45,30 @@ export function getHub(hubPath: string): HubConnection {
     .withUrl(url, {
       transport: HttpTransportType.WebSockets,
       skipNegotiation: true,
-      // Cookie auth flows automatically because we set withCredentials:
-      // true on the underlying fetch — provided the backend CORS policy
-      // allows credentials from this origin (configured in Program.cs).
+      // Cross-origin WebSocket handshake — the session cookie is
+      // sameSite=lax (correct for CSRF hygiene) so it won't ride
+      // along on the upgrade. Instead we fetch the JWT from a same-
+      // origin endpoint on every (re)connect and let SignalR append
+      // it as ?access_token=… — the backend's OnMessageReceived
+      // handler pulls it into ctx.Token for the JwtBearer scheme.
+      // Called on the first start AND on every automatic reconnect,
+      // so a token refreshed elsewhere is picked up transparently.
+      accessTokenFactory: async () => {
+        try {
+          const res = await fetch("/api/auth/hub-token", {
+            cache: "no-store",
+            credentials: "same-origin",
+          });
+          if (!res.ok) return "";
+          const body = (await res.json()) as { token?: string | null };
+          return body.token ?? "";
+        } catch {
+          // Network glitch — return empty so SignalR fails the connect
+          // and its reconnect loop retries. Better than throwing here
+          // (which would surface as an unhandled rejection).
+          return "";
+        }
+      },
       withCredentials: true,
     })
     .withHubProtocol(new MessagePackHubProtocol())

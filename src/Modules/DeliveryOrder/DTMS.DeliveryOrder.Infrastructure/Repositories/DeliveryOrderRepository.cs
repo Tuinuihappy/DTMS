@@ -25,10 +25,10 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
             .AsSplitQuery()
             .FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
 
-    public Task<Domain.Entities.DeliveryOrder?> GetByRefAsync(SourceSystem sourceSystem, string orderRef, CancellationToken cancellationToken = default)
+    public Task<Domain.Entities.DeliveryOrder?> GetByRefAsync(string sourceSystemKey, string orderRef, CancellationToken cancellationToken = default)
         => _context.DeliveryOrders
             .AsNoTracking()
-            .FirstOrDefaultAsync(o => o.SourceSystem == sourceSystem && o.OrderRef == orderRef, cancellationToken);
+            .FirstOrDefaultAsync(o => o.SourceSystemKey == sourceSystemKey && o.OrderRef == orderRef, cancellationToken);
 
     public async Task<List<Domain.Entities.DeliveryOrder>> GetByStatusAsync(OrderStatus status, int page, int pageSize, CancellationToken cancellationToken = default)
         => await _context.DeliveryOrders

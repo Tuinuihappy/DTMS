@@ -151,7 +151,7 @@ public class OrderListViewReadRepository : IOrderListViewReadRepository
 
     private static OrderListViewEntry Map(OrderListViewRow r) => new(
         r.OrderId, r.OrderRef,
-        r.SourceSystem, r.Priority, r.Status,
+        r.SourceSystem, r.SourceSystemDisplayName, r.Priority, r.Status,
         r.SubmittedAt, r.CreatedBy, r.RequestedBy, r.Notes,
         r.CreatedAt, r.UpdatedAt,
         r.TotalWeightKg, r.TotalQuantity, r.TotalItems,

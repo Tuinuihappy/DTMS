@@ -1,5 +1,5 @@
 using DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
-using DTMS.DeliveryOrder.Domain.Enums;
+using DTMS.DeliveryOrder.Domain;
 using FluentValidation;
 
 namespace DTMS.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
@@ -9,9 +9,15 @@ public class CreateUpstreamDeliveryOrderCommandValidator : AbstractValidator<Cre
     public CreateUpstreamDeliveryOrderCommandValidator()
     {
         RuleFor(x => x.OrderRef).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.SourceSystem)
-            .NotEqual(SourceSystem.Manual)
-            .WithMessage("Upstream orders cannot have Manual source system.");
+        // Phase P4: string-based key validation. Existence check (whether
+        // the key maps to a real SystemClient row) happens in the handler
+        // via IOrderOriginResolver — validators are sync and can't do
+        // async DB lookups.
+        RuleFor(x => x.SourceSystemKey)
+            .NotEmpty()
+            .MaximumLength(50)
+            .NotEqual(WellKnownSourceSystems.Manual)
+            .WithMessage("Upstream orders cannot use the 'manual' source key.");
         RuleFor(x => x.ServiceWindow).NotNull()
             .WithMessage("Upstream orders must include a ServiceWindow.");
         RuleFor(x => x.ServiceWindow)

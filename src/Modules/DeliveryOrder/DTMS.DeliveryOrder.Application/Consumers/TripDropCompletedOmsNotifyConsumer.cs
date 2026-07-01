@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using DTMS.DeliveryOrder.Application.Projections;
+using DTMS.DeliveryOrder.Domain;
 using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Domain.Repositories;
@@ -93,11 +94,11 @@ public class TripDropCompletedOmsNotifyConsumer : IConsumer<TripDropCompletedInt
         // S.3.1b-followup guard — see TripStartedOmsNotifyConsumer for
         // the full rationale. Legacy adapter handles OMS only; Sap/Erp
         // route through the S.3.1b SystemEventSubscriptions pipeline.
-        if (order.SourceSystem != SourceSystem.Oms)
+        if (!string.Equals(order.SourceSystemKey, WellKnownSourceSystems.Oms, StringComparison.Ordinal))
         {
             _logger.LogDebug(
                 "[OmsArrived] Order {OrderId} source={Source} — not OMS, skipping legacy adapter",
-                order.Id, order.SourceSystem);
+                order.Id, order.SourceSystemKey);
             return;
         }
 

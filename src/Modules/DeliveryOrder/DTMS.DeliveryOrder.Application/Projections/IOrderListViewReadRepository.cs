@@ -23,6 +23,11 @@ public record OrderListViewEntry(
     Guid OrderId,
     string OrderRef,
     string SourceSystem,
+    // Phase P5 — human-readable snapshot captured at create-time; null
+    // for pre-P4 rows until the P5 normalize migration backfills them
+    // from iam.SystemClients (and stays null forever for rows whose
+    // origin SystemClient was removed before P5).
+    string? SourceSystemDisplayName,
     string Priority,
     string Status,
     DateTime? SubmittedAt,
