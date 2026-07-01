@@ -114,6 +114,127 @@ public class SystemJwtValidatorTests
            .WithMessage("*PEM-encoded RSA key*");
     }
 
+    // ── Phase S.8c — revocation flow (integration-style) ────────────────
+
+    [Fact]
+    public void Validate_TokenOnRevocationList_ReturnsRejected()
+    {
+        var (privatePem, publicPem) = GenerateRsaKeyPair();
+        var revocationList = Substitute.For<ISystemJwtRevocationList>();
+        var issuer = BuildIssuer(privatePem);
+        var token = issuer.Issue("oms");
+
+        // Stub blocklist to say "yes, this jti is revoked".
+        revocationList.IsRevokedAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+        var validator = new SystemJwtValidator(
+            Options.Create(new SystemJwtIssuerOptions
+            {
+                PublicKeyPem = publicPem,
+                Issuer = "dtms",
+                Audience = "dtms-api",
+                KeyId = "test-v1",
+            }),
+            revocationList,
+            NullLogger<SystemJwtValidator>.Instance);
+
+        var result = validator.Validate(token.AccessToken);
+
+        result.IsValid.Should().BeFalse();
+        result.FailureReason.Should().Be("token revoked");
+    }
+
+    [Fact]
+    public void Validate_RevocationListThrows_FailsClosed()
+    {
+        // Fail-close semantics: Redis outage → reject request. The
+        // alternative (fail-open) would let a revoked-but-leaked token
+        // slip through during a Redis blip, defeating the point of
+        // per-jti revocation.
+        var (privatePem, publicPem) = GenerateRsaKeyPair();
+        var revocationList = Substitute.For<ISystemJwtRevocationList>();
+        revocationList.IsRevokedAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<Task<bool>>(_ => throw new InvalidOperationException("simulated Redis outage"));
+
+        var issuer = BuildIssuer(privatePem);
+        var token = issuer.Issue("oms");
+        var validator = new SystemJwtValidator(
+            Options.Create(new SystemJwtIssuerOptions
+            {
+                PublicKeyPem = publicPem,
+                Issuer = "dtms",
+                Audience = "dtms-api",
+                KeyId = "test-v1",
+            }),
+            revocationList,
+            NullLogger<SystemJwtValidator>.Instance);
+
+        var result = validator.Validate(token.AccessToken);
+
+        result.IsValid.Should().BeFalse();
+        result.FailureReason.Should().Be("revocation check unavailable");
+    }
+
+    [Fact]
+    public void Validate_RevocationListNotCalled_WhenSignatureAlreadyFailed()
+    {
+        // Ordering matters: don't hit Redis for tokens that already failed
+        // signature validation — cheaper checks come first.
+        var (foreignPriv, _) = GenerateRsaKeyPair();
+        var (_, ourPub) = GenerateRsaKeyPair();
+        var foreignIssuer = BuildIssuer(foreignPriv);
+        var token = foreignIssuer.Issue("oms");
+
+        var revocationList = Substitute.For<ISystemJwtRevocationList>();
+        var validator = new SystemJwtValidator(
+            Options.Create(new SystemJwtIssuerOptions
+            {
+                PublicKeyPem = ourPub,
+                Issuer = "dtms",
+                Audience = "dtms-api",
+                KeyId = "test-v1",
+            }),
+            revocationList,
+            NullLogger<SystemJwtValidator>.Instance);
+
+        var result = validator.Validate(token.AccessToken);
+
+        result.IsValid.Should().BeFalse();
+        // Signature check fails before we reach the revocation list.
+        revocationList.DidNotReceive().IsRevokedAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void Validate_JtiPassedToRevocationCheck_MatchesTokenJti()
+    {
+        // Verifies the validator hands the correct jti to the blocklist —
+        // a bug where we pass the wrong claim (e.g. sub) would silently
+        // allow revoked tokens through until observed in prod.
+        var (privatePem, publicPem) = GenerateRsaKeyPair();
+        string? capturedJti = null;
+        var revocationList = Substitute.For<ISystemJwtRevocationList>();
+        revocationList.IsRevokedAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ci => { capturedJti = ci.Arg<string>(); return Task.FromResult(false); });
+
+        var issuer = BuildIssuer(privatePem);
+        var token = issuer.Issue("oms");
+        var validator = new SystemJwtValidator(
+            Options.Create(new SystemJwtIssuerOptions
+            {
+                PublicKeyPem = publicPem,
+                Issuer = "dtms",
+                Audience = "dtms-api",
+                KeyId = "test-v1",
+            }),
+            revocationList,
+            NullLogger<SystemJwtValidator>.Instance);
+
+        var result = validator.Validate(token.AccessToken);
+
+        result.IsValid.Should().BeTrue();
+        capturedJti.Should().Be(token.Jti);
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────
 
     private static (SystemJwtIssuer Issuer, SystemJwtValidator Validator) BuildPair()

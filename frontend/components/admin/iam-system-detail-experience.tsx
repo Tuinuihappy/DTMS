@@ -466,6 +466,31 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
         {issuedTokens.length === 0 ? (
           <p className="mt-3 text-[12px] text-[var(--color-ink-400)]">No admin-issued tokens.</p>
         ) : (
+          <>
+            {(() => {
+              // Aggregate warning banner — surface "expiring soon" so the
+              // operator sees it at a glance without eyeballing every row.
+              // 7-day window matches the "should reissue this week" cue
+              // that most rotation policies (Google, Auth0) use.
+              const now = Date.now();
+              const soonMs = 7 * 86400 * 1000;
+              const expiringSoon = issuedTokens.filter(t => {
+                if (t.status === "Revoked") return false;
+                const exp = new Date(t.expiresAt).getTime();
+                return exp > now && exp - now <= soonMs;
+              });
+              if (expiringSoon.length === 0) return null;
+              return (
+                <div className="mt-3 flex items-start gap-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-200">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={2.2} />
+                  <span>
+                    <strong>{expiringSoon.length}</strong>{" "}
+                    {expiringSoon.length === 1 ? "token expires" : "tokens expire"} within 7 days.
+                    Issue a replacement + coordinate with the partner before the current ones lapse.
+                  </span>
+                </div>
+              );
+            })()}
           <div className="mt-3 overflow-hidden rounded border border-[var(--color-ink-100)] dark:border-white/[0.06]">
             <table className="w-full text-left text-[12px]">
               <thead className="bg-[var(--color-ink-50)] text-[10.5px] uppercase tracking-[0.08em] text-[var(--color-ink-500)] dark:bg-white/[0.04]">
@@ -480,8 +505,15 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
               </thead>
               <tbody>
                 {issuedTokens.map((t) => {
-                  const isExpired = new Date(t.expiresAt) < new Date();
+                  const expMs = new Date(t.expiresAt).getTime();
+                  const nowMs = Date.now();
+                  const isExpired = expMs < nowMs;
                   const isRevoked = t.status === "Revoked";
+                  // "expiring soon" flags — only meaningful for Active rows.
+                  // 7 days → red, 7-30 days → yellow, > 30 days → no highlight.
+                  const daysToExpiry = Math.ceil((expMs - nowMs) / 86400000);
+                  const expiryCritical = !isRevoked && !isExpired && daysToExpiry <= 7;
+                  const expiryWarn = !isRevoked && !isExpired && daysToExpiry > 7 && daysToExpiry <= 30;
                   return (
                     <tr key={t.jti} className="border-t border-[var(--color-ink-100)] dark:border-white/[0.06]">
                       <td className="px-3 py-2 font-mono text-[11px]" title={t.jti}>
@@ -501,7 +533,21 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
                         </span>
                       </td>
                       <td className="px-3 py-2 text-[var(--color-ink-500)]">{new Date(t.issuedAt).toLocaleString()}</td>
-                      <td className="px-3 py-2 text-[var(--color-ink-500)]">{new Date(t.expiresAt).toLocaleString()}</td>
+                      <td className={cn(
+                        "px-3 py-2",
+                        expiryCritical
+                          ? "text-rose-700 dark:text-rose-300 font-medium"
+                          : expiryWarn
+                          ? "text-amber-700 dark:text-amber-300"
+                          : "text-[var(--color-ink-500)]",
+                      )}>
+                        {new Date(t.expiresAt).toLocaleString()}
+                        {(expiryCritical || expiryWarn) && (
+                          <span className="ml-1.5 text-[10.5px]">
+                            ({daysToExpiry === 1 ? "1 day" : `${daysToExpiry} days`} left)
+                          </span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-[var(--color-ink-500)]">{t.issuedBy}</td>
                       <td className="px-3 py-2">
                         <span className={cn(
@@ -535,6 +581,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
               </tbody>
             </table>
           </div>
+          </>
         )}
       </section>
 

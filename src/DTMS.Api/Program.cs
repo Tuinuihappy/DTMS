@@ -963,6 +963,11 @@ app.MapGet("/health/status/vendors", async (HealthCheckService svc) =>
 // AllowAnonymous inside the extension so it bypasses both auth schemes.
 app.MapOauthTokenEndpoint();
 
+// Phase S.8d — RFC 7517 JSON Web Key Set. Anonymous, publishes the
+// system-JWT public key so partners / gateways can verify DTMS-issued
+// tokens without embedding the raw PEM.
+app.MapJwksEndpoint();
+
 // Map all module Minimal API endpoints (require auth)
 app.MapAllModuleEndpoints();
 
