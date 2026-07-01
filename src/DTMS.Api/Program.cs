@@ -104,8 +104,27 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     if (string.IsNullOrWhiteSpace(jwtSettings.PublicKey))
         throw new InvalidOperationException("Jwt:PublicKey is not configured. Set the External Auth RSA public key.");
 
-    var rsa = RSA.Create();
-    rsa.ImportRSAPublicKey(Convert.FromBase64String(jwtSettings.PublicKey.Replace("\r", "").Replace("\n", "")), out _);
+    var externalAuthRsa = RSA.Create();
+    externalAuthRsa.ImportRSAPublicKey(Convert.FromBase64String(jwtSettings.PublicKey.Replace("\r", "").Replace("\n", "")), out _);
+    var externalAuthKey = new RsaSecurityKey(externalAuthRsa);
+
+    // Phase S.8b — accept DTMS-signed system JWTs at the SAME JwtBearer
+    // pipeline that validates External Auth user JWTs. Trade-off: system
+    // JWTs (issued by admins, lifetime up to 365 days) can now hit any
+    // [Authorize] endpoint — permission grants in SystemClientPermissions
+    // become the sole gate. Path-based scoping (/api/v1/source/*) is no
+    // longer the security boundary; permission scope is.
+    RsaSecurityKey? systemJwtKey = null;
+    if (!string.IsNullOrWhiteSpace(jwtSettings.SystemSigningPublicKey))
+    {
+        var systemRsa = RSA.Create();
+        systemRsa.ImportFromPem(jwtSettings.SystemSigningPublicKey);
+        systemJwtKey = new RsaSecurityKey(systemRsa) { KeyId = jwtSettings.SystemTokenKeyId };
+    }
+
+    var signingKeys = systemJwtKey is null
+        ? new SecurityKey[] { externalAuthKey }
+        : new SecurityKey[] { externalAuthKey, systemJwtKey };
 
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
@@ -124,11 +143,20 @@ builder.Services.ConfigureHttpJsonOptions(options =>
                 ValidateAudience = false,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new RsaSecurityKey(rsa),
+                // Resolver returns BOTH signing keys unconditionally —
+                // JsonWebTokenHandler tries each in turn and one must
+                // verify. External Auth JWTs have no kid header (verify
+                // with externalAuthKey); system JWTs have kid=dtms-system-...
+                // (verify with systemJwtKey). Bypass kid matching for
+                // the same reason as SystemJwtValidator — RsaSecurityKey
+                // initializer-assigned KeyId doesn't propagate through
+                // the handler's internal key collection.
+                IssuerSigningKeyResolver = (_, _, _, _) => signingKeys,
 
                 // Pin the WS-Federation URIs External Auth uses so role/name
                 // checks don't silently break if a future framework version
-                // changes its defaults.
+                // changes its defaults. System JWTs use `sub` for identity
+                // (checked separately in PermissionClaimsTransformer).
                 NameClaimType = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
                 RoleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
 
@@ -169,6 +197,28 @@ builder.Services.ConfigureHttpJsonOptions(options =>
                 },
             };
         });
+
+    // Phase S.8 — System (M2M) JWT issuance for OAuth client_credentials
+    // grant. Options mapped from the same Jwt config section the user-JWT
+    // validation above reads from, but kept as a separate Options class so
+    // the Iam.Application layer doesn't depend on the API-layer JwtSettings
+    // type. Singleton because the underlying RSA + SigningCredentials are
+    // built once in the ctor and reused across token mints.
+    builder.Services.Configure<DTMS.Iam.Application.Authorization.SystemJwtIssuerOptions>(o =>
+    {
+        o.PrivateKeyPem = jwtSettings.SystemSigningPrivateKey;
+        o.PublicKeyPem = jwtSettings.SystemSigningPublicKey;
+        o.Issuer = jwtSettings.SystemTokenIssuer;
+        o.Audience = jwtSettings.SystemTokenAudience;
+        o.DefaultLifetimeSeconds = jwtSettings.SystemTokenLifetimeSeconds;
+        o.KeyId = jwtSettings.SystemTokenKeyId;
+    });
+    builder.Services.AddSingleton<
+        DTMS.Iam.Application.Authorization.ISystemJwtIssuer,
+        DTMS.Iam.Application.Authorization.SystemJwtIssuer>();
+    builder.Services.AddSingleton<
+        DTMS.Iam.Application.Authorization.ISystemJwtValidator,
+        DTMS.Iam.Application.Authorization.SystemJwtValidator>();
 }
 
 // Configure MediatR — scan all module Application assemblies
@@ -602,6 +652,33 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
+// Phase S.8 — fail-fast keypair validation. Singleton resolution is lazy
+// by default, so a missing/malformed RSA key would only surface on the
+// first /oauth/token call (which might be hours after deploy). Force
+// resolution here so a misconfigured keypair throws at startup and the
+// container restart loop makes the error obvious in ops dashboards
+// rather than silently sitting at "Healthy" until traffic hits.
+//
+// Both Issuer + Validator must be resolvable — Issuer requires the
+// private key, Validator requires the public key. Resolving both also
+// asserts they parse as valid PEM.
+{
+    try
+    {
+        _ = app.Services.GetRequiredService<DTMS.Iam.Application.Authorization.ISystemJwtIssuer>();
+        _ = app.Services.GetRequiredService<DTMS.Iam.Application.Authorization.ISystemJwtValidator>();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogCritical(ex,
+            "System JWT keypair failed startup validation. " +
+            "Set Jwt__SystemSigningPrivateKey + Jwt__SystemSigningPublicKey env vars " +
+            "with a matching PEM-encoded RSA keypair, then restart. " +
+            "See docs/system-onboarding.md §4 for openssl commands.");
+        throw;
+    }
+}
+
 // Apply EF Core migrations for all module databases on startup.
 // Wrapped in a retry loop with exponential backoff so a brief postgres
 // outage (compose restart, brief network blip, slow startup ordering)
@@ -879,6 +956,12 @@ app.MapGet("/health/status/vendors", async (HealthCheckService svc) =>
 .WithTags("Health")
 .WithSummary("Vendors")
 .WithDescription("Checks external vendor connectivity: RIOT3.");
+
+// Phase S.8 — OAuth 2.0 client_credentials token endpoint for federated
+// source systems whose AuthScheme=bearer-jwt. Mounted at /oauth/token (no
+// /api/v1 prefix — matches standard OAuth discovery conventions); marked
+// AllowAnonymous inside the extension so it bypasses both auth schemes.
+app.MapOauthTokenEndpoint();
 
 // Map all module Minimal API endpoints (require auth)
 app.MapAllModuleEndpoints();

@@ -189,7 +189,9 @@ public static class IamEndpoints
 
         group.MapPost("/roles/{name}/permissions/{code}",
             async (string name, string code, HttpContext ctx, IRoleRepository roleRepo,
-                   IPermissionRepository permRepo, IAuditLogRepository audit, CancellationToken ct) =>
+                   IPermissionRepository permRepo, IAuditLogRepository audit,
+                   Microsoft.Extensions.Caching.Memory.IMemoryCache cache,
+                   CancellationToken ct) =>
             {
                 if (await roleRepo.GetByNameAsync(name, ct) is null) return Results.NotFound(new { error = $"Role '{name}' not found." });
                 // Wildcards (e.g. dtms:facility:*) are valid grants but
@@ -204,6 +206,11 @@ public static class IamEndpoints
                 var inserted = await roleRepo.GrantPermissionAsync(name, code, ct);
                 if (inserted)
                 {
+                    // Phase S.8b — evict PermissionClaimsTransformer cache
+                    // so users on this role see the grant on their next
+                    // request instead of waiting up to 5 minutes.
+                    cache.Remove($"iam:perms:{name}");
+
                     await audit.AppendAsync(new PermissionAuditEntry(
                         actorEmployeeId: ActorOrUnknown(ctx),
                         action: "grant",
@@ -215,27 +222,35 @@ public static class IamEndpoints
 
         group.MapDelete("/roles/{name}/permissions/{code}",
             async (string name, string code, HttpContext ctx, IRoleRepository repo,
-                   IAuditLogRepository audit, CancellationToken ct) =>
+                   IAuditLogRepository audit,
+                   Microsoft.Extensions.Caching.Memory.IMemoryCache cache,
+                   CancellationToken ct) =>
             {
                 // Self-lockout guard — the catch-all wildcard is the
-                // master key; once cache hits TTL the actor loses every
-                // perm, including dtms:iam:role:write needed to undo it.
-                // Other revokes on your own role are allowed because the
-                // operator can pick a single perm back through another
-                // surface; only this case is unrecoverable from the UI.
+                // master key; once the transformer cache is evicted the
+                // actor loses every perm, including dtms:iam:role:write
+                // needed to undo it. Other revokes on your own role are
+                // allowed because the operator can pick a single perm
+                // back through another surface; only this case is
+                // unrecoverable from the UI.
                 if (code == "dtms:*"
                     && string.Equals(name, ActorRole(ctx), StringComparison.Ordinal))
                 {
                     return Results.BadRequest(new
                     {
                         error = "Refusing to revoke 'dtms:*' from the role you are " +
-                                "signed in with — this would lock you out within 5 minutes."
+                                "signed in with — this would lock you out on next request."
                     });
                 }
 
                 var deleted = await repo.RevokePermissionAsync(name, code, ct);
                 if (deleted)
                 {
+                    // Phase S.8b — evict transformer cache so users on this
+                    // role lose the revoked permission on their next
+                    // request (else it persists in-memory for up to 5 min).
+                    cache.Remove($"iam:perms:{name}");
+
                     await audit.AppendAsync(new PermissionAuditEntry(
                         actorEmployeeId: ActorOrUnknown(ctx),
                         action: "revoke",
