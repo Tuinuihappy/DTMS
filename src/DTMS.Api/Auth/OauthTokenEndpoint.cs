@@ -14,8 +14,8 @@ namespace DTMS.Api.Auth;
 /// POST their <c>client_id</c> + <c>client_secret</c> here and get back a
 /// short-lived JWT signed by <see cref="ISystemJwtIssuer"/>. They then
 /// present that JWT as <c>Authorization: Bearer ...</c> when calling
-/// <c>/api/v1/source/{key}/*</c> — the same middleware that handles api-key
-/// also accepts bearer-jwt (see <c>SystemClientAuthMiddleware</c>).</para>
+/// <c>/api/v1/source/*</c> — <see cref="DTMS.Api.Middlewares.SystemClientAuthMiddleware"/>
+/// resolves identity from the JWT sub claim.</para>
 ///
 /// <para><b>Why an endpoint here</b> rather than on the IAM module's
 /// SystemAdminEndpoints: this is a public, anonymous OAuth surface, not an

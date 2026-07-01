@@ -35,7 +35,7 @@ public sealed record UserPrincipal(string EmployeeId, string DisplayName) : IPri
 /// A federated source system — identified by a short slug and resolved
 /// by <c>SystemClientAuthMiddleware</c> from the inbound credential.
 /// <see cref="Key"/> is the canonical id used in routes
-/// (<c>/api/v1/source/{key}/*</c>) and audit logs.
+/// (<c>/api/v1/source/*</c>) and audit logs.
 /// </summary>
 public sealed record SystemPrincipal(string Key, string DisplayName) : IPrincipal
 {

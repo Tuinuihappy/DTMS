@@ -21,6 +21,33 @@ namespace DTMS.Api.Middlewares;
 /// JWT (1 hour default), then present it as <c>Authorization: Bearer ...</c>
 /// here. The legacy <c>api-key</c> scheme was removed at production launch
 /// — no backward compat needed (no production partners existed yet).</para>
+///
+/// <para><b>Phase S.8e (P3) — JWT-only identity.</b> Order of operations:
+/// <list type="number">
+///   <item>Extract Bearer token; missing/blank → 401.</item>
+///   <item>Validate JWT signature + exp; failure → 401 (no lookups yet).</item>
+///   <item>Take <c>SystemKey</c> from the validated <c>sub</c> claim — the
+///     sole source of identity.</item>
+///   <item>Load SystemClient row via that key; missing/inactive → 401.</item>
+///   <item>Load SystemCredential row (checks the client actually has an
+///     auth config registered) — belt-and-suspenders against an admin
+///     inserting a bare SystemClient row without minting a secret. The
+///     <c>AuthScheme</c> column stays <c>bearer-jwt</c> for the same
+///     reason a checkstamp does; if it's ever anything else that's an
+///     admin misconfig and we reject rather than fall through.</item>
+///   <item>Stamp <see cref="SystemPrincipal"/> + permission claims.</item>
+/// </list>
+/// The old URL-vs-<c>sub</c> comparison from Phases S.2 – S.8d
+/// is gone. JWT sig verification already makes <c>sub</c>
+/// authoritative — echoing it in the URL added wire redundancy without
+/// changing what an attacker can do. The <c>/api/v1/source/{key}/*</c>
+/// route shape is retired in favour of a single canonical URL per
+/// operation.</para>
+///
+/// <para><b>Attack surface note.</b> A stream of forged Bearer tokens
+/// aimed at <c>/api/v1/source/*</c> gets rejected before any Redis or
+/// Postgres lookup, so an attacker can't use the endpoint to burn our
+/// cache/DB budget the way the pre-P1 order allowed.</para>
 /// </remarks>
 public sealed class SystemClientAuthMiddleware : IMiddleware
 {
@@ -29,17 +56,20 @@ public sealed class SystemClientAuthMiddleware : IMiddleware
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
 
     private readonly CachedCredentialReader _credentials;
+    private readonly CachedSystemClientReader _cachedClients;
     private readonly ISystemClientRepository _clients;
     private readonly ISystemJwtValidator _jwtValidator;
     private readonly ILogger<SystemClientAuthMiddleware> _log;
 
     public SystemClientAuthMiddleware(
         CachedCredentialReader credentials,
+        CachedSystemClientReader cachedClients,
         ISystemClientRepository clients,
         ISystemJwtValidator jwtValidator,
         ILogger<SystemClientAuthMiddleware> log)
     {
         _credentials = credentials;
+        _cachedClients = cachedClients;
         _clients = clients;
         _jwtValidator = jwtValidator;
         _log = log;
@@ -47,47 +77,72 @@ public sealed class SystemClientAuthMiddleware : IMiddleware
 
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
-        // Route shape: /api/v1/source/{key}/...
-        // Parse the {key} segment without re-running the full template
-        // matcher — we own the route prefix at the UseWhen layer.
-        if (!TryExtractSystemKey(context.Request.Path, out var systemKey))
+        // Step 1 — extract Bearer. Pure header parse, no I/O, so a
+        // header-less request never touches the cache.
+        if (!TryExtractBearer(context, out var token))
         {
-            await Reject(context, StatusCodes.Status404NotFound, "source key missing");
+            await Reject(context, StatusCodes.Status401Unauthorized, "missing bearer");
             return;
         }
 
-        var client = await _clients.GetByKeyAsync(systemKey, context.RequestAborted);
+        // Step 2 — validate signature + expiry via the SystemJwt public
+        // key loaded at startup (no per-request I/O). Forged/expired
+        // tokens die here so a flooder can't cost us a Redis hit.
+        var validated = _jwtValidator.Validate(token);
+        if (!validated.IsValid)
+        {
+            _log.LogWarning("bearer-jwt rejected: {Reason}", validated.FailureReason);
+            await Reject(context, StatusCodes.Status401Unauthorized, "jwt invalid");
+            return;
+        }
+
+        // Step 3 — the JWT sub claim is the identity. Anything downstream
+        // (endpoint handlers, permission handler, request log, actor
+        // context) reads off the SystemPrincipal we stamp below; the URL
+        // path is not consulted for identity anywhere in the pipeline.
+        var systemKey = validated.SystemKey;
+        if (string.IsNullOrEmpty(systemKey))
+        {
+            _log.LogWarning("bearer-jwt valid but sub claim missing/empty");
+            await Reject(context, StatusCodes.Status401Unauthorized, "jwt missing sub");
+            return;
+        }
+
+        // Step 4 — verify the client row still exists and is active. The
+        // admin API invalidates the L1/L2 cache on deactivate, so this
+        // catches a just-revoked partner within one L1 TTL (60s) even if
+        // their JWT hasn't expired yet.
+        var client = await _cachedClients.GetAsync(systemKey, context.RequestAborted);
         if (client is null || !client.IsActive)
         {
             await Reject(context, StatusCodes.Status401Unauthorized, "unknown or inactive source system");
             return;
         }
 
+        // Step 5 — the credential row must exist and be bearer-jwt.
+        // A missing credential means an out-of-band DB edit created a
+        // client without a secret — treat as misconfig, not "valid
+        // JWT means anything goes". A scheme other than bearer-jwt
+        // means the same thing at a different layer (admin API only
+        // writes bearer-jwt); either way, refuse rather than pretend.
         var credential = await _credentials.GetAsync(systemKey, context.RequestAborted);
         if (credential is null)
         {
             await Reject(context, StatusCodes.Status401Unauthorized, "no credential configured");
             return;
         }
-
-        // OAuth client_credentials grant only. Partner first POSTs to
-        // /oauth/token to exchange client_id+secret for a short-lived JWT,
-        // then presents it here as Authorization: Bearer ...
-        // Any other AuthScheme value in the DB indicates a misconfiguration
-        // (the admin API only ever writes "bearer-jwt") — reject 401 rather
-        // than silently allow.
-        bool authenticated = credential.AuthScheme switch
+        if (!string.Equals(credential.AuthScheme, "bearer-jwt", StringComparison.Ordinal))
         {
-            "bearer-jwt" => TryAuthenticateJwt(context, systemKey),
-            _ => false,
-        };
-
-        if (!authenticated)
-        {
-            await Reject(context, StatusCodes.Status401Unauthorized, "credential rejected");
+            _log.LogWarning(
+                "credential for '{Key}' has non-bearer-jwt scheme '{Scheme}' — refusing",
+                systemKey, credential.AuthScheme);
+            await Reject(context, StatusCodes.Status401Unauthorized, "credential scheme mismatch");
             return;
         }
 
+        // Step 6 — stamp SystemPrincipal + permission claims. Downstream
+        // reads from this principal; identity flows from JWT → principal
+        // → whatever needs it, with no URL-parsing anywhere.
         var principal = new SystemPrincipal(client.Key, client.DisplayName);
         context.Items[PrincipalItemKey] = principal;
 
@@ -111,64 +166,17 @@ public sealed class SystemClientAuthMiddleware : IMiddleware
         await next(context);
     }
 
-    private static bool TryExtractSystemKey(PathString path, out string key)
+    private static bool TryExtractBearer(HttpContext ctx, out string token)
     {
-        // PathString.Value is "/api/v1/source/oms/..." here.
-        ReadOnlySpan<char> v = path.Value.AsSpan();
-        const string prefix = "/api/v1/source/";
-        if (!v.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-        {
-            key = string.Empty;
-            return false;
-        }
-        var after = v[prefix.Length..];
-        int slash = after.IndexOf('/');
-        var segment = slash < 0 ? after : after[..slash];
-        if (segment.IsEmpty)
-        {
-            key = string.Empty;
-            return false;
-        }
-        key = segment.ToString();
-        return true;
-    }
-
-    private bool TryAuthenticateJwt(HttpContext ctx, string urlSystemKey)
-    {
-        // Header convention: Authorization: Bearer <jwt>
         var header = ctx.Request.Headers.Authorization.ToString();
         const string scheme = "Bearer ";
         if (!header.StartsWith(scheme, StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        var token = header[scheme.Length..].Trim();
-        if (token.Length == 0)
-            return false;
-
-        var result = _jwtValidator.Validate(token);
-        if (!result.IsValid)
         {
-            _log.LogWarning(
-                "bearer-jwt rejected for url system '{Url}': {Reason}",
-                urlSystemKey, result.FailureReason);
+            token = string.Empty;
             return false;
         }
-
-        // Token-substitution guard: a token minted for system "oms" must not
-        // unlock /api/v1/source/sap/*. The validator extracted the sub claim;
-        // we compare it to the URL segment the middleware already parsed.
-        // Both come from authenticated channels (sub via RSA-signed JWT, url
-        // via routing) so a mismatch is always an attack or a misconfigured
-        // partner — never a benign edge case.
-        if (!string.Equals(result.SystemKey, urlSystemKey, StringComparison.Ordinal))
-        {
-            _log.LogWarning(
-                "bearer-jwt sub mismatch: token sub='{Sub}' but url='{Url}'.",
-                result.SystemKey, urlSystemKey);
-            return false;
-        }
-
-        return true;
+        token = header[scheme.Length..].Trim();
+        return token.Length > 0;
     }
 
     private static async Task Reject(HttpContext ctx, int statusCode, string reason)
@@ -178,5 +186,4 @@ public sealed class SystemClientAuthMiddleware : IMiddleware
         var body = JsonSerializer.Serialize(new { error = reason }, JsonOpts);
         await ctx.Response.WriteAsync(body);
     }
-
 }

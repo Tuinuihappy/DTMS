@@ -85,8 +85,9 @@ curl -X POST https://dtms.internal/oauth/token \
 # Response:
 # { "access_token": "eyJ...", "token_type": "Bearer", "expires_in": 3600 }
 
-# Step 2 — use the access_token on every API call
-curl -X POST https://dtms.internal/api/v1/source/acme/order \
+# Step 2 — use the access_token on every API call. Identity is derived
+# from the JWT sub claim, not the URL — the endpoint has no {key} segment.
+curl -X POST https://dtms.internal/api/v1/source/delivery-orders \
   -H "Authorization: Bearer eyJ..." \
   -H "Content-Type: application/json" \
   -d '{...order payload...}'
@@ -134,12 +135,12 @@ can mint a JWT directly with a custom lifetime.
 3. Pick a lifetime (presets: 7 / 30 / 90 / 180 / 365 days; default 90)
 4. Click **Issue token** — banner shows the JWT plaintext (`eyJ...`)
 5. Click **Test this credential** — confirms the JWT authenticates
-   against `/source/{key}/whoami` directly (no OAuth round-trip)
+   against `/source/whoami` directly (no OAuth round-trip)
 6. Send the JWT to the partner via a secure channel
 7. Partner uses it directly:
 
 ```bash
-curl -X POST https://dtms.internal/api/v1/source/oms/order \
+curl -X POST https://dtms.internal/api/v1/source/delivery-orders \
   -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIs..." \
   -H "Content-Type: application/json" \
   -d '{...order payload...}'
@@ -311,7 +312,7 @@ simple replace-and-restart works because token lifetime is only 1 hour.
 - Partner's `client_id` doesn't match a SystemClient → check `key` spelling
 - System is deactivated → reactivate before token requests will succeed
 
-### `401 credential rejected` from `/api/v1/source/{key}/*`
+### `401 credential rejected` from `/api/v1/source/*`
 - Token expired → partner's cache is stale; force a re-fetch
 - Token signature invalid → DTMS keypair rotated since token was minted;
   partner needs to re-fetch (will use new key)

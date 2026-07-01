@@ -30,7 +30,7 @@ public static class RequirePermissionExtensions
     /// <c>HttpContext.User</c> that <see cref="DTMS.Api.Middlewares"/>
     /// <c>SystemClientAuthMiddleware</c> set, including its
     /// already-stamped permission claims. Apply only to endpoints
-    /// mounted under <c>/api/v1/source/{key}/*</c>; using it on a
+    /// mounted under <c>/api/v1/source/*</c>; using it on a
     /// user-facing endpoint would bypass the Bearer scheme guard.
     /// </summary>
     public static TBuilder RequirePermissionForSourceSystem<TBuilder>(
@@ -52,7 +52,7 @@ public static class RequirePermissionExtensions
     ///
     /// <para>Pair with <see cref="SourceSystemPermissionHandler"/>; both
     /// must be registered in DI. Apply only under
-    /// <c>/api/v1/source/{key}/*</c> for the same Bearer-scheme reason
+    /// <c>/api/v1/source/*</c> for the same Bearer-scheme reason
     /// noted on <see cref="RequirePermissionForSourceSystem"/>.</para>
     /// </summary>
     public static TBuilder RequirePermissionFromRouteKey<TBuilder>(

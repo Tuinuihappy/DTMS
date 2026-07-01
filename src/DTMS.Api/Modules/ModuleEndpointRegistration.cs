@@ -21,9 +21,10 @@ public static class ModuleEndpointRegistration
         app.MapFleetEndpoints();
         app.MapDeliveryOrderEndpoints();
         // Phase S.2.2 — federated source-system endpoint group at
-        // /api/v1/source/{key}/* (separate from the admin-side
+        // /api/v1/source/* (separate from the admin-side
         // /api/v1/delivery-orders/upstream so the system auth +
-        // request-log middleware applies cleanly).
+        // request-log middleware applies cleanly). Phase S.8e P3 dropped
+        // the URL {key} segment — identity comes from the JWT sub claim.
         app.MapSourceSystemDeliveryOrderEndpoints();
         app.MapItemEndpoints();
         app.MapDashboardEndpoints();
@@ -33,6 +34,7 @@ public static class ModuleEndpointRegistration
         app.MapPlanningReportsEndpoints();
         app.MapAdminProjectionsEndpoints();
         app.MapAdminWorkflowEndpoints();
+        app.MapAdminOutboxEndpoints();  // Phase O3 — DLQ list / replay / delete
         app.MapPlanningEndpoints();
         app.MapDispatchEndpoints();
         app.MapRiot3Webhooks();

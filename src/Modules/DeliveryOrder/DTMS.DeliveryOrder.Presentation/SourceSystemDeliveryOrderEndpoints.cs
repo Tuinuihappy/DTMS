@@ -12,88 +12,73 @@ using Microsoft.AspNetCore.Routing;
 namespace DTMS.DeliveryOrder.Presentation;
 
 /// <summary>
-/// Phase S.2.2 — federated source-system endpoint group. Mirrors the
-/// admin-side <c>POST /api/v1/delivery-orders/upstream</c> shape but
-/// runs under <c>/api/v1/source/{key}/*</c> so the
-/// <see cref="DTMS.Api.Middlewares"/> system auth + request log
-/// middleware applies. Routes the request through the same
-/// <see cref="CreateUpstreamDeliveryOrderCommand"/> handler — there's
-/// only one validated path to "Submitted → Validated → Confirmed",
-/// reachable through either the user surface or the system surface.
+/// Federated source-system endpoint group. Runs under
+/// <c>/api/v1/source/*</c> so the
+/// <see cref="DTMS.Api.Middlewares"/> system auth + request log middleware
+/// applies. Routes the request through
+/// <see cref="CreateUpstreamDeliveryOrderCommand"/> — one validated path
+/// to "Submitted → Validated → Confirmed".
+///
+/// <para><b>Phase S.8e (P3) — single canonical URL.</b> Only
+/// <c>POST /api/v1/source/delivery-orders</c> exists. The former legacy
+/// route <c>/api/v1/source/{key}/delivery-orders</c> was retired here;
+/// callers derive their identity from the JWT <c>sub</c> claim, and the
+/// URL carries no system slug. See
+/// <see cref="DTMS.Api.Middlewares.SystemClientAuthMiddleware"/> for the
+/// JWT-first identity resolution.</para>
 /// </summary>
 public static class SourceSystemDeliveryOrderEndpoints
 {
     public static void MapSourceSystemDeliveryOrderEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/v1/source/{key}").WithTags("SourceSystem");
-
-        // POST /api/v1/source/{key}/delivery-orders
-        // Authorization: ApiKey ...  (or future bearer-jwt / hmac via the
-        //   middleware's auth scheme switch)
-        // Idempotency-Key: <uuid>    (transport-level retry guard)
-        //
-        // Server reconstructs the SourceSystem enum from {key} so the
-        // body cannot lie about which system it claims to be — even if
-        // an attacker crafted a body with SourceSystem=Sap, the URL +
-        // verified credential pin the value to OMS.
-        group.MapPost("/delivery-orders",
-            async (string key, [FromBody] CreateSourceOrderRequest body, ISender sender) =>
-        {
-            if (!TryMapSourceSystem(key, out var sourceSystem))
-                return Results.BadRequest(new { error = $"Unsupported source system: '{key}'" });
-
-            var command = new CreateUpstreamDeliveryOrderCommand(
-                OrderRef: body.OrderRef,
-                ServiceWindow: body.ServiceWindow,
-                Items: body.Items,
-                SourceSystem: sourceSystem,
-                Priority: body.Priority ?? Priority.Normal,
-                RequestedBy: body.RequestedBy,
-                Notes: body.Notes,
-                RequestedTransportMode: body.RequestedTransportMode,
-                RequiresDropPod: body.RequiresDropPod,
-                RequiresPickupPod: body.RequiresPickupPod);
-
-            var result = await sender.Send(command);
-            return result.IsSuccess
-                ? Results.Created(
-                    $"/api/v1/delivery-orders/{result.Value.Order.Id}",
-                    result.Value)
-                : Results.BadRequest(new { error = result.Error });
-        })
+        var group = app.MapGroup("/api/v1/source").WithTags("SourceSystem");
+        group.MapPost("/delivery-orders", HandleCreateAsync)
             .RequireIdempotencyKey()
-            // Phase S.3.1a — permission code derives from the URL {key}
-            // segment at enforcement time, so adding a new SystemClient
-            // (sap, erp, wms-acme, ...) requires no code change here —
-            // only the matching permission row in iam.SystemClientPermissions
-            // and the corresponding credential. Handler validates the slug
-            // before substitution to prevent permission-string injection.
             .RequirePermissionFromRouteKey(StandardSystemPermissions.OrderWriteTemplate);
     }
 
-    private static bool TryMapSourceSystem(string urlKey, out SourceSystem mapped)
+    private static async Task<IResult> HandleCreateAsync(
+        [FromBody] CreateSourceOrderRequest body,
+        HttpContext ctx,
+        ISender sender)
     {
-        // URL key is the slug from iam.SystemClients (lowercase). The
-        // domain enum predates the dynamic client table and stays
-        // closed by design — a system that isn't in the enum can't
-        // create orders even if its credential is valid.
-        switch (urlKey)
-        {
-            case "oms": mapped = SourceSystem.Oms; return true;
-            case "sap": mapped = SourceSystem.Sap; return true;
-            case "erp": mapped = SourceSystem.Erp; return true;
-            default:
-                mapped = default;
-                return false;
-        }
+        // Middleware has already validated the JWT and stashed the
+        // principal — the null path here would mean the endpoint got
+        // mounted outside the /api/v1/source pipeline UseWhen branch,
+        // which is a wiring bug, not a runtime input error.
+        if (ctx.Items["principal"] is not SystemPrincipal principal)
+            return Results.Problem(
+                title: "system principal missing",
+                detail: "SystemClientAuthMiddleware did not run for this request",
+                statusCode: StatusCodes.Status500InternalServerError);
+
+        var command = new CreateUpstreamDeliveryOrderCommand(
+            OrderRef: body.OrderRef,
+            ServiceWindow: body.ServiceWindow,
+            Items: body.Items,
+            SourceSystemKey: principal.Key,
+            Priority: body.Priority ?? Priority.Normal,
+            RequestedBy: body.RequestedBy,
+            Notes: body.Notes,
+            RequestedTransportMode: body.RequestedTransportMode,
+            RequiresDropPod: body.RequiresDropPod,
+            RequiresPickupPod: body.RequiresPickupPod);
+
+        var result = await sender.Send(command);
+        return result.IsSuccess
+            ? Results.Created(
+                $"/api/v1/delivery-orders/{result.Value.Order.Id}",
+                result.Value)
+            : Results.BadRequest(new { error = result.Error });
     }
 }
 
 /// <summary>
 /// Inbound payload shape for source-system order creation. Mirrors
 /// <see cref="CreateUpstreamDeliveryOrderCommand"/> minus the
-/// <c>SourceSystem</c> field — the server pins that from the URL
-/// segment so the wire payload can't lie about its origin.
+/// <c>SourceSystemKey</c> field — the server pins that from the
+/// authenticated <see cref="SystemPrincipal"/> so the wire payload
+/// can't lie about its origin.
 /// </summary>
 public record CreateSourceOrderRequest(
     string OrderRef,

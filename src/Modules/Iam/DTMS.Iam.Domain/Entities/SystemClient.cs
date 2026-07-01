@@ -4,7 +4,7 @@ namespace DTMS.Iam.Domain.Entities;
 /// An external source system that DTMS recognises as a first-class
 /// caller — e.g. <c>oms</c>, <c>sap</c>, <c>wms-acme</c>. The
 /// <see cref="Key"/> is the canonical short slug used in routes
-/// (<c>/api/v1/source/{key}/*</c>), audit logs, and config maps.
+/// (<c>/api/v1/source/*</c>), audit logs, and config maps.
 /// Lives alongside the user-role world but never shares a table —
 /// lifecycles, credentials, and admin workflows diverge enough that
 /// unifying them in storage would force coincidence-only joins.

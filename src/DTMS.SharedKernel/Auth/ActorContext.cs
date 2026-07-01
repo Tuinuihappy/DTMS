@@ -164,7 +164,7 @@ public enum SourceChannel
     ManualWeb,
     /// <summary>Driver/operator using the mobile PWA at <c>/api/operator/*</c>.</summary>
     OperatorPwa,
-    /// <summary>Federated external system calling <c>/api/v1/source/{key}/*</c> (S.2+).</summary>
+    /// <summary>Federated external system calling <c>/api/v1/source/*</c> (S.2+).</summary>
     SystemApi,
     /// <summary>Background hosted services, outbox consumers, scheduled jobs.</summary>
     InternalJob,

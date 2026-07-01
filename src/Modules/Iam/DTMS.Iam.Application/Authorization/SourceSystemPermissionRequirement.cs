@@ -11,7 +11,7 @@ namespace DTMS.Iam.Application.Authorization;
 /// new <c>SystemClient</c> to the DB without redeploying.
 ///
 /// <para>Sibling of <see cref="PermissionRequirement"/> — both live on
-/// federated <c>/api/v1/source/{key}/*</c> endpoints, but only this one
+/// federated <c>/api/v1/source/*</c> endpoints, but only this one
 /// derives the permission code from the URL.</para>
 /// </summary>
 public sealed class SourceSystemPermissionRequirement : IAuthorizationRequirement

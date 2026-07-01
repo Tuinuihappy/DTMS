@@ -12,7 +12,7 @@ import { testCredential, type TestCredentialMode } from "@/lib/api/iam-systems";
  * - Plaintext is masked by default; reveal with the Eye toggle
  * - Copy button writes to clipboard with a 2s "Copied!" confirmation
  * - "Test key" button verifies the new key against the backend's
- *   /source/{key}/whoami probe in one click — gives instant feedback
+ *   /source/whoami probe in one click — gives instant feedback
  *   so the operator doesn't have to context-switch to Swagger
  * - Dismissable; once dismissed the plaintext is gone from React state
  * - Warning text ("Save this now — won't show again") sits above the box

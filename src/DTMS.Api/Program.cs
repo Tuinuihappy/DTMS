@@ -247,6 +247,12 @@ builder.Services.AddOpenTelemetry()
     .WithTracing(tracing => tracing
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
+        // Phase O4 — outbox publish spans. Trace context is captured at
+        // outbox-row commit time (Activity.Current.Id → TraceParent column)
+        // and restored in OutboxProcessorService.PublishBatchAsync so the
+        // consumer span chains under the original request's root, even
+        // across the async gap.
+        .AddSource(DTMS.SharedKernel.Diagnostics.OutboxActivitySource.Name)
         .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)))
     // P0.3 — projection metrics (lag, throughput, dedup) — Meter name
     // matches DTMS.SharedKernel.Projection.ProjectionMetrics.MeterName.
@@ -994,12 +1000,17 @@ app.MapHub<DTMS.Api.Realtime.Hubs.FleetHub>("/hubs/fleet");
 app.MapHub<DTMS.Api.Realtime.Hubs.ManualBoardHub>("/hubs/manual-board");
 
 // Phase S.2 smoke test endpoint — returns the authenticated source
-// system's principal id + display name. Guarded by the new system-side
+// system's principal id + display name. Guarded by the system-side
 // permission policy so a system that holds `dtms:source:oms:order:read`
-// (or a wildcard above it) passes and any other system gets 403.
-// Will be removed once the real S.2.2 endpoint group lands.
-app.MapGet("/api/v1/source/{key}/whoami",
-    (HttpContext ctx, string key) =>
+// (or a wildcard above it) passes and any other system gets 403. Doubles
+// as the "test key" probe fired from the admin one-time-secret banner
+// after a client secret is minted or rotated.
+//
+// Phase S.8e (P3) — canonical URL only. The former legacy variant
+// /api/v1/source/{key}/whoami was retired; identity comes from the
+// JWT sub claim so the URL carries no system slug.
+app.MapGet("/api/v1/source/whoami",
+    (HttpContext ctx) =>
     {
         if (ctx.Items[DTMS.Api.Middlewares.SystemClientAuthMiddleware.PrincipalItemKey]
             is not DTMS.Iam.Application.Authorization.SystemPrincipal sp)

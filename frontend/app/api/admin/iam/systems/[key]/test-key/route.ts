@@ -5,10 +5,17 @@ import { NextResponse, type NextRequest } from "next/server";
 // "Test this credential" button on OneTimeSecretBanner posts the freshly-
 // minted client_secret here. We trade it for an access token via
 // /oauth/token (the exact OAuth flow OMS will run in prod), then call
-// /source/{key}/whoami with `Authorization: Bearer <jwt>` to confirm
-// end-to-end auth works. A token-endpoint failure is returned as ok:false
-// with the upstream's RFC 6749 error body so the operator can distinguish
-// "wrong secret" from "wrong target system".
+// /source/whoami with `Authorization: Bearer <jwt>` to confirm end-to-end
+// auth works. A token-endpoint failure is returned as ok:false with the
+// upstream's RFC 6749 error body so the operator can distinguish "wrong
+// secret" from "wrong target system".
+//
+// Phase S.8e (P3) — whoami is the canonical URL-less route; the target
+// system is identified by the JWT sub, not by a URL segment. The `key`
+// route param on this Next.js route is still used to pass client_id to
+// /oauth/token — the key identifies the CredentialSource, and the JWT
+// returned from that exchange carries sub=system:{key} verbatim, so the
+// downstream call to /source/whoami ends up at the same principal.
 //
 // Body shape: { secret: "dtms_cs_<key>_..." }
 // Response:   { ok: true, principalId, displayName, permissions }
@@ -52,7 +59,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   const root = base.replace(/\/$/, "");
-  const whoamiUrl = `${root}/api/v1/source/${encodeURIComponent(key)}/whoami`;
+  const whoamiUrl = `${root}/api/v1/source/whoami`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10_000);
