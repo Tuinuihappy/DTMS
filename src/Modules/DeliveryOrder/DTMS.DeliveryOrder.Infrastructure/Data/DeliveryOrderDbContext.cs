@@ -50,7 +50,8 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(o => o.TotalWeightKg).IsRequired();
             b.Property(o => o.TotalQuantity).IsRequired();
             b.Property(o => o.TotalItems).IsRequired();
-            b.Property(o => o.SourceSystem).HasConversion<string>().HasMaxLength(20).IsRequired();
+            b.Property(o => o.SourceSystemKey).HasMaxLength(50).IsRequired();
+            b.Property(o => o.SourceSystemDisplayName).HasMaxLength(200).IsRequired();
             b.Property(o => o.Priority).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
             b.Property(o => o.RequestedTransportMode).HasConversion<string>().HasMaxLength(20);
@@ -69,7 +70,7 @@ public class DeliveryOrderDbContext : DbContext
 
             b.HasIndex(o => o.Status);
             b.HasIndex(o => o.CreatedDate);
-            b.HasIndex(o => new { o.SourceSystem, o.OrderRef }).IsUnique();
+            b.HasIndex(o => new { o.SourceSystemKey, o.OrderRef }).IsUnique();
 
             b.HasMany(o => o.Items)
              .WithOne()
@@ -215,6 +216,8 @@ public class DeliveryOrderDbContext : DbContext
             // table doesn't have the columns.
             b.Ignore(e => e.PartitionKey);
             b.Ignore(e => e.CorrelationId);
+            // Phase O4 — W3C traceparent captured at write time.
+            b.Property(e => e.TraceParent).HasMaxLength(55);
         });
 
         // ── Phase P1 — projection_inbox (idempotency bookkeeping) ──────
@@ -304,7 +307,10 @@ public class DeliveryOrderDbContext : DbContext
             b.HasKey(e => e.OrderId);
             b.Property(e => e.OrderRef).HasMaxLength(200).IsRequired();
             b.Property(e => e.Status).HasMaxLength(30).IsRequired();
-            b.Property(e => e.SourceSystem).HasMaxLength(20).IsRequired();
+            // Phase P5 — column widened to varchar(50) to fit lowercase
+            // slugs (e.g. wms-acme) that exceed the legacy enum-name width.
+            b.Property(e => e.SourceSystem).HasMaxLength(50).IsRequired();
+            b.Property(e => e.SourceSystemDisplayName).HasMaxLength(200);
             b.Property(e => e.Priority).HasMaxLength(20).IsRequired();
             b.Property(e => e.TransportMode).HasMaxLength(20);
             b.Property(e => e.RequestedBy).HasMaxLength(200);
@@ -334,7 +340,7 @@ public class DeliveryOrderDbContext : DbContext
             b.ToTable("OrderFacts", "bi");
             b.HasKey(e => e.OrderId);
             b.Property(e => e.OrderRef).HasMaxLength(200).IsRequired();
-            b.Property(e => e.SourceSystem).HasMaxLength(20).IsRequired();
+            b.Property(e => e.SourceSystem).HasMaxLength(50).IsRequired();
             b.Property(e => e.Priority).HasMaxLength(20).IsRequired();
             b.Property(e => e.TransportMode).HasMaxLength(20);
             b.Property(e => e.RequestedBy).HasMaxLength(200);

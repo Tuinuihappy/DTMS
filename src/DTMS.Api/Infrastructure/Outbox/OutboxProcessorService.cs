@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using DTMS.DeliveryOrder.Infrastructure.Data;
 using DTMS.Dispatch.Infrastructure.Data;
@@ -18,17 +19,25 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptionsMonitor<OutboxOptions> _options;
     private readonly WorkflowMetrics _metrics;
+    private readonly IOutboxWakeSignal _wakeSignal;
     private readonly ILogger<OutboxProcessorService> _logger;
+
+    // Phase O3 — adaptive polling. Empty ticks double the delay from
+    // AdaptivePollBaseMs to AdaptivePollMaxMs. Any of (fetched > 0 |
+    // NOTIFY wake | manual replay) resets to 0.
+    private int _consecutiveEmptyTicks;
 
     public OutboxProcessorService(
         IServiceScopeFactory scopeFactory,
         IOptionsMonitor<OutboxOptions> options,
         WorkflowMetrics metrics,
+        IOutboxWakeSignal wakeSignal,
         ILogger<OutboxProcessorService> logger)
     {
         _scopeFactory = scopeFactory;
         _options = options;
         _metrics = metrics;
+        _wakeSignal = wakeSignal;
         _logger = logger;
     }
 
@@ -36,29 +45,89 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
     {
         var opts = _options.CurrentValue;
         _logger.LogInformation(
-            "OutboxProcessorService started (UseSkipLocked={UseSkipLocked}, BatchSize={BatchSize}, PublishConcurrency={PublishConcurrency}, PollIntervalSeconds={PollIntervalSeconds}, PerMessageTimeoutSeconds={PerMessageTimeoutSeconds})",
-            opts.UseSkipLocked, opts.BatchSize, opts.PublishConcurrency, opts.PollIntervalSeconds, opts.PerMessageTimeoutSeconds);
+            "OutboxProcessorService started (UseSkipLocked={UseSkipLocked}, BatchSize={BatchSize}, PublishConcurrency={PublishConcurrency}, PollIntervalSeconds={PollIntervalSeconds}, PerMessageTimeoutSeconds={PerMessageTimeoutSeconds}, UseListenNotify={UseListenNotify}, AdaptivePollBaseMs={AdaptivePollBaseMs}, AdaptivePollMaxMs={AdaptivePollMaxMs})",
+            opts.UseSkipLocked, opts.BatchSize, opts.PublishConcurrency, opts.PollIntervalSeconds, opts.PerMessageTimeoutSeconds, opts.UseListenNotify, opts.AdaptivePollBaseMs, opts.AdaptivePollMaxMs);
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            int processed = 0;
             try
             {
-                await ProcessUnpublishedEventsAsync(stoppingToken);
+                processed = await ProcessUnpublishedEventsInternalAsync(stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogError(ex, "Error processing outbox messages");
             }
 
-            // Hot-reload friendly — read PollIntervalSeconds per iteration so a
-            // config edit takes effect on the NEXT sleep. Clamped to >=1s so a
-            // misconfigured 0 doesn't become a busy loop.
-            var pollSeconds = Math.Max(1, _options.CurrentValue.PollIntervalSeconds);
-            await Task.Delay(TimeSpan.FromSeconds(pollSeconds), stoppingToken);
+            // Phase O3 — adaptive delay. Non-empty tick resets the backoff
+            // (there's flow, drain fast). Empty tick doubles until it hits
+            // AdaptivePollMaxMs (idle steady state).
+            if (processed > 0)
+                _consecutiveEmptyTicks = 0;
+            else
+                _consecutiveEmptyTicks++;
+
+            var currentOpts = _options.CurrentValue;
+            var delayMs = CalculateAdaptiveDelayMs(_consecutiveEmptyTicks,
+                currentOpts.AdaptivePollBaseMs, currentOpts.AdaptivePollMaxMs);
+
+            // Phase O2 — wait for the NEXT of two events: (a) adaptive poll
+            // timer, or (b) a NOTIFY signal delivered by OutboxListenerService.
+            // First-to-fire wins; the other is cancelled so we don't leak
+            // Task instances between ticks. Poll interval remains as safety
+            // net — a missed notification (listener disconnect, unlucky
+            // commit ordering) is picked up ≤delayMs later without any
+            // correctness gap.
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            var delayTask = Task.Delay(TimeSpan.FromMilliseconds(delayMs), linked.Token);
+            var wakeTask = _wakeSignal.WaitAsync(linked.Token);
+            try
+            {
+                var completed = await Task.WhenAny(delayTask, wakeTask);
+                if (completed == wakeTask)
+                {
+                    // NOTIFY arrived — reset backoff even if the wake races
+                    // with an empty processing tick just before it.
+                    _consecutiveEmptyTicks = 0;
+                }
+            }
+            catch (OperationCanceledException) { break; }
+            finally
+            {
+                linked.Cancel();
+            }
         }
     }
 
+    /// <summary>
+    /// Phase O3 — exponential backoff clamped to the configured max.
+    /// Zero empty ticks = base delay; capped at AdaptivePollMaxMs. Public
+    /// static so a unit test can exercise it without spinning up the
+    /// hosted service.
+    /// </summary>
+    public static int CalculateAdaptiveDelayMs(int consecutiveEmptyTicks, int baseMs, int maxMs)
+    {
+        var safeBase = Math.Max(1, baseMs);
+        var safeMax = Math.Max(safeBase, maxMs);
+        if (consecutiveEmptyTicks <= 0) return safeBase;
+        // Clamp exponent to avoid double overflow for absurd values.
+        var exponent = Math.Min(consecutiveEmptyTicks, 20);
+        var delay = safeBase * Math.Pow(2, exponent);
+        return (int)Math.Min(delay, safeMax);
+    }
+
     public async Task ProcessUnpublishedEventsAsync(CancellationToken cancellationToken = default)
+    {
+        await ProcessUnpublishedEventsInternalAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Phase O3 internal — same as the public method but returns the total
+    /// number of messages processed this tick. Used by ExecuteAsync to
+    /// drive the adaptive-poll counter.
+    /// </summary>
+    private async Task<int> ProcessUnpublishedEventsInternalAsync(CancellationToken cancellationToken = default)
     {
         // Snapshot per-tick so a config edit landing mid-tick doesn't mix paths
         // across modules. The IOptionsMonitor wrapper guarantees a hot-reload
@@ -67,6 +136,7 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
 
         using var scope = _scopeFactory.CreateScope();
         var publisher = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+        var dlq = scope.ServiceProvider.GetRequiredService<DTMS.SharedKernel.Outbox.IDeadLetterStore>();
 
         // Phase A Step A4 — parallel per-module loop. Each module's tick is
         // ~500-800ms with full SKIP LOCKED tx + parallel publish + SaveChanges +
@@ -97,17 +167,17 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
             (scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>(), VendorAdapterDbContext.Schema),
         };
 
-        var pendingPerModule = await Task.WhenAll(modules.Select(async m =>
+        var perModuleResults = await Task.WhenAll(modules.Select(async m =>
         {
             try
             {
-                return await ProcessModuleAsync(m.db, publisher, m.source, opts, cancellationToken);
+                return await ProcessModuleAsync(m.db, publisher, dlq, m.source, opts, cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogError(ex,
                     "Outbox module {Source} tick failed; other modules unaffected", m.source);
-                return 0L;
+                return (Pending: 0L, Processed: 0);
             }
         }));
 
@@ -115,24 +185,27 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
         // dtms_workflow_outbox_pending gauge reflects current backlog. If this
         // climbs > 500 sustained the outbox is falling behind and ops should
         // page (see plan section 5).
-        _metrics.SetOutboxPending(pendingPerModule.Sum());
+        _metrics.SetOutboxPending(perModuleResults.Sum(r => r.Pending));
+        return perModuleResults.Sum(r => r.Processed);
     }
 
-    private Task<long> ProcessModuleAsync(
+    private Task<(long Pending, int Processed)> ProcessModuleAsync(
         DbContext db,
         IPublishEndpoint publisher,
+        DTMS.SharedKernel.Outbox.IDeadLetterStore dlq,
         string source,
         OutboxOptions opts,
         CancellationToken cancellationToken)
     {
         return opts.UseSkipLocked
-            ? ProcessModuleSkipLockedAsync(db, publisher, source, opts, cancellationToken)
-            : ProcessModuleLegacyAsync(db, publisher, source, opts, cancellationToken);
+            ? ProcessModuleSkipLockedAsync(db, publisher, dlq, source, opts, cancellationToken)
+            : ProcessModuleLegacyAsync(db, publisher, dlq, source, opts, cancellationToken);
     }
 
-    private async Task<long> ProcessModuleLegacyAsync(
+    private async Task<(long Pending, int Processed)> ProcessModuleLegacyAsync(
         DbContext db,
         IPublishEndpoint publisher,
+        DTMS.SharedKernel.Outbox.IDeadLetterStore dlq,
         string source,
         OutboxOptions opts,
         CancellationToken cancellationToken)
@@ -141,15 +214,15 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
 
         if (messages.Count == 0)
         {
-            return await CountPendingAsync(db, cancellationToken);
+            return (await CountPendingAsync(db, cancellationToken), 0);
         }
 
         _logger.LogDebug("Processing {Count} outbox messages from {Source}", messages.Count, source);
 
-        await PublishBatchAsync(messages, publisher, source, opts, cancellationToken);
+        await PublishBatchAsync(messages, publisher, dlq, db, source, opts, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
 
-        return await CountPendingAsync(db, cancellationToken);
+        return (await CountPendingAsync(db, cancellationToken), messages.Count);
     }
 
     // SKIP LOCKED path — the FOR UPDATE row locks are held inside an explicit
@@ -157,9 +230,10 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
     // second outbox worker (Phase D — multiple replicas) sees the same rows as
     // locked and SKIPs them rather than fighting for them. Locks release on
     // commit/rollback, never leaking past the tick.
-    private async Task<long> ProcessModuleSkipLockedAsync(
+    private async Task<(long Pending, int Processed)> ProcessModuleSkipLockedAsync(
         DbContext db,
         IPublishEndpoint publisher,
+        DTMS.SharedKernel.Outbox.IDeadLetterStore dlq,
         string source,
         OutboxOptions opts,
         CancellationToken cancellationToken)
@@ -181,17 +255,17 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
             if (messages.Count == 0)
             {
                 await tx.RollbackAsync(cancellationToken);
-                return await CountPendingAsync(db, cancellationToken);
+                return (await CountPendingAsync(db, cancellationToken), 0);
             }
 
             _logger.LogDebug("Processing {Count} outbox messages from {Source} (SKIP LOCKED)",
                 messages.Count, source);
 
-            await PublishBatchAsync(messages, publisher, source, opts, cancellationToken);
+            await PublishBatchAsync(messages, publisher, dlq, db, source, opts, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await tx.CommitAsync(cancellationToken);
 
-            return await CountPendingAsync(db, cancellationToken);
+            return (await CountPendingAsync(db, cancellationToken), messages.Count);
         });
     }
 
@@ -243,6 +317,8 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
     private async Task PublishBatchAsync(
         List<OutboxMessage> messages,
         IPublishEndpoint publisher,
+        DTMS.SharedKernel.Outbox.IDeadLetterStore dlq,
+        DbContext db,
         string source,
         OutboxOptions opts,
         CancellationToken cancellationToken)
@@ -263,12 +339,33 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
             async (i, ct) =>
             {
                 var message = messages[i];
+
+                // Phase O4 — restore the trace context captured at outbox-
+                // write time so the publish + consumer + projection spans
+                // chain under the original request's root. When TraceParent
+                // is missing (pre-O4 rows, background-write paths) the
+                // Activity starts as a fresh root — still a valid trace,
+                // just detached from the origin. Activity kind = Producer
+                // per OTel semantic conventions for messaging producers.
+                ActivityContext parentContext = default;
+                if (!string.IsNullOrEmpty(message.TraceParent))
+                {
+                    ActivityContext.TryParse(message.TraceParent, null, out parentContext);
+                }
+                using var activity = DTMS.SharedKernel.Diagnostics.OutboxActivitySource.Source
+                    .StartActivity("outbox.publish", ActivityKind.Producer, parentContext);
+                activity?.SetTag("outbox.message_id", message.Id);
+                activity?.SetTag("outbox.source", source);
+                activity?.SetTag("outbox.type", message.Type);
+
                 try
                 {
                     var type = Type.GetType(message.Type);
                     if (type == null)
                     {
-                        results[i] = (null, new InvalidOperationException($"Type not found: {message.Type}"));
+                        var typeError = new InvalidOperationException($"Type not found: {message.Type}");
+                        activity?.SetStatus(ActivityStatusCode.Error, typeError.Message);
+                        results[i] = (null, typeError);
                         return;
                     }
 
@@ -291,6 +388,8 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
                 }
                 catch (Exception ex)
                 {
+                    activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                    activity?.AddException(ex);
                     results[i] = (null, ex);
                 }
             });
@@ -307,24 +406,53 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
             }
             else
             {
-                HandleFailure(messages[i], source, error?.Message ?? "Unknown publish failure", error);
+                await HandleFailureAsync(messages[i], dlq, db, source, error?.Message ?? "Unknown publish failure", error, cancellationToken);
             }
         }
     }
 
-    private void HandleFailure(OutboxMessage message, string source, string error, Exception? exception)
+    private async Task HandleFailureAsync(
+        OutboxMessage message,
+        DTMS.SharedKernel.Outbox.IDeadLetterStore dlq,
+        DbContext db,
+        string source,
+        string error,
+        Exception? exception,
+        CancellationToken cancellationToken)
     {
-        message.MarkAsFailed(DateTime.UtcNow, error);
+        var now = DateTime.UtcNow;
+        message.MarkAsFailed(now, error);
 
-        if (message.HasReachedMaxRetries)
-        {
-            _logger.LogError(exception, "Outbox message {Id} from {Source} permanently failed after {Max} attempts: {Error}",
-                message.Id, source, OutboxRetryPolicy.MaxRetries, error);
-        }
-        else
+        if (!message.HasReachedMaxRetries)
         {
             _logger.LogWarning(exception, "Outbox message {Id} from {Source} failed (attempt {Count}/{Max}); next retry at {NextRetry:o}: {Error}",
                 message.Id, source, message.RetryCount, OutboxRetryPolicy.MaxRetries, message.NextRetryAtUtc, error);
+            return;
+        }
+
+        _logger.LogError(exception,
+            "Outbox message {Id} from {Source} permanently failed after {Max} attempts: {Error}",
+            message.Id, source, OutboxRetryPolicy.MaxRetries, error);
+
+        // Phase O3 — move to central DLQ + physically remove from module
+        // table. Both wrapped in try/catch: on failure, the row stays in
+        // its terminal-in-place state (ProcessedOnUtc set, blocked from
+        // re-publish) and ops sees the discrepancy via metric spread —
+        // the periodic DlqSweeperService (if wired) can re-attempt.
+        // OriginalOutboxId has a UNIQUE constraint so MoveAsync is
+        // idempotent — a re-attempt on partial-success (insert OK, delete
+        // failed) is a no-op.
+        try
+        {
+            var firstFailed = message.OccurredOnUtc; // approximation — first-fail time isn't tracked on the entity
+            await dlq.MoveAsync(message, source, firstFailed, now, cancellationToken);
+            db.Set<OutboxMessage>().Remove(message);
+        }
+        catch (Exception moveEx)
+        {
+            _logger.LogError(moveEx,
+                "DLQ move failed for {Id} from {Source} — row stays terminal in module table; will retry on next tick or via sweeper",
+                message.Id, source);
         }
     }
 }

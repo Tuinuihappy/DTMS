@@ -313,6 +313,10 @@ namespace DTMS.Fleet.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
 
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(55)
+                        .HasColumnType("character varying(55)");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(500)

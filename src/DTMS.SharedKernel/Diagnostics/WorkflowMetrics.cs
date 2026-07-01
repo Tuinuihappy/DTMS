@@ -41,6 +41,8 @@ public sealed class WorkflowMetrics : IDisposable
     // coordinating on the meter.
     private long _ordersStuckPlanned;
     private long _outboxPending;
+    // Phase O3 — DLQ size gauge. Set periodically by DlqSizeReporterService.
+    private long _outboxDlqSize;
 
     public WorkflowMetrics()
     {
@@ -93,6 +95,12 @@ public sealed class WorkflowMetrics : IDisposable
             () => Interlocked.Read(ref _outboxPending),
             unit: "messages",
             description: "Outbox messages with ProcessedOnUtc=null (set by the outbox processor).");
+
+        _meter.CreateObservableGauge(
+            "dtms.workflow.outbox_dlq_size",
+            () => Interlocked.Read(ref _outboxDlqSize),
+            unit: "messages",
+            description: "Phase O3 — count of rows in outbox.DeadLetterMessages (set by DlqSizeReporterService every 30s).");
     }
 
     public void RecordConsumerRetry(string consumerType)
@@ -124,6 +132,9 @@ public sealed class WorkflowMetrics : IDisposable
 
     public void SetOutboxPending(long count)
         => Interlocked.Exchange(ref _outboxPending, Math.Max(0, count));
+
+    public void SetOutboxDlqSize(long count)
+        => Interlocked.Exchange(ref _outboxDlqSize, Math.Max(0, count));
 
     private static KeyValuePair<string, object?> Tag(string key, string value)
         => new(key, value);

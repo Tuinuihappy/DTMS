@@ -57,6 +57,10 @@ namespace DTMS.Api.Infrastructure.Outbox.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
 
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(55)
+                        .HasColumnType("character varying(55)");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -69,6 +73,61 @@ namespace DTMS.Api.Infrastructure.Outbox.Migrations
                     b.HasIndex("ProcessedOnUtc");
 
                     b.ToTable("OutboxMessages", "outbox");
+                });
+
+            modelBuilder.Entity("DTMS.SharedKernel.Outbox.DeadLetterMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("FirstFailedOnUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTime>("LastFailedOnUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("OccurredOnUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OriginalOutboxId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(55)
+                        .HasColumnType("character varying(55)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LastFailedOnUtc")
+                        .IsDescending();
+
+                    b.HasIndex("Source");
+
+                    b.HasIndex("OriginalOutboxId")
+                        .IsUnique();
+
+                    b.ToTable("DeadLetterMessages", "outbox");
                 });
 #pragma warning restore 612, 618
         }

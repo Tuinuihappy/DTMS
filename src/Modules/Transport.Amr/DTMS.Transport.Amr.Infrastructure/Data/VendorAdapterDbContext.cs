@@ -42,6 +42,8 @@ public class VendorAdapterDbContext : DbContext
             // doesn't SELECT them.
             b.Ignore(e => e.PartitionKey);
             b.Ignore(e => e.CorrelationId);
+            // Phase O4 — W3C traceparent captured at write time.
+            b.Property(e => e.TraceParent).HasMaxLength(55);
         });
     }
 }

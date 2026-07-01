@@ -233,6 +233,8 @@ public class DispatchDbContext : DbContext
             // table doesn't have the columns.
             builder.Ignore(e => e.PartitionKey);
             builder.Ignore(e => e.CorrelationId);
+            // Phase O4 — W3C traceparent captured at write time.
+            builder.Property(e => e.TraceParent).HasMaxLength(55);
         });
 
         // ── Phase P1 — projection_inbox (idempotency bookkeeping) ──────

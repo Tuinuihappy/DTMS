@@ -374,13 +374,16 @@ services:
       - Outbox__PollIntervalSeconds=${Outbox__PollIntervalSeconds:-5}
       - Outbox__BatchSize=${Outbox__BatchSize:-50}
       - Outbox__PerMessageTimeoutSeconds=${Outbox__PerMessageTimeoutSeconds:-10}
-      # Phase D — gate the OutboxProcessor IHostedService. Default true so
-      # plain `docker compose up` (no worker container started) still drains
-      # the outbox from the api container. Override to false via .env.test
-      # (or env var) when running the outbox-worker container alongside so
-      # api request handling doesn't compete with outbox drain. The worker
-      # container hardcodes Outbox__RunInThisProcess=true regardless.
-      - Outbox__RunInThisProcess=${Outbox__RunInThisProcess:-true}
+      # Phase D — gate the OutboxProcessor IHostedService. Default false as
+      # of Outbox O1 hygiene pass: the outbox-worker container is the sole
+      # drainer in every deployment posture this compose file ships (compose
+      # always brings up the worker service). Setting api=false eliminates
+      # the SkipLocked-off race where two processes fetched the same row
+      # (api uses UseSkipLocked=false by default, worker uses true → dup
+      # publish possible). Override to true only for a stripped-down deploy
+      # that omits the worker service. IOutboxProcessor singleton stays
+      # registered on api regardless so /admin replay endpoints work.
+      - Outbox__RunInThisProcess=${Outbox__RunInThisProcess:-false}
       # Safety net for dropped RIOT3 TASK_FINISHED webhooks — polls RIOT3
       # for in-flight envelope trips and reconciles via idempotent Mark*.
       # On by default so dropped webhooks self-heal within ~1 poll interval.
@@ -483,6 +486,17 @@ services:
       - Outbox__PerMessageTimeoutSeconds=${Outbox__PerMessageTimeoutSeconds:-10}
       # The reason this container exists — outbox always runs here.
       - Outbox__RunInThisProcess=true
+      # Phase O2 — LISTEN/NOTIFY. Cuts publish latency from ~1s (poll)
+      # to ~50ms by waking the processor the instant Postgres delivers
+      # a NOTIFY. Poll interval (=1s here) remains as safety net.
+      # Flip off to fall back to poll-only without a redeploy.
+      - Outbox__UseListenNotify=${Outbox__UseListenNotify:-true}
+      - Outbox__ListenReconnectSeconds=${Outbox__ListenReconnectSeconds:-5}
+      # Phase O2 — direct postgres connection for LISTEN. pgbouncer in
+      # transaction mode does not carry LISTEN state across transactions;
+      # the listener needs a session-scoped connection. All other
+      # DbContexts continue through pgbouncer via DefaultConnection.
+      - ConnectionStrings__OutboxListener=Host=postgres;Port=5432;Database=amr_delivery_planning;Username=postgres;Password=postgres
       # Phase F1 — worker also needs the SignalR backplane on whenever api
       # uses it. Worker's consumers push to IHubContext<T> during projector
       # work; without the backplane those broadcasts would only reach clients

@@ -29,11 +29,29 @@ public class OutboxMessage
     /// </summary>
     public Guid? CorrelationId { get; private set; }
 
+    /// <summary>
+    /// Phase O4 — W3C traceparent (55 chars, format
+    /// <c>00-{32-hex}-{16-hex}-{2-hex}</c>) captured at outbox-write time
+    /// from the ambient <see cref="System.Diagnostics.Activity.Current"/>.
+    /// Restored by <c>OutboxProcessorService.PublishBatchAsync</c> so the
+    /// consumer's Activity chains under the original request's trace —
+    /// Jaeger renders one connected waterfall from HTTP POST to SignalR
+    /// broadcast, even across the async gap (retry, worker-container jump).
+    /// </summary>
+    public string? TraceParent { get; private set; }
+
     public bool HasReachedMaxRetries => RetryCount >= OutboxRetryPolicy.MaxRetries;
 
     private OutboxMessage() { } // For EF Core
 
-    public OutboxMessage(Guid id, string type, string content, DateTime occurredOnUtc, string? partitionKey = null, Guid? correlationId = null)
+    public OutboxMessage(
+        Guid id,
+        string type,
+        string content,
+        DateTime occurredOnUtc,
+        string? partitionKey = null,
+        Guid? correlationId = null,
+        string? traceParent = null)
     {
         Id = id;
         Type = type;
@@ -41,6 +59,7 @@ public class OutboxMessage
         OccurredOnUtc = occurredOnUtc;
         PartitionKey = partitionKey;
         CorrelationId = correlationId;
+        TraceParent = traceParent;
     }
 
     public void MarkAsProcessed(DateTime processedOnUtc)

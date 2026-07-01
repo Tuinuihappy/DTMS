@@ -154,6 +154,17 @@ public static class ModuleServiceRegistration
         // depends on the scoped ISystemCredentialRepository on cache
         // miss — register scoped so the dependency chain resolves.
         services.AddScoped<DTMS.Iam.Application.Authorization.CachedCredentialReader>();
+        // SourceSystem migration P1 — mirror of CachedCredentialReader.
+        // Same scoping (scoped) for the same reason: depends on the
+        // scoped ISystemClientRepository on cache miss.
+        services.AddScoped<DTMS.Iam.Application.Authorization.CachedSystemClientReader>();
+        // Cross-module glue: DeliveryOrder handlers inject
+        // IOrderOriginResolver to stamp SourceSystemKey +
+        // SourceSystemDisplayName from the authenticated context. Lives
+        // in the API host (not DeliveryOrder.Infrastructure) so the
+        // DeliveryOrder module doesn't take a project reference on IAM.
+        services.AddScoped<DTMS.DeliveryOrder.Application.Services.IOrderOriginResolver,
+                           DTMS.Api.Auth.OrderOriginResolver>();
         // Sink resolved per drain-batch scope by BatchedLogDrainService;
         // sink ctor takes the scoped IamDbContext for one bulk INSERT
         // per flush.
@@ -694,6 +705,22 @@ public static class ModuleServiceRegistration
                 DTMS.Api.Infrastructure.Outbox.OutboxOptions.SectionName));
         services.AddSingleton<IOutboxProcessor, OutboxProcessorService>();
 
+        // Phase O2 — wake signal is a singleton bounded channel shared
+        // between OutboxListenerService (writer, on Postgres NOTIFY) and
+        // OutboxProcessorService (reader, in the outer loop). Registered
+        // unconditionally so the processor can inject it whether or not
+        // the listener is enabled.
+        services.AddSingleton<DTMS.SharedKernel.Outbox.IOutboxWakeSignal,
+                              DTMS.SharedKernel.Outbox.OutboxWakeSignal>();
+
+        // Phase O3 — DLQ store + router. Both scoped so they share the
+        // per-tick OutboxDbContext with the processor and can look up
+        // module DbContexts for replay routing.
+        services.AddScoped<DTMS.SharedKernel.Outbox.IDeadLetterStore,
+                           DTMS.Api.Infrastructure.Outbox.DeadLetterStore>();
+        services.AddScoped<DTMS.Api.Infrastructure.Outbox.IDeadLetterReplayRouter,
+                           DTMS.Api.Infrastructure.Outbox.DeadLetterReplayRouter>();
+
         // Phase D — OutboxProcessor as IHostedService is conditional. Default
         // true so existing single-container deployments keep working. When the
         // dtms-outbox-worker container ships, the api container sets
@@ -705,7 +732,22 @@ public static class ModuleServiceRegistration
         // can still call ProcessUnpublishedEventsAsync on demand from the API.
         var runOutboxHere = configuration.GetValue<bool>("Outbox:RunInThisProcess", true);
         if (runOutboxHere)
+        {
             services.AddHostedService<OutboxProcessorService>();
+
+            // Phase O2 — Postgres LISTEN/NOTIFY driver. Only run alongside
+            // the processor (they share the wake signal channel); flip off
+            // via Outbox:UseListenNotify=false for a poll-only posture
+            // during migration or debugging.
+            if (configuration.GetValue<bool>("Outbox:UseListenNotify", true))
+                services.AddHostedService<OutboxListenerService>();
+
+            // Phase O3 — DLQ size reporter. 30s tick updates the
+            // outbox_dlq_size gauge on WorkflowMetrics. Gated behind
+            // RunInThisProcess so only the drain container runs it —
+            // otherwise it would double-report across api + worker.
+            services.AddHostedService<DlqSizeReporterService>();
+        }
 
         // Phase S.3 — partitioned outbox drain for federated source
         // callbacks. Same RunInThisProcess gate as the legacy processor

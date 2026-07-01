@@ -65,10 +65,15 @@ namespace DTMS.DeliveryOrder.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("RequiresPickupPod");
 
-                    b.Property<string>("SourceSystem")
+                    b.Property<string>("SourceSystemDisplayName")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SourceSystemKey")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -102,7 +107,7 @@ namespace DTMS.DeliveryOrder.Infrastructure.Migrations
 
                     b.HasIndex("Status");
 
-                    b.HasIndex("SourceSystem", "OrderRef")
+                    b.HasIndex("SourceSystemKey", "OrderRef")
                         .IsUnique();
 
                     b.ToTable("DeliveryOrders", "deliveryorder");
@@ -443,8 +448,8 @@ namespace DTMS.DeliveryOrder.Infrastructure.Migrations
 
                     b.Property<string>("SourceSystem")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime?>("SubmittedAt")
                         .HasColumnType("timestamp with time zone");
@@ -606,8 +611,12 @@ namespace DTMS.DeliveryOrder.Infrastructure.Migrations
 
                     b.Property<string>("SourceSystem")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("SourceSystemDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -716,6 +725,10 @@ namespace DTMS.DeliveryOrder.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
+
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(55)
+                        .HasColumnType("character varying(55)");
 
                     b.Property<string>("Type")
                         .IsRequired()
