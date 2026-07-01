@@ -230,9 +230,16 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=amr_delivery_planning;Username=postgres;Password=postgres
-      # Migrator shares Program.cs which requires Jwt__PublicKey at startup
-      # before --migrate-only branches off — keep parity with api/worker.
+      # Migrator shares Program.cs which validates the JWT keypair at
+      # startup BEFORE --migrate-only branches off — keep parity with
+      # api/worker so a missing key fails all three identically.
       - Jwt__PublicKey=${Jwt__PublicKey:?Jwt__PublicKey must be set in .env from External Auth team}
+      - Jwt__SystemSigningPrivateKey=${Jwt__SystemSigningPrivateKey:?Jwt__SystemSigningPrivateKey must be set in .env — run scripts/setup-system-jwt-keypair.sh}
+      - Jwt__SystemSigningPublicKey=${Jwt__SystemSigningPublicKey:?Jwt__SystemSigningPublicKey must be set in .env — run scripts/setup-system-jwt-keypair.sh}
+      - Jwt__SystemTokenKeyId=${Jwt__SystemTokenKeyId:-dtms-system-v1}
+      - Jwt__SystemTokenIssuer=${Jwt__SystemTokenIssuer:-dtms}
+      - Jwt__SystemTokenAudience=${Jwt__SystemTokenAudience:-dtms-api}
+      - Jwt__SystemTokenLifetimeSeconds=${Jwt__SystemTokenLifetimeSeconds:-3600}
     command: ["dotnet", "DTMS.Api.dll", "--migrate-only"]
 
   api:
@@ -311,9 +318,19 @@ services:
       - VendorAdapter__Riot3__BaseUrl=http://10.204.212.28:12000
       - VendorAdapter__Riot3__ApiKey=${VendorAdapter__Riot3__ApiKey:-}
       # External Auth RSA public key (PKCS#1 base64). Required — startup
-      # fails if missing. Per ADR-014, DTMS only verifies JWTs issued by
-      # External Auth and never signs its own.
+      # fails if missing. Per ADR-014, DTMS only verifies USER JWTs issued
+      # by External Auth and never signs its own.
       - Jwt__PublicKey=${Jwt__PublicKey:?Jwt__PublicKey must be set in .env from External Auth team}
+      # System (M2M) JWT signing keypair — used by POST /oauth/token to
+      # mint access tokens for federated source systems. Required — startup
+      # validation in Program.cs throws if missing or malformed. Generate
+      # via scripts/setup-system-jwt-keypair.sh (see docs/system-onboarding.md §4).
+      - Jwt__SystemSigningPrivateKey=${Jwt__SystemSigningPrivateKey:?Jwt__SystemSigningPrivateKey must be set in .env — run scripts/setup-system-jwt-keypair.sh}
+      - Jwt__SystemSigningPublicKey=${Jwt__SystemSigningPublicKey:?Jwt__SystemSigningPublicKey must be set in .env — run scripts/setup-system-jwt-keypair.sh}
+      - Jwt__SystemTokenKeyId=${Jwt__SystemTokenKeyId:-dtms-system-v1}
+      - Jwt__SystemTokenIssuer=${Jwt__SystemTokenIssuer:-dtms}
+      - Jwt__SystemTokenAudience=${Jwt__SystemTokenAudience:-dtms-api}
+      - Jwt__SystemTokenLifetimeSeconds=${Jwt__SystemTokenLifetimeSeconds:-3600}
       # Vendor outbound kill switch. true = production-shape (Riot3OrderDispatcherAdapter,
       # real RIOT3 calls). false = NoOpOrderDispatcherAdapter (orders reach DTMS
       # Dispatched without contacting RIOT) — for load tests / dev without
@@ -486,9 +503,17 @@ services:
       - VendorAdapter__Riot3__Enabled=${VendorAdapter__Riot3__Enabled:-true}
       - VendorAdapter__Riot3__BaseUrl=http://10.204.212.28:12000
       - VendorAdapter__Riot3__ApiKey=${VendorAdapter__Riot3__ApiKey:-}
-      # Worker shares Program.cs which requires Jwt__PublicKey at startup
-      # even though it doesn't serve HTTP — keep parity with api.
+      # Worker shares Program.cs which validates the JWT keypair at startup
+      # even though it doesn't serve /oauth/token itself — keep parity with
+      # api so a missing keypair fails both containers identically (rather
+      # than worker silently starting while api crash-loops).
       - Jwt__PublicKey=${Jwt__PublicKey:?Jwt__PublicKey must be set in .env from External Auth team}
+      - Jwt__SystemSigningPrivateKey=${Jwt__SystemSigningPrivateKey:?Jwt__SystemSigningPrivateKey must be set in .env — run scripts/setup-system-jwt-keypair.sh}
+      - Jwt__SystemSigningPublicKey=${Jwt__SystemSigningPublicKey:?Jwt__SystemSigningPublicKey must be set in .env — run scripts/setup-system-jwt-keypair.sh}
+      - Jwt__SystemTokenKeyId=${Jwt__SystemTokenKeyId:-dtms-system-v1}
+      - Jwt__SystemTokenIssuer=${Jwt__SystemTokenIssuer:-dtms}
+      - Jwt__SystemTokenAudience=${Jwt__SystemTokenAudience:-dtms-api}
+      - Jwt__SystemTokenLifetimeSeconds=${Jwt__SystemTokenLifetimeSeconds:-3600}
 
   # TMS dashboard (Next.js 16 standalone). Currently renders from mock
   # data so it doesn't depend on the .NET API — opt-in via the `prod`

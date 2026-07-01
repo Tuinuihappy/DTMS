@@ -9,20 +9,13 @@ namespace DTMS.Api.OpenApi;
 /// Without this, calls made from the docs UI go out without an Authorization
 /// header and every protected endpoint returns 401.
 ///
-/// <para>Phase S.6 — DTMS has TWO auth schemes at runtime: Bearer (user JWT
-/// from External Auth, per ADR-014) and ApiKey (system credential generated
-/// + verified by us). They share the <c>Authorization</c> header but with
-/// different scheme prefixes. To support both from one Swagger Authorize
-/// field we declare the scheme as <see cref="SecuritySchemeType.ApiKey"/> in
-/// the header — Swagger then sends the value VERBATIM with no auto-prefix.
-/// Callers paste the FULL header value including the scheme word
-/// (<c>Bearer ...</c> or <c>ApiKey ...</c>), and the matching backend
-/// handler downstream picks up its own scheme prefix.</para>
-///
-/// <para>The original Http+Bearer scheme auto-prefixed the value with
-/// <c>Bearer </c>, which made pasting a system <c>ApiKey ...</c> impossible
-/// from the UI. The current shape lets one Authorize field cover both
-/// principal types without conflating them at the backend.</para>
+/// <para>Uses <see cref="SecuritySchemeType.Http"/> + scheme <c>bearer</c>
+/// so Swagger auto-prefixes the value with <c>Bearer </c> — operators paste
+/// the raw JWT (no need to remember the scheme word). This was
+/// previously <c>ApiKey</c>+verbatim to support the legacy api-key path
+/// alongside Bearer; that path was removed at Phase S.8 production
+/// launch, so verbatim is no longer needed and the foot-gun of forgetting
+/// the `Bearer ` prefix is gone.</para>
 /// </summary>
 internal sealed class BearerSecuritySchemeTransformer : IOpenApiDocumentTransformer
 {
@@ -36,24 +29,16 @@ internal sealed class BearerSecuritySchemeTransformer : IOpenApiDocumentTransfor
         // We KEEP the "Bearer" name on the scheme so existing operation-level
         // [Authorize] OpenAPI annotations + clients that reference the
         // scheme by id continue to compile. Only the Type + behavior change.
+        // Scalar UI doesn't auto-generate a description from the type +
+        // scheme + bearerFormat triple (Swagger UI does — different quirk),
+        // so provide the canonical one-liner explicitly. Onboarding details
+        // live in docs/system-onboarding.md where they can breathe.
         document.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
         {
-            Type = SecuritySchemeType.ApiKey,
-            In = ParameterLocation.Header,
-            Name = "Authorization",
-            Description = """
-                Paste the FULL Authorization header value, INCLUDING the scheme prefix:
-
-                - User (JWT from External Auth):   `Bearer <jwt>`
-                - System (Phase S.2 / S.6 key):    `ApiKey dtms_<systemKey>_<plaintext>`
-
-                Swagger sends the value verbatim — do not omit the scheme word.
-
-                Switching identities (e.g. user → system, or rotating a system key):
-                click `Logout` first to clear the stored value, then paste the new
-                full header. Otherwise Swagger keeps sending the previous one and
-                every request returns 401.
-                """,
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            Description = "JWT Authorization header using Bearer scheme",
         };
 
         document.Security ??= new List<OpenApiSecurityRequirement>();
