@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AlertCircle, Check, CheckCircle2, Copy, Eye, EyeOff, ShieldCheck, X } from "lucide-react";
-import { testApiKey } from "@/lib/api/iam-systems";
+import { testCredential, type TestCredentialMode } from "@/lib/api/iam-systems";
 
 /**
  * Phase S.6 — banner that shows a freshly minted plaintext secret ONCE
@@ -26,19 +26,25 @@ export function OneTimeSecretBanner({
   secret,
   helpText,
   testKeyForSystem,
+  testMode = "client-secret",
   onDismiss,
 }: {
   title: string;
   secret: string;
   helpText?: string;
-  // When set, surfaces a "Test this key" button that calls
+  // When set, surfaces a "Test this credential" button that calls
   // /api/admin/iam/systems/{testKeyForSystem}/test-key. Pass the
   // system slug the secret was minted for.
   testKeyForSystem?: string;
+  // "client-secret" (default) → the route handler runs the full OAuth
+  // exchange before calling /whoami. "jwt" → the secret IS the JWT;
+  // the handler sends it as `Authorization: Bearer ...` directly.
+  testMode?: TestCredentialMode;
   onDismiss: () => void;
 }) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedHeader, setCopiedHeader] = useState(false);
   const [testState, setTestState] = useState<
     | { kind: "idle" }
     | { kind: "testing" }
@@ -58,11 +64,23 @@ export function OneTimeSecretBanner({
     }
   };
 
+  // For JWT mode the partner pastes it as `Authorization: Bearer <jwt>` —
+  // surface a one-click copy in that exact format so operators don't have
+  // to remember to prepend "Bearer " (a recurring 401-in-Swagger
+  // foot-gun: Swagger sends the Authorize value verbatim, no auto-prefix).
+  const onCopyAsHeader = async () => {
+    try {
+      await navigator.clipboard.writeText(`Bearer ${secret}`);
+      setCopiedHeader(true);
+      setTimeout(() => setCopiedHeader(false), 2000);
+    } catch { /* same fallback as onCopy */ }
+  };
+
   const onTest = async () => {
     if (!testKeyForSystem) return;
     setTestState({ kind: "testing" });
     try {
-      const result = await testApiKey(testKeyForSystem, secret);
+      const result = await testCredential(testKeyForSystem, secret, testMode);
       if (result.ok) {
         setTestState({
           kind: "ok",
@@ -73,7 +91,7 @@ export function OneTimeSecretBanner({
       } else {
         setTestState({
           kind: "fail",
-          message: `Backend rejected the key${result.status ? ` (HTTP ${result.status})` : ""}${
+          message: `Backend rejected the credential${result.status ? ` (HTTP ${result.status})` : ""}${
             result.message ? `: ${result.message}` : ""
           }`,
         });
@@ -132,6 +150,22 @@ export function OneTimeSecretBanner({
             </button>
           </div>
 
+          {testMode === "jwt" && (
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onCopyAsHeader}
+                className="inline-flex items-center gap-1 rounded border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-medium text-amber-800 hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-900"
+              >
+                {copiedHeader ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                {copiedHeader ? "Copied!" : "Copy as `Bearer <jwt>`"}
+              </button>
+              <span className="text-[11px] text-amber-700/80 dark:text-amber-400/80">
+                Use this when pasting into Swagger Authorize / curl <code>-H Authorization:</code>
+              </span>
+            </div>
+          )}
+
           {testKeyForSystem && (
             <div className="mt-3 flex items-center gap-2">
               <button
@@ -141,7 +175,7 @@ export function OneTimeSecretBanner({
                 className="inline-flex items-center gap-1 rounded border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/40 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-900"
               >
                 <ShieldCheck className="h-3 w-3" strokeWidth={2.2} />
-                {testState.kind === "testing" ? "Testing…" : "Test this key"}
+                {testState.kind === "testing" ? "Testing…" : "Test this credential"}
               </button>
               {testState.kind === "ok" && (
                 <span className="inline-flex items-center gap-1 text-[11.5px] text-emerald-700 dark:text-emerald-300">

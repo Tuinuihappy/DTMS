@@ -9,6 +9,11 @@
          IAuthorizationHandler, IEndpointConventionBuilder, and the Logging
          abstractions transitively — no separate PackageReferences needed. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <!-- Phase S.8 — SystemJwtIssuer signs M2M access tokens here. JwtBearer
+         lives in the API layer (verifies inbound); only the lower-level
+         token + key primitives are needed here. -->
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" />
   </ItemGroup>
 
   <PropertyGroup>

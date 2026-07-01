@@ -143,6 +143,13 @@ public static class ModuleServiceRegistration
                            DTMS.Iam.Infrastructure.Repositories.SystemClientRepository>();
         services.AddScoped<DTMS.Iam.Application.Repositories.ISystemCredentialRepository,
                            DTMS.Iam.Infrastructure.Repositories.SystemCredentialRepository>();
+        // Phase S.8c — audit + backing store for admin-issued JWTs (revoke list).
+        services.AddScoped<DTMS.Iam.Application.Repositories.ISystemIssuedTokenRepository,
+                           DTMS.Iam.Infrastructure.Repositories.SystemIssuedTokenRepository>();
+        // Phase S.8c — Redis-backed revocation list, singleton because
+        // IConnectionMultiplexer is a singleton and we hold no per-request state.
+        services.AddSingleton<DTMS.Iam.Application.Authorization.ISystemJwtRevocationList,
+                              DTMS.Iam.Infrastructure.Authorization.RedisSystemJwtRevocationList>();
         // CachedCredentialReader takes ITieredCache (singleton) but
         // depends on the scoped ISystemCredentialRepository on cache
         // miss — register scoped so the dependency chain resolves.

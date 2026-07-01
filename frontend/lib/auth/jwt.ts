@@ -28,9 +28,9 @@ export function decodeJwt(token: string): JwtClaims | null {
         .join(""),
     );
     const payload = JSON.parse(json);
-    const employeeCode = String(payload.EmployeeId ?? payload.employeeCode ?? "");
+    const employeeCode = String(payload.EmployeeId ?? payload.employeeCode ?? payload.sub ?? "");
     const role = String(payload[ROLE_CLAIM] ?? payload.role ?? "");
-    const username = String(payload[NAME_CLAIM] ?? payload.name ?? "");
+    const username = String(payload[NAME_CLAIM] ?? payload.name ?? payload.unique_name ?? "");
     const exp = typeof payload.exp === "number" ? payload.exp : 0;
     if (!exp) return null;
     return { employeeCode, role, username, exp };

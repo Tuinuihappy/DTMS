@@ -10,10 +10,12 @@ namespace DTMS.Iam.Infrastructure.Migrations
     /// <inheritdoc />
     // Phase A.2 — extend the permission catalog from Facility-only to cover
     // every protected endpoint in DeliveryOrder, Dispatch, Fleet, Planning,
-    // and the Transport.Manual operator PWA. Role mappings follow the matrix
-    // in the Phase A.2 plan: Admin keeps the dtms:* wildcard (no new rows),
-    // Supervisor gets management + recovery, Operator gets read-only + PWA
-    // workflow actions.
+    // and the Transport.Manual operator PWA. Admin keeps the dtms:* wildcard
+    // (no new rows). The original seed assigned management + read-only
+    // perms to Supervisor / Operator system roles, but those roles were
+    // removed from the default seed — operators now provision their own
+    // role hierarchy via /admin/roles, so this migration ships permissions
+    // only and no longer seeds non-admin role mappings.
     [DbContext(typeof(IamDbContext))]
     [Migration("20260627000100_AddIamPermissionsPhaseA2")]
     public partial class AddIamPermissionsPhaseA2 : Migration
@@ -88,78 +90,11 @@ namespace DTMS.Iam.Infrastructure.Migrations
                 ON CONFLICT (""Code"") DO NOTHING;
             ");
 
-            migrationBuilder.Sql(@"
-                INSERT INTO iam.""RolePermissions"" (""Role"", ""PermissionCode"") VALUES
-                  -- Supervisor — management + recovery + reports, no destructive
-                  -- ('reopen', 'abandon', 'redispatch', 'upstream') and no
-                  -- catalog-mutation permissions.
-                  ('Supervisor', 'dtms:order:read'),
-                  ('Supervisor', 'dtms:order:write'),
-                  ('Supervisor', 'dtms:order:submit'),
-                  ('Supervisor', 'dtms:order:confirm'),
-                  ('Supervisor', 'dtms:order:reject'),
-                  ('Supervisor', 'dtms:order:cancel'),
-                  ('Supervisor', 'dtms:order:hold'),
-                  ('Supervisor', 'dtms:order:bulk'),
-                  ('Supervisor', 'dtms:order:notify-oms'),
-                  ('Supervisor', 'dtms:order:pod'),
-                  ('Supervisor', 'dtms:order:item:read'),
-                  ('Supervisor', 'dtms:dashboard:read'),
-
-                  ('Supervisor', 'dtms:trip:read'),
-                  ('Supervisor', 'dtms:trip:pause'),
-                  ('Supervisor', 'dtms:trip:acknowledge'),
-                  ('Supervisor', 'dtms:trip:cancel'),
-                  ('Supervisor', 'dtms:trip:retry'),
-                  ('Supervisor', 'dtms:trip:exception'),
-                  ('Supervisor', 'dtms:trip:pod'),
-
-                  ('Supervisor', 'dtms:vehicle:read'),
-                  ('Supervisor', 'dtms:vehicle:maintenance'),
-
-                  ('Supervisor', 'dtms:planning:job:read'),
-                  ('Supervisor', 'dtms:planning:job:write'),
-                  ('Supervisor', 'dtms:planning:job:plan'),
-                  ('Supervisor', 'dtms:planning:job:retry'),
-                  ('Supervisor', 'dtms:planning:consolidate'),
-                  ('Supervisor', 'dtms:planning:cost-model:read'),
-                  ('Supervisor', 'dtms:planning:action-template:read'),
-                  ('Supervisor', 'dtms:planning:order-template:read'),
-                  ('Supervisor', 'dtms:planning:order-template:create'),
-
-                  ('Supervisor', 'dtms:operator:profile:read'),
-                  ('Supervisor', 'dtms:operator:trip:acknowledge'),
-                  ('Supervisor', 'dtms:operator:trip:pickup'),
-                  ('Supervisor', 'dtms:operator:trip:drop'),
-                  ('Supervisor', 'dtms:operator:trip:complete'),
-                  ('Supervisor', 'dtms:operator:geofence:override'),
-                  ('Supervisor', 'dtms:operator:push:register'),
-                  ('Supervisor', 'dtms:operator:pod:upload'),
-
-                  ('Supervisor', 'dtms:report:read'),
-                  ('Supervisor', 'dtms:report:export'),
-
-                  -- Operator — read-only basics + the PWA workflow actions.
-                  ('Operator',   'dtms:order:read'),
-                  ('Operator',   'dtms:order:pod'),
-                  ('Operator',   'dtms:order:item:read'),
-
-                  ('Operator',   'dtms:trip:read'),
-
-                  ('Operator',   'dtms:vehicle:read'),
-
-                  ('Operator',   'dtms:planning:job:read'),
-
-                  ('Operator',   'dtms:operator:profile:read'),
-                  ('Operator',   'dtms:operator:trip:acknowledge'),
-                  ('Operator',   'dtms:operator:trip:pickup'),
-                  ('Operator',   'dtms:operator:trip:drop'),
-                  ('Operator',   'dtms:operator:trip:complete'),
-                  ('Operator',   'dtms:operator:geofence:override'),
-                  ('Operator',   'dtms:operator:push:register'),
-                  ('Operator',   'dtms:operator:pod:upload')
-                ON CONFLICT (""Role"", ""PermissionCode"") DO NOTHING;
-            ");
+            // No role mappings seeded here. Admin already holds dtms:*
+            // from Phase A. Supervisor + Operator system roles were
+            // dropped from the default seed (see Phase B migration);
+            // any custom role created via /admin/roles starts blank and
+            // earns permissions through the same admin UI.
         }
 
         /// <inheritdoc />

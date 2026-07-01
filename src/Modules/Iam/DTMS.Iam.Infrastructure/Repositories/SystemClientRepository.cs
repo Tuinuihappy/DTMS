@@ -85,4 +85,39 @@ public sealed class SystemClientRepository : ISystemClientRepository
         _db.SystemClients.Remove(client);
         await _db.SaveChangesAsync(ct);
     }
+
+    public async Task<bool> GrantPermissionAsync(
+        string systemKey, string permissionCode, string grantedBy, CancellationToken ct = default)
+    {
+        var existing = await _db.SystemClientPermissions
+            .FirstOrDefaultAsync(p => p.SystemKey == systemKey && p.PermissionCode == permissionCode, ct);
+        if (existing is not null) return false;
+
+        _db.SystemClientPermissions.Add(
+            new Domain.Entities.SystemClientPermission(systemKey, permissionCode, grantedBy));
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            // Race: another caller inserted the same (key, code) between our
+            // existence check and SaveChanges. The unique PK enforces the
+            // single-row invariant — treat as idempotent.
+            return false;
+        }
+    }
+
+    public async Task<bool> RevokePermissionAsync(
+        string systemKey, string permissionCode, CancellationToken ct = default)
+    {
+        var row = await _db.SystemClientPermissions
+            .FirstOrDefaultAsync(p => p.SystemKey == systemKey && p.PermissionCode == permissionCode, ct);
+        if (row is null) return false;
+
+        _db.SystemClientPermissions.Remove(row);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
 }

@@ -6,6 +6,11 @@
     <!-- API -->
     <PackageVersion Include="Cronos" Version="0.13.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.6" />
+    <!-- Phase S.8 — DTMS signs its own M2M tokens (OAuth client_credentials)
+         in the Iam.Application layer. JwtBearer above only covers verifying
+         inbound tokens in the API layer; these power Issue() + manual Validate(). -->
+    <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.2.1" />
+    <PackageVersion Include="Microsoft.IdentityModel.Tokens" Version="8.2.1" />
     <!-- Realtime: SignalR + MessagePack binary protocol + Redis backplane.
          Used by Phase P0 (5 hubs) for projection push to the browser. -->
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.0" />

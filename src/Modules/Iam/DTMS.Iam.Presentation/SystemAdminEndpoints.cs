@@ -14,12 +14,12 @@ namespace DTMS.Iam.Presentation;
 /// SystemClient + SystemCredential + perm rows + compute SHA256 by
 /// hand) with an HTTP API.
 ///
-/// <para><b>Scope kept narrow on purpose.</b> No DELETE (deactivate
-/// instead — cascade impact across credentials, perms, subscriptions,
-/// outbox rows is too large for a routine endpoint; route real
-/// deletions through SQL ops). No fine-grained permission grant /
-/// revoke — the S.3.1a auto-seed of standard permissions covers the
-/// common case; a future endpoint can split if usage demands it.</para>
+/// <para><b>Scope.</b> Identity + credential + callback config CRUD,
+/// activate / deactivate, hard delete (gated on IsActive=false; see
+/// the DELETE handler), inbound credential rotate, and per-system
+/// permission grant / revoke (Phase S.7 — mirrors role-side
+/// /roles/{name}/permissions/{code}). Subscription CRUD lives in
+/// <see cref="SystemSubscriptionEndpoints"/>.</para>
 /// </summary>
 public static class SystemAdminEndpoints
 {
@@ -30,7 +30,10 @@ public static class SystemAdminEndpoints
             .RequireAuthorization();
 
         // ── Create: provisions client + auto-seeds standard perms + ─────
-        //     mints inbound API key (plaintext returned ONE TIME).
+        //     mints inbound credential (plaintext returned ONE TIME).
+        //     Default scheme = api-key; pass authScheme="bearer-jwt" to
+        //     mint an OAuth client_secret instead — partner then POSTs to
+        //     /oauth/token to exchange it for a short-lived JWT.
         group.MapPost("/",
             async (CreateSystemRequest req, HttpContext ctx,
                    ISystemClientRepository systems,
@@ -40,6 +43,13 @@ public static class SystemAdminEndpoints
             {
                 if (await systems.GetByKeyAsync(req.Key, ct) is not null)
                     return Results.Conflict(new { error = $"System '{req.Key}' already exists." });
+
+                var scheme = NormaliseScheme(req.AuthScheme);
+                if (scheme is null)
+                    return Results.BadRequest(new
+                    {
+                        error = "AuthScheme must be 'bearer-jwt' (or omitted to default).",
+                    });
 
                 try
                 {
@@ -57,11 +67,11 @@ public static class SystemAdminEndpoints
                     await systems.AddWithPermissionsAsync(
                         client, permissions, grantedBy: ActorOrUnknown(ctx), ct);
 
-                    var apiKey = ApiKeyGenerator.Mint(req.Key);
+                    var minted = MintCredential(req.Key, scheme);
                     var credential = new SystemCredential(
                         systemKey: req.Key,
-                        authScheme: "api-key",
-                        authConfig: JsonSerializer.Serialize(new { keyHash = apiKey.Sha256Hex }));
+                        authScheme: scheme,
+                        authConfig: minted.AuthConfigJson);
                     await creds.AddAsync(credential, ct);
 
                     await audit.AppendAsync(new PermissionAuditEntry(
@@ -71,6 +81,7 @@ public static class SystemAdminEndpoints
                         details: JsonSerializer.Serialize(new
                         {
                             systemKey = req.Key,
+                            authScheme = scheme,
                             permissions,
                         })), ct);
 
@@ -84,7 +95,8 @@ public static class SystemAdminEndpoints
                             OwnerContact: client.OwnerContact,
                             CreatedAt: client.CreatedAt,
                             Permissions: permissions,
-                            ApiKey: apiKey.Plaintext));
+                            AuthScheme: scheme,
+                            Secret: minted.Plaintext));
                 }
                 catch (ArgumentException ex)
                 {
@@ -329,7 +341,10 @@ public static class SystemAdminEndpoints
                 return Results.NoContent();
             }).RequirePermission("dtms:iam:system:write");
 
-        // ── Rotate inbound api-key ────────────────────────────────────
+        // ── Rotate inbound credential (scheme-preserving) ─────────────
+        //     Mints a new secret of WHATEVER scheme the credential is
+        //     currently on. To switch schemes use PUT /credential/scheme
+        //     below.
         group.MapPost("/{key}/credential/rotate",
             async (string key, HttpContext ctx,
                    ISystemClientRepository systems,
@@ -343,14 +358,20 @@ public static class SystemAdminEndpoints
                 if (cred is null)
                     return Results.Conflict(new { error = $"No credential row for '{key}'." });
 
-                var apiKey = ApiKeyGenerator.Mint(key);
+                if (cred.AuthScheme != "bearer-jwt")
+                    return Results.Conflict(new
+                    {
+                        error = $"Unsupported AuthScheme '{cred.AuthScheme}' on row — only bearer-jwt is supported. Fix the DB row or PUT /credential/scheme.",
+                    });
+
+                var minted = MintCredential(key, cred.AuthScheme);
                 cred.RotateInbound(
-                    authScheme: "api-key",
-                    authConfig: JsonSerializer.Serialize(new { keyHash = apiKey.Sha256Hex }));
+                    authScheme: cred.AuthScheme,
+                    authConfig: minted.AuthConfigJson);
                 await creds.UpdateAsync(cred, ct);
 
                 // Evict the cached credential so the next inbound call
-                // re-reads from DB. Without this the old key would
+                // re-reads from DB. Without this the old secret would
                 // continue to authenticate up to the 5-minute L2 TTL.
                 await reader.InvalidateAsync(key, ct);
 
@@ -358,9 +379,294 @@ public static class SystemAdminEndpoints
                     actorEmployeeId: ActorOrUnknown(ctx),
                     action: "system-credential-rotated",
                     permissionCode: null,
-                    details: $"{{\"systemKey\":\"{key}\"}}"), ct);
+                    details: JsonSerializer.Serialize(new
+                    {
+                        systemKey = key,
+                        authScheme = cred.AuthScheme,
+                    })), ct);
 
-                return Results.Ok(new RotateCredentialResponse(apiKey.Plaintext, cred.UpdatedAt));
+                return Results.Ok(new RotateCredentialResponse(
+                    Secret: minted.Plaintext,
+                    AuthScheme: cred.AuthScheme,
+                    RotatedAt: cred.UpdatedAt));
+            }).RequirePermission("dtms:iam:system:write");
+
+        // ── Switch inbound auth scheme (api-key ↔ bearer-jwt) ─────────
+        //     Replaces the credential with a fresh secret of the new
+        //     scheme. Cache invalidated so the change takes effect within
+        //     one Redis round-trip across all pods. Partner must update
+        //     their integration to match the new scheme before the next
+        //     call — there's no grace period because one credential row
+        //     holds one scheme at a time.
+        group.MapPut("/{key}/credential/scheme",
+            async (string key, RotateSchemeRequest req, HttpContext ctx,
+                   ISystemClientRepository systems,
+                   ISystemCredentialRepository creds,
+                   CachedCredentialReader reader,
+                   IAuditLogRepository audit,
+                   CancellationToken ct) =>
+            {
+                if (await systems.GetByKeyAsync(key, ct) is null) return Results.NotFound();
+                var cred = await creds.GetBySystemKeyAsync(key, ct);
+                if (cred is null)
+                    return Results.Conflict(new { error = $"No credential row for '{key}'." });
+
+                var newScheme = NormaliseScheme(req.AuthScheme);
+                if (newScheme is null)
+                    return Results.BadRequest(new
+                    {
+                        error = "AuthScheme must be 'bearer-jwt'.",
+                    });
+
+                var fromScheme = cred.AuthScheme;
+                var minted = MintCredential(key, newScheme);
+                cred.RotateInbound(
+                    authScheme: newScheme,
+                    authConfig: minted.AuthConfigJson);
+                await creds.UpdateAsync(cred, ct);
+                await reader.InvalidateAsync(key, ct);
+
+                await audit.AppendAsync(new PermissionAuditEntry(
+                    actorEmployeeId: ActorOrUnknown(ctx),
+                    action: "system-credential-scheme-changed",
+                    permissionCode: null,
+                    details: JsonSerializer.Serialize(new
+                    {
+                        systemKey = key,
+                        fromScheme,
+                        toScheme = newScheme,
+                    })), ct);
+
+                return Results.Ok(new RotateCredentialResponse(
+                    Secret: minted.Plaintext,
+                    AuthScheme: newScheme,
+                    RotatedAt: cred.UpdatedAt));
+            }).RequirePermission("dtms:iam:system:write");
+
+        // ── Admin-issued long-lived JWT (escape hatch for partners that ─
+        //     can't run an OAuth client). Bypasses /oauth/token: admin
+        //     mints a JWT here with a custom lifetime (default 90 days,
+        //     max 365 days) and hands it to the partner via a secure
+        //     channel. Partner sends it as `Authorization: Bearer ...`
+        //     directly — no token refresh logic on their side.
+        //
+        //     Phase S.8c — the mint is recorded in iam.SystemIssuedTokens
+        //     so admins can list + revoke individual tokens without
+        //     having to nuke the entire system.
+        group.MapPost("/{key}/issue-token",
+            async (string key, IssueTokenRequest req, HttpContext ctx,
+                   ISystemClientRepository systems,
+                   ISystemCredentialRepository creds,
+                   ISystemIssuedTokenRepository issuedTokens,
+                   ISystemJwtIssuer issuer,
+                   IAuditLogRepository audit,
+                   CancellationToken ct) =>
+            {
+                var client = await systems.GetByKeyAsync(key, ct);
+                if (client is null) return Results.NotFound();
+                if (!client.IsActive)
+                    return Results.Conflict(new { error = $"System '{key}' is deactivated — reactivate first." });
+
+                var cred = await creds.GetBySystemKeyAsync(key, ct);
+                if (cred is null || cred.AuthScheme != "bearer-jwt")
+                    return Results.Conflict(new
+                    {
+                        error = $"System '{key}' is not configured for bearer-jwt. Switch scheme via PUT /credential/scheme first.",
+                    });
+
+                // 90 days default — long enough that partners with a quarterly
+                // change-window can cope, short enough that a forgotten-in-
+                // pastebin token stops working before the next audit.
+                var lifetime = req.LifetimeSeconds ?? 7_776_000;
+                if (lifetime < 60)
+                    return Results.BadRequest(new { error = "LifetimeSeconds must be at least 60." });
+                // Hard cap at 365 days — anything longer is essentially a
+                // forever-token, at which point use a different mechanism
+                // (e.g. mTLS) rather than pretending it's a JWT.
+                if (lifetime > 31_536_000)
+                    return Results.BadRequest(new { error = "LifetimeSeconds must be at most 31,536,000 (365 days)." });
+
+                var token = issuer.Issue(key, lifetimeSecondsOverride: lifetime);
+
+                // Phase S.8c — persist for the admin list + revoke UI.
+                // Only stores metadata (jti, exp, issuer identity) — never
+                // the JWT body itself.
+                await issuedTokens.AddAsync(new SystemIssuedToken(
+                    id: Guid.NewGuid(),
+                    systemKey: key,
+                    jti: token.Jti,
+                    issuedAt: DateTime.UtcNow,
+                    expiresAt: token.ExpiresAt,
+                    issuedBy: ActorOrUnknown(ctx)), ct);
+
+                await audit.AppendAsync(new PermissionAuditEntry(
+                    actorEmployeeId: ActorOrUnknown(ctx),
+                    action: "system-token-issued",
+                    permissionCode: null,
+                    details: JsonSerializer.Serialize(new
+                    {
+                        systemKey = key,
+                        jti = token.Jti,
+                        lifetimeSeconds = lifetime,
+                        expiresAt = token.ExpiresAt,
+                    })), ct);
+
+                return Results.Ok(new IssueTokenResponse(
+                    AccessToken: token.AccessToken,
+                    TokenType: "Bearer",
+                    ExpiresInSeconds: token.ExpiresInSeconds,
+                    ExpiresAt: token.ExpiresAt,
+                    Jti: token.Jti));
+            }).RequirePermission("dtms:iam:system:write");
+
+        // ── Phase S.8c — list admin-issued tokens for a system ────────
+        //     Newest-first. Includes Active + Revoked (audit trail).
+        //     Response omits sensitive fields — jti is the only opaque
+        //     identifier the UI needs to feed into the revoke endpoint.
+        group.MapGet("/{key}/tokens",
+            async (string key,
+                   ISystemClientRepository systems,
+                   ISystemIssuedTokenRepository issuedTokens,
+                   CancellationToken ct) =>
+            {
+                if (await systems.GetByKeyAsync(key, ct) is null)
+                    return Results.NotFound();
+
+                var rows = await issuedTokens.ListBySystemAsync(key, ct);
+                return Results.Ok(rows.Select(t => new IssuedTokenSummary(
+                    Jti: t.Jti,
+                    IssuedAt: t.IssuedAt,
+                    ExpiresAt: t.ExpiresAt,
+                    IssuedBy: t.IssuedBy,
+                    Status: t.Status.ToString(),
+                    RevokedAt: t.RevokedAt,
+                    RevokedBy: t.RevokedBy,
+                    RevokeReason: t.RevokeReason)));
+            }).RequirePermission("dtms:iam:system:read");
+
+        // ── Phase S.8c — revoke an admin-issued token by jti ──────────
+        //     Idempotent: re-revoking is a no-op that returns 204. Redis
+        //     TTL matches the token's remaining lifetime, so the block-
+        //     list entry drops on its own after natural expiry — no
+        //     cleanup job needed. The DB row lives forever (audit).
+        group.MapPost("/{key}/tokens/{jti}/revoke",
+            async (string key, string jti, RevokeTokenRequest? req, HttpContext ctx,
+                   ISystemClientRepository systems,
+                   ISystemIssuedTokenRepository issuedTokens,
+                   ISystemJwtRevocationList revocationList,
+                   IAuditLogRepository audit,
+                   CancellationToken ct) =>
+            {
+                if (await systems.GetByKeyAsync(key, ct) is null)
+                    return Results.NotFound(new { error = $"System '{key}' not found." });
+
+                var row = await issuedTokens.GetByJtiAsync(jti, ct);
+                if (row is null)
+                    return Results.NotFound(new { error = $"Token with jti '{jti}' not found." });
+                // Cross-check: jti must belong to the system on the URL.
+                // Prevents admin-of-system-A from revoking system-B's
+                // tokens via URL manipulation (the audit trail would be
+                // filed under system-A which is misleading).
+                if (!string.Equals(row.SystemKey, key, StringComparison.Ordinal))
+                    return Results.NotFound(new { error = $"Token with jti '{jti}' not found for system '{key}'." });
+
+                // Idempotent: already revoked → 204 + skip Redis write.
+                // Prevents duplicate audit rows when the UI double-clicks
+                // or a retry lands on an already-revoked token.
+                if (row.Status == SystemIssuedTokenStatus.Revoked)
+                    return Results.NoContent();
+
+                // Redis first — if the blocklist write fails, throw and
+                // let the caller retry. Alternative (write DB first, then
+                // Redis) would leave a "logically revoked but effectively
+                // active" state on Redis failure; caller retries would
+                // then see "already revoked" and skip Redis forever.
+                await revocationList.RevokeAsync(row.Jti, row.ExpiresAt, ct);
+
+                row.Revoke(ActorOrUnknown(ctx), req?.Reason);
+                await issuedTokens.UpdateAsync(row, ct);
+
+                await audit.AppendAsync(new PermissionAuditEntry(
+                    actorEmployeeId: ActorOrUnknown(ctx),
+                    action: "system-token-revoked",
+                    permissionCode: null,
+                    details: JsonSerializer.Serialize(new
+                    {
+                        systemKey = key,
+                        jti = row.Jti,
+                        reason = req?.Reason,
+                    })), ct);
+
+                return Results.NoContent();
+            }).RequirePermission("dtms:iam:system:write");
+
+        // ── Grant permission to system ──────────────────────────────────
+        //     Mirrors role-side POST /roles/{name}/permissions/{code}.
+        //     Catalog existence check intentionally skipped — system perms
+        //     can be runtime-resolved templates (dtms:source:{key}:order:*)
+        //     that don't sit in iam.permissions. Endpoint is locked behind
+        //     dtms:iam:system:write so bad-data risk is bounded.
+        group.MapPost("/{key}/permissions/{code}",
+            async (string key, string code, HttpContext ctx,
+                   ISystemClientRepository systems,
+                   IAuditLogRepository audit,
+                   Microsoft.Extensions.Caching.Memory.IMemoryCache cache,
+                   CancellationToken ct) =>
+            {
+                if (await systems.GetByKeyAsync(key, ct) is null)
+                    return Results.NotFound(new { error = $"System '{key}' not found." });
+
+                if (string.IsNullOrWhiteSpace(code) || code.Length > 120)
+                    return Results.BadRequest(new { error = "PermissionCode must be 1-120 chars." });
+
+                var inserted = await systems.GrantPermissionAsync(key, code, ActorOrUnknown(ctx), ct);
+                if (inserted)
+                {
+                    // Phase S.8b — evict the PermissionClaimsTransformer
+                    // cache so system JWTs already in flight pick up the
+                    // grant on their next request (else it takes 5 min).
+                    cache.Remove($"iam:sys-perms:{key}");
+
+                    await audit.AppendAsync(new PermissionAuditEntry(
+                        actorEmployeeId: ActorOrUnknown(ctx),
+                        action: "system-grant",
+                        permissionCode: code,
+                        details: JsonSerializer.Serialize(new { systemKey = key })), ct);
+                }
+                return Results.NoContent();
+            }).RequirePermission("dtms:iam:system:write");
+
+        // ── Revoke permission from system ───────────────────────────────
+        //     Symmetric with grant. No self-lockout guard needed (admin
+        //     identity is user-side, not system-side). Standard auto-seed
+        //     perms can also be revoked — the proper kill switch for a
+        //     misbehaving integration is Deactivate, not perm stripping.
+        group.MapDelete("/{key}/permissions/{code}",
+            async (string key, string code, HttpContext ctx,
+                   ISystemClientRepository systems,
+                   IAuditLogRepository audit,
+                   Microsoft.Extensions.Caching.Memory.IMemoryCache cache,
+                   CancellationToken ct) =>
+            {
+                if (await systems.GetByKeyAsync(key, ct) is null)
+                    return Results.NotFound(new { error = $"System '{key}' not found." });
+
+                var deleted = await systems.RevokePermissionAsync(key, code, ct);
+                if (deleted)
+                {
+                    // Phase S.8b — evict transformer cache so revokes take
+                    // effect immediately for tokens already in flight
+                    // (otherwise the granted claim persists in principals
+                    // reconstructed from cache for up to 5 minutes).
+                    cache.Remove($"iam:sys-perms:{key}");
+
+                    await audit.AppendAsync(new PermissionAuditEntry(
+                        actorEmployeeId: ActorOrUnknown(ctx),
+                        action: "system-revoke",
+                        permissionCode: code,
+                        details: JsonSerializer.Serialize(new { systemKey = key })), ct);
+                }
+                return Results.NoContent();
             }).RequirePermission("dtms:iam:system:write");
     }
 
@@ -368,6 +674,52 @@ public static class SystemAdminEndpoints
         => ctx.User.FindFirst("sub")?.Value
            ?? ctx.User.Identity?.Name
            ?? "unknown";
+
+    /// <summary>
+    /// Coerce an inbound auth scheme name to the canonical lowercase form
+    /// the middleware switch checks. Single scheme today —
+    /// <c>bearer-jwt</c> — but kept as a function so adding a second
+    /// scheme later is a one-liner rather than touching every endpoint.
+    /// Null/empty defaults to <c>bearer-jwt</c>. Returns null for any
+    /// other value so the caller returns 400.
+    /// </summary>
+    private static string? NormaliseScheme(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "bearer-jwt";
+        var v = value.Trim().ToLowerInvariant();
+        return v is "bearer-jwt" ? v : null;
+    }
+
+    /// <summary>
+    /// Mint the client_secret + AuthConfig JSON for a bearer-jwt system.
+    /// Plaintext is returned to the caller exactly ONCE — only the
+    /// SHA-256 hash lives in <see cref="SystemCredential.AuthConfig"/>.
+    /// </summary>
+    private static MintedCredential MintCredential(string systemKey, string scheme)
+    {
+        // Defensive — NormaliseScheme above is the only producer of
+        // `scheme` and only emits "bearer-jwt", but assert anyway so a
+        // future second scheme can't silently fall through to wrong shape.
+        if (scheme != "bearer-jwt")
+            throw new InvalidOperationException(
+                $"MintCredential called with unsupported scheme '{scheme}'. " +
+                "Update NormaliseScheme + this switch in lockstep when adding schemes.");
+
+        var s = ClientSecretGenerator.Mint(systemKey);
+        // tokenLifetimeSeconds=0 means "use the issuer's default"
+        // (configured globally via Jwt:SystemTokenLifetimeSeconds).
+        // Per-credential override path stays open via direct DB edit
+        // until a UI for it lands.
+        return new MintedCredential(
+            Plaintext: s.Plaintext,
+            AuthConfigJson: JsonSerializer.Serialize(new
+            {
+                clientSecretHash = s.Sha256Hex,
+                tokenLifetimeSeconds = 0,
+            }));
+    }
+
+    private sealed record MintedCredential(string Plaintext, string AuthConfigJson);
 
     /// <summary>
     /// Phase S.6 follow-up — best-effort JWT expiry extraction. Decodes
@@ -423,7 +775,13 @@ public sealed record CreateSystemRequest(
     string DisplayName,
     string? Description,
     string? OwnerContact,
-    bool? IsActive);
+    bool? IsActive,
+    // Single supported value today: "bearer-jwt" (OAuth client_credentials
+    // grant via /oauth/token). Field kept for forward compat — add hmac /
+    // partner-signed JWT here in the future. Omit to default to bearer-jwt.
+    string? AuthScheme = null);
+
+public sealed record RotateSchemeRequest(string AuthScheme);
 
 public sealed record PatchSystemRequest(
     string? DisplayName,
@@ -447,7 +805,10 @@ public sealed record CreatedSystemResponse(
     string? OwnerContact,
     DateTime CreatedAt,
     IReadOnlyList<string> Permissions,
-    string ApiKey);
+    // AuthScheme="bearer-jwt" → Secret is "dtms_cs_<key>_..." (client_secret).
+    // Returned plaintext exactly once; only the SHA-256 hash is stored.
+    string AuthScheme,
+    string Secret);
 
 public sealed record SystemSummaryDto(
     string Key,
@@ -487,4 +848,37 @@ public sealed record SystemDetailDto(
     IReadOnlyList<SubscriptionSummary> Subscriptions,
     CredentialSummary? Credential);
 
-public sealed record RotateCredentialResponse(string ApiKey, DateTime RotatedAt);
+public sealed record RotateCredentialResponse(
+    // See CreatedSystemResponse for the Secret/AuthScheme contract.
+    string Secret,
+    string AuthScheme,
+    DateTime RotatedAt);
+
+public sealed record IssueTokenRequest(
+    // Optional override. Default is 90 days when omitted. Bounded by
+    // [60s, 365d] at the endpoint — outside that range the request
+    // returns 400. The endpoint never silently clamps; admin sees what
+    // they get.
+    int? LifetimeSeconds = null);
+
+public sealed record IssueTokenResponse(
+    string AccessToken,
+    string TokenType,
+    int ExpiresInSeconds,
+    DateTime ExpiresAt,
+    // Phase S.8c — surfaced so the admin UI can persist the mapping to
+    // the row it lists, and callers with scripting workflows can revoke
+    // without a separate lookup.
+    string Jti);
+
+public sealed record RevokeTokenRequest(string? Reason = null);
+
+public sealed record IssuedTokenSummary(
+    string Jti,
+    DateTime IssuedAt,
+    DateTime ExpiresAt,
+    string IssuedBy,
+    string Status,
+    DateTime? RevokedAt,
+    string? RevokedBy,
+    string? RevokeReason);

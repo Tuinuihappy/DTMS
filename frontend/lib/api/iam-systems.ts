@@ -39,15 +39,25 @@ export type SystemDetailDto = SystemSummaryDto & {
   credential: CredentialSummary | null;
 };
 
+// Returned plaintext exactly once at create/rotate time. authScheme is
+// always "bearer-jwt" today (single supported scheme); secret is the
+// OAuth client_secret ("dtms_cs_<key>_..."). Partners POST it to
+// /oauth/token to receive a short-lived JWT for inbound API calls.
 export type CreatedSystemResponse = SystemSummaryDto & {
   permissions: string[];
-  apiKey: string;          // ← one-time plaintext, never re-fetchable
+  authScheme: AuthScheme;
+  secret: string;          // ← one-time plaintext, never re-fetchable
 };
 
 export type RotateCredentialResponse = {
-  apiKey: string;          // ← one-time plaintext
+  secret: string;          // ← one-time plaintext (see CreatedSystemResponse)
+  authScheme: AuthScheme;
   rotatedAt: string;
 };
+
+// Kept as a union so adding a second scheme later is a one-liner.
+// Today: bearer-jwt only.
+export type AuthScheme = "bearer-jwt";
 
 export type SubscriptionDto = {
   id: string;
@@ -67,6 +77,12 @@ export type CreateSystemRequest = {
   description?: string | null;
   ownerContact?: string | null;
   isActive?: boolean | null;
+  // Phase S.8 — omit to default to api-key (backward compat).
+  authScheme?: AuthScheme;
+};
+
+export type RotateSchemeRequest = {
+  authScheme: AuthScheme;
 };
 
 export type PatchSystemRequest = {
@@ -181,6 +197,94 @@ export async function rotateCredential(key: string): Promise<RotateCredentialRes
   return (await res.json()) as RotateCredentialResponse;
 }
 
+// Phase S.8 — change the credential's auth scheme (api-key ↔ bearer-jwt).
+// Mints a fresh secret of the new scheme; cache invalidated server-side so
+// the partner must update their integration before the next call.
+export async function rotateScheme(
+  key: string,
+  body: RotateSchemeRequest,
+): Promise<RotateCredentialResponse> {
+  const res = await fetch(
+    `/api/admin/iam/systems/${encodeURIComponent(key)}/credential/scheme`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) throw new Error(await readError(res));
+  return (await res.json()) as RotateCredentialResponse;
+}
+
+// Admin-issued long-lived JWT (escape hatch for partners that can't run an
+// OAuth client). Hands back a JWT the partner sends as Authorization:
+// Bearer <jwt> directly — no /oauth/token round-trip on their side. Default
+// lifetime is 90 days; bounded at the endpoint to [60s, 365d].
+export type IssueTokenRequest = { lifetimeSeconds?: number };
+export type IssueTokenResponse = {
+  accessToken: string;
+  tokenType: string;
+  expiresInSeconds: number;
+  expiresAt: string;
+};
+
+export async function issueToken(
+  key: string,
+  body: IssueTokenRequest,
+): Promise<IssueTokenResponse> {
+  const res = await fetch(
+    `/api/admin/iam/systems/${encodeURIComponent(key)}/issue-token`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) throw new Error(await readError(res));
+  return (await res.json()) as IssueTokenResponse;
+}
+
+// Phase S.8c — audit + revocation list for admin-issued long-lived JWTs.
+// One row per Issue click; status flips Active → Revoked on revoke.
+export type IssuedTokenSummary = {
+  jti: string;
+  issuedAt: string;
+  expiresAt: string;
+  issuedBy: string;
+  status: "Active" | "Revoked";
+  revokedAt: string | null;
+  revokedBy: string | null;
+  revokeReason: string | null;
+};
+
+export async function listIssuedTokens(
+  key: string,
+  signal?: AbortSignal,
+): Promise<IssuedTokenSummary[]> {
+  const res = await fetch(
+    `/api/admin/iam/systems/${encodeURIComponent(key)}/tokens`,
+    { signal, cache: "no-store" },
+  );
+  if (!res.ok) throw new Error(await readError(res));
+  return (await res.json()) as IssuedTokenSummary[];
+}
+
+export async function revokeToken(
+  key: string,
+  jti: string,
+  reason?: string,
+): Promise<void> {
+  const res = await fetch(
+    `/api/admin/iam/systems/${encodeURIComponent(key)}/tokens/${encodeURIComponent(jti)}/revoke`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(reason ? { reason } : {}),
+    },
+  );
+  if (!res.ok) throw new Error(await readError(res));
+}
+
 // ── Subscriptions CRUD ───────────────────────────────────────────────────
 
 export async function getEventTypes(signal?: AbortSignal): Promise<string[]> {
@@ -253,30 +357,58 @@ export async function getMyPermissions(signal?: AbortSignal): Promise<string[]> 
   return data.permissions ?? [];
 }
 
-// ── Test key (Phase S.6 UX — verify a freshly-minted key works) ──────────
+// ── Test credential (Phase S.6 UX — verify a freshly-minted secret works) ─
 
-export type TestApiKeyResult =
+export type TestCredentialResult =
   | { ok: true; principalId?: string; displayName?: string; permissions?: string[] }
   | { ok: false; status?: number; message?: string };
 
+// "client-secret" → handler trades secret for a JWT via /oauth/token first.
+// "jwt"           → handler uses the value as Bearer directly (for admin-
+//                   issued long-lived JWTs that skip /oauth/token entirely).
+export type TestCredentialMode = "client-secret" | "jwt";
+
 /**
- * Probe the backend with a freshly-minted plaintext to confirm it
- * authenticates correctly. Exercises the same /api/v1/source/{key}/whoami
- * the production inbound path uses — no cache surprises. Posts the
- * plaintext through the Next route handler so it stays server-side and
- * doesn't leak into browser network logs (DevTools shows only the proxy
- * call, not the upstream `Authorization: ApiKey ...` header).
+ * Probe the backend to confirm a freshly-minted credential authenticates
+ * end-to-end. For client-secret mode the route handler runs the full OAuth
+ * flow (exchange → use JWT to call /whoami) — exactly what OMS does in
+ * prod. For jwt mode the handler sends `Authorization: Bearer <value>`
+ * directly, exercising the same middleware path partners hit with admin-
+ * issued tokens. Plaintext stays server-side either way (the proxy handler
+ * holds it), so it never lands in browser network logs.
  */
-export async function testApiKey(key: string, apiKey: string): Promise<TestApiKeyResult> {
+export async function testCredential(
+  key: string,
+  secret: string,
+  mode: TestCredentialMode = "client-secret",
+): Promise<TestCredentialResult> {
   const res = await fetch(`/api/admin/iam/systems/${encodeURIComponent(key)}/test-key`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apiKey }),
+    body: JSON.stringify({ secret, mode }),
   });
   // Route handler always returns 200 with an `ok` field — even on
   // upstream failures — so we can render the result inline without
-  // dealing with thrown exceptions for expected "key didn't work" cases.
-  return (await res.json()) as TestApiKeyResult;
+  // dealing with thrown exceptions for expected "secret didn't work" cases.
+  return (await res.json()) as TestCredentialResult;
+}
+
+// ── permission grant / revoke (Phase S.7) ────────────────────────────────
+
+export async function grantSystemPermission(key: string, code: string): Promise<void> {
+  const res = await fetch(
+    `/api/admin/iam/systems/${encodeURIComponent(key)}/permissions/${encodeURIComponent(code)}`,
+    { method: "POST" },
+  );
+  if (!res.ok) throw new Error(await readError(res));
+}
+
+export async function revokeSystemPermission(key: string, code: string): Promise<void> {
+  const res = await fetch(
+    `/api/admin/iam/systems/${encodeURIComponent(key)}/permissions/${encodeURIComponent(code)}`,
+    { method: "DELETE" },
+  );
+  if (!res.ok) throw new Error(await readError(res));
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────

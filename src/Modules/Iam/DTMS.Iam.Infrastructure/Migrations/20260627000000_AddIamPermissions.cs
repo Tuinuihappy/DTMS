@@ -88,27 +88,12 @@ namespace DTMS.Iam.Infrastructure.Migrations
 
             // ── Seed: Role → Permission mapping ───────────────────────────
             // Admin gets the dtms:* wildcard so future permissions are
-            // automatically granted. Supervisor / Operator are enumerated
-            // explicitly so adding a permission doesn't widen their scope
-            // by accident.
+            // automatically granted. No other roles ship by default —
+            // operators are expected to create their own role hierarchy
+            // through the /admin/roles UI.
             migrationBuilder.Sql(@"
                 INSERT INTO iam.""RolePermissions"" (""Role"", ""PermissionCode"") VALUES
-                  ('Admin',      'dtms:*'),
-
-                  ('Supervisor', 'dtms:facility:map:read'),
-                  ('Supervisor', 'dtms:facility:map:sync'),
-                  ('Supervisor', 'dtms:facility:station:read'),
-                  ('Supervisor', 'dtms:facility:station:force-offline'),
-                  ('Supervisor', 'dtms:facility:warehouse:read'),
-                  ('Supervisor', 'dtms:facility:topology-overlay:write'),
-                  ('Supervisor', 'dtms:facility:shelf:release'),
-                  ('Supervisor', 'dtms:facility:profile:read'),
-
-                  ('Operator',   'dtms:facility:map:read'),
-                  ('Operator',   'dtms:facility:station:read'),
-                  ('Operator',   'dtms:facility:warehouse:read'),
-                  ('Operator',   'dtms:facility:profile:read'),
-                  ('Operator',   'dtms:facility:shelf:release')
+                  ('Admin', 'dtms:*')
                 ON CONFLICT (""Role"", ""PermissionCode"") DO NOTHING;
             ");
         }

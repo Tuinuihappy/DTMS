@@ -34,8 +34,8 @@ export function IamSystemsExperience() {
   // Lives in state ONLY until the user dismisses the banner — once gone,
   // it's gone (matching the backend's "shown once" contract).
   const [secret, setSecret] = useState<
-    | { kind: "created"; key: string; apiKey: string }
-    | { kind: "rotated"; key: string; apiKey: string; rotatedAt: string }
+    | { kind: "created"; key: string; secret: string }
+    | { kind: "rotated"; key: string; secret: string; rotatedAt: string }
     | null
   >(null);
 
@@ -129,7 +129,12 @@ export function IamSystemsExperience() {
     markBusy(key);
     try {
       const res: RotateCredentialResponse = await rotateCredential(key);
-      setSecret({ kind: "rotated", key, apiKey: res.apiKey, rotatedAt: res.rotatedAt });
+      setSecret({
+        kind: "rotated",
+        key,
+        secret: res.secret,
+        rotatedAt: res.rotatedAt,
+      });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -188,15 +193,15 @@ export function IamSystemsExperience() {
         <OneTimeSecretBanner
           title={
             secret.kind === "created"
-              ? `API key for "${secret.key}" — copy now`
-              : `New API key for "${secret.key}" — copy now (old key revoked)`
+              ? `client_secret for "${secret.key}" — copy now`
+              : `New client_secret for "${secret.key}" — copy now (old value revoked)`
           }
-          secret={secret.apiKey}
+          secret={secret.secret}
           testKeyForSystem={secret.key}
           helpText={
             secret.kind === "created"
-              ? 'Send this key to the source-system operator. They use it as `Authorization: ApiKey <value>` on every inbound POST. Click "Test this key" to verify it authenticates before sharing.'
-              : `Rotated at ${secret.rotatedAt}. The previous key is no longer accepted. Click "Test this key" to confirm the new value works.`
+              ? 'Send this client_secret to the source-system operator. They POST it to /oauth/token with grant_type=client_credentials + client_id=<system key> to receive a JWT, then send `Authorization: Bearer <jwt>` on inbound POSTs. Click "Test this credential" to verify the full flow before sharing.'
+              : `Rotated at ${secret.rotatedAt}. The previous value is no longer accepted. Click "Test this credential" to confirm the new value works.`
           }
           onDismiss={() => setSecret(null)}
         />
@@ -321,7 +326,7 @@ export function IamSystemsExperience() {
           onClose={() => setCreating(false)}
           onCreated={(r) => {
             setCreating(false);
-            setSecret({ kind: "created", key: r.key, apiKey: r.apiKey });
+            setSecret({ kind: "created", key: r.key, secret: r.secret });
             void load();
           }}
         />
@@ -353,6 +358,7 @@ function CreateSystemModal({
     setSubmitting(true);
     setError(null);
     try {
+      // authScheme defaults to "bearer-jwt" server-side — no need to send.
       const res = await createSystem({
         key,
         displayName,
@@ -383,7 +389,7 @@ function CreateSystemModal({
           </button>
         </div>
         <p className="mt-1 text-[12px] text-[var(--color-ink-500)]">
-          The API key will be shown once after create — copy it before closing the banner.
+          The credential will be shown once after create — copy it before closing the banner.
         </p>
 
         <div className="mt-4 space-y-3">
@@ -436,6 +442,13 @@ function CreateSystemModal({
             />
           </div>
         </div>
+        <p className="mt-3 text-[10.5px] text-[var(--color-ink-400)]">
+          Auth is OAuth 2.0 client_credentials (RFC 6749 §4.4). The partner
+          POSTs the issued <code>client_secret</code> to <code>/oauth/token</code>{" "}
+          with <code>client_id=&lt;key&gt;</code> to receive a short-lived JWT
+          (1 hour default), then sends <code>Authorization: Bearer &lt;jwt&gt;</code>{" "}
+          on inbound API calls.
+        </p>
 
         {error && (
           <div className="mt-3 flex items-start gap-2 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-[12px] text-rose-700 dark:border-rose-500/30 dark:bg-rose-950/40">

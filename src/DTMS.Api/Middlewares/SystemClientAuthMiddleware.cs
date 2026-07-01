@@ -1,6 +1,4 @@
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using DTMS.Iam.Application.Authorization;
 using DTMS.Iam.Application.Repositories;
@@ -8,25 +6,21 @@ using DTMS.Iam.Application.Repositories;
 namespace DTMS.Api.Middlewares;
 
 /// <summary>
-/// Phase S.2 inbound authentication for federated source-system
-/// callers. Only branched in for paths under <c>/api/v1/source/*</c>
-/// (registered via <c>app.UseWhen</c>) so user traffic never pays
-/// the lookup cost. On a successful match the middleware stashes a
+/// Inbound authentication for federated source-system callers. Only
+/// branched in for paths under <c>/api/v1/source/*</c> (registered via
+/// <c>app.UseWhen</c>) so user traffic never pays the lookup cost. On
+/// a successful match the middleware stashes a
 /// <see cref="SystemPrincipal"/> into <c>HttpContext.Items["principal"]</c>
 /// — the ActorContext resolver and permission claims transformer
 /// then pick it up exactly like any other authenticated request.
 /// </summary>
 /// <remarks>
-/// <para><b>Auth scheme support.</b> The plan lists three schemes
-/// (api-key, bearer-jwt, hmac). Phase S.2 ships <c>api-key</c> first
-/// because it's the smallest viable surface to validate the full
-/// pipeline end-to-end; bearer-jwt + hmac slot in as additional
-/// branches without changing the middleware shape.</para>
-///
-/// <para><b>Hashing.</b> The stored <c>AuthConfig</c> for api-key
-/// holds <c>{"keyHash":"&lt;sha256-hex&gt;"}</c>; the wire-format
-/// API key is hashed with SHA-256 and compared in constant time so
-/// a timing oracle can't reveal partial matches.</para>
+/// <para><b>Auth scheme.</b> Single scheme — <c>bearer-jwt</c> (OAuth 2.0
+/// client_credentials grant per RFC 6749 §4.4). Partners exchange a
+/// long-lived client_secret at <c>POST /oauth/token</c> for a short-lived
+/// JWT (1 hour default), then present it as <c>Authorization: Bearer ...</c>
+/// here. The legacy <c>api-key</c> scheme was removed at production launch
+/// — no backward compat needed (no production partners existed yet).</para>
 /// </remarks>
 public sealed class SystemClientAuthMiddleware : IMiddleware
 {
@@ -36,15 +30,18 @@ public sealed class SystemClientAuthMiddleware : IMiddleware
 
     private readonly CachedCredentialReader _credentials;
     private readonly ISystemClientRepository _clients;
+    private readonly ISystemJwtValidator _jwtValidator;
     private readonly ILogger<SystemClientAuthMiddleware> _log;
 
     public SystemClientAuthMiddleware(
         CachedCredentialReader credentials,
         ISystemClientRepository clients,
+        ISystemJwtValidator jwtValidator,
         ILogger<SystemClientAuthMiddleware> log)
     {
         _credentials = credentials;
         _clients = clients;
+        _jwtValidator = jwtValidator;
         _log = log;
     }
 
@@ -73,11 +70,15 @@ public sealed class SystemClientAuthMiddleware : IMiddleware
             return;
         }
 
+        // OAuth client_credentials grant only. Partner first POSTs to
+        // /oauth/token to exchange client_id+secret for a short-lived JWT,
+        // then presents it here as Authorization: Bearer ...
+        // Any other AuthScheme value in the DB indicates a misconfiguration
+        // (the admin API only ever writes "bearer-jwt") — reject 401 rather
+        // than silently allow.
         bool authenticated = credential.AuthScheme switch
         {
-            "api-key" => TryAuthenticateApiKey(context, credential),
-            // Future schemes drop in here without touching the surrounding
-            // shape. Plan v4 calls out bearer-jwt + hmac as deferred.
+            "bearer-jwt" => TryAuthenticateJwt(context, systemKey),
             _ => false,
         };
 
@@ -98,7 +99,7 @@ public sealed class SystemClientAuthMiddleware : IMiddleware
         // instead of plumbing system principals through that pipeline.
         var permCodes = await _clients.GetPermissionCodesAsync(client.Key, context.RequestAborted);
         var identity = new ClaimsIdentity(
-            authenticationType: "SystemApiKey",
+            authenticationType: "SystemBearerJwt",
             nameType: ClaimTypes.Name,
             roleType: ClaimTypes.Role);
         identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, principal.PrincipalId));
@@ -132,40 +133,42 @@ public sealed class SystemClientAuthMiddleware : IMiddleware
         return true;
     }
 
-    private bool TryAuthenticateApiKey(HttpContext ctx, CachedCredential credential)
+    private bool TryAuthenticateJwt(HttpContext ctx, string urlSystemKey)
     {
-        // Header convention: Authorization: ApiKey <key>
+        // Header convention: Authorization: Bearer <jwt>
         var header = ctx.Request.Headers.Authorization.ToString();
-        const string scheme = "ApiKey ";
+        const string scheme = "Bearer ";
         if (!header.StartsWith(scheme, StringComparison.OrdinalIgnoreCase))
             return false;
 
-        var presented = header[scheme.Length..].Trim();
-        if (presented.Length == 0)
+        var token = header[scheme.Length..].Trim();
+        if (token.Length == 0)
             return false;
 
-        ApiKeyConfig? cfg;
-        try
+        var result = _jwtValidator.Validate(token);
+        if (!result.IsValid)
         {
-            cfg = JsonSerializer.Deserialize<ApiKeyConfig>(credential.AuthConfig, JsonOpts);
-        }
-        catch (JsonException ex)
-        {
-            _log.LogError(ex, "Malformed AuthConfig for api-key scheme on system {Key}", credential.SystemKey);
+            _log.LogWarning(
+                "bearer-jwt rejected for url system '{Url}': {Reason}",
+                urlSystemKey, result.FailureReason);
             return false;
         }
-        if (cfg is null || string.IsNullOrEmpty(cfg.KeyHash))
+
+        // Token-substitution guard: a token minted for system "oms" must not
+        // unlock /api/v1/source/sap/*. The validator extracted the sub claim;
+        // we compare it to the URL segment the middleware already parsed.
+        // Both come from authenticated channels (sub via RSA-signed JWT, url
+        // via routing) so a mismatch is always an attack or a misconfigured
+        // partner — never a benign edge case.
+        if (!string.Equals(result.SystemKey, urlSystemKey, StringComparison.Ordinal))
+        {
+            _log.LogWarning(
+                "bearer-jwt sub mismatch: token sub='{Sub}' but url='{Url}'.",
+                result.SystemKey, urlSystemKey);
             return false;
+        }
 
-        Span<byte> hash = stackalloc byte[32];
-        SHA256.HashData(Encoding.UTF8.GetBytes(presented), hash);
-        var presentedHex = Convert.ToHexString(hash);
-
-        // Constant-time comparison — defeats timing oracles that would
-        // otherwise leak the hash prefix one byte at a time.
-        return CryptographicOperations.FixedTimeEquals(
-            Encoding.ASCII.GetBytes(presentedHex),
-            Encoding.ASCII.GetBytes(cfg.KeyHash.ToUpperInvariant()));
+        return true;
     }
 
     private static async Task Reject(HttpContext ctx, int statusCode, string reason)
@@ -176,8 +179,4 @@ public sealed class SystemClientAuthMiddleware : IMiddleware
         await ctx.Response.WriteAsync(body);
     }
 
-    private sealed class ApiKeyConfig
-    {
-        public string KeyHash { get; set; } = string.Empty;
-    }
 }

@@ -3,7 +3,9 @@
 import {
   AlertCircle,
   ArrowLeft,
+  Check,
   CheckCircle2,
+  Copy,
   KeyRound,
   Pencil,
   Power,
@@ -14,19 +16,28 @@ import {
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   activateSystem,
   deactivateSystem,
   getSystem,
+  grantSystemPermission,
+  issueToken,
+  listIssuedTokens,
   patchSystem,
+  revokeSystemPermission,
+  revokeToken,
   rotateCredential,
   setCallback,
   type CallbackConfigRequest,
   type CredentialSummary,
+  type IssuedTokenSummary,
   type SystemDetailDto,
 } from "@/lib/api/iam-systems";
+import { listPermissions, type PermissionDto } from "@/lib/api/iam";
+import { resolveStandardSystemPermissions } from "@/lib/iam/standard-system-permissions";
 import { OneTimeSecretBanner } from "@/components/admin/one-time-secret-banner";
+import { PermissionsChecklist } from "@/components/admin/permissions-checklist";
 import { cn } from "@/lib/utils";
 
 // Phase S.6 — single-system detail page. Three cards: metadata,
@@ -42,7 +53,43 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
   const [busy, setBusy] = useState(false);
   const [editingMetadata, setEditingMetadata] = useState(false);
   const [editingCallback, setEditingCallback] = useState(false);
-  const [rotatedKey, setRotatedKey] = useState<{ apiKey: string; rotatedAt: string } | null>(null);
+  // Codes currently in flight (grant or revoke). Drives per-row spinner.
+  const [togglingCodes, setTogglingCodes] = useState<Set<string>>(new Set());
+  const [catalog, setCatalog] = useState<PermissionDto[] | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [rotatedKey, setRotatedKey] = useState<{
+    secret: string;
+    rotatedAt: string;
+  } | null>(null);
+  // Admin-issued long-lived JWT — separate from rotatedKey because it's
+  // a different artifact (JWT to paste directly, not a client_secret to
+  // exchange via /oauth/token).
+  const [issuedToken, setIssuedToken] = useState<{
+    accessToken: string;
+    expiresAt: string;
+    expiresInSeconds: number;
+  } | null>(null);
+  const [issuingToken, setIssuingToken] = useState(false);
+  const [showIssueModal, setShowIssueModal] = useState(false);
+  // Phase S.8c — list of admin-issued JWTs (audit + revocation UI).
+  // Refetched on mount, on successful Issue, and after Revoke.
+  const [issuedTokens, setIssuedTokens] = useState<IssuedTokenSummary[]>([]);
+  const [revokingJti, setRevokingJti] = useState<string | null>(null);
+  // Which JTI was just copied — drives the "✓ copied" glyph for 1.5s.
+  const [copiedJti, setCopiedJti] = useState<string | null>(null);
+
+  // Synthesize the runtime-resolved standard system permission rows
+  // (`dtms:source:{key}:order:read|write`) so they appear under a
+  // "Source" group in the checklist alongside catalog perms.
+  const syntheticSystemPerms = useMemo<PermissionDto[]>(
+    () =>
+      resolveStandardSystemPermissions(systemKey).map((code) => ({
+        code,
+        description: "Standard source-system permission (auto-seeded at create)",
+        module: "Source",
+      })),
+    [systemKey],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -59,6 +106,34 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const loadIssuedTokens = useCallback(async () => {
+    try {
+      setIssuedTokens(await listIssuedTokens(systemKey));
+    } catch {
+      // Non-fatal — table shows empty; page keeps loading the rest.
+      // Explicit error banner is overkill for a supplemental view.
+      setIssuedTokens([]);
+    }
+  }, [systemKey]);
+
+  useEffect(() => {
+    void loadIssuedTokens();
+  }, [loadIssuedTokens]);
+
+  // Load the global permission catalog once when the page mounts. The
+  // checkbox list below renders catalog rows × this system; if catalog
+  // fetch fails, the standard templates resolved from the system key
+  // are still shown so the page is never empty.
+  useEffect(() => {
+    const abort = new AbortController();
+    listPermissions(abort.signal)
+      .then((rows) => setCatalog(rows))
+      .catch((e) => {
+        if (!abort.signal.aborted) setCatalogError((e as Error).message);
+      });
+    return () => abort.abort();
+  }, []);
 
   const onActivate = async () => {
     setBusy(true);
@@ -85,6 +160,27 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
     }
   };
 
+  const onTogglePermission = async (code: string, currentlyGranted: boolean) => {
+    setTogglingCodes((prev) => new Set(prev).add(code));
+    setError(null);
+    try {
+      if (currentlyGranted) {
+        await revokeSystemPermission(systemKey, code);
+      } else {
+        await grantSystemPermission(systemKey, code);
+      }
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setTogglingCodes((prev) => {
+        const next = new Set(prev);
+        next.delete(code);
+        return next;
+      });
+    }
+  };
+
   const onRotate = async () => {
     if (rotatedKey) {
       setError("A freshly rotated key is still visible above — copy it before rotating again.");
@@ -99,12 +195,64 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
     setBusy(true);
     try {
       const r = await rotateCredential(systemKey);
-      setRotatedKey({ apiKey: r.apiKey, rotatedAt: r.rotatedAt });
+      setRotatedKey({ secret: r.secret, rotatedAt: r.rotatedAt });
       await load();
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const onIssueToken = async (lifetimeSeconds: number) => {
+    setIssuingToken(true);
+    setError(null);
+    try {
+      const r = await issueToken(systemKey, { lifetimeSeconds });
+      setIssuedToken({
+        accessToken: r.accessToken,
+        expiresAt: r.expiresAt,
+        expiresInSeconds: r.expiresInSeconds,
+      });
+      setShowIssueModal(false);
+      // Refresh the issued-tokens list so the new row shows up
+      // immediately (otherwise operator sees the banner but no row).
+      void loadIssuedTokens();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIssuingToken(false);
+    }
+  };
+
+  const onCopyJti = async (jti: string) => {
+    try {
+      await navigator.clipboard.writeText(jti);
+      setCopiedJti(jti);
+      // Auto-clear the ✓ glyph so a stale "copied" state doesn't
+      // confuse the next click.
+      setTimeout(() => setCopiedJti(c => (c === jti ? null : c)), 1500);
+    } catch {
+      /* clipboard blocked (rare) — user can still select+copy the text */
+    }
+  };
+
+  const onRevokeToken = async (jti: string) => {
+    if (!confirm(
+      `Revoke this token?\n\n` +
+      `• The token stops authenticating on its NEXT request (revocation is immediate).\n` +
+      `• Other tokens for "${systemKey}" are unaffected.\n` +
+      `• This cannot be undone — the partner will need a new token.`,
+    )) return;
+    setRevokingJti(jti);
+    setError(null);
+    try {
+      await revokeToken(systemKey, jti);
+      await loadIssuedTokens();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setRevokingJti(null);
     }
   };
 
@@ -200,11 +348,38 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
 
       {rotatedKey && (
         <OneTimeSecretBanner
-          title={`New API key for "${data.key}" — copy now (old key revoked)`}
-          secret={rotatedKey.apiKey}
+          title={`New client_secret for "${data.key}" — copy now (old value revoked)`}
+          secret={rotatedKey.secret}
           testKeyForSystem={data.key}
-          helpText={`Rotated at ${rotatedKey.rotatedAt}. Click "Test this key" to confirm it authenticates, then send to the operator. Do NOT click Rotate again until you've copied + tested.`}
+          helpText={`Rotated at ${rotatedKey.rotatedAt}. Click "Test this credential" to confirm it authenticates, then send to the operator. Do NOT click Rotate again until you've copied + tested.`}
           onDismiss={() => setRotatedKey(null)}
+        />
+      )}
+
+      {issuedToken && (
+        <OneTimeSecretBanner
+          title={`Admin-issued JWT for "${data.key}" — copy now`}
+          secret={issuedToken.accessToken}
+          testKeyForSystem={data.key}
+          testMode="jwt"
+          helpText={
+            `Expires ${new Date(issuedToken.expiresAt).toLocaleString()} ` +
+            `(in ${Math.round(issuedToken.expiresInSeconds / 86400)} days). ` +
+            `Send to the partner via a secure channel — they use it directly as ` +
+            `"Authorization: Bearer <token>" with no /oauth/token round-trip needed. ` +
+            `Revocation requires deactivating the system or rotating the signing keypair ` +
+            `until per-jti revocation lands.`
+          }
+          onDismiss={() => setIssuedToken(null)}
+        />
+      )}
+
+      {showIssueModal && (
+        <IssueTokenModal
+          systemKey={data.key}
+          submitting={issuingToken}
+          onCancel={() => setShowIssueModal(false)}
+          onIssue={onIssueToken}
         />
       )}
 
@@ -231,16 +406,34 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
       <section className="rounded-xl border border-[var(--color-ink-100)] bg-white/70 p-5 dark:border-white/[0.06] dark:bg-white/[0.03]">
         <div className="flex items-center justify-between">
           <h2 className="text-[13px] font-semibold text-[var(--color-ink-800)]">Credential</h2>
-          <button
-            type="button"
-            onClick={onRotate}
-            disabled={busy || rotatedKey !== null}
-            title={rotatedKey ? "Copy + test the visible key first before rotating again" : undefined}
-            className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <KeyRound className="h-3 w-3" strokeWidth={2.2} />
-            Rotate key
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowIssueModal(true)}
+              disabled={busy || issuedToken !== null || !data.isActive}
+              title={
+                !data.isActive
+                  ? "Reactivate the system first"
+                  : issuedToken
+                  ? "Copy + dismiss the visible token first"
+                  : "Issue a long-lived JWT for partners that can't run an OAuth client"
+              }
+              className="inline-flex items-center gap-1 rounded border border-sky-300 bg-sky-50 px-2 py-1 text-[11px] text-sky-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <KeyRound className="h-3 w-3" strokeWidth={2.2} />
+              Issue JWT
+            </button>
+            <button
+              type="button"
+              onClick={onRotate}
+              disabled={busy || rotatedKey !== null}
+              title={rotatedKey ? "Copy + test the visible key first before rotating again" : undefined}
+              className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <KeyRound className="h-3 w-3" strokeWidth={2.2} />
+              Rotate key
+            </button>
+          </div>
         </div>
         <p className="mt-1 text-[11px] text-[var(--color-ink-500)]">
           The current key works forever. Rotate <em>only</em> when the key
@@ -255,6 +448,93 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
           </dl>
         ) : (
           <p className="mt-3 text-[12px] text-[var(--color-ink-400)]">No credential row.</p>
+        )}
+      </section>
+
+      {/* ── Issued tokens card (Phase S.8c) ─────────────────────────── */}
+      <section className="rounded-xl border border-[var(--color-ink-100)] bg-white/70 p-5 dark:border-white/[0.06] dark:bg-white/[0.03]">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[13px] font-semibold text-[var(--color-ink-800)]">
+            Issued tokens <span className="ml-1 text-[11px] font-normal text-[var(--color-ink-400)]">({issuedTokens.length})</span>
+          </h2>
+        </div>
+        <p className="mt-1 text-[11px] text-[var(--color-ink-500)]">
+          Every click of <strong>Issue JWT</strong> is recorded here. Revoking a
+          row invalidates that token immediately on its next request — other
+          tokens for this system are unaffected. Rows past expiry stay for audit.
+        </p>
+        {issuedTokens.length === 0 ? (
+          <p className="mt-3 text-[12px] text-[var(--color-ink-400)]">No admin-issued tokens.</p>
+        ) : (
+          <div className="mt-3 overflow-hidden rounded border border-[var(--color-ink-100)] dark:border-white/[0.06]">
+            <table className="w-full text-left text-[12px]">
+              <thead className="bg-[var(--color-ink-50)] text-[10.5px] uppercase tracking-[0.08em] text-[var(--color-ink-500)] dark:bg-white/[0.04]">
+                <tr>
+                  <th className="px-3 py-2">JTI</th>
+                  <th className="px-3 py-2">Issued</th>
+                  <th className="px-3 py-2">Expires</th>
+                  <th className="px-3 py-2">By</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2 text-right"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {issuedTokens.map((t) => {
+                  const isExpired = new Date(t.expiresAt) < new Date();
+                  const isRevoked = t.status === "Revoked";
+                  return (
+                    <tr key={t.jti} className="border-t border-[var(--color-ink-100)] dark:border-white/[0.06]">
+                      <td className="px-3 py-2 font-mono text-[11px]" title={t.jti}>
+                        <span className="inline-flex items-center gap-1.5">
+                          <span>{t.jti.slice(0, 8)}…{t.jti.slice(-4)}</span>
+                          <button
+                            type="button"
+                            onClick={() => onCopyJti(t.jti)}
+                            title="Copy full JTI"
+                            aria-label="Copy full JTI"
+                            className="rounded p-0.5 text-[var(--color-ink-400)] hover:bg-[var(--color-ink-50)] hover:text-[var(--color-ink-600)] dark:hover:bg-white/[0.06]"
+                          >
+                            {copiedJti === t.jti
+                              ? <Check className="h-3 w-3 text-emerald-600" strokeWidth={2.4} />
+                              : <Copy className="h-3 w-3" strokeWidth={2} />}
+                          </button>
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-[var(--color-ink-500)]">{new Date(t.issuedAt).toLocaleString()}</td>
+                      <td className="px-3 py-2 text-[var(--color-ink-500)]">{new Date(t.expiresAt).toLocaleString()}</td>
+                      <td className="px-3 py-2 text-[var(--color-ink-500)]">{t.issuedBy}</td>
+                      <td className="px-3 py-2">
+                        <span className={cn(
+                          "inline-flex rounded px-1.5 py-0.5 text-[10.5px] font-medium",
+                          isRevoked
+                            ? "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                            : isExpired
+                            ? "bg-[var(--color-ink-100)] text-[var(--color-ink-500)]"
+                            : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+                        )}>
+                          {isRevoked ? "Revoked" : isExpired ? "Expired" : "Active"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {isRevoked || isExpired ? (
+                          <span className="text-[10.5px] text-[var(--color-ink-300)]">—</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onRevokeToken(t.jti)}
+                            disabled={revokingJti === t.jti}
+                            className="rounded border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] text-rose-700 hover:bg-rose-100 disabled:opacity-50 dark:border-rose-500/40 dark:bg-rose-950 dark:text-rose-300 dark:hover:bg-rose-900"
+                          >
+                            {revokingJti === t.jti ? "Revoking…" : "Revoke"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
@@ -327,21 +607,16 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
         )}
       </section>
 
-      {/* ── Permissions auto-seeded ─────────────────────────────────── */}
-      <section className="rounded-xl border border-[var(--color-ink-100)] bg-white/70 p-5 dark:border-white/[0.06] dark:bg-white/[0.03]">
-        <h2 className="text-[13px] font-semibold text-[var(--color-ink-800)]">Granted permissions</h2>
-        <p className="mt-1 text-[11px] text-[var(--color-ink-500)]">
-          Seeded automatically at create time from the S.3.1a template list. Custom grant/revoke
-          is not yet wired in the UI — use psql if needed.
-        </p>
-        <ul className="mt-3 grid grid-cols-1 gap-1 text-[12px] md:grid-cols-2">
-          {data.permissions.map((p) => (
-            <li key={p}>
-              <code className="font-mono text-[11.5px] text-[var(--color-ink-700)]">{p}</code>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {/* ── Granted permissions (Phase S.7 — checkbox grid) ───────── */}
+      <PermissionsChecklist
+        granted={data.permissions}
+        catalog={catalog}
+        catalogError={catalogError}
+        toggling={togglingCodes}
+        onToggle={onTogglePermission}
+        syntheticPermissions={syntheticSystemPerms}
+        hint="Tick a row to grant; untick to revoke. Changes apply on the next inbound request — no cache to flush. To stop this system entirely, use Deactivate above."
+      />
 
       {editingMetadata && (
         <EditMetadataModal
@@ -612,6 +887,93 @@ function ErrorBanner({ message }: { message: string }) {
       <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={2.2} />
       <span>{message}</span>
     </div>
+  );
+}
+
+function IssueTokenModal({
+  systemKey,
+  submitting,
+  onCancel,
+  onIssue,
+}: {
+  systemKey: string;
+  submitting: boolean;
+  onCancel: () => void;
+  onIssue: (lifetimeSeconds: number) => void;
+}) {
+  // 90 days default — balances "partner doesn't have to come back too often"
+  // against "stops working before it's truly forgotten." Operator can pick
+  // shorter for higher-stakes integrations.
+  const [days, setDays] = useState(90);
+  const lifetimeSeconds = days * 86400;
+  // Mirror endpoint validation so the operator sees the cap before they hit
+  // submit — bad UX to bounce off the backend with a 400.
+  const valid = days >= 1 && days <= 365;
+
+  return (
+    <ModalShell title={`Issue JWT for "${systemKey}"`} onClose={onCancel}>
+      <p className="text-[12px] text-[var(--color-ink-500)]">
+        Generates a JWT signed by DTMS that the partner sends directly as
+        {" "}<code>Authorization: Bearer &lt;token&gt;</code>{" "}— no OAuth
+        round-trip on their side. Pick a lifetime; pass the token to the
+        partner via a secure channel.
+      </p>
+      <div className="mt-4 space-y-3">
+        <Field label="Lifetime (days)">
+          <div className="flex flex-wrap gap-1.5">
+            {[7, 30, 90, 180, 365].map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDays(d)}
+                className={cn(
+                  "rounded border px-2.5 py-1 text-[12px]",
+                  days === d
+                    ? "border-sky-400 bg-sky-50 text-sky-700"
+                    : "border-[var(--color-ink-200)] bg-white text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]",
+                )}
+              >
+                {d} {d === 1 ? "day" : "days"}
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={365}
+              value={days}
+              onChange={(e) => setDays(Number(e.target.value) || 0)}
+              className="w-20 rounded border border-[var(--color-ink-200)] bg-white px-2 py-1 text-[13px]"
+            />
+            <span className="text-[11px] text-[var(--color-ink-500)]">days (1-365)</span>
+          </div>
+        </Field>
+        <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+          ⚠ Token will be valid for <strong>{days} days</strong>. If leaked,
+          it's accepted until that date (no per-token revocation in V1).
+          Deactivating the system or rotating the signing keypair is the
+          only kill switch.
+        </div>
+      </div>
+      <div className="mt-5 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded border border-[var(--color-ink-200)] bg-white px-3 py-1.5 text-[12px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={!valid || submitting}
+          onClick={() => onIssue(lifetimeSeconds)}
+          className="rounded bg-sky-600 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {submitting ? "Issuing…" : "Issue token"}
+        </button>
+      </div>
+    </ModalShell>
   );
 }
 

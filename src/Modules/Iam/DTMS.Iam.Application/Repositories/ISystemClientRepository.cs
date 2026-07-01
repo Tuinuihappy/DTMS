@@ -58,4 +58,19 @@ public interface ISystemClientRepository
     /// preserved as historical fact when the SystemClient is removed.
     /// </summary>
     Task RemoveAsync(SystemClient client, CancellationToken ct = default);
+
+    /// <summary>
+    /// Insert (<paramref name="systemKey"/>, <paramref name="permissionCode"/>)
+    /// into <c>iam.SystemClientPermissions</c>. Returns <c>true</c> if a
+    /// row was inserted, <c>false</c> if the pair already exists
+    /// (idempotent — multi-tab clicks both resolve to "already granted").
+    /// </summary>
+    Task<bool> GrantPermissionAsync(string systemKey, string permissionCode, string grantedBy, CancellationToken ct = default);
+
+    /// <summary>
+    /// Delete (<paramref name="systemKey"/>, <paramref name="permissionCode"/>)
+    /// from <c>iam.SystemClientPermissions</c>. Returns <c>true</c> if a
+    /// row was removed, <c>false</c> if the pair was not granted.
+    /// </summary>
+    Task<bool> RevokePermissionAsync(string systemKey, string permissionCode, CancellationToken ct = default);
 }

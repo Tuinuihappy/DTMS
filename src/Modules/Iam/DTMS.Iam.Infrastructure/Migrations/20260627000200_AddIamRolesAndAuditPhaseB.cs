@@ -45,13 +45,14 @@ namespace DTMS.Iam.Infrastructure.Migrations
                     table.PrimaryKey("PK_Roles", x => x.Name);
                 });
 
-            // Seed system roles (must exist before the FK on RolePermissions
-            // is added or the FK creation fails).
+            // Seed the Admin system role (must exist before the FK on
+            // RolePermissions is added or the FK creation fails). Other
+            // roles are created on demand via the /admin/roles UI; the
+            // platform intentionally ships with only the bootstrap admin
+            // so each deployment defines its own staffing hierarchy.
             migrationBuilder.Sql(@"
                 INSERT INTO iam.""Roles"" (""Name"", ""Description"", ""IsSystem"", ""CreatedAt"") VALUES
-                  ('Admin',      'Full access (holds the dtms:* wildcard).',      true, now()),
-                  ('Supervisor', 'Dispatcher / shift lead. Manage + recover.',     true, now()),
-                  ('Operator',   'Field operator. Read-only + PWA trip workflow.', true, now())
+                  ('Admin', 'Full access (holds the dtms:* wildcard).', true, now())
                 ON CONFLICT (""Name"") DO NOTHING;
             ");
 
