@@ -21,6 +21,9 @@ public class IamDbContext : DbContext
     // Phase S.3.1b — outbound callback subscriptions.
     public DbSet<SystemEventSubscription> SystemEventSubscriptions { get; set; } = null!;
 
+    // Phase S.8c — audit + revocation backing store for admin-issued JWTs.
+    public DbSet<SystemIssuedToken> SystemIssuedTokens { get; set; } = null!;
+
     public IamDbContext(DbContextOptions<IamDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -124,6 +127,31 @@ public class IamDbContext : DbContext
             b.Property(s => s.CreatedAtUtc).IsRequired();
             b.Property(s => s.UpdatedAtUtc).IsRequired();
             b.HasIndex(s => new { s.SystemKey, s.EventType }).IsUnique();
+        });
+
+        modelBuilder.Entity<SystemIssuedToken>(b =>
+        {
+            b.ToTable("SystemIssuedTokens");
+            b.HasKey(t => t.Id);
+            b.Property(t => t.SystemKey).HasMaxLength(50).IsRequired();
+            b.Property(t => t.Jti).HasMaxLength(64).IsRequired();
+            b.Property(t => t.IssuedAt).IsRequired();
+            b.Property(t => t.ExpiresAt).IsRequired();
+            b.Property(t => t.IssuedBy).HasMaxLength(50).IsRequired();
+            b.Property(t => t.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+            b.Property(t => t.RevokedBy).HasMaxLength(50);
+            b.Property(t => t.RevokeReason).HasMaxLength(300);
+            // Jti is globally unique per mint — enforce so a duplicated
+            // insert (retry, race) surfaces loud instead of quietly
+            // producing 2 rows sharing an id.
+            b.HasIndex(t => t.Jti).IsUnique();
+            // Admin UI lists tokens per system newest-first.
+            b.HasIndex(t => new { t.SystemKey, t.IssuedAt });
+            b.HasOne<SystemClient>()
+                .WithMany()
+                .HasForeignKey(t => t.SystemKey)
+                .HasPrincipalKey(s => s.Key)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<SystemRequestLogEntry>(b =>
