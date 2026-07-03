@@ -15,13 +15,12 @@ public interface IOperatorRepository
     Task<Operator?> GetByIdWithDetailsAsync(Guid id, CancellationToken ct = default);
     Task<Operator?> GetByEmployeeCodeWithDetailsAsync(string employeeCode, CancellationToken ct = default);
 
-    // Phase 4.4 — Eligible-for-assignment query for ManualDispatchStrategy.
-    // Returns Active + CurrentTripId IS NULL operators, ordered so the
-    // assignment policy can take the first match. preferredWarehouseId
-    // floats operators whose PrimaryWarehouseId matches to the top;
-    // unscoped operators come after.
+    // WMS PR-3c — pool query for ManualDispatchStrategy. Returns every
+    // Active + idle (CurrentTripId IS NULL) operator, ordered by
+    // EmployeeCode for deterministic tie-breaking. Policy layers
+    // cert filtering + load balancing on top.
     Task<IReadOnlyList<Operator>> GetEligibleForAssignmentAsync(
-        Guid? preferredWarehouseId, CancellationToken ct = default);
+        CancellationToken ct = default);
 
     // Phase 4.6 — Dispatcher console "operator board" feed. Returns
     // ALL operators (any status, with or without an active trip) so
@@ -40,7 +39,7 @@ public interface IGeofenceOverrideRequestRepository
     // pickup/drop endpoints call this after a geofence-fail to decide
     // whether to honour the operator's claim. Approved + not expired only.
     Task<GeofenceOverrideRequest?> GetApprovedForTripLegAsync(
-        Guid tripId, Guid operatorId, Guid expectedWarehouseId, CancellationToken ct = default);
+        Guid tripId, Guid operatorId, Guid expectedWmsLocationId, CancellationToken ct = default);
 
     // Phase 4.6 — Dispatcher feed: "what overrides are waiting for me?"
     // Pending only — Approved/Denied/Expired stay in the table for

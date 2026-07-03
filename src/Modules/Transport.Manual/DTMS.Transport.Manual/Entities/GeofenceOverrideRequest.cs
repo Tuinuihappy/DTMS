@@ -16,9 +16,9 @@ public class GeofenceOverrideRequest : AggregateRoot<Guid>
     public Guid TripId { get; private set; }
 
     // The leg the operator was trying to complete when the geofence
-    // failed — pickup or drop. Stored as the warehouse the operator
+    // failed — pickup or drop. Stored as the WMS location Id the operator
     // claimed to be at so the dispatcher can sanity-check the request.
-    public Guid ExpectedWarehouseId { get; private set; }
+    public Guid ExpectedWmsLocationId { get; private set; }
     public double ReportedLatitude { get; private set; }
     public double ReportedLongitude { get; private set; }
     public double DistanceFromGeofenceM { get; private set; }
@@ -41,7 +41,7 @@ public class GeofenceOverrideRequest : AggregateRoot<Guid>
     public static GeofenceOverrideRequest Submit(
         Guid operatorId,
         Guid tripId,
-        Guid expectedWarehouseId,
+        Guid expectedWmsLocationId,
         double reportedLat,
         double reportedLng,
         double distanceFromGeofenceM,
@@ -64,7 +64,7 @@ public class GeofenceOverrideRequest : AggregateRoot<Guid>
             Id = Guid.NewGuid(),
             OperatorId = operatorId,
             TripId = tripId,
-            ExpectedWarehouseId = expectedWarehouseId,
+            ExpectedWmsLocationId = expectedWmsLocationId,
             ReportedLatitude = reportedLat,
             ReportedLongitude = reportedLng,
             DistanceFromGeofenceM = distanceFromGeofenceM,

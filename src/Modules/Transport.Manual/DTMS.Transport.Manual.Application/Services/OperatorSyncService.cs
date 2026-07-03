@@ -14,17 +14,17 @@ public sealed class OperatorSyncService : IOperatorSyncService
         string displayName,
         OperatorRole role,
         string? thumbnailUrl,
-        Guid? primaryWarehouseId,
         CancellationToken ct = default)
     {
         var existing = await _repo.GetByEmployeeCodeAsync(employeeCode, ct);
         if (existing is null)
         {
             // First-time login — create the DTMS-side row. Domain
-            // factory raises OperatorRegisteredDomainEvent.
+            // factory raises OperatorRegisteredDomainEvent. ServiceZones
+            // are seeded empty; admin (PR-4 UI or seed script) populates
+            // them before the operator can receive Manual trips.
             var created = Operator.CreateFromJwtClaims(
                 employeeCode, displayName, role,
-                primaryWarehouseId: primaryWarehouseId,
                 phone: null,
                 thumbnailUrl: thumbnailUrl);
             await _repo.AddAsync(created, ct);
@@ -33,21 +33,13 @@ public sealed class OperatorSyncService : IOperatorSyncService
         }
 
         // Subsequent logins — overwrite DisplayName + Role (External
-        // Auth owns those). PrimaryWarehouseId from claims is only
-        // applied when DTMS doesn't already have one — dispatcher
-        // console may override locally and we don't want to clobber.
+        // Auth owns those). ServiceZones stay under DTMS's own admin
+        // control; External Auth doesn't own them.
         var nameDrifted = existing.DisplayName != displayName.Trim();
         var roleDrifted = existing.Role != role;
         if (nameDrifted || roleDrifted)
         {
             existing.SyncFromJwtClaims(displayName, role, thumbnailUrl);
-        }
-        if (primaryWarehouseId.HasValue && existing.PrimaryWarehouseId is null)
-        {
-            existing.SetPrimaryWarehouse(primaryWarehouseId);
-        }
-        if (nameDrifted || roleDrifted || (primaryWarehouseId.HasValue && existing.PrimaryWarehouseId == primaryWarehouseId))
-        {
             await _repo.SaveChangesAsync(ct);
         }
         return existing;

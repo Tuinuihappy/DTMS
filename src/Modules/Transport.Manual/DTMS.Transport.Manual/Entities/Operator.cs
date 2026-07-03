@@ -31,10 +31,6 @@ public class Operator : AggregateRoot<Guid>
     // an in-flight trip already bound to this operator.
     public OperatorStatus Status { get; private set; } = OperatorStatus.Active;
 
-    // Optional default-warehouse hint — dispatcher console uses this to
-    // pre-filter the operator picker. Null = operator can serve any
-    // warehouse (typically a "floating" worker covering multiple sites).
-    public Guid? PrimaryWarehouseId { get; private set; }
 
     // Currently-assigned trip — at most one active trip per operator
     // (enforced by AssignToTrip below). Null when idle / off-shift.
@@ -68,7 +64,6 @@ public class Operator : AggregateRoot<Guid>
         string employeeCode,
         string displayName,
         OperatorRole role,
-        Guid? primaryWarehouseId = null,
         string? phone = null,
         string? thumbnailUrl = null)
     {
@@ -85,7 +80,6 @@ public class Operator : AggregateRoot<Guid>
             DisplayName = displayName.Trim(),
             Role = role,
             Status = OperatorStatus.Active,
-            PrimaryWarehouseId = primaryWarehouseId,
             Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim(),
             ThumbnailUrl = string.IsNullOrWhiteSpace(thumbnailUrl) ? null : thumbnailUrl,
             CreatedAt = now,
@@ -114,15 +108,6 @@ public class Operator : AggregateRoot<Guid>
         if (!string.IsNullOrWhiteSpace(thumbnailUrl))
             ThumbnailUrl = thumbnailUrl;
         LastSyncedAt = DateTime.UtcNow;
-    }
-
-    // Dispatcher console — set operator's home warehouse (for picker
-    // filtering and SLA reports). Idempotent — same warehouse twice is
-    // a no-op and doesn't fire a domain event.
-    public void SetPrimaryWarehouse(Guid? warehouseId)
-    {
-        if (PrimaryWarehouseId == warehouseId) return;
-        PrimaryWarehouseId = warehouseId;
     }
 
     // Assign trip — caller (ManualDispatchStrategy when it ships in

@@ -44,12 +44,6 @@ public class TransportManualDbContext : DbContext
             b.Property(o => o.CreatedAt).IsRequired();
             b.Property(o => o.LastSyncedAt).IsRequired();
 
-            // PrimaryWarehouseId — FK target lives in Facility module's
-            // schema; we don't model the cross-schema FK at EF level
-            // (would require shared DbContext); the application layer
-            // validates referential integrity via IWarehouseLookup.
-            b.Property(o => o.PrimaryWarehouseId);
-
             // CurrentTripId — same cross-module-FK concern, not modelled
             // at the DB level. Index for dispatcher "which trip is
             // operator X on" lookups.

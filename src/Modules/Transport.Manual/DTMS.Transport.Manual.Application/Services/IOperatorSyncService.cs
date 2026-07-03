@@ -14,6 +14,5 @@ public interface IOperatorSyncService
         string displayName,
         OperatorRole role,
         string? thumbnailUrl,
-        Guid? primaryWarehouseId,
         CancellationToken ct = default);
 }

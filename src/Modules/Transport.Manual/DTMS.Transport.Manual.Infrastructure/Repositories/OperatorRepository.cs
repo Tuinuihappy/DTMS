@@ -36,27 +36,16 @@ public sealed class OperatorRepository : IOperatorRepository
                     .ToListAsync(ct);
 
     public async Task<IReadOnlyList<Operator>> GetEligibleForAssignmentAsync(
-        Guid? preferredWarehouseId, CancellationToken ct = default)
+        CancellationToken ct = default)
     {
-        // Active + idle. Order: warehouse match first (so the policy
-        // picks a "right warehouse" operator deterministically), then
-        // by EmployeeCode for stability across runs.
-        var query = _db.Operators
+        // Any Active + idle operator qualifies — PR-3c dropped the
+        // per-operator ServiceZones filter after ops confirmed the
+        // in-plant Manual pool is fully mobile.
+        return await _db.Operators
                        .Where(o => o.Status == OperatorStatus.Active
-                                && o.CurrentTripId == null);
-        if (preferredWarehouseId.HasValue)
-        {
-            // EF translates the boolean projection into ORDER BY (case … then 0 else 1)
-            // which falls back to lexical order on EmployeeCode within each bucket.
-            query = query
-                .OrderBy(o => o.PrimaryWarehouseId == preferredWarehouseId.Value ? 0 : 1)
-                .ThenBy(o => o.EmployeeCode);
-        }
-        else
-        {
-            query = query.OrderBy(o => o.EmployeeCode);
-        }
-        return await query.ToListAsync(ct);
+                                && o.CurrentTripId == null)
+                       .OrderBy(o => o.EmployeeCode)
+                       .ToListAsync(ct);
     }
 
     public Task AddAsync(Operator op, CancellationToken ct = default)
@@ -75,13 +64,13 @@ public sealed class GeofenceOverrideRequestRepository : IGeofenceOverrideRequest
         => _db.GeofenceOverrideRequests.FirstOrDefaultAsync(r => r.Id == id, ct);
 
     public Task<GeofenceOverrideRequest?> GetApprovedForTripLegAsync(
-        Guid tripId, Guid operatorId, Guid expectedWarehouseId, CancellationToken ct = default)
+        Guid tripId, Guid operatorId, Guid expectedWmsLocationId, CancellationToken ct = default)
     {
         var now = DateTime.UtcNow;
         return _db.GeofenceOverrideRequests
             .Where(r => r.TripId == tripId
                      && r.OperatorId == operatorId
-                     && r.ExpectedWarehouseId == expectedWarehouseId
+                     && r.ExpectedWmsLocationId == expectedWmsLocationId
                      && r.Status == OverrideRequestStatus.Approved
                      && r.ExpiresAt > now)
             .OrderByDescending(r => r.DecidedAt)
