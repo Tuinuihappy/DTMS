@@ -51,7 +51,7 @@ public class GetPodPresignedUrlHandlerTests
         var tripId = Guid.NewGuid();
         var owner = Guid.NewGuid();
         var caller = Guid.NewGuid();
-        var ext = ManualTripExtension.AssignToOperator(tripId, owner, null, null, null);
+        var ext = ManualTripExtension.AssignToOperator(tripId, owner, null, null);
         _extensions.GetByTripIdAsync(tripId, Arg.Any<CancellationToken>()).Returns(ext);
 
         var sut = CreateSut();
@@ -67,7 +67,7 @@ public class GetPodPresignedUrlHandlerTests
     {
         var tripId = Guid.NewGuid();
         var opId = Guid.NewGuid();
-        var ext = ManualTripExtension.AssignToOperator(tripId, opId, null, null, null);
+        var ext = ManualTripExtension.AssignToOperator(tripId, opId, null, null);
         _extensions.GetByTripIdAsync(tripId, Arg.Any<CancellationToken>()).Returns(ext);
         _storage.GeneratePresignedPutAsync(
             "dtms-pod",

@@ -14,10 +14,4 @@ public interface IManualBoardClient
     /// Hint shape: <c>{ overrideRequestId, tripId, status }</c>.
     /// </summary>
     Task OverrideDecided(object hint);
-
-    /// <summary>
-    /// A Manual trip was reassigned to a different operator.
-    /// Hint shape: <c>{ tripId, oldOperatorId, newOperatorId }</c>.
-    /// </summary>
-    Task TripReassigned(object hint);
 }

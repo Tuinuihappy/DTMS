@@ -23,7 +23,6 @@ export type ManualTripBoardRow = {
   acknowledgedAt: string | null;
   pickedUpAt: string | null;
   droppedAt: string | null;
-  ackDeadline: string | null;
   pickupDeadline: string | null;
   dropDeadline: string | null;
 };

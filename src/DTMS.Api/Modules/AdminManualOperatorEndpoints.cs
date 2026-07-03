@@ -2,7 +2,6 @@ using DTMS.Api.Realtime.Hubs;
 using DTMS.Api.Realtime.Hubs.Clients;
 using DTMS.Transport.Manual.Application.Commands.Admin.ApproveGeofenceOverride;
 using DTMS.Transport.Manual.Application.Commands.Admin.DenyGeofenceOverride;
-using DTMS.Transport.Manual.Application.Commands.Admin.ReassignManualTrip;
 using DTMS.Transport.Manual.Application.Queries.Admin;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -99,24 +98,13 @@ public static class AdminManualOperatorEndpoints
         .WithName("AdminDenyGeofenceOverride")
         .WithSummary("Deny a pending geofence-override request.");
 
-        group.MapPost("/trips/{tripId:guid}/reassign",
-            async (Guid tripId, [FromBody] ReassignRequest body, ISender sender,
-                   IHubContext<ManualBoardHub, IManualBoardClient> board, CancellationToken ct) =>
-        {
-            var result = await sender.Send(new ReassignManualTripCommand(
-                TripId: tripId,
-                NewOperatorId: body.NewOperatorId,
-                Reason: body.Reason), ct);
-            if (!result.IsSuccess) return Results.BadRequest(new { Error = result.Error });
-            await board.Clients.Group(ManualBoardHub.BoardGroup).TripReassigned(
-                new { TripId = tripId, NewOperatorId = body.NewOperatorId });
-            return Results.NoContent();
-        })
-        .WithName("AdminReassignManualTrip")
-        .WithSummary("Move an active Manual trip to a different operator.");
+        // Admin reassign endpoint deleted per ADR-011 §"Consequences":
+        // force-assigning a claimed pool trip elsewhere breaks the single-
+        // owner CAS invariant. If a legitimate reassign use case surfaces,
+        // it needs a fresh ADR + a race-safe implementation (probably
+        // "release back to pool" followed by a normal claim).
     }
 }
 
 public sealed record OverrideApproveRequest(Guid DecidedByOperatorId, string? Note);
 public sealed record OverrideDenyRequest(Guid DecidedByOperatorId, string Reason);
-public sealed record ReassignRequest(Guid NewOperatorId, string? Reason);

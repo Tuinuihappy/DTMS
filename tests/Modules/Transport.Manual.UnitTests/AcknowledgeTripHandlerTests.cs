@@ -49,7 +49,7 @@ public class AcknowledgeTripHandlerTests
         var tripId = Guid.NewGuid();
         var owner = Guid.NewGuid();
         var other = Guid.NewGuid();
-        var ext = ManualTripExtension.AssignToOperator(tripId, owner, null, null, null);
+        var ext = ManualTripExtension.AssignToOperator(tripId, owner, null, null);
         _extensions.GetByTripIdAsync(tripId, Arg.Any<CancellationToken>()).Returns(ext);
         var sut = CreateSut();
 
@@ -68,7 +68,7 @@ public class AcknowledgeTripHandlerTests
         var owner = Guid.NewGuid();
         var trip = Trip.CreateForEnvelope(
             deliveryOrderId: Guid.NewGuid(), upperKey: "UK-DUP-1", vendorOrderKey: null);
-        var ext = ManualTripExtension.AssignToOperator(trip.Id, owner, null, null, null);
+        var ext = ManualTripExtension.AssignToOperator(trip.Id, owner, null, null);
         ext.MarkAcknowledged();
         _extensions.GetByTripIdAsync(trip.Id, Arg.Any<CancellationToken>()).Returns(ext);
         var sut = CreateSut();

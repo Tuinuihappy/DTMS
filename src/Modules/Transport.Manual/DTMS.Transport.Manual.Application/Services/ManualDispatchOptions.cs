@@ -22,15 +22,4 @@ public sealed class ManualDispatchOptions
     // an incident) without redeploying. When false the strategy short-
     // circuits at DispatchGroupAsync entry.
     public bool EnableDispatch { get; set; } = true;
-
-    // ── Admin reassign flow (deprecated, defer for later cleanup) ────
-    // The dispatcher's "reassign this trip to operator X" admin command
-    // still reads these. That command is inconsistent with the pool
-    // model — pool trips claim themselves; forced admin reassign is a
-    // race-safety hazard. Slated for removal in a follow-up cleanup PR;
-    // keeping the fields for now so the admin endpoint still compiles.
-    public int AckSlaMinutes { get; set; } = 5;
-    public string PushTitleTemplate { get; set; } = "New delivery: {0}";
-    public string PushBodyTemplate { get; set; } = "Tap to view trip details.";
-    public string PushTargetUrl { get; set; } = "/m/trips";
 }

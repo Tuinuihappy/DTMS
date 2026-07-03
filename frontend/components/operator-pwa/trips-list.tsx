@@ -124,15 +124,13 @@ function TripStatusBadge({ trip }: { trip: AssignedTrip }) {
 
 function DeadlineFooter({ trip }: { trip: AssignedTrip }) {
   // Show the nearest unfulfilled deadline. Skip past deadlines on a
-  // step the operator has already completed (e.g. AckDeadline is moot
-  // once acknowledgedAt is set).
-  const next = !trip.acknowledgedAt
-    ? trip.ackDeadline && { label: "Acknowledge by", iso: trip.ackDeadline }
-    : !trip.pickedUpAt
-      ? trip.pickupDeadline && { label: "Pickup by", iso: trip.pickupDeadline }
-      : !trip.droppedAt
-        ? trip.dropDeadline && { label: "Drop by", iso: trip.dropDeadline }
-        : null;
+  // step the operator has already completed. Pool claim + ack happen
+  // atomically so there is no separate AckDeadline anymore.
+  const next = !trip.pickedUpAt
+    ? trip.pickupDeadline && { label: "Pickup by", iso: trip.pickupDeadline }
+    : !trip.droppedAt
+      ? trip.dropDeadline && { label: "Drop by", iso: trip.dropDeadline }
+      : null;
   if (!next) return null;
   return (
     <div className="mt-3 flex items-center justify-between border-t border-zinc-800 pt-3 text-xs text-zinc-400">

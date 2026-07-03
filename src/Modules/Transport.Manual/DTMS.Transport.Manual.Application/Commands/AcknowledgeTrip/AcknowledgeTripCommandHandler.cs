@@ -171,7 +171,6 @@ internal sealed class AcknowledgeTripCommandHandler : ICommandHandler<Acknowledg
         var ext = ManualTripExtension.AssignToOperator(
             tripId: request.TripId,
             operatorId: request.OperatorId,
-            ackDeadline: null,             // pool path acks + assigns in one atomic step
             pickupDeadline: pickupDeadline,
             dropDeadline: dropDeadline);
         ext.MarkAcknowledged();

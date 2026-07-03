@@ -9,7 +9,6 @@ public class ManualTripExtensionTests
         ManualTripExtension.AssignToOperator(
             tripId: Guid.NewGuid(),
             operatorId: Guid.NewGuid(),
-            ackDeadline: DateTime.UtcNow.AddMinutes(15),
             pickupDeadline: DateTime.UtcNow.AddHours(1),
             dropDeadline: DateTime.UtcNow.AddHours(3));
 
@@ -23,14 +22,14 @@ public class ManualTripExtensionTests
         ext.AcknowledgedAt.Should().BeNull();
         ext.PickedUpAt.Should().BeNull();
         ext.DroppedAt.Should().BeNull();
-        ext.AckDeadline.Should().NotBeNull();
+        ext.PickupDeadline.Should().NotBeNull();
     }
 
     [Fact]
     public void AssignToOperator_EmptyTripId_Throws()
     {
         var act = () => ManualTripExtension.AssignToOperator(
-            Guid.Empty, Guid.NewGuid(), null, null, null);
+            Guid.Empty, Guid.NewGuid(), null, null);
         act.Should().Throw<ArgumentException>().WithParameterName("tripId");
     }
 

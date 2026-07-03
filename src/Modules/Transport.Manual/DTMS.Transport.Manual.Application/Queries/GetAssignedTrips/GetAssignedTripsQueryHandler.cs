@@ -17,7 +17,6 @@ internal sealed class GetAssignedTripsQueryHandler : IQueryHandler<GetAssignedTr
             AcknowledgedAt: e.AcknowledgedAt,
             PickedUpAt: e.PickedUpAt,
             DroppedAt: e.DroppedAt,
-            AckDeadline: e.AckDeadline,
             PickupDeadline: e.PickupDeadline,
             DropDeadline: e.DropDeadline,
             PickupOverrideUsed: e.PickupGeofenceOverrideId.HasValue,

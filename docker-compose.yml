@@ -350,13 +350,6 @@ services:
       - TransportModes__Amr__Enabled=${TransportModes__Amr__Enabled:-true}
       - TransportModes__Manual__Enabled=${TransportModes__Manual__Enabled:-false}
       - TransportModes__Fleet__Enabled=${TransportModes__Fleet__Enabled:-false}
-      # WMS PR-4b — Pool dispatch. When true, Manual/Fleet dispatch skips
-      # operator selection at dispatch time; the trip lands in Dispatched
-      # state and notifies OMS immediately with deliveryBy=null. Any
-      # active operator can then Acknowledge&Start to claim + begin work.
-      # When false (default) the legacy per-trip operator assignment
-      # + ManualTripExtension SLA flow is used.
-      - TransportModes__Manual__Dispatch__PoolMode=${TransportModes__Manual__Dispatch__PoolMode:-false}
       # Upstream OMS shipment notification (POST /api/shipments) fired
       # when a Trip transitions Created → InProgress. BearerToken is a
       # long-lived JWT supplied by OMS ops — DO NOT commit; pass via

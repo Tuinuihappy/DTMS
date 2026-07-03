@@ -20,9 +20,9 @@ public sealed class OperatorSyncService : IOperatorSyncService
         if (existing is null)
         {
             // First-time login — create the DTMS-side row. Domain
-            // factory raises OperatorRegisteredDomainEvent. ServiceZones
-            // are seeded empty; admin (PR-4 UI or seed script) populates
-            // them before the operator can receive Manual trips.
+            // factory raises OperatorRegisteredDomainEvent. Pool model
+            // is universal so no per-operator zone/warehouse gating
+            // is needed post-registration.
             var created = Operator.CreateFromJwtClaims(
                 employeeCode, displayName, role,
                 phone: null,
@@ -33,8 +33,7 @@ public sealed class OperatorSyncService : IOperatorSyncService
         }
 
         // Subsequent logins — overwrite DisplayName + Role (External
-        // Auth owns those). ServiceZones stay under DTMS's own admin
-        // control; External Auth doesn't own them.
+        // Auth owns those).
         var nameDrifted = existing.DisplayName != displayName.Trim();
         var roleDrifted = existing.Role != role;
         if (nameDrifted || roleDrifted)

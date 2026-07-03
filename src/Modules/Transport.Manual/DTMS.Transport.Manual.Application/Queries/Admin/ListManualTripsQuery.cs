@@ -15,7 +15,6 @@ public record ManualTripBoardDto(
     DateTime? AcknowledgedAt,
     DateTime? PickedUpAt,
     DateTime? DroppedAt,
-    DateTime? AckDeadline,
     DateTime? PickupDeadline,
     DateTime? DropDeadline);
 
@@ -32,7 +31,7 @@ internal sealed class ListManualTripsQueryHandler : IQueryHandler<ListManualTrip
         var dtos = rows.Select(e => new ManualTripBoardDto(
             e.TripId, e.OperatorId, e.AssignedAt,
             e.AcknowledgedAt, e.PickedUpAt, e.DroppedAt,
-            e.AckDeadline, e.PickupDeadline, e.DropDeadline)).ToList();
+            e.PickupDeadline, e.DropDeadline)).ToList();
         return Result<IReadOnlyList<ManualTripBoardDto>>.Success(dtos);
     }
 }
