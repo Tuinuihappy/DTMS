@@ -50,4 +50,22 @@ public interface ITripRepository
     /// than throwing for an observability-only feature.
     /// </summary>
     Task<Guid> GetRootTripIdAsync(Guid tripId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// WMS PR-4b — Atomic pool-claim CAS. Attempts to bind
+    /// <paramref name="operatorId"/> to a pooled trip in a single UPDATE
+    /// (no read-then-write race window). Wins only when the trip still
+    /// matches the pool predicate:
+    ///   Status = 'Created' ∧ DispatchedAt IS NOT NULL ∧
+    ///   ClaimedByOperatorId IS NULL.
+    /// Sets <c>ClaimedByOperatorId</c> + <c>ClaimedAt</c>; status stays
+    /// <see cref="TripStatus.Created"/> — the Created → InProgress
+    /// transition + <c>TripStartedDomainEvent</c> emit are done via the
+    /// domain aggregate in the caller after this returns <c>true</c>.
+    /// Returns <c>false</c> when someone else already claimed the trip,
+    /// the trip has already started, or the trip never entered the pool
+    /// (AMR trip). The caller maps <c>false</c> to HTTP 409 so the PWA
+    /// toasts + refreshes.
+    /// </summary>
+    Task<bool> TryClaimFromPoolAsync(Guid tripId, Guid operatorId, CancellationToken cancellationToken = default);
 }

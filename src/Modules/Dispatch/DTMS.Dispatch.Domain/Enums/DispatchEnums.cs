@@ -1,5 +1,15 @@
 namespace DTMS.Dispatch.Domain.Enums;
 
+// Trip lifecycle states — unified across AMR and Manual/Fleet.
+//   Created    — trip persisted, awaiting acceptance. AMR: RIOT3 TASK_PROCESSING;
+//                Manual pool: an operator to Acknowledge from the pool.
+//   InProgress — vendor / operator has taken the trip and is executing it.
+//   Paused     — vendor placed the trip in a hold/hang state.
+//   Completed / Failed / Cancelled — terminal states.
+//
+// The "in pool" signal for Manual/Fleet is NOT a distinct status — it is
+// derived from (Status = Created ∧ DispatchedAt IS NOT NULL ∧
+// ClaimedByOperatorId IS NULL). See IX_Trips_Pool.
 public enum TripStatus { Created, InProgress, Paused, Completed, Failed, Cancelled }
 
 // Why the trip is in Paused state. The vendor exposes two distinct paused

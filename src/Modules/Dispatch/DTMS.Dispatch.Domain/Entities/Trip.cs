@@ -53,14 +53,27 @@ public class Trip : AggregateRoot<Guid>
     public Guid? PickupStationId { get; private set; }
     public Guid? DropStationId { get; private set; }
 
-    // Phase 2.5 — snapshot the warehouse Ids at create time. Mirrors the
-    // existing StationId snapshot pattern but at the building level (per
-    // ADR-002): every trip is associated with a pickup + drop warehouse,
-    // even Manual / Fleet that don't have specific stations. Nullable now
-    // because the existing CreateForEnvelope callers don't supply them
-    // yet — Phase 2.6 wires resolution into the create command handler.
-    public Guid? PickupWarehouseId { get; private set; }
-    public Guid? DropWarehouseId { get; private set; }
+    // WMS PR-2 — Manual/Fleet trips snapshot the WMS location Ids at create
+    // time. Downstream operator geofence + POD checks read these. AMR
+    // trips leave these NULL (station-based, see PickupStationId above).
+    public Guid? PickupWmsLocationId { get; private set; }
+    public Guid? DropWmsLocationId { get; private set; }
+
+    // WMS PR-4b — pool-dispatch tracking. Manual/Fleet trips are born
+    // Dispatched (see TripStatus.Dispatched) and sit in the pool until an
+    // operator clicks "Acknowledge and start" on their PWA.
+    //
+    // The claim is a single atomic step: the endpoint runs a SQL CAS that
+    // sets Status → InProgress + ClaimedByOperatorId + ClaimedAt in one
+    // statement so two operators tapping the same row race safely (only
+    // one UPDATE affects a row; the loser gets 0 rowsAffected → 409).
+    //
+    // DispatchedAt is the pool-order key; operators see FIFO by default.
+    // AMR trips leave all three NULL — their own lifecycle is Created →
+    // InProgress via the RIOT3 webhook path, not the operator pool.
+    public Guid? ClaimedByOperatorId { get; private set; }
+    public DateTime? ClaimedAt { get; private set; }
+    public DateTime? DispatchedAt { get; private set; }
 
     // Retry chain. First dispatch = 1, each retry increments.
     // PreviousAttemptId points to the trip this one supersedes (null for
@@ -114,8 +127,8 @@ public class Trip : AggregateRoot<Guid>
         int? priorityAtDispatch = null,
         string? vendorRequestSnapshot = null,
         Guid? jobId = null,
-        Guid? pickupWarehouseId = null,
-        Guid? dropWarehouseId = null)
+        Guid? pickupWmsLocationId = null,
+        Guid? dropWmsLocationId = null)
     {
         if (string.IsNullOrWhiteSpace(upperKey))
             throw new ArgumentException("UpperKey must not be empty.", nameof(upperKey));
@@ -138,8 +151,8 @@ public class Trip : AggregateRoot<Guid>
             UpperKey = upperKey.Trim(),
             PickupStationId = pickupStationId,
             DropStationId = dropStationId,
-            PickupWarehouseId = pickupWarehouseId,
-            DropWarehouseId = dropWarehouseId,
+            PickupWmsLocationId = pickupWmsLocationId,
+            DropWmsLocationId = dropWmsLocationId,
             AttemptNumber = attemptNumber,
             PreviousAttemptId = previousAttemptId,
             TemplateNameAtDispatch = string.IsNullOrWhiteSpace(templateNameAtDispatch) ? null : templateNameAtDispatch.Trim(),
@@ -182,6 +195,42 @@ public class Trip : AggregateRoot<Guid>
             VendorExpectedCompletionAt = expectedCompletionAt.Value;
 
         RecordEvent("VendorSnapshotCaptured", $"sizeBytes={snapshotJson.Length}");
+    }
+
+    /// <summary>
+    /// WMS PR-4b — Manual/Fleet pool dispatch. Marks the trip as "available
+    /// in the pool" by stamping <see cref="DispatchedAt"/>. Status stays
+    /// <see cref="TripStatus.Created"/> so the lifecycle is unified with
+    /// AMR (which also sits in Created until vendor acceptance). The pool
+    /// membership predicate is therefore
+    /// (Status = Created ∧ DispatchedAt IS NOT NULL ∧ ClaimedByOperatorId IS NULL).
+    ///
+    /// Fires <see cref="TripDispatchedDomainEvent"/> which
+    /// <c>DispatchDomainEventMapper</c> forwards as
+    /// <c>TripDispatchedIntegrationEventV1</c>. Downstream:
+    ///   • TripStartedOmsNotifyConsumer notifies OMS (DeliveryBy = null).
+    ///   • TripPoolBroadcaster (PR-D) pushes to operator PWAs.
+    ///
+    /// Idempotent — subsequent calls no-op via the <c>DispatchedAt</c>
+    /// timestamp check. AMR trips must never call this; the guard rejects
+    /// any trip already past <c>Created</c> (i.e. already claimed/started).
+    ///
+    /// Caller responsibility: bind Items (via AssignItemsToTripCommand)
+    /// BEFORE calling MarkDispatched so the item snapshot passed here is
+    /// complete. The OMS consumer skips when the items list is empty.
+    /// </summary>
+    public void MarkDispatched(IReadOnlyList<TripItemSnapshot>? items = null)
+    {
+        if (DispatchedAt.HasValue)
+            return; // idempotent — pool signal already emitted
+        if (Status != TripStatus.Created)
+            throw new InvalidOperationException(
+                $"MarkDispatched requires Created status; got {Status}.");
+
+        DispatchedAt = DateTime.UtcNow;
+        RecordEvent("Dispatched", $"itemCount={items?.Count ?? 0}");
+        AddDomainEvent(new TripDispatchedDomainEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, items));
     }
 
     // Envelope-flow vendor state transitions. All idempotent — duplicate

@@ -16,6 +16,19 @@ public record TripStartedDomainEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId,
     Guid? VehicleId, string? VendorVehicleKey,
     IReadOnlyList<TripItemSnapshot>? Items = null) : IDomainEvent;
+
+// WMS PR-4b — fired when a Manual/Fleet trip enters the pool
+// (Created → Dispatched) at dispatch time, before any operator has
+// claimed it. Downstream OMS notification fires from this event
+// (with DeliveryBy = null) so the customer/system learns about the
+// shipment immediately at dispatch, not at operator claim time.
+//
+// Items — snapshot of the items bound to this trip. Populated by
+// Trip.MarkDispatched via ITripItemSnapshotProvider (same pattern
+// as TripStartedDomainEvent). Null/empty is valid for legacy paths.
+public record TripDispatchedDomainEvent(
+    Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId,
+    IReadOnlyList<TripItemSnapshot>? Items = null) : IDomainEvent;
 public record TripPickupCompletedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId) : IDomainEvent;
 
 // RequiresDropPod is the order's effective POD policy resolved at

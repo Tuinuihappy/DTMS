@@ -58,10 +58,19 @@ public class DispatchDbContext : DbContext
             // Nullable for now; existing CreateForEnvelope callers don't pass
             // them yet. Phase 2.6 wires resolution at the command-handler
             // layer so every new Trip carries both Ids.
-            builder.Property(t => t.PickupWarehouseId);
-            builder.Property(t => t.DropWarehouseId);
+            // WMS PR-2 — Manual/Fleet trips snapshot WMS location Ids.
+            // AMR trips leave these NULL (station-based).
+            builder.Property(t => t.PickupWmsLocationId);
+            builder.Property(t => t.DropWmsLocationId);
             builder.Property(t => t.PickupStationId);
             builder.Property(t => t.DropStationId);
+            // WMS PR-4b — pool dispatch tracking. The partial index that
+            // powers the "available trips" pool query lives in the
+            // migration (EF fluent HasIndex can't express the composite
+            // filter WHERE Status='Dispatched' AND ClaimedByOperatorId IS NULL).
+            builder.Property(t => t.ClaimedByOperatorId);
+            builder.Property(t => t.ClaimedAt);
+            builder.Property(t => t.DispatchedAt);
             // UpperKey is the RIOT3 correlation key (and unique). Legacy
             // job/task trips (which had null UpperKey) were dropped in
             // Phase b7 — all surviving rows are envelope-dispatched.

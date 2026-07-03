@@ -10,6 +10,7 @@ using DTMS.Transport.Manual.Application.Commands.UnregisterPushSubscription;
 using DTMS.Transport.Manual.Application.Queries.GetAssignedTrips;
 using DTMS.Transport.Manual.Application.Queries.GetMyProfile;
 using DTMS.Transport.Manual.Application.Queries.GetPodPresignedUrl;
+using DTMS.Transport.Manual.Application.Queries.GetPoolTrips;
 using DTMS.Transport.Manual.Application.Services;
 using DTMS.Transport.Manual.Domain.Enums;
 using MediatR;
@@ -55,11 +56,31 @@ public static class OperatorEndpoints
         }).RequirePermission("dtms:operator:profile:read");
 
         // ── Trip actions ──────────────────────────────────────────────
+        // WMS PR-4b (PR-D) — Pool list. Universal visibility (no zone or
+        // warehouse filter); FIFO by DispatchedAt. Frontend renders cards +
+        // subscribes to /hubs/operator-pool for realtime add/claim/remove.
+        group.MapGet("/trips/pool",
+            async (ISender sender) =>
+            {
+                var result = await sender.Send(new GetPoolTripsQuery());
+                return ToHttp(result);
+                // Reuse the acknowledge permission — anyone who can see the
+                // pool must also be able to act on it (there's no read-only
+                // pool viewer role today).
+            }).RequirePermission("dtms:operator:trip:acknowledge");
+
         group.MapPost("/trips/{tripId:guid}/acknowledge",
             async (Guid tripId, HttpContext ctx, ISender sender) =>
             {
                 var opId = ResolveOperatorId(ctx);
                 var result = await sender.Send(new AcknowledgeTripCommand(tripId, opId));
+                // WMS PR-4b — pool race handling. When two operators tap
+                // Acknowledge on the same pooled trip, exactly one wins the
+                // SQL CAS; the loser gets AlreadyClaimedErrorCode so the
+                // PWA can toast "someone else took it" and refresh the pool
+                // list (instead of a generic 400 that reads like user error).
+                if (result.IsFailure && result.Error == AcknowledgeTripErrorCodes.AlreadyClaimed)
+                    return Results.Conflict(new { Error = result.Error });
                 return ToHttp(result);
             }).RequirePermission("dtms:operator:trip:acknowledge");
 
@@ -95,7 +116,7 @@ public static class OperatorEndpoints
             {
                 var opId = ResolveOperatorId(ctx);
                 var result = await sender.Send(new SubmitGeofenceOverrideCommand(
-                    req.TripId, opId, req.ExpectedWarehouseId,
+                    req.TripId, opId, req.ExpectedWmsLocationId,
                     req.Lat, req.Lng, req.Reason, req.PhotoUrl));
                 return result.IsSuccess
                     ? Results.Created($"/api/operator/geofence/override-request/{result.Value}", new { Id = result.Value })
@@ -180,7 +201,7 @@ public static class OperatorEndpoints
 public record RecordPickupRequest(double Lat, double Lng, string? PodKey);
 public record RecordDropRequest(double Lat, double Lng, string? PodKey);
 public record SubmitOverrideRequest(
-    Guid TripId, Guid ExpectedWarehouseId, double Lat, double Lng,
+    Guid TripId, Guid ExpectedWmsLocationId, double Lat, double Lng,
     string Reason, string? PhotoUrl);
 public record RegisterPushRequest(
     string Platform, string Endpoint, string? PublicKey, string? AuthSecret, string? DeviceLabel);

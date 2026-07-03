@@ -53,6 +53,20 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     // (caller populated via ITripItemSnapshotProvider).
                     Items: evt.Items)
             ],
+            // WMS PR-4b — Manual/Fleet pool dispatch. Maps to the new
+            // integration event that TripStartedOmsNotifyConsumer subscribes
+            // to alongside TripStartedIntegrationEvent.
+            TripDispatchedDomainEvent evt =>
+            [
+                new TripDispatchedIntegrationEventV1(
+                    evt.EventId,
+                    evt.OccurredOn,
+                    evt.TripId,
+                    evt.DeliveryOrderId,
+                    TriggeredBy: triggeredBy,
+                    CorrelationId: correlationId,
+                    Items: evt.Items)
+            ],
             TripPickupCompletedDomainEvent evt =>
             [
                 new TripPickupCompletedIntegrationEvent(

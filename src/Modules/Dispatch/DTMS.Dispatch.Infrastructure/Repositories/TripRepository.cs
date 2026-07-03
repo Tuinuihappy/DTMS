@@ -224,6 +224,34 @@ public class TripRepository : ITripRepository
         }
     }
 
+    public async Task<bool> TryClaimFromPoolAsync(
+        Guid tripId, Guid operatorId, CancellationToken cancellationToken = default)
+    {
+        // Raw SQL CAS — atomic single-statement UPDATE avoids the read-then-
+        // write race window an EF LINQ update would open. WHERE narrows to
+        // the pool predicate; rowcount is the authority (1 = won, 0 = someone
+        // else already claimed OR trip started OR AMR trip that never
+        // dispatched to pool). Status stays 'Created' — the caller flips it
+        // via trip.MarkVendorStarted so TripStartedDomainEvent + StartedAt
+        // stay in the aggregate (single source of truth for the transition).
+        //
+        // The partial index IX_Trips_Pool covers the WHERE + supplies the
+        // FIFO order key; an unclaimed trip lookup is O(log n).
+        var now = DateTime.UtcNow;
+        var rows = await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            UPDATE dispatch."Trips"
+               SET "ClaimedByOperatorId" = {operatorId},
+                   "ClaimedAt"           = {now}
+             WHERE "Id"                  = {tripId}
+               AND "Status"              = 'Created'
+               AND "DispatchedAt"        IS NOT NULL
+               AND "ClaimedByOperatorId" IS NULL
+            """,
+            cancellationToken);
+        return rows == 1;
+    }
+
     private async Task AddNewProofsOfDeliveryAsync(Trip trip, CancellationToken cancellationToken)
     {
         foreach (var proofOfDelivery in trip.ProofsOfDelivery)

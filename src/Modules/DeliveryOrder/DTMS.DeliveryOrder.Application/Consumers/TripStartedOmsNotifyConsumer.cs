@@ -21,6 +21,12 @@ namespace DTMS.DeliveryOrder.Application.Consumers;
 /// Phase b/c — Notifies the upstream OMS that a shipment has started
 /// once RIOT3 emits TASK_PROCESSING (Trip: Created → InProgress).
 ///
+/// WMS PR-4b — also consumes <c>TripDispatchedIntegrationEventV1</c>
+/// so Manual/Fleet pool trips notify OMS at dispatch time (before any
+/// operator claims). In that path <c>DeliveryBy</c> is null — the shared
+/// consume method routes on the presence of a vehicle name to keep the
+/// two flows in a single place.
+///
 /// Gated by:
 ///   • UpstreamOms:Enabled kill switch (dev/test).
 ///   • Order.OrderRef presence — only upstream-originated orders get
@@ -32,7 +38,9 @@ namespace DTMS.DeliveryOrder.Application.Consumers;
 /// paired Fault consumer (TripStartedOmsNotifyFaultConsumer) handle the
 /// dead-letter audit.
 /// </summary>
-public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEvent>
+public class TripStartedOmsNotifyConsumer :
+    IConsumer<TripStartedIntegrationEvent>,
+    IConsumer<TripDispatchedIntegrationEventV1>
 {
     private const string AuditEventType = "UpstreamOmsNotified";
 
@@ -65,28 +73,45 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
         _logger = logger;
     }
 
-    public async Task Consume(ConsumeContext<TripStartedIntegrationEvent> context)
-    {
-        var evt = context.Message;
-        var ct = context.CancellationToken;
+    public Task Consume(ConsumeContext<TripStartedIntegrationEvent> context) =>
+        NotifyAsync(
+            eventType: "TripStarted",
+            tripId: context.Message.TripId,
+            deliveryOrderId: context.Message.DeliveryOrderId,
+            requireVendorVehicleName: true,
+            ct: context.CancellationToken);
 
+    // WMS PR-4b — pool-dispatch notification. Fires immediately at
+    // dispatch time; no vehicle/operator claimed yet so DeliveryBy = null.
+    public Task Consume(ConsumeContext<TripDispatchedIntegrationEventV1> context) =>
+        NotifyAsync(
+            eventType: "TripDispatched",
+            tripId: context.Message.TripId,
+            deliveryOrderId: context.Message.DeliveryOrderId,
+            requireVendorVehicleName: false,
+            ct: context.CancellationToken);
+
+    private async Task NotifyAsync(
+        string eventType, Guid tripId, Guid deliveryOrderId,
+        bool requireVendorVehicleName, CancellationToken ct)
+    {
         if (!_options.Enabled)
         {
-            _logger.LogDebug("[OmsNotify] disabled — skipping Trip {TripId}", evt.TripId);
+            _logger.LogDebug("[OmsNotify] disabled — skipping Trip {TripId}", tripId);
             return;
         }
 
-        if (evt.DeliveryOrderId == Guid.Empty)
+        if (deliveryOrderId == Guid.Empty)
         {
-            _logger.LogDebug("[OmsNotify] Trip {TripId} has no DeliveryOrderId — skipping", evt.TripId);
+            _logger.LogDebug("[OmsNotify] Trip {TripId} has no DeliveryOrderId — skipping", tripId);
             return;
         }
 
-        var order = await _orderRepository.GetByIdAsync(evt.DeliveryOrderId, ct);
+        var order = await _orderRepository.GetByIdAsync(deliveryOrderId, ct);
         if (order is null)
         {
             _logger.LogWarning("[OmsNotify] No DeliveryOrder for {OrderId} (Trip {TripId}) — skipping",
-                evt.DeliveryOrderId, evt.TripId);
+                deliveryOrderId, tripId);
             return;
         }
 
@@ -115,22 +140,48 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
         }
 
         var lots = order.Items
-            .Where(i => i.TripId == evt.TripId)
+            .Where(i => i.TripId == tripId)
             .Select(i => i.ItemId)
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .ToList();
 
         if (lots.Count == 0)
         {
+            // Pool dispatch may see the event before AssignItemsToTripCommand
+            // has committed the item→trip binding. Throwing lets MassTransit
+            // retry (backoff up to 3 attempts) so we don't lose the OMS
+            // notification just because the two saves raced. AMR path used
+            // to log-and-skip here — same behaviour for the started event
+            // preserves legacy semantics.
+            if (eventType == "TripDispatched")
+                throw new InvalidOperationException(
+                    $"Trip {tripId} has no bound items yet — race with AssignItemsToTripCommand save. Will retry.");
             _logger.LogInformation(
                 "[OmsNotify] Order {OrderId} Trip {TripId} has no bound items — pre-binding row, skipping",
-                order.Id, evt.TripId);
+                order.Id, tripId);
             return;
         }
 
-        var trip = await _tripRepository.GetByIdAsync(evt.TripId, ct);
+        var trip = await _tripRepository.GetByIdAsync(tripId, ct);
+
+        // WMS PR-4b — Pool trips are notified ONCE at dispatch time via
+        // TripDispatchedIntegrationEventV1 (DeliveryBy=null). When the
+        // operator subsequently claims, TripStartedIntegrationEvent also
+        // reaches this consumer, but re-POSTing to OMS would duplicate the
+        // shipment notify for the same shipmentId. Trip.DispatchedAt is the
+        // pool signature: AMR trips never dispatch to a pool (it stays null),
+        // Manual/Fleet pool trips always have it stamped. Skip the second
+        // notify for pool trips on TripStarted.
+        if (eventType == "TripStarted" && trip?.DispatchedAt is not null)
+        {
+            _logger.LogInformation(
+                "[OmsNotify] Trip {TripId} — pool trip already notified at dispatch time (DispatchedAt={DispatchedAt}); skipping duplicate TripStarted POST.",
+                tripId, trip.DispatchedAt);
+            return;
+        }
+
         var vendorVehicleName = trip?.VendorVehicleName;
-        if (string.IsNullOrWhiteSpace(vendorVehicleName))
+        if (requireVendorVehicleName && string.IsNullOrWhiteSpace(vendorVehicleName))
         {
             // Throw instead of sending an empty/placeholder name — Option A
             // semantics: the OMS POST overwrites deliveryBy, so a blank
@@ -140,20 +191,24 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
             // MarkVendorStarted save hasn't committed yet — retry will
             // re-read once it has.
             throw new InvalidOperationException(
-                $"Trip {evt.TripId} has no VendorVehicleName yet — race with TASK_PROCESSING save (Name + Key arrive together from RIOT3). Will retry.");
+                $"Trip {tripId} has no VendorVehicleName yet — race with TASK_PROCESSING save (Name + Key arrive together from RIOT3). Will retry.");
         }
+        // WMS PR-4b — pool dispatch skips the vehicle-name requirement:
+        // DeliveryBy is explicitly null on the wire. OMS should accept
+        // this as "vehicle not yet known" (verified per team agreement).
+        string? deliveryBy = requireVendorVehicleName ? vendorVehicleName : null;
 
         // [Option A] Stable shipmentId across retry chain. Walking
         // PreviousAttemptId back to the first attempt's Id means OMS sees
         // one shipment with vehicle/state updates per retry, not a fresh
         // shipment per attempt.
-        var rootTripId = await _tripRepository.GetRootTripIdAsync(evt.TripId, ct);
+        var rootTripId = await _tripRepository.GetRootTripIdAsync(tripId, ct);
         var shipmentId = rootTripId.ToString();
         var attemptNumber = trip!.AttemptNumber;
 
         var payload = new OmsShipmentNotification(
             ShipmentId: shipmentId,
-            DeliveryBy: vendorVehicleName,
+            DeliveryBy: deliveryBy,
             Lots: lots.Select(id => new OmsLot(id)).ToList());
 
         var target = await _targetResolver.ResolveAsync("oms", ct);
@@ -161,7 +216,7 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
         {
             _logger.LogInformation(
                 "[OmsNotify] No callback target resolved for 'oms' (neither SystemCredentials.CallbackBaseUrl nor UpstreamOms__BaseUrl set) — skipping Trip {TripId}",
-                evt.TripId);
+                tripId);
             return;
         }
 
@@ -174,13 +229,13 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
         {
             sw.Stop();
             _logger.LogWarning(ex,
-                "[OmsNotify] Trip {TripId} (attempt {N}) → OMS event=TripStarted outcome=Failed shipmentId={Sid} vehicle={VehName} lots={LotCount} latencyMs={Ms}",
-                evt.TripId, attemptNumber, shipmentId, vendorVehicleName, lots.Count, sw.ElapsedMilliseconds);
+                "[OmsNotify] Trip {TripId} (attempt {N}) → OMS event={EventType} outcome=Failed shipmentId={Sid} vehicle={VehName} lots={LotCount} latencyMs={Ms}",
+                tripId, attemptNumber, eventType, shipmentId, deliveryBy, lots.Count, sw.ElapsedMilliseconds);
             throw;
         }
         sw.Stop();
 
-        var auditDetails = $"trip-started shipmentId={shipmentId} attempt={attemptNumber} vehicle={vendorVehicleName} lots={lots.Count} latencyMs={sw.ElapsedMilliseconds}";
+        var auditDetails = $"{eventType.ToLowerInvariant()} shipmentId={shipmentId} attempt={attemptNumber} vehicle={deliveryBy ?? "(none)"} lots={lots.Count} latencyMs={sw.ElapsedMilliseconds}";
         await _auditRepository.AddAsync(new OrderAuditEvent(
             order.Id, AuditEventType, auditDetails), ct);
         await _auditRepository.SaveChangesAsync(ct);
@@ -198,12 +253,12 @@ public class TripStartedOmsNotifyConsumer : IConsumer<TripStartedIntegrationEven
             details: auditDetails,
             actorId: null,
             occurredAt: DateTime.UtcNow,
-            relatedTripId: evt.TripId,
+            relatedTripId: tripId,
             attemptNumber: attemptNumber,
             cancellationToken: ct);
 
         _logger.LogInformation(
-            "[OmsNotify] Trip {TripId} (attempt {N}) → OMS event=TripStarted outcome=Success shipmentId={Sid} vehicle={VehName} lots={LotCount} latencyMs={Ms}",
-            evt.TripId, attemptNumber, shipmentId, vendorVehicleName, lots.Count, sw.ElapsedMilliseconds);
+            "[OmsNotify] Trip {TripId} (attempt {N}) → OMS event={EventType} outcome=Success shipmentId={Sid} vehicle={VehName} lots={LotCount} latencyMs={Ms}",
+            tripId, attemptNumber, eventType, shipmentId, deliveryBy, lots.Count, sw.ElapsedMilliseconds);
     }
 }
