@@ -1,0 +1,106 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "iteration": null,
+  "links": [
+    {
+      "targetBlank": true,
+      "title": "ADR-011",
+      "type": "link",
+      "url": "https://github.com/YOUR_REPO/blob/main/docs/multi-mode-transport/adr/adr-011-operator-pool-model.md"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Pool depth (now)",
+      "description": "Trips available in the pool right now. Alerts fire when >50 for 5m.",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "dtms_pool_depth", "legendFormat": "depth", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 50 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Pool depth over time",
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 },
+      "targets": [
+        { "expr": "dtms_pool_depth", "legendFormat": "depth", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Claim outcomes / min",
+      "description": "success = 204 (CAS won). conflict = 409 (CAS lost — race). error = anything else.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        { "expr": "rate(dtms_pool_claim_total{outcome=\"success\"}[1m]) * 60",  "legendFormat": "success",  "refId": "A" },
+        { "expr": "rate(dtms_pool_claim_total{outcome=\"conflict\"}[1m]) * 60", "legendFormat": "conflict", "refId": "B" },
+        { "expr": "rate(dtms_pool_claim_total{outcome=\"error\"}[1m]) * 60",    "legendFormat": "error",    "refId": "C" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Claim latency (ms, p50 / p95 / p99)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(dtms_pool_claim_latency_ms_bucket[5m])) by (le))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum(rate(dtms_pool_claim_latency_ms_bucket[5m])) by (le))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum(rate(dtms_pool_claim_latency_ms_bucket[5m])) by (le))", "legendFormat": "p99", "refId": "C" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Wait in pool (seconds, p50 / p95 / p99)",
+      "description": "Time from Trip.DispatchedAt to Trip.ClaimedAt. Alerts if p95 > 5 min for 5m.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(dtms_pool_wait_seconds_bucket[5m])) by (le))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum(rate(dtms_pool_wait_seconds_bucket[5m])) by (le))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum(rate(dtms_pool_wait_seconds_bucket[5m])) by (le))", "legendFormat": "p99", "refId": "C" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "SignalR broadcast outcomes / min",
+      "description": "'failed' broadcasts are swallowed by the fire-and-forget contract — high rate here means clients rely on REST fallback.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "rate(dtms_pool_broadcast_total{outcome=\"sent\"}[1m]) * 60",   "legendFormat": "{{event}} sent",   "refId": "A" },
+        { "expr": "rate(dtms_pool_broadcast_total{outcome=\"failed\"}[1m]) * 60", "legendFormat": "{{event}} failed", "refId": "B" }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["dtms", "pool", "operator", "manual", "fleet"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "Asia/Bangkok",
+  "title": "DTMS — Operator Pool",
+  "uid": "dtms-operator-pool",
+  "version": 1,
+  "weekStart": ""
+}

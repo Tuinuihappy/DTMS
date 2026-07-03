@@ -37,6 +37,8 @@ for the projector-side rules.
 | TripHub | `/hubs/trips` | `trip:{id:N}` | Event-driven |
 | DashboardHub | `/hubs/dashboard` | `dashboard:{boardKey}` | Batched (250 ms window) |
 | FleetHub | `/hubs/fleet` | `floor:{facilityId:N}` | Throttled (1 s window, latest-wins) |
+| ManualBoardHub | `/hubs/manual-board` | `manual-board` (single) | Event-driven (dispatcher hints) |
+| OperatorPoolHub | `/hubs/operator-pool` | `operator-pool` (single) | Event-driven (add/claim/remove) |
 
 ---
 
@@ -169,6 +171,57 @@ robot reporting at 10 Hz doesn't translate into 10 hub pushes.
 |---|---|---|
 | `RobotPositionsUpdated` | `IReadOnlyList<RobotPosition>` | 1 s flush, latest position per robot |
 | `RobotStateChanged` | `(Guid robotId, string state)` | Individual lifecycle change, not batched |
+
+---
+
+## 7.5 OperatorPoolHub — `/hubs/operator-pool`
+
+**Source:** [OperatorPoolHub.cs](../src/DTMS.Api/Realtime/Hubs/OperatorPoolHub.cs) · **Broadcaster:** [SignalROperatorPoolBroadcaster.cs](../src/DTMS.Api/Realtime/Publishers/SignalROperatorPoolBroadcaster.cs) · **ADR:** [ADR-011](multi-mode-transport/adr/adr-011-operator-pool-model.md)
+
+Powers the operator PWA's `/m/pool` view. Universal group — every
+connected operator sees every pool event. Auth via `OperatorOnly` policy
+(Operator | Supervisor | Admin role); the bearer arrives on the
+`?access_token=…` query string per the WebSocket upgrade constraint.
+
+Group membership is auto-joined on `OnConnectedAsync` so clients don't
+need to remember to invoke `Subscribe` after each reconnect — the
+connection alone is intent enough. A no-op `Subscribe()` / `Unsubscribe()`
+pair exists so the frontend's shared `useHubSubscription` hook has a
+method to invoke on its reconnect handler.
+
+### Client → server methods
+
+| Method | Args | Group |
+|---|---|---|
+| `Subscribe` | – | `operator-pool` (idempotent, auto-joined on connect) |
+| `Unsubscribe` | – | – |
+
+### Server → client callbacks (`IOperatorPoolClient`)
+
+| Callback | Payload | When |
+|---|---|---|
+| `PoolTripAdded` | `PoolTripDto` | Dispatch strategy commits a new pool trip |
+| `PoolTripClaimed` | `{ tripId, claimedByOperatorId, claimedByName, claimedAt }` | Operator wins the SQL CAS in `AcknowledgeTripCommandHandler` |
+| `PoolTripRemoved` | `{ tripId, reason }` | Pool trip cancelled before any claim (admin action — pending PR-G) |
+
+### Reducer contract
+
+The frontend hook [`usePoolTrips`](../frontend/lib/hooks/use-pool-trips.ts)
+keeps a local `PoolTrip[]` in sync via a reducer:
+
+- `PoolTripAdded` → insert (deduped by `tripId`, sorted FIFO by `dispatchedAt`)
+- `PoolTripClaimed` → remove `tripId`
+- `PoolTripRemoved` → remove `tripId`
+- On SignalR reconnect → `REFETCH` (full REST list refresh)
+
+The reducer tolerates late/duplicate events silently — the server is the source of truth; the reducer just tries to keep the UI close to it between REST fetches.
+
+### Failure mode
+
+Broadcaster methods are **fire-and-forget** and swallow exceptions
+(logged at warn level). A hub hiccup must not roll back the DB commit
+that just published the pool trip. Clients recover on their next
+reconnect by re-fetching REST — worst case is 15 seconds of stale UI.
 
 ---
 

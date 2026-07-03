@@ -127,6 +127,23 @@ public class ManualTripExtension
 
 ### Step 3: Implement ManualDispatchStrategy
 
+> **⚠️ Superseded 2026-07-03 by [ADR-011: Operator Pool Model](../adr/adr-011-operator-pool-model.md).**
+>
+> The design captured below describes the **auto-assign v1** shipped in Phase 4.4:
+> the strategy picks an operator, writes a `ManualTripExtension`, and pushes.
+> That model is **no longer live**. Post-cleanup:
+>
+> - `IOperatorAssignmentPolicy` and `WarehouseAwareOperatorAssignmentPolicy` are deleted.
+> - `ManualDispatchStrategy` lives at [`src/DTMS.Api/Adapters/ManualDispatchStrategy.cs`](../../../src/DTMS.Api/Adapters/ManualDispatchStrategy.cs) (composition root, not the module).
+> - Trip lands in the **shared pool** at `Status='Created' + DispatchedAt=now + ClaimedByOperatorId=null`.
+> - Operator selection, `ManualTripExtension`, SLA windows, and push notification move to `AcknowledgeTripCommandHandler` (the pool claim path).
+> - OMS is notified at dispatch time via `TripDispatchedIntegrationEventV1` with `deliveryBy=null`; the claim-time TripStarted notify is skipped for pool trips.
+> - Frontend at [`/m/pool`](../../../frontend/app/m/pool/page.tsx) subscribes to `/hubs/operator-pool` for realtime updates.
+>
+> See ADR-011 §"Implementation trail" for the PR-by-PR history and §"Verification evidence" for the 2026-07-03 E2E results.
+>
+> The section below is retained as **historical record** of what was planned, not what is running.
+
 **`src/Modules/Transport.Manual/.../Application/Services/ManualDispatchStrategy.cs`** (NEW):
 
 ```csharp
