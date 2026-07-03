@@ -22,6 +22,14 @@ public interface IStationValidationService
     Task<Result<IReadOnlyDictionary<string, Guid>>>
         BuildStationMapAsync(IEnumerable<Item> items, CancellationToken ct = default);
 
+    /// <summary>
+    /// WMS PR-2 — Manual/Fleet transport-mode order path. Resolves each item's
+    /// PickupLocationCode/DropLocationCode against the local WMS snapshot
+    /// (populated by <c>WmsLocationSyncService</c>). Rejects unknown or
+    /// upstream-inactive codes with a clear message so the order stays out
+    /// of the Validated state pointing at a location the dispatcher couldn't
+    /// route to.
+    /// </summary>
     Task<Result<IReadOnlyDictionary<string, Guid>>>
-        BuildWarehouseMapAsync(IEnumerable<Item> items, CancellationToken ct = default);
+        BuildWmsLocationMapAsync(IEnumerable<Item> items, CancellationToken ct = default);
 }

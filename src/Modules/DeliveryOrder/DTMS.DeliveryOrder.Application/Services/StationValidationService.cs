@@ -6,14 +6,14 @@ namespace DTMS.DeliveryOrder.Application.Services;
 public class StationValidationService : IStationValidationService
 {
     private readonly IStationLookup _stationLookup;
-    private readonly IWarehouseLookup _warehouseLookup;
+    private readonly IWmsLocationLookup _wmsLocationLookup;
 
     public StationValidationService(
         IStationLookup stationLookup,
-        IWarehouseLookup warehouseLookup)
+        IWmsLocationLookup wmsLocationLookup)
     {
         _stationLookup = stationLookup;
-        _warehouseLookup = warehouseLookup;
+        _wmsLocationLookup = wmsLocationLookup;
     }
 
     // AMR path (existing) — interpret location codes as station codes.
@@ -63,28 +63,32 @@ public class StationValidationService : IStationValidationService
     // No manual-override concept on Warehouse yet (that's a Station
     // operator-driven flag); when warehouses gain a similar lifecycle
     // hook in a later phase we add the equivalent check here.
+    // WMS PR-2 path — resolve every unique location code in the order
+    // against the local WMS snapshot. Mirrors the station/warehouse
+    // shape so the caller's control flow doesn't have to change beyond
+    // picking the right method by RequestedTransportMode.
     public async Task<Result<IReadOnlyDictionary<string, Guid>>>
-        BuildWarehouseMapAsync(IEnumerable<Item> items, CancellationToken ct = default)
+        BuildWmsLocationMapAsync(IEnumerable<Item> items, CancellationToken ct = default)
     {
         var codes = items
             .SelectMany(i => new[] { i.PickupLocationCode, i.DropLocationCode })
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var resolved = await _warehouseLookup.ResolveBatchAsync(codes, ct);
+        var resolved = await _wmsLocationLookup.ResolveBatchAsync(codes, ct);
 
         var map = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
         foreach (var code in codes)
         {
-            if (!resolved.TryGetValue(code, out var warehouse))
+            if (!resolved.TryGetValue(code, out var loc))
                 return Result<IReadOnlyDictionary<string, Guid>>.Failure(
-                    $"'{code}' is not a valid warehouse code.");
+                    $"'{code}' is not a valid WMS location.");
 
-            if (!warehouse.IsActive)
+            if (!loc.IsActive)
                 return Result<IReadOnlyDictionary<string, Guid>>.Failure(
-                    $"'{code}' is deactivated and cannot be used for new orders.");
+                    $"'{code}' is no longer active in WMS and cannot be used for new orders.");
 
-            map[code] = warehouse.Id;
+            map[code] = loc.Id;
         }
 
         return Result<IReadOnlyDictionary<string, Guid>>.Success(map);
