@@ -26,8 +26,7 @@ import {
   type Uom,
 } from "@/lib/api/delivery-orders";
 import { getStationOptions, type StationOption } from "@/lib/api/facility";
-import { useWarehouseOptions } from "@/lib/api/warehouses";
-import { WarehouseCombobox } from "@/components/primitives/warehouse-combobox";
+import { WmsLocationCombobox } from "@/components/primitives/wms-location-combobox";
 import { cn } from "@/lib/utils";
 import {
   fromDateTimeLocalInput,
@@ -249,17 +248,10 @@ export function CreateOrderDialog({
   const [stations, setStations] = useState<StationOption[]>([]);
   const [stationsLoading, setStationsLoading] = useState(false);
   const [stationsError, setStationsError] = useState<string | null>(null);
-  // Phase 2.5 Path A — Manual / Fleet orders pick warehouses, not
-  // AMR stations. The hook fetches once per mode change and the picker
-  // swaps in below. Server-side filter by serviceMode keeps the list
-  // tight (a warehouse only set up for AMR won't appear for Manual).
-  const warehouseServiceMode =
-    form.transport === "Amr" ? undefined : form.transport;
-  const {
-    warehouses,
-    loading: warehousesLoading,
-    error: warehousesError,
-  } = useWarehouseOptions({ serviceMode: warehouseServiceMode });
+  // WMS PR-4 — Manual/Fleet orders resolve pickup/drop against the WMS
+  // location snapshot instead of internal Warehouse rows. The WMS
+  // picker owns its own debounced server-side search (see
+  // WmsLocationCombobox), so there's no shared list fetch to prop-drill.
 
   useEffect(() => {
     if (open) {
@@ -713,12 +705,9 @@ export function CreateOrderDialog({
                                   error={stationsError}
                                 />
                               ) : (
-                                <WarehouseCombobox
+                                <WmsLocationCombobox
                                   value={it.pickup}
                                   onChange={(v) => updateItem(idx, { pickup: v })}
-                                  warehouses={warehouses}
-                                  loading={warehousesLoading}
-                                  error={warehousesError}
                                 />
                               )}
                             </Field>
@@ -732,12 +721,9 @@ export function CreateOrderDialog({
                                   error={stationsError}
                                 />
                               ) : (
-                                <WarehouseCombobox
+                                <WmsLocationCombobox
                                   value={it.drop}
                                   onChange={(v) => updateItem(idx, { drop: v })}
-                                  warehouses={warehouses}
-                                  loading={warehousesLoading}
-                                  error={warehousesError}
                                 />
                               )}
                             </Field>

@@ -40,8 +40,20 @@ public sealed class OperatorSyncMiddleware : IMiddleware
             return;
         }
 
-        var employeeCode = user.FindFirstValue("employeeCode") ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
-        var displayName = user.FindFirstValue("displayName") ?? user.FindFirstValue(ClaimTypes.Name);
+        // External Auth JWTs carry the employee identity under `EmployeeId`
+        // (short custom claim per ADR-014). Fall back to `employeeCode` (dev
+        // fixture) or `nameidentifier` (standard) so unit tests + hand-rolled
+        // tokens keep working. `MapInboundClaims=false` on the JwtBearer
+        // options means `sub` stays as-is — hence the extra fallback.
+        var employeeCode = user.FindFirstValue("EmployeeId")
+            ?? user.FindFirstValue("employeeCode")
+            ?? user.FindFirstValue("sub")
+            ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
+        var displayName = user.FindFirstValue("displayName")
+            ?? user.FindFirstValue(ClaimTypes.Name)
+            ?? user.Identity?.Name
+            ?? user.FindFirstValue("unique_name")
+            ?? employeeCode;   // last-resort so a JWT with only EmployeeId still syncs
         var roleStr = user.FindFirstValue("role") ?? user.FindFirstValue(ClaimTypes.Role);
         if (string.IsNullOrWhiteSpace(employeeCode) || string.IsNullOrWhiteSpace(displayName))
         {
@@ -53,17 +65,12 @@ public sealed class OperatorSyncMiddleware : IMiddleware
         if (!Enum.TryParse<OperatorRole>(roleStr, ignoreCase: true, out var role))
             role = OperatorRole.Operator;
 
-        Guid? primaryWarehouseId = null;
-        var warehouseClaim = user.FindFirstValue("warehouseId") ?? user.FindFirstValue("primaryWarehouseId");
-        if (Guid.TryParse(warehouseClaim, out var wid))
-            primaryWarehouseId = wid;
-
         var thumbnailUrl = user.FindFirstValue("thumbnailUrl");
 
         try
         {
             var op = await _sync.SyncFromClaimsAsync(
-                employeeCode, displayName, role, thumbnailUrl, primaryWarehouseId,
+                employeeCode, displayName, role, thumbnailUrl,
                 context.RequestAborted);
             context.Items[OperatorIdItemKey] = op.Id;
         }
