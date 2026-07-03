@@ -4,20 +4,24 @@ import { redirect } from "next/navigation";
 import { SESSION_COOKIE } from "@/lib/auth/session";
 import { OperatorShellHeader } from "@/components/operator-pwa/operator-shell-header";
 import { OperatorTabsNav } from "@/components/operator-pwa/operator-tabs-nav";
-import { TripsList } from "@/components/operator-pwa/trips-list";
+import { PoolTripsList } from "@/components/operator-pwa/pool-trips-list";
 
-export const metadata: Metadata = { title: "Trips — DTMS Operator" };
+export const metadata: Metadata = { title: "Pool — DTMS Operator" };
 
-export default async function OperatorTripsPage() {
+// WMS PR-4b (PR-D) — Operator pool view. Universal visibility — any
+// active operator sees every dispatched, unclaimed Manual/Fleet trip and
+// can tap to claim + start atomically. Realtime updates arrive via the
+// /hubs/operator-pool SignalR hub (see PoolTripsList).
+export default async function OperatorPoolPage() {
   const jar = await cookies();
   if (!jar.get(SESSION_COOKIE)?.value) {
     redirect("/m/login");
   }
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col">
-      <OperatorShellHeader title="My trips" />
+      <OperatorShellHeader title="Trip pool" />
       <OperatorTabsNav />
-      <TripsList />
+      <PoolTripsList />
     </main>
   );
 }

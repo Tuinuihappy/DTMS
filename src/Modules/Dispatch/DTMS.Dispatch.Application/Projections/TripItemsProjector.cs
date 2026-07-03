@@ -35,6 +35,7 @@ namespace DTMS.Dispatch.Application.Projections;
 /// </summary>
 public class TripItemsProjector :
     IConsumer<TripStartedIntegrationEvent>,
+    IConsumer<TripDispatchedIntegrationEventV1>,
     IConsumer<TripPickupCompletedIntegrationEvent>,
     IConsumer<TripDropCompletedIntegrationEvent>,
     IConsumer<TripCompletedIntegrationEvent>,
@@ -117,6 +118,68 @@ public class TripItemsProjector :
             _metrics.RecordPermanentFailure(Name, nameof(TripStartedIntegrationEvent));
             _logger.LogError(ex,
                 "Permanent projection failure for TripStartedIntegrationEvent {EventId} — event dropped",
+                evt.EventId);
+        }
+    }
+
+    // WMS PR-4b — Manual/Fleet pool dispatch. Same shape as TripStarted:
+    // the DTO carries a TripItemSnapshot array we insert into the read
+    // side. Firing at DISPATCH time (not claim time) means the operator
+    // pool card can render pickup/drop/weight/item-count without waiting
+    // for an operator to acknowledge. Deduped per EventId; if the
+    // subsequent TripStarted at claim time carries the same items list,
+    // InsertBindingsAsync skips duplicates.
+    public async Task Consume(ConsumeContext<TripDispatchedIntegrationEventV1> ctx)
+    {
+        var evt = ctx.Message;
+        var ct = ctx.CancellationToken;
+
+        using var scope = _logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["Projector"] = Name,
+            ["EventId"] = evt.EventId,
+            ["EventType"] = nameof(TripDispatchedIntegrationEventV1),
+            ["TripId"] = evt.TripId,
+        });
+
+        if (await _store.HasProcessedEventAsync(Name, evt.EventId, ct))
+        {
+            _metrics.RecordDedupSkipped(Name, nameof(TripDispatchedIntegrationEventV1));
+            _logger.LogDebug("Skipped duplicate event {EventId}", evt.EventId);
+            return;
+        }
+
+        try
+        {
+            var items = evt.Items ?? Array.Empty<TripItemSnapshot>();
+            if (items.Count == 0)
+            {
+                await _store.RecordEmptyBindingAsync(Name, evt.EventId, evt.TripId, evt.OccurredOn, ct);
+                _metrics.RecordProjected(Name, nameof(TripDispatchedIntegrationEventV1));
+                _metrics.RecordLag(Name, evt.OccurredOn);
+                _logger.LogInformation(
+                    "Trip {TripId} dispatched with empty item snapshot — inbox recorded, binding deferred",
+                    evt.TripId);
+                return;
+            }
+
+            await _store.InsertBindingsAsync(Name, evt.EventId, evt.TripId, evt.OccurredOn, items, ct);
+            _metrics.RecordProjected(Name, nameof(TripDispatchedIntegrationEventV1));
+            _metrics.RecordLag(Name, evt.OccurredOn);
+            _logger.LogInformation(
+                "Projected TripDispatched for Trip {TripId}: {ItemCount} items bound",
+                evt.TripId, items.Count);
+        }
+        catch (Exception ex) when (IsTransient(ex))
+        {
+            _logger.LogWarning(ex, "Transient projection failure — will retry");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _metrics.RecordPermanentFailure(Name, nameof(TripDispatchedIntegrationEventV1));
+            _logger.LogError(ex,
+                "Permanent projection failure for TripDispatchedIntegrationEventV1 {EventId} — event dropped",
                 evt.EventId);
         }
     }
