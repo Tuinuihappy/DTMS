@@ -1,0 +1,17 @@
+# Tells Grafana to auto-load every JSON file under the mounted
+# /var/lib/grafana/dashboards directory as a dashboard. New JSONs
+# dropped there are picked up within 30 s without a Grafana restart.
+
+apiVersion: 1
+
+providers:
+  - name: dtms
+    orgId: 1
+    folder: DTMS
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true

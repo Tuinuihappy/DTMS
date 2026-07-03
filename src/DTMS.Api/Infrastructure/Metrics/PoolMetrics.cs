@@ -38,30 +38,32 @@ public sealed class PoolMetrics : IDisposable
     {
         _meter = new Meter(MeterName, "1.0.0");
 
+        // Units omitted intentionally — the OTel Prometheus exporter
+        // appends the unit to the exported metric name, producing
+        // names like `dtms_pool_depth_trips` that drift from the
+        // OTel spec's dotted name and force downstream dashboards to
+        // know both spellings. Keeping the metric name self-describing
+        // (`latency_ms`, `wait_seconds`) is clearer for our size of
+        // metric catalog.
         _depthGauge = _meter.CreateObservableGauge(
             "dtms.pool.depth",
             () => _depthSnapshot,
-            unit: "trips",
             description: "Number of Manual/Fleet trips currently in the pool (Status=Created ∧ DispatchedAt≠null ∧ ClaimedByOperatorId IS NULL).");
 
         _claimTotal = _meter.CreateCounter<long>(
             "dtms.pool.claim.total",
-            unit: "claims",
             description: "Pool acknowledge outcomes. success=CAS won; conflict=CAS lost (409); error=all other failures.");
 
         _claimLatencyMs = _meter.CreateHistogram<double>(
             "dtms.pool.claim.latency_ms",
-            unit: "ms",
             description: "AcknowledgeTripCommandHandler pool-path duration.");
 
         _waitSeconds = _meter.CreateHistogram<double>(
             "dtms.pool.wait_seconds",
-            unit: "s",
             description: "Time from dispatch to successful claim (ClaimedAt − DispatchedAt).");
 
         _broadcastTotal = _meter.CreateCounter<long>(
             "dtms.pool.broadcast.total",
-            unit: "events",
             description: "SignalR pool broadcasts fired. outcome=failed means the hub threw and we swallowed.");
     }
 

@@ -1,0 +1,14 @@
+# Auto-registers Prometheus as the default Grafana datasource so
+# dashboards work out-of-the-box without a click-through wizard.
+# The URL uses the docker service DNS name; the container-to-container
+# network resolves it internally without going through the host.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

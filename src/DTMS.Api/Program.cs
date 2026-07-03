@@ -270,6 +270,12 @@ builder.Services.AddOpenTelemetry()
         // (consume_duration_seconds, receive_total, retry_total, fault_total)
         // so we don't need to write our own observer for consumer retries.
         .AddMeter("MassTransit")
+        // PR-H deploy — Prometheus scrape endpoint at /metrics. The
+        // ops-side `prometheus` container pulls from here every 15 s
+        // and Grafana renders the pool dashboard on top. OTLP export
+        // kept side-by-side so any future collector-based pipeline
+        // (Tempo/Loki/etc.) still receives the same metrics stream.
+        .AddPrometheusExporter()
         .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)));
 
 // T1.6 — singleton holder shared by consumers, watchdog, and outbox processor.
@@ -911,6 +917,12 @@ app.UseAuthorization();
 app.UseWhen(
     ctx => ctx.Request.Path.StartsWithSegments("/api/operator"),
     branch => branch.UseMiddleware<DTMS.Api.Auth.OperatorSyncMiddleware>());
+
+// PR-H deploy — Prometheus scrape endpoint. Anonymous (Prometheus can't
+// carry a bearer through service discovery) and text-format only. On the
+// prod cluster this goes behind a firewall / mesh policy so external
+// callers can't hit it; locally it's just http://localhost:5219/metrics.
+app.MapPrometheusScrapingEndpoint().AllowAnonymous();
 
 // Liveness probe (always 200 if process is up). G1 Phase 1 — excludes the
 // "drain" check so a draining pod stays liveness-Healthy and kubelet

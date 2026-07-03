@@ -174,6 +174,52 @@ services:
       # Cap in-memory span store (default 100k spans ≈ 200 MB+ over time).
       - MEMORY_MAX_TRACES=20000
 
+  # PR-H — Prometheus + Grafana for the operator pool dashboard.
+  #
+  # Prometheus scrapes http://api:8080/metrics every 15 s (config at
+  # ./ops/prometheus/prometheus.yml). The OTLP push kept in Program.cs
+  # still fires alongside — so any future collector-based pipeline
+  # (Tempo/Loki/etc.) receives the same stream.
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: dtms-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    mem_limit: 256m
+    logging: *default-logging
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+
+  # Grafana UI at http://localhost:3001 (login: admin/admin — change
+  # via GF_SECURITY_ADMIN_PASSWORD in prod). Prometheus is auto-wired
+  # as the default datasource and every JSON under ./docs/grafana is
+  # imported at boot via file-based provisioning (see
+  # ./ops/grafana/provisioning/dashboards/dashboards.yml).
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: dtms-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    mem_limit: 256m
+    logging: *default-logging
+    depends_on:
+      - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docs/grafana:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+
   # Phase 4.3 — MinIO object storage for Manual mode POD (per ADR-015).
   # PWA receives a presigned PUT URL from the API and uploads directly to
   # MinIO so the .NET process never touches the photo bytes. Bucket
@@ -601,3 +647,5 @@ volumes:
   pgdata:
   miniodata:
   rabbitmqdata:
+  prometheus-data:
+  grafana-data:
