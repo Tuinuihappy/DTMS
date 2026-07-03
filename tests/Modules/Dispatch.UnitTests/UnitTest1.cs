@@ -828,6 +828,12 @@ internal sealed class FakeTripRepository : ITripRepository
         UpdateCalls++;
         return Task.CompletedTask;
     }
+
+    // WMS PR-4b (PR-F) — Fake CAS: this test double doesn't need pool
+    // semantics for the existing suite. Real behavior is covered in
+    // Dispatch.IntegrationTests (raw SQL against a real Postgres).
+    public Task<bool> TryClaimFromPoolAsync(Guid tripId, Guid operatorId, CancellationToken ct = default)
+        => Task.FromResult(false);
 }
 
 // ── AcknowledgeRobotPass handler tests ──────────────────────────────────
