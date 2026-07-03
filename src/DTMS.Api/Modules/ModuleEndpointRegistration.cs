@@ -6,6 +6,8 @@ using DTMS.Iam.Presentation;
 using DTMS.Planning.Presentation;
 using DTMS.Transport.Amr.Webhooks;
 using DTMS.Transport.Manual.Presentation;
+using DTMS.Api.SystemCapabilities;
+using DTMS.Wms.Presentation;
 
 namespace DTMS.Api.Modules;
 
@@ -17,7 +19,8 @@ public static class ModuleEndpointRegistration
     public static WebApplication MapAllModuleEndpoints(this WebApplication app)
     {
         app.MapFacilityEndpoints();
-        app.MapWarehouseEndpoints();   // Phase 2.7a — separate file from MapEndpoints to keep AMR vs Warehouse surfaces distinct
+        app.MapWmsLocationEndpoints();   // WMS PR-1 — /api/v1/wms/locations (list + manual sync trigger)
+        app.MapSystemCapabilitiesEndpoints();   // WMS PR-4 — /api/v1/system/capabilities (feature flags)
         app.MapFleetEndpoints();
         app.MapDeliveryOrderEndpoints();
         // Phase S.2.2 — federated source-system endpoint group at
@@ -35,6 +38,7 @@ public static class ModuleEndpointRegistration
         app.MapAdminProjectionsEndpoints();
         app.MapAdminWorkflowEndpoints();
         app.MapAdminOutboxEndpoints();  // Phase O3 — DLQ list / replay / delete
+        app.MapAdminPoolEndpoints();    // WMS PR-4b (PR-G) — /api/v1/admin/pool/summary
         app.MapPlanningEndpoints();
         app.MapDispatchEndpoints();
         app.MapRiot3Webhooks();

@@ -113,14 +113,14 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
             return Result<UpstreamOrderAckDto>.Failure(ex.Message);
         }
 
-        // Phase 2.5 Path A — interpret location codes by mode. Upstream
-        // OMS still treats AMR as the default when RequestedTransportMode
-        // isn't supplied; Manual / Fleet upstream payloads (when those
-        // modes go live) supply the mode and the same PickupLocationCode
-        // field is interpreted as a warehouse code.
+        // WMS PR-2 — interpret location codes by mode. Upstream OMS still
+        // treats AMR as the default when RequestedTransportMode isn't
+        // supplied; Manual / Fleet upstream payloads (when those modes go
+        // live) supply the mode and the same PickupLocationCode field is
+        // interpreted as a WMS location code (wms.Locations).
         var mode = order.RequestedTransportMode ?? DTMS.DeliveryOrder.Domain.Enums.TransportMode.Amr;
         IReadOnlyDictionary<string, Guid>? stationMap = null;
-        IReadOnlyDictionary<string, Guid>? warehouseMap = null;
+        IReadOnlyDictionary<string, Guid>? wmsLocationMap = null;
 
         if (mode == DTMS.DeliveryOrder.Domain.Enums.TransportMode.Amr)
         {
@@ -134,19 +134,19 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         }
         else
         {
-            var warehouseResult = await _stationValidation.BuildWarehouseMapAsync(order.Items, cancellationToken);
-            if (warehouseResult.IsFailure)
+            var wmsResult = await _stationValidation.BuildWmsLocationMapAsync(order.Items, cancellationToken);
+            if (wmsResult.IsFailure)
             {
-                _logger.LogWarning("[Upstream] Order '{OrderRef}' warehouse mapping failed: {Error}.", request.OrderRef, warehouseResult.Error);
-                return Result<UpstreamOrderAckDto>.Failure(warehouseResult.Error);
+                _logger.LogWarning("[Upstream] Order '{OrderRef}' WMS location mapping failed: {Error}.", request.OrderRef, wmsResult.Error);
+                return Result<UpstreamOrderAckDto>.Failure(wmsResult.Error);
             }
-            warehouseMap = warehouseResult.Value;
+            wmsLocationMap = wmsResult.Value;
         }
 
         try
         {
             order.RaiseCreatedEvent();
-            order.MarkAsValidated(stationMap, warehouseMap);
+            order.MarkAsValidated(stationMap, wmsLocationMap);
             order.Confirm(_options.WeightFallbackKg);
             // POD-required orders sit at DroppedOff until operator scans;
             // upstream caller opts in via the optional flag. Null leaves

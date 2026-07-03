@@ -14,7 +14,7 @@ public record OverrideQueueDto(
     Guid Id,
     Guid OperatorId,
     Guid TripId,
-    Guid ExpectedWarehouseId,
+    Guid ExpectedWmsLocationId,
     double ReportedLatitude,
     double ReportedLongitude,
     double DistanceFromGeofenceM,
@@ -35,7 +35,7 @@ internal sealed class ListPendingOverridesQueryHandler : IQueryHandler<ListPendi
     {
         var pending = await _overrides.ListPendingAsync(cancellationToken);
         var dtos = pending.Select(r => new OverrideQueueDto(
-            r.Id, r.OperatorId, r.TripId, r.ExpectedWarehouseId,
+            r.Id, r.OperatorId, r.TripId, r.ExpectedWmsLocationId,
             r.ReportedLatitude, r.ReportedLongitude, r.DistanceFromGeofenceM,
             r.Reason, r.PhotoUrl, r.Status, r.RequestedAt, r.ExpiresAt)).ToList();
         return Result<IReadOnlyList<OverrideQueueDto>>.Success(dtos);

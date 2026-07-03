@@ -112,15 +112,15 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         }
 
         // Validate locations sequentially — both IStationLookup and
-        // IWarehouseLookup back onto the Facility DbContext which is
-        // not safe to use concurrently across orders. Per Phase 2.5
-        // Path A, dispatch by RequestedTransportMode: AMR resolves
-        // station codes; Manual / Fleet resolve warehouse codes.
+        // IWmsLocationLookup back onto their respective DbContexts which
+        // are not safe to use concurrently across orders. WMS PR-2 —
+        // dispatch by RequestedTransportMode: AMR resolves station codes;
+        // Manual / Fleet resolve WMS location codes (wms.Locations).
         foreach (var order in pendingOrders)
         {
             var mode = order.RequestedTransportMode ?? DTMS.DeliveryOrder.Domain.Enums.TransportMode.Amr;
             IReadOnlyDictionary<string, Guid>? stationMap = null;
-            IReadOnlyDictionary<string, Guid>? warehouseMap = null;
+            IReadOnlyDictionary<string, Guid>? wmsLocationMap = null;
 
             if (mode == DTMS.DeliveryOrder.Domain.Enums.TransportMode.Amr)
             {
@@ -134,13 +134,13 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
             }
             else
             {
-                var warehouseResult = await _stationValidation.BuildWarehouseMapAsync(order.Items, cancellationToken);
-                if (warehouseResult.IsFailure)
+                var wmsResult = await _stationValidation.BuildWmsLocationMapAsync(order.Items, cancellationToken);
+                if (wmsResult.IsFailure)
                 {
-                    failures.Add(new BulkSubmitFailure(order.OrderRef, warehouseResult.Error));
+                    failures.Add(new BulkSubmitFailure(order.OrderRef, wmsResult.Error));
                     continue;
                 }
-                warehouseMap = warehouseResult.Value;
+                wmsLocationMap = wmsResult.Value;
             }
 
             // Phase P5 — atomic Submit + Validate + Confirm per order.
@@ -149,7 +149,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
             // when the bulk call returns.
             order.RaiseCreatedEvent();
             order.Submit();
-            order.MarkAsValidated(stationMap, warehouseMap);
+            order.MarkAsValidated(stationMap, wmsLocationMap);
             order.Confirm(_options.WeightFallbackKg);
             var warnings = WeightWarningEvaluator.Evaluate(order.Items);
             succeeded.Add(new BulkSubmitSuccess(

@@ -182,10 +182,6 @@ public static class ModuleServiceRegistration
         services.AddScoped<IShelfRepository, ShelfRepository>();
         services.AddScoped<ICarrierTypeProfileRepository, CarrierTypeProfileRepository>();
         services.AddScoped<ILoadUnitProfileRepository, LoadUnitProfileRepository>();
-        // Phase 2.6 — Warehouse aggregate persistence + lookup. The
-        // IWarehouseLookup binding (in DeliveryOrder module section below)
-        // depends on IFacilityReadService being registered, which it is.
-        services.AddScoped<IWarehouseRepository, WarehouseRepository>();
         services.AddScoped<IFacilityReadService, FacilityReadService>();
         var riot3BaseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
         var riot3ApiKey = configuration.GetValue<string>("VendorAdapter:Riot3:ApiKey");
@@ -235,6 +231,45 @@ public static class ModuleServiceRegistration
         }
 
         services.AddHostedService<TopologyOverlayExpiryService>();
+
+        // ── WMS Module ────────────────────────────────────────────────
+        // Snapshot cache of the external WMS (Warehouse Management System)
+        // location catalogue used by Manual/Fleet transport-mode order
+        // routing. Sync-to-local pattern: background poller pulls every N
+        // minutes, Order Submit reads from the local table so a WMS outage
+        // doesn't block user-facing writes.
+        services.AddDbContext<DTMS.Wms.Infrastructure.Data.WmsDbContext>(o =>
+            o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));
+        services.Configure<DTMS.Wms.Infrastructure.Services.WmsOptions>(
+            configuration.GetSection(DTMS.Wms.Infrastructure.Services.WmsOptions.SectionName));
+        services.AddTransient<DTMS.Wms.Infrastructure.Services.WmsBearerTokenHandler>();
+        services.AddScoped<DTMS.Wms.Domain.Repositories.IWmsLocationRepository,
+                           DTMS.Wms.Infrastructure.Repositories.WmsLocationRepository>();
+        // Sync config bridge — Application handler needs PageSize + MaxRows
+        // but stays free of IOptions dependency; adapter projects WmsOptions
+        // onto the small IWmsSyncConfig interface.
+        services.AddScoped<DTMS.Wms.Application.Commands.SyncWmsLocations.IWmsSyncConfig,
+                           DTMS.Wms.Infrastructure.Services.WmsSyncConfigAdapter>();
+
+        var wmsBaseUrl = configuration.GetValue<string>("Wms:BaseUrl") ?? "";
+        var wmsTimeoutSeconds = configuration.GetValue<int>("Wms:HttpTimeoutSeconds", 15);
+        services.AddHttpClient<DTMS.Wms.Application.Services.IWmsClient,
+                               DTMS.Wms.Infrastructure.Services.WmsClient>(client =>
+        {
+            if (!string.IsNullOrWhiteSpace(wmsBaseUrl))
+                client.BaseAddress = new Uri(wmsBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(wmsTimeoutSeconds);
+        })
+        .AddHttpMessageHandler<DTMS.Wms.Infrastructure.Services.WmsBearerTokenHandler>()
+        .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
+        .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
+
+        // Sync poller — gated to the api container along with the other
+        // vendor pollers so the outbox worker doesn't double-poll.
+        if (runVendorPollers)
+        {
+            services.AddHostedService<DTMS.Wms.Infrastructure.Services.WmsLocationSyncService>();
+        }
 
         // ── Fleet Module ──────────────────────────────────────────────
         services.AddScoped<FleetDomainEventMapper>();
@@ -297,6 +332,10 @@ public static class ModuleServiceRegistration
                            DTMS.Transport.Manual.Infrastructure.Repositories.GeofenceOverrideRequestRepository>();
         services.AddScoped<DTMS.Transport.Manual.Domain.Repositories.IManualTripExtensionRepository,
                            DTMS.Transport.Manual.Infrastructure.Repositories.ManualTripExtensionRepository>();
+        // Cross-module read port — lets Dispatch's trip-detail query resolve
+        // the claiming operator's display name (Trip.ClaimedByOperatorId → name).
+        services.AddScoped<DTMS.SharedKernel.Operators.IOperatorDirectory,
+                           DTMS.Transport.Manual.Infrastructure.Services.OperatorDirectory>();
         services.AddScoped<DTMS.Transport.Manual.Application.Services.IOperatorSyncService,
                            DTMS.Transport.Manual.Application.Services.OperatorSyncService>();
         services.AddScoped<DTMS.Api.Auth.OperatorSyncMiddleware>();
@@ -332,9 +371,11 @@ public static class ModuleServiceRegistration
         services.Configure<DTMS.Transport.Manual.Application.Services.ManualDispatchOptions>(
             configuration.GetSection(
                 DTMS.Transport.Manual.Application.Services.ManualDispatchOptions.SectionName));
-        services.AddScoped<DTMS.Transport.Manual.Application.Services.IOperatorAssignmentPolicy,
-                           DTMS.Transport.Manual.Application.Services.WarehouseAwareOperatorAssignmentPolicy>();
-
+        // WMS PR-3 — geofence radius for Manual drop-scan against WMS locations
+        // (legacy warehouse trips continue using Warehouse.GeofenceRadiusM).
+        services.Configure<DTMS.Transport.Manual.Application.Options.RecordDropGeofenceOptions>(
+            configuration.GetSection(
+                DTMS.Transport.Manual.Application.Options.RecordDropGeofenceOptions.SectionName));
         // ── DeliveryOrder Module ──────────────────────────────────────
         services.AddScoped<DeliveryOrderDomainEventMapper>();
         services.AddDbContext<DeliveryOrderDbContext>((sp, o) => o
@@ -357,7 +398,12 @@ public static class ModuleServiceRegistration
         // contract → Facility module's read service). Not yet consumed by
         // order validation (MarkAsValidated still uses stations only);
         // Phase 4 Manual mode will inject this for operator scope checks.
-        services.AddScoped<IWarehouseLookup, FacilityWarehouseLookup>();
+        // WMS PR-1/PR-3b — location lookup used by Manual/Fleet submit path
+        // to resolve PickupLocationCode → WmsLocation. Delegates to the WMS
+        // module's repository so the DeliveryOrder Application layer stays
+        // free of a direct WMS.Domain dependency.
+        services.AddScoped<DTMS.DeliveryOrder.Application.Services.IWmsLocationLookup,
+                           DTMS.DeliveryOrder.Infrastructure.Services.WmsLocationLookup>();
         services.AddScoped<IOrderAmendmentRepository, OrderAmendmentRepository>();
         services.AddScoped<IOrderAuditEventRepository, OrderAuditEventRepository>();
         // Phase P5.3 — Dispatch-side bridge so the vendor adapter can
@@ -503,6 +549,40 @@ public static class ModuleServiceRegistration
         // Phase P1 — projection infrastructure for the Dispatch module.
         services.AddSingleton<DTMS.Dispatch.Application.Projections.ITripRealtimePublisher,
                               DTMS.Api.Realtime.Publishers.SignalRTripRealtimePublisher>();
+        // WMS PR-4b (PR-D) — operator pool realtime broadcaster + REST list
+        // handler. Broadcaster is stateless (only holds IHubContext) so
+        // singleton scope is fine. The query handler needs DispatchDbContext
+        // (scoped) so it stays scoped.
+        services.AddSingleton<DTMS.Transport.Manual.Application.Services.IOperatorPoolBroadcaster,
+                              DTMS.Api.Realtime.Publishers.SignalROperatorPoolBroadcaster>();
+        // WMS PR-4b (PR-H) — pool metrics + depth polling. Meter is a
+        // singleton because Meter instances are process-global by design
+        // (they belong to the OTel meter provider); the sink is a thin
+        // module-boundary shim so the Application handler can record
+        // outcomes without referencing Api types.
+        services.AddSingleton<DTMS.Api.Infrastructure.Metrics.PoolMetrics>();
+        services.AddSingleton<DTMS.Transport.Manual.Application.Services.IPoolMetricsSink,
+                              DTMS.Api.Infrastructure.Metrics.PoolMetricsSink>();
+        services.AddHostedService<DTMS.Api.Infrastructure.Metrics.PoolDepthPollingService>();
+        // Register as the MediatR-expected IRequestHandler<> shape (not
+        // just IQueryHandler<>) — MediatR resolves by the concrete request-
+        // handler pair, and IQueryHandler is a marker interface on top.
+        // Existing handlers in *.Application assemblies get picked up by
+        // MediatR's assembly scan; this handler lives in DTMS.Api (composition
+        // root) so it needs an explicit registration.
+        services.AddScoped<MediatR.IRequestHandler<
+                              DTMS.Transport.Manual.Application.Queries.GetPoolTrips.GetPoolTripsQuery,
+                              DTMS.SharedKernel.Messaging.Result<IReadOnlyList<
+                                  DTMS.Transport.Manual.Application.Queries.GetPoolTrips.PoolTripDto>>>,
+                           DTMS.Api.Adapters.PoolTripsQueryHandler>();
+        // WMS PR-4b (PR-G) — dispatcher pool summary. Same registration
+        // shape as PoolTripsQueryHandler (Api-layer handler crosses two
+        // DbContexts, so MediatR needs the explicit binding).
+        services.AddScoped<MediatR.IRequestHandler<
+                              DTMS.Transport.Manual.Application.Queries.GetPoolSummary.GetPoolSummaryQuery,
+                              DTMS.SharedKernel.Messaging.Result<
+                                  DTMS.Transport.Manual.Application.Queries.GetPoolSummary.PoolSummaryDto>>,
+                           DTMS.Api.Adapters.PoolSummaryQueryHandler>();
         services.AddScoped<DTMS.Dispatch.Application.Projections.ITripStatusHistoryReadRepository,
                            DTMS.Dispatch.Infrastructure.Projections.TripStatusHistoryReadRepository>();
         services.AddScoped<DTMS.Dispatch.Application.Projections.ITripStatusHistoryProjectionStore,

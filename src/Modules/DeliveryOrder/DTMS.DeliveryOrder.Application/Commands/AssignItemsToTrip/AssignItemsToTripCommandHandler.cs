@@ -28,8 +28,8 @@ public class AssignItemsToTripCommandHandler : ICommandHandler<AssignItemsToTrip
             request.AttemptNumber,
             request.PickupStationId,
             request.DropStationId,
-            request.PickupWarehouseId,
-            request.DropWarehouseId);
+            request.PickupWmsLocationId,
+            request.DropWmsLocationId);
 
         if (bound == 0)
         {

@@ -181,7 +181,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
                 p.HandlingInstructions.Count > 0
                     ? p.HandlingInstructions.Select(h => h.ToString()).ToList()
                     : null,
-                p.PickupWarehouseId, p.DropWarehouseId))
+                p.PickupWmsLocationId, p.DropWmsLocationId))
             .ToList();
 
         AddDomainEvent(new DeliveryOrderCreatedDomainEvent(
@@ -240,7 +240,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     public int AssignItemsToTrip(
         Guid tripId, int attemptNumber,
         Guid pickupStationId, Guid dropStationId,
-        Guid? pickupWarehouseId = null, Guid? dropWarehouseId = null)
+        Guid? pickupWmsLocationId = null, Guid? dropWmsLocationId = null)
     {
         if (tripId == Guid.Empty)
             throw new ArgumentException("TripId must not be empty.", nameof(tripId));
@@ -248,22 +248,20 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         var bound = 0;
         foreach (var item in _items)
         {
-            // Mirror of MarkGroupItemsAsDispatchFailed (Bug A) — match by
-            // station pair (AMR) OR warehouse pair (Manual / Fleet whose
-            // items carry null station Ids per ADR-002). Empty-Guid station
-            // sentinel from the Manual consumer doesn't match items' null
-            // station Ids; the warehouse branch picks them up.
+            // Match by station pair (AMR) OR WMS location pair (Manual/Fleet).
+            // Empty-Guid station sentinel from the Manual consumer doesn't
+            // match items' null station Ids; the WMS branch picks them up.
             var matchesStation =
                 pickupStationId != Guid.Empty && dropStationId != Guid.Empty
                 && item.PickupStationId == pickupStationId
                 && item.DropStationId == dropStationId;
 
-            var matchesWarehouse =
-                pickupWarehouseId.HasValue && dropWarehouseId.HasValue
-                && item.PickupWarehouseId == pickupWarehouseId
-                && item.DropWarehouseId == dropWarehouseId;
+            var matchesWms =
+                pickupWmsLocationId.HasValue && dropWmsLocationId.HasValue
+                && item.PickupWmsLocationId == pickupWmsLocationId
+                && item.DropWmsLocationId == dropWmsLocationId;
 
-            if (!matchesStation && !matchesWarehouse) continue;
+            if (!matchesStation && !matchesWms) continue;
 
             // Skip terminal items the operator already finalised (Cancelled
             // by admin etc.) — they don't ride retries.
@@ -516,33 +514,26 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         }
     }
 
-    // Existing AMR validation path — keeps the 4 existing call sites
-    // (Submit / BulkSubmit / CreateUpstream / ReplanStuck) working
-    // unchanged. New mode-aware path is the (stationMap, warehouseMap)
-    // overload below; this is now a thin wrapper.
+    // AMR validation path — thin wrapper over the mode-aware overload below.
     public void MarkAsValidated(IReadOnlyDictionary<string, Guid> stationMap)
-        => MarkAsValidated(stationMap, warehouseMap: null);
+        => MarkAsValidated(stationMap, wmsLocationMap: null);
 
     /// <summary>
-    /// Mode-aware validation (Phase 2.5 Path A). The order's
-    /// <see cref="RequestedTransportMode"/> determines which map(s) get
-    /// applied: AMR orders pass stationMap; Manual / Fleet orders pass
-    /// warehouseMap. At least one must be non-null — the
-    /// <see cref="PickupLocationCode"/>/<see cref="DropLocationCode"/>
-    /// strings are then expected to be present in the supplied map(s).
-    ///
-    /// Both maps non-null is allowed (Phase 2.3 onward — once AmrStation
-    /// carries FacilityId, AMR orders will populate both).
+    /// Mode-aware validation. The order's <see cref="RequestedTransportMode"/>
+    /// determines which map applies:
+    ///   - AMR → stationMap only.
+    ///   - Manual/Fleet → wmsLocationMap only.
+    /// At least one map must be non-null.
     /// </summary>
     public void MarkAsValidated(
         IReadOnlyDictionary<string, Guid>? stationMap,
-        IReadOnlyDictionary<string, Guid>? warehouseMap)
+        IReadOnlyDictionary<string, Guid>? wmsLocationMap)
     {
         if (Status != OrderStatus.Submitted)
             throw new InvalidOperationException("Only submitted orders can be validated.");
-        if (stationMap is null && warehouseMap is null)
+        if (stationMap is null && wmsLocationMap is null)
             throw new ArgumentException(
-                "Either stationMap or warehouseMap must be provided",
+                "At least one of stationMap / wmsLocationMap must be provided",
                 nameof(stationMap));
 
         foreach (var item in _items)
@@ -558,15 +549,15 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
                 item.SetStationIds(pickupId, dropId);
             }
 
-            if (warehouseMap is not null)
+            if (wmsLocationMap is not null)
             {
-                if (!warehouseMap.TryGetValue(item.PickupLocationCode, out var pickupWh))
+                if (!wmsLocationMap.TryGetValue(item.PickupLocationCode, out var pickupLoc))
                     throw new InvalidOperationException(
-                        $"Missing warehouse mapping for pickup {item.PickupLocationCode}.");
-                if (!warehouseMap.TryGetValue(item.DropLocationCode, out var dropWh))
+                        $"Missing WMS location mapping for pickup {item.PickupLocationCode}.");
+                if (!wmsLocationMap.TryGetValue(item.DropLocationCode, out var dropLoc))
                     throw new InvalidOperationException(
-                        $"Missing warehouse mapping for drop {item.DropLocationCode}.");
-                item.SetWarehouseIds(pickupWh, dropWh);
+                        $"Missing WMS location mapping for drop {item.DropLocationCode}.");
+                item.SetWmsLocationIds(pickupLoc, dropLoc);
             }
         }
 
@@ -635,7 +626,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
                 p.HandlingInstructions.Count > 0
                     ? p.HandlingInstructions.Select(h => h.ToString()).ToList()
                     : null,
-                p.PickupWarehouseId, p.DropWarehouseId))
+                p.PickupWmsLocationId, p.DropWmsLocationId))
             .ToList();
 
         return new DeliveryOrderConfirmedDomainEvent(
@@ -780,17 +771,13 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     /// keeps the failed group's items from blocking the order's eventual
     /// transition to terminal.
     ///
-    /// Phase 4-prep (Bug A fix) — accepts both station Ids (AMR) and
-    /// warehouse Ids (Manual / Fleet). An item matches if EITHER pair
-    /// matches: AMR-shaped items match by station, Manual / Fleet items
-    /// match by warehouse. Before this fix, the consumer collapsed
-    /// Manual orders' null station Ids to Guid.Empty for grouping; the
-    /// station-only matcher then rejected every item because null !=
-    /// Guid.Empty, leaving items at Pending and the order stuck at Planned.
+    /// Accepts station Ids (AMR) or WMS location Ids (Manual/Fleet).
+    /// An item matches if EITHER pair matches: AMR items match by station,
+    /// Manual/Fleet by WMS location.
     /// </summary>
     public int MarkGroupItemsAsDispatchFailed(
         Guid? pickupStationId, Guid? dropStationId,
-        Guid? pickupWarehouseId, Guid? dropWarehouseId,
+        Guid? pickupWmsLocationId, Guid? dropWmsLocationId,
         string reason)
     {
         var changed = 0;
@@ -798,26 +785,20 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         {
             // Station match — both sides of the pair must be supplied AND
             // equal the item's. Empty-Guid sentinels (non-AMR) won't match
-            // the items' null IDs and fall through to the warehouse check.
+            // the items' null IDs and fall through to the WMS check.
             var matchesStation =
                 pickupStationId.HasValue && dropStationId.HasValue
                 && pickupStationId.Value != Guid.Empty && dropStationId.Value != Guid.Empty
                 && item.PickupStationId == pickupStationId
                 && item.DropStationId == dropStationId;
 
-            // Warehouse match — same shape on the warehouse side. Empty-Guid
-            // sentinels here mean "ungrouped" (e.g. the Manual stub's
-            // collapsed group); we still want to match items of an order
-            // whose warehouse Ids are populated. To support that, treat
-            // both sides being Empty as "match any item in this order"
-            // — safe because the caller (Planning consumer) only invokes
-            // us with the items it intends to fail anyway.
-            var matchesWarehouse =
-                pickupWarehouseId.HasValue && dropWarehouseId.HasValue
-                && item.PickupWarehouseId == pickupWarehouseId
-                && item.DropWarehouseId == dropWarehouseId;
+            // WMS location match — Manual/Fleet items have WMS Ids populated.
+            var matchesWms =
+                pickupWmsLocationId.HasValue && dropWmsLocationId.HasValue
+                && item.PickupWmsLocationId == pickupWmsLocationId
+                && item.DropWmsLocationId == dropWmsLocationId;
 
-            if (!matchesStation && !matchesWarehouse) continue;
+            if (!matchesStation && !matchesWms) continue;
 
             // Don't override items the operator already finalised or items
             // that successfully bound to a Trip (different attempt etc.).

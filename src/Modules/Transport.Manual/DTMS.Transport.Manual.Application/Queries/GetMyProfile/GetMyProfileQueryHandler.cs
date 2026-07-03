@@ -21,7 +21,6 @@ internal sealed class GetMyProfileQueryHandler : IQueryHandler<GetMyProfileQuery
             DisplayName: op.DisplayName,
             Role: op.Role,
             Status: op.Status,
-            PrimaryWarehouseId: op.PrimaryWarehouseId,
             CurrentTripId: op.CurrentTripId,
             Phone: op.Phone,
             ThumbnailUrl: op.ThumbnailUrl,

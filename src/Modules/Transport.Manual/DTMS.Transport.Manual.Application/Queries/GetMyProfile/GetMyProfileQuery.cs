@@ -13,7 +13,6 @@ public record OperatorProfileDto(
     string DisplayName,
     OperatorRole Role,
     OperatorStatus Status,
-    Guid? PrimaryWarehouseId,
     Guid? CurrentTripId,
     string? Phone,
     string? ThumbnailUrl,

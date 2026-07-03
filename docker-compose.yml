@@ -336,6 +336,27 @@ services:
       # Dispatched without contacting RIOT) — for load tests / dev without
       # spamming the vendor cluster. Default true so prod is safe.
       - VendorAdapter__Riot3__Enabled=${VendorAdapter__Riot3__Enabled:-true}
+      # WMS (Warehouse Management System) location catalogue integration.
+      # Manual/Fleet transport-mode order routing resolves PickupLocationCode
+      # against the local snapshot populated by WmsLocationSyncService.
+      # Auth token is a JWT issued by WMS admin — DO NOT commit; pass via .env.
+      - Wms__Enabled=${Wms__Enabled:-false}
+      - Wms__BaseUrl=${Wms__BaseUrl:-http://10.204.212.28:5207}
+      - Wms__PageSize=${Wms__PageSize:-1000}
+      - Wms__SyncIntervalSeconds=${Wms__SyncIntervalSeconds:-300}
+      - Wms__Auth__Token=${Wms__Auth__Token:-}
+      # WMS PR-4 — TransportMode feature flags. Frontend calls
+      # /api/v1/system/capabilities to read these + hide unavailable modes.
+      - TransportModes__Amr__Enabled=${TransportModes__Amr__Enabled:-true}
+      - TransportModes__Manual__Enabled=${TransportModes__Manual__Enabled:-false}
+      - TransportModes__Fleet__Enabled=${TransportModes__Fleet__Enabled:-false}
+      # WMS PR-4b — Pool dispatch. When true, Manual/Fleet dispatch skips
+      # operator selection at dispatch time; the trip lands in Dispatched
+      # state and notifies OMS immediately with deliveryBy=null. Any
+      # active operator can then Acknowledge&Start to claim + begin work.
+      # When false (default) the legacy per-trip operator assignment
+      # + ManualTripExtension SLA flow is used.
+      - TransportModes__Manual__Dispatch__PoolMode=${TransportModes__Manual__Dispatch__PoolMode:-false}
       # Upstream OMS shipment notification (POST /api/shipments) fired
       # when a Trip transitions Created → InProgress. BearerToken is a
       # long-lived JWT supplied by OMS ops — DO NOT commit; pass via
@@ -517,6 +538,12 @@ services:
       - VendorAdapter__Riot3__Enabled=${VendorAdapter__Riot3__Enabled:-true}
       - VendorAdapter__Riot3__BaseUrl=http://10.204.212.28:12000
       - VendorAdapter__Riot3__ApiKey=${VendorAdapter__Riot3__ApiKey:-}
+      # WMS — outbox worker shares Program.cs so needs the same config, but
+      # runVendorPollers=false in the worker container means the sync poller
+      # won't fire; only DbContext + repository registrations kick in.
+      - Wms__Enabled=${Wms__Enabled:-false}
+      - Wms__BaseUrl=${Wms__BaseUrl:-http://10.204.212.28:5207}
+      - Wms__Auth__Token=${Wms__Auth__Token:-}
       # Worker shares Program.cs which validates the JWT keypair at startup
       # even though it doesn't serve /oauth/token itself — keep parity with
       # api so a missing keypair fails both containers identically (rather
@@ -565,6 +592,10 @@ services:
       # AllowedOrigins entry (Cors__HubsAllowedOrigins env on api). For
       # dev: API exposed at host port 5219.
       - NEXT_PUBLIC_DTMS_HUBS_URL=${NEXT_PUBLIC_DTMS_HUBS_URL:-http://localhost:5219}
+      # WMS PR-4 — dev bypass for testing without Delta VPN. Any
+      # credentials pass; the Next.js proxy signs a local JWT.
+      - DTMS_AUTH_BYPASS=${DTMS_AUTH_BYPASS:-false}
+      - DTMS_JWT_SECRET=${DTMS_JWT_SECRET:-}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/"]

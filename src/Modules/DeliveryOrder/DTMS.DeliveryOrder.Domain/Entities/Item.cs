@@ -12,13 +12,13 @@ public class Item : Entity<Guid>
     public Guid? PickupStationId { get; private set; }
     public Guid? DropStationId { get; private set; }
 
-    // Phase 2.5 — per ADR-002, every order references a Warehouse (building/site);
-    // AMR additionally references a specific Station (dock within the warehouse).
-    // Nullable now (Phase 2.5 just adds the slot); Phase 2.6 wires IWarehouseLookup
-    // into the validation pipeline so PickupWarehouseId / DropWarehouseId actually
-    // get populated alongside PickupStationId / DropStationId.
-    public Guid? PickupWarehouseId { get; private set; }
-    public Guid? DropWarehouseId { get; private set; }
+    // WMS PR-2 — Manual/Fleet orders resolve PickupLocationCode against the
+    // external WMS location catalogue (wms.Locations). Nullable because
+    // AMR orders never populate these (they route via PickupStationId
+    // above). Only one pair per item is populated: station for AMR, WMS
+    // location for Manual/Fleet.
+    public Guid? PickupWmsLocationId { get; private set; }
+    public Guid? DropWmsLocationId { get; private set; }
     public int ItemSeq { get; private set; }
     // Upstream-supplied identifier for this item instance (e.g. SAP/ERP item id,
     // scanner barcode). Unique within an order — used by POD scan matching.
@@ -108,21 +108,21 @@ public class Item : Entity<Guid>
     }
 
     /// <summary>
-    /// Set the warehouse Ids resolved from PickupLocationCode / DropLocationCode.
-    /// Phase 2.5 introduces the slot; Phase 2.6 wires IWarehouseLookup to call
-    /// this alongside the existing SetStationIds. Internal because warehouse
-    /// resolution belongs to the order validation pipeline (Application layer),
-    /// not arbitrary callers.
+    /// WMS PR-2 — Set the WMS location Ids resolved from
+    /// PickupLocationCode / DropLocationCode. Called by MarkAsValidated for
+    /// Manual/Fleet orders. Internal because WMS resolution is an Application
+    /// concern; direct callers would bypass the codes-to-ids consistency
+    /// check MarkAsValidated enforces.
     /// </summary>
-    internal void SetWarehouseIds(Guid pickupWarehouseId, Guid dropWarehouseId)
+    internal void SetWmsLocationIds(Guid pickupWmsLocationId, Guid dropWmsLocationId)
     {
-        if (pickupWarehouseId == Guid.Empty)
-            throw new ArgumentException("PickupWarehouseId must not be empty.", nameof(pickupWarehouseId));
-        if (dropWarehouseId == Guid.Empty)
-            throw new ArgumentException("DropWarehouseId must not be empty.", nameof(dropWarehouseId));
+        if (pickupWmsLocationId == Guid.Empty)
+            throw new ArgumentException("PickupWmsLocationId must not be empty.", nameof(pickupWmsLocationId));
+        if (dropWmsLocationId == Guid.Empty)
+            throw new ArgumentException("DropWmsLocationId must not be empty.", nameof(dropWmsLocationId));
 
-        PickupWarehouseId = pickupWarehouseId;
-        DropWarehouseId = dropWarehouseId;
+        PickupWmsLocationId = pickupWmsLocationId;
+        DropWmsLocationId = dropWmsLocationId;
     }
 
     internal void UpdateStatus(ItemStatus status) => Status = status;

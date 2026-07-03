@@ -46,6 +46,9 @@ public sealed record TripQueueItem(
     Guid? VehicleId,
     string? VendorVehicleKey,
     string? VendorVehicleName,
+    // Manual pool trips carry no vendor vehicle; the executor is the
+    // claiming operator. Name is resolved in the query handler (batched).
+    Guid? ClaimedByOperatorId,
     TripStatus Status,
     int AttemptNumber,
     Guid? PreviousAttemptId,

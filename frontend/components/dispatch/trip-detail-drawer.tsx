@@ -282,8 +282,16 @@ export function TripDetailDrawer({
                     />
                     <MetaCell
                       icon={<Bot className="h-3 w-3" strokeWidth={2.2} />}
-                      label="Vehicle"
-                      value={data.vendorVehicleName ?? data.vendorVehicleKey ?? "— not assigned"}
+                      label="Vehicle / Operator"
+                      // AMR trips → robot (vendorVehicle*); Manual pool trips
+                      // carry no vehicle, so fall back to the claiming
+                      // operator's name. "— not assigned" only when neither.
+                      value={
+                        data.vendorVehicleName ??
+                        data.vendorVehicleKey ??
+                        data.claimedByOperatorName ??
+                        "— not assigned"
+                      }
                       mono={!data.vendorVehicleName && !!data.vendorVehicleKey}
                       hint={data.vendorVehicleName && data.vendorVehicleKey ? data.vendorVehicleKey : undefined}
                     />

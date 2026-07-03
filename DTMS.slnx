@@ -54,6 +54,12 @@
     <Project Path="src/Modules/Transport.Amr/DTMS.Transport.Amr/DTMS.Transport.Amr.csproj" />
     <Project Path="src/Modules/Transport.Amr/DTMS.Transport.Amr.Infrastructure/DTMS.Transport.Amr.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Wms/">
+    <Project Path="src/Modules/Wms/DTMS.Wms.Application/DTMS.Wms.Application.csproj" />
+    <Project Path="src/Modules/Wms/DTMS.Wms.Domain/DTMS.Wms.Domain.csproj" />
+    <Project Path="src/Modules/Wms/DTMS.Wms.Infrastructure/DTMS.Wms.Infrastructure.csproj" />
+    <Project Path="src/Modules/Wms/DTMS.Wms.Presentation/DTMS.Wms.Presentation.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Transport.Manual/">
     <Project Path="src/Modules/Transport.Manual/DTMS.Transport.Manual/DTMS.Transport.Manual.csproj" />
     <Project Path="src/Modules/Transport.Manual/DTMS.Transport.Manual.Application/DTMS.Transport.Manual.Application.csproj" />

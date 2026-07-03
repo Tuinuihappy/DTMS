@@ -1,5 +1,6 @@
 using DTMS.Dispatch.Application.Projections;
 using DTMS.SharedKernel.Messaging;
+using DTMS.SharedKernel.Operators;
 
 namespace DTMS.Dispatch.Application.Queries.GetTripsQueue;
 
@@ -8,10 +9,14 @@ public class GetTripsQueueQueryHandler : IQueryHandler<GetTripsQueueQuery, Trips
     private const int MaxPageSize = 200;
 
     private readonly ITripQueueReadRepository _readRepository;
+    private readonly IOperatorDirectory _operatorDirectory;
 
-    public GetTripsQueueQueryHandler(ITripQueueReadRepository readRepository)
+    public GetTripsQueueQueryHandler(
+        ITripQueueReadRepository readRepository,
+        IOperatorDirectory operatorDirectory)
     {
         _readRepository = readRepository;
+        _operatorDirectory = operatorDirectory;
     }
 
     public async Task<Result<TripsQueueResult>> Handle(GetTripsQueueQuery request, CancellationToken cancellationToken)
@@ -37,6 +42,17 @@ public class GetTripsQueueQueryHandler : IQueryHandler<GetTripsQueueQuery, Trips
 
         var page = await _readRepository.SearchAsync(filter, cancellationToken);
 
+        // Manual pool trips have no vendor vehicle — resolve the claiming
+        // operators' names in one batched round trip so the list's
+        // "Vehicle / Operator" column can show who took each job.
+        var operatorIds = page.Items
+            .Where(t => t.ClaimedByOperatorId is not null)
+            .Select(t => t.ClaimedByOperatorId!.Value)
+            .ToList();
+        var operatorNames = operatorIds.Count > 0
+            ? await _operatorDirectory.GetDisplayNamesAsync(operatorIds, cancellationToken)
+            : (IReadOnlyDictionary<Guid, string>)new Dictionary<Guid, string>();
+
         var items = page.Items
             .Select(t => new TripQueueItemDto(
                 t.Id,
@@ -46,6 +62,10 @@ public class GetTripsQueueQueryHandler : IQueryHandler<GetTripsQueueQuery, Trips
                 t.VehicleId,
                 t.VendorVehicleKey,
                 t.VendorVehicleName,
+                t.ClaimedByOperatorId,
+                t.ClaimedByOperatorId is { } opId && operatorNames.TryGetValue(opId, out var name)
+                    ? name
+                    : null,
                 t.Status.ToString(),
                 t.AttemptNumber,
                 t.PreviousAttemptId,

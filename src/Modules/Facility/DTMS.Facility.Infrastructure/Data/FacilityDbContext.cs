@@ -16,7 +16,6 @@ public class FacilityDbContext : DbContext
     public DbSet<Shelf> Shelves { get; set; } = null!;
     public DbSet<CarrierTypeProfile> CarrierTypeProfiles { get; set; } = null!;
     public DbSet<LoadUnitProfile> LoadUnitProfiles { get; set; } = null!;
-    public DbSet<Warehouse> Warehouses { get; set; } = null!;
 
     public FacilityDbContext(DbContextOptions<FacilityDbContext> options) : base(options) { }
 
@@ -153,99 +152,6 @@ public class FacilityDbContext : DbContext
             b.Property(p => p.MaxGrossWeightKg).IsRequired();
             b.Property(p => p.CarrierTypeCode).HasMaxLength(50).IsRequired();
             b.HasIndex(p => p.CarrierTypeCode);
-        });
-
-        modelBuilder.Entity<Warehouse>(b =>
-        {
-            b.HasKey(w => w.Id);
-            b.Property(w => w.Code).HasMaxLength(50).IsRequired();
-            b.HasIndex(w => w.Code).IsUnique();
-            b.Property(w => w.Name).HasMaxLength(200).IsRequired();
-
-            // Owned value objects — explicit HasColumnName on every property
-            // per memory feedback_owned_entity_column_name: without these EF
-            // generates "Location_Lat" / "Address_Street" style names that
-            // are awkward in raw SQL and migrations.
-            b.OwnsOne(w => w.Location, lb =>
-            {
-                lb.Property(l => l.Lat).HasColumnName("LocationLat").IsRequired();
-                lb.Property(l => l.Lng).HasColumnName("LocationLng").IsRequired();
-            });
-            b.Navigation(w => w.Location).IsRequired();
-
-            b.OwnsOne(w => w.Address, ab =>
-            {
-                ab.Property(a => a.Street).HasColumnName("AddressStreet").HasMaxLength(500).IsRequired();
-                ab.Property(a => a.City).HasColumnName("AddressCity").HasMaxLength(100);
-                ab.Property(a => a.State).HasColumnName("AddressState").HasMaxLength(100);
-                ab.Property(a => a.PostalCode).HasColumnName("AddressPostalCode").HasMaxLength(20);
-                ab.Property(a => a.Country).HasColumnName("AddressCountry").HasMaxLength(100);
-            });
-            b.Navigation(w => w.Address).IsRequired();
-
-            b.OwnsOne(w => w.Hours, hb =>
-            {
-                hb.Property(h => h.MondayOpen).HasColumnName("HoursMondayOpen");
-                hb.Property(h => h.MondayClose).HasColumnName("HoursMondayClose");
-                hb.Property(h => h.TuesdayOpen).HasColumnName("HoursTuesdayOpen");
-                hb.Property(h => h.TuesdayClose).HasColumnName("HoursTuesdayClose");
-                hb.Property(h => h.WednesdayOpen).HasColumnName("HoursWednesdayOpen");
-                hb.Property(h => h.WednesdayClose).HasColumnName("HoursWednesdayClose");
-                hb.Property(h => h.ThursdayOpen).HasColumnName("HoursThursdayOpen");
-                hb.Property(h => h.ThursdayClose).HasColumnName("HoursThursdayClose");
-                hb.Property(h => h.FridayOpen).HasColumnName("HoursFridayOpen");
-                hb.Property(h => h.FridayClose).HasColumnName("HoursFridayClose");
-                hb.Property(h => h.SaturdayOpen).HasColumnName("HoursSaturdayOpen");
-                hb.Property(h => h.SaturdayClose).HasColumnName("HoursSaturdayClose");
-                hb.Property(h => h.SundayOpen).HasColumnName("HoursSundayOpen");
-                hb.Property(h => h.SundayClose).HasColumnName("HoursSundayClose");
-            });
-            b.Navigation(w => w.Hours).IsRequired();
-
-            // PrimaryContact is OPTIONAL — owned-entity nullability via
-            // navigation not required. All columns nullable at DB level
-            // even though Name/Phone are required when contact exists.
-            b.OwnsOne(w => w.PrimaryContact, cb =>
-            {
-                cb.Property(c => c.Name).HasColumnName("ContactName").HasMaxLength(200);
-                cb.Property(c => c.Phone).HasColumnName("ContactPhone").HasMaxLength(50);
-                cb.Property(c => c.Email).HasColumnName("ContactEmail").HasMaxLength(200);
-            });
-
-            b.Property(w => w.GeofenceRadiusM);
-            b.Property(w => w.GeofenceAreaWkt).HasMaxLength(5000);
-
-            // ServiceModes (List<TransportMode>) → jsonb. Stored as string
-            // array so the JSON is human-readable in queries / pg_dump.
-            // Typed Property<T> form (not Property(typeof, name)) — the
-            // untyped overload returns a non-generic PropertyBuilder which
-            // would force HasConversion to take Type arguments instead of
-            // the strongly-typed Func<T,U> lambdas we want.
-            b.Property<List<DTMS.DeliveryOrder.Domain.Enums.TransportMode>>("_serviceModes")
-                .HasField("_serviceModes")
-                .UsePropertyAccessMode(PropertyAccessMode.Field)
-                .HasColumnName("ServiceModes")
-                .HasColumnType("jsonb")
-                .HasConversion(
-                    v => System.Text.Json.JsonSerializer.Serialize(
-                        v.Select(m => m.ToString()).ToList(),
-                        (System.Text.Json.JsonSerializerOptions?)null),
-                    v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(
-                            v, (System.Text.Json.JsonSerializerOptions?)null)!
-                        .Select(s => Enum.Parse<DTMS.DeliveryOrder.Domain.Enums.TransportMode>(s))
-                        .ToList())
-                .IsRequired();
-            // Hide the public read-only navigation (it's IReadOnlyCollection
-            // backed by _serviceModes) from EF so it doesn't try to map twice.
-            b.Ignore(w => w.ServiceModes);
-
-            b.Property(w => w.IsActive).HasDefaultValue(true).IsRequired();
-            b.Property(w => w.CreatedAt).IsRequired();
-            b.Property(w => w.UpdatedAt);
-
-            b.HasIndex(w => w.IsActive);
-
-            b.Ignore(w => w.DomainEvents);
         });
 
         base.OnModelCreating(modelBuilder);

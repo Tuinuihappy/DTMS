@@ -47,14 +47,13 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
             return Result<SubmitDeliveryOrderResult>.Failure(readiness.Error);
         }
 
-        // Phase 2.5 Path A — interpret location codes based on the
-        // order's RequestedTransportMode. AMR keeps the existing
-        // station-code semantics; Manual / Fleet interpret the same
-        // PickupLocationCode / DropLocationCode field as a warehouse
-        // code (since they don't reference specific AMR stations).
+        // WMS PR-2 — interpret location codes based on the order's
+        // RequestedTransportMode. AMR keeps the existing station-code
+        // semantics; Manual / Fleet resolve against the WMS snapshot
+        // (wms.Locations) instead of internal Warehouse rows.
         var mode = order.RequestedTransportMode ?? TransportMode.Amr;
         IReadOnlyDictionary<string, Guid>? stationMap = null;
-        IReadOnlyDictionary<string, Guid>? warehouseMap = null;
+        IReadOnlyDictionary<string, Guid>? wmsLocationMap = null;
 
         if (mode == TransportMode.Amr)
         {
@@ -64,10 +63,10 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
         }
         else
         {
-            // Manual / Fleet → warehouse-code interpretation.
-            var warehouseResult = await _stationValidation.BuildWarehouseMapAsync(order.Items, cancellationToken);
-            if (warehouseResult.IsFailure) return Result<SubmitDeliveryOrderResult>.Failure(warehouseResult.Error);
-            warehouseMap = warehouseResult.Value;
+            // Manual / Fleet → WMS location-code interpretation.
+            var wmsResult = await _stationValidation.BuildWmsLocationMapAsync(order.Items, cancellationToken);
+            if (wmsResult.IsFailure) return Result<SubmitDeliveryOrderResult>.Failure(wmsResult.Error);
+            wmsLocationMap = wmsResult.Value;
         }
 
         try
@@ -79,7 +78,7 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
             // that already listen on DeliveryOrderConfirmedIntegrationEventV1
             // don't need to distinguish "system submit" from "user submit".
             order.Submit();
-            order.MarkAsValidated(stationMap, warehouseMap);
+            order.MarkAsValidated(stationMap, wmsLocationMap);
             order.Confirm(_options.WeightFallbackKg);
 
             await _auditRepo.AddAsync(new OrderAuditEvent(

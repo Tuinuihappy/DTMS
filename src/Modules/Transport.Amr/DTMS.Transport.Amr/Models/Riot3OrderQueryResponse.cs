@@ -27,9 +27,11 @@ public sealed class Riot3OrderQueryData
     [JsonPropertyName("upperKey")]
     public string? UpperKey { get; init; }
 
-    // Task-level state — same vocabulary as the notify payload's task.state
-    // (PROCESSING / FINISHED / FAILED / CANCELED / QUEUEING / HANG / HELD …).
-    [JsonPropertyName("state")]
+    // Order-level state from GET /orders/{key}?isUpper=true. RIOT3 emits it
+    // as "orderState" here (not "state" — that field exists only per-mission
+    // inside data.missions[]). Vocabulary matches the notify payload's
+    // task.state: PROCESSING / FINISHED / FAILED / CANCELLED / HANG / HELD …
+    [JsonPropertyName("orderState")]
     public string? State { get; init; }
 
     [JsonPropertyName("failReason")]

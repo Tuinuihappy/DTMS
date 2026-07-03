@@ -230,6 +230,7 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(DTMS.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(DTMS.Dispatch.Application.Commands.CreateEnvelopeTrip.CreateEnvelopeTripCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(DTMS.Transport.Manual.Application.Commands.AcknowledgeTrip.AcknowledgeTripCommand).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(DTMS.Wms.Application.Commands.SyncWmsLocations.SyncWmsLocationsCommand).Assembly);
     cfg.AddOpenBehavior(typeof(DTMS.SharedKernel.Behaviors.ValidationBehavior<,>));
 });
 
@@ -264,6 +265,7 @@ builder.Services.AddOpenTelemetry()
         .AddMeter("DTMS.Projection")
         .AddMeter("DTMS.SignalR")
         .AddMeter("DTMS.Workflow")
+        .AddMeter(DTMS.Api.Infrastructure.Metrics.PoolMetrics.MeterName)
         // T1.6 — MassTransit native meter emits messaging.* metrics
         // (consume_duration_seconds, receive_total, retry_total, fault_total)
         // so we don't need to write our own observer for consumer retries.
@@ -716,6 +718,7 @@ var app = builder.Build();
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<OutboxDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Transport.Amr.Infrastructure.Data.VendorAdapterDbContext>(), logger, app.Environment);
             await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Transport.Manual.Infrastructure.Data.TransportManualDbContext>(), logger, app.Environment);
+            await ApplyMigrationsAsync(scope.ServiceProvider.GetRequiredService<DTMS.Wms.Infrastructure.Data.WmsDbContext>(), logger, app.Environment);
 
             logger.LogInformation("Database migrations applied successfully.");
             break;
@@ -998,6 +1001,11 @@ app.MapHub<DTMS.Api.Realtime.Hubs.DashboardHub>("/hubs/dashboard");
 app.MapHub<DTMS.Api.Realtime.Hubs.FleetHub>("/hubs/fleet");
 // Phase 4.6 — dispatcher Manual operator board realtime hints.
 app.MapHub<DTMS.Api.Realtime.Hubs.ManualBoardHub>("/hubs/manual-board");
+// WMS PR-4b (PR-D) — operator PWA pool broadcast hub. Universal group
+// "operator-pool" auto-joined on connect; every connected PWA receives
+// PoolTripAdded / PoolTripClaimed / PoolTripRemoved so local lists stay
+// in lock-step with the server-side CAS.
+app.MapHub<DTMS.Api.Realtime.Hubs.OperatorPoolHub>("/hubs/operator-pool");
 
 // Phase S.2 smoke test endpoint — returns the authenticated source
 // system's principal id + display name. Guarded by the system-side

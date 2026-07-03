@@ -9,7 +9,7 @@ namespace DTMS.Transport.Manual.Application.Commands.SubmitGeofenceOverride;
 public record SubmitGeofenceOverrideCommand(
     Guid TripId,
     Guid OperatorId,
-    Guid ExpectedWarehouseId,
+    Guid ExpectedWmsLocationId,
     double ReportedLat,
     double ReportedLng,
     string Reason,

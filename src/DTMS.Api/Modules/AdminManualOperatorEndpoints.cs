@@ -44,7 +44,8 @@ public static class AdminManualOperatorEndpoints
                 : Results.Problem(result.Error);
         })
         .WithName("AdminListManualOperators")
-        .WithSummary("List all Manual-mode operators (active, on-leave, deactivated).");
+        .WithSummary("List all Manual-mode operators (active, on-leave, deactivated).")
+        .RequireAuthorization(policy => policy.RequireRole("Admin", "Supervisor"));
 
         group.MapGet("/trips", async (ISender sender, CancellationToken ct) =>
         {

@@ -1,8 +1,10 @@
 using DTMS.Dispatch.Domain.Repositories;
-using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
+using DTMS.Transport.Manual.Application.Options;
 using DTMS.Transport.Manual.Application.Services;
 using DTMS.Transport.Manual.Domain.Repositories;
+using DTMS.Wms.Domain.Repositories;
+using Microsoft.Extensions.Options;
 
 namespace DTMS.Transport.Manual.Application.Commands.RecordDrop;
 
@@ -10,19 +12,22 @@ internal sealed class RecordDropCommandHandler : ICommandHandler<RecordDropComma
 {
     private readonly IManualTripExtensionRepository _extensions;
     private readonly ITripRepository _trips;
-    private readonly IWarehouseRepository _warehouses;
+    private readonly IWmsLocationRepository _wmsLocations;
     private readonly IGeofenceOverrideRequestRepository _overrides;
+    private readonly RecordDropGeofenceOptions _geofenceOptions;
 
     public RecordDropCommandHandler(
         IManualTripExtensionRepository extensions,
         ITripRepository trips,
-        IWarehouseRepository warehouses,
-        IGeofenceOverrideRequestRepository overrides)
+        IWmsLocationRepository wmsLocations,
+        IGeofenceOverrideRequestRepository overrides,
+        IOptions<RecordDropGeofenceOptions> geofenceOptions)
     {
         _extensions = extensions;
         _trips = trips;
-        _warehouses = warehouses;
+        _wmsLocations = wmsLocations;
         _overrides = overrides;
+        _geofenceOptions = geofenceOptions.Value;
     }
 
     public async Task<Result> Handle(RecordDropCommand request, CancellationToken cancellationToken)
@@ -34,27 +39,33 @@ internal sealed class RecordDropCommandHandler : ICommandHandler<RecordDropComma
             return Result.Failure("Trip is assigned to a different operator.");
 
         var trip = await _trips.GetByIdAsync(request.TripId, cancellationToken);
-        if (trip?.DropWarehouseId is null)
-            return Result.Failure($"Trip {request.TripId} has no drop warehouse.");
+        if (trip is null)
+            return Result.Failure($"Trip {request.TripId} not found.");
 
-        var warehouse = await _warehouses.GetByIdAsync(trip.DropWarehouseId.Value, cancellationToken);
-        if (warehouse is null)
-            return Result.Failure($"Drop warehouse {trip.DropWarehouseId} not found.");
+        if (trip.DropWmsLocationId is null)
+            return Result.Failure($"Trip {request.TripId} has no drop WMS location.");
+
+        var loc = await _wmsLocations.GetByIdAsync(trip.DropWmsLocationId.Value, cancellationToken);
+        if (loc is null)
+            return Result.Failure($"Drop WMS location {trip.DropWmsLocationId} not found in snapshot.");
+        if (loc.Latitude is null || loc.Longitude is null)
+            return Result.Failure(
+                $"Drop WMS location '{loc.LocationCode}' has no GPS coordinates — geofence check impossible.");
 
         var check = GeofenceCalculator.Check(
             request.ReportedLat, request.ReportedLng,
-            warehouse.Location.Lat, warehouse.Location.Lng,
-            warehouse.GeofenceRadiusM);
+            loc.Latitude.Value, loc.Longitude.Value,
+            (int)_geofenceOptions.DefaultRadiusM);
 
         Guid? overrideId = null;
         if (!check.IsInside)
         {
             var approvedOverride = await _overrides.GetApprovedForTripLegAsync(
-                trip.Id, request.OperatorId, trip.DropWarehouseId.Value, cancellationToken);
+                trip.Id, request.OperatorId, trip.DropWmsLocationId.Value, cancellationToken);
             if (approvedOverride is null)
             {
                 return Result.Failure(
-                    $"GEOFENCE_REJECTED: {check.OvershootM:F0}m outside warehouse geofence " +
+                    $"GEOFENCE_REJECTED: {check.OvershootM:F0}m outside WMS location geofence " +
                     $"(radius {check.RadiusM}m). Submit an override request first.");
             }
             overrideId = approvedOverride.Id;

@@ -9,15 +9,15 @@ namespace DTMS.DeliveryOrder.Application.Commands.MarkGroupItemsAsDispatchFailed
 /// (terminal) so the order can eventually reach PartiallyCompleted / Failed
 /// instead of being stuck on pending items.
 ///
-/// Phase 4-prep (Bug A) — accepts both station Ids (AMR pairing) and
-/// warehouse Ids (Manual / Fleet pairing). Caller (Planning consumer)
-/// supplies whichever the order's mode uses; items match by either pair.
+/// Accepts station Ids (AMR pairing) or WMS location Ids (Manual/Fleet
+/// pairing). Caller (Planning consumer) supplies whichever the order's
+/// mode uses; items match by either pair.
 /// </summary>
 public record MarkGroupItemsAsDispatchFailedCommand(
     Guid OrderId,
     Guid? PickupStationId,
     Guid? DropStationId,
-    Guid? PickupWarehouseId,
-    Guid? DropWarehouseId,
+    Guid? PickupWmsLocationId,
+    Guid? DropWmsLocationId,
     string Reason
 ) : ICommand<int>;

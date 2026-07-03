@@ -11,6 +11,7 @@
     <ProjectReference Include="..\..\..\DTMS.SharedKernel\DTMS.SharedKernel.csproj" />
     <ProjectReference Include="..\..\Facility\DTMS.Facility.Application\DTMS.Facility.Application.csproj" />
     <ProjectReference Include="..\..\Dispatch\DTMS.Dispatch.Domain\DTMS.Dispatch.Domain.csproj" />
+    <ProjectReference Include="..\..\Wms\DTMS.Wms.Domain\DTMS.Wms.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

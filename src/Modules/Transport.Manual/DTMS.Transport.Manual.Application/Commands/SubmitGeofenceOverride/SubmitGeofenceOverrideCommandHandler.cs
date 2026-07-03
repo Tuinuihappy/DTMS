@@ -1,12 +1,18 @@
 using DTMS.Dispatch.Domain.Repositories;
-using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
+using DTMS.Transport.Manual.Application.Options;
 using DTMS.Transport.Manual.Application.Services;
 using DTMS.Transport.Manual.Domain.Entities;
 using DTMS.Transport.Manual.Domain.Repositories;
+using DTMS.Wms.Domain.Repositories;
+using Microsoft.Extensions.Options;
 
 namespace DTMS.Transport.Manual.Application.Commands.SubmitGeofenceOverride;
 
+// WMS PR-3b — geofence override request is now scoped to a WMS location
+// (previously scoped to a Warehouse row). Operator submits when their
+// GPS falls outside the configured radius around the trip's pickup or
+// drop WMS location.
 internal sealed class SubmitGeofenceOverrideCommandHandler : ICommandHandler<SubmitGeofenceOverrideCommand, Guid>
 {
     // Per ADR-016 — dispatcher has 15 minutes to decide before the
@@ -16,16 +22,19 @@ internal sealed class SubmitGeofenceOverrideCommandHandler : ICommandHandler<Sub
 
     private readonly IGeofenceOverrideRequestRepository _overrides;
     private readonly ITripRepository _trips;
-    private readonly IWarehouseRepository _warehouses;
+    private readonly IWmsLocationRepository _wmsLocations;
+    private readonly RecordDropGeofenceOptions _geofenceOptions;
 
     public SubmitGeofenceOverrideCommandHandler(
         IGeofenceOverrideRequestRepository overrides,
         ITripRepository trips,
-        IWarehouseRepository warehouses)
+        IWmsLocationRepository wmsLocations,
+        IOptions<RecordDropGeofenceOptions> geofenceOptions)
     {
         _overrides = overrides;
         _trips = trips;
-        _warehouses = warehouses;
+        _wmsLocations = wmsLocations;
+        _geofenceOptions = geofenceOptions.Value;
     }
 
     public async Task<Result<Guid>> Handle(SubmitGeofenceOverrideCommand request, CancellationToken cancellationToken)
@@ -34,26 +43,29 @@ internal sealed class SubmitGeofenceOverrideCommandHandler : ICommandHandler<Sub
         if (trip is null)
             return Result<Guid>.Failure($"Trip {request.TripId} not found.");
 
-        // The warehouse must be one of trip's two legs — operator can't
-        // request override for an unrelated warehouse.
-        if (trip.PickupWarehouseId != request.ExpectedWarehouseId &&
-            trip.DropWarehouseId != request.ExpectedWarehouseId)
+        // The WMS location must be one of trip's two legs — operator
+        // can't request an override for an unrelated location.
+        if (trip.PickupWmsLocationId != request.ExpectedWmsLocationId &&
+            trip.DropWmsLocationId != request.ExpectedWmsLocationId)
         {
             return Result<Guid>.Failure(
-                "Override warehouse must match the trip's pickup or drop warehouse.");
+                "Override WMS location must match the trip's pickup or drop location.");
         }
 
-        var warehouse = await _warehouses.GetByIdAsync(request.ExpectedWarehouseId, cancellationToken);
-        if (warehouse is null)
-            return Result<Guid>.Failure($"Warehouse {request.ExpectedWarehouseId} not found.");
+        var loc = await _wmsLocations.GetByIdAsync(request.ExpectedWmsLocationId, cancellationToken);
+        if (loc is null)
+            return Result<Guid>.Failure($"WMS location {request.ExpectedWmsLocationId} not found in snapshot.");
+        if (loc.Latitude is null || loc.Longitude is null)
+            return Result<Guid>.Failure(
+                $"WMS location '{loc.LocationCode}' has no GPS coordinates — geofence check impossible.");
 
         // Compute the actual overshoot so the dispatcher's review UI
         // can render "operator is 250m from the geofence" without
         // re-computing.
         var check = GeofenceCalculator.Check(
             request.ReportedLat, request.ReportedLng,
-            warehouse.Location.Lat, warehouse.Location.Lng,
-            warehouse.GeofenceRadiusM);
+            loc.Latitude.Value, loc.Longitude.Value,
+            (int)_geofenceOptions.DefaultRadiusM);
 
         // Distance argument to Submit() must be strictly positive; if
         // the operator was actually inside (rare race — geofence check
@@ -64,7 +76,7 @@ internal sealed class SubmitGeofenceOverrideCommandHandler : ICommandHandler<Sub
         var record = GeofenceOverrideRequest.Submit(
             operatorId: request.OperatorId,
             tripId: request.TripId,
-            expectedWarehouseId: request.ExpectedWarehouseId,
+            expectedWmsLocationId: request.ExpectedWmsLocationId,
             reportedLat: request.ReportedLat,
             reportedLng: request.ReportedLng,
             distanceFromGeofenceM: distanceForRecord,

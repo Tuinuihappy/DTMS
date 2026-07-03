@@ -7,11 +7,10 @@ public record ItemHazmatDto(string ClassCode, string? PackingGroup);
 
 public record ItemTemperatureDto(double? MinC, double? MaxC);
 
-// Phase 3a (multi-mode): station Ids are nullable — Manual / Fleet
-// orders resolve location codes to warehouse Ids instead. Both pairs
-// are nullable so the Created event can still fire pre-validation
-// (when neither resolution has run) and consumers can pick whichever
-// pair matches the order's RequestedTransportMode.
+// WMS PR-2 — station Ids for AMR, WMS location Ids for Manual/Fleet.
+// Both pairs nullable so the Created event can still fire pre-validation
+// (when neither resolution has run) and consumers pick whichever pair
+// matches the order's RequestedTransportMode.
 public record ItemEventDto(
     string ItemId,
     double WeightKg,
@@ -20,8 +19,9 @@ public record ItemEventDto(
     ItemHazmatDto? Hazmat = null,
     ItemTemperatureDto? Temperature = null,
     IReadOnlyList<string>? HandlingInstructions = null,
-    Guid? PickupWarehouseId = null,
-    Guid? DropWarehouseId = null);
+    // WMS PR-2 — Manual/Fleet orders populate these; AMR leaves them null.
+    Guid? PickupWmsLocationId = null,
+    Guid? DropWmsLocationId = null);
 
 public record DeliveryOrderDraftedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;
 public record DeliveryOrderSubmittedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId) : IDomainEvent;

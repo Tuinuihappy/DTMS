@@ -24,7 +24,7 @@ public class MarkGroupItemsAsDispatchFailedCommandHandler : ICommandHandler<Mark
 
         var marked = order.MarkGroupItemsAsDispatchFailed(
             request.PickupStationId, request.DropStationId,
-            request.PickupWarehouseId, request.DropWarehouseId,
+            request.PickupWmsLocationId, request.DropWmsLocationId,
             request.Reason);
 
         if (marked > 0)
@@ -33,7 +33,7 @@ public class MarkGroupItemsAsDispatchFailedCommandHandler : ICommandHandler<Mark
             // Log whichever pair the caller passed — caller knows the order's mode.
             var groupLabel = request.PickupStationId.HasValue && request.PickupStationId.Value != Guid.Empty
                 ? $"station {request.PickupStationId} → {request.DropStationId}"
-                : $"warehouse {request.PickupWarehouseId} → {request.DropWarehouseId}";
+                : $"WMS location {request.PickupWmsLocationId} → {request.DropWmsLocationId}";
             _logger.LogWarning(
                 "[GroupDispatchFailed] Order {OrderId} ({Group}): {Count} items marked Failed — {Reason}",
                 request.OrderId, groupLabel, marked, request.Reason);

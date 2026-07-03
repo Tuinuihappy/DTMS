@@ -43,11 +43,9 @@ internal sealed class AmrDispatchStrategy : IDispatchStrategy
             .Where(i => i.PickupStationId.HasValue && i.DropStationId.HasValue)
             .GroupBy(i => (Pickup: i.PickupStationId!.Value, Drop: i.DropStationId!.Value))
             .Select(g => new DispatchGroup(
-                PickupStationId:   g.Key.Pickup,
-                DropStationId:     g.Key.Drop,
-                PickupWarehouseId: null,
-                DropWarehouseId:   null,
-                Items: g.ToList()))
+                PickupStationId: g.Key.Pickup,
+                DropStationId:   g.Key.Drop,
+                Items:           g.ToList()))
             .ToList();
 
     public async Task<Result<DispatchGroupOutcome>> DispatchGroupAsync(

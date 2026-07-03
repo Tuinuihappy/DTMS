@@ -17,7 +17,6 @@ public record OperatorBoardDto(
     string DisplayName,
     OperatorRole Role,
     OperatorStatus Status,
-    Guid? PrimaryWarehouseId,
     Guid? CurrentTripId,
     DateTime LastSyncedAt);
 
@@ -31,7 +30,7 @@ internal sealed class ListOperatorsQueryHandler : IQueryHandler<ListOperatorsQue
         var ops = await _operators.ListAllAsync(cancellationToken);
         var dtos = ops.Select(o => new OperatorBoardDto(
             o.Id, o.EmployeeCode, o.DisplayName, o.Role, o.Status,
-            o.PrimaryWarehouseId, o.CurrentTripId, o.LastSyncedAt)).ToList();
+            o.CurrentTripId, o.LastSyncedAt)).ToList();
         return Result<IReadOnlyList<OperatorBoardDto>>.Success(dtos);
     }
 }

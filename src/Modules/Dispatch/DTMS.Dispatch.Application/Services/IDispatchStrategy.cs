@@ -56,21 +56,24 @@ public sealed record DispatchGroupItem(
     string ItemId,
     Guid? PickupStationId,
     Guid? DropStationId,
-    Guid? PickupWarehouseId,
-    Guid? DropWarehouseId);
+    // WMS PR-3 — Manual/Fleet strategies group + dispatch by WMS location.
+    // Nullable so AMR items (station-based) don't need to populate them.
+    Guid? PickupWmsLocationId = null,
+    Guid? DropWmsLocationId = null);
 
 /// <summary>
 /// Result of <see cref="IDispatchStrategy.GroupItems"/>. Carries one
-/// pair (station OR warehouse, never both populated in practice) and
-/// the subset of items in this group. Consumer translates this into
-/// one <see cref="DispatchGroupRequest"/> per group.
+/// pair (station for AMR OR WMS location for Manual/Fleet, never both
+/// populated in practice) and the subset of items in this group.
+/// Consumer translates this into one <see cref="DispatchGroupRequest"/>
+/// per group.
 /// </summary>
 public sealed record DispatchGroup(
     Guid? PickupStationId,
     Guid? DropStationId,
-    Guid? PickupWarehouseId,
-    Guid? DropWarehouseId,
-    IReadOnlyList<DispatchGroupItem> Items);
+    IReadOnlyList<DispatchGroupItem> Items,
+    Guid? PickupWmsLocationId = null,
+    Guid? DropWmsLocationId = null);
 
 /// <summary>
 /// Inputs the consumer passes to <see cref="IDispatchStrategy.DispatchGroupAsync"/>.
@@ -90,13 +93,12 @@ public sealed record DispatchGroupRequest(
     Guid? PreviousAttemptId = null,
     int? PriorityOverride = null,
     string? AppointVehicleKeyOverride = null,
-    // Phase 4.4 — Manual + Fleet strategies select operators / providers
-    // off the warehouse Id, not the AMR-only station Id. Consumer reads
-    // these off the group's first item (warehouse Ids land on items via
-    // Phase 2.5 Path A) and passes them through. AMR ignores.
-    Guid? PickupWarehouseId = null,
-    Guid? DropWarehouseId = null,
-    DateTime? SlaDeadline = null);
+    DateTime? SlaDeadline = null,
+    // WMS PR-3 — Manual/Fleet dispatch groups pass the WMS location Ids
+    // resolved during order validation. Strategy uses these to look up
+    // the parent zone code + geofence coords.
+    Guid? PickupWmsLocationId = null,
+    Guid? DropWmsLocationId = null);
 
 /// <summary>
 /// Result of a dispatch attempt. <see cref="VendorOrderKey"/> is the

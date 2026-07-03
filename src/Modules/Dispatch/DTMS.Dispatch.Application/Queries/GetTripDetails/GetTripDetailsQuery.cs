@@ -22,6 +22,11 @@ public sealed record TripDetailsDto(
     string? VendorOrderKey,
     string? VendorVehicleKey,
     string? VendorVehicleName,
+    // Manual pool trips carry no vendor vehicle — the "executor" is the
+    // operator who claimed the trip. Null for AMR trips (robot is in the
+    // VendorVehicle* fields) and for unclaimed pool trips.
+    Guid? ClaimedByOperatorId,
+    string? ClaimedByOperatorName,
     string? TemplateNameAtDispatch,
     int? PriorityAtDispatch,
     DateTime CreatedAt,

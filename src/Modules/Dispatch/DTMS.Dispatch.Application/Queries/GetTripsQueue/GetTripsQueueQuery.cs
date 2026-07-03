@@ -36,6 +36,10 @@ public sealed record TripQueueItemDto(
     Guid? VehicleId,
     string? VendorVehicleKey,
     string? VendorVehicleName,
+    // Manual pool trips: the operator who claimed the trip (null for AMR /
+    // unclaimed trips — those use the vendorVehicle* fields instead).
+    Guid? ClaimedByOperatorId,
+    string? ClaimedByOperatorName,
     string Status,
     int AttemptNumber,
     Guid? PreviousAttemptId,

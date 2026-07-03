@@ -35,6 +35,10 @@ export type TripDetailsDto = {
   vendorOrderKey: string | null;
   vendorVehicleKey: string | null;
   vendorVehicleName: string | null;
+  // Manual pool trips: the operator who claimed the trip (null for AMR /
+  // unclaimed trips — those use the vendorVehicle* fields instead).
+  claimedByOperatorId: string | null;
+  claimedByOperatorName: string | null;
   templateNameAtDispatch: string | null;
   priorityAtDispatch: number | null;
   createdAt: string;
@@ -153,6 +157,10 @@ export type TripQueueItemDto = {
   vehicleId: string | null;
   vendorVehicleKey: string | null;
   vendorVehicleName: string | null;
+  // Manual pool trips: the operator who claimed the trip (null for AMR /
+  // unclaimed trips — those use the vendorVehicle* fields instead).
+  claimedByOperatorId: string | null;
+  claimedByOperatorName: string | null;
   status: TripStatus;
   attemptNumber: number;
   previousAttemptId: string | null;

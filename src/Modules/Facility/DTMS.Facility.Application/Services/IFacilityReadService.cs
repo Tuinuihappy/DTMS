@@ -29,17 +29,6 @@ public sealed record StationLookupResult(
     bool ManualOverrideActive,
     string? ManualOverrideReason);
 
-/// <summary>
-/// Warehouse lookup outcome. Mirrors StationLookupResult shape but for the
-/// Warehouse aggregate added in Phase 2.1 (per ADR-002). Consumers see
-/// only the read-side projection — no domain types leak.
-/// </summary>
-public sealed record WarehouseLookupResult(
-    Guid Id,
-    string Code,
-    string Name,
-    bool IsActive);
-
 public interface IFacilityReadService
 {
     Task<bool> StationExistsAsync(Guid stationId, CancellationToken cancellationToken = default);
@@ -72,24 +61,5 @@ public interface IFacilityReadService
     Task<double?> GetRouteCostAsync(
         Guid fromStationId,
         Guid toStationId,
-        CancellationToken cancellationToken = default);
-
-    // ── Warehouse lookups (Phase 2.6) ────────────────────────────────────
-    // Mirror the station lookup shape so consumers (DeliveryOrder validation,
-    // Phase 4 operator assignment, Phase 5 fleet provider matching) have
-    // the same surface to bind against.
-
-    Task<bool> WarehouseExistsAsync(Guid warehouseId, CancellationToken cancellationToken = default);
-
-    Task<Guid?> ResolveWarehouseByCodeAsync(string code, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Batch-resolve warehouse codes in one round trip. Caller passes raw
-    /// codes (possibly mixed case); the result is keyed by the caller's
-    /// original input. Codes that don't match are omitted — caller decides
-    /// if that's an error (order validation = yes; suggestion box = no).
-    /// </summary>
-    Task<IReadOnlyDictionary<string, WarehouseLookupResult>> ResolveWarehousesBatchAsync(
-        IReadOnlyList<string> codes,
         CancellationToken cancellationToken = default);
 }

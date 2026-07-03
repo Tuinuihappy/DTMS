@@ -1,5 +1,6 @@
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
+using DTMS.SharedKernel.Operators;
 
 namespace DTMS.Dispatch.Application.Queries.GetTripDetails;
 
@@ -7,13 +8,16 @@ public class GetTripDetailsQueryHandler : IQueryHandler<GetTripDetailsQuery, Tri
 {
     private readonly ITripRepository _tripRepository;
     private readonly ITripMissionEventRepository _missionRepository;
+    private readonly IOperatorDirectory _operatorDirectory;
 
     public GetTripDetailsQueryHandler(
         ITripRepository tripRepository,
-        ITripMissionEventRepository missionRepository)
+        ITripMissionEventRepository missionRepository,
+        IOperatorDirectory operatorDirectory)
     {
         _tripRepository = tripRepository;
         _missionRepository = missionRepository;
+        _operatorDirectory = operatorDirectory;
     }
 
     public async Task<Result<TripDetailsDto>> Handle(GetTripDetailsQuery request, CancellationToken cancellationToken)
@@ -23,6 +27,13 @@ public class GetTripDetailsQueryHandler : IQueryHandler<GetTripDetailsQuery, Tri
             return Result<TripDetailsDto>.Failure($"Trip {request.TripId} not found.");
 
         var missions = await _missionRepository.GetByTripIdAsync(trip.Id, cancellationToken);
+
+        // Manual pool trips have no vendor vehicle — resolve the claiming
+        // operator's name so the drawer's "Vehicle / Operator" cell can show
+        // who took the job. Skipped for AMR / unclaimed trips (Id is null).
+        var claimedByOperatorName = trip.ClaimedByOperatorId is { } opId
+            ? await _operatorDirectory.GetDisplayNameAsync(opId, cancellationToken)
+            : null;
 
         var missionDtos = missions
             .Select(m => new TripMissionDto(
@@ -49,6 +60,8 @@ public class GetTripDetailsQueryHandler : IQueryHandler<GetTripDetailsQuery, Tri
             VendorOrderKey: trip.VendorOrderKey,
             VendorVehicleKey: trip.VendorVehicleKey,
             VendorVehicleName: trip.VendorVehicleName,
+            ClaimedByOperatorId: trip.ClaimedByOperatorId,
+            ClaimedByOperatorName: claimedByOperatorName,
             TemplateNameAtDispatch: trip.TemplateNameAtDispatch,
             PriorityAtDispatch: trip.PriorityAtDispatch,
             CreatedAt: trip.CreatedAt,

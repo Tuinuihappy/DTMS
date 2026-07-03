@@ -78,6 +78,12 @@ COPY src/Modules/Transport.Manual/DTMS.Transport.Manual.Application/DTMS.Transpo
 COPY src/Modules/Transport.Manual/DTMS.Transport.Manual.Infrastructure/DTMS.Transport.Manual.Infrastructure.csproj src/Modules/Transport.Manual/DTMS.Transport.Manual.Infrastructure/
 COPY src/Modules/Transport.Manual/DTMS.Transport.Manual.Presentation/DTMS.Transport.Manual.Presentation.csproj src/Modules/Transport.Manual/DTMS.Transport.Manual.Presentation/
 
+# WMS (PR-1) — external WMS location catalogue sync for Manual/Fleet routing
+COPY src/Modules/Wms/DTMS.Wms.Domain/DTMS.Wms.Domain.csproj src/Modules/Wms/DTMS.Wms.Domain/
+COPY src/Modules/Wms/DTMS.Wms.Application/DTMS.Wms.Application.csproj src/Modules/Wms/DTMS.Wms.Application/
+COPY src/Modules/Wms/DTMS.Wms.Infrastructure/DTMS.Wms.Infrastructure.csproj src/Modules/Wms/DTMS.Wms.Infrastructure/
+COPY src/Modules/Wms/DTMS.Wms.Presentation/DTMS.Wms.Presentation.csproj src/Modules/Wms/DTMS.Wms.Presentation/
+
 RUN dotnet restore src/DTMS.Api/DTMS.Api.csproj
 
 # Copy everything and build

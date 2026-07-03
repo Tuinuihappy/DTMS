@@ -1,31 +1,38 @@
 using DTMS.Dispatch.Domain.Repositories;
-using DTMS.Facility.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
+using DTMS.Transport.Manual.Application.Options;
 using DTMS.Transport.Manual.Application.Services;
 using DTMS.Transport.Manual.Domain.Repositories;
+using DTMS.Wms.Domain.Repositories;
+using Microsoft.Extensions.Options;
 
 namespace DTMS.Transport.Manual.Application.Commands.RecordPickup;
 
-// Per ADR-016 — server-strict geofence check. If the operator's GPS
-// reports outside Warehouse.GeofenceRadiusM, the pickup is rejected
-// UNLESS an approved GeofenceOverrideRequest exists for this trip leg.
+// Per ADR-016 / WMS PR-3 — server-strict geofence check against the
+// trip's pickup WMS location. If the operator's GPS is outside the
+// configured radius (Wms:Geofence:DefaultRadiusM), the pickup is
+// rejected UNLESS an approved GeofenceOverrideRequest exists for this
+// trip leg.
 internal sealed class RecordPickupCommandHandler : ICommandHandler<RecordPickupCommand>
 {
     private readonly IManualTripExtensionRepository _extensions;
     private readonly ITripRepository _trips;
-    private readonly IWarehouseRepository _warehouses;
+    private readonly IWmsLocationRepository _wmsLocations;
     private readonly IGeofenceOverrideRequestRepository _overrides;
+    private readonly RecordDropGeofenceOptions _geofenceOptions;
 
     public RecordPickupCommandHandler(
         IManualTripExtensionRepository extensions,
         ITripRepository trips,
-        IWarehouseRepository warehouses,
-        IGeofenceOverrideRequestRepository overrides)
+        IWmsLocationRepository wmsLocations,
+        IGeofenceOverrideRequestRepository overrides,
+        IOptions<RecordDropGeofenceOptions> geofenceOptions)
     {
         _extensions = extensions;
         _trips = trips;
-        _warehouses = warehouses;
+        _wmsLocations = wmsLocations;
         _overrides = overrides;
+        _geofenceOptions = geofenceOptions.Value;
     }
 
     public async Task<Result> Handle(RecordPickupCommand request, CancellationToken cancellationToken)
@@ -37,28 +44,33 @@ internal sealed class RecordPickupCommandHandler : ICommandHandler<RecordPickupC
             return Result.Failure("Trip is assigned to a different operator.");
 
         var trip = await _trips.GetByIdAsync(request.TripId, cancellationToken);
-        if (trip?.PickupWarehouseId is null)
-            return Result.Failure($"Trip {request.TripId} has no pickup warehouse.");
+        if (trip is null)
+            return Result.Failure($"Trip {request.TripId} not found.");
+        if (trip.PickupWmsLocationId is null)
+            return Result.Failure($"Trip {request.TripId} has no pickup WMS location.");
 
-        var warehouse = await _warehouses.GetByIdAsync(trip.PickupWarehouseId.Value, cancellationToken);
-        if (warehouse is null)
-            return Result.Failure($"Pickup warehouse {trip.PickupWarehouseId} not found.");
+        var loc = await _wmsLocations.GetByIdAsync(trip.PickupWmsLocationId.Value, cancellationToken);
+        if (loc is null)
+            return Result.Failure($"Pickup WMS location {trip.PickupWmsLocationId} not found in snapshot.");
+        if (loc.Latitude is null || loc.Longitude is null)
+            return Result.Failure(
+                $"Pickup WMS location '{loc.LocationCode}' has no GPS coordinates — geofence check impossible.");
 
         var check = GeofenceCalculator.Check(
             request.ReportedLat, request.ReportedLng,
-            warehouse.Location.Lat, warehouse.Location.Lng,
-            warehouse.GeofenceRadiusM);
+            loc.Latitude.Value, loc.Longitude.Value,
+            (int)_geofenceOptions.DefaultRadiusM);
 
         Guid? overrideId = null;
         if (!check.IsInside)
         {
             // Look for an already-approved override for this exact leg.
             var approvedOverride = await _overrides.GetApprovedForTripLegAsync(
-                trip.Id, request.OperatorId, trip.PickupWarehouseId.Value, cancellationToken);
+                trip.Id, request.OperatorId, trip.PickupWmsLocationId.Value, cancellationToken);
             if (approvedOverride is null)
             {
                 return Result.Failure(
-                    $"GEOFENCE_REJECTED: {check.OvershootM:F0}m outside warehouse geofence " +
+                    $"GEOFENCE_REJECTED: {check.OvershootM:F0}m outside WMS location geofence " +
                     $"(radius {check.RadiusM}m). Submit an override request first.");
             }
             overrideId = approvedOverride.Id;

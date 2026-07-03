@@ -82,10 +82,10 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         var groupingInput = evt.Items
             .Select(i => new DispatchGroupItem(
                 ItemId: i.ItemId,
-                PickupStationId:   i.PickupStationId,
-                DropStationId:     i.DropStationId,
-                PickupWarehouseId: i.PickupWarehouseId,
-                DropWarehouseId:   i.DropWarehouseId))
+                PickupStationId:     i.PickupStationId,
+                DropStationId:       i.DropStationId,
+                PickupWmsLocationId: i.PickupWmsLocationId,
+                DropWmsLocationId:   i.DropWmsLocationId))
             .ToList();
         var groups = strategy.GroupItems(groupingInput);
 
@@ -135,8 +135,8 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                 _logger.LogWarning(
                     "[AutoPlan] Job anchor failed for group {G} ({Pickup} → {Drop}): {Err}",
                     groupIndex + 1,
-                    (object?)group.PickupStationId ?? group.PickupWarehouseId,
-                    (object?)group.DropStationId   ?? group.DropWarehouseId,
+                    (object?)group.PickupStationId ?? group.PickupWmsLocationId,
+                    (object?)group.DropStationId   ?? group.DropWmsLocationId,
                     jobResult.Error);
         }
 
@@ -174,8 +174,8 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
 
             _logger.LogInformation("[AutoPlan] Group {G}: {Count} item(s) ({Pickup} → {Drop}) Step=Dispatching",
                 groupIndex + 1, items.Count,
-                (object?)group.PickupStationId ?? group.PickupWarehouseId,
-                (object?)group.DropStationId   ?? group.DropWarehouseId);
+                (object?)group.PickupStationId ?? group.PickupWmsLocationId,
+                (object?)group.DropStationId   ?? group.DropWmsLocationId);
 
             try
             {
@@ -191,9 +191,9 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                         DropStationId:   group.DropStationId   ?? Guid.Empty,
                         UpperKey: upperKey,
                         JobId: jobId == Guid.Empty ? null : jobId,
-                        PickupWarehouseId: group.PickupWarehouseId,
-                        DropWarehouseId:   group.DropWarehouseId,
-                        SlaDeadline: evt.LatestUtc),
+                        SlaDeadline: evt.LatestUtc,
+                        PickupWmsLocationId: group.PickupWmsLocationId,
+                        DropWmsLocationId:   group.DropWmsLocationId),
                     ct);
 
                 if (envelopeResult.IsSuccess && envelopeResult.Value.TripId != Guid.Empty)
@@ -222,8 +222,8 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                     _logger.LogError(
                         "[AutoPlan] ⚠ Group {G} ({Pickup} → {Drop}) orphan: {Reason} Step=MarkJobFailed-Orphan",
                         groupIndex + 1,
-                        (object?)group.PickupStationId ?? group.PickupWarehouseId,
-                        (object?)group.DropStationId   ?? group.DropWarehouseId,
+                        (object?)group.PickupStationId ?? group.PickupWmsLocationId,
+                        (object?)group.DropStationId   ?? group.DropWmsLocationId,
                         orphanReason);
 
                     if (jobId != Guid.Empty)
@@ -235,8 +235,8 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                     _logger.LogWarning(
                         "[AutoPlan] ✗ Group {G} ({Pickup} → {Drop}) failed: {Reason} Step=MarkJobFailed-VendorRejected",
                         groupIndex + 1,
-                        (object?)group.PickupStationId ?? group.PickupWarehouseId,
-                        (object?)group.DropStationId   ?? group.DropWarehouseId,
+                        (object?)group.PickupStationId ?? group.PickupWmsLocationId,
+                        (object?)group.DropStationId   ?? group.DropWmsLocationId,
                         envelopeResult.Error);
 
                     if (jobId != Guid.Empty)
@@ -252,8 +252,8 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                         evt.DeliveryOrderId,
                         group.PickupStationId ?? Guid.Empty,
                         group.DropStationId   ?? Guid.Empty,
-                        group.PickupWarehouseId,
-                        group.DropWarehouseId,
+                        group.PickupWmsLocationId,
+                        group.DropWmsLocationId,
                         envelopeResult.Error ?? "vendor rejected dispatch"), ct);
                 }
             }
@@ -312,8 +312,8 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                         evt.DeliveryOrderId,
                         group.PickupStationId ?? Guid.Empty,
                         group.DropStationId   ?? Guid.Empty,
-                        group.PickupWarehouseId,
-                        group.DropWarehouseId,
+                        group.PickupWmsLocationId,
+                        group.DropWmsLocationId,
                         $"dispatch threw {ex.GetType().Name}"), ct);
                 }
                 catch (Exception markEx) when (markEx is not OperationCanceledException)

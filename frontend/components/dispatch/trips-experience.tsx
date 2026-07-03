@@ -663,6 +663,15 @@ function TripsTable({
                   >
                     {t.vendorVehicleKey}
                   </span>
+                ) : t.claimedByOperatorName ? (
+                  // Manual pool trips have no vehicle — show the operator
+                  // who claimed the job instead.
+                  <span
+                    className="truncate text-[11.5px] font-semibold text-[var(--color-ink-900)] dark:text-white"
+                    title={t.claimedByOperatorName}
+                  >
+                    {t.claimedByOperatorName}
+                  </span>
                 ) : (
                   <span className="text-[var(--color-ink-300)]">—</span>
                 )}

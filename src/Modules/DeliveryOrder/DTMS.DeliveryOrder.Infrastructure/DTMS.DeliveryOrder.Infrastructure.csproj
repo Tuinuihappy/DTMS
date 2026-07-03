@@ -4,6 +4,7 @@
     <ProjectReference Include="..\DTMS.DeliveryOrder.Domain\DTMS.DeliveryOrder.Domain.csproj" />
     <ProjectReference Include="..\DTMS.DeliveryOrder.Application\DTMS.DeliveryOrder.Application.csproj" />
     <ProjectReference Include="..\..\Facility\DTMS.Facility.Application\DTMS.Facility.Application.csproj" />
+    <ProjectReference Include="..\..\Wms\DTMS.Wms.Domain\DTMS.Wms.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

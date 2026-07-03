@@ -1,10 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>
+    <UserSecretsId>1093e95f-6d59-4f9f-afca-5bc2c61f4045</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -40,6 +41,8 @@
     <ProjectReference Include="..\DTMS.Infrastructure\DTMS.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Facility\DTMS.Facility.Presentation\DTMS.Facility.Presentation.csproj" />
     <ProjectReference Include="..\Modules\Facility\DTMS.Facility.Infrastructure\DTMS.Facility.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Wms\DTMS.Wms.Presentation\DTMS.Wms.Presentation.csproj" />
+    <ProjectReference Include="..\Modules\Wms\DTMS.Wms.Infrastructure\DTMS.Wms.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Fleet\DTMS.Fleet.Presentation\DTMS.Fleet.Presentation.csproj" />
     <ProjectReference Include="..\Modules\Fleet\DTMS.Fleet.Infrastructure\DTMS.Fleet.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\DeliveryOrder\DTMS.DeliveryOrder.Presentation\DTMS.DeliveryOrder.Presentation.csproj" />
