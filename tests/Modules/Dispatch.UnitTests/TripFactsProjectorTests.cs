@@ -149,6 +149,22 @@ public class TripFactsProjectorTests
     }
 
     [Fact]
+    public async Task TripVehicleBackfilled_PatchesVendorVehicleKey()
+    {
+        // Late robot recovery on a terminal trip — patches the BI row's
+        // VendorVehicleKey that TripStarted left null (missed TASK_PROCESSING).
+        var (projector, store) = Build();
+        var tripId = Guid.NewGuid();
+        var evt = new TripVehicleBackfilledIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, tripId, VendorVehicleKey: "e47366d4");
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).SetVendorVehicleKeyAsync(
+            tripId, evt.OccurredOn, "e47366d4", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task DuplicateEvent_IsSkipped()
     {
         var (projector, store) = Build();

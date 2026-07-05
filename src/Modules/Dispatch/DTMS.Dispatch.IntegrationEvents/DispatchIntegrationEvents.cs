@@ -144,3 +144,14 @@ public record TripRobotPassAcknowledgedIntegrationEventV1(
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
     string SchemaVersion = "1.1") : IIntegrationEvent;
+
+// Fired when Trip.BackfillVendorVehicle recovers the robot for a trip that
+// reached a terminal state without ever capturing one (missed
+// TASK_PROCESSING). TripFactsProjector consumes this to patch
+// bi.TripFacts.VendorVehicleKey, which is otherwise only ever set on
+// TripStarted and would stay null on these trips forever.
+public record TripVehicleBackfilledIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid TripId, string VendorVehicleKey,
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.0") : IIntegrationEvent;

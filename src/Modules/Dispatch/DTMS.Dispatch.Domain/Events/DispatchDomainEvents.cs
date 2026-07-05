@@ -68,6 +68,16 @@ public record TripCancelledDomainEvent(Guid EventId, DateTime OccurredOn, Guid T
 // via processingVehicle.key on the first task webhook).
 public record TripVehicleAssignedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId, Guid VehicleId) : IDomainEvent;
 
+// Fired by Trip.BackfillVendorVehicle when the vendor vehicle is recovered
+// AFTER the trip already reached a terminal state — the TASK_PROCESSING
+// signal (webhook or in-flight poll) that normally captures the robot was
+// missed, so the vehicle is derived from RIOT3's terminal record
+// (executeVehicleKey) instead. Carries VendorVehicleKey so the BI projector
+// can patch bi.TripFacts, which only receives the key on TripStarted and
+// would otherwise stay null for these trips forever.
+public record TripVehicleBackfilledDomainEvent(
+    Guid EventId, DateTime OccurredOn, Guid TripId, string VendorVehicleKey) : IDomainEvent;
+
 public record ExceptionRaisedDomainEvent(
     Guid EventId,
     DateTime OccurredOn,

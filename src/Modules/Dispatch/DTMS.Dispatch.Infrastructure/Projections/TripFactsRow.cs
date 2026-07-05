@@ -76,6 +76,17 @@ public class TripFactsRow
         UpdatedAt = at;
     }
 
+    // Late robot patch for a trip whose TripStarted carried no vehicle key
+    // (recovered post-terminal via Trip.BackfillVendorVehicle). Fill-only-if-
+    // empty + no lifecycle side effects — mirrors the SetStartedAt guard so a
+    // real key already on the row is never clobbered.
+    public void BackfillVendorVehicleKey(string vendorVehicleKey, DateTime at)
+    {
+        if (string.IsNullOrWhiteSpace(vendorVehicleKey) || VendorVehicleKey is not null) return;
+        VendorVehicleKey = vendorVehicleKey;
+        UpdatedAt = at;
+    }
+
     public void RecordPaused(DateTime at)
     {
         FirstPausedAt ??= at;

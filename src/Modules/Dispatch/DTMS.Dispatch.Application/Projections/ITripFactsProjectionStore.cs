@@ -29,6 +29,14 @@ public interface ITripFactsProjectionStore
         Guid tripId, DateTime at,
         Guid? deliveryOrderId, Guid? jobId, string? vendorUpperKey, CancellationToken ct);
 
+    /// <summary>
+    /// Patches VendorVehicleKey for a trip whose row was created without one
+    /// (TripStarted carried no vehicle). Fill-only-if-empty; no lifecycle
+    /// side effects. Fed by TripVehicleBackfilledIntegrationEventV1.
+    /// </summary>
+    Task SetVendorVehicleKeyAsync(
+        Guid tripId, DateTime at, string vendorVehicleKey, CancellationToken ct);
+
     Task SetFailedAtAsync(
         Guid tripId, DateTime at,
         Guid? deliveryOrderId, Guid? jobId,

@@ -1,0 +1,48 @@
+# DTMS workflow SLO alert rules.
+#
+# Evaluated by Prometheus every `evaluation_interval` (15s). Without an
+# Alertmanager these fire + surface in the Prometheus UI (/alerts) only;
+# wire Alertmanager to route them to Slack/email.
+#
+# Metric names come from the DTMS.Workflow meter (WorkflowMetrics.cs). The
+# OTel→Prometheus exporter maps dots to underscores; units are intentionally
+# omitted on these instruments so the exported name matches 1:1 (no unit
+# suffix). Verify against GET /metrics if a rule ever reports "no data".
+groups:
+  - name: amr-reconciler
+    rules:
+      # PRIMARY: the "order stuck" signal. An in-flight envelope trip that has
+      # aged past the reconcile window (created > StaleThresholdHours ago) is
+      # silently abandoned — the reconciler no longer polls RIOT3 for it, so it
+      # will never self-heal. > 0 for 10m means a real order is wedged and needs
+      # a human (admin force-complete / force-start endpoint).
+      - alert: AmrTripsStuckBeyondReconcileWindow
+        expr: dtms_workflow_trips_stuck_reconcile > 0
+        for: 10m
+        labels:
+          severity: P1
+          service: dtms-api
+        annotations:
+          summary: "{{ $value }} AMR trip(s) stuck past the reconcile window"
+          description: >
+            In-flight envelope trips older than the reconcile window are no
+            longer being reconciled against RIOT3 and will not self-heal.
+            Investigate via the admin workflow endpoints; a dropped webhook was
+            never caught in time. Value = current stuck count.
+
+      # LEADING INDICATOR: RIOT3 connectivity trouble. Sustained fetch errors
+      # mean the reconciler can't reach RIOT3 — dropped webhooks won't be healed
+      # and trips will start aging toward the stuck state above. Catch it early.
+      - alert: Riot3ReconcilerFetchErrors
+        expr: rate(dtms_workflow_reconciler_fetch_error_total[5m]) > 0
+        for: 10m
+        labels:
+          severity: P2
+          service: dtms-api
+        annotations:
+          summary: "RIOT3 reconciler fetch errors sustained for 10m"
+          description: >
+            The AMR reconciler is failing to fetch trip state from RIOT3
+            (timeout / unreachable) across the last 10 minutes. Check RIOT3
+            connectivity (host, latency, VendorAdapter__Riot3__BaseUrl) before
+            trips age past the reconcile window.

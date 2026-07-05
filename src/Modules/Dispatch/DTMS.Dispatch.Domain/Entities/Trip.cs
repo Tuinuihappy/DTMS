@@ -431,6 +431,68 @@ public class Trip : AggregateRoot<Guid>
         RecordEvent("TripVehicleAssigned", vehicleId.ToString());
     }
 
+    // Reconciler backstop for a MISSED TASK_PROCESSING reassignment webhook.
+    // RIOT3 auto-reassigns robots mid-trip (robot A fails → robot B takes
+    // over) and echoes the current robot on the order query. The webhook path
+    // records this via MarkVendorStarted (its RecordVehicleAssignment block
+    // runs even after the trip left Created); this method lets the reconciler
+    // apply the SAME update when that webhook was dropped, so DTMS's current-
+    // vehicle pointer doesn't drift from RIOT3 until terminal.
+    //
+    // Idempotent: RecordVehicleAssignment no-ops when the (key, name) matches
+    // the latest assignment, so a steady-state 60s poll never appends a
+    // duplicate history row. Returns true only when the current-vehicle
+    // pointer actually moved to a different robot (caller persists + counts
+    // it); false on no-op (same robot, terminal trip, or no vendor key).
+    public bool ReconcileVehicleAssignment(string? vendorVehicleKey, string? vendorVehicleName, string source)
+    {
+        if (string.IsNullOrWhiteSpace(vendorVehicleKey)) return false;
+        if (Status is TripStatus.Completed or TripStatus.Cancelled or TripStatus.Failed) return false;
+
+        var before = AmrExtension?.VendorVehicleKey;
+        AmrExtension ??= AmrTripExtension.Create(Id);
+        AmrExtension.RecordVehicleAssignment(vendorVehicleKey, vendorVehicleName, source, DateTime.UtcNow);
+
+        var changed = !string.Equals(before, AmrExtension.VendorVehicleKey, StringComparison.Ordinal);
+        if (changed)
+            RecordEvent("VehicleReconciled", $"{before ?? "(none)"} → {AmrExtension.VendorVehicleKey} via {source}");
+        return changed;
+    }
+
+    // Recover the vendor vehicle for a trip that reached a terminal state
+    // WITHOUT ever capturing one — the TASK_PROCESSING signal (webhook or
+    // in-flight poll) that normally records the robot was missed, so the
+    // vehicle is derived from RIOT3's terminal record (executeVehicleKey).
+    //
+    // Distinct from ReconcileVehicleAssignment on two axes:
+    //   • No status guard. Reconcile refuses terminal trips (a mid-flight
+    //     reassignment on a finished trip is meaningless); backfill exists
+    //     precisely FOR terminal trips, because executeVehicleKey is only
+    //     guaranteed present once the order finishes.
+    //   • Fill-only-if-empty. The live capture path (MarkVendorStarted /
+    //     ReconcileVehicleAssignment) always wins — backfill never overwrites
+    //     a robot the primary path already recorded, so a real reassignment
+    //     history is never clobbered by the single terminal snapshot value.
+    //
+    // Idempotent: a no-op once VendorVehicleKey is set (repeat sweeps/ticks
+    // don't append) and a no-op when the vendor record carries no vehicle
+    // (key null → nothing to record). Fires TripVehicleBackfilledDomainEvent
+    // only when it actually writes, so the BI projector patches TripFacts.
+    // Returns true only when it recorded a vehicle, so the reconciler can
+    // count + log real backfills without re-reading the extension.
+    public bool BackfillVendorVehicle(string? vendorVehicleKey, string? vendorVehicleName, string source)
+    {
+        if (string.IsNullOrWhiteSpace(vendorVehicleKey)) return false;
+        if (!string.IsNullOrWhiteSpace(AmrExtension?.VendorVehicleKey)) return false;
+
+        AmrExtension ??= AmrTripExtension.Create(Id);
+        AmrExtension.RecordVehicleAssignment(vendorVehicleKey, vendorVehicleName, source, DateTime.UtcNow);
+        RecordEvent("VehicleBackfilled", $"{AmrExtension.VendorVehicleKey} via {source}");
+        AddDomainEvent(new TripVehicleBackfilledDomainEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, AmrExtension.VendorVehicleKey!));
+        return true;
+    }
+
     public TripException RaiseException(string code, string severity, string detail)
     {
         var exception = new TripException(Id, code, severity, detail);

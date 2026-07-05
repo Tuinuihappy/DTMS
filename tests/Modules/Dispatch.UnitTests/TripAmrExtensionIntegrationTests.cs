@@ -1,5 +1,6 @@
 using DTMS.Dispatch.Domain.Entities;
 using DTMS.Dispatch.Domain.Enums;
+using DTMS.Dispatch.Domain.Events;
 using FluentAssertions;
 
 namespace Dispatch.UnitTests;
@@ -130,6 +131,93 @@ public class TripAmrExtensionIntegrationTests
         trip.AcknowledgeRobotPass();   // no throw
 
         trip.Events.Should().Contain(e => e.EventType == "RobotPassAcknowledged");
+    }
+
+    // ── BackfillVendorVehicle (terminal-state robot recovery) ────────────
+    // The fix for "trip completed but shows no vehicle": TASK_PROCESSING was
+    // missed, so the robot is recovered from RIOT3's terminal record after
+    // the trip is already Completed/Failed.
+
+    [Fact]
+    public void BackfillVendorVehicle_OnTerminalTrip_WithNoVehicle_FillsIt()
+    {
+        // Core scenario. Trip reached Completed WITHOUT ever capturing a
+        // robot. Backfill fills it — status stays terminal, history + cache
+        // populated, returns true.
+        var trip = Trip.CreateForEnvelope(Guid.NewGuid(), "upper-G1", "RIOT3-ABC");
+        trip.MarkVendorStarted();            // Created → InProgress, no vehicle
+        trip.MarkVendorCompleted();          // → Completed
+        trip.VendorVehicleKey.Should().BeNull();
+
+        var wrote = trip.BackfillVendorVehicle("e47366d4", "FAN1_STANDARD_NO5", "reconciler-terminal");
+
+        wrote.Should().BeTrue();
+        trip.Status.Should().Be(TripStatus.Completed);          // status untouched
+        trip.VendorVehicleKey.Should().Be("e47366d4");
+        trip.VendorVehicleName.Should().Be("FAN1_STANDARD_NO5");
+        trip.AmrExtension!.VehicleAssignments.Should().HaveCount(1);
+        trip.AmrExtension.VehicleAssignments[0].Source.Should().Be("reconciler-terminal");
+    }
+
+    [Fact]
+    public void BackfillVendorVehicle_ContrastsWith_ReconcileVehicleAssignment_OnTerminal()
+    {
+        // Locks the distinction that motivated a separate method: on a
+        // terminal trip ReconcileVehicleAssignment is a no-op (guards out),
+        // while BackfillVendorVehicle succeeds.
+        var trip = Trip.CreateForEnvelope(Guid.NewGuid(), "upper-G1", "RIOT3-ABC");
+        trip.MarkVendorStarted();
+        trip.MarkVendorCompleted();
+
+        trip.ReconcileVehicleAssignment("e47366d4", "FAN1_NO5", "reconciler").Should().BeFalse();
+        trip.VendorVehicleKey.Should().BeNull();                // reconcile refused terminal
+
+        trip.BackfillVendorVehicle("e47366d4", "FAN1_NO5", "reconciler-terminal").Should().BeTrue();
+        trip.VendorVehicleKey.Should().Be("e47366d4");
+    }
+
+    [Fact]
+    public void BackfillVendorVehicle_WhenVehicleAlreadyCaptured_IsNoOp_PrimaryWins()
+    {
+        // The live capture path always wins — backfill must never clobber a
+        // robot already recorded, nor grow the history.
+        var trip = Trip.CreateForEnvelope(Guid.NewGuid(), "upper-G1", "RIOT3-ABC");
+        trip.MarkVendorStarted(vendorVehicleKey: "Delta6FAN1", vendorVehicleName: "FAN1_NO5");
+        trip.MarkVendorCompleted();
+
+        var wrote = trip.BackfillVendorVehicle("DIFFERENT-KEY", "OTHER", "reconciler-terminal");
+
+        wrote.Should().BeFalse();
+        trip.VendorVehicleKey.Should().Be("Delta6FAN1");        // unchanged
+        trip.AmrExtension!.VehicleAssignments.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void BackfillVendorVehicle_NullKey_IsNoOp_NoEvent()
+    {
+        var trip = Trip.CreateForEnvelope(Guid.NewGuid(), "upper-G1", "RIOT3-ABC");
+        trip.MarkVendorStarted();
+        trip.MarkVendorCompleted();
+
+        trip.BackfillVendorVehicle(null, "name-only", "reconciler-terminal").Should().BeFalse();
+
+        trip.VendorVehicleKey.Should().BeNull();
+        trip.Events.Should().NotContain(e => e.EventType == "VehicleBackfilled");
+        trip.DomainEvents.Should().NotContain(e => e is TripVehicleBackfilledDomainEvent);
+    }
+
+    [Fact]
+    public void BackfillVendorVehicle_FiresBackfilledDomainEvent_ForBiSync()
+    {
+        var trip = Trip.CreateForEnvelope(Guid.NewGuid(), "upper-G1", "RIOT3-ABC");
+        trip.MarkVendorStarted();
+        trip.MarkVendorCompleted();
+
+        trip.BackfillVendorVehicle("e47366d4", "FAN1_NO5", "reconciler-terminal");
+
+        trip.DomainEvents.Should().ContainSingle(e => e is TripVehicleBackfilledDomainEvent);
+        var evt = (TripVehicleBackfilledDomainEvent)trip.DomainEvents.Single(e => e is TripVehicleBackfilledDomainEvent);
+        evt.VendorVehicleKey.Should().Be("e47366d4");
     }
 
     [Fact]

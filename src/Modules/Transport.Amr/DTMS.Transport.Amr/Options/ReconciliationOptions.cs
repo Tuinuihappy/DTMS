@@ -24,4 +24,15 @@ public class ReconciliationOptions
     /// (no longer chased by the poller). Ops handles those manually.
     /// </summary>
     public int StaleThresholdHours { get; set; } = 24;
+
+    /// <summary>
+    /// Self-heal sweep window (hours). Each tick also re-checks terminal
+    /// trips completed within this window that never captured a vehicle
+    /// (webhook drove the terminal transition, so the in-flight terminal
+    /// backfill never ran). Kept short — a real backfill happens on the tick
+    /// right after completion; the window only covers brief outages. Trips
+    /// drop out permanently once their snapshot is captured, so this bounds
+    /// the sweep size, not correctness.
+    /// </summary>
+    public int SelfHealWindowHours { get; set; } = 2;
 }

@@ -142,6 +142,14 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     evt.EventId, evt.OccurredOn, evt.TripId, evt.VendorVehicleKey,
                     TriggeredBy: triggeredBy, CorrelationId: correlationId)
             ],
+            // Late robot recovery on a terminal trip — TripFactsProjector
+            // patches bi.TripFacts.VendorVehicleKey off this event.
+            TripVehicleBackfilledDomainEvent evt =>
+            [
+                new TripVehicleBackfilledIntegrationEventV1(
+                    evt.EventId, evt.OccurredOn, evt.TripId, evt.VendorVehicleKey,
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+            ],
             ExceptionRaisedDomainEvent evt =>
             [
                 new ExceptionRaisedIntegrationEvent(

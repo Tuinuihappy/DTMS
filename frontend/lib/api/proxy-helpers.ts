@@ -123,12 +123,22 @@ export async function proxyToBackend({
   }
 
   if (!upstream.ok && !passthroughErrors) {
+    // Backend Result failures come back as { Error: "..." } (see
+    // OperatorEndpoints.ToHttp / minimal-API convention), while other
+    // handlers use { message: "..." }. Honour both so the real reason
+    // (e.g. GEOFENCE_REJECTED) reaches the client instead of being
+    // masked by the generic "Upstream error 400" fallback.
+    const fromField = (key: string): string | "" => {
+      if (typeof payload === "object" && payload !== null) {
+        const v = (payload as Record<string, unknown>)[key];
+        if (typeof v === "string") return v;
+      }
+      return "";
+    };
     const message =
-      (typeof payload === "object" &&
-        payload !== null &&
-        "message" in (payload as Record<string, unknown>) &&
-        typeof (payload as Record<string, unknown>).message === "string" &&
-        ((payload as Record<string, unknown>).message as string)) ||
+      fromField("message") ||
+      fromField("Error") ||
+      fromField("error") ||
       (typeof payload === "string" ? payload : "") ||
       `Upstream error ${upstream.status}`;
     return NextResponse.json({ message }, { status: upstream.status });

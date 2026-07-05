@@ -1,0 +1,79 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "iteration": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Trips stuck past reconcile window (now)",
+      "description": "In-flight envelope trips created > StaleThresholdHours ago — the reconciler no longer polls RIOT3 for them, so a dropped webhook here never self-heals. Any value > 0 is a real stuck order. Drives the AmrTripsStuckBeyondReconcileWindow alert.",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        { "expr": "dtms_workflow_trips_stuck_reconcile", "legendFormat": "stuck", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Reconcile window: stuck vs in-flight over time",
+      "description": "stuck = past the window (abandoned). inflight = inside the window, still being reconciled each tick. A rising 'stuck' with flat 'inflight' means trips are aging out unhealed.",
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 },
+      "targets": [
+        { "expr": "dtms_workflow_trips_stuck_reconcile", "legendFormat": "stuck (abandoned)", "refId": "A" },
+        { "expr": "dtms_workflow_reconciler_inflight", "legendFormat": "in-flight (in window)", "refId": "B" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "RIOT3 reconciler fetch errors / min",
+      "description": "Trips whose RIOT3 fetch failed per minute (timeout / unreachable). Sustained > 0 = vendor connectivity trouble; dropped webhooks won't be healed and trips will start aging toward stuck. Drives the Riot3ReconcilerFetchErrors alert.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "rate(dtms_workflow_reconciler_fetch_error_total[5m]) * 60", "legendFormat": "fetch errors", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Trips healed by reconciler / min",
+      "description": "Trips the reconciler corrected to match RIOT3 state per minute — i.e. dropped webhooks the backstop recovered. A high sustained rate means webhooks are being lost upstream (investigate RIOT3 → DTMS delivery).",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "rate(dtms_workflow_reconciler_reconciled_total[5m]) * 60", "legendFormat": "healed", "refId": "A" }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["dtms", "workflow", "reconciler", "amr", "slo"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "Asia/Bangkok",
+  "title": "DTMS — Workflow / Reconciler Health",
+  "uid": "dtms-workflow-health",
+  "version": 1,
+  "weekStart": ""
+}

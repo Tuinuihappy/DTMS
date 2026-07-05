@@ -33,6 +33,22 @@ public interface ITripRepository
     Task<List<Trip>> GetInFlightEnvelopeTripsAsync(DateTime staleCutoffUtc, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Self-heal backstop for the reconciler. Lists terminal envelope trips
+    /// (Status ∈ {Completed, Failed}) that finished recently but never
+    /// captured a vendor vehicle — the TASK_PROCESSING signal was missed AND
+    /// a webhook (not the reconciler) drove the terminal transition, so the
+    /// in-flight loop never ran the terminal snapshot/backfill pass on them.
+    ///
+    /// Gated on <c>VendorFinalSnapshot IS NULL</c>: the caller fetches the
+    /// vendor record, captures the snapshot, and backfills the vehicle in one
+    /// pass — after which the snapshot is non-null and the trip permanently
+    /// drops out of this query (no re-fetch loop, even when the vendor record
+    /// genuinely carries no vehicle). <paramref name="completedSinceUtc"/>
+    /// bounds the sweep to recent completions.
+    /// </summary>
+    Task<List<Trip>> GetTerminalTripsMissingVehicleAsync(DateTime completedSinceUtc, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Lists every Trip belonging to a DeliveryOrder, regardless of
     /// status. Used by the cancel-cascade flow to find which trips to
     /// stop on the vendor side.

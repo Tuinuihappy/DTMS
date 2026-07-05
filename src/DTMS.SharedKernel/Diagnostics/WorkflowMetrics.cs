@@ -17,11 +17,17 @@ namespace DTMS.SharedKernel.Diagnostics;
 ///   - dtms.workflow.outbox_age_seconds            (histogram)
 ///   - dtms.workflow.watchdog_replays_total        (counter)
 ///   - dtms.workflow.shutdown_duration_seconds     (histogram, G2 — tag: phase=bus|hosted_services|total)
+///   - dtms.workflow.trips_stuck_reconcile         (gauge, set by the AMR reconciler)
+///   - dtms.workflow.reconciler_inflight           (gauge, set by the AMR reconciler)
+///   - dtms.workflow.reconciler_fetch_error_total  (counter)
+///   - dtms.workflow.reconciler_reconciled_total   (counter)
+///   - dtms.workflow.reconciler_backfilled_total   (counter — post-terminal vehicle recovery)
 ///
 /// Drives the SLO alerts defined in the Tier 1 plan:
 ///   - orders_stuck_planned &gt; 0 for 5 minutes (P1)
 ///   - consumer_faulted rate &gt; 0.1/s for 10 minutes (P2)
 ///   - outbox_age_seconds &gt; 120 (P2)
+///   - trips_stuck_reconcile &gt; 0 for 10 minutes (P1 — AMR order stuck past reconcile window)
 /// </summary>
 public sealed class WorkflowMetrics : IDisposable
 {
@@ -34,6 +40,17 @@ public sealed class WorkflowMetrics : IDisposable
     private readonly Counter<long> _watchdogReplays;
     private readonly Histogram<double> _outboxAge;
     private readonly Histogram<double> _shutdownDuration;
+    // AMR reconciler health (Riot3ReconciliationService). fetch_error counts
+    // trips whose RIOT3 fetch failed this tick (RIOT slow/unreachable) — the
+    // leading indicator of vendor connectivity trouble before it escalates.
+    private readonly Counter<long> _reconcilerFetchError;
+    private readonly Counter<long> _reconcilerReconciled;
+    // Trips whose vendor vehicle the reconciler recovered post-terminal
+    // (BackfillVendorVehicle — terminal record or self-heal sweep). Counted
+    // apart from _reconcilerReconciled: a backfill patches a MISSED capture,
+    // it doesn't correct a live-state divergence, so conflating the two would
+    // hide how often TASK_PROCESSING is being dropped.
+    private readonly Counter<long> _reconcilerBackfilled;
 
     // Observable gauges read from a snapshot the producer (watchdog, outbox
     // processor) updates. Using a snapshot rather than a callback keeps the
@@ -43,6 +60,12 @@ public sealed class WorkflowMetrics : IDisposable
     private long _outboxPending;
     // Phase O3 — DLQ size gauge. Set periodically by DlqSizeReporterService.
     private long _outboxDlqSize;
+    // AMR reconciler gauges, set each tick by Riot3ReconciliationService.
+    // trips_stuck = in-flight envelope trips PAST the reconcile window (created
+    // > StaleThresholdHours ago) — these are silently abandoned, the true
+    // "order stuck" signal. inflight = trips inside the window being reconciled.
+    private long _reconcilerTripsStuck;
+    private long _reconcilerInflight;
 
     public WorkflowMetrics()
     {
@@ -101,6 +124,33 @@ public sealed class WorkflowMetrics : IDisposable
             () => Interlocked.Read(ref _outboxDlqSize),
             unit: "messages",
             description: "Phase O3 — count of rows in outbox.DeadLetterMessages (set by DlqSizeReporterService every 30s).");
+
+        // AMR reconciler signals. Units intentionally omitted: the OTel
+        // Prometheus exporter appends the unit to the metric name, so a
+        // `unit: "trips"` here would export `dtms_workflow_trips_stuck_reconcile_trips`
+        // and the alert rule would have to know that spelling. Omitting keeps
+        // the name stable + self-describing for the rule file + dashboard.
+        _reconcilerFetchError = _meter.CreateCounter<long>(
+            "dtms.workflow.reconciler_fetch_error_total",
+            description: "Trips whose RIOT3 fetch failed during a reconciler tick (RIOT slow/unreachable). Rising = vendor connectivity trouble.");
+
+        _reconcilerReconciled = _meter.CreateCounter<long>(
+            "dtms.workflow.reconciler_reconciled_total",
+            description: "Trips the reconciler corrected to match RIOT3 state (a dropped webhook it healed).");
+
+        _reconcilerBackfilled = _meter.CreateCounter<long>(
+            "dtms.workflow.reconciler_backfilled_total",
+            description: "Trips whose vendor vehicle was recovered post-terminal (missed TASK_PROCESSING, filled from RIOT3's terminal record). Rising = webhook loss during the PROCESSING signal.");
+
+        _meter.CreateObservableGauge(
+            "dtms.workflow.trips_stuck_reconcile",
+            () => Interlocked.Read(ref _reconcilerTripsStuck),
+            description: "In-flight envelope trips PAST the reconcile window (created > StaleThresholdHours ago) — silently abandoned by the reconciler. > 0 = orders stuck. Set by Riot3ReconciliationService.");
+
+        _meter.CreateObservableGauge(
+            "dtms.workflow.reconciler_inflight",
+            () => Interlocked.Read(ref _reconcilerInflight),
+            description: "In-flight envelope trips INSIDE the reconcile window being checked each tick. Set by Riot3ReconciliationService.");
     }
 
     public void RecordConsumerRetry(string consumerType)
@@ -135,6 +185,17 @@ public sealed class WorkflowMetrics : IDisposable
 
     public void SetOutboxDlqSize(long count)
         => Interlocked.Exchange(ref _outboxDlqSize, Math.Max(0, count));
+
+    /// <summary>Emit one reconciler tick's outcome. Counters take the tick's
+    /// delta (0 is a valid no-op); gauges take the current snapshot.</summary>
+    public void RecordReconcilerTick(long tripsStuck, long inflight, long reconciled, long fetchErrors, long backfilled = 0)
+    {
+        Interlocked.Exchange(ref _reconcilerTripsStuck, Math.Max(0, tripsStuck));
+        Interlocked.Exchange(ref _reconcilerInflight, Math.Max(0, inflight));
+        if (reconciled > 0) _reconcilerReconciled.Add(reconciled);
+        if (fetchErrors > 0) _reconcilerFetchError.Add(fetchErrors);
+        if (backfilled > 0) _reconcilerBackfilled.Add(backfilled);
+    }
 
     private static KeyValuePair<string, object?> Tag(string key, string value)
         => new(key, value);

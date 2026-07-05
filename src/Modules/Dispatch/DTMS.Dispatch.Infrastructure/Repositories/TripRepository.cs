@@ -73,12 +73,46 @@ public class TripRepository : ITripRepository
     {
         // IgnoreQueryFilters: the reconciler runs as a system service with no
         // tenant context.
+        // Include AmrExtension + VehicleAssignments so the reconciler can
+        // (a) compare RIOT3's current robot against DTMS's cached pointer to
+        // detect a missed reassignment webhook, and (b) append to the history
+        // collection without EF treating the add as Modified (see the same
+        // note on GetByUpperKeyAsync). Without the Include, MarkVendorStarted /
+        // ReconcileVehicleAssignment would Create() a fresh extension and
+        // collide with the existing row's PK on save.
         return await _context.Trips
             .IgnoreQueryFilters()
+            .Include(t => t.AmrExtension)
+                .ThenInclude(e => e!.VehicleAssignments)
             .Where(t => (t.Status == TripStatus.Created
                          || t.Status == TripStatus.InProgress
                          || t.Status == TripStatus.Paused)
                         && t.CreatedAt >= staleCutoffUtc)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<Trip>> GetTerminalTripsMissingVehicleAsync(DateTime completedSinceUtc, CancellationToken cancellationToken = default)
+    {
+        // IgnoreQueryFilters + Include AmrExtension/VehicleAssignments for the
+        // same reasons as GetInFlightEnvelopeTripsAsync: the reconciler runs
+        // tenant-less, and BackfillVendorVehicle → RecordVehicleAssignment
+        // appends to the history collection (must be loaded or EF Creates a
+        // colliding extension row on save).
+        //
+        // Gate on VendorFinalSnapshot == null so a trip drops out for good
+        // once the caller captures the snapshot — no per-tick re-fetch, even
+        // when the vendor record has no vehicle. UpperKey filter keeps this to
+        // AMR envelope trips (Manual/Fleet never set it and can't be queried
+        // against RIOT3).
+        return await _context.Trips
+            .IgnoreQueryFilters()
+            .Include(t => t.AmrExtension)
+                .ThenInclude(e => e!.VehicleAssignments)
+            .Where(t => (t.Status == TripStatus.Completed || t.Status == TripStatus.Failed)
+                        && t.VendorFinalSnapshot == null
+                        && (t.AmrExtension == null || t.AmrExtension.VendorVehicleKey == null)
+                        && t.UpperKey != ""
+                        && t.CompletedAt >= completedSinceUtc)
             .ToListAsync(cancellationToken);
     }
 

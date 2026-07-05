@@ -19,7 +19,8 @@ public class TripFactsProjector :
     IConsumer<TripResumedIntegrationEventV1>,
     IConsumer<TripCompletedIntegrationEvent>,
     IConsumer<TripFailedIntegrationEvent>,
-    IConsumer<TripCancelledIntegrationEvent>
+    IConsumer<TripCancelledIntegrationEvent>,
+    IConsumer<TripVehicleBackfilledIntegrationEventV1>
 {
     public const string Name = nameof(TripFactsProjector);
 
@@ -74,6 +75,11 @@ public class TripFactsProjector :
             ctx.Message.DeliveryOrderId == Guid.Empty ? null : ctx.Message.DeliveryOrderId,
             ctx.Message.JobId == Guid.Empty ? null : ctx.Message.JobId,
             ctx.Message.VendorUpperKey, ctx.Message.Reason, ctx.CancellationToken));
+
+    public Task Consume(ConsumeContext<TripVehicleBackfilledIntegrationEventV1> ctx)
+        => Run(ctx, () => _store.SetVendorVehicleKeyAsync(
+            ctx.Message.TripId, ctx.Message.OccurredOn,
+            ctx.Message.VendorVehicleKey, ctx.CancellationToken));
 
     private async Task Run<TEvent>(ConsumeContext<TEvent> ctx, Func<Task> body)
         where TEvent : class, IIntegrationEvent

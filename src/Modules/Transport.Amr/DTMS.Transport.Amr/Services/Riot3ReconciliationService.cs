@@ -2,6 +2,7 @@ using DTMS.Dispatch.Application.Projections;
 using DTMS.Dispatch.Domain.Entities;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Dispatch.Domain.Services;
+using DTMS.SharedKernel.Diagnostics;
 using DTMS.Transport.Amr.Options;
 using DTMS.Transport.Amr.Models;
 using DTMS.Transport.Amr.Services;
@@ -9,6 +10,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("Transport.Amr.UnitTests")]
 
 namespace DTMS.Transport.Amr.Services;
 
@@ -26,15 +30,18 @@ public sealed class Riot3ReconciliationService : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptionsMonitor<ReconciliationOptions> _options;
     private readonly ILogger<Riot3ReconciliationService> _logger;
+    private readonly WorkflowMetrics _metrics;
 
     public Riot3ReconciliationService(
         IServiceScopeFactory scopeFactory,
         IOptionsMonitor<ReconciliationOptions> options,
-        ILogger<Riot3ReconciliationService> logger)
+        ILogger<Riot3ReconciliationService> logger,
+        WorkflowMetrics metrics)
     {
         _scopeFactory = scopeFactory;
         _options = options;
         _logger = logger;
+        _metrics = metrics;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -52,7 +59,14 @@ public sealed class Riot3ReconciliationService : BackgroundService
                 if (opts.Enabled)
                     await ReconcileTickAsync(opts, stoppingToken);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            // NOTE: filter on the token, NOT the exception type. HttpClient.Timeout
+            // surfaces as TaskCanceledException (a subclass of OperationCanceledException)
+            // even though stoppingToken was never cancelled — an `is not
+            // OperationCanceledException` filter lets that escape ExecuteAsync and the
+            // default BackgroundServiceExceptionBehavior.StopHost kills the whole API
+            // (crash-loops whenever RIOT3 is slow). Only a genuinely cancelled token
+            // (real shutdown) should propagate; everything else is caught + retried.
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
                 _logger.LogError(ex, "[Reconciler] tick failed unexpectedly");
             }
@@ -75,7 +89,25 @@ public sealed class Riot3ReconciliationService : BackgroundService
         var staleCutoff = DateTime.UtcNow.AddHours(-opts.StaleThresholdHours);
         var inFlight = await tripRepo.GetInFlightEnvelopeTripsAsync(staleCutoff, ct);
 
-        if (inFlight.Count == 0) return;
+        if (inFlight.Count == 0)
+        {
+            // Nothing in the reconcile window this tick. TWO things must still
+            // run before bailing:
+            //   1. The self-heal backstop targets TERMINAL trips (a webhook
+            //      drove completion), independent of in-flight traffic — so an
+            //      empty window does NOT mean there's nothing to heal. Skipping
+            //      it here meant a trip that completed during a quiet window was
+            //      never backfilled until unrelated in-flight traffic reappeared,
+            //      and could age out of the SelfHealWindowHours window for good.
+            //   2. Refresh trips_stuck; otherwise the gauge goes stale at its
+            //      last non-empty-tick value and the alert could miss / false-fire.
+            var healedQuiet = await SelfHealMissingVehiclesAsync(tripRepo, queryService, opts, ct);
+            var staleOnly = await CountStaleTripsAsync(scope, staleCutoff, ct);
+            _metrics.RecordReconcilerTick(tripsStuck: staleOnly, inflight: 0, reconciled: 0, fetchErrors: 0);
+            if (healedQuiet > 0)
+                _logger.LogInformation("[Reconciler] tick: in-flight=0, self-healed {Healed} terminal trip(s) missing a vehicle", healedQuiet);
+            return;
+        }
 
         var reconciled = 0;
         var completed = 0;
@@ -84,6 +116,8 @@ public sealed class Riot3ReconciliationService : BackgroundService
         var started = 0;
         var paused = 0;
         var resumed = 0;
+        var vehicleReassigned = 0;
+        var vehicleBackfilled = 0;
         var skippedNoVendorRecord = 0;
         var skippedFetchError = 0;
 
@@ -97,7 +131,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
             {
                 data = await queryService.GetOrderByUpperKeyAsync(trip.UpperKey, ct);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (!ct.IsCancellationRequested)
             {
                 skippedFetchError++;
                 _logger.LogWarning(ex, "[Reconciler] fetch failed for Trip {TripId} (upperKey {UpperKey}) — will retry next tick",
@@ -127,6 +161,15 @@ public sealed class Riot3ReconciliationService : BackgroundService
                 case Transition.Started: started++; break;
                 case Transition.Paused: paused++; break;
                 case Transition.Resumed: resumed++; break;
+                case Transition.VehicleReassigned:
+                    vehicleReassigned++;
+                    // Drift = a TASK_PROCESSING reassignment webhook was
+                    // dropped and only the reconciler caught it. Surface it so
+                    // ops can quantify webhook loss (the root cause).
+                    _logger.LogWarning(
+                        "[Reconciler] Trip {TripId} (upperKey {UpperKey}) vehicle drift corrected → now '{Vehicle}' (missed reassignment webhook)",
+                        trip.Id, trip.UpperKey, data.ProcessingVehicle?.Name ?? data.ProcessingVehicle?.Key ?? "(unknown)");
+                    break;
                 case Transition.None: break;   // mission upsert may still have run
             }
 
@@ -137,7 +180,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     await tripRepo.UpdateAsync(trip, ct);
                     reconciled++;
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+                catch (Exception ex) when (!ct.IsCancellationRequested)
                 {
                     _logger.LogError(ex, "[Reconciler] persist failed for Trip {TripId} (upperKey {UpperKey})",
                         trip.Id, trip.UpperKey);
@@ -158,13 +201,28 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     {
                         var expectedCompletion = TryParseRiot3Time(data.OrderStateChangeTime ?? data.FinalTime);
                         trip.CaptureFinalSnapshot(raw, expectedCompletion);
+
+                        // Recover the robot from the terminal record for trips
+                        // whose TASK_PROCESSING signal was missed — the vehicle
+                        // is echoed as executeVehicleKey once finished. No-op
+                        // when a live capture already recorded it. Same tick as
+                        // the snapshot so both persist in the UpdateAsync below.
+                        var (vKey, vName) = data.ResolvedVehicle;
+                        if (trip.BackfillVendorVehicle(vKey, vName, "reconciler-terminal"))
+                        {
+                            vehicleBackfilled++;
+                            _logger.LogInformation(
+                                "[Reconciler] Trip {TripId} (upperKey {UpperKey}) vehicle backfilled from terminal record → '{Vehicle}' (missed TASK_PROCESSING)",
+                                trip.Id, trip.UpperKey, vName ?? vKey ?? "(unknown)");
+                        }
+
                         await tripRepo.UpdateAsync(trip, ct);
                         _logger.LogInformation(
                             "[Reconciler] Captured final snapshot for Trip {TripId} (upperKey {UpperKey}, state {State})",
                             trip.Id, trip.UpperKey, data.State);
                     }
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+                catch (Exception ex) when (!ct.IsCancellationRequested)
                 {
                     _logger.LogWarning(ex, "[Reconciler] snapshot capture failed for Trip {TripId} — will retry",
                         trip.Id);
@@ -172,10 +230,23 @@ public sealed class Riot3ReconciliationService : BackgroundService
             }
         }
 
+        // Self-heal backstop — terminal trips the in-flight loop never touched
+        // because a webhook (not the reconciler) drove the terminal transition,
+        // so the terminal snapshot/backfill pass above never ran on them.
+        // Bounded + idempotent: each trip drops out once its snapshot is
+        // captured here, so this never grows into a per-tick re-fetch loop.
+        vehicleBackfilled += await SelfHealMissingVehiclesAsync(tripRepo, queryService, opts, ct);
+
         var stale = await CountStaleTripsAsync(scope, staleCutoff, ct);
         _logger.LogInformation(
-            "[Reconciler] tick: in-flight={InFlight} reconciled={Reconciled} (completed={Completed} failed={Failed} cancelled={Cancelled} started={Started} paused={Paused} resumed={Resumed}) noVendor={NoVendor} fetchErr={FetchErr} stale-skipped={Stale}",
-            inFlight.Count, reconciled, completed, failed, cancelled, started, paused, resumed, skippedNoVendorRecord, skippedFetchError, stale);
+            "[Reconciler] tick: in-flight={InFlight} reconciled={Reconciled} (completed={Completed} failed={Failed} cancelled={Cancelled} started={Started} paused={Paused} resumed={Resumed} vehicleReassigned={VehicleReassigned} vehicleBackfilled={VehicleBackfilled}) noVendor={NoVendor} fetchErr={FetchErr} stale-skipped={Stale}",
+            inFlight.Count, reconciled, completed, failed, cancelled, started, paused, resumed, vehicleReassigned, vehicleBackfilled, skippedNoVendorRecord, skippedFetchError, stale);
+
+        // Publish tick outcome to Prometheus (WorkflowMetrics / DTMS.Workflow).
+        // trips_stuck (=stale) drives the "AMR order stuck past reconcile window"
+        // alert; fetch_error is the leading indicator of RIOT connectivity trouble;
+        // backfilled counts post-terminal vehicle recoveries (webhook loss volume).
+        _metrics.RecordReconcilerTick(tripsStuck: stale, inflight: inFlight.Count, reconciled: reconciled, fetchErrors: skippedFetchError, backfilled: vehicleBackfilled);
     }
 
     private static async Task<Transition> ApplyVendorStateAsync(
@@ -227,9 +298,25 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     {
                         // Vendor resumed and we missed the HANG/HELD_TO_CONTINUE
                         // webhook — sync back to InProgress so operator commands
-                        // map correctly.
+                        // map correctly. Also reconcile the robot in case the
+                        // resume rode in on a reassignment we didn't see.
                         trip.Resume();
+                        trip.ReconcileVehicleAssignment(
+                            data.ProcessingVehicle?.Key, data.ProcessingVehicle?.Name, source: "reconciler");
                         return Transition.Resumed;
+                    }
+                    // Trip already InProgress — backstop a MISSED reassignment
+                    // TASK_PROCESSING webhook. RIOT3's order-level
+                    // processingVehicle is the current robot; keep DTMS's cache
+                    // pointer in sync so operator PASS/CANCEL commands (and the
+                    // trip board) target the robot actually running the job.
+                    // Idempotent — no-ops (returns false) when the robot is
+                    // unchanged, so a steady-state poll produces no transition.
+                    if (trip.Status == DTMS.Dispatch.Domain.Enums.TripStatus.InProgress
+                        && trip.ReconcileVehicleAssignment(
+                            data.ProcessingVehicle?.Key, data.ProcessingVehicle?.Name, source: "reconciler"))
+                    {
+                        return Transition.VehicleReassigned;
                     }
                     return Transition.None;
 
@@ -268,6 +355,68 @@ public sealed class Riot3ReconciliationService : BackgroundService
             // likely landed between query and apply. Safe to ignore.
             return Transition.None;
         }
+    }
+
+    // Self-heal sweep — see the call site for why it exists. Fetches the
+    // authoritative order record for each terminal trip missing a vehicle,
+    // captures the snapshot (which permanently drops the trip out of the
+    // query), and backfills the robot. Returns the count actually backfilled.
+    // internal (not private) so the unit tests can drive one sweep directly
+    // without standing up the full IServiceScopeFactory tick harness — every
+    // dependency is passed in, so the method is self-contained.
+    internal async Task<int> SelfHealMissingVehiclesAsync(
+        ITripRepository tripRepo,
+        IRiot3OrderQueryService queryService,
+        ReconciliationOptions opts,
+        CancellationToken ct)
+    {
+        var cutoff = DateTime.UtcNow.AddHours(-Math.Max(1, opts.SelfHealWindowHours));
+        var trips = await tripRepo.GetTerminalTripsMissingVehicleAsync(cutoff, ct);
+        if (trips.Count == 0) return 0;
+
+        var healed = 0;
+        foreach (var trip in trips)
+        {
+            if (ct.IsCancellationRequested) break;
+            if (string.IsNullOrEmpty(trip.UpperKey)) continue;
+
+            try
+            {
+                var data = await queryService.GetOrderByUpperKeyAsync(trip.UpperKey, ct);
+                if (data is null) continue;   // RIOT3 purged the order — retry next tick, bounded by the window
+
+                // TODO(efficiency, low): this hits the SAME RIOT3 endpoint twice
+                // (GetOrder parses, GetRaw re-fetches the body). Safe to fold into
+                // one round trip because the `data is null` gate above already
+                // established code=="0". Bounded (self-heal window + drop-out) so
+                // not urgent; revisit only if RIOT3 GET traffic is ever a measured
+                // problem. Add a `GetOrderWithRawByUpperKeyAsync` returning
+                // (data, raw) — KEEP the standalone raw method (CaptureFinalSnapshot
+                // Consumer needs it, and its E110014-only guard differs by design).
+                var raw = await queryService.GetRawByUpperKeyAsync(trip.UpperKey, ct);
+                if (string.IsNullOrWhiteSpace(raw)) continue;
+
+                // Snapshot FIRST — this is the write that removes the trip from
+                // the self-heal query for good, even when no vehicle exists.
+                var expectedCompletion = TryParseRiot3Time(data.OrderStateChangeTime ?? data.FinalTime);
+                trip.CaptureFinalSnapshot(raw, expectedCompletion);
+
+                var (vKey, vName) = data.ResolvedVehicle;
+                var backfilled = trip.BackfillVendorVehicle(vKey, vName, "reconciler-selfheal");
+                if (backfilled) healed++;
+
+                await tripRepo.UpdateAsync(trip, ct);
+                _logger.LogInformation(
+                    "[Reconciler] Self-heal Trip {TripId} (upperKey {UpperKey}): snapshot captured, vehicle {Result}",
+                    trip.Id, trip.UpperKey,
+                    backfilled ? $"→ '{vName ?? vKey}'" : "unavailable — sealed, no re-fetch");
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                _logger.LogWarning(ex, "[Reconciler] Self-heal failed for Trip {TripId} — will retry next tick", trip.Id);
+            }
+        }
+        return healed;
     }
 
     private static async Task<int> CountStaleTripsAsync(IServiceScope scope, DateTime cutoff, CancellationToken ct)
@@ -364,5 +513,5 @@ public sealed class Riot3ReconciliationService : BackgroundService
             out var dt) ? dt : null;
     }
 
-    private enum Transition { None, Completed, Failed, Cancelled, Started, Paused, Resumed }
+    private enum Transition { None, Completed, Failed, Cancelled, Started, Paused, Resumed, VehicleReassigned }
 }

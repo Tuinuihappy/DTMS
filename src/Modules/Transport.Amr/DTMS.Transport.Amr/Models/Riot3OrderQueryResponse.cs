@@ -43,6 +43,28 @@ public sealed class Riot3OrderQueryData
     [JsonPropertyName("processingVehicle")]
     public Riot3NotifyProcessingVehicle? ProcessingVehicle { get; init; }
 
+    // Terminal-record vehicle. RIOT3 emits `processingVehicle` only while the
+    // order is running; once it finishes the executing robot is echoed here
+    // instead (executeVehicleKey/Name — same key as the earlier
+    // processingVehicle.key). Surfaced so the reconciler can capture the
+    // robot on a trip whose PROCESSING signal was missed and only the
+    // terminal state remains. See ResolvedVehicle for the fallback order.
+    [JsonPropertyName("executeVehicleKey")]
+    public string? ExecuteVehicleKey { get; init; }
+
+    [JsonPropertyName("executeVehicleName")]
+    public string? ExecuteVehicleName { get; init; }
+
+    // Single source of truth for "which robot is/was on this order", used by
+    // every capture site (reconciler terminal + self-heal). Prefers the live
+    // processingVehicle when present (running order); falls back to the
+    // terminal executeVehicle* (finished order). Defined once here so the
+    // fallback order can't drift across call sites.
+    [JsonIgnore]
+    public (string? Key, string? Name) ResolvedVehicle =>
+        (ProcessingVehicle?.Key ?? ExecuteVehicleKey,
+         ProcessingVehicle?.Name ?? ExecuteVehicleName);
+
     [JsonPropertyName("orderStateChangeTime")]
     public string? OrderStateChangeTime { get; init; }
 

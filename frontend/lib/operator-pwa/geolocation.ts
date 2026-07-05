@@ -29,8 +29,17 @@ function readMockFix(): GeoFix | null {
       }
     }
   }
-  const lat = Number(process.env.NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT);
-  const lng = Number(process.env.NEXT_PUBLIC_OPERATOR_MOCK_GPS_LNG);
+  // Guard against the empty-string build arg (docker-compose passes
+  // NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT="" by default). Number("") is 0
+  // — a *finite* value — so without this check the mock would silently
+  // return {lat:0, lng:0}, a point off the coast of Africa that fails
+  // every geofence with a ~9,800 km overshoot instead of falling
+  // through to the device's real GPS.
+  const latRaw = process.env.NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT;
+  const lngRaw = process.env.NEXT_PUBLIC_OPERATOR_MOCK_GPS_LNG;
+  if (!latRaw || !lngRaw) return null;
+  const lat = Number(latRaw);
+  const lng = Number(lngRaw);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   return { lat, lng, accuracy: 10 };
 }

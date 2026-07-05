@@ -61,6 +61,16 @@ public class TripFactsProjectionStore : ITripFactsProjectionStore
         row?.SetCompletedAt(at, deliveryOrderId, jobId, vendorUpperKey);
     }
 
+    public async Task SetVendorVehicleKeyAsync(
+        Guid tripId, DateTime at, string vendorVehicleKey, CancellationToken ct)
+    {
+        // Row already exists by the time a backfill fires (it follows the
+        // terminal event), but EnsureRow keeps us safe against bus reordering.
+        await EnsureRowAsync(tripId, at, null, null, ct);
+        var row = await Find(tripId, ct);
+        row?.BackfillVendorVehicleKey(vendorVehicleKey, at);
+    }
+
     public async Task SetFailedAtAsync(
         Guid tripId, DateTime at,
         Guid? deliveryOrderId, Guid? jobId,
@@ -81,6 +91,14 @@ public class TripFactsProjectionStore : ITripFactsProjectionStore
         row?.SetCancelledAt(at, deliveryOrderId, jobId, vendorUpperKey, reason);
     }
 
-    private Task<TripFactsRow?> Find(Guid tripId, CancellationToken ct)
-        => _db.TripFacts.FirstOrDefaultAsync(r => r.TripId == tripId, ct);
+    // Check the change tracker BEFORE the database. EnsureRowAsync Adds a new
+    // row for a trip whose first event we see (e.g. TripStarted), but that add
+    // isn't persisted until MarkProcessedAsync's SaveChanges — so a LINQ query
+    // to the DB wouldn't find it yet and Set* would silently no-op against a
+    // null row (the bug that left VendorVehicleKey / StartedAt null on every
+    // trip whose first projected event created the row). Local first fixes all
+    // Set* callers at the source.
+    private async Task<TripFactsRow?> Find(Guid tripId, CancellationToken ct)
+        => _db.TripFacts.Local.FirstOrDefault(r => r.TripId == tripId)
+           ?? await _db.TripFacts.FirstOrDefaultAsync(r => r.TripId == tripId, ct);
 }
