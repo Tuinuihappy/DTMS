@@ -33,9 +33,10 @@ public class P0MapperEnrichmentTests
         var integration = integrationEvents.First()
             .Should().BeOfType<DeliveryOrderCancelledIntegrationEventV1>().Subject;
         integration.TriggeredBy.Should().Be("ops-lead-01");
-        // Bumped by Phase S.1 follow-up (Channel + DisplayName added to the
-        // record alongside the existing 1.1 fields).
-        integration.SchemaVersion.Should().Be("1.2");
+        // Tracks DeliveryOrderCancelledIntegrationEventV1.SchemaVersion: 1.1
+        // → 1.2 (Channel + DisplayName) → 1.4 (SourceSystem). Keep in lockstep
+        // with the record's default in DeliveryOrderStatusIntegrationEvents.cs.
+        integration.SchemaVersion.Should().Be("1.4");
     }
 
     [Fact]
