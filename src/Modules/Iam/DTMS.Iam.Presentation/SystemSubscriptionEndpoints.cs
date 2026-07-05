@@ -26,7 +26,7 @@ public static class SystemSubscriptionEndpoints
 
         // ── Read-only: list event types the platform supports ──────────
         group.MapGet("/event-types", () => Results.Ok(CallbackEventTypes.All))
-            .RequirePermission("dtms:iam:subscription:read");
+            .RequirePermission(Permissions.Iam.SubscriptionRead);
 
         // ── List subscriptions for a system ────────────────────────────
         group.MapGet("/systems/{key}/subscriptions",
@@ -40,7 +40,7 @@ public static class SystemSubscriptionEndpoints
 
             var rows = await subs.ListBySystemAsync(key, ct);
             return Results.Ok(rows.Select(SubscriptionDto.FromEntity));
-        }).RequirePermission("dtms:iam:subscription:read");
+        }).RequirePermission(Permissions.Iam.SubscriptionRead);
 
         // ── Create ─────────────────────────────────────────────────────
         group.MapPost("/systems/{key}/subscriptions",
@@ -101,7 +101,7 @@ public static class SystemSubscriptionEndpoints
             {
                 return Results.BadRequest(new { error = ex.Message });
             }
-        }).RequirePermission("dtms:iam:subscription:write");
+        }).RequirePermission(Permissions.Iam.SubscriptionWrite);
 
         // ── Toggle Enabled / change formatter ──────────────────────────
         group.MapPatch("/systems/{key}/subscriptions/{eventType}",
@@ -140,7 +140,7 @@ public static class SystemSubscriptionEndpoints
             lookup.Invalidate(eventType);
 
             return Results.Ok(SubscriptionDto.FromEntity(row));
-        }).RequirePermission("dtms:iam:subscription:write");
+        }).RequirePermission(Permissions.Iam.SubscriptionWrite);
 
         // ── Delete ─────────────────────────────────────────────────────
         group.MapDelete("/systems/{key}/subscriptions/{eventType}",
@@ -169,7 +169,7 @@ public static class SystemSubscriptionEndpoints
             lookup.Invalidate(eventType);
 
             return Results.NoContent();
-        }).RequirePermission("dtms:iam:subscription:write");
+        }).RequirePermission(Permissions.Iam.SubscriptionWrite);
     }
 
     private static string ActorOrUnknown(HttpContext ctx)

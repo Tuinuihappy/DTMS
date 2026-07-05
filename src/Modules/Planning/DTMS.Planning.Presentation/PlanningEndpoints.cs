@@ -49,21 +49,21 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/planning/jobs/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:job:write");
+        }).RequirePermission(Permissions.Planning.JobWrite);
 
         // POST /api/v1/planning/jobs/{id}/assign — Assign a vehicle (Greedy)
         group.MapPost("/{id:guid}/assign", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new AssignVehicleToJobCommand(id));
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:job:plan");
+        }).RequirePermission(Permissions.Planning.JobPlan);
 
         // POST /api/v1/planning/jobs/{id}/commit — Commit the plan
         group.MapPost("/{id:guid}/commit", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new CommitPlanCommand(id));
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:job:plan");
+        }).RequirePermission(Permissions.Planning.JobPlan);
 
         // POST /api/v1/planning/jobs/{id}/replan — Replan a committed job
         group.MapPost("/{id:guid}/replan", async (Guid id, ReplanJobCommand command, ISender sender) =>
@@ -71,7 +71,7 @@ public static class PlanningEndpoints
             if (id != command.JobId) return Results.BadRequest("ID mismatch");
             var result = await sender.Send(command);
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:job:plan");
+        }).RequirePermission(Permissions.Planning.JobPlan);
 
         // POST /api/v1/planning/jobs/{id}/retry — Re-dispatch a Failed envelope
         // job. Increments AttemptNumber, builds a new UpperKey, calls
@@ -82,14 +82,14 @@ public static class PlanningEndpoints
         {
             var result = await sender.Send(new RetryJobCommand(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:job:retry");
+        }).RequirePermission(Permissions.Planning.JobRetry);
 
         // GET /api/v1/planning/jobs/{id} — Get job details
         group.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new GetJobByIdQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
-        }).RequirePermission("dtms:planning:job:read");
+        }).RequirePermission(Permissions.Planning.JobRead);
 
         // GET /api/v1/planning/jobs/{id}/status-history — Phase P1 (b12)
         // Structured status-transition timeline materialized by
@@ -100,7 +100,7 @@ public static class PlanningEndpoints
         {
             var result = await sender.Send(new GetJobStatusHistoryQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:job:read");
+        }).RequirePermission(Permissions.Planning.JobRead);
 
         // GET /api/v1/planning/jobs/queue?statuses=Failed&statuses=Created&page=1&pageSize=20&sortBy=&sortDir=
         // — Phase b10-frontend.2 — paginated operator queue across every
@@ -133,7 +133,7 @@ public static class PlanningEndpoints
                 string.IsNullOrWhiteSpace(sortBy) ? null : sortBy,
                 descending));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:job:read");
+        }).RequirePermission(Permissions.Planning.JobRead);
 
         // GET /api/v1/planning/jobs?orderId={guid} — Phase b10 — list Jobs for an
         // order so the operator drawer can show Job lineage alongside Trips.
@@ -143,7 +143,7 @@ public static class PlanningEndpoints
                 return Results.BadRequest("orderId query parameter is required.");
             var result = await sender.Send(new GetJobsByOrderQuery(orderId.Value));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:job:read");
+        }).RequirePermission(Permissions.Planning.JobRead);
 
         // Consolidation + Phase 3 endpoints under /api/planning
         var planningGroup = app.MapGroup("/api/planning").WithTags("Planning").RequireAuthorization();
@@ -155,7 +155,7 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/planning/jobs/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:consolidate");
+        }).RequirePermission(Permissions.Planning.Consolidate);
 
         // POST /api/planning/cross-dock — Create linked inbound/outbound cross-dock jobs
         planningGroup.MapPost("/cross-dock", async (CreateCrossDockJobsCommand command, ISender sender) =>
@@ -164,7 +164,7 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/planning/jobs/{result.Value.InboundJobId}", result.Value)
                 : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:consolidate");
+        }).RequirePermission(Permissions.Planning.Consolidate);
 
         // POST /api/planning/milk-runs — Create a milk-run template + initial job
         planningGroup.MapPost("/milk-runs", async (CreateMilkRunCommand command, ISender sender) =>
@@ -173,7 +173,7 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/planning/milk-runs/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:consolidate");
+        }).RequirePermission(Permissions.Planning.Consolidate);
 
         // POST /api/planning/multi-pick-drop — Create a CVRPPD job with pickup-delivery pairs
         planningGroup.MapPost("/multi-pick-drop", async (CreateMultiPickDropJobCommand command, ISender sender) =>
@@ -182,21 +182,21 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/planning/jobs/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:consolidate");
+        }).RequirePermission(Permissions.Planning.Consolidate);
 
         // GET /api/planning/cost-model — Get current cost model config
         planningGroup.MapGet("/cost-model", async (string? vehicleTypeKey, ISender sender) =>
         {
             var result = await sender.Send(new GetCostModelQuery(vehicleTypeKey));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:cost-model:read");
+        }).RequirePermission(Permissions.Planning.CostModelRead);
 
         // PUT /api/planning/cost-model — Update cost model config
         planningGroup.MapPut("/cost-model", async (UpdateCostModelCommand command, ISender sender) =>
         {
             var result = await sender.Send(command);
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:cost-model:write");
+        }).RequirePermission(Permissions.Planning.CostModelWrite);
 
         // ── ActionTemplate catalog (Phase 1B) ────────────────────────────────
         // Mirrors RIOT3's /api/v4/order/action-templates — each entry is a
@@ -240,7 +240,7 @@ public static class PlanningEndpoints
                     $"/api/v1/action-templates/{result.Value!.Id}",
                     result.Value)
                 : RiotEnvelope.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:action-template:write");
+        }).RequirePermission(Permissions.Planning.ActionTemplateWrite);
 
         // GET — paged list (page/size mirror RIOT3 PageRequest semantics).
         // search matches actionName case-insensitively; sortBy accepts
@@ -269,7 +269,7 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? RiotEnvelope.Ok(result.Value)
                 : RiotEnvelope.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:action-template:read");
+        }).RequirePermission(Permissions.Planning.ActionTemplateRead);
 
         // GET /stats — unfiltered catalog counters for the KPI strip.
         // Mirrors /api/v1/delivery-orders/stats: a fixed system overview
@@ -280,7 +280,7 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? RiotEnvelope.Ok(result.Value)
                 : RiotEnvelope.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:action-template:read");
+        }).RequirePermission(Permissions.Planning.ActionTemplateRead);
 
         // GET /{id} — fetch one
         actionTemplates.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
@@ -289,7 +289,7 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? RiotEnvelope.Ok(result.Value)
                 : RiotEnvelope.NotFound(result.Error);
-        }).RequirePermission("dtms:planning:action-template:read");
+        }).RequirePermission(Permissions.Planning.ActionTemplateRead);
 
         // PUT /{id} — full resource replacement, including rename.
         // Body uses the same RIOT3 shape as POST and requires every field
@@ -318,7 +318,7 @@ public static class PlanningEndpoints
                 return result.IsSuccess
                     ? RiotEnvelope.Ok<object?>(null)
                     : RiotEnvelope.BadRequest(result.Error);
-            }).RequirePermission("dtms:planning:action-template:write");
+            }).RequirePermission(Permissions.Planning.ActionTemplateWrite);
 
         // POST /{id}/activate, /deactivate — soft enable/disable
         actionTemplates.MapPost("/{id:guid}/activate", async (Guid id, ISender sender) =>
@@ -327,7 +327,7 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? RiotEnvelope.Ok<object?>(null)
                 : RiotEnvelope.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:action-template:write");
+        }).RequirePermission(Permissions.Planning.ActionTemplateWrite);
 
         actionTemplates.MapPost("/{id:guid}/deactivate", async (Guid id, ISender sender) =>
         {
@@ -335,7 +335,7 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? RiotEnvelope.Ok<object?>(null)
                 : RiotEnvelope.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:action-template:write");
+        }).RequirePermission(Permissions.Planning.ActionTemplateWrite);
 
         // DELETE /{id} — hard delete (no OrderTemplate ref check yet — Phase 1C)
         actionTemplates.MapDelete("/{id:guid}", async (Guid id, ISender sender) =>
@@ -344,7 +344,7 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? RiotEnvelope.Ok<object?>(null)
                 : RiotEnvelope.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:action-template:write");
+        }).RequirePermission(Permissions.Planning.ActionTemplateWrite);
 
         // ── OrderTemplate (Phase 1C) ─────────────────────────────────────────
         // Mirrors RIOT3 /api/v4/order/order-templates payload — name +
@@ -406,7 +406,7 @@ public static class PlanningEndpoints
                     $"/api/v1/order-templates/{result.Value!.Id}",
                     result.Value)
                 : RiotEnvelope.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:order-template:write");
+        }).RequirePermission(Permissions.Planning.OrderTemplateWrite);
 
         // GET — paged list (page/size mirror RIOT3 PageRequest semantics).
         // sortBy accepts name (default) | priority | modifiedAt | createdAt |
@@ -430,7 +430,7 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? RiotEnvelope.Ok(result.Value)
                 : RiotEnvelope.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:order-template:read");
+        }).RequirePermission(Permissions.Planning.OrderTemplateRead);
 
         // GET /{id}
         orderTemplates.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
@@ -439,7 +439,7 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? RiotEnvelope.Ok(result.Value)
                 : RiotEnvelope.NotFound(result.Error);
-        }).RequirePermission("dtms:planning:order-template:read");
+        }).RequirePermission(Permissions.Planning.OrderTemplateRead);
 
         // PUT /{id} — full resource replacement (body carries every field
         // the entity exposes). Labelled PATCH originally but the handler
@@ -484,7 +484,7 @@ public static class PlanningEndpoints
                 return result.IsSuccess
                     ? RiotEnvelope.Ok<object?>(null)
                     : RiotEnvelope.BadRequest(result.Error);
-            }).RequirePermission("dtms:planning:order-template:write");
+            }).RequirePermission(Permissions.Planning.OrderTemplateWrite);
 
         // POST /{id}/activate, /deactivate — soft enable/disable
         orderTemplates.MapPost("/{id:guid}/activate", async (Guid id, ISender sender) =>
@@ -493,7 +493,7 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? RiotEnvelope.Ok<object?>(null)
                 : RiotEnvelope.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:order-template:write");
+        }).RequirePermission(Permissions.Planning.OrderTemplateWrite);
 
         orderTemplates.MapPost("/{id:guid}/deactivate", async (Guid id, ISender sender) =>
         {
@@ -501,7 +501,7 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? RiotEnvelope.Ok<object?>(null)
                 : RiotEnvelope.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:order-template:write");
+        }).RequirePermission(Permissions.Planning.OrderTemplateWrite);
 
         // DELETE /{id}
         orderTemplates.MapDelete("/{id:guid}", async (Guid id, ISender sender) =>
@@ -510,7 +510,7 @@ public static class PlanningEndpoints
             return result.IsSuccess
                 ? RiotEnvelope.Ok<object?>(null)
                 : RiotEnvelope.BadRequest(result.Error);
-        }).RequirePermission("dtms:planning:order-template:write");
+        }).RequirePermission(Permissions.Planning.OrderTemplateWrite);
 
         // POST /{id}/create — resolve ActionTemplate references against
         // the catalog and POST the full envelope to RIOT3. dryRun=true skips
@@ -532,7 +532,7 @@ public static class PlanningEndpoints
                 return result.IsSuccess
                     ? RiotEnvelope.Ok(result.Value)
                     : RiotEnvelope.BadRequest(result.Error);
-            }).RequirePermission("dtms:planning:order-template:create");
+            }).RequirePermission(Permissions.Planning.OrderTemplateCreate);
     }
 }
 

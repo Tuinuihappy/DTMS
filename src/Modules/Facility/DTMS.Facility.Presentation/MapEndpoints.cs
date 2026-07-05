@@ -40,25 +40,25 @@ public static class MapEndpoints
         {
             var result = await sender.Send(command);
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:facility:map:write");
+        }).RequirePermission(Permissions.Facility.MapWrite);
 
         group.MapGet("/maps/{id:guid}", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new GetMapByIdQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
-        }).RequirePermission("dtms:facility:map:read");
+        }).RequirePermission(Permissions.Facility.MapRead);
 
         group.MapGet("/maps", async (ISender sender) =>
         {
             var result = await sender.Send(new ListMapsQuery());
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:facility:map:read");
+        }).RequirePermission(Permissions.Facility.MapRead);
 
         group.MapPost("/maps/import-from-riot3", async (ImportMapFromRiot3Request req, ISender sender) =>
         {
             var result = await sender.Send(new ImportMapFromRiot3Command(req.Riot3MapId));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:facility:map:import");
+        }).RequirePermission(Permissions.Facility.MapImport);
 
         // Manual on-demand sync — same code path as the background poller, so the user
         // can refresh a map immediately after editing it in RIOT3 instead of waiting
@@ -67,7 +67,7 @@ public static class MapEndpoints
         {
             var result = await sender.Send(new SyncMapStationsCommand(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:facility:map:sync");
+        }).RequirePermission(Permissions.Facility.MapSync);
 
         // ── Stations ───────────────────────────────────────────────────────
         // POST /api/v1/facility/maps/{mapId}/stations
@@ -79,7 +79,7 @@ public static class MapEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/facility/stations/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:facility:station:write");
+        }).RequirePermission(Permissions.Facility.StationWrite);
 
         // GET /api/v1/facility/stations?mapId=&type=&zoneId=&compatibleWith=&includeInactive=&code=
         group.MapGet("/stations", async (Guid? mapId, string? type, Guid? zoneId, string? compatibleWith, bool includeInactive, string? code, ISender sender) =>
@@ -87,7 +87,7 @@ public static class MapEndpoints
             StationType? stationType = type != null && Enum.TryParse<StationType>(type, true, out var t) ? t : null;
             var result = await sender.Send(new GetStationsQuery(mapId, stationType, zoneId, compatibleWith, includeInactive, code));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:facility:station:read");
+        }).RequirePermission(Permissions.Facility.StationRead);
 
         // PATCH /api/v1/facility/stations/{stationId}
         group.MapMethods("/stations/{stationId:guid}", ["PATCH"],
@@ -97,7 +97,7 @@ public static class MapEndpoints
                     stationId, req.Type, req.Code,
                     req.UpdateActions, req.Actions));
                 return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
-            }).RequirePermission("dtms:facility:station:write");
+            }).RequirePermission(Permissions.Facility.StationWrite);
 
         // POST /api/v1/facility/stations/{stationId}/force-offline
         // Manual operator override — TTL-bounded (5..1440 minutes). Survives RIOT3 sync until cleared or expired.
@@ -107,7 +107,7 @@ public static class MapEndpoints
                 var result = await sender.Send(new ForceStationOfflineCommand(
                     stationId, req.Reason, req.DurationMinutes, req.By));
                 return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
-            }).RequirePermission("dtms:facility:station:force-offline");
+            }).RequirePermission(Permissions.Facility.StationForceOffline);
 
         // DELETE /api/v1/facility/stations/{stationId}/force-offline
         group.MapDelete("/stations/{stationId:guid}/force-offline",
@@ -115,7 +115,7 @@ public static class MapEndpoints
             {
                 var result = await sender.Send(new ClearStationOverrideCommand(stationId));
                 return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
-            }).RequirePermission("dtms:facility:station:force-offline");
+            }).RequirePermission(Permissions.Facility.StationForceOffline);
 
         // ── Route Costs ────────────────────────────────────────────────────
         // GET /api/v1/facility/route-cost?from=&to=
@@ -124,7 +124,7 @@ public static class MapEndpoints
         {
             var result = await sender.Send(new GetRouteCostQuery(from, to));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
-        }).RequirePermission("dtms:facility:map:read");
+        }).RequirePermission(Permissions.Facility.MapRead);
 
         // ── Topology Overlays ──────────────────────────────────────────────
         group.MapPost("/topology-overlays", async (CreateTopologyOverlayCommand command, ISender sender) =>
@@ -133,20 +133,20 @@ public static class MapEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/facility/topology-overlays/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:facility:topology-overlay:write");
+        }).RequirePermission(Permissions.Facility.TopologyOverlayWrite);
 
         group.MapDelete("/topology-overlays/{id:guid}", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new ExpireTopologyOverlayCommand(id));
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:facility:topology-overlay:write");
+        }).RequirePermission(Permissions.Facility.TopologyOverlayWrite);
 
         // ── Shelves ────────────────────────────────────────────────────────
         group.MapPost("/shelves/{rfid}/release", async (string rfid, ISender sender) =>
         {
             var result = await sender.Send(new ReleaseShelfCommand(rfid));
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:facility:shelf:release");
+        }).RequirePermission(Permissions.Facility.ShelfRelease);
 
         // ── Carrier Type Profiles ─────────────────────────────────────────
         group.MapPost("/carrier-type-profiles", async (RegisterCarrierTypeProfileCommand command, ISender sender) =>
@@ -155,13 +155,13 @@ public static class MapEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/facility/carrier-type-profiles/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:facility:profile:write");
+        }).RequirePermission(Permissions.Facility.ProfileWrite);
 
         group.MapGet("/carrier-type-profiles", async (ISender sender) =>
         {
             var result = await sender.Send(new GetCarrierTypeProfilesQuery());
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:facility:profile:read");
+        }).RequirePermission(Permissions.Facility.ProfileRead);
 
         // ── Load Unit Profiles ────────────────────────────────────────────
         group.MapPost("/load-unit-profiles", async (RegisterLoadUnitProfileCommand command, ISender sender) =>
@@ -170,13 +170,13 @@ public static class MapEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/facility/load-unit-profiles/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:facility:profile:write");
+        }).RequirePermission(Permissions.Facility.ProfileWrite);
 
         group.MapGet("/load-unit-profiles", async (string? carrierTypeCode, ISender sender) =>
         {
             var result = await sender.Send(new GetLoadUnitProfilesQuery(carrierTypeCode));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:facility:profile:read");
+        }).RequirePermission(Permissions.Facility.ProfileRead);
 
         // ── Facility Resources ─────────────────────────────────────────────
         group.MapPost("/resources", async (RegisterFacilityResourceCommand command, ISender sender) =>
@@ -185,13 +185,13 @@ public static class MapEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/facility/resources/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:facility:resource:write");
+        }).RequirePermission(Permissions.Facility.ResourceWrite);
 
         group.MapPost("/resources/{id:guid}/command", async (Guid id, ResourceCommandRequest req, ISender sender) =>
         {
             var result = await sender.Send(new CommandFacilityResourceCommand(id, req.Command));
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:facility:resource:write");
+        }).RequirePermission(Permissions.Facility.ResourceWrite);
     }
 }
 

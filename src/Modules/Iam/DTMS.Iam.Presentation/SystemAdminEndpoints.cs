@@ -102,7 +102,7 @@ public static class SystemAdminEndpoints
                 {
                     return Results.BadRequest(new { error = ex.Message });
                 }
-            }).RequirePermission("dtms:iam:system:write");
+            }).RequirePermission(Permissions.Iam.SystemWrite);
 
         // ── List ──────────────────────────────────────────────────────
         group.MapGet("/",
@@ -110,7 +110,7 @@ public static class SystemAdminEndpoints
             {
                 var rows = await systems.ListAllAsync(ct);
                 return Results.Ok(rows.Select(SystemSummaryDto.FromEntity));
-            }).RequirePermission("dtms:iam:system:read");
+            }).RequirePermission(Permissions.Iam.SystemRead);
 
         // ── Detail (system + credential metadata, no secret hash) ─────
         group.MapGet("/{key}",
@@ -146,7 +146,7 @@ public static class SystemAdminEndpoints
                         CallbackTimeoutMs: cred.CallbackTimeoutMs,
                         UpdatedAt: cred.UpdatedAt,
                         CallbackTokenExpiresAt: TryReadJwtExpiry(cred.CallbackAuthConfig))));
-            }).RequirePermission("dtms:iam:system:read");
+            }).RequirePermission(Permissions.Iam.SystemRead);
 
         // ── Patch metadata ────────────────────────────────────────────
         group.MapPatch("/{key}",
@@ -177,7 +177,7 @@ public static class SystemAdminEndpoints
                 {
                     return Results.BadRequest(new { error = ex.Message });
                 }
-            }).RequirePermission("dtms:iam:system:write");
+            }).RequirePermission(Permissions.Iam.SystemWrite);
 
         // ── Activate / Deactivate ─────────────────────────────────────
         group.MapPost("/{key}/activate",
@@ -198,7 +198,7 @@ public static class SystemAdminEndpoints
                     permissionCode: null,
                     details: $"{{\"systemKey\":\"{key}\"}}"), ct);
                 return Results.NoContent();
-            }).RequirePermission("dtms:iam:system:write");
+            }).RequirePermission(Permissions.Iam.SystemWrite);
 
         group.MapPost("/{key}/deactivate",
             async (string key, HttpContext ctx,
@@ -218,7 +218,7 @@ public static class SystemAdminEndpoints
                     permissionCode: null,
                     details: $"{{\"systemKey\":\"{key}\"}}"), ct);
                 return Results.NoContent();
-            }).RequirePermission("dtms:iam:system:write");
+            }).RequirePermission(Permissions.Iam.SystemWrite);
 
         // ── Set callback config (URL + outbound auth + timeouts) ──────
         group.MapPut("/{key}/callback",
@@ -297,7 +297,7 @@ public static class SystemAdminEndpoints
                     })), ct);
 
                 return Results.NoContent();
-            }).RequirePermission("dtms:iam:system:write");
+            }).RequirePermission(Permissions.Iam.SystemWrite);
 
         // ── Hard delete (only when inactive) ─────────────────────────
         // Soft delete via /deactivate is the routine path. Hard delete
@@ -339,7 +339,7 @@ public static class SystemAdminEndpoints
                     })), ct);
 
                 return Results.NoContent();
-            }).RequirePermission("dtms:iam:system:write");
+            }).RequirePermission(Permissions.Iam.SystemWrite);
 
         // ── Rotate inbound credential (scheme-preserving) ─────────────
         //     Mints a new secret of WHATEVER scheme the credential is
@@ -389,7 +389,7 @@ public static class SystemAdminEndpoints
                     Secret: minted.Plaintext,
                     AuthScheme: cred.AuthScheme,
                     RotatedAt: cred.UpdatedAt));
-            }).RequirePermission("dtms:iam:system:write");
+            }).RequirePermission(Permissions.Iam.SystemWrite);
 
         // ── Switch inbound auth scheme (api-key ↔ bearer-jwt) ─────────
         //     Replaces the credential with a fresh secret of the new
@@ -441,7 +441,7 @@ public static class SystemAdminEndpoints
                     Secret: minted.Plaintext,
                     AuthScheme: newScheme,
                     RotatedAt: cred.UpdatedAt));
-            }).RequirePermission("dtms:iam:system:write");
+            }).RequirePermission(Permissions.Iam.SystemWrite);
 
         // ── Admin-issued long-lived JWT (escape hatch for partners that ─
         //     can't run an OAuth client). Bypasses /oauth/token: admin
@@ -517,7 +517,7 @@ public static class SystemAdminEndpoints
                     ExpiresInSeconds: token.ExpiresInSeconds,
                     ExpiresAt: token.ExpiresAt,
                     Jti: token.Jti));
-            }).RequirePermission("dtms:iam:system:write");
+            }).RequirePermission(Permissions.Iam.SystemWrite);
 
         // ── Phase S.8c — list admin-issued tokens for a system ────────
         //     Newest-first. Includes Active + Revoked (audit trail).
@@ -542,7 +542,7 @@ public static class SystemAdminEndpoints
                     RevokedAt: t.RevokedAt,
                     RevokedBy: t.RevokedBy,
                     RevokeReason: t.RevokeReason)));
-            }).RequirePermission("dtms:iam:system:read");
+            }).RequirePermission(Permissions.Iam.SystemRead);
 
         // ── Phase S.8c — revoke an admin-issued token by jti ──────────
         //     Idempotent: re-revoking is a no-op that returns 204. Redis
@@ -598,7 +598,7 @@ public static class SystemAdminEndpoints
                     })), ct);
 
                 return Results.NoContent();
-            }).RequirePermission("dtms:iam:system:write");
+            }).RequirePermission(Permissions.Iam.SystemWrite);
 
         // ── Grant permission to system ──────────────────────────────────
         //     Mirrors role-side POST /roles/{name}/permissions/{code}.
@@ -634,7 +634,7 @@ public static class SystemAdminEndpoints
                         details: JsonSerializer.Serialize(new { systemKey = key })), ct);
                 }
                 return Results.NoContent();
-            }).RequirePermission("dtms:iam:system:write");
+            }).RequirePermission(Permissions.Iam.SystemWrite);
 
         // ── Revoke permission from system ───────────────────────────────
         //     Symmetric with grant. No self-lockout guard needed (admin
@@ -667,7 +667,7 @@ public static class SystemAdminEndpoints
                         details: JsonSerializer.Serialize(new { systemKey = key })), ct);
                 }
                 return Results.NoContent();
-            }).RequirePermission("dtms:iam:system:write");
+            }).RequirePermission(Permissions.Iam.SystemWrite);
     }
 
     private static string ActorOrUnknown(HttpContext ctx)

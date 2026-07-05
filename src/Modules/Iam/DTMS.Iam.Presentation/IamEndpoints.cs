@@ -58,7 +58,7 @@ public static class IamEndpoints
         {
             var items = await repo.ListAllAsync(ct);
             return Results.Ok(items.Select(p => new PermissionDto(p.Code, p.Description, p.Module)));
-        }).RequirePermission("dtms:iam:permission:read");
+        }).RequirePermission(Permissions.Iam.PermissionRead);
 
         group.MapPost("/permissions",
             async (CreatePermissionRequest req, HttpContext ctx, IPermissionRepository repo,
@@ -82,7 +82,7 @@ public static class IamEndpoints
                 {
                     return Results.BadRequest(new { error = ex.Message });
                 }
-            }).RequirePermission("dtms:iam:permission:write");
+            }).RequirePermission(Permissions.Iam.PermissionWrite);
 
         group.MapPut("/permissions/{code}",
             async (string code, UpdatePermissionRequest req, HttpContext ctx,
@@ -99,7 +99,7 @@ public static class IamEndpoints
                     permissionCode: code,
                     details: System.Text.Json.JsonSerializer.Serialize(req)), ct);
                 return Results.NoContent();
-            }).RequirePermission("dtms:iam:permission:write");
+            }).RequirePermission(Permissions.Iam.PermissionWrite);
 
         group.MapDelete("/permissions/{code}",
             async (string code, HttpContext ctx, IPermissionRepository repo,
@@ -114,7 +114,7 @@ public static class IamEndpoints
                     action: "permission-deleted",
                     permissionCode: code), ct);
                 return Results.NoContent();
-            }).RequirePermission("dtms:iam:permission:write");
+            }).RequirePermission(Permissions.Iam.PermissionWrite);
     }
 
     // ── Roles + their permission mappings ────────────────────────────────
@@ -124,7 +124,7 @@ public static class IamEndpoints
         {
             var items = await repo.ListAllAsync(ct);
             return Results.Ok(items.Select(r => new RoleDto(r.Name, r.Description, r.IsSystem)));
-        }).RequirePermission("dtms:iam:role:read");
+        }).RequirePermission(Permissions.Iam.RoleRead);
 
         // Returns every permission code mapped to this role — including
         // wildcards. The frontend resolves wildcard ↔ catalog itself so
@@ -135,7 +135,7 @@ public static class IamEndpoints
                 if (await roleRepo.GetByNameAsync(name, ct) is null) return Results.NotFound();
                 var codes = await permRepo.GetPermissionCodesForRoleAsync(name, ct);
                 return Results.Ok(codes);
-            }).RequirePermission("dtms:iam:role:read");
+            }).RequirePermission(Permissions.Iam.RoleRead);
 
         group.MapPost("/roles",
             async (CreateRoleRequest req, HttpContext ctx, IRoleRepository repo,
@@ -159,7 +159,7 @@ public static class IamEndpoints
                 {
                     return Results.BadRequest(new { error = ex.Message });
                 }
-            }).RequirePermission("dtms:iam:role:write");
+            }).RequirePermission(Permissions.Iam.RoleWrite);
 
         group.MapDelete("/roles/{name}",
             async (string name, HttpContext ctx, IRoleRepository repo,
@@ -185,7 +185,7 @@ public static class IamEndpoints
                     action: "role-deleted",
                     role: name), ct);
                 return Results.NoContent();
-            }).RequirePermission("dtms:iam:role:write");
+            }).RequirePermission(Permissions.Iam.RoleWrite);
 
         group.MapPost("/roles/{name}/permissions/{code}",
             async (string name, string code, HttpContext ctx, IRoleRepository roleRepo,
@@ -218,7 +218,7 @@ public static class IamEndpoints
                         permissionCode: code), ct);
                 }
                 return Results.NoContent();
-            }).RequirePermission("dtms:iam:role:write");
+            }).RequirePermission(Permissions.Iam.RoleWrite);
 
         group.MapDelete("/roles/{name}/permissions/{code}",
             async (string name, string code, HttpContext ctx, IRoleRepository repo,
@@ -258,7 +258,7 @@ public static class IamEndpoints
                         permissionCode: code), ct);
                 }
                 return Results.NoContent();
-            }).RequirePermission("dtms:iam:role:write");
+            }).RequirePermission(Permissions.Iam.RoleWrite);
     }
 
     // ── Audit log read ───────────────────────────────────────────────────
@@ -280,7 +280,7 @@ public static class IamEndpoints
                     page = p,
                     pageSize = s,
                 });
-            }).RequirePermission("dtms:iam:audit:read");
+            }).RequirePermission(Permissions.Iam.AuditRead);
     }
 
     private static string ActorOrUnknown(HttpContext ctx)

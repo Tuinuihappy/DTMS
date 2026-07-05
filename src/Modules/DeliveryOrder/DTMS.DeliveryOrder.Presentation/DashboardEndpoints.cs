@@ -31,6 +31,6 @@ public static class DashboardEndpoints
 
             var result = await sender.Send(new GetOrderFunnelQuery(from, to));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:dashboard:read");
+        }).RequirePermission(Permissions.Reporting.DashboardRead);
     }
 }

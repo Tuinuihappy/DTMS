@@ -61,14 +61,14 @@ public static class DeliveryOrderEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/delivery-orders/{result.Value.Id}", result.Value)
                 : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:write");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderWrite);
 
         // POST /api/v1/delivery-orders/{id}/submit — submit draft (Draft → Validated)
         group.MapPost("/{id:guid}/submit", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new SubmitDeliveryOrderCommand(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:submit");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderSubmit);
 
         // POST /api/v1/delivery-orders/{id}/confirm was removed in Phase P5.
         // Submit now auto-confirms atomically (Draft → Confirmed in one
@@ -81,14 +81,14 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new RejectDeliveryOrderCommand(id, body.Reason, body.RejectedBy));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:reject");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderReject);
 
         // POST /api/v1/delivery-orders/{id}/hold — hold an order (any live state → Held)
         group.MapPost("/{id:guid}/hold", async (Guid id, [FromBody] HoldOrderRequest body, ISender sender) =>
         {
             var result = await sender.Send(new HoldDeliveryOrderCommand(id, body.Reason, body.HeldBy));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:hold");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderHold);
 
         // POST /api/v1/delivery-orders/{id}/release — release a held order back to Confirmed
         // (re-fires DeliveryOrderConfirmedIntegrationEvent so Planning re-plans).
@@ -96,7 +96,7 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new ReleaseDeliveryOrderCommand(id, body?.ReleasedBy));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:hold");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderHold);
 
         // POST /api/v1/delivery-orders/{id}/reopen — admin override: bring a
         // Failed order back to Confirmed so the operator can call
@@ -106,7 +106,7 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new ReopenDeliveryOrderCommand(id, body.ReopenedBy, body.Reason));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:reopen");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderReopen);
 
         // POST /api/v1/delivery-orders/{id}/abandon-after-trip-cancel —
         // Phase b11 escape hatch (Option B). Operator-driven close-out
@@ -119,7 +119,7 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new AbandonStuckDeliveryOrderCommand(id, body.AbandonedBy, body.Reason));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:abandon");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderAbandon);
 
         // POST /api/v1/delivery-orders/{id}/items/{itemId}/pod-scan —
         // Operator submits a POD scan for one item. Body.scanType selects
@@ -134,7 +134,7 @@ public static class DeliveryOrderEndpoints
             return result.IsSuccess
                 ? Results.Ok(result.Value)
                 : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:pod");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderPod);
 
         // POST /api/v1/delivery-orders/{id}/pod-batch — Bulk POD scan
         // for trip-level confirmation (one operator action covers
@@ -160,7 +160,7 @@ public static class DeliveryOrderEndpoints
                 }
             }
             return Results.Ok(new { confirmed, skipped, results });
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:pod");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderPod);
 
         // POST /api/v1/delivery-orders/{id}/redispatch — recovery for orders
         // whose dispatch produced no Trip at all (every group failed at
@@ -174,7 +174,7 @@ public static class DeliveryOrderEndpoints
             var result = await sender.Send(new RedispatchDeliveryOrderCommand(
                 id, body.RedispatchedBy, body.Reason, body.WeightFallbackKg));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:redispatch");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderRedispatch);
 
         // POST /api/v1/delivery-orders/{id}/trips/{tripId}/notify-oms —
         // Operator-driven manual resend of the upstream-OMS shipment
@@ -188,7 +188,7 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new ResendOmsNotificationCommand(id, tripId, body?.RequestedBy));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:notify-oms");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderNotifyOms);
 
         // POST /api/v1/delivery-orders/{id}/trips/{tripId}/notify-oms-arrived —
         // Mirror of /notify-oms but for the /arrived (drop completed)
@@ -199,7 +199,7 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new ResendOmsArrivedNotificationCommand(id, tripId, body?.RequestedBy));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:notify-oms");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderNotifyOms);
 
         // POST /api/v1/delivery-orders/upstream was removed in Phase P4 of
         // the SourceSystem migration. External systems now hit the federated
@@ -221,7 +221,7 @@ public static class DeliveryOrderEndpoints
             return bulk.Failures.Count > 0
                 ? Results.Json(bulk, statusCode: 207)
                 : Results.Ok(bulk);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:bulk");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderBulk);
 
         // POST /api/v1/delivery-orders/bulk-cancel — Backend Phase 2
         // Body: { orderIds: [guid...], reason: string }
@@ -240,14 +240,14 @@ public static class DeliveryOrderEndpoints
             return bulk.Failures.Count > 0
                 ? Results.Json(bulk, statusCode: 207)
                 : Results.Ok(bulk);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:cancel");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderCancel);
 
         // GET /api/v1/delivery-orders/{id}
         group.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new GetDeliveryOrderQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
-        }).RequirePermission("dtms:order:read");
+        }).RequirePermission(Permissions.DeliveryOrder.OrderRead);
 
         // GET /api/v1/delivery-orders?status=&statusBucket=&priority=&transportMode=&search=&sortBy=&sortDir=&page=&pageSize=&createdFromUtc=&createdToUtc=
         group.MapGet("/", async (
@@ -301,7 +301,7 @@ public static class DeliveryOrderEndpoints
 
             var result = await sender.Send(query);
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:order:read");
+        }).RequirePermission(Permissions.DeliveryOrder.OrderRead);
 
         // GET /api/v1/delivery-orders/stats — aggregate counts for the KPI strip
         // and filter chips. Unfiltered by design: the strip is a system-wide
@@ -310,35 +310,35 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new GetDeliveryOrderStatsQuery());
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:order:read");
+        }).RequirePermission(Permissions.DeliveryOrder.OrderRead);
 
         // DELETE /api/v1/delivery-orders/{id}
         group.MapDelete("/{id:guid}", async (Guid id, [FromBody] CancelOrderRequest body, ISender sender) =>
         {
             var result = await sender.Send(new CancelDeliveryOrderCommand(id, body.Reason));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:cancel");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderCancel);
 
         // PUT /api/v1/delivery-orders/{id} — replace draft (only allowed when status=Draft)
         group.MapPut("/{id:guid}", async (Guid id, UpdateDraftDeliveryOrderCommand command, ISender sender) =>
         {
             var result = await sender.Send(command with { OrderId = id });
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:write");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderWrite);
 
         // PATCH /api/v1/delivery-orders/{id} — amendment
         group.MapPatch("/{id:guid}", async (Guid id, AmendDeliveryOrderCommand command, ISender sender) =>
         {
             var result = await sender.Send(command with { OrderId = id });
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission("dtms:order:write");
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderWrite);
 
         // GET /api/v1/delivery-orders/{id}/timeline
         group.MapGet("/{id:guid}/timeline", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new GetOrderTimelineQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
-        }).RequirePermission("dtms:order:read");
+        }).RequirePermission(Permissions.DeliveryOrder.OrderRead);
 
         // GET /api/v1/delivery-orders/{id}/status-history — Phase P1 (b12)
         // Structured status-transition timeline materialized by
@@ -349,7 +349,7 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new GetOrderStatusHistoryQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:order:read");
+        }).RequirePermission(Permissions.DeliveryOrder.OrderRead);
 
         // GET /api/v1/delivery-orders/{id}/audit-full — consolidated
         // audit log: OrderAuditEvents + amendments + per-trip execution
@@ -359,7 +359,7 @@ public static class DeliveryOrderEndpoints
         {
             var result = await sender.Send(new GetFullOrderAuditQuery(id));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
-        }).RequirePermission("dtms:order:read");
+        }).RequirePermission(Permissions.DeliveryOrder.OrderRead);
 
         // GET /api/v1/delivery-orders/{id}/items?status=
         group.MapGet("/{id:guid}/items", async (Guid id, string? status, ISender sender) =>
@@ -367,7 +367,7 @@ public static class DeliveryOrderEndpoints
             ItemStatus? itemStatus = status != null && Enum.TryParse<ItemStatus>(status, true, out var s) ? s : null;
             var result = await sender.Send(new GetOrderItemsQuery(id, itemStatus));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
-        }).RequirePermission("dtms:order:read");
+        }).RequirePermission(Permissions.DeliveryOrder.OrderRead);
 
         // GET /api/v1/delivery-orders/{id}/items/{itemId}
         group.MapGet("/{id:guid}/items/{itemId:guid}", async (Guid id, Guid itemId, ISender sender) =>
@@ -378,6 +378,6 @@ public static class DeliveryOrderEndpoints
                 return Results.NotFound($"Item {itemId} not found in order {id}.");
 
             return Results.Ok(result.Value);
-        }).RequirePermission("dtms:order:read");
+        }).RequirePermission(Permissions.DeliveryOrder.OrderRead);
     }
 }

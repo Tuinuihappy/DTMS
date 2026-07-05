@@ -46,7 +46,7 @@ public static class WmsLocationEndpoints
             return result.IsSuccess
                 ? Results.Ok(result.Value)
                 : Results.BadRequest(new { error = result.Error });
-        }).RequirePermission("dtms:order:read");
+        }).RequirePermission(Permissions.DeliveryOrder.OrderRead);
 
         // POST /api/v1/wms/locations/sync — admin-triggered pull. Idempotent
         // with the background poller (both go through the same handler +
@@ -58,6 +58,6 @@ public static class WmsLocationEndpoints
             return result.IsSuccess
                 ? Results.Ok(result.Value)
                 : Results.BadRequest(new { error = result.Error });
-        }).RequirePermission("dtms:facility:warehouse:write");
+        }).RequirePermission(Permissions.Facility.WarehouseWrite);
     }
 }

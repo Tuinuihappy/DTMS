@@ -30,6 +30,6 @@ public static class FleetDashboardEndpoints
 
             var result = await sender.Send(new GetFleetUtilizationQuery(from, to));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:dashboard:read");
+        }).RequirePermission(Permissions.Reporting.DashboardRead);
     }
 }

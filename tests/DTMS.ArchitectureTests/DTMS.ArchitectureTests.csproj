@@ -18,4 +18,8 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\Iam\DTMS.Iam.Application\DTMS.Iam.Application.csproj" />
+  </ItemGroup>
+
 </Project>

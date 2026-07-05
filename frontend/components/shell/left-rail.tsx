@@ -38,6 +38,7 @@ import { useEffect, useRef, useState } from "react";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { useShell } from "@/components/shell/shell-context";
 import { useAuth } from "@/components/auth/auth-provider";
+import { Permissions } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
 
 type RailChild = {
@@ -204,7 +205,7 @@ const actions: RailAction[] = [
         label: "Systems",
         href: "/admin/systems",
         hint: "Source systems & callbacks",
-        requires: "dtms:iam:system:read",
+        requires: Permissions.Iam.SystemRead,
       },
     ],
   },

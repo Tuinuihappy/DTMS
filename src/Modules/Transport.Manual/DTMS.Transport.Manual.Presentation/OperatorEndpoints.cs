@@ -46,14 +46,14 @@ public static class OperatorEndpoints
             var opId = ResolveOperatorId(ctx);
             var result = await sender.Send(new GetMyProfileQuery(opId));
             return ToHttp(result);
-        }).RequirePermission("dtms:operator:profile:read");
+        }).RequirePermission(Permissions.Operator.ProfileRead);
 
         group.MapGet("/trips/assigned", async (HttpContext ctx, ISender sender) =>
         {
             var opId = ResolveOperatorId(ctx);
             var result = await sender.Send(new GetAssignedTripsQuery(opId));
             return ToHttp(result);
-        }).RequirePermission("dtms:operator:profile:read");
+        }).RequirePermission(Permissions.Operator.ProfileRead);
 
         // ── Trip actions ──────────────────────────────────────────────
         // WMS PR-4b (PR-D) — Pool list. Universal visibility (no zone or
@@ -67,7 +67,7 @@ public static class OperatorEndpoints
                 // Reuse the acknowledge permission — anyone who can see the
                 // pool must also be able to act on it (there's no read-only
                 // pool viewer role today).
-            }).RequirePermission("dtms:operator:trip:acknowledge");
+            }).RequirePermission(Permissions.Operator.TripAcknowledge);
 
         group.MapPost("/trips/{tripId:guid}/acknowledge",
             async (Guid tripId, HttpContext ctx, ISender sender) =>
@@ -82,7 +82,7 @@ public static class OperatorEndpoints
                 if (result.IsFailure && result.Error == AcknowledgeTripErrorCodes.AlreadyClaimed)
                     return Results.Conflict(new { Error = result.Error });
                 return ToHttp(result);
-            }).RequirePermission("dtms:operator:trip:acknowledge");
+            }).RequirePermission(Permissions.Operator.TripAcknowledge);
 
         group.MapPost("/trips/{tripId:guid}/pickup",
             async (Guid tripId, RecordPickupRequest req, HttpContext ctx, ISender sender) =>
@@ -91,7 +91,7 @@ public static class OperatorEndpoints
                 var result = await sender.Send(new RecordPickupCommand(
                     tripId, opId, req.Lat, req.Lng, req.PodKey));
                 return ToHttp(result);
-            }).RequirePermission("dtms:operator:trip:pickup");
+            }).RequirePermission(Permissions.Operator.TripPickup);
 
         group.MapPost("/trips/{tripId:guid}/drop",
             async (Guid tripId, RecordDropRequest req, HttpContext ctx, ISender sender) =>
@@ -100,7 +100,7 @@ public static class OperatorEndpoints
                 var result = await sender.Send(new RecordDropCommand(
                     tripId, opId, req.Lat, req.Lng, req.PodKey));
                 return ToHttp(result);
-            }).RequirePermission("dtms:operator:trip:drop");
+            }).RequirePermission(Permissions.Operator.TripDrop);
 
         group.MapPost("/trips/{tripId:guid}/complete",
             async (Guid tripId, HttpContext ctx, ISender sender) =>
@@ -108,7 +108,7 @@ public static class OperatorEndpoints
                 var opId = ResolveOperatorId(ctx);
                 var result = await sender.Send(new CompleteTripCommand(tripId, opId));
                 return ToHttp(result);
-            }).RequirePermission("dtms:operator:trip:complete");
+            }).RequirePermission(Permissions.Operator.TripComplete);
 
         // ── Geofence override ─────────────────────────────────────────
         group.MapPost("/geofence/override-request",
@@ -121,7 +121,7 @@ public static class OperatorEndpoints
                 return result.IsSuccess
                     ? Results.Created($"/api/operator/geofence/override-request/{result.Value}", new { Id = result.Value })
                     : Results.BadRequest(new { Error = result.Error });
-            }).RequirePermission("dtms:operator:geofence:override");
+            }).RequirePermission(Permissions.Operator.GeofenceOverride);
 
         // ── Push subscriptions ────────────────────────────────────────
         group.MapPost("/devices/register-push",
@@ -133,7 +133,7 @@ public static class OperatorEndpoints
                 var result = await sender.Send(new RegisterPushSubscriptionCommand(
                     opId, platform, req.Endpoint, req.PublicKey, req.AuthSecret, req.DeviceLabel));
                 return ToHttp(result);
-            }).RequirePermission("dtms:operator:push:register");
+            }).RequirePermission(Permissions.Operator.PushRegister);
 
         group.MapDelete("/devices/push",
             async (string endpoint, HttpContext ctx, ISender sender) =>
@@ -141,7 +141,7 @@ public static class OperatorEndpoints
                 var opId = ResolveOperatorId(ctx);
                 var result = await sender.Send(new UnregisterPushSubscriptionCommand(opId, endpoint));
                 return ToHttp(result);
-            }).RequirePermission("dtms:operator:push:register");
+            }).RequirePermission(Permissions.Operator.PushRegister);
 
         // ── Web Push (per ADR-013) ────────────────────────────────────
         // Public key feed for the PWA's SW.subscribe() call. Not
@@ -166,7 +166,7 @@ public static class OperatorEndpoints
                     Url: "/m/trips",
                     Tag: "dtms-test"));
                 return Results.Ok(outcome);
-            }).RequirePermission("dtms:operator:push:register");
+            }).RequirePermission(Permissions.Operator.PushRegister);
 
         // ── POD presign (MinIO, per ADR-015) ──────────────────────────
         group.MapPost("/pod/presign",
@@ -179,7 +179,7 @@ public static class OperatorEndpoints
                     Kind: req.Kind,
                     FileExtension: req.FileExtension ?? "jpg"));
                 return ToHttp(result);
-            }).RequirePermission("dtms:operator:pod:upload");
+            }).RequirePermission(Permissions.Operator.PodUpload);
     }
 
     private static Guid ResolveOperatorId(HttpContext ctx)

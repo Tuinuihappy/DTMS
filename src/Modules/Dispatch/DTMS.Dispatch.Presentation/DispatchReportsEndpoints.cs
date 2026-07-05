@@ -33,7 +33,7 @@ public static class DispatchReportsEndpoints
             var (from, to) = ResolveWindow(fromUtc, toUtc, defaultDays: 7);
             var result = await sender.Send(new GetVehiclePerformanceReportQuery(from, to));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:report:read");
+        }).RequirePermission(Permissions.Reporting.ReportRead);
 
         // Raw TripFacts CSV — analyst follow-up for the vendor performance
         // report. Same shape + cap as the orders-export endpoint.
@@ -50,7 +50,7 @@ public static class DispatchReportsEndpoints
             http.Response.Headers.ContentDisposition =
                 $"attachment; filename=\"trips-{from:yyyyMMdd}-{to:yyyyMMdd}.csv\"";
             await WriteCsvAsync(http.Response.Body, rows, ct);
-        }).RequirePermission("dtms:report:export");
+        }).RequirePermission(Permissions.Reporting.ReportExport);
     }
 
     private static (DateTime from, DateTime to) ResolveWindow(

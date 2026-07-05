@@ -35,13 +35,13 @@ public static class ItemEndpoints
                 page, pageSize));
 
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:order:item:read");
+        }).RequirePermission(Permissions.DeliveryOrder.ItemRead);
 
         // GET /api/v1/items/{itemId}
         group.MapGet("/{itemId:guid}", async (Guid itemId, ISender sender) =>
         {
             var result = await sender.Send(new GetItemQuery(itemId));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
-        }).RequirePermission("dtms:order:item:read");
+        }).RequirePermission(Permissions.DeliveryOrder.ItemRead);
     }
 }

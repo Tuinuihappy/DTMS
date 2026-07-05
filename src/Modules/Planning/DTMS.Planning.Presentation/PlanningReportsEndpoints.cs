@@ -29,7 +29,7 @@ public static class PlanningReportsEndpoints
             var (from, to) = ResolveWindow(fromUtc, toUtc, defaultDays: 7);
             var result = await sender.Send(new GetJobFailuresReportQuery(from, to));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission("dtms:report:read");
+        }).RequirePermission(Permissions.Reporting.ReportRead);
 
         // Raw JobFacts CSV — analyst follow-up for the job-failures
         // report. Mirrors /trips-export pattern in DispatchReportsEndpoints.
@@ -48,7 +48,7 @@ public static class PlanningReportsEndpoints
             http.Response.Headers.ContentDisposition =
                 $"attachment; filename=\"jobs-{from:yyyyMMdd}-{to:yyyyMMdd}.csv\"";
             await WriteCsvAsync(http.Response.Body, rows, ct);
-        }).RequirePermission("dtms:report:export");
+        }).RequirePermission(Permissions.Reporting.ReportExport);
     }
 
     private static (DateTime from, DateTime to) ResolveWindow(
