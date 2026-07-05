@@ -46,3 +46,33 @@ groups:
             (timeout / unreachable) across the last 10 minutes. Check RIOT3
             connectivity (host, latency, VendorAdapter__Riot3__BaseUrl) before
             trips age past the reconcile window.
+
+      # INDIRECT RETRY CHECK (method A). Every trip the reconciler heals or
+      # backfills is a webhook RIOT3 sent that DTMS never received — and that
+      # RIOT3 did NOT successfully re-deliver, or the reconciler would have had
+      # nothing left to do. A sustained healing rate therefore means webhooks
+      # are being lost upstream AND RIOT3 retry (if any) is not compensating —
+      # the backstop is carrying load it shouldn't. reconciled = live-state
+      # divergence; backfilled = missed TASK_PROCESSING. Summed = total
+      # webhook-loss volume the reconciler absorbed.
+      #
+      # Threshold (> 1/min for 15m) is a first cut with no traffic baseline yet
+      # — tune once real dispatch volume establishes a normal healing rate.
+      - alert: ReconcilerAbsorbingWebhookLoss
+        expr: >
+          (rate(dtms_workflow_reconciler_reconciled_total[15m])
+           + rate(dtms_workflow_reconciler_backfilled_total[15m])) * 60 > 1
+        for: 15m
+        labels:
+          severity: P2
+          service: dtms-api
+        annotations:
+          summary: "Reconciler healing {{ printf \"%.1f\" $value }} missed webhook(s)/min for 15m"
+          description: >
+            The AMR reconciler is routinely correcting trips whose RIOT3 webhook
+            never arrived — i.e. RIOT3 → DTMS webhook delivery is lossy and retry
+            is not compensating. The reconciler is masking it (orders still
+            resolve), but latency to terminal state is now poll-bound (~1
+            interval) instead of webhook-immediate. Investigate webhook delivery
+            (network, RIOT3 notification config/retry) and consider enabling
+            RIOT3-side retry.
