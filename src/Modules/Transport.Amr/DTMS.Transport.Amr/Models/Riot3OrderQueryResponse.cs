@@ -29,8 +29,11 @@ public sealed class Riot3OrderQueryData
 
     // Order-level state from GET /orders/{key}?isUpper=true. RIOT3 emits it
     // as "orderState" here (not "state" — that field exists only per-mission
-    // inside data.missions[]). Vocabulary matches the notify payload's
-    // task.state: PROCESSING / FINISHED / FAILED / CANCELLED / HANG / HELD …
+    // inside data.missions[]). NOTE: the vocabulary does NOT fully match the
+    // notify payload's task.state — success is reported as "SUCCEEDED" here vs
+    // "FINISHED" in the notify. Both must be treated as terminal-success by any
+    // reader (see Riot3ReconciliationService switch + IsTerminalVendorState).
+    // Other values seen: PROCESSING / FAILED / CANCELLED / HANG / HELD …
     [JsonPropertyName("orderState")]
     public string? State { get; init; }
 

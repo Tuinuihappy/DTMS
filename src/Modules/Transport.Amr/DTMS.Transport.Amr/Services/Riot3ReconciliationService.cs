@@ -249,7 +249,10 @@ public sealed class Riot3ReconciliationService : BackgroundService
         _metrics.RecordReconcilerTick(tripsStuck: stale, inflight: inFlight.Count, reconciled: reconciled, fetchErrors: skippedFetchError, backfilled: vehicleBackfilled);
     }
 
-    private static async Task<Transition> ApplyVendorStateAsync(
+    // internal (not private) so the unit tests can assert the orderState →
+    // Transition mapping directly — the SUCCEEDED-vs-FINISHED vocabulary gap
+    // (an unrecognized terminal state) is exactly what regressed here.
+    internal static async Task<Transition> ApplyVendorStateAsync(
         Trip trip,
         Riot3OrderQueryData data,
         ITripItemSnapshotProvider itemSnapshotProvider,
@@ -260,7 +263,13 @@ public sealed class Riot3ReconciliationService : BackgroundService
         {
             switch (state)
             {
+                // "FINISHED" is the notify (task.state) success token; the
+                // order-level GET (orderState) reports success as "SUCCEEDED".
+                // The reconciler reads orderState, so it MUST accept both or it
+                // goes blind to every completion whose TASK_FINISHED webhook was
+                // lost — the exact failure mode this safety net exists to cover.
                 case "FINISHED":
+                case "SUCCEEDED":
                     trip.MarkVendorCompleted();
                     return Transition.Completed;
 
@@ -502,7 +511,9 @@ public sealed class Riot3ReconciliationService : BackgroundService
     {
         if (string.IsNullOrWhiteSpace(state)) return false;
         var s = state.ToUpperInvariant();
-        return s is "FINISHED" or "FAILED" or "CANCELED" or "CANCELLED" or "REJECTED";
+        // "SUCCEEDED" is the order-level orderState success token (the notify
+        // task.state uses "FINISHED"); both must gate snapshot + vehicle backfill.
+        return s is "FINISHED" or "SUCCEEDED" or "FAILED" or "CANCELED" or "CANCELLED" or "REJECTED";
     }
 
     private static DateTime? TryParseRiot3Time(string? value)
@@ -513,5 +524,5 @@ public sealed class Riot3ReconciliationService : BackgroundService
             out var dt) ? dt : null;
     }
 
-    private enum Transition { None, Completed, Failed, Cancelled, Started, Paused, Resumed, VehicleReassigned }
+    internal enum Transition { None, Completed, Failed, Cancelled, Started, Paused, Resumed, VehicleReassigned }
 }

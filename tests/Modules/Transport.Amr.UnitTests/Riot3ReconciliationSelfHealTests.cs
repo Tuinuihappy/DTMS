@@ -1,6 +1,7 @@
 using DTMS.Dispatch.Domain.Entities;
 using DTMS.Dispatch.Domain.Enums;
 using DTMS.Dispatch.Domain.Repositories;
+using DTMS.Dispatch.Domain.Services;
 using DTMS.SharedKernel.Diagnostics;
 using DTMS.Transport.Amr.Models;
 using DTMS.Transport.Amr.Options;
@@ -105,5 +106,37 @@ public class Riot3ReconciliationSelfHealTests
 
         healed.Should().Be(0);
         await query.DidNotReceive().GetOrderByUpperKeyAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+}
+
+// orderState → Transition mapping. The reconciler reads the order-level GET,
+// which reports success as "SUCCEEDED" — NOT the notify's "FINISHED". Before
+// the fix this state fell through to Transition.None, so any completion whose
+// TASK_FINISHED webhook was lost stayed InProgress forever with no vehicle
+// backfill (IsTerminalVendorState also skipped it). These pin both tokens.
+public class Riot3ReconciliationStateMappingTests
+{
+    private static Trip InProgressTrip()
+    {
+        var trip = Trip.CreateForEnvelope(Guid.NewGuid(), "upper-G1", "RIOT3-ABC");
+        trip.MarkVendorStarted();   // Created → InProgress
+        return trip;
+    }
+
+    [Theory]
+    [InlineData("SUCCEEDED")]   // order-level GET success token
+    [InlineData("FINISHED")]    // notify task.state success token
+    [InlineData("succeeded")]   // case-insensitive
+    public async Task ApplyVendorState_TerminalSuccess_CompletesTrip(string orderState)
+    {
+        var trip = InProgressTrip();
+        var data = new Riot3OrderQueryData { State = orderState };
+        var snapshots = Substitute.For<ITripItemSnapshotProvider>();
+
+        var transition = await Riot3ReconciliationService.ApplyVendorStateAsync(
+            trip, data, snapshots, CancellationToken.None);
+
+        transition.Should().Be(Riot3ReconciliationService.Transition.Completed);
+        trip.Status.Should().Be(TripStatus.Completed);
     }
 }
