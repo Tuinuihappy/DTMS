@@ -16,6 +16,10 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="WireMock.Net" />
     <PackageReference Include="System.Linq.Dynamic.Core" />
+    <!-- Direct ref so the CPM Scriban.Signed pin overrides WireMock.Net's
+         vulnerable 5.5.0 transitive (GHSA-24c8-4792-22hx). Same pattern as
+         System.Linq.Dynamic.Core above. -->
+    <PackageReference Include="Scriban.Signed" />
   </ItemGroup>
 
   <ItemGroup>

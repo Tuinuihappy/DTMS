@@ -70,6 +70,14 @@
          older WireMock.Net releases transitively depend on (GHSA-4cv2-4hjh-77rx). -->
     <PackageVersion Include="WireMock.Net" Version="1.5.62" />
     <PackageVersion Include="System.Linq.Dynamic.Core" Version="1.6.7" />
+    <!-- Scriban.Signed pinned past the vulnerable 5.5.0 that WireMock.Net
+         1.5.62 transitively depends on (GHSA-24c8-4792-22hx). The advisory
+         spans the 5.x/6.x line; the fix first lands in 7.x, so pin 7.2.5.
+         WireMock 1.5.62 was built against Scriban 5.x but is runtime-compatible
+         with 7.2.5 — verified by OmsAdapter.IntegrationTests (32/32 green). Same
+         override-the-transitive pattern as System.Linq.Dynamic.Core above; it
+         only takes effect via the direct PackageReference in that test csproj. -->
+    <PackageVersion Include="Scriban.Signed" Version="7.2.5" />
     <!-- Phase 4.3 — MinIO object storage (POD photos per ADR-015) +
          Web Push gateway (operator PWA notifications per ADR-013). -->
     <PackageVersion Include="Minio" Version="6.0.3" />
