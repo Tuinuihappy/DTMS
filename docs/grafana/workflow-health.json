@@ -62,6 +62,15 @@
       "targets": [
         { "expr": "rate(dtms_workflow_reconciler_reconciled_total[5m]) * 60", "legendFormat": "healed", "refId": "A" }
       ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Vehicles backfilled post-terminal / min",
+      "description": "Trips whose vendor robot was recovered AFTER the trip reached a terminal state — the TASK_PROCESSING signal was missed, so the vehicle was filled from RIOT3's executeVehicleKey (reconciler terminal pass or self-heal sweep). Distinct from 'healed': that corrects a live-state divergence, this fills a capture that was never made. A sustained rate means the PROCESSING webhook is being dropped upstream (investigate RIOT3 → DTMS delivery).",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "rate(dtms_workflow_reconciler_backfilled_total[5m]) * 60", "legendFormat": "backfilled", "refId": "A" }
+      ]
     }
   ],
   "refresh": "30s",
@@ -74,6 +83,6 @@
   "timezone": "Asia/Bangkok",
   "title": "DTMS — Workflow / Reconciler Health",
   "uid": "dtms-workflow-health",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
