@@ -3,12 +3,6 @@
   <ItemGroup>
     <ProjectReference Include="..\DTMS.Iam.Application\DTMS.Iam.Application.csproj" />
     <ProjectReference Include="..\DTMS.Iam.Domain\DTMS.Iam.Domain.csproj" />
-    <!-- Phase S.3 — Iam.Infrastructure hosts the MultiPartitionOutboxProcessor
-         + PerSystemHttpClient which depend on the IDistributedCircuitBreaker
-         (S.0) abstraction. The interface lives in SharedKernel; the Redis impl
-         in DTMS.Infrastructure. Reference the impl here so the hosted services
-         resolve. -->
-    <ProjectReference Include="..\..\..\DTMS.Infrastructure\DTMS.Infrastructure.csproj" />
     <!-- Phase S.3.1b — per-system payload formatters live here. They
          map DeliveryOrder integration events to their corresponding
          external system's wire schema. Reference the IntegrationEvents

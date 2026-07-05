@@ -21,8 +21,9 @@ public class ModuleBoundaryTests
 
         Assert.True(
             violations.Count == 0,
-            "Module Infrastructure projects must not reference another module's Infrastructure project. " +
-            "Use Application contracts/read services instead.\n" +
+            "Module Infrastructure projects must not reference another module's Infrastructure project, " +
+            "nor the shared root DTMS.Infrastructure. Depend on SharedKernel abstractions (or Application " +
+            "contracts/read services) and let the composition root wire concrete impls.\n" +
             string.Join('\n', violations));
     }
 
@@ -208,6 +209,12 @@ public class ModuleBoundaryTests
             var referencedPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(projectPath)!, include));
             var referencedModule = GetModuleName(referencedPath);
 
+            // Forbid referencing any Infrastructure project that isn't this
+            // module's own — that covers another module's Infrastructure AND
+            // the shared root DTMS.Infrastructure (empty referencedModule).
+            // Module infrastructure must depend on ABSTRACTIONS (SharedKernel
+            // interfaces); concrete shared-infra impls are wired by the
+            // composition root, not referenced here.
             if (!string.Equals(projectModule, referencedModule, StringComparison.OrdinalIgnoreCase))
             {
                 return new[]
