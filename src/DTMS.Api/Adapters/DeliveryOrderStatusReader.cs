@@ -35,4 +35,12 @@ internal sealed class DeliveryOrderStatusReader : IDeliveryOrderStatusReader
         if (!result.IsSuccess || result.Value is null) return null;
         return result.Value.RequiresDropPod;
     }
+
+    public async Task<string?> GetSourceSystemKeyAsync(Guid orderId, CancellationToken cancellationToken = default)
+    {
+        var result = await _sender.Send(new GetDeliveryOrderQuery(orderId), cancellationToken);
+        if (!result.IsSuccess || result.Value is null) return null;
+        // DTO exposes the slug as SourceSystem (mapped from order.SourceSystemKey).
+        return result.Value.SourceSystem;
+    }
 }

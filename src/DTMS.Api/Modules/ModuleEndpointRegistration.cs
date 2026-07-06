@@ -29,6 +29,10 @@ public static class ModuleEndpointRegistration
         // request-log middleware applies cleanly). Phase S.8e P3 dropped
         // the URL {key} segment — identity comes from the JWT sub claim.
         app.MapSourceSystemDeliveryOrderEndpoints();
+        // Source-system trip lifecycle — /api/v1/source/trips/* (acknowledge
+        // → pickup → drop → complete), the machine-caller analogue of the
+        // operator PWA trip actions. Same /api/v1/source auth pipeline.
+        app.MapSourceSystemTripEndpoints();
         app.MapItemEndpoints();
         app.MapDashboardEndpoints();
         app.MapFleetDashboardEndpoints();

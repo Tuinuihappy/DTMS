@@ -16,10 +16,23 @@ public static class StandardSystemPermissions
     public const string OrderWriteTemplate = "dtms:source:{key}:order:write";
     public const string OrderReadTemplate  = "dtms:source:{key}:order:read";
 
+    // Trip lifecycle — a source system reports its trips' progress
+    // (acknowledge → pickup → drop → complete) through /api/v1/source/trips/*.
+    // Granular per-action so a partner can hold, say, drop+complete without
+    // acknowledge. Enforced against the caller's own key (SourceSystemPermissionHandler).
+    public const string TripAcknowledgeTemplate = "dtms:source:{key}:trip:acknowledge";
+    public const string TripPickupTemplate      = "dtms:source:{key}:trip:pickup";
+    public const string TripDropTemplate         = "dtms:source:{key}:trip:drop";
+    public const string TripCompleteTemplate     = "dtms:source:{key}:trip:complete";
+
     public static readonly IReadOnlyList<string> All = new[]
     {
         OrderWriteTemplate,
         OrderReadTemplate,
+        TripAcknowledgeTemplate,
+        TripPickupTemplate,
+        TripDropTemplate,
+        TripCompleteTemplate,
     };
 
     /// <summary>

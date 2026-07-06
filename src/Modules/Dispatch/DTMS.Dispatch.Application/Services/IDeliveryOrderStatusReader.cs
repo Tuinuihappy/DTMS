@@ -27,4 +27,13 @@ public interface IDeliveryOrderStatusReader
     /// (POD pending) without taking a hard dependency on DeliveryOrder.
     /// </summary>
     Task<bool?> GetRequiresDropPodAsync(Guid orderId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the parent order's <c>SourceSystemKey</c> slug (e.g. "oms",
+    /// "sap"), or null if the order doesn't exist. Used by the source-system
+    /// trip endpoints to verify the authenticated caller owns the trip it's
+    /// acting on — a <c>Trip</c> carries no source key of its own, so origin
+    /// is always resolved back through its parent order.
+    /// </summary>
+    Task<string?> GetSourceSystemKeyAsync(Guid orderId, CancellationToken cancellationToken = default);
 }
