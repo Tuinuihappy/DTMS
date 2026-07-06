@@ -13,6 +13,6 @@ namespace DTMS.Transport.Manual.Application.Commands.RecordPickup;
 public record RecordPickupCommand(
     Guid TripId,
     Guid OperatorId,
-    double ReportedLat,
-    double ReportedLng,
+    double? ReportedLat,
+    double? ReportedLng,
     string? PodKey) : ICommand;

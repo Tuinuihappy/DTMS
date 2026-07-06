@@ -42,33 +42,45 @@ internal sealed class RecordDropCommandHandler : ICommandHandler<RecordDropComma
         if (trip is null)
             return Result.Failure($"Trip {request.TripId} not found.");
 
-        if (trip.DropWmsLocationId is null)
-            return Result.Failure($"Trip {request.TripId} has no drop WMS location.");
-
-        var loc = await _wmsLocations.GetByIdAsync(trip.DropWmsLocationId.Value, cancellationToken);
-        if (loc is null)
-            return Result.Failure($"Drop WMS location {trip.DropWmsLocationId} not found in snapshot.");
-        if (loc.Latitude is null || loc.Longitude is null)
-            return Result.Failure(
-                $"Drop WMS location '{loc.LocationCode}' has no GPS coordinates — geofence check impossible.");
-
-        var check = GeofenceCalculator.Check(
-            request.ReportedLat, request.ReportedLng,
-            loc.Latitude.Value, loc.Longitude.Value,
-            (int)_geofenceOptions.DefaultRadiusM);
-
+        // Geofence enforcement is opt-out per Wms:Geofence:Enabled. When
+        // disabled, manual drop needs no GPS at all and we skip the WMS
+        // location lookup + distance check. When enabled, coordinates are
+        // mandatory — otherwise an operator could bypass the fence by simply
+        // omitting them.
         Guid? overrideId = null;
-        if (!check.IsInside)
+        if (_geofenceOptions.Enabled)
         {
-            var approvedOverride = await _overrides.GetApprovedForTripLegAsync(
-                trip.Id, request.OperatorId, trip.DropWmsLocationId.Value, cancellationToken);
-            if (approvedOverride is null)
-            {
+            if (request.ReportedLat is null || request.ReportedLng is null)
                 return Result.Failure(
-                    $"GEOFENCE_REJECTED: {check.OvershootM:F0}m outside WMS location geofence " +
-                    $"(radius {check.RadiusM}m). Submit an override request first.");
+                    "GEOFENCE_REQUIRED: operator GPS coordinates are required for drop.");
+
+            if (trip.DropWmsLocationId is null)
+                return Result.Failure($"Trip {request.TripId} has no drop WMS location.");
+
+            var loc = await _wmsLocations.GetByIdAsync(trip.DropWmsLocationId.Value, cancellationToken);
+            if (loc is null)
+                return Result.Failure($"Drop WMS location {trip.DropWmsLocationId} not found in snapshot.");
+            if (loc.Latitude is null || loc.Longitude is null)
+                return Result.Failure(
+                    $"Drop WMS location '{loc.LocationCode}' has no GPS coordinates — geofence check impossible.");
+
+            var check = GeofenceCalculator.Check(
+                request.ReportedLat.Value, request.ReportedLng.Value,
+                loc.Latitude.Value, loc.Longitude.Value,
+                (int)_geofenceOptions.DefaultRadiusM);
+
+            if (!check.IsInside)
+            {
+                var approvedOverride = await _overrides.GetApprovedForTripLegAsync(
+                    trip.Id, request.OperatorId, trip.DropWmsLocationId.Value, cancellationToken);
+                if (approvedOverride is null)
+                {
+                    return Result.Failure(
+                        $"GEOFENCE_REJECTED: {check.OvershootM:F0}m outside WMS location geofence " +
+                        $"(radius {check.RadiusM}m). Submit an override request first.");
+                }
+                overrideId = approvedOverride.Id;
             }
-            overrideId = approvedOverride.Id;
         }
 
         var firstDrop = !ext.DroppedAt.HasValue;

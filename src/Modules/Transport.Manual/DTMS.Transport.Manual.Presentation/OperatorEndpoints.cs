@@ -198,8 +198,8 @@ public static class OperatorEndpoints
 }
 
 // ── Request DTOs ──────────────────────────────────────────────────────
-public record RecordPickupRequest(double Lat, double Lng, string? PodKey);
-public record RecordDropRequest(double Lat, double Lng, string? PodKey);
+public record RecordPickupRequest(double? Lat, double? Lng, string? PodKey);
+public record RecordDropRequest(double? Lat, double? Lng, string? PodKey);
 public record SubmitOverrideRequest(
     Guid TripId, Guid ExpectedWmsLocationId, double Lat, double Lng,
     string Reason, string? PhotoUrl);

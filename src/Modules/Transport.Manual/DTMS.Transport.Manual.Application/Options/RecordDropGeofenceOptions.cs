@@ -13,6 +13,15 @@ public sealed class RecordDropGeofenceOptions
 {
     public const string SectionName = "Wms:Geofence";
 
+    /// <summary>Master switch for server-strict geofence enforcement on
+    /// manual pickup/drop. Default <c>true</c> preserves ADR-016 behaviour.
+    /// Set <c>false</c> (Wms:Geofence:Enabled) to let operators pickup/drop
+    /// without GPS — the handler then skips the location lookup and distance
+    /// check entirely and does not require ReportedLat/Lng. When <c>true</c>,
+    /// coordinates are mandatory so an operator can't bypass the fence by
+    /// simply omitting them.</summary>
+    public bool Enabled { get; set; } = true;
+
     /// <summary>Fleet-wide default radius (meters). Overridable in config;
     /// per-zone overrides would land here as a code→radius map in a future
     /// phase if ops finds 30m too strict or lax for specific zones.</summary>

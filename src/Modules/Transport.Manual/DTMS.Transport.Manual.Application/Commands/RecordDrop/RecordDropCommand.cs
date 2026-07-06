@@ -8,6 +8,6 @@ namespace DTMS.Transport.Manual.Application.Commands.RecordDrop;
 public record RecordDropCommand(
     Guid TripId,
     Guid OperatorId,
-    double ReportedLat,
-    double ReportedLng,
+    double? ReportedLat,
+    double? ReportedLng,
     string? PodKey) : ICommand;

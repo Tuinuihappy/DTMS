@@ -46,34 +46,47 @@ internal sealed class RecordPickupCommandHandler : ICommandHandler<RecordPickupC
         var trip = await _trips.GetByIdAsync(request.TripId, cancellationToken);
         if (trip is null)
             return Result.Failure($"Trip {request.TripId} not found.");
-        if (trip.PickupWmsLocationId is null)
-            return Result.Failure($"Trip {request.TripId} has no pickup WMS location.");
 
-        var loc = await _wmsLocations.GetByIdAsync(trip.PickupWmsLocationId.Value, cancellationToken);
-        if (loc is null)
-            return Result.Failure($"Pickup WMS location {trip.PickupWmsLocationId} not found in snapshot.");
-        if (loc.Latitude is null || loc.Longitude is null)
-            return Result.Failure(
-                $"Pickup WMS location '{loc.LocationCode}' has no GPS coordinates — geofence check impossible.");
-
-        var check = GeofenceCalculator.Check(
-            request.ReportedLat, request.ReportedLng,
-            loc.Latitude.Value, loc.Longitude.Value,
-            (int)_geofenceOptions.DefaultRadiusM);
-
+        // Geofence enforcement is opt-out per Wms:Geofence:Enabled. When
+        // disabled, manual pickup needs no GPS at all and we skip the WMS
+        // location lookup + distance check. When enabled, coordinates are
+        // mandatory — otherwise an operator could bypass the fence by simply
+        // omitting them.
         Guid? overrideId = null;
-        if (!check.IsInside)
+        if (_geofenceOptions.Enabled)
         {
-            // Look for an already-approved override for this exact leg.
-            var approvedOverride = await _overrides.GetApprovedForTripLegAsync(
-                trip.Id, request.OperatorId, trip.PickupWmsLocationId.Value, cancellationToken);
-            if (approvedOverride is null)
-            {
+            if (request.ReportedLat is null || request.ReportedLng is null)
                 return Result.Failure(
-                    $"GEOFENCE_REJECTED: {check.OvershootM:F0}m outside WMS location geofence " +
-                    $"(radius {check.RadiusM}m). Submit an override request first.");
+                    "GEOFENCE_REQUIRED: operator GPS coordinates are required for pickup.");
+
+            if (trip.PickupWmsLocationId is null)
+                return Result.Failure($"Trip {request.TripId} has no pickup WMS location.");
+
+            var loc = await _wmsLocations.GetByIdAsync(trip.PickupWmsLocationId.Value, cancellationToken);
+            if (loc is null)
+                return Result.Failure($"Pickup WMS location {trip.PickupWmsLocationId} not found in snapshot.");
+            if (loc.Latitude is null || loc.Longitude is null)
+                return Result.Failure(
+                    $"Pickup WMS location '{loc.LocationCode}' has no GPS coordinates — geofence check impossible.");
+
+            var check = GeofenceCalculator.Check(
+                request.ReportedLat.Value, request.ReportedLng.Value,
+                loc.Latitude.Value, loc.Longitude.Value,
+                (int)_geofenceOptions.DefaultRadiusM);
+
+            if (!check.IsInside)
+            {
+                // Look for an already-approved override for this exact leg.
+                var approvedOverride = await _overrides.GetApprovedForTripLegAsync(
+                    trip.Id, request.OperatorId, trip.PickupWmsLocationId.Value, cancellationToken);
+                if (approvedOverride is null)
+                {
+                    return Result.Failure(
+                        $"GEOFENCE_REJECTED: {check.OvershootM:F0}m outside WMS location geofence " +
+                        $"(radius {check.RadiusM}m). Submit an override request first.");
+                }
+                overrideId = approvedOverride.Id;
             }
-            overrideId = approvedOverride.Id;
         }
 
         var firstPickup = !ext.PickedUpAt.HasValue;
