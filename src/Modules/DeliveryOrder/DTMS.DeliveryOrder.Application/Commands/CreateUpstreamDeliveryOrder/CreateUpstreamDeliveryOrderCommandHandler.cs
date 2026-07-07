@@ -59,6 +59,17 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
                 $"Unknown source system '{request.SourceSystemKey}'.");
         }
 
+        // Self-managed is Manual-only (it replaces the operator pool, not AMR's
+        // RIOT3 lifecycle) and auto-acks + auto-picks-up at trip creation using
+        // RequestedBy as the actor. Reject up front with clear 400s; the domain
+        // guards both invariants defensively too.
+        if (request.SelfManaged && request.RequestedTransportMode != Domain.Enums.TransportMode.Manual)
+            return Result<UpstreamOrderAckDto>.Failure(
+                "selfManaged is only supported for Manual transport mode (requestedTransportMode=Manual).");
+        if (request.SelfManaged && string.IsNullOrWhiteSpace(request.RequestedBy))
+            return Result<UpstreamOrderAckDto>.Failure(
+                "requestedBy is required when selfManaged is true — it is the actor recorded on the auto acknowledge + pickup.");
+
         // Idempotency check — if (SourceSystemKey, OrderRef) already exists, return existing ack
         var existing = await _repository.GetByRefAsync(request.SourceSystemKey, request.OrderRef, cancellationToken);
         if (existing is not null)
@@ -82,7 +93,8 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
                 origin.Key, origin.DisplayName,
                 origin.DisplayName,
                 request.RequestedBy, request.Notes,
-                request.RequestedTransportMode);
+                request.RequestedTransportMode,
+                request.SelfManaged);
 
             foreach (var (item, idx) in request.Items.Select((p, i) => (p, i + 1)))
             {

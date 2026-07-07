@@ -21,6 +21,8 @@ public record ResendOmsNotificationCommand(
 
 public sealed record ResendOmsNotificationResult(
     string ShipmentId,
-    string DeliveryBy,
+    // Null for self-managed orders — the source system executes transport
+    // itself, so there is no vendor vehicle (DeliveryBy sent to OMS as null).
+    string? DeliveryBy,
     int LotCount,
     long LatencyMs);

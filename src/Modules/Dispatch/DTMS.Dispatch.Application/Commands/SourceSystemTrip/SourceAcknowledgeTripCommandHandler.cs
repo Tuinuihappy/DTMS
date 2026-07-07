@@ -37,11 +37,11 @@ public sealed class SourceAcknowledgeTripCommandHandler
             return Result.Failure(
                 $"Cannot acknowledge a trip in {trip.Status} status.");
 
-        trip.MarkVendorStarted();
+        trip.AcknowledgeBySource(request.AcknowledgedBy, request.AcknowledgedAt);
         await _trips.UpdateAsync(trip, cancellationToken);
         _logger.LogInformation(
-            "[SourceTrip] Trip {TripId} acknowledged (started) by source system {Key}",
-            trip.Id, request.SourceSystemKey);
+            "[SourceTrip] Trip {TripId} acknowledged (started) by {AcknowledgedBy} via source system {Key}",
+            trip.Id, request.AcknowledgedBy, request.SourceSystemKey);
         return Result.Success();
     }
 }

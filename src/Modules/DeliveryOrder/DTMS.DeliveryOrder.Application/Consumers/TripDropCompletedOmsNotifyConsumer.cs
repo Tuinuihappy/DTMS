@@ -102,6 +102,18 @@ public class TripDropCompletedOmsNotifyConsumer : IConsumer<TripDropCompletedInt
             return;
         }
 
+        // Manual transport does not report arrival to OMS — the delivery is
+        // handled outside DTMS's vendor pipeline (operator pool or a
+        // self-managed source system), so OMS owns the arrival signal itself.
+        // The shipment-started notify still fires; only /arrived is suppressed.
+        if (order.RequestedTransportMode == TransportMode.Manual)
+        {
+            _logger.LogDebug(
+                "[OmsArrived] Order {OrderId} is Manual transport — skipping arrived notify.",
+                order.Id);
+            return;
+        }
+
         var lots = order.Items
             .Where(i => i.TripId == evt.TripId)
             .Select(i => i.ItemId)
@@ -119,6 +131,23 @@ public class TripDropCompletedOmsNotifyConsumer : IConsumer<TripDropCompletedInt
         // [Option A] shipmentId stable across retry chain.
         var rootTripId = await _tripRepository.GetRootTripIdAsync(evt.TripId, ct);
         var shipmentId = rootTripId.ToString();
+
+        // Idempotency guard — RIOT3 re-emits SUB_TASK_FINISHED (and self-managed
+        // sources re-POST /source/trips/{id}/drop) several times per trip, so
+        // this consumer fires repeatedly for the same shipment. OMS must get
+        // exactly one /arrived per shipmentId; bail if a successful arrived
+        // notify is already on record. shipmentId is the stable root-trip id,
+        // so every retry attempt collapses onto the same marker too.
+        var alreadyNotified = await _auditRepository.ExistsAsync(
+            order.Id, AuditEventType, $"shipmentId={shipmentId}", ct);
+        if (alreadyNotified)
+        {
+            _logger.LogInformation(
+                "[OmsArrived] Trip {TripId} shipmentId={Sid} already notified — skipping duplicate /arrived",
+                evt.TripId, shipmentId);
+            return;
+        }
+
         // Best-effort attempt number for the audit row. Pre-binding rows
         // or chain breaks fall through with attempt=1 — harmless.
         var trip = await _tripRepository.GetByIdAsync(evt.TripId, ct);

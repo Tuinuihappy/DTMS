@@ -76,6 +76,134 @@ public class TripTests
     }
 
     [Fact]
+    public void AcknowledgeBySource_FromCreated_StampsActorAndStarts()
+    {
+        var trip = NewEnvelopeTrip();
+        var when = new DateTime(2026, 7, 6, 8, 30, 0, DateTimeKind.Utc);
+
+        trip.AcknowledgeBySource("alice@oms", when);
+
+        trip.Status.Should().Be(TripStatus.InProgress);
+        trip.AcknowledgedBy.Should().Be("alice@oms");
+        trip.AcknowledgedAt.Should().Be(when);
+        trip.Events.Should().ContainSingle(e => e.EventType == "SourceAcknowledged");
+    }
+
+    [Fact]
+    public void AcknowledgeBySource_SecondActor_FirstWins_ButAuditsEveryAttempt()
+    {
+        var trip = NewEnvelopeTrip();
+
+        trip.AcknowledgeBySource("alice@oms");
+        var firstAt = trip.AcknowledgedAt;
+        trip.AcknowledgeBySource("bob@oms");   // late/duplicate ack by a different human
+
+        // First-ack wins — the persisted actor never changes.
+        trip.AcknowledgedBy.Should().Be("alice@oms");
+        trip.AcknowledgedAt.Should().Be(firstAt);
+        // ...but every attempt is on the audit trail.
+        trip.Events.Where(e => e.EventType == "SourceAcknowledged").Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void AcknowledgeBySource_NullActor_Throws()
+    {
+        var trip = NewEnvelopeTrip();
+        var act = () => trip.AcknowledgeBySource("  ");
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void AcknowledgeBySource_StampsActorAndTimeOnAuditEvent()
+    {
+        var trip = NewEnvelopeTrip();
+        var when = new DateTime(2026, 7, 6, 8, 0, 0, DateTimeKind.Utc);
+
+        trip.AcknowledgeBySource("alice@oms", when);
+
+        var ev = trip.Events.Single(e => e.EventType == "SourceAcknowledged");
+        ev.Actor.Should().Be("alice@oms");
+        ev.ActedAt.Should().Be(when);
+    }
+
+    [Fact]
+    public void MarkVendorPickedUp_WithActor_StampsAuditEvent()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted();   // Created → InProgress
+        var when = new DateTime(2026, 7, 6, 9, 0, 0, DateTimeKind.Utc);
+
+        trip.MarkVendorPickedUp("bob@oms", when);
+
+        var ev = trip.Events.Single(e => e.EventType == "VendorPickupCompleted");
+        ev.Actor.Should().Be("bob@oms");
+        ev.ActedAt.Should().Be(when);
+    }
+
+    [Fact]
+    public void MarkVendorDropCompleted_WithActor_StampsAuditEvent()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted();
+        var when = new DateTime(2026, 7, 6, 10, 0, 0, DateTimeKind.Utc);
+
+        trip.MarkVendorDropCompleted(requiresDropPod: true, actor: "carol@oms", actedAt: when);
+
+        var ev = trip.Events.Single(e => e.EventType == "VendorDropCompleted");
+        ev.Actor.Should().Be("carol@oms");
+        ev.ActedAt.Should().Be(when);
+    }
+
+    [Fact]
+    public void MarkVendorCompleted_WithActor_StampsAuditEvent()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted();
+        var when = new DateTime(2026, 7, 6, 11, 0, 0, DateTimeKind.Utc);
+
+        trip.MarkVendorCompleted("dave@oms", when);
+
+        var ev = trip.Events.Single(e => e.EventType == "VendorCompleted");
+        ev.Actor.Should().Be("dave@oms");
+        ev.ActedAt.Should().Be(when);
+    }
+
+    [Theory]
+    [InlineData(DateTimeKind.Local)]
+    [InlineData(DateTimeKind.Unspecified)]
+    public void SourceActions_NonUtcActedAt_NormalizedToUtc(DateTimeKind kind)
+    {
+        // Source systems may send actedAt with an offset (Local) or none
+        // (Unspecified); a non-UTC Kind makes Npgsql throw on the
+        // `timestamp with time zone` column. All source paths must coerce to UTC.
+        var trip = NewEnvelopeTrip();
+        var acked = new DateTime(2026, 7, 6, 12, 0, 0, kind);
+        trip.AcknowledgeBySource("alice@oms", acked);
+        var dropAt = new DateTime(2026, 7, 6, 13, 0, 0, kind);
+        trip.MarkVendorDropCompleted(actor: "bob@oms", actedAt: dropAt);
+        var completeAt = new DateTime(2026, 7, 6, 14, 0, 0, kind);
+        trip.MarkVendorCompleted("carol@oms", completeAt);
+
+        trip.AcknowledgedAt!.Value.Kind.Should().Be(DateTimeKind.Utc);
+        foreach (var ev in trip.Events.Where(e => e.ActedAt is not null))
+            ev.ActedAt!.Value.Kind.Should().Be(DateTimeKind.Utc);
+    }
+
+    [Fact]
+    public void MarkVendorPickedUp_FromAmrWebhook_NoActor_LeavesAuditActorNull()
+    {
+        // The AMR webhook path calls the parameterless overload — actor stays null.
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted();
+
+        trip.MarkVendorPickedUp();
+
+        var ev = trip.Events.Single(e => e.EventType == "VendorPickupCompleted");
+        ev.Actor.Should().BeNull();
+        ev.ActedAt.Should().BeNull();
+    }
+
+    [Fact]
     public void MarkVendorStarted_WithVendorKey_StoresVendorVehicleKey()
     {
         // RIOT3 reports processingVehicle.key as a deviceKey string. Capture
@@ -770,6 +898,8 @@ internal sealed class StubOrderStatusReader : IDeliveryOrderStatusReader
         => Task.FromResult(_status);
     public Task<bool?> GetRequiresDropPodAsync(Guid orderId, CancellationToken ct = default)
         => Task.FromResult<bool?>(null);
+    public Task<string?> GetSourceSystemKeyAsync(Guid orderId, CancellationToken ct = default)
+        => Task.FromResult<string?>(null);
 }
 
 internal sealed class StubRetryEventRepository : ITripRetryEventRepository

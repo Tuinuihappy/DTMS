@@ -54,5 +54,10 @@ public interface IOrderAuditEventRepository
 {
     Task AddAsync(OrderAuditEvent auditEvent, CancellationToken cancellationToken = default);
     Task<List<OrderAuditEvent>> GetByOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
+    // Dedup helper: has an audit event of this type, whose Details contain the
+    // given marker, already been recorded for the order? Makes OMS callbacks
+    // idempotent per shipment when RIOT3 (SUB_TASK_FINISHED) or a self-managed
+    // source re-emits drop-completed several times for the same trip.
+    Task<bool> ExistsAsync(Guid orderId, string eventType, string detailsContains, CancellationToken cancellationToken = default);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

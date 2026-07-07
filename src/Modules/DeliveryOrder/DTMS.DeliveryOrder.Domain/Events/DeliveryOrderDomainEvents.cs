@@ -62,7 +62,11 @@ public record DeliveryOrderConfirmedDomainEvent(
     DateTime? LatestUtc,
     DateTime? SubmittedAt,
     IReadOnlyList<ItemEventDto> Items,
-    string? RequestedTransportMode = null) : IDomainEvent;
+    string? RequestedTransportMode = null,
+    // Self-managed: external system executes transport itself → Planning
+    // auto-acks + auto-picks-up the trip, attributed to RequestedBy.
+    bool SelfManaged = false,
+    string? RequestedBy = null) : IDomainEvent;
 public record DeliveryOrderRejectedDomainEvent(Guid EventId, DateTime OccurredOn, Guid OrderId, string Reason) : IDomainEvent;
 // Phase S.3.1b follow-up — source key propagated so the IAM fan-out
 // consumer can route the callback back to the order's originating

@@ -57,6 +57,9 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(o => o.RequestedTransportMode).HasConversion<string>().HasMaxLength(20);
             b.Property(o => o.RequiresDropPod).HasColumnName("RequiresDropPod");
             b.Property(o => o.RequiresPickupPod).HasColumnName("RequiresPickupPod");
+            // Self-managed: source system executes transport itself (auto
+            // ack + pickup on trip creation). Non-nullable, defaults false.
+            b.Property(o => o.SelfManaged).HasColumnName("SelfManaged").HasDefaultValue(false);
             b.Property(o => o.RequestedBy).HasMaxLength(200);
             b.Property(o => o.Notes).HasMaxLength(1000);
             b.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion().IsConcurrencyToken();

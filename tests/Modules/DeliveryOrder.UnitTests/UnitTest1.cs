@@ -351,6 +351,53 @@ public class DeliveryOrderTests
     }
 
     [Fact]
+    public void CreateFromUpstream_SelfManaged_ManualWithRequestedBy_SetsFlag()
+    {
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.CreateFromUpstream(
+            "UPS-SM-1", Priority.Normal, ServiceWindow.Create(null, DateTime.UtcNow.AddHours(1)),
+            sourceSystemKey: "oms", sourceSystemDisplayName: "OMS",
+            requestedBy: "alice@oms",
+            requestedTransportMode: TransportMode.Manual, selfManaged: true);
+
+        order.SelfManaged.Should().BeTrue();
+        order.RequestedBy.Should().Be("alice@oms");
+    }
+
+    [Fact]
+    public void CreateFromUpstream_SelfManaged_ManualWithoutRequestedBy_Throws()
+    {
+        var act = () => DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.CreateFromUpstream(
+            "UPS-SM-2", Priority.Normal, ServiceWindow.Create(null, DateTime.UtcNow.AddHours(1)),
+            sourceSystemKey: "oms", sourceSystemDisplayName: "OMS",
+            requestedBy: null,
+            requestedTransportMode: TransportMode.Manual, selfManaged: true);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*RequestedBy*");
+    }
+
+    [Fact]
+    public void CreateFromUpstream_SelfManaged_NonManualMode_Throws()
+    {
+        var act = () => DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.CreateFromUpstream(
+            "UPS-SM-4", Priority.Normal, ServiceWindow.Create(null, DateTime.UtcNow.AddHours(1)),
+            sourceSystemKey: "oms", sourceSystemDisplayName: "OMS",
+            requestedBy: "alice@oms",
+            requestedTransportMode: TransportMode.Amr, selfManaged: true);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Manual*");
+    }
+
+    [Fact]
+    public void CreateFromUpstream_NotSelfManaged_DefaultsFalse()
+    {
+        var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.CreateFromUpstream(
+            "UPS-SM-3", Priority.Normal, ServiceWindow.Create(null, DateTime.UtcNow.AddHours(1)),
+            sourceSystemKey: "oms", sourceSystemDisplayName: "OMS");
+
+        order.SelfManaged.Should().BeFalse();
+    }
+
+    [Fact]
     public void CreateFromUpstream_StartsSlaClockImmediately()
     {
         var before = DateTime.UtcNow;

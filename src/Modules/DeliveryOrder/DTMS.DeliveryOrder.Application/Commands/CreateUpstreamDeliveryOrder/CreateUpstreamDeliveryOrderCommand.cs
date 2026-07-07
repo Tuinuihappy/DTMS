@@ -24,7 +24,11 @@ public record CreateUpstreamDeliveryOrderCommand(
     string? Notes = null,
     TransportMode? RequestedTransportMode = TransportMode.Amr,
     bool? RequiresDropPod = null,
-    bool? RequiresPickupPod = null
+    bool? RequiresPickupPod = null,
+    // When true, the source system executes transport itself: DTMS auto-acks
+    // + auto-picks-up the trip (attributed to RequestedBy) and the source
+    // reports drop + complete. RequestedBy becomes required.
+    bool SelfManaged = false
 ) : ICommand<UpstreamOrderAckDto>;
 
 public record UpstreamOrderAckDto(

@@ -34,4 +34,9 @@ public record DeliveryOrderConfirmedIntegrationEventV1(
     DateTime? SubmittedAt,
     IReadOnlyList<ItemSummaryDto> Items,
     string? RequestedTransportMode = null,
+    // Self-managed: the source system executes transport itself. Planning
+    // routes to the self-managed dispatch path (auto ack + pickup) instead
+    // of RIOT3/operator-pool; RequestedBy is the actor stamped on both.
+    bool SelfManaged = false,
+    string? RequestedBy = null,
     string SchemaVersion = "1.0") : IIntegrationEvent;

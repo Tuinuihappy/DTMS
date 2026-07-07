@@ -33,17 +33,20 @@ namespace DTMS.Planning.Application.Consumers;
 public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIntegrationEventV1>
 {
     private readonly IDispatchStrategyRegistry _strategyRegistry;
+    private readonly ISelfManagedDispatchService _selfManaged;
     private readonly ISender _sender;
     private readonly WorkflowMetrics _metrics;
     private readonly ILogger<DeliveryOrderValidatedConsumer> _logger;
 
     public DeliveryOrderValidatedConsumer(
         IDispatchStrategyRegistry strategyRegistry,
+        ISelfManagedDispatchService selfManaged,
         ISender sender,
         WorkflowMetrics metrics,
         ILogger<DeliveryOrderValidatedConsumer> logger)
     {
         _strategyRegistry = strategyRegistry;
+        _selfManaged = selfManaged;
         _sender = sender;
         _metrics = metrics;
         _logger = logger;
@@ -183,18 +186,30 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                 // AMR fills PickupStationId/DropStationId, Manual fills the
                 // warehouse pair. Pass both through — DispatchGroupAsync
                 // implementations ignore the pair they don't use.
-                var envelopeResult = await strategy.DispatchGroupAsync(
-                    new DispatchGroupRequest(
-                        DeliveryOrderId: evt.DeliveryOrderId,
-                        GroupIndex: groupIndex + 1,
-                        PickupStationId: group.PickupStationId ?? Guid.Empty,
-                        DropStationId:   group.DropStationId   ?? Guid.Empty,
-                        UpperKey: upperKey,
-                        JobId: jobId == Guid.Empty ? null : jobId,
-                        SlaDeadline: evt.LatestUtc,
-                        PickupWmsLocationId: group.PickupWmsLocationId,
-                        DropWmsLocationId:   group.DropWmsLocationId),
-                    ct);
+                var dispatchRequest = new DispatchGroupRequest(
+                    DeliveryOrderId: evt.DeliveryOrderId,
+                    GroupIndex: groupIndex + 1,
+                    PickupStationId: group.PickupStationId ?? Guid.Empty,
+                    DropStationId:   group.DropStationId   ?? Guid.Empty,
+                    UpperKey: upperKey,
+                    JobId: jobId == Guid.Empty ? null : jobId,
+                    SlaDeadline: evt.LatestUtc,
+                    PickupWmsLocationId: group.PickupWmsLocationId,
+                    DropWmsLocationId:   group.DropWmsLocationId,
+                    RequestedBy: evt.RequestedBy);
+
+                // Self-managed orders (source system runs the transport itself)
+                // route to the self-managed path: create trip + auto ack +
+                // pickup, no vendor/pool. Supported for Manual mode only — it
+                // replaces the operator-pool execution, not AMR's RIOT3
+                // lifecycle. Order creation already rejects self-managed +
+                // non-Manual; the mode gate here is defence in depth so a
+                // stray event can't self-dispatch an AMR trip. Grouping above
+                // still used the Manual strategy (WMS pair).
+                var selfManaged = evt.SelfManaged && mode == TransportMode.Manual;
+                var envelopeResult = selfManaged
+                    ? await _selfManaged.DispatchGroupAsync(dispatchRequest, ct)
+                    : await strategy.DispatchGroupAsync(dispatchRequest, ct);
 
                 if (envelopeResult.IsSuccess && envelopeResult.Value.TripId != Guid.Empty)
                 {

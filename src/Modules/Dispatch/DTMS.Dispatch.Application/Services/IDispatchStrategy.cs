@@ -98,7 +98,10 @@ public sealed record DispatchGroupRequest(
     // resolved during order validation. Strategy uses these to look up
     // the parent zone code + geofence coords.
     Guid? PickupWmsLocationId = null,
-    Guid? DropWmsLocationId = null);
+    Guid? DropWmsLocationId = null,
+    // Self-managed dispatch only — the order's RequestedBy, used as the actor
+    // on the auto acknowledge + pickup. Null for AMR/Manual (they ignore it).
+    string? RequestedBy = null);
 
 /// <summary>
 /// Result of a dispatch attempt. <see cref="VendorOrderKey"/> is the

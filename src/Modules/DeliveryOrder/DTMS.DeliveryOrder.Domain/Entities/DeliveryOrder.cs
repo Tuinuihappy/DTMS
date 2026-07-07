@@ -48,6 +48,18 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     /// </summary>
     public bool? RequiresPickupPod { get; private set; }
 
+    /// <summary>
+    /// When true, an external system (OMS/WMS/ERP) executes the physical
+    /// transport itself and reports lifecycle to DTMS via the federated
+    /// <c>/api/v1/source/trips/*</c> endpoints. Instead of the operator pool,
+    /// the trip is auto-acked + auto-picked-up at creation (attributed to
+    /// <see cref="RequestedBy"/>), and the external system sends drop +
+    /// complete. Only supported for <see cref="TransportMode.Manual"/> (it
+    /// replaces the pool path, not AMR's vendor-driven RIOT3 lifecycle), only
+    /// settable on upstream orders, and requires <see cref="RequestedBy"/>.
+    /// </summary>
+    public bool SelfManaged { get; private set; }
+
     private readonly List<Item> _items = new();
     public IReadOnlyCollection<Item> Items => _items.AsReadOnly();
 
@@ -99,10 +111,24 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         ServiceWindow? serviceWindow,
         string sourceSystemKey, string sourceSystemDisplayName,
         string? createdBy = null, string? requestedBy = null, string? notes = null,
-        TransportMode? requestedTransportMode = Enums.TransportMode.Amr)
+        TransportMode? requestedTransportMode = Enums.TransportMode.Amr,
+        bool selfManaged = false)
     {
         if (string.Equals(sourceSystemKey, WellKnownSourceSystems.Manual, StringComparison.Ordinal))
             throw new InvalidOperationException("Upstream orders cannot use the 'manual' source key.");
+
+        // Self-managed is only supported for Manual transport — the auto
+        // ack + pickup path replaces the operator-pool execution, not AMR's
+        // RIOT3 lifecycle (which is vendor-driven).
+        if (selfManaged && requestedTransportMode != Enums.TransportMode.Manual)
+            throw new InvalidOperationException(
+                "A self-managed order is only supported for Manual transport mode.");
+
+        // Self-managed orders auto-acknowledge + auto-pickup on trip creation,
+        // attributing the action to RequestedBy — so it must be present.
+        if (selfManaged && string.IsNullOrWhiteSpace(requestedBy))
+            throw new InvalidOperationException(
+                "A self-managed order requires RequestedBy — it is the actor recorded on the auto acknowledge + pickup.");
 
         var order = new DeliveryOrder
         {
@@ -119,7 +145,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             Notes = notes,
             RequestedTransportMode = requestedTransportMode,
             RequiresDropPod = false,
-            RequiresPickupPod = false
+            RequiresPickupPod = false,
+            SelfManaged = selfManaged
         };
 
         order.AddDomainEvent(new DeliveryOrderSubmittedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, order.Id));
@@ -632,7 +659,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         return new DeliveryOrderConfirmedDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, Priority.ToString(),
             ServiceWindow?.EarliestUtc, ServiceWindow?.LatestUtc,
-            SubmittedAt, itemDtos, RequestedTransportMode?.ToString());
+            SubmittedAt, itemDtos, RequestedTransportMode?.ToString(),
+            SelfManaged, RequestedBy);
     }
 
     public void MarkPlanned()

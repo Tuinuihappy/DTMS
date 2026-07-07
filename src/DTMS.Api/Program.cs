@@ -91,8 +91,14 @@ builder.Services.AddSingleton<
     Microsoft.AspNetCore.Authorization.IAuthorizationHandler,
     DTMS.Iam.Application.Authorization.SourceSystemPermissionHandler>();
 builder.Services.ConfigureHttpJsonOptions(options =>
+{
     options.SerializerOptions.Converters.Add(
-        new System.Text.Json.Serialization.JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.SnakeCaseUpper)));
+        new System.Text.Json.Serialization.JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.SnakeCaseUpper));
+    // Normalize every request-body DateTime to UTC so non-UTC input (offset or
+    // bare) can't 500 on the `timestamp with time zone` columns. Covers the
+    // whole write surface (actedAt, ServiceWindow, …) in one place.
+    options.SerializerOptions.Converters.Add(new DTMS.Api.Serialization.UtcDateTimeJsonConverter());
+});
 
 // Configure authentication. Per ADR-014, External Auth (at
 // http://10.204.212.28:15000) owns identity; DTMS only validates the

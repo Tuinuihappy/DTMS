@@ -3,6 +3,7 @@ using DTMS.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Presentation.Idempotency;
 using DTMS.Iam.Application.Authorization;
+using System.ComponentModel;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -62,7 +63,8 @@ public static class SourceSystemDeliveryOrderEndpoints
             Notes: body.Notes,
             RequestedTransportMode: body.RequestedTransportMode,
             RequiresDropPod: body.RequiresDropPod,
-            RequiresPickupPod: body.RequiresPickupPod);
+            RequiresPickupPod: body.RequiresPickupPod,
+            SelfManaged: body.SelfManaged);
 
         var result = await sender.Send(command);
         return result.IsSuccess
@@ -88,5 +90,10 @@ public record CreateSourceOrderRequest(
     string? RequestedBy = null,
     string? Notes = null,
     TransportMode? RequestedTransportMode = TransportMode.Amr,
-    bool? RequiresDropPod = null,
-    bool? RequiresPickupPod = null);
+    [property: DefaultValue(false)] bool? RequiresDropPod = false,
+    [property: DefaultValue(false)] bool? RequiresPickupPod = false,
+    // When true, this source system executes the transport itself: DTMS auto
+    // acknowledges + picks up the trip (actor = RequestedBy) and the source
+    // reports drop + complete via /api/v1/source/trips/*. Manual mode only
+    // (RequestedTransportMode=Manual) and RequestedBy is required.
+    [property: DefaultValue(false)] bool SelfManaged = false);

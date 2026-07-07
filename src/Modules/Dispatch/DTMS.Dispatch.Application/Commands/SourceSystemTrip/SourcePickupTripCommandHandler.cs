@@ -37,11 +37,11 @@ public sealed class SourcePickupTripCommandHandler
                 $"Cannot record pickup for a trip in {trip.Status} status — " +
                 "acknowledge (start) the trip first.");
 
-        trip.MarkVendorPickedUp();
+        trip.MarkVendorPickedUp(request.ActionBy, request.ActedAt);
         await _trips.UpdateAsync(trip, cancellationToken);
         _logger.LogInformation(
-            "[SourceTrip] Trip {TripId} pickup recorded by source system {Key}",
-            trip.Id, request.SourceSystemKey);
+            "[SourceTrip] Trip {TripId} pickup recorded by {ActionBy} via source system {Key}",
+            trip.Id, request.ActionBy, request.SourceSystemKey);
         return Result.Success();
     }
 }

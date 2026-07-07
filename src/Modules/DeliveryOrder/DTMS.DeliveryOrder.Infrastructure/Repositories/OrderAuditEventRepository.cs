@@ -19,6 +19,13 @@ public class OrderAuditEventRepository : IOrderAuditEventRepository
             .OrderBy(e => e.OccurredAt)
             .ToListAsync(cancellationToken);
 
+    public Task<bool> ExistsAsync(Guid orderId, string eventType, string detailsContains, CancellationToken cancellationToken = default)
+        => _context.OrderAuditEvents.AnyAsync(e =>
+            e.DeliveryOrderId == orderId &&
+            e.EventType == eventType &&
+            e.Details != null &&
+            e.Details.Contains(detailsContains), cancellationToken);
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
         => _context.SaveChangesAsync(cancellationToken);
 }

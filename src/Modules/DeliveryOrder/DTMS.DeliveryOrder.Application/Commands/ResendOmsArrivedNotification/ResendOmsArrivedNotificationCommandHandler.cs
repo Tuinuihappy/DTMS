@@ -77,6 +77,15 @@ public class ResendOmsArrivedNotificationCommandHandler
                 $"Order is from {order.SourceSystemKey}, not OMS. Use the federated callback admin tools (Phase S.3.1b) to manage non-OMS notifications.");
         }
 
+        // Manual transport does not report arrival to OMS (parity with the auto
+        // TripDropCompletedOmsNotifyConsumer) — OMS owns the arrival signal for
+        // operator-pool / self-managed deliveries.
+        if (order.RequestedTransportMode == TransportMode.Manual)
+        {
+            return Result<ResendOmsArrivedNotificationResult>.Failure(
+                "Manual transport does not send arrival notifications to OMS.");
+        }
+
         var trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);
         if (trip is null)
             return Result<ResendOmsArrivedNotificationResult>.Failure($"Trip {request.TripId} not found.");

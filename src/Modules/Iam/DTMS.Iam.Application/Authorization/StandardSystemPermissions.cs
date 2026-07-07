@@ -25,6 +25,12 @@ public static class StandardSystemPermissions
     public const string TripDropTemplate         = "dtms:source:{key}:trip:drop";
     public const string TripCompleteTemplate     = "dtms:source:{key}:trip:complete";
 
+    // Robot PASS — a source system nudges a DTMS-executed AMR robot past a
+    // checkpoint via /api/v1/source/trips/{id}/acknowledge-robot-pass. Held
+    // separately from the operator-level dtms:dispatch:trip:acknowledge so a
+    // partner can PASS its own trips without any broad dispatch authority.
+    public const string TripAcknowledgeRobotPassTemplate = "dtms:source:{key}:trip:acknowledge-robot-pass";
+
     public static readonly IReadOnlyList<string> All = new[]
     {
         OrderWriteTemplate,
@@ -33,6 +39,7 @@ public static class StandardSystemPermissions
         TripPickupTemplate,
         TripDropTemplate,
         TripCompleteTemplate,
+        TripAcknowledgeRobotPassTemplate,
     };
 
     /// <summary>

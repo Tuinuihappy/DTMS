@@ -523,6 +523,12 @@ public static class ModuleServiceRegistration
         // the body for the real operator-assignment flow.
         services.AddScoped<DTMS.Dispatch.Application.Services.IDispatchStrategy,
             DTMS.Api.Adapters.ManualDispatchStrategy>();
+        // Self-managed dispatch (source system runs transport itself). Not an
+        // IDispatchStrategy — it's mode-orthogonal, selected by the order's
+        // SelfManaged flag in DeliveryOrderValidatedConsumer, not by the
+        // registry. Creates trip + auto ack + pickup; no vendor/pool.
+        services.AddScoped<DTMS.Dispatch.Application.Services.ISelfManagedDispatchService,
+            DTMS.Api.Adapters.SelfManagedDispatchStrategy>();
         services.AddScoped<IDispatchOrderTemplateService, DispatchOrderTemplateService>();
         services.Configure<DTMS.Planning.Application.Options.DispatchOptions>(
             configuration.GetSection(DTMS.Planning.Application.Options.DispatchOptions.SectionName));

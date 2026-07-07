@@ -75,6 +75,17 @@ public class Trip : AggregateRoot<Guid>
     public DateTime? ClaimedAt { get; private set; }
     public DateTime? DispatchedAt { get; private set; }
 
+    // Source-system acknowledge actor. Populated only via the federated
+    // /api/v1/source/trips/{id}/acknowledge path, where the machine caller
+    // forwards the identity of the human who accepted the trip in its own
+    // system (there is no DTMS user on a system-to-system call). Free-text
+    // because it's an identifier owned by the source system, not a DTMS Guid
+    // — mirrors DeliveryOrder's RequestedBy. First-ack wins (see
+    // AcknowledgeBySource); every attempt is still recorded in ExecutionEvent.
+    // AMR webhook / operator-pool acks leave these NULL.
+    public string? AcknowledgedBy { get; private set; }
+    public DateTime? AcknowledgedAt { get; private set; }
+
     // Retry chain. First dispatch = 1, each retry increments.
     // PreviousAttemptId points to the trip this one supersedes (null for
     // first attempt). See TripRetryEvent for the immutable audit record.
@@ -282,6 +293,61 @@ public class Trip : AggregateRoot<Guid>
     }
 
     /// <summary>
+    /// Federated source-system acknowledge: a machine caller reports that a
+    /// human in its own system accepted this trip. Wraps
+    /// <see cref="MarkVendorStarted"/> (Created → InProgress) but additionally
+    /// captures WHO acknowledged.
+    ///
+    /// <para><b>First-ack wins</b> — the <see cref="AcknowledgedBy"/> actor is
+    /// only written on the first acknowledge, so a duplicate at-least-once
+    /// delivery (or a second person acking an already-started trip) never
+    /// overwrites the original acknowledger. This mirrors the idempotency of
+    /// <see cref="MarkVendorStarted"/> itself.</para>
+    ///
+    /// <para><b>Every attempt is audited</b> — the <c>SourceAcknowledged</c>
+    /// <see cref="ExecutionEvent"/> is recorded on every call regardless of
+    /// whether the actor was persisted or the status transitioned, so the full
+    /// history of who tried to ack (and when) survives on the trip. Query
+    /// <c>ExecutionEvent WHERE EventType = 'SourceAcknowledged'</c> for the
+    /// complete list.</para>
+    /// </summary>
+    /// <param name="acknowledgedBy">Source-system identifier of the human who
+    /// accepted the trip (id / name / email). Required.</param>
+    /// <param name="acknowledgedAt">When the human acked in the source system.
+    /// Null falls back to now — the moment DTMS received the call.</param>
+    public void AcknowledgeBySource(string acknowledgedBy, DateTime? acknowledgedAt = null,
+        IReadOnlyList<TripItemSnapshot>? items = null)
+    {
+        if (string.IsNullOrWhiteSpace(acknowledgedBy))
+            throw new ArgumentException("AcknowledgedBy must not be empty.", nameof(acknowledgedBy));
+
+        var actor = acknowledgedBy.Trim();
+        // Coerce a source-supplied timestamp to UTC before it hits the
+        // `timestamp with time zone` columns (AcknowledgedAt + the event's
+        // ActedAt) — a non-UTC Kind makes Npgsql throw on save. See
+        // ExecutionEvent.NormalizeToUtc.
+        var stampedAt = ExecutionEvent.NormalizeToUtc(acknowledgedAt) ?? DateTime.UtcNow;
+
+        // First-ack wins — never clobber the original acknowledger on a
+        // duplicate or late second ack.
+        if (AcknowledgedBy is null)
+        {
+            AcknowledgedBy = actor;
+            AcknowledgedAt = stampedAt;
+        }
+
+        // Audit every attempt (actor + upstream time), even the idempotent
+        // no-op transitions below.
+        RecordEvent("SourceAcknowledged", $"by={actor}", actor, stampedAt);
+
+        // Drive the (idempotent) Created → InProgress transition + TripStarted
+        // event. Safe to call repeatedly; no-ops once past Created. Items ride
+        // the TripStarted event so TripItemsProjector materializes the item
+        // snapshot for self-managed trips (which skip the MarkDispatched path).
+        MarkVendorStarted(items: items);
+    }
+
+    /// <summary>
     /// Vendor reports the robot finished its pickup action at this trip's
     /// pickup station — items are now physically loaded and in transit.
     /// Doesn't change Trip.Status (the trip is still InProgress) — fires
@@ -290,13 +356,13 @@ public class Trip : AggregateRoot<Guid>
     /// and the underlying webhook handler only calls this once the
     /// pickup station's mission finished.
     /// </summary>
-    public void MarkVendorPickedUp()
+    public void MarkVendorPickedUp(string? actor = null, DateTime? actedAt = null)
     {
         // Pickup only makes sense while the trip is in flight. Fail-loud
         // would mask network races; bail quietly instead.
         if (Status is not TripStatus.InProgress) return;
 
-        RecordEvent("VendorPickupCompleted", null);
+        RecordEvent("VendorPickupCompleted", actor is null ? null : $"by={actor}", actor, actedAt);
         AddDomainEvent(new TripPickupCompletedDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId));
     }
@@ -314,15 +380,21 @@ public class Trip : AggregateRoot<Guid>
     /// Delivered immediately (no POD required); true = items hold at
     /// DroppedOff pending operator /pod-scan.
     /// </summary>
-    public void MarkVendorDropCompleted(bool? requiresDropPod = null)
+    public void MarkVendorDropCompleted(bool? requiresDropPod = null,
+        string? actor = null, DateTime? actedAt = null)
     {
         if (Status is not TripStatus.InProgress) return;
-        RecordEvent("VendorDropCompleted", requiresDropPod is null ? null : $"requiresDropPod={requiresDropPod}");
+        var details = string.Join(" ", new[]
+        {
+            requiresDropPod is null ? null : $"requiresDropPod={requiresDropPod}",
+            actor is null ? null : $"by={actor}",
+        }.Where(s => s is not null));
+        RecordEvent("VendorDropCompleted", details.Length == 0 ? null : details, actor, actedAt);
         AddDomainEvent(new TripDropCompletedDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId, requiresDropPod));
     }
 
-    public void MarkVendorCompleted()
+    public void MarkVendorCompleted(string? actor = null, DateTime? actedAt = null)
     {
         if (Status == TripStatus.Completed)
             return;
@@ -331,7 +403,7 @@ public class Trip : AggregateRoot<Guid>
 
         Status = TripStatus.Completed;
         CompletedAt = DateTime.UtcNow;
-        RecordEvent("VendorCompleted", null);
+        RecordEvent("VendorCompleted", actor is null ? null : $"by={actor}", actor, actedAt);
         AddDomainEvent(new TripCompletedDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, JobId, DeliveryOrderId, UpperKey));
     }
@@ -382,7 +454,12 @@ public class Trip : AggregateRoot<Guid>
     // robot level, not a state transition. Requires VendorVehicleKey because
     // RIOT3 routes PASS by deviceKey, not by orderKey. Phase 3b — key lives
     // on the AMR extension; AMR-only call is a no-op for Manual/Fleet trips.
-    public void AcknowledgeRobotPass()
+    //
+    // actionBy/actedAt are optional: the operator PWA path leaves them null
+    // (the ExecutionEvent's Actor stays blank, same as before), while the
+    // federated source-system endpoint passes WHO nudged it upstream so the
+    // audit trail attributes the PASS to the calling system's user.
+    public void AcknowledgeRobotPass(string? actionBy = null, DateTime? actedAt = null)
     {
         if (Status != TripStatus.InProgress)
             throw new InvalidOperationException("Only InProgress trips can acknowledge a robot pass.");
@@ -390,7 +467,9 @@ public class Trip : AggregateRoot<Guid>
         if (string.IsNullOrWhiteSpace(vehicleKey))
             throw new InvalidOperationException("Cannot pass — no vendor vehicle key on file.");
 
-        RecordEvent("RobotPassAcknowledged", vehicleKey);
+        var actor = string.IsNullOrWhiteSpace(actionBy) ? null : actionBy.Trim();
+        var stampedAt = ExecutionEvent.NormalizeToUtc(actedAt);
+        RecordEvent("RobotPassAcknowledged", vehicleKey, actor, stampedAt);
         AddDomainEvent(new TripRobotPassAcknowledgedDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, vehicleKey));
     }
@@ -523,8 +602,9 @@ public class Trip : AggregateRoot<Guid>
         return pod;
     }
 
-    private void RecordEvent(string eventType, string? details)
+    private void RecordEvent(string eventType, string? details,
+        string? actor = null, DateTime? actedAt = null)
     {
-        _events.Add(new ExecutionEvent(Id, null, eventType, details));
+        _events.Add(new ExecutionEvent(Id, null, eventType, details, actor, actedAt));
     }
 }

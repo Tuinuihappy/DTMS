@@ -37,11 +37,11 @@ public sealed class SourceCompleteTripCommandHandler
             return Result.Failure(
                 $"Cannot complete a trip in {trip.Status} status.");
 
-        trip.MarkVendorCompleted();
+        trip.MarkVendorCompleted(request.ActionBy, request.ActedAt);
         await _trips.UpdateAsync(trip, cancellationToken);
         _logger.LogInformation(
-            "[SourceTrip] Trip {TripId} completed by source system {Key}",
-            trip.Id, request.SourceSystemKey);
+            "[SourceTrip] Trip {TripId} completed by {ActionBy} via source system {Key}",
+            trip.Id, request.ActionBy, request.SourceSystemKey);
         return Result.Success();
     }
 }

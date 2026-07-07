@@ -40,11 +40,11 @@ public sealed class SourceDropTripCommandHandler
         var requiresDropPod = await _orders.GetRequiresDropPodAsync(
             trip.DeliveryOrderId, cancellationToken);
 
-        trip.MarkVendorDropCompleted(requiresDropPod);
+        trip.MarkVendorDropCompleted(requiresDropPod, request.ActionBy, request.ActedAt);
         await _trips.UpdateAsync(trip, cancellationToken);
         _logger.LogInformation(
-            "[SourceTrip] Trip {TripId} drop recorded by source system {Key} (requiresDropPod={Pod})",
-            trip.Id, request.SourceSystemKey, requiresDropPod);
+            "[SourceTrip] Trip {TripId} drop recorded by {ActionBy} via source system {Key} (requiresDropPod={Pod})",
+            trip.Id, request.ActionBy, request.SourceSystemKey, requiresDropPod);
         return Result.Success();
     }
 }

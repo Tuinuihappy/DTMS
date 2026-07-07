@@ -71,6 +71,11 @@ public class DispatchDbContext : DbContext
             builder.Property(t => t.ClaimedByOperatorId);
             builder.Property(t => t.ClaimedAt);
             builder.Property(t => t.DispatchedAt);
+            // Source-system acknowledge actor (federated /api/v1/source path).
+            // Free-text identifier owned by the caller's system; NULL for AMR
+            // webhook + operator-pool acks. See Trip.AcknowledgeBySource.
+            builder.Property(t => t.AcknowledgedBy).HasMaxLength(200);
+            builder.Property(t => t.AcknowledgedAt);
             // UpperKey is the RIOT3 correlation key (and unique). Legacy
             // job/task trips (which had null UpperKey) were dropped in
             // Phase b7 — all surviving rows are envelope-dispatched.
@@ -164,6 +169,11 @@ public class DispatchDbContext : DbContext
             builder.HasKey(e => e.Id);
             builder.Property(e => e.EventType).HasMaxLength(50);
             builder.Property(e => e.Details).HasMaxLength(500);
+            // Source-system action actor + upstream action time (federated
+            // /api/v1/source/trips/* path). NULL for events with no external
+            // actor. See Trip.RecordEvent / ExecutionEvent.
+            builder.Property(e => e.Actor).HasMaxLength(200);
+            builder.Property(e => e.ActedAt);
         });
 
         modelBuilder.Entity<TripRetryEvent>(builder =>

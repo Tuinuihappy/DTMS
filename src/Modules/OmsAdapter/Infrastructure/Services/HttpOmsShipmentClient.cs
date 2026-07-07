@@ -93,6 +93,20 @@ internal sealed class HttpOmsShipmentClient : IOmsShipmentClient
             return;
         }
 
+        // 409 Conflict = OMS already recorded this shipment's arrival. Treat as
+        // a no-op success (symmetric with NotifyShipmentStartedAsync's 409
+        // handling) so an at-least-once retry — or a duplicate SUB_TASK_FINISHED
+        // that slipped past the consumer's dedup guard — doesn't dead-letter as
+        // a permanent 4xx. If OMS makes /arrived idempotent with a 2xx we never
+        // reach here.
+        if (response.StatusCode == HttpStatusCode.Conflict)
+        {
+            _logger.LogInformation(
+                "[OmsAdapter] POST {Path} shipmentId={ShipmentId} → 409 — already arrived, treating as no-op",
+                path, shipmentId);
+            return;
+        }
+
         var errBody = await SafeReadBodyAsync(response, cancellationToken);
         _logger.LogWarning(
             "[OmsAdapter] POST {Path} shipmentId={ShipmentId} failed → {Status} body={Body}",

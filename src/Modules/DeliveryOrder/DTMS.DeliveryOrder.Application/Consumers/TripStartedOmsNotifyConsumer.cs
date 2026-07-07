@@ -180,8 +180,14 @@ public class TripStartedOmsNotifyConsumer :
             return;
         }
 
+        // Self-managed orders (source system executes the transport itself)
+        // have no vendor vehicle — the auto TripStarted would otherwise wait
+        // forever for a RIOT3 vehicle name that never arrives. Treat them like
+        // the pool path: notify OMS once with DeliveryBy=null.
+        var requireName = requireVendorVehicleName && !order.SelfManaged;
+
         var vendorVehicleName = trip?.VendorVehicleName;
-        if (requireVendorVehicleName && string.IsNullOrWhiteSpace(vendorVehicleName))
+        if (requireName && string.IsNullOrWhiteSpace(vendorVehicleName))
         {
             // Throw instead of sending an empty/placeholder name — Option A
             // semantics: the OMS POST overwrites deliveryBy, so a blank
@@ -193,10 +199,16 @@ public class TripStartedOmsNotifyConsumer :
             throw new InvalidOperationException(
                 $"Trip {tripId} has no VendorVehicleName yet — race with TASK_PROCESSING save (Name + Key arrive together from RIOT3). Will retry.");
         }
-        // WMS PR-4b — pool dispatch skips the vehicle-name requirement:
-        // DeliveryBy is explicitly null on the wire. OMS should accept
-        // this as "vehicle not yet known" (verified per team agreement).
-        string? deliveryBy = requireVendorVehicleName ? vendorVehicleName : null;
+        // DeliveryBy semantics per flow:
+        //   • AMR   → the vendor vehicle name (robot) reported by RIOT3.
+        //   • Pool  → null on TripDispatched ("vehicle not yet known").
+        //   • Self-managed → the order's RequestedBy: the external actor is
+        //     the closest thing to "who is delivering" since the source system
+        //     runs the transport itself (no vendor vehicle). RequestedBy is
+        //     required on self-managed orders, so it's present here.
+        string? deliveryBy = order.SelfManaged
+            ? order.RequestedBy
+            : (requireName ? vendorVehicleName : null);
 
         // [Option A] Stable shipmentId across retry chain. Walking
         // PreviousAttemptId back to the first attempt's Id means OMS sees

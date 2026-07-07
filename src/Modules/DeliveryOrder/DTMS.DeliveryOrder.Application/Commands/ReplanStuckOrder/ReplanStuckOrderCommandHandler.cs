@@ -139,7 +139,9 @@ public class ReplanStuckOrderCommandHandler : ICommandHandler<ReplanStuckOrderCo
             LatestUtc: order.ServiceWindow?.LatestUtc,
             SubmittedAt: order.SubmittedAt,
             Items: items,
-            RequestedTransportMode: order.RequestedTransportMode?.ToString());
+            RequestedTransportMode: order.RequestedTransportMode?.ToString(),
+            SelfManaged: order.SelfManaged,
+            RequestedBy: order.RequestedBy);
 
         var previousStatus = order.Status.ToString();
         await _publisher.Publish(evt, cancellationToken);

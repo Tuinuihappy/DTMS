@@ -50,7 +50,8 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
                         i.Temperature is { } tr ? new ItemTemperatureSummaryDto(tr.MinC, tr.MaxC) : null,
                         i.HandlingInstructions,
                         i.PickupWmsLocationId, i.DropWmsLocationId)).ToList(),
-                    evt.RequestedTransportMode)
+                    evt.RequestedTransportMode,
+                    evt.SelfManaged, evt.RequestedBy)
             ],
             DeliveryOrderCancelledDomainEvent evt =>
             [
