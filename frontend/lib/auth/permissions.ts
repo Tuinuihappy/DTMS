@@ -13,6 +13,7 @@ export const Permissions = {
   },
   Facility: {
     ProfileRead: "dtms:facility:profile:read",
+    ProfileWrite: "dtms:facility:profile:write",
     MapRead: "dtms:facility:map:read",
   },
   Dispatch: {

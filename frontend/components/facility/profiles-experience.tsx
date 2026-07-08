@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Boxes, Loader2, Route as RouteIcon, Layers } from "lucide-react";
+import { ArrowRight, Boxes, Loader2, Plus, Route as RouteIcon, Layers } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { PermissionGuard } from "@/components/auth/permission-guard";
@@ -24,6 +24,10 @@ import {
 } from "@/lib/api/facility-profiles";
 import { Permissions } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
+import {
+  RegisterCarrierProfileDialog,
+  RegisterLoadUnitProfileDialog,
+} from "./register-profile-dialogs";
 
 export function FacilityProfilesExperience() {
   return (
@@ -36,16 +40,25 @@ export function FacilityProfilesExperience() {
 function Inner() {
   const { hasPermission } = useAuth();
   const canRouteCost = hasPermission(Permissions.Facility.MapRead);
+  const canWrite = hasPermission(Permissions.Facility.ProfileWrite);
 
   const [carriers, setCarriers] = useState<CarrierTypeProfile[]>([]);
   const [carrierFilter, setCarrierFilter] = useState("");
   const [loadUnits, setLoadUnits] = useState<LoadUnitProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [carrierDialog, setCarrierDialog] = useState(false);
+  const [loadUnitDialog, setLoadUnitDialog] = useState(false);
 
   const loadUnitsFor = useCallback((code: string) => {
     getLoadUnitProfiles(code || undefined)
       .then(setLoadUnits)
+      .catch((e: Error) => setError(e.message));
+  }, []);
+
+  const reloadCarriers = useCallback(() => {
+    getCarrierTypeProfiles()
+      .then(setCarriers)
       .catch((e: Error) => setError(e.message));
   }, []);
 
@@ -94,7 +107,19 @@ function Inner() {
         </GlassCard>
       ) : (
         <>
-          <Section title="Carrier type profiles" icon={Boxes} count={carriers.length}>
+          <Section
+            title="Carrier type profiles"
+            icon={Boxes}
+            count={carriers.length}
+            aside={
+              canWrite ? (
+                <button type="button" onClick={() => setCarrierDialog(true)} className={registerBtn}>
+                  <Plus className="h-3.5 w-3.5" strokeWidth={2.4} />
+                  Register
+                </button>
+              ) : undefined
+            }
+          >
             {carriers.length === 0 ? (
               <TableEmptyState variant="no-data" title="No carrier profiles" body="Register carrier types to see them here." icon={Boxes} />
             ) : (
@@ -145,7 +170,8 @@ function Inner() {
             icon={Boxes}
             count={loadUnits.length}
             aside={
-              <select
+              <div className="flex items-center gap-2">
+                <select
                 value={carrierFilter}
                 onChange={(e) => {
                   setCarrierFilter(e.target.value);
@@ -160,6 +186,13 @@ function Inner() {
                   </option>
                 ))}
               </select>
+                {canWrite && (
+                  <button type="button" onClick={() => setLoadUnitDialog(true)} className={registerBtn}>
+                    <Plus className="h-3.5 w-3.5" strokeWidth={2.4} />
+                    Register
+                  </button>
+                )}
+              </div>
             }
           >
             {loadUnits.length === 0 ? (
@@ -206,6 +239,18 @@ function Inner() {
           </Section>
         </>
       )}
+
+      <RegisterCarrierProfileDialog
+        open={carrierDialog}
+        onClose={() => setCarrierDialog(false)}
+        onCreated={reloadCarriers}
+      />
+      <RegisterLoadUnitProfileDialog
+        open={loadUnitDialog}
+        carriers={carriers}
+        onClose={() => setLoadUnitDialog(false)}
+        onCreated={() => loadUnitsFor(carrierFilter)}
+      />
     </div>
   );
 }
@@ -331,3 +376,6 @@ const inputClass =
 
 const primaryBtn =
   "inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-4 text-[12px] font-semibold text-white transition-all hover:shadow-[0_14px_36px_-12px_rgba(15,23,42,0.6)] disabled:opacity-40 disabled:cursor-not-allowed dark:bg-[var(--color-brand-500)]";
+
+const registerBtn =
+  "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-3 text-[11.5px] font-semibold text-white transition-all hover:shadow-[0_10px_28px_-12px_rgba(15,23,42,0.5)] dark:bg-[var(--color-brand-500)]";

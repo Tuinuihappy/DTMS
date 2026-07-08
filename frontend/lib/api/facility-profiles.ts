@@ -65,3 +65,55 @@ export function getRouteCost(from: string, to: string): Promise<RouteCost> {
   const qs = new URLSearchParams({ from, to });
   return getJson<RouteCost>(`/api/facility/route-cost?${qs.toString()}`, true);
 }
+
+async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let message = `Request failed (${res.status})`;
+    try {
+      const b = (await res.json()) as { message?: string };
+      if (b?.message) message = b.message;
+    } catch {
+      // not JSON
+    }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export type CreateCarrierTypeProfileInput = {
+  code: string;
+  displayName: string;
+  // Backend property AMRCapability; JSON binding is case-insensitive so
+  // either casing binds — we send the read-DTO casing for consistency.
+  aMRCapability: string;
+  maxWeightKg?: number | null;
+  maxSlots?: number | null;
+  description?: string | null;
+};
+
+export function createCarrierTypeProfile(
+  input: CreateCarrierTypeProfileInput,
+): Promise<string> {
+  return postJson<string>("/api/facility/carrier-type-profiles", input);
+}
+
+export type CreateLoadUnitProfileInput = {
+  code: string;
+  displayName: string;
+  lengthMm: number;
+  widthMm: number;
+  heightMm: number;
+  maxGrossWeightKg: number;
+  carrierTypeCode: string;
+};
+
+export function createLoadUnitProfile(
+  input: CreateLoadUnitProfileInput,
+): Promise<string> {
+  return postJson<string>("/api/facility/load-unit-profiles", input);
+}
