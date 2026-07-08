@@ -8,4 +8,14 @@ export const Permissions = {
     RoleRead: "dtms:iam:role:read",
     SubscriptionRead: "dtms:iam:subscription:read",
   },
+  DeliveryOrder: {
+    ItemRead: "dtms:deliveryorder:item:read",
+  },
+  Facility: {
+    ProfileRead: "dtms:facility:profile:read",
+    MapRead: "dtms:facility:map:read",
+  },
+  Dispatch: {
+    TripRead: "dtms:dispatch:trip:read",
+  },
 } as const;
