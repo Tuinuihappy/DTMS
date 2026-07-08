@@ -312,6 +312,25 @@ export function acknowledgeRobotPass(tripId: string): Promise<void> {
   return api<void>(`/api/dispatch/trips/${tripId}/acknowledge-robot-pass`, { method: "POST" });
 }
 
+export type RaiseTripExceptionInput = {
+  code: string;
+  severity: string;
+  detail: string;
+};
+
+// POST /trips/{id}/exceptions — dispatcher flags an exception on a trip.
+// Returns the new exception id.
+export function raiseTripException(
+  tripId: string,
+  input: RaiseTripExceptionInput,
+): Promise<string> {
+  return api<string>(`/api/dispatch/trips/${tripId}/exceptions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
 export type RetryTripRequest = {
   source?: "Manual" | "Automatic" | "Reopen";
   retriedBy?: string | null;

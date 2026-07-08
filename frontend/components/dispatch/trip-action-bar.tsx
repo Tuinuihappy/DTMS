@@ -1,10 +1,11 @@
 "use client";
 
-import { ChevronsRight, Pause, Play, Repeat2, X } from "lucide-react";
+import { AlertTriangle, ChevronsRight, Pause, Play, Repeat2, X } from "lucide-react";
 import { useState } from "react";
 import { cancelTrip, pauseTrip, resumeTrip, retryTrip, type TripStatus } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
 import { PassRobotDialog } from "./pass-robot-dialog";
+import { RaiseExceptionDialog } from "./raise-exception-dialog";
 
 // Contextual action toolbar for a Trip. Buttons enable/disable based on
 // the current Trip status so operators can't fire commands the domain
@@ -14,7 +15,7 @@ import { PassRobotDialog } from "./pass-robot-dialog";
 // PASS is grouped separately on the left because it's a robot-level
 // interaction (operator nudges the robot past a checkpoint) — distinct
 // from the lifecycle group on the right which mutates Trip.Status.
-type Action = "cancel" | "pause" | "resume" | "retry" | "pass";
+type Action = "cancel" | "pause" | "resume" | "retry" | "pass" | "exception";
 
 export function TripActionBar({
   tripId,
@@ -37,12 +38,16 @@ export function TripActionBar({
   const [busy, setBusy] = useState<Action | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [passDialogOpen, setPassDialogOpen] = useState(false);
+  const [exceptionDialogOpen, setExceptionDialogOpen] = useState(false);
 
   const canCancel = status === "Created" || status === "InProgress" || status === "Paused";
   const canPause = status === "InProgress";
   const canResume = status === "Paused";
   const canRetry = status === "Cancelled";
   const canPass = status === "InProgress" && !!vendorVehicleKey;
+  // Annotate a problem on an in-flight trip (doesn't change Trip.Status).
+  const canRaiseException =
+    status === "Created" || status === "InProgress" || status === "Paused";
 
   const run = async (action: Exclude<Action, "pass">, fn: () => Promise<unknown>) => {
     setBusy(action);
@@ -76,6 +81,19 @@ export function TripActionBar({
             canPass
               ? "Acknowledge robot waiting at checkpoint"
               : "ใช้ได้เฉพาะตอน Trip InProgress และมี Vehicle key"
+          }
+        />
+        <ActionButton
+          icon={AlertTriangle}
+          label="Flag"
+          tone="amber"
+          disabled={!canRaiseException || busy !== null}
+          busy={false}
+          onClick={() => setExceptionDialogOpen(true)}
+          title={
+            canRaiseException
+              ? "Raise an exception on this trip"
+              : "ใช้ได้เฉพาะตอน Trip ยัง active (Created/InProgress/Paused)"
           }
         />
         <span
@@ -138,6 +156,12 @@ export function TripActionBar({
           onPassed={() => onAction?.("pass")}
         />
       )}
+      <RaiseExceptionDialog
+        open={exceptionDialogOpen}
+        tripId={tripId}
+        onClose={() => setExceptionDialogOpen(false)}
+        onRaised={() => onAction?.("exception")}
+      />
     </div>
   );
 }
