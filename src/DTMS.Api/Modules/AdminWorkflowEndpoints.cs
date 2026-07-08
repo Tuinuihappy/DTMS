@@ -4,6 +4,7 @@ using DTMS.Dispatch.Application.Commands.ForceCompleteTrip;
 using DTMS.Dispatch.Application.Commands.ForceDropCompletedTrip;
 using DTMS.Dispatch.Application.Commands.ForcePickupCompletedTrip;
 using DTMS.Dispatch.Application.Commands.ForceStartTrip;
+using DTMS.Iam.Application.Authorization;
 using DTMS.SharedKernel.Auth;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -52,7 +53,8 @@ public static class AdminWorkflowEndpoints
                 : Results.BadRequest(result.Error);
         })
         .WithName("AdminReplanOrder")
-        .WithSummary("Replan a stuck order by republishing DeliveryOrderConfirmedIntegrationEventV1.");
+        .WithSummary("Replan a stuck order by republishing DeliveryOrderConfirmedIntegrationEventV1.")
+        .RequirePermission(Permissions.DeliveryOrder.OrderReplan);
 
         // Four admin overrides mirroring the four RIOT3 webhooks DTMS
         // consumes for envelope-dispatched trips. Each runs the same domain
@@ -84,7 +86,8 @@ public static class AdminWorkflowEndpoints
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         })
         .WithName("AdminForceStartTrip")
-        .WithSummary("Force-start a Trip stuck at Created because TASK_PROCESSING webhook was dropped. Notifies upstream OMS.");
+        .WithSummary("Force-start a Trip stuck at Created because TASK_PROCESSING webhook was dropped. Notifies upstream OMS.")
+        .RequirePermission(Permissions.Dispatch.TripForce);
 
         group.MapPost("/trips/{id:guid}/force-pickup-completed", async (
             Guid id,
@@ -103,7 +106,8 @@ public static class AdminWorkflowEndpoints
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         })
         .WithName("AdminForcePickupCompletedTrip")
-        .WithSummary("Force-pickup-complete a Trip whose pickup sub-task webhook was dropped. Does NOT notify upstream OMS.");
+        .WithSummary("Force-pickup-complete a Trip whose pickup sub-task webhook was dropped. Does NOT notify upstream OMS.")
+        .RequirePermission(Permissions.Dispatch.TripForce);
 
         group.MapPost("/trips/{id:guid}/force-drop-completed", async (
             Guid id,
@@ -122,7 +126,8 @@ public static class AdminWorkflowEndpoints
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         })
         .WithName("AdminForceDropCompletedTrip")
-        .WithSummary("Force-drop-complete a Trip whose drop sub-task webhook was dropped. Notifies upstream OMS.");
+        .WithSummary("Force-drop-complete a Trip whose drop sub-task webhook was dropped. Notifies upstream OMS.")
+        .RequirePermission(Permissions.Dispatch.TripForce);
 
         group.MapPost("/trips/{id:guid}/force-complete", async (
             Guid id,
@@ -141,7 +146,8 @@ public static class AdminWorkflowEndpoints
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         })
         .WithName("AdminForceCompleteTrip")
-        .WithSummary("Force-complete a Trip stuck at InProgress/Paused because TASK_FINISHED webhook was dropped. Does NOT notify upstream OMS.");
+        .WithSummary("Force-complete a Trip stuck at InProgress/Paused because TASK_FINISHED webhook was dropped. Does NOT notify upstream OMS.")
+        .RequirePermission(Permissions.Dispatch.TripForce);
 
         // G1 Phase 1 — pod drain. Called by K8s preStop hook (curl from
         // inside the pod) or operators during planned shutdown. Returns 202

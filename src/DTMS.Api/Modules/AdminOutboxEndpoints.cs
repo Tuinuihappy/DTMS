@@ -1,3 +1,4 @@
+using DTMS.Iam.Application.Authorization;
 using DTMS.SharedKernel.Outbox;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -53,14 +54,16 @@ public static class AdminOutboxEndpoints
                     // keep response small. Use GET /{id} to inspect payload.
                 }),
             });
-        });
+        })
+        .RequirePermission(Permissions.Iam.OutboxManage);
 
         // GET /api/v1/admin/outbox/dlq/{id} — full row including Content
         group.MapGet("/{id:guid}", async (Guid id, IDeadLetterStore store, CancellationToken ct) =>
         {
             var row = await store.GetAsync(id, ct);
             return row is null ? Results.NotFound() : Results.Ok(row);
-        });
+        })
+        .RequirePermission(Permissions.Iam.OutboxManage);
 
         // POST /api/v1/admin/outbox/dlq/{id}/replay
         // Re-emits the DLQ message into its origin module's OutboxMessages
@@ -79,13 +82,15 @@ public static class AdminOutboxEndpoints
                 // Router rejected an unknown Source — 500 with the message.
                 return Results.Problem(ex.Message, statusCode: StatusCodes.Status500InternalServerError);
             }
-        });
+        })
+        .RequirePermission(Permissions.Iam.OutboxManage);
 
         // DELETE /api/v1/admin/outbox/dlq/{id} — permanent drop, no replay
         group.MapDelete("/{id:guid}", async (Guid id, IDeadLetterStore store, CancellationToken ct) =>
         {
             var ok = await store.DeleteAsync(id, ct);
             return ok ? Results.NoContent() : Results.NotFound();
-        });
+        })
+        .RequirePermission(Permissions.Iam.OutboxManage);
     }
 }

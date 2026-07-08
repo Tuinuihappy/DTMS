@@ -1,5 +1,6 @@
 using DTMS.Api.Realtime.Hubs;
 using DTMS.Api.Realtime.Hubs.Clients;
+using DTMS.Iam.Application.Authorization;
 using DTMS.Transport.Manual.Application.Commands.Admin.ApproveGeofenceOverride;
 using DTMS.Transport.Manual.Application.Commands.Admin.DenyGeofenceOverride;
 using DTMS.Transport.Manual.Application.Queries.Admin;
@@ -44,7 +45,7 @@ public static class AdminManualOperatorEndpoints
         })
         .WithName("AdminListManualOperators")
         .WithSummary("List all Manual-mode operators (active, on-leave, deactivated).")
-        .RequireAuthorization(policy => policy.RequireRole("Admin", "Supervisor"));
+        .RequirePermission(Permissions.Operator.PoolRead);
 
         group.MapGet("/trips", async (ISender sender, CancellationToken ct) =>
         {
@@ -54,7 +55,8 @@ public static class AdminManualOperatorEndpoints
                 : Results.Problem(result.Error);
         })
         .WithName("AdminListManualTrips")
-        .WithSummary("List active Manual trips (not yet dropped).");
+        .WithSummary("List active Manual trips (not yet dropped).")
+        .RequirePermission(Permissions.Operator.PoolRead);
 
         group.MapGet("/geofence-overrides", async (ISender sender, CancellationToken ct) =>
         {
@@ -64,7 +66,8 @@ public static class AdminManualOperatorEndpoints
                 : Results.Problem(result.Error);
         })
         .WithName("AdminListPendingOverrides")
-        .WithSummary("List pending geofence-override requests awaiting approval.");
+        .WithSummary("List pending geofence-override requests awaiting approval.")
+        .RequirePermission(Permissions.Operator.GeofenceReview);
 
         group.MapPost("/geofence-overrides/{id:guid}/approve",
             async (Guid id, [FromBody] OverrideApproveRequest body, ISender sender,
@@ -80,7 +83,8 @@ public static class AdminManualOperatorEndpoints
             return Results.NoContent();
         })
         .WithName("AdminApproveGeofenceOverride")
-        .WithSummary("Approve a pending geofence-override request.");
+        .WithSummary("Approve a pending geofence-override request.")
+        .RequirePermission(Permissions.Operator.GeofenceReview);
 
         group.MapPost("/geofence-overrides/{id:guid}/deny",
             async (Guid id, [FromBody] OverrideDenyRequest body, ISender sender,
@@ -96,7 +100,8 @@ public static class AdminManualOperatorEndpoints
             return Results.NoContent();
         })
         .WithName("AdminDenyGeofenceOverride")
-        .WithSummary("Deny a pending geofence-override request.");
+        .WithSummary("Deny a pending geofence-override request.")
+        .RequirePermission(Permissions.Operator.GeofenceReview);
 
         // Admin reassign endpoint deleted per ADR-011 §"Consequences":
         // force-assigning a claimed pool trip elsewhere breaks the single-

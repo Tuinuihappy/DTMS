@@ -1,3 +1,4 @@
+using DTMS.Iam.Application.Authorization;
 using DTMS.Transport.Manual.Application.Queries.GetPoolSummary;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
@@ -34,6 +35,7 @@ public static class AdminPoolEndpoints
             return result.IsSuccess
                 ? Results.Ok(result.Value)
                 : Results.BadRequest(new { Error = result.Error });
-        });
+        })
+        .RequirePermission(Permissions.Operator.PoolRead);
     }
 }

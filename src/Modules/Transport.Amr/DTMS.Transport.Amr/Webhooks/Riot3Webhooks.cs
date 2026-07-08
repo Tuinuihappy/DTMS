@@ -66,13 +66,6 @@ public static class Riot3Webhooks
             await outbox.SaveChangesAsync(cancellationToken);
             return Results.Ok();
         }).AddEndpointFilter<Riot3WebhookAuthFilter>();
-
-        // RIOT3.0 action callback mid-task
-        group.MapPost("/action-callback", (Riot3ActionCallbackPayload payload, ILogger<Riot3ActionCallbackPayload> logger) =>
-        {
-            logger.LogInformation("RIOT3 action callback: taskId={TaskId} result={Result}", payload.TaskId, payload.Result);
-            return Results.Ok();
-        });
     }
 
     // ── task event handlers ──────────────────────────────────────────────────
@@ -490,11 +483,4 @@ public static class Riot3Webhooks
         "CHARGING" => "Charging",
         _ => "Offline"
     };
-}
-
-public class Riot3ActionCallbackPayload
-{
-    public string? TaskId { get; set; }
-    public string? Result { get; set; }
-    public string? ErrorCode { get; set; }
 }

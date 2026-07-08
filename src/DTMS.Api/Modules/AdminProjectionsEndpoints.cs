@@ -2,6 +2,7 @@ using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.DeliveryOrder.Infrastructure.Data;
 using DTMS.Dispatch.Infrastructure.Data;
 using DTMS.Fleet.Infrastructure.Data;
+using DTMS.Iam.Application.Authorization;
 using DTMS.Planning.Infrastructure.Data;
 using DTMS.SharedKernel.Projection;
 using Microsoft.AspNetCore.Builder;
@@ -75,7 +76,8 @@ public static class AdminProjectionsEndpoints
                 },
                 modules,
             });
-        });
+        })
+        .RequirePermission(Permissions.Iam.ProjectionManage);
 
         // POST /api/v1/admin/projections/{name}/replay — trigger replay
         // through IProjectionReplayService. Today this resolves the
@@ -111,7 +113,8 @@ public static class AdminProjectionsEndpoints
                     new { message = ex.Message },
                     statusCode: StatusCodes.Status501NotImplemented);
             }
-        });
+        })
+        .RequirePermission(Permissions.Iam.ProjectionManage);
 
         // Phase 3 — safety-net rebuild of the OrderListView projection.
         // Reads from the canonical sources (DeliveryOrders + Items +
@@ -135,7 +138,8 @@ public static class AdminProjectionsEndpoints
             });
         })
         .WithName("AdminRebuildOrderListView")
-        .WithSummary("Rebuild every OrderListView row from the DeliveryOrder aggregate + dispatch.Trips + planning.Jobs.");
+        .WithSummary("Rebuild every OrderListView row from the DeliveryOrder aggregate + dispatch.Trips + planning.Jobs.")
+        .RequirePermission(Permissions.Iam.ProjectionManage);
     }
 
     /// <summary>

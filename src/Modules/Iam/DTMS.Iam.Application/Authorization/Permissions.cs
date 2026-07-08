@@ -40,6 +40,7 @@ public static class Permissions
         public static readonly PermissionDefinition TripRetry = new("dtms:dispatch:trip:retry", "Retry a failed trip", "Dispatch");
         public static readonly PermissionDefinition TripException = new("dtms:dispatch:exception:raise", "Raise a trip exception", "Dispatch");
         public static readonly PermissionDefinition TripPod = new("dtms:dispatch:pod:upload", "Upload trip proof of delivery", "Dispatch");
+        public static readonly PermissionDefinition TripForce = new("dtms:dispatch:trip:force", "Force a trip through a lifecycle transition (admin override)", "Dispatch");
     }
 
     public static class DeliveryOrder
@@ -53,6 +54,7 @@ public static class Permissions
         public static readonly PermissionDefinition OrderReopen = new("dtms:deliveryorder:order:reopen", "Reopen a failed order (admin override)", "DeliveryOrder");
         public static readonly PermissionDefinition OrderAbandon = new("dtms:deliveryorder:order:abandon", "Abandon a stuck order (escape hatch)", "DeliveryOrder");
         public static readonly PermissionDefinition OrderRedispatch = new("dtms:deliveryorder:order:redispatch", "Redispatch an order whose dispatch failed", "DeliveryOrder");
+        public static readonly PermissionDefinition OrderReplan = new("dtms:deliveryorder:order:replan", "Replan a stuck order (admin override)", "DeliveryOrder");
         public static readonly PermissionDefinition OrderUpstream = new("dtms:deliveryorder:order:create-upstream", "Pipeline create-from-upstream (SAP/OMS)", "DeliveryOrder");
         public static readonly PermissionDefinition OrderBulk = new("dtms:deliveryorder:order:bulk-submit", "Bulk submit orders", "DeliveryOrder");
         public static readonly PermissionDefinition OrderNotifyOms = new("dtms:deliveryorder:order:notify-oms", "Resend an OMS notification", "DeliveryOrder");
@@ -115,6 +117,8 @@ public static class Permissions
         public static readonly PermissionDefinition SystemWrite = new("dtms:iam:system:write", "Manage system clients", "Iam");
         public static readonly PermissionDefinition SubscriptionRead = new("dtms:iam:subscription:read", "Read event subscriptions", "Iam");
         public static readonly PermissionDefinition SubscriptionWrite = new("dtms:iam:subscription:write", "Manage event subscriptions", "Iam");
+        public static readonly PermissionDefinition ProjectionManage = new("dtms:iam:projection:manage", "Inspect / replay / rebuild projections", "Iam");
+        public static readonly PermissionDefinition OutboxManage = new("dtms:iam:outbox:manage", "Inspect / replay / delete outbox DLQ messages", "Iam");
     }
 
     public static class Operator
@@ -127,6 +131,8 @@ public static class Permissions
         public static readonly PermissionDefinition GeofenceOverride = new("dtms:operator:geofence:override", "Request a geofence override", "TransportManual");
         public static readonly PermissionDefinition PushRegister = new("dtms:operator:push:register", "Register a push token", "TransportManual");
         public static readonly PermissionDefinition PodUpload = new("dtms:operator:pod:upload", "Upload proof of delivery", "TransportManual");
+        public static readonly PermissionDefinition PoolRead = new("dtms:operator:pool:read", "Read the operator pool + manual board (admin)", "TransportManual");
+        public static readonly PermissionDefinition GeofenceReview = new("dtms:operator:geofence:review", "Review (approve/deny) geofence override requests", "TransportManual");
     }
 
     public static class Reporting
