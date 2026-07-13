@@ -43,43 +43,12 @@ export type AuditLogPage = {
 
 // ── Permissions ──────────────────────────────────────────────────────────
 
+// The catalog is defined in code and served read-only — there is no
+// create/update/delete. Add or rename a permission via a code change + deploy.
 export async function listPermissions(signal?: AbortSignal): Promise<PermissionDto[]> {
   const res = await fetch("/api/admin/iam/permissions", { signal, cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to load permissions: ${res.status}`);
   return (await res.json()) as PermissionDto[];
-}
-
-export async function createPermission(body: {
-  code: string;
-  description: string;
-  module: string;
-}): Promise<PermissionDto> {
-  const res = await fetch("/api/admin/iam/permissions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(await readError(res));
-  return (await res.json()) as PermissionDto;
-}
-
-export async function updatePermission(
-  code: string,
-  body: { description: string; module: string },
-): Promise<void> {
-  const res = await fetch(`/api/admin/iam/permissions/${encodeURIComponent(code)}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(await readError(res));
-}
-
-export async function deletePermission(code: string): Promise<void> {
-  const res = await fetch(`/api/admin/iam/permissions/${encodeURIComponent(code)}`, {
-    method: "DELETE",
-  });
-  if (!res.ok) throw new Error(await readError(res));
 }
 
 // ── Roles ────────────────────────────────────────────────────────────────

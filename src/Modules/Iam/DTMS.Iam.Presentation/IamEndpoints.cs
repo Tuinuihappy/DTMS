@@ -51,70 +51,20 @@ public static class IamEndpoints
         // can read its own permission set; that's the point of the endpoint.
     }
 
-    // ── Permissions catalog ──────────────────────────────────────────────
+    // ── Permissions catalog (code-served, read-only) ──────────────────────
+    // The catalog IS the code — `Permissions.All` is the enforcement source
+    // of truth, so the admin UI reads it straight from there. This is
+    // reset-safe (no DB seed to keep in sync) and cannot drift from what the
+    // code actually checks. Permissions are added by shipping a new
+    // PermissionDefinition, never at runtime — hence no write endpoints.
     private static void MapPermissionEndpoints(RouteGroupBuilder group)
     {
-        group.MapGet("/permissions", async (IPermissionRepository repo, CancellationToken ct) =>
-        {
-            var items = await repo.ListAllAsync(ct);
-            return Results.Ok(items.Select(p => new PermissionDto(p.Code, p.Description, p.Module)));
-        }).RequirePermission(Permissions.Iam.PermissionRead);
-
-        group.MapPost("/permissions",
-            async (CreatePermissionRequest req, HttpContext ctx, IPermissionRepository repo,
-                   IAuditLogRepository audit, CancellationToken ct) =>
-            {
-                if (await repo.GetByCodeAsync(req.Code, ct) is not null)
-                    return Results.Conflict(new { error = $"Permission '{req.Code}' already exists." });
-                try
-                {
-                    var permission = new Permission(req.Code, req.Description ?? "", req.Module ?? "");
-                    await repo.AddAsync(permission, ct);
-                    await audit.AppendAsync(new PermissionAuditEntry(
-                        actorEmployeeId: ActorOrUnknown(ctx),
-                        action: "permission-created",
-                        permissionCode: req.Code,
-                        details: System.Text.Json.JsonSerializer.Serialize(req)), ct);
-                    return Results.Created($"/api/v1/iam/permissions/{req.Code}",
-                        new PermissionDto(permission.Code, permission.Description, permission.Module));
-                }
-                catch (ArgumentException ex)
-                {
-                    return Results.BadRequest(new { error = ex.Message });
-                }
-            }).RequirePermission(Permissions.Iam.PermissionWrite);
-
-        group.MapPut("/permissions/{code}",
-            async (string code, UpdatePermissionRequest req, HttpContext ctx,
-                   IPermissionRepository repo, IAuditLogRepository audit, CancellationToken ct) =>
-            {
-                var permission = await repo.GetByCodeAsync(code, ct);
-                if (permission is null) return Results.NotFound();
-
-                permission.UpdateMetadata(req.Description ?? "", req.Module ?? "");
-                await repo.UpdateAsync(permission, ct);
-                await audit.AppendAsync(new PermissionAuditEntry(
-                    actorEmployeeId: ActorOrUnknown(ctx),
-                    action: "permission-updated",
-                    permissionCode: code,
-                    details: System.Text.Json.JsonSerializer.Serialize(req)), ct);
-                return Results.NoContent();
-            }).RequirePermission(Permissions.Iam.PermissionWrite);
-
-        group.MapDelete("/permissions/{code}",
-            async (string code, HttpContext ctx, IPermissionRepository repo,
-                   IAuditLogRepository audit, CancellationToken ct) =>
-            {
-                var permission = await repo.GetByCodeAsync(code, ct);
-                if (permission is null) return Results.NotFound();
-
-                await repo.DeleteAsync(code, ct);
-                await audit.AppendAsync(new PermissionAuditEntry(
-                    actorEmployeeId: ActorOrUnknown(ctx),
-                    action: "permission-deleted",
-                    permissionCode: code), ct);
-                return Results.NoContent();
-            }).RequirePermission(Permissions.Iam.PermissionWrite);
+        group.MapGet("/permissions", () =>
+            Results.Ok(Permissions.All
+                .OrderBy(p => p.Module, StringComparer.Ordinal)
+                .ThenBy(p => p.Code, StringComparer.Ordinal)
+                .Select(p => new PermissionDto(p.Code, p.Description, p.Module))))
+            .RequirePermission(Permissions.Iam.PermissionRead);
     }
 
     // ── Roles + their permission mappings ────────────────────────────────
@@ -299,8 +249,6 @@ public static class IamEndpoints
 
 // ── DTOs ─────────────────────────────────────────────────────────────────
 public record PermissionDto(string Code, string Description, string Module);
-public record CreatePermissionRequest(string Code, string? Description, string? Module);
-public record UpdatePermissionRequest(string? Description, string? Module);
 
 public record RoleDto(string Name, string Description, bool IsSystem);
 public record CreateRoleRequest(string Name, string? Description);

@@ -6,9 +6,10 @@ namespace DTMS.ArchitectureTests;
 /// <summary>
 /// Guards the permission catalog (ADR-017). The catalog in
 /// <see cref="Permissions"/> is the single source of truth: every endpoint
-/// references a definition here (no raw literals), and every code must be
-/// seeded so it is grantable. These tests fail the build when any of those
-/// invariants regress.
+/// references a definition here (no raw literals), and the catalog is served
+/// to the admin UI straight from code (<c>Permissions.All</c>) — so it is
+/// reset-safe and cannot drift from a DB seed. These tests fail the build
+/// when any of those invariants regress.
 /// </summary>
 public class PermissionCatalogTests
 {
@@ -86,18 +87,12 @@ public class PermissionCatalogTests
             "raw RequirePermission(\"dtms:…\") literals found in: " + string.Join(", ", offenders));
     }
 
-    /// <summary>
-    /// Every catalog code must appear in an IAM seed migration, otherwise the
-    /// permission cannot be granted to any role and every endpoint using it
-    /// 403s silently. Forward direction only (catalog ⊆ seeded).
-    /// </summary>
-    [Fact]
-    public void EveryCatalogCode_IsSeeded()
-    {
-        var seeded = SeededCodes();
-        var missing = Permissions.All.Select(p => p.Code).Where(c => !seeded.Contains(c)).ToList();
-        Assert.True(missing.Count == 0, "catalog codes not seeded in any migration: " + string.Join(", ", missing));
-    }
+    // NOTE: the former EveryCatalogCode_IsSeeded test was removed with the
+    // move to a code-served catalog. Permissions are no longer seeded into
+    // iam.Permissions to be grantable — the API serves Permissions.All
+    // directly, and grants store raw codes with no FK to a catalog table.
+    // Requiring a seed row would block the intended workflow (add a
+    // PermissionDefinition in code, deploy, done — no migration).
 
     // ── helpers ──────────────────────────────────────────────────────────
 
@@ -106,21 +101,6 @@ public class PermissionCatalogTests
         var modules = Path.Combine(RepoRoot(), "src", "Modules");
         return Directory.EnumerateDirectories(modules, "*.Presentation", SearchOption.AllDirectories)
             .SelectMany(d => Directory.EnumerateFiles(d, "*.cs", SearchOption.AllDirectories));
-    }
-
-    private static HashSet<string> SeededCodes()
-    {
-        var migrations = Path.Combine(RepoRoot(),
-            "src", "Modules", "Iam", "DTMS.Iam.Infrastructure", "Migrations");
-        // Codes appear either as SQL string literals ('dtms:…', the seed
-        // migrations) or as C# tuple literals ("dtms:…", the rename migration
-        // that generates its SQL at runtime). Accept both quote styles.
-        var codeRx = new Regex(@"[""'](dtms:[a-z0-9:_-]+)[""']", RegexOptions.Compiled);
-        var set = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var file in Directory.EnumerateFiles(migrations, "*.cs"))
-            foreach (Match m in codeRx.Matches(File.ReadAllText(file)))
-                set.Add(m.Groups[1].Value);
-        return set;
     }
 
     private static string RepoRoot()
