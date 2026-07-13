@@ -6,6 +6,11 @@ holds a long-lived `client_secret`, exchanges it for a short-lived JWT
 (1 hour default) via `POST /oauth/token`, then sends the JWT as
 `Authorization: Bearer <token>` on inbound API calls.
 
+For partners that cannot run an OAuth client, an admin can also **issue a
+JWT directly** — bounded (up to 365 days) or perpetual — that the partner
+pastes in as a fixed `Bearer` token (§2.5). Both paths produce the same
+RS256 JWT validated the same way.
+
 This document covers:
 
 1. Production launch checklist (first-time setup)
@@ -24,11 +29,24 @@ This document covers:
 | 2 | Set `Jwt__SystemSigningPrivateKey` + `Jwt__SystemSigningPublicKey` in production secret store (Docker Compose `.env` or external vault) | DevOps | `docker compose config` shows env vars set (don't echo values) |
 | 3 | Deploy DTMS image + restart api container | DevOps | `docker compose ps` → api Healthy |
 | 4 | Smoke `/oauth/token` with dummy credentials (should return 401 invalid_client, NOT 500) | DevOps | `curl -X POST .../oauth/token -d '...' → 401` proves keypair loaded |
-| 5 | Onboard first partner (e.g. OMS) — see §2 | Admin | partner integration test passes |
-| 6 | Set monitoring on 401 rate of `/api/v1/source/*` + token endpoint | DevOps | dashboards live |
+| 5 | Confirm at least one External Auth user has the **`Admin`** role | Admin | that user can open **Admin → IAM** |
+| 6 | Onboard first partner (e.g. OMS) — see §2 | Admin | partner integration test passes |
+| 7 | Set monitoring on 401 rate of `/api/v1/source/*` + token endpoint | DevOps | dashboards live |
 
 If step 4 returns 500 → keypair PEM is malformed or env var not set.
 See [troubleshooting §5](#5-troubleshooting).
+
+> **A fresh database is empty by design.** Migrations seed **only** the
+> `Admin` role granted the `dtms:*` wildcard — nothing else. There are no
+> pre-created SystemClients, no partner credentials, and no permission
+> catalog; every system is onboarded by hand (§2). The first operator gets
+> in because **External Auth assigns them the `Admin` role**, which the
+> bootstrap maps to `dtms:*`; from there they can create systems, grant
+> permissions, and issue tokens. **If no External Auth user holds the
+> `Admin` role, nobody can configure anything** — line this up before
+> launch (step 5). Point this migration set only at a *fresh* database:
+> the seed-reset migration wipes the IAM tables, so running it against an
+> environment that already holds real partner data would delete it.
 
 ---
 
@@ -45,7 +63,9 @@ See [troubleshooting §5](#5-troubleshooting).
    hash; the plaintext is unrecoverable after the banner closes.
 6. Click **Test this credential** — the proxy handler runs the full
    OAuth flow (`POST /oauth/token` → use returned JWT to call
-   `/source/{key}/whoami`) and reports back whether auth works end-to-end.
+   `/api/v1/source/whoami`) and reports back whether auth works end-to-end.
+   (Identity comes from the JWT `sub` claim; the URL carries no `{key}`
+   segment.)
 7. Send the `client_secret` to the partner operator via a secure channel
    (1Password, Bitwarden, encrypted email — never plain Slack/email).
 
@@ -132,10 +152,11 @@ can mint a JWT directly with a custom lifetime.
 
 1. **Admin → IAM → Systems → click the system row**
 2. In the Credential card click **Issue JWT**
-3. Pick a lifetime (presets: 7 / 30 / 90 / 180 / 365 days; default 90)
+3. Pick a lifetime (presets: 7 / 30 / 90 / 180 / 365 days; default 90), or
+   tick **☑ Never expires** for a perpetual token (see the warning below)
 4. Click **Issue token** — banner shows the JWT plaintext (`eyJ...`)
 5. Click **Test this credential** — confirms the JWT authenticates
-   against `/source/whoami` directly (no OAuth round-trip)
+   against `/api/v1/source/whoami` directly (no OAuth round-trip)
 6. Send the JWT to the partner via a secure channel
 7. Partner uses it directly:
 
@@ -146,13 +167,33 @@ curl -X POST https://dtms.internal/api/v1/source/delivery-orders \
   -d '{...order payload...}'
 ```
 
+### ⚠️ Perpetual (never-expires) tokens (Phase S.8d)
+
+Ticking **Never expires** mints a JWT with **no `exp` claim** — it is
+accepted forever until you revoke it. Use it only for a partner that
+genuinely cannot re-fetch a token and must paste one fixed value into a
+config. Prefer a bounded lifetime (or the OAuth flow) whenever possible.
+
+- **Only kill switch is Revoke** (see below) — there is no natural expiry
+  to bound the blast radius if the token leaks. Treat it as a standing
+  credential: store it in a secret manager, restrict who can see it, and
+  revoke the instant you suspect exposure.
+- **Backed by a durable allowlist.** A perpetual token is valid only while
+  its row in `iam.SystemIssuedTokens` is `Active`. Revoke flips that row to
+  `Revoked` (durable) *and* writes the Redis blocklist (instant), so a
+  Redis flush cannot resurrect a revoked forever-token.
+- **Redis persistence matters.** The revoke entry for a perpetual token is
+  written with **no TTL**. Run Redis with AOF + a non-`allkeys` eviction
+  policy (the shipped compose uses `--appendonly yes` +
+  `--maxmemory-policy volatile-lru`) so the blocklist survives restarts and
+  is never evicted. The DB allowlist is the backstop either way.
+
 ### Trade-offs you accept
 
 | Risk | Mitigation |
 |---|---|
-| JWT leaked → usable for full lifetime (up to 365 days) | Pick the shortest lifetime your partner can cope with. Rotate the signing keypair (§4.3) for a wholesale revoke |
-| No per-token revocation | Deactivate the system (kills all its JWTs in ≤ 1 minute via cache invalidation) or rotate the signing keypair (revokes globally) |
-| Admin needs to re-issue + re-distribute manually before expiry | Calendar the expiry date; set a reminder a week ahead |
+| JWT leaked → usable until it expires (up to 365 days, or **forever** for a perpetual token) | Pick the shortest lifetime your partner can cope with. **Revoke** the specific token (per-jti, see below) — this is the only kill switch for a perpetual one. Deactivating the system kills all its tokens; rotating the signing keypair (§4.3) revokes globally |
+| Admin needs to re-issue + re-distribute before a bounded token expires | Calendar the expiry; the Issued-tokens list flags any token due within 7 days |
 
 ### What "admin-issued" means at the protocol level
 
@@ -183,8 +224,9 @@ Clicking **Revoke** does:
 
 1. DB row → `Status = Revoked`, `RevokedAt`, `RevokedBy` filled.
 2. Redis `iam:revoked-jti:{jti}` set with TTL = remaining lifetime.
-3. **Next request** with that token → validator sees the Redis entry →
-   returns 401 `"credential rejected"`.
+3. **Next request** with that token → validator sees the Redis entry (and,
+   for perpetual tokens, the `Revoked` DB row) → middleware returns
+   401 `"jwt invalid"`.
 4. Other tokens for the same system continue to work.
 
 **Fail-close semantics:** if Redis is unreachable during the validator's
@@ -293,15 +335,24 @@ docker compose exec api curl -s -X POST http://localhost:8080/oauth/token \
 3. Update `Jwt__SystemSigningPrivateKey` + `Jwt__SystemSigningPublicKey`
    to the new values
 4. Restart the api container
-5. Tokens minted by the old keypair will fail validation immediately
-   (no overlap window in V1) — partners will re-fetch via `/oauth/token`
-   on their next call, automatically getting new-keyed tokens
-6. Worst case impact: in-flight requests during the restart return 401
-   one time → partner retry succeeds. Typically zero user impact.
+5. Tokens minted by the old keypair fail validation immediately (no overlap
+   window) — OAuth partners re-fetch via `/oauth/token` on their next call
+   and automatically get new-keyed tokens.
+6. Worst case for OAuth partners: in-flight requests during the restart
+   return 401 once → retry succeeds. Typically zero user impact.
 
-A future enhancement (deferred) adds a `/.well-known/jwks.json` endpoint
-+ overlap window so old keys validate until they expire. For now the
-simple replace-and-restart works because token lifetime is only 1 hour.
+> ⚠️ **Admin-issued and perpetual tokens do NOT self-recover.** They are
+> pasted-in fixed strings with no `/oauth/token` refresh, so rotating the
+> keypair permanently breaks them. After a rotation you must **re-issue and
+> re-distribute** every admin-issued/perpetual token. Keep a list (the
+> Issued-tokens view per system) and coordinate before rotating.
+
+The public half is published at **`GET /.well-known/jwks.json`** (JWKS,
+RFC 7517) so a downstream gateway or partner can verify DTMS-issued tokens
+without holding the raw PEM. A multi-key **overlap window** (old keys stay
+valid until their tokens expire) is still deferred — for now rotation is a
+clean replace-and-restart, which is fine because OAuth token lifetime is
+only 1 hour (but see the admin-issued caveat above).
 
 ---
 
@@ -312,14 +363,16 @@ simple replace-and-restart works because token lifetime is only 1 hour.
 - Partner's `client_id` doesn't match a SystemClient → check `key` spelling
 - System is deactivated → reactivate before token requests will succeed
 
-### `401 credential rejected` from `/api/v1/source/*`
+### `401 jwt invalid` from `/api/v1/source/*`
 - Token expired → partner's cache is stale; force a re-fetch
 - Token signature invalid → DTMS keypair rotated since token was minted;
   partner needs to re-fetch (will use new key)
-- Token `sub` doesn't match URL `{key}` → partner is reusing a token across
-  multiple system keys, or their cache lookup has a bug. **Each system
-  has its own client_secret + token — never share tokens across systems.**
-- System deactivated → reactivate
+- Token was **revoked** (per-jti Revoke, or its system Deactivated/Deleted)
+  → issue a fresh one
+- Perpetual token rejected as `"token not active"` in logs → its
+  `SystemIssuedTokens` row is missing or `Revoked` → re-issue
+- Identity comes from the JWT `sub` (not the URL). Each system has its own
+  client_secret + token — never share tokens across systems
 
 ### `500 server_error` from `/oauth/token`
 - Credential row's `AuthConfig` JSON is malformed → fix via DB or rotate
@@ -346,6 +399,7 @@ simple replace-and-restart works because token lifetime is only 1 hour.
 ## Related code
 
 - [src/DTMS.Api/Auth/OauthTokenEndpoint.cs](../src/DTMS.Api/Auth/OauthTokenEndpoint.cs) — token endpoint
+- [src/DTMS.Api/Auth/JwksEndpoint.cs](../src/DTMS.Api/Auth/JwksEndpoint.cs) — `/.well-known/jwks.json` public-key publication
 - [src/DTMS.Api/Middlewares/SystemClientAuthMiddleware.cs](../src/DTMS.Api/Middlewares/SystemClientAuthMiddleware.cs) — inbound auth dispatch
 - [src/Modules/Iam/DTMS.Iam.Application/Authorization/SystemJwtIssuer.cs](../src/Modules/Iam/DTMS.Iam.Application/Authorization/SystemJwtIssuer.cs) — token minting
 - [src/Modules/Iam/DTMS.Iam.Application/Authorization/SystemJwtValidator.cs](../src/Modules/Iam/DTMS.Iam.Application/Authorization/SystemJwtValidator.cs) — token verification
