@@ -1,6 +1,10 @@
 using System.Security.Cryptography;
 using DTMS.Iam.Application.Authorization;
+using DTMS.Iam.Application.Repositories;
+using DTMS.Iam.Domain.Entities;
 using FluentAssertions;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -127,16 +131,7 @@ public class SystemJwtValidatorTests
         // Stub blocklist to say "yes, this jti is revoked".
         revocationList.IsRevokedAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(true));
-        var validator = new SystemJwtValidator(
-            Options.Create(new SystemJwtIssuerOptions
-            {
-                PublicKeyPem = publicPem,
-                Issuer = "dtms",
-                Audience = "dtms-api",
-                KeyId = "test-v1",
-            }),
-            revocationList,
-            NullLogger<SystemJwtValidator>.Instance);
+        var validator = NewValidator(publicPem, revocationList);
 
         var result = validator.Validate(token.AccessToken);
 
@@ -158,16 +153,7 @@ public class SystemJwtValidatorTests
 
         var issuer = BuildIssuer(privatePem);
         var token = issuer.Issue("oms");
-        var validator = new SystemJwtValidator(
-            Options.Create(new SystemJwtIssuerOptions
-            {
-                PublicKeyPem = publicPem,
-                Issuer = "dtms",
-                Audience = "dtms-api",
-                KeyId = "test-v1",
-            }),
-            revocationList,
-            NullLogger<SystemJwtValidator>.Instance);
+        var validator = NewValidator(publicPem, revocationList);
 
         var result = validator.Validate(token.AccessToken);
 
@@ -186,16 +172,7 @@ public class SystemJwtValidatorTests
         var token = foreignIssuer.Issue("oms");
 
         var revocationList = Substitute.For<ISystemJwtRevocationList>();
-        var validator = new SystemJwtValidator(
-            Options.Create(new SystemJwtIssuerOptions
-            {
-                PublicKeyPem = ourPub,
-                Issuer = "dtms",
-                Audience = "dtms-api",
-                KeyId = "test-v1",
-            }),
-            revocationList,
-            NullLogger<SystemJwtValidator>.Instance);
+        var validator = NewValidator(ourPub, revocationList);
 
         var result = validator.Validate(token.AccessToken);
 
@@ -218,21 +195,101 @@ public class SystemJwtValidatorTests
 
         var issuer = BuildIssuer(privatePem);
         var token = issuer.Issue("oms");
-        var validator = new SystemJwtValidator(
-            Options.Create(new SystemJwtIssuerOptions
-            {
-                PublicKeyPem = publicPem,
-                Issuer = "dtms",
-                Audience = "dtms-api",
-                KeyId = "test-v1",
-            }),
-            revocationList,
-            NullLogger<SystemJwtValidator>.Instance);
+        var validator = NewValidator(publicPem, revocationList);
 
         var result = validator.Validate(token.AccessToken);
 
         result.IsValid.Should().BeTrue();
         capturedJti.Should().Be(token.Jti);
+    }
+
+    // ── Phase S.8d — perpetual (no-exp) tokens ──────────────────────────
+
+    [Fact]
+    public void Validate_PerpetualToken_ActiveInDb_Succeeds()
+    {
+        // No-exp token passes ValidateLifetime (RequireExpirationTime=false)
+        // AND the durable DB allowlist says Active → accepted.
+        var (priv, pub) = GenerateRsaKeyPair();
+        var issuer = BuildIssuer(priv);
+        var token = issuer.Issue("oms", neverExpires: true);
+
+        var repo = Substitute.For<ISystemIssuedTokenRepository>();
+        repo.GetByJtiAsync(token.Jti, Arg.Any<CancellationToken>())
+            .Returns(PerpetualRow(token.Jti, revoked: false));
+        var validator = NewValidator(pub, NeverRevoked(), ScopeFactoryFor(repo));
+
+        var result = validator.Validate(token.AccessToken);
+
+        result.IsValid.Should().BeTrue(result.FailureReason);
+        result.SystemKey.Should().Be("oms");
+    }
+
+    [Fact]
+    public void Validate_PerpetualToken_RevokedInDb_Fails()
+    {
+        // Redis says not-revoked, but the durable DB row is Revoked — the
+        // allowlist is authoritative for perpetual tokens (survives a Redis
+        // flush that dropped the blocklist entry).
+        var (priv, pub) = GenerateRsaKeyPair();
+        var issuer = BuildIssuer(priv);
+        var token = issuer.Issue("oms", neverExpires: true);
+
+        var repo = Substitute.For<ISystemIssuedTokenRepository>();
+        repo.GetByJtiAsync(token.Jti, Arg.Any<CancellationToken>())
+            .Returns(PerpetualRow(token.Jti, revoked: true));
+        var validator = NewValidator(pub, NeverRevoked(), ScopeFactoryFor(repo));
+
+        var result = validator.Validate(token.AccessToken);
+
+        result.IsValid.Should().BeFalse();
+        result.FailureReason.Should().Be("token not active");
+    }
+
+    [Fact]
+    public void Validate_PerpetualToken_MissingFromDb_Fails()
+    {
+        // No DB row at all → the perpetual token was never (or no longer is)
+        // an admin-issued token → reject.
+        var (priv, pub) = GenerateRsaKeyPair();
+        var issuer = BuildIssuer(priv);
+        var token = issuer.Issue("oms", neverExpires: true);
+
+        var repo = Substitute.For<ISystemIssuedTokenRepository>();
+        repo.GetByJtiAsync(token.Jti, Arg.Any<CancellationToken>())
+            .Returns((SystemIssuedToken?)null);
+        var validator = NewValidator(pub, NeverRevoked(), ScopeFactoryFor(repo));
+
+        var result = validator.Validate(token.AccessToken);
+
+        result.IsValid.Should().BeFalse();
+        result.FailureReason.Should().Be("token not active");
+    }
+
+    [Fact]
+    public void Validate_ExpiringToken_SkipsDbAllowlist()
+    {
+        // A normal (exp-carrying) token must NOT pay the DB round-trip — only
+        // perpetual tokens consult the allowlist.
+        var (priv, pub) = GenerateRsaKeyPair();
+        var issuer = BuildIssuer(priv);
+        var token = issuer.Issue("oms"); // has exp
+
+        var repo = Substitute.For<ISystemIssuedTokenRepository>();
+        var validator = NewValidator(pub, NeverRevoked(), ScopeFactoryFor(repo));
+
+        var result = validator.Validate(token.AccessToken);
+
+        result.IsValid.Should().BeTrue(result.FailureReason);
+        repo.DidNotReceive().GetByJtiAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    private static ISystemJwtRevocationList NeverRevoked()
+    {
+        var list = Substitute.For<ISystemJwtRevocationList>();
+        list.IsRevokedAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(false));
+        return list;
     }
 
     // ── helpers ─────────────────────────────────────────────────────────
@@ -278,7 +335,55 @@ public class SystemJwtValidatorTests
         var revocationList = Substitute.For<ISystemJwtRevocationList>();
         revocationList.IsRevokedAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(false));
-        return new SystemJwtValidator(opts, revocationList, NullLogger<SystemJwtValidator>.Instance);
+        return new SystemJwtValidator(opts, revocationList,
+            Substitute.For<IServiceScopeFactory>(),
+            new MemoryCache(new MemoryCacheOptions()),
+            NullLogger<SystemJwtValidator>.Instance);
+    }
+
+    // Phase S.8d — validator ctor also takes an IServiceScopeFactory (for the
+    // perpetual-token DB allowlist) + IMemoryCache. Non-perpetual tests never
+    // reach the DB path (tokens carry exp), so a bare scope factory is fine.
+    private static SystemJwtValidator NewValidator(
+        string publicPem,
+        ISystemJwtRevocationList revocationList,
+        IServiceScopeFactory? scopeFactory = null)
+    {
+        var opts = Options.Create(new SystemJwtIssuerOptions
+        {
+            PublicKeyPem = publicPem,
+            Issuer = "dtms",
+            Audience = "dtms-api",
+            KeyId = "test-v1",
+        });
+        return new SystemJwtValidator(
+            opts, revocationList,
+            scopeFactory ?? Substitute.For<IServiceScopeFactory>(),
+            new MemoryCache(new MemoryCacheOptions()),
+            NullLogger<SystemJwtValidator>.Instance);
+    }
+
+    // Wires a scope factory whose scope resolves ISystemIssuedTokenRepository
+    // to the given stub — mirrors how the singleton validator opens a scope
+    // per perpetual-token check.
+    private static IServiceScopeFactory ScopeFactoryFor(ISystemIssuedTokenRepository repo)
+    {
+        var provider = Substitute.For<IServiceProvider>();
+        provider.GetService(typeof(ISystemIssuedTokenRepository)).Returns(repo);
+        var scope = Substitute.For<IServiceScope>();
+        scope.ServiceProvider.Returns(provider);
+        var factory = Substitute.For<IServiceScopeFactory>();
+        factory.CreateScope().Returns(scope);
+        return factory;
+    }
+
+    private static SystemIssuedToken PerpetualRow(string jti, bool revoked)
+    {
+        // ExpiresAt = null → perpetual, matching the issuer's no-exp token.
+        var row = new SystemIssuedToken(
+            Guid.NewGuid(), "oms", jti, DateTime.UtcNow, expiresAt: null, "tester");
+        if (revoked) row.Revoke("tester", "test");
+        return row;
     }
 
     private static (string PrivatePem, string PublicPem) GenerateRsaKeyPair()

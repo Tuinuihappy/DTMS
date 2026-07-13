@@ -42,6 +42,26 @@ public class SystemJwtIssuerTests
     }
 
     [Fact]
+    public void Issue_NeverExpires_OmitsExpClaim_AndReportsNullExpiry()
+    {
+        // Phase S.8d — a perpetual token carries no exp claim (and no
+        // expires_in / absolute expiry to report). Everything else — sub,
+        // jti, iss, aud, iat, nbf — is stamped as normal.
+        var (privatePem, publicPem) = GenerateRsaKeyPair();
+        using var issuer = BuildIssuer(privatePem);
+
+        var token = issuer.Issue("oms", neverExpires: true);
+
+        token.ExpiresAt.Should().BeNull();
+        token.ExpiresInSeconds.Should().BeNull();
+
+        var jwt = new JsonWebToken(token.AccessToken);
+        jwt.Claims.Should().NotContain(c => c.Type == "exp");
+        jwt.Subject.Should().Be("system:oms");
+        jwt.Claims.Should().Contain(c => c.Type == "jti");
+    }
+
+    [Fact]
     public void Issue_WithDifferentSigningKey_FailsValidation()
     {
         var (privatePem, _) = GenerateRsaKeyPair();
