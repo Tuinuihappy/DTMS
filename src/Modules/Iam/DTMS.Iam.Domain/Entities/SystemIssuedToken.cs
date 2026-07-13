@@ -28,7 +28,12 @@ public sealed class SystemIssuedToken
     public string Jti { get; private set; } = string.Empty;
 
     public DateTime IssuedAt { get; private set; }
-    public DateTime ExpiresAt { get; private set; }
+
+    /// <summary>Absolute expiry of the minted JWT, or <c>null</c> for a
+    /// perpetual (never-expires) token that carries no <c>exp</c> claim
+    /// (Phase S.8d). A null here is exactly what makes the DB row the sole
+    /// durable kill switch — see <see cref="SystemJwtValidator"/>.</summary>
+    public DateTime? ExpiresAt { get; private set; }
 
     /// <summary>Employee id (or "unknown") of the admin who clicked Issue.
     /// Read from ctx.User.Sub at the endpoint — no separate write path.</summary>
@@ -46,7 +51,7 @@ public sealed class SystemIssuedToken
         string systemKey,
         string jti,
         DateTime issuedAt,
-        DateTime expiresAt,
+        DateTime? expiresAt,
         string issuedBy)
     {
         if (id == Guid.Empty) throw new ArgumentException("Id required.", nameof(id));
@@ -54,7 +59,9 @@ public sealed class SystemIssuedToken
             throw new ArgumentException("SystemKey required.", nameof(systemKey));
         if (string.IsNullOrWhiteSpace(jti))
             throw new ArgumentException("Jti required.", nameof(jti));
-        if (expiresAt <= issuedAt)
+        // Null expiresAt = perpetual token (no exp claim). Only validate the
+        // ordering when an expiry was actually supplied.
+        if (expiresAt is DateTime exp && exp <= issuedAt)
             throw new ArgumentException("ExpiresAt must be after IssuedAt.", nameof(expiresAt));
         if (string.IsNullOrWhiteSpace(issuedBy))
             throw new ArgumentException("IssuedBy required.", nameof(issuedBy));

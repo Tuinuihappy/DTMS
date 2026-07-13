@@ -220,12 +220,15 @@ export async function rotateScheme(
 // OAuth client). Hands back a JWT the partner sends as Authorization:
 // Bearer <jwt> directly — no /oauth/token round-trip on their side. Default
 // lifetime is 90 days; bounded at the endpoint to [60s, 365d].
-export type IssueTokenRequest = { lifetimeSeconds?: number };
+// Phase S.8d — neverExpires mints a perpetual token (no exp claim). Set
+// EITHER lifetimeSeconds OR neverExpires, never both (backend 400s on both).
+export type IssueTokenRequest = { lifetimeSeconds?: number; neverExpires?: boolean };
 export type IssueTokenResponse = {
   accessToken: string;
   tokenType: string;
-  expiresInSeconds: number;
-  expiresAt: string;
+  // Null for a perpetual token — no exp, so no expires_in / absolute expiry.
+  expiresInSeconds: number | null;
+  expiresAt: string | null;
 };
 
 export async function issueToken(
@@ -249,7 +252,8 @@ export async function issueToken(
 export type IssuedTokenSummary = {
   jti: string;
   issuedAt: string;
-  expiresAt: string;
+  // Null for a perpetual token (Phase S.8d) — rendered as "Never".
+  expiresAt: string | null;
   issuedBy: string;
   status: "Active" | "Revoked";
   revokedAt: string | null;

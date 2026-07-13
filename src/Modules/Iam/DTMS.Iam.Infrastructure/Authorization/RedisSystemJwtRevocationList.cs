@@ -30,20 +30,32 @@ public sealed class RedisSystemJwtRevocationList : ISystemJwtRevocationList
         _log = log;
     }
 
-    public async Task RevokeAsync(string jti, DateTime expiresAt, CancellationToken ct = default)
+    public async Task RevokeAsync(string jti, DateTime? expiresAt, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(jti))
             throw new ArgumentException("jti required.", nameof(jti));
+
+        var db = _redis.GetDatabase();
+
+        // Phase S.8d — perpetual token (no exp): write with NO TTL so the
+        // blocklist entry never self-drops. The DB row is the durable
+        // record; this Redis key is the hot-path fast reject.
+        if (expiresAt is not DateTime exp)
+        {
+            await db.StringSetAsync(KeyPrefix + jti, Sentinel);
+            _log.LogInformation(
+                "Perpetual system JWT jti={Jti} added to revocation list (no TTL)", jti);
+            return;
+        }
 
         // TTL = remaining lifetime. Clamp to a minimum so a token that
         // expires in the next second doesn't get a negative/zero TTL
         // (Redis rejects those). A 1-minute floor is fine — the token
         // itself will exp inside that window and validator checks exp.
-        var ttl = expiresAt - DateTime.UtcNow;
+        var ttl = exp - DateTime.UtcNow;
         if (ttl < TimeSpan.FromMinutes(1))
             ttl = TimeSpan.FromMinutes(1);
 
-        var db = _redis.GetDatabase();
         await db.StringSetAsync(KeyPrefix + jti, Sentinel, ttl);
 
         _log.LogInformation(

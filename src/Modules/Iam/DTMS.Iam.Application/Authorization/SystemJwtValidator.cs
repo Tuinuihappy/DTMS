@@ -1,4 +1,8 @@
 using System.Security.Cryptography;
+using DTMS.Iam.Application.Repositories;
+using DTMS.Iam.Domain.Entities;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -34,14 +38,20 @@ public sealed class SystemJwtValidator : ISystemJwtValidator, IDisposable
     private readonly TokenValidationParameters _tvp;
     private readonly JsonWebTokenHandler _handler = new();
     private readonly ISystemJwtRevocationList _revocationList;
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IMemoryCache _cache;
     private readonly ILogger<SystemJwtValidator> _log;
 
     public SystemJwtValidator(
         IOptions<SystemJwtIssuerOptions> opts,
         ISystemJwtRevocationList revocationList,
+        IServiceScopeFactory scopeFactory,
+        IMemoryCache cache,
         ILogger<SystemJwtValidator> log)
     {
         _revocationList = revocationList;
+        _scopeFactory = scopeFactory;
+        _cache = cache;
         _log = log;
         var o = opts.Value;
         if (string.IsNullOrWhiteSpace(o.PublicKeyPem))
@@ -86,6 +96,13 @@ public sealed class SystemJwtValidator : ISystemJwtValidator, IDisposable
             ValidateAudience = true,
             ValidAudience = o.Audience,
             ValidateLifetime = true,
+            // Phase S.8d — perpetual admin tokens carry no exp claim. Keep
+            // ValidateLifetime on (so any token that DOES have exp still
+            // expires) but stop *requiring* exp, else a no-exp token is
+            // rejected with SecurityTokenNoExpirationException. Perpetual
+            // tokens are additionally gated by the DB allowlist below, so
+            // relaxing this here does not weaken revocability.
+            RequireExpirationTime = false,
             ValidateIssuerSigningKey = true,
             IssuerSigningKeyResolver = (_, _, _, _) => new[] { signingKey },
             ClockSkew = TimeSpan.FromSeconds(30),
@@ -120,6 +137,18 @@ public sealed class SystemJwtValidator : ISystemJwtValidator, IDisposable
         if (string.IsNullOrWhiteSpace(systemKey))
             return new SystemJwtValidationResult(false, null, "sub has empty system key");
 
+        // Phase S.8d — a token with no exp claim is a perpetual admin token.
+        // Its ONLY kill switch is revocation, so it MUST carry a jti we can
+        // key on; refuse one that doesn't (should never happen — the issuer
+        // always stamps jti — but a missing jti here would be an
+        // unrevokable forever-token, the worst possible failure mode).
+        var isPerpetual = !result.Claims.ContainsKey("exp");
+        result.Claims.TryGetValue("jti", out var jtiObj);
+        var jti = jtiObj as string;
+
+        if (isPerpetual && string.IsNullOrEmpty(jti))
+            return new SystemJwtValidationResult(false, null, "perpetual token missing jti");
+
         // Phase S.8c — revocation list check (fail-close on Redis outage).
         // Any exception from Redis is treated as "reject the request" —
         // the alternative (fail-open) would let a revoked token slip
@@ -127,7 +156,7 @@ public sealed class SystemJwtValidator : ISystemJwtValidator, IDisposable
         // GetAwaiter().GetResult() is used because the caller is a sync
         // middleware branch; Redis KeyExistsAsync is a single round-trip
         // (~1-2ms typical) so blocking is acceptable.
-        if (result.Claims.TryGetValue("jti", out var jtiObj) && jtiObj is string jti)
+        if (!string.IsNullOrEmpty(jti))
         {
             try
             {
@@ -146,12 +175,47 @@ public sealed class SystemJwtValidator : ISystemJwtValidator, IDisposable
                     jti);
                 return new SystemJwtValidationResult(false, null, "revocation check unavailable");
             }
+
+            // Phase S.8d — perpetual tokens get a second, DURABLE gate: the
+            // iam.SystemIssuedTokens row must still exist and be Active. Redis
+            // above gives instant revoke, but a Redis flush/rebuild would
+            // resurrect a revoked token — the DB is the source of truth that
+            // survives that. Expiring tokens skip this (Redis + natural exp
+            // already bound their blast radius) so the common OAuth path pays
+            // no DB cost.
+            if (isPerpetual && !IsPerpetualTokenActive(jti))
+            {
+                _log.LogWarning(
+                    "Perpetual system JWT rejected: jti={Jti} not Active in DB allowlist.",
+                    jti);
+                return new SystemJwtValidationResult(false, null, "token not active");
+            }
         }
-        // No jti on the token = OAuth-issued short-lived (they still have
-        // jti — this branch is defensive for future non-jti tokens).
 
         return new SystemJwtValidationResult(true, systemKey, null);
     }
+
+    /// <summary>
+    /// Phase S.8d — durable allowlist check for a perpetual token's jti.
+    /// True only when a SystemIssuedTokens row exists AND is Active.
+    ///
+    /// <para>Cached 60s to keep a flood of perpetual-token requests off the
+    /// DB. Because the Redis blocklist (checked first) already delivers
+    /// instant revoke, this short TTL only delays the durable backstop — the
+    /// single scenario it leaves briefly open (a token revoked in the DB
+    /// while Redis simultaneously loses its blocklist entry) closes within
+    /// the minute. Resolved through a fresh scope because the validator is a
+    /// singleton and the repository/DbContext are scoped.</para>
+    /// </summary>
+    private bool IsPerpetualTokenActive(string jti)
+        => _cache.GetOrCreate($"iam:perp-jti:{jti}", entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(60);
+            using var scope = _scopeFactory.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<ISystemIssuedTokenRepository>();
+            var row = repo.GetByJtiAsync(jti).GetAwaiter().GetResult();
+            return row is not null && row.Status == SystemIssuedTokenStatus.Active;
+        });
 
     public void Dispose() => _rsa.Dispose();
 }

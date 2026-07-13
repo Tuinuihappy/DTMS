@@ -136,7 +136,8 @@ public class IamDbContext : DbContext
             b.Property(t => t.SystemKey).HasMaxLength(50).IsRequired();
             b.Property(t => t.Jti).HasMaxLength(64).IsRequired();
             b.Property(t => t.IssuedAt).IsRequired();
-            b.Property(t => t.ExpiresAt).IsRequired();
+            // Nullable: perpetual tokens (Phase S.8d) carry no exp.
+            b.Property(t => t.ExpiresAt);
             b.Property(t => t.IssuedBy).HasMaxLength(50).IsRequired();
             b.Property(t => t.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.Property(t => t.RevokedBy).HasMaxLength(50);

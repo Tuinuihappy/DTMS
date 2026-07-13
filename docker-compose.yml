@@ -154,7 +154,27 @@ services:
       - "6379:6379"
     mem_limit: 128m
     logging: *default-logging
-    command: ["redis-server", "--maxmemory", "96mb", "--maxmemory-policy", "allkeys-lru"]
+    # Persistence (Phase S.8d): AOF (appendfsync everysec ≈ ≤1s data loss)
+    # keeps the JWT revocation blocklist across restarts — critical for
+    # perpetual tokens, whose revoke entries carry NO TTL. Paired with the
+    # redis-data volume below so the AOF survives container recreation.
+    #
+    # Eviction changed allkeys-lru → volatile-lru: under the 96mb ceiling
+    # only keys that carry a TTL (credential cache, expiring-token revokes)
+    # may be evicted. The perpetual revoke keys are written WITHOUT a TTL, so
+    # volatile-lru can never evict them — allkeys-lru could, silently
+    # resurrecting a revoked forever-token. (The DB allowlist is the durable
+    # backstop regardless; this keeps Redis from disagreeing with it.)
+    command:
+      - "redis-server"
+      - "--maxmemory"
+      - "96mb"
+      - "--maxmemory-policy"
+      - "volatile-lru"
+      - "--appendonly"
+      - "yes"
+    volumes:
+      - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -405,6 +425,10 @@ services:
       - UpstreamOms__BaseUrl=${UpstreamOms__BaseUrl:-http://10.204.37.65:5002/}
       - UpstreamOms__BearerToken=${UpstreamOms__BearerToken:-}
       - UpstreamOms__TimeoutSeconds=${UpstreamOms__TimeoutSeconds:-10}
+      # Phase S.5 (B2) — federated shipment.started/arrived fan-out. When true
+      # the new pipeline owns OMS started/arrived callbacks (keep UpstreamOms
+      # legacy off to avoid double-send). Dark (false) by default.
+      - Callbacks__ShipmentEventsEnabled=${Callbacks__ShipmentEventsEnabled:-false}
       - Dispatch__UseOrderTemplateDispatch=${Dispatch__UseOrderTemplateDispatch:-false}
       # T1.4 — Planning workflow watchdog. Polls every 60s for orders stuck
       # at Status=Planned with no Trip (the OD-0374 / OD-0375 incident shape)
@@ -547,6 +571,14 @@ services:
       - Outbox__PerMessageTimeoutSeconds=${Outbox__PerMessageTimeoutSeconds:-10}
       # The reason this container exists — outbox always runs here.
       - Outbox__RunInThisProcess=true
+      # P4 — the worker also runs the OMS-notify consumers, so it must honor
+      # the same .env kill-switch as the api. Without this line the worker
+      # binds UpstreamOms:Enabled from appsettings (=true) and would still
+      # 404 the real OMS for test/WIP orders with fabricated lot numbers.
+      - UpstreamOms__Enabled=${UpstreamOms__Enabled:-true}
+      # Phase S.5 (B2) — worker runs the shipment fan-out consumers too; honor
+      # the same .env flag as the api.
+      - Callbacks__ShipmentEventsEnabled=${Callbacks__ShipmentEventsEnabled:-false}
       # Phase O2 — LISTEN/NOTIFY. Cuts publish latency from ~1s (poll)
       # to ~50ms by waking the processor the instant Postgres delivers
       # a NOTIFY. Poll interval (=1s here) remains as safety net.
@@ -650,3 +682,4 @@ volumes:
   rabbitmqdata:
   prometheus-data:
   grafana-data:
+  redis-data:

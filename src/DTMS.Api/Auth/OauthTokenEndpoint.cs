@@ -183,7 +183,9 @@ public static class OauthTokenEndpoint
         return Results.Ok(new TokenResponse(
             AccessToken: token.AccessToken,
             TokenType: "Bearer",
-            ExpiresIn: token.ExpiresInSeconds));
+            // OAuth path never mints a perpetual token, so ExpiresInSeconds is
+            // always populated here; ?? 0 only satisfies the nullable type.
+            ExpiresIn: token.ExpiresInSeconds ?? 0));
     }
 
     private static IResult TokenError(int status, string error, string description)

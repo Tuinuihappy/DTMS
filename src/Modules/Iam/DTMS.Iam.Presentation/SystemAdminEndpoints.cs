@@ -474,23 +474,44 @@ public static class SystemAdminEndpoints
                         error = $"System '{key}' is not configured for bearer-jwt. Switch scheme via PUT /credential/scheme first.",
                     });
 
+                // Phase S.8d — perpetual token escape hatch. NeverExpires
+                // skips the lifetime bounds entirely and mints a JWT with no
+                // exp claim. Deliberately gated to this admin endpoint (not
+                // the OAuth grant) and backed by the DB allowlist so revoke
+                // still works — see SystemJwtValidator. LifetimeSeconds is
+                // ignored when NeverExpires is set; reject the combination so
+                // the caller doesn't think a lifetime was honoured.
+                if (req.NeverExpires && req.LifetimeSeconds is not null)
+                    return Results.BadRequest(new
+                    {
+                        error = "Set either NeverExpires or LifetimeSeconds, not both.",
+                    });
+
                 // 90 days default — long enough that partners with a quarterly
                 // change-window can cope, short enough that a forgotten-in-
                 // pastebin token stops working before the next audit.
                 var lifetime = req.LifetimeSeconds ?? 7_776_000;
-                if (lifetime < 60)
-                    return Results.BadRequest(new { error = "LifetimeSeconds must be at least 60." });
-                // Hard cap at 365 days — anything longer is essentially a
-                // forever-token, at which point use a different mechanism
-                // (e.g. mTLS) rather than pretending it's a JWT.
-                if (lifetime > 31_536_000)
-                    return Results.BadRequest(new { error = "LifetimeSeconds must be at most 31,536,000 (365 days)." });
+                if (!req.NeverExpires)
+                {
+                    if (lifetime < 60)
+                        return Results.BadRequest(new { error = "LifetimeSeconds must be at least 60." });
+                    // Hard cap at 365 days — a longer-but-finite token should
+                    // still not masquerade as forever; use NeverExpires
+                    // explicitly (and accept the durable-revoke trade-off) if
+                    // that is genuinely what's wanted.
+                    if (lifetime > 31_536_000)
+                        return Results.BadRequest(new { error = "LifetimeSeconds must be at most 31,536,000 (365 days)." });
+                }
 
-                var token = issuer.Issue(key, lifetimeSecondsOverride: lifetime);
+                var token = req.NeverExpires
+                    ? issuer.Issue(key, neverExpires: true)
+                    : issuer.Issue(key, lifetimeSecondsOverride: lifetime);
 
                 // Phase S.8c — persist for the admin list + revoke UI.
                 // Only stores metadata (jti, exp, issuer identity) — never
-                // the JWT body itself.
+                // the JWT body itself. Phase S.8d: for a perpetual token this
+                // row (ExpiresAt=null) is also the durable revocation source
+                // of truth the validator consults, not just an audit record.
                 await issuedTokens.AddAsync(new SystemIssuedToken(
                     id: Guid.NewGuid(),
                     systemKey: key,
@@ -507,7 +528,8 @@ public static class SystemAdminEndpoints
                     {
                         systemKey = key,
                         jti = token.Jti,
-                        lifetimeSeconds = lifetime,
+                        neverExpires = req.NeverExpires,
+                        lifetimeSeconds = req.NeverExpires ? (int?)null : lifetime,
                         expiresAt = token.ExpiresAt,
                     })), ct);
 
@@ -858,14 +880,20 @@ public sealed record IssueTokenRequest(
     // Optional override. Default is 90 days when omitted. Bounded by
     // [60s, 365d] at the endpoint — outside that range the request
     // returns 400. The endpoint never silently clamps; admin sees what
-    // they get.
-    int? LifetimeSeconds = null);
+    // they get. Ignored (and rejected if also set) when NeverExpires=true.
+    int? LifetimeSeconds = null,
+    // Phase S.8d — mint a perpetual token with no exp claim. The token can
+    // only ever be stopped via revoke (DB allowlist + Redis blocklist), so
+    // treat handing one out as a standing credential, not a session token.
+    bool NeverExpires = false);
 
 public sealed record IssueTokenResponse(
     string AccessToken,
     string TokenType,
-    int ExpiresInSeconds,
-    DateTime ExpiresAt,
+    // Null for a perpetual token — it carries no exp, so there is no
+    // expires_in / absolute expiry to report.
+    int? ExpiresInSeconds,
+    DateTime? ExpiresAt,
     // Phase S.8c — surfaced so the admin UI can persist the mapping to
     // the row it lists, and callers with scripting workflows can revoke
     // without a separate lookup.
@@ -876,7 +904,8 @@ public sealed record RevokeTokenRequest(string? Reason = null);
 public sealed record IssuedTokenSummary(
     string Jti,
     DateTime IssuedAt,
-    DateTime ExpiresAt,
+    // Null for a perpetual token (Phase S.8d) — UI renders "Never".
+    DateTime? ExpiresAt,
     string IssuedBy,
     string Status,
     DateTime? RevokedAt,

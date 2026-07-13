@@ -14,8 +14,12 @@ public interface ISystemJwtIssuer
     /// becomes the <c>sub</c> claim as <c>system:{key}</c>.</param>
     /// <param name="lifetimeSecondsOverride">Per-credential override (read
     /// from AuthConfig.tokenLifetimeSeconds). Falls back to options default
-    /// when null.</param>
-    IssuedSystemToken Issue(string systemKey, int? lifetimeSecondsOverride = null);
+    /// when null. Ignored when <paramref name="neverExpires"/> is true.</param>
+    /// <param name="neverExpires">Phase S.8d — mint a perpetual token with
+    /// NO <c>exp</c> claim. Admin-issue path only; the caller MUST persist a
+    /// SystemIssuedTokens row because the durable DB allowlist is the sole
+    /// kill switch for a token that never naturally expires.</param>
+    IssuedSystemToken Issue(string systemKey, int? lifetimeSecondsOverride = null, bool neverExpires = false);
 }
 
 /// <summary>
@@ -28,6 +32,8 @@ public interface ISystemJwtIssuer
 /// </summary>
 public sealed record IssuedSystemToken(
     string AccessToken,
-    int ExpiresInSeconds,
-    DateTime ExpiresAt,
+    // Null for a perpetual (never-expires) token — it carries no exp claim,
+    // so there is no expires_in to report per RFC 6749 §5.1.
+    int? ExpiresInSeconds,
+    DateTime? ExpiresAt,
     string Jti);

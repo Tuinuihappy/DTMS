@@ -20,8 +20,11 @@ public interface ISystemJwtRevocationList
     /// <summary>Add a jti to the blocklist. TTL is set to the token's
     /// remaining lifetime — after natural expiry the key drops on its
     /// own (Redis EXPIRE), and the audit row in the DB carries the
-    /// long-term history.</summary>
-    Task RevokeAsync(string jti, DateTime expiresAt, CancellationToken ct = default);
+    /// long-term history. Pass <c>null</c> for a perpetual token (Phase
+    /// S.8d): the key is written with NO expiry so the blocklist entry
+    /// never drops on its own — the durable DB allowlist is the source of
+    /// truth if Redis is later flushed.</summary>
+    Task RevokeAsync(string jti, DateTime? expiresAt, CancellationToken ct = default);
 
     /// <summary>Check if a jti is on the blocklist. Throws
     /// <see cref="System.Net.WebException"/> or Redis-specific

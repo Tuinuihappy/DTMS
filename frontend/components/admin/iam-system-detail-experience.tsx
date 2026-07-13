@@ -32,6 +32,7 @@ import {
   type CallbackConfigRequest,
   type CredentialSummary,
   type IssuedTokenSummary,
+  type IssueTokenRequest,
   type SystemDetailDto,
 } from "@/lib/api/iam-systems";
 import { listPermissions, type PermissionDto } from "@/lib/api/iam";
@@ -66,8 +67,9 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
   // exchange via /oauth/token).
   const [issuedToken, setIssuedToken] = useState<{
     accessToken: string;
-    expiresAt: string;
-    expiresInSeconds: number;
+    // Null for a perpetual token (Phase S.8d).
+    expiresAt: string | null;
+    expiresInSeconds: number | null;
   } | null>(null);
   const [issuingToken, setIssuingToken] = useState(false);
   const [showIssueModal, setShowIssueModal] = useState(false);
@@ -204,11 +206,11 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
     }
   };
 
-  const onIssueToken = async (lifetimeSeconds: number) => {
+  const onIssueToken = async (body: IssueTokenRequest) => {
     setIssuingToken(true);
     setError(null);
     try {
-      const r = await issueToken(systemKey, { lifetimeSeconds });
+      const r = await issueToken(systemKey, body);
       setIssuedToken({
         accessToken: r.accessToken,
         expiresAt: r.expiresAt,
@@ -363,12 +365,14 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
           testKeyForSystem={data.key}
           testMode="jwt"
           helpText={
-            `Expires ${new Date(issuedToken.expiresAt).toLocaleString()} ` +
-            `(in ${Math.round(issuedToken.expiresInSeconds / 86400)} days). ` +
+            (issuedToken.expiresAt === null
+              ? `Never expires (perpetual token). `
+              : `Expires ${new Date(issuedToken.expiresAt).toLocaleString()} ` +
+                `(in ${Math.round((issuedToken.expiresInSeconds ?? 0) / 86400)} days). `) +
             `Send to the partner via a secure channel — they use it directly as ` +
             `"Authorization: Bearer <token>" with no /oauth/token round-trip needed. ` +
-            `Revocation requires deactivating the system or rotating the signing keypair ` +
-            `until per-jti revocation lands.`
+            `Revoke it any time from the Issued tokens list below (revoke takes ` +
+            `effect immediately).`
           }
           onDismiss={() => setIssuedToken(null)}
         />
@@ -476,6 +480,8 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
               const soonMs = 7 * 86400 * 1000;
               const expiringSoon = issuedTokens.filter(t => {
                 if (t.status === "Revoked") return false;
+                // Perpetual tokens (null expiry) never expire → never "soon".
+                if (t.expiresAt === null) return false;
                 const exp = new Date(t.expiresAt).getTime();
                 return exp > now && exp - now <= soonMs;
               });
@@ -505,9 +511,13 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
               </thead>
               <tbody>
                 {issuedTokens.map((t) => {
-                  const expMs = new Date(t.expiresAt).getTime();
+                  // Perpetual token (Phase S.8d) — no expiry, so none of the
+                  // "expired / expiring soon" logic applies; it reads Active
+                  // until revoked.
+                  const isPerpetual = t.expiresAt === null;
+                  const expMs = isPerpetual ? Infinity : new Date(t.expiresAt as string).getTime();
                   const nowMs = Date.now();
-                  const isExpired = expMs < nowMs;
+                  const isExpired = !isPerpetual && expMs < nowMs;
                   const isRevoked = t.status === "Revoked";
                   // "expiring soon" flags — only meaningful for Active rows.
                   // 7 days → red, 7-30 days → yellow, > 30 days → no highlight.
@@ -541,11 +551,17 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
                           ? "text-amber-700 dark:text-amber-300"
                           : "text-[var(--color-ink-500)]",
                       )}>
-                        {new Date(t.expiresAt).toLocaleString()}
-                        {(expiryCritical || expiryWarn) && (
-                          <span className="ml-1.5 text-[10.5px]">
-                            ({daysToExpiry === 1 ? "1 day" : `${daysToExpiry} days`} left)
-                          </span>
+                        {isPerpetual ? (
+                          <span className="font-medium text-[var(--color-ink-700)] dark:text-[var(--color-ink-300)]">Never</span>
+                        ) : (
+                          <>
+                            {new Date(t.expiresAt as string).toLocaleString()}
+                            {(expiryCritical || expiryWarn) && (
+                              <span className="ml-1.5 text-[10.5px]">
+                                ({daysToExpiry === 1 ? "1 day" : `${daysToExpiry} days`} left)
+                              </span>
+                            )}
+                          </>
                         )}
                       </td>
                       <td className="px-3 py-2 text-[var(--color-ink-500)]">{t.issuedBy}</td>
@@ -946,16 +962,20 @@ function IssueTokenModal({
   systemKey: string;
   submitting: boolean;
   onCancel: () => void;
-  onIssue: (lifetimeSeconds: number) => void;
+  onIssue: (body: IssueTokenRequest) => void;
 }) {
   // 90 days default — balances "partner doesn't have to come back too often"
   // against "stops working before it's truly forgotten." Operator can pick
   // shorter for higher-stakes integrations.
   const [days, setDays] = useState(90);
+  // Phase S.8d — perpetual token. When on, the days input is irrelevant and
+  // the request carries neverExpires instead of lifetimeSeconds.
+  const [neverExpires, setNeverExpires] = useState(false);
   const lifetimeSeconds = days * 86400;
   // Mirror endpoint validation so the operator sees the cap before they hit
-  // submit — bad UX to bounce off the backend with a 400.
-  const valid = days >= 1 && days <= 365;
+  // submit — bad UX to bounce off the backend with a 400. Perpetual mode has
+  // no bound to validate.
+  const valid = neverExpires || (days >= 1 && days <= 365);
 
   return (
     <ModalShell title={`Issue JWT for "${systemKey}"`} onClose={onCancel}>
@@ -967,7 +987,7 @@ function IssueTokenModal({
       </p>
       <div className="mt-4 space-y-3">
         <Field label="Lifetime (days)">
-          <div className="flex flex-wrap gap-1.5">
+          <div className={cn("flex flex-wrap gap-1.5", neverExpires && "opacity-40 pointer-events-none")}>
             {[7, 30, 90, 180, 365].map((d) => (
               <button
                 key={d}
@@ -984,24 +1004,48 @@ function IssueTokenModal({
               </button>
             ))}
           </div>
-          <div className="mt-2 flex items-center gap-2">
+          <div className={cn("mt-2 flex items-center gap-2", neverExpires && "opacity-40 pointer-events-none")}>
             <input
               type="number"
               min={1}
               max={365}
               value={days}
+              disabled={neverExpires}
               onChange={(e) => setDays(Number(e.target.value) || 0)}
               className="w-20 rounded border border-[var(--color-ink-200)] bg-white px-2 py-1 text-[13px]"
             />
             <span className="text-[11px] text-[var(--color-ink-500)]">days (1-365)</span>
           </div>
         </Field>
-        <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
-          ⚠ Token will be valid for <strong>{days} days</strong>. If leaked,
-          it's accepted until that date (no per-token revocation in V1).
-          Deactivating the system or rotating the signing keypair is the
-          only kill switch.
-        </div>
+        {/* Phase S.8d — perpetual token toggle. */}
+        <label className="flex items-start gap-2 rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 text-[12px] text-[var(--color-ink-700)]">
+          <input
+            type="checkbox"
+            checked={neverExpires}
+            onChange={(e) => setNeverExpires(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-medium">Never expires</span>{" "}
+            <span className="text-[var(--color-ink-500)]">
+              — mint a perpetual token with no expiry. Use only for partners
+              that cannot re-fetch a token. Revoke is the sole kill switch.
+            </span>
+          </span>
+        </label>
+        {neverExpires ? (
+          <div className="rounded border border-rose-300 bg-rose-50 px-3 py-2 text-[11px] text-rose-800 dark:border-rose-500/40 dark:bg-rose-950/40 dark:text-rose-200">
+            ⚠ Token <strong>never expires</strong>. If leaked, it is accepted
+            forever until you revoke it from the Issued tokens list. Prefer a
+            bounded lifetime unless the partner genuinely cannot refresh.
+          </div>
+        ) : (
+          <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+            ⚠ Token will be valid for <strong>{days} days</strong>. If leaked,
+            it's accepted until that date. Revoke it any time from the Issued
+            tokens list (revoke takes effect immediately).
+          </div>
+        )}
       </div>
       <div className="mt-5 flex items-center justify-end gap-2">
         <button
@@ -1014,7 +1058,7 @@ function IssueTokenModal({
         <button
           type="button"
           disabled={!valid || submitting}
-          onClick={() => onIssue(lifetimeSeconds)}
+          onClick={() => onIssue(neverExpires ? { neverExpires: true } : { lifetimeSeconds })}
           className="rounded bg-sky-600 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? "Issuing…" : "Issue token"}

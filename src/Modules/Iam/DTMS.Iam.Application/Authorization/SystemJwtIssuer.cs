@@ -33,7 +33,13 @@ public sealed class SystemJwtIssuer : ISystemJwtIssuer, IDisposable
     private readonly SystemJwtIssuerOptions _opts;
     private readonly RSA _rsa;
     private readonly SigningCredentials _signingCredentials;
-    private readonly JsonWebTokenHandler _handler = new();
+    // SetDefaultTimesOnTokenCreation=false: without it, JsonWebTokenHandler
+    // auto-stamps exp = now + 60min whenever the descriptor leaves Expires
+    // null — which would silently defeat the never-expires path. The normal
+    // path sets iat/nbf/exp explicitly, so disabling the defaults changes
+    // nothing there; only the perpetual branch (Expires left null) relies on
+    // this to emit a token with no exp claim.
+    private readonly JsonWebTokenHandler _handler = new() { SetDefaultTimesOnTokenCreation = false };
 
     public SystemJwtIssuer(IOptions<SystemJwtIssuerOptions> opts)
     {
@@ -60,19 +66,49 @@ public sealed class SystemJwtIssuer : ISystemJwtIssuer, IDisposable
         _signingCredentials = new SigningCredentials(key, SecurityAlgorithms.RsaSha256);
     }
 
-    public IssuedSystemToken Issue(string systemKey, int? lifetimeSecondsOverride = null)
+    public IssuedSystemToken Issue(
+        string systemKey,
+        int? lifetimeSecondsOverride = null,
+        bool neverExpires = false)
     {
         if (string.IsNullOrWhiteSpace(systemKey))
             throw new ArgumentException("systemKey required.", nameof(systemKey));
+
+        var now = DateTime.UtcNow;
+        var jti = Guid.NewGuid().ToString("N");
+
+        // Phase S.8d — perpetual token: NO exp claim. Everything else
+        // (iss/aud/sub/jti/iat/nbf) is identical so the validator, middleware
+        // and permission lookup treat it the same; it just never trips the
+        // lifetime check. Kept in a separate branch rather than a null-exp
+        // ternary so the "no expiry" decision is unmissable at a glance.
+        if (neverExpires)
+        {
+            var perpetualDescriptor = new SecurityTokenDescriptor
+            {
+                Issuer = _opts.Issuer,
+                Audience = _opts.Audience,
+                Subject = new ClaimsIdentity(
+                [
+                    new Claim(JwtRegisteredClaimNames.Sub, $"system:{systemKey}"),
+                    new Claim(JwtRegisteredClaimNames.Jti, jti),
+                ]),
+                IssuedAt = now,
+                NotBefore = now,
+                // Expires deliberately left null → emitted with no exp claim
+                // (relies on SetDefaultTimesOnTokenCreation=false above).
+                SigningCredentials = _signingCredentials,
+            };
+            var perpetualToken = _handler.CreateToken(perpetualDescriptor);
+            return new IssuedSystemToken(perpetualToken, null, null, jti);
+        }
 
         var lifetime = lifetimeSecondsOverride ?? _opts.DefaultLifetimeSeconds;
         if (lifetime <= 0)
             throw new ArgumentOutOfRangeException(nameof(lifetimeSecondsOverride),
                 "Token lifetime must be positive.");
 
-        var now = DateTime.UtcNow;
         var exp = now.AddSeconds(lifetime);
-        var jti = Guid.NewGuid().ToString("N");
 
         var descriptor = new SecurityTokenDescriptor
         {
