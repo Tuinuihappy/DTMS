@@ -76,8 +76,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     /// </summary>
     public static DeliveryOrder Create(string orderRef, Priority priority,
         ServiceWindow? serviceWindow,
-        string sourceSystemKey = WellKnownSourceSystems.Manual,
-        string sourceSystemDisplayName = "Manual",
+        string sourceSystemKey = WellKnownSourceSystems.Internal,
+        string sourceSystemDisplayName = WellKnownSourceSystems.InternalDisplayName,
         string? createdBy = null, string? requestedBy = null, string? notes = null,
         TransportMode? requestedTransportMode = Enums.TransportMode.Amr)
     {
@@ -104,7 +104,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
 
     /// <summary>
     /// Create an already-Submitted order from an upstream system. Rejects
-    /// the 'manual' key because that slug identifies the UI path — which
+    /// the 'internal' key because that slug identifies the UI path — which
     /// must go through Draft + Submit separately.
     /// </summary>
     public static DeliveryOrder CreateFromUpstream(string orderRef, Priority priority,
@@ -114,8 +114,8 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         TransportMode? requestedTransportMode = Enums.TransportMode.Amr,
         bool selfManaged = false)
     {
-        if (string.Equals(sourceSystemKey, WellKnownSourceSystems.Manual, StringComparison.Ordinal))
-            throw new InvalidOperationException("Upstream orders cannot use the 'manual' source key.");
+        if (string.Equals(sourceSystemKey, WellKnownSourceSystems.Internal, StringComparison.Ordinal))
+            throw new InvalidOperationException("Upstream orders cannot use the 'internal' source key.");
 
         // Self-managed is only supported for Manual transport — the auto
         // ack + pickup path replaces the operator-pool execution, not AMR's

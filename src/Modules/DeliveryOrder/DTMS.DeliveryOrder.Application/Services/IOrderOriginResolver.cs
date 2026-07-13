@@ -17,8 +17,9 @@ public sealed record OrderOrigin(string Key, string DisplayName);
 /// — clients (UI + external) cannot send <c>sourceSystem</c> and cannot
 /// spoof origin. Two entry points reflect the two provenance flows:
 /// <list type="bullet">
-///   <item><see cref="GetManualAsync"/> — UI / operator flow, always
-///   resolves to the <c>manual</c> SystemClient row.</item>
+///   <item><see cref="GetInternalAsync"/> — UI / operator flow, a fixed
+///   <c>internal</c> origin (no SystemClients row — the operator is on
+///   the order's CreatedBy).</item>
 ///   <item><see cref="GetByKeyAsync"/> — external-system flow, resolves
 ///   the URL <c>{key}</c> segment (already authenticated + validated
 ///   by the middleware). Returns <c>null</c> if the client vanished
@@ -29,11 +30,10 @@ public sealed record OrderOrigin(string Key, string DisplayName);
 public interface IOrderOriginResolver
 {
     /// <summary>
-    /// UI / operator flow. Throws when the <c>manual</c> seed is
-    /// missing from <c>iam.SystemClients</c> (deployment misconfig —
-    /// migrations didn't run).
+    /// UI / operator flow. Returns the fixed <c>internal</c> origin — it is
+    /// not an external system and has no <c>iam.SystemClients</c> row.
     /// </summary>
-    Task<OrderOrigin> GetManualAsync(CancellationToken ct = default);
+    Task<OrderOrigin> GetInternalAsync(CancellationToken ct = default);
 
     /// <summary>
     /// External-system flow. <paramref name="key"/> is the URL segment

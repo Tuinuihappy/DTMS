@@ -45,7 +45,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
 
         // Phase P4 — one origin resolve for the whole batch (cheap:
         // cached / claim-first) + one JWT read for RequestedBy.
-        var origin = await _originResolver.GetManualAsync(cancellationToken);
+        var origin = await _originResolver.GetInternalAsync(cancellationToken);
         var actor = _currentUser.GetCurrentUserName();
 
         // validate and build orders first (sequential — shares DbContext safely)

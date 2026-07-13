@@ -36,16 +36,16 @@ public sealed class OrderOriginResolver : IOrderOriginResolver
         _httpContextAccessor = httpContextAccessor;
     }
 
-    public async Task<OrderOrigin> GetManualAsync(CancellationToken ct = default)
-    {
-        var origin = await GetByKeyAsync(WellKnownSourceSystems.Manual, ct);
-        if (origin is null)
-            throw new InvalidOperationException(
-                $"SystemClient row for '{WellKnownSourceSystems.Manual}' is missing. " +
-                "Run migration 20260630020000_SeedManualSapErpSystemClients — the UI order path " +
-                "cannot stamp origin without it.");
-        return origin;
-    }
+    public Task<OrderOrigin> GetInternalAsync(CancellationToken ct = default)
+        // 'internal' is not an external system — it never authenticates and has
+        // no iam.SystemClients row. It is the fixed origin stamped on UI /
+        // operator-created orders (the operator is on the order's CreatedBy),
+        // so resolve it as a constant. This keeps the internal order path free
+        // of any dependency on the external-system registry, which a
+        // fresh/production DB leaves empty by design.
+        => Task.FromResult(new OrderOrigin(
+            WellKnownSourceSystems.Internal,
+            WellKnownSourceSystems.InternalDisplayName));
 
     public async Task<OrderOrigin?> GetByKeyAsync(string key, CancellationToken ct = default)
     {

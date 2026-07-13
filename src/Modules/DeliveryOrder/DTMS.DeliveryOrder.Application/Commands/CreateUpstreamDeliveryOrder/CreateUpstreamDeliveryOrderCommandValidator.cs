@@ -16,8 +16,8 @@ public class CreateUpstreamDeliveryOrderCommandValidator : AbstractValidator<Cre
         RuleFor(x => x.SourceSystemKey)
             .NotEmpty()
             .MaximumLength(50)
-            .NotEqual(WellKnownSourceSystems.Manual)
-            .WithMessage("Upstream orders cannot use the 'manual' source key.");
+            .NotEqual(WellKnownSourceSystems.Internal)
+            .WithMessage("Upstream orders cannot use the 'internal' source key.");
         RuleFor(x => x.ServiceWindow).NotNull()
             .WithMessage("Upstream orders must include a ServiceWindow.");
         RuleFor(x => x.ServiceWindow)

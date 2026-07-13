@@ -38,7 +38,7 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
         // SystemClient row (throws if the P1 seed is missing).
         // RequestedBy is set from the JWT name — the UI wire no longer
         // carries either field.
-        var origin = await _originResolver.GetManualAsync(cancellationToken);
+        var origin = await _originResolver.GetInternalAsync(cancellationToken);
         var actor = _currentUser.GetCurrentUserName();
 
         var order = Domain.Entities.DeliveryOrder.Create(
