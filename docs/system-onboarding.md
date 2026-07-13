@@ -11,6 +11,12 @@ JWT directly** — bounded (up to 365 days) or perpetual — that the partner
 pastes in as a fixed `Bearer` token (§2.5). Both paths produce the same
 RS256 JWT validated the same way.
 
+**System principals are confined to the data-plane.** A system JWT is
+accepted **only** on `/api/v1/source/*`; used anywhere else it is rejected
+with **403** regardless of what permissions the system was granted. The
+control-plane (admin / operator UIs) is for human — i.e. External Auth
+user — principals only.
+
 This document covers:
 
 1. Production launch checklist (first-time setup)
@@ -373,6 +379,13 @@ only 1 hour (but see the admin-issued caveat above).
   `SystemIssuedTokens` row is missing or `Revoked` → re-issue
 - Identity comes from the JWT `sub` (not the URL). Each system has its own
   client_secret + token — never share tokens across systems
+
+### `403 System principals are confined to /api/v1/source/*`
+- A system JWT was presented on a control-plane path (anything outside
+  `/api/v1/source/*`). This is intentional — systems can only reach the
+  source data-plane, no matter what permissions they hold. Use the endpoint
+  under `/api/v1/source/*`, or (for admin work) a human/External-Auth user
+  token instead of a system token.
 
 ### `500 server_error` from `/oauth/token`
 - Credential row's `AuthConfig` JSON is malformed → fix via DB or rotate
