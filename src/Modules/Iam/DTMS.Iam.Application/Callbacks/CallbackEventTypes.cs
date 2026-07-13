@@ -28,10 +28,20 @@ public static class CallbackEventTypes
     /// <summary>Order was cancelled before completion.</summary>
     public const string OrderCancelledV1 = "order.cancelled.v1";
 
+    /// <summary>Shipment started — trip Created → InProgress (Phase S.5, was the
+    /// legacy OMS <c>POST /api/shipments</c>).</summary>
+    public const string ShipmentStartedV1 = "shipment.started.v1";
+
+    /// <summary>Shipment arrived at the drop station (Phase S.5, was the legacy
+    /// OMS <c>POST /api/shipments/{id}/arrived</c>).</summary>
+    public const string ShipmentArrivedV1 = "shipment.arrived.v1";
+
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
         OrderDeliveredV1,
         OrderCancelledV1,
+        ShipmentStartedV1,
+        ShipmentArrivedV1,
     };
 
     public static bool IsKnown(string eventType) => All.Contains(eventType);

@@ -6,6 +6,7 @@ import {
   RefreshCw,
   Route,
   Search,
+  UserRound,
   X,
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -671,6 +672,23 @@ function TripsTable({
                     title={t.claimedByOperatorName}
                   >
                     {t.claimedByOperatorName}
+                  </span>
+                ) : t.requestedBy && t.transportMode !== "Amr" ? (
+                  // Manual / self-managed trips that never went through the
+                  // operator pool carry no vehicle and no claiming operator —
+                  // fall back to the order requester, tagged with a person
+                  // icon so it reads as "requester", not driver/vehicle.
+                  // Gated off AMR: a robot-mode trip with no vehicle recorded
+                  // shows "—", never the requester.
+                  <span
+                    className="flex items-center gap-1 truncate text-[11.5px] font-semibold text-[var(--color-ink-900)] dark:text-white"
+                    title={`Requested by ${t.requestedBy}`}
+                  >
+                    <UserRound
+                      className="h-3 w-3 shrink-0 text-[var(--color-ink-400)]"
+                      strokeWidth={2.2}
+                    />
+                    <span className="truncate">{t.requestedBy}</span>
                   </span>
                 ) : (
                   <span className="text-[var(--color-ink-300)]">—</span>

@@ -7,6 +7,7 @@ import {
   Clock,
   Hash,
   Layers,
+  UserRound,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -280,21 +281,49 @@ export function TripDetailDrawer({
                       label="Priority"
                       value={data.priorityAtDispatch?.toString() ?? "—"}
                     />
-                    <MetaCell
-                      icon={<Bot className="h-3 w-3" strokeWidth={2.2} />}
-                      label="Vehicle / Operator"
-                      // AMR trips → robot (vendorVehicle*); Manual pool trips
-                      // carry no vehicle, so fall back to the claiming
-                      // operator's name. "— not assigned" only when neither.
-                      value={
-                        data.vendorVehicleName ??
-                        data.vendorVehicleKey ??
-                        data.claimedByOperatorName ??
-                        "— not assigned"
-                      }
-                      mono={!data.vendorVehicleName && !!data.vendorVehicleKey}
-                      hint={data.vendorVehicleName && data.vendorVehicleKey ? data.vendorVehicleKey : undefined}
-                    />
+                    {(() => {
+                      // AMR trips → robot (vendorVehicle*); Manual pool trips →
+                      // claiming operator; manual / self-managed trips that
+                      // skipped the pool → order requester (person icon).
+                      // Requester is gated off AMR: a robot-mode trip with no
+                      // vehicle recorded shows "— not assigned", not a person.
+                      const requester =
+                        data.requestedBy && data.transportMode !== "Amr"
+                          ? data.requestedBy
+                          : null;
+                      const showsRequester =
+                        !data.vendorVehicleName &&
+                        !data.vendorVehicleKey &&
+                        !data.claimedByOperatorName &&
+                        !!requester;
+                      return (
+                        <MetaCell
+                          icon={
+                            showsRequester ? (
+                              <UserRound className="h-3 w-3" strokeWidth={2.2} />
+                            ) : (
+                              <Bot className="h-3 w-3" strokeWidth={2.2} />
+                            )
+                          }
+                          label="Vehicle / Operator"
+                          value={
+                            data.vendorVehicleName ??
+                            data.vendorVehicleKey ??
+                            data.claimedByOperatorName ??
+                            requester ??
+                            "— not assigned"
+                          }
+                          mono={!data.vendorVehicleName && !!data.vendorVehicleKey}
+                          hint={
+                            data.vendorVehicleName && data.vendorVehicleKey
+                              ? data.vendorVehicleKey
+                              : showsRequester
+                                ? "Requester"
+                                : undefined
+                          }
+                        />
+                      );
+                    })()}
                     <MetaCell
                       icon={<Box className="h-3 w-3" strokeWidth={2.2} />}
                       label="Upper key"

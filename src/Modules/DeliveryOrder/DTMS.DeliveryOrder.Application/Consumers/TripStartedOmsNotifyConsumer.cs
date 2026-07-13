@@ -7,6 +7,7 @@ using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Dispatch.IntegrationEvents;
 using DTMS.OmsAdapter.Abstractions;
+using DTMS.OmsAdapter.Abstractions.Exceptions;
 using DTMS.OmsAdapter.Abstractions.Models;
 using DTMS.OmsAdapter.Infrastructure.Options;
 // Phase S.6 follow-up — outbound URL+token resolved at call time via
@@ -191,13 +192,16 @@ public class TripStartedOmsNotifyConsumer :
         {
             // Throw instead of sending an empty/placeholder name — Option A
             // semantics: the OMS POST overwrites deliveryBy, so a blank
-            // would clobber a previous-attempt's real vehicle. Name + Key
-            // arrive together on RIOT3 TASK_PROCESSING and are captured
-            // first-write-wins, so a missing Name here means the racing
-            // MarkVendorStarted save hasn't committed yet — retry will
-            // re-read once it has.
-            throw new InvalidOperationException(
-                $"Trip {tripId} has no VendorVehicleName yet — race with TASK_PROCESSING save (Name + Key arrive together from RIOT3). Will retry.");
+            // would clobber a previous-attempt's real vehicle. Name + Key are
+            // captured atomically with MarkVendorStarted, so a miss here is a
+            // sub-second save race — the in-process retry ladder (~65s) re-reads
+            // once it commits. VendorVehicleUnavailableException is excluded from
+            // the minutes-scale DELAYED redelivery ladder (see
+            // ModuleServiceRegistration), so the pathological "robot never
+            // reported" case dead-letters in ~1min instead of ~21min — no more
+            // trip-started faults timestamped long after the trip completed.
+            throw new VendorVehicleUnavailableException(
+                $"Trip {tripId} has no VendorVehicleName yet — race with MarkVendorStarted save (Name + Key arrive together from RIOT3). Will retry (fast-capped).");
         }
         // DeliveryBy semantics per flow:
         //   • AMR   → the vendor vehicle name (robot) reported by RIOT3.

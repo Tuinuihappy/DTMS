@@ -252,6 +252,13 @@ public class DispatchDbContext : DbContext
             // table doesn't have the columns.
             builder.Ignore(e => e.PartitionKey);
             builder.Ignore(e => e.CorrelationId);
+            // Phase S.5 — callback route + order/trip linkage columns are
+            // mapped only on the central OutboxDbContext; this module's
+            // table doesn't have them.
+            builder.Ignore(e => e.CallbackPath);
+            builder.Ignore(e => e.CallbackMethod);
+            builder.Ignore(e => e.RelatedOrderId);
+            builder.Ignore(e => e.RelatedTripId);
             // Phase O4 — W3C traceparent captured at write time.
             builder.Property(e => e.TraceParent).HasMaxLength(55);
         });

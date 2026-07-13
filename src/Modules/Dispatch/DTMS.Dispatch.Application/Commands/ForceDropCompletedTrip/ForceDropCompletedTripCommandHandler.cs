@@ -32,7 +32,17 @@ public class ForceDropCompletedTripCommandHandler : ICommandHandler<ForceDropCom
                 $"Cannot force-drop a trip in {trip.Status} status. " +
                 "Only InProgress trips can be force-drop-completed.");
 
-        var alreadyDropped = trip.Events.Any(e => e.EventType == "VendorDropCompleted");
+        // Fire-once: the vendor (or a prior force) already recorded the drop, so
+        // MarkVendorDropCompleted would be a no-op. Short-circuit before the
+        // pointless save (and the extra RIOT3 POD lookup) and tell the operator
+        // the state already holds.
+        if (trip.VendorDroppedAt is not null)
+        {
+            _logger.LogInformation(
+                "[AdminForceDrop] Trip {TripId} already dropped at {At} (upperKey {UpperKey}) — force is a no-op.",
+                trip.Id, trip.VendorDroppedAt, trip.UpperKey ?? "(none)");
+            return Result.Success();
+        }
 
         // RequiresDropPod determines whether items land at Delivered (no POD)
         // or DroppedOff (POD pending) — same lookup the vendor webhook does
@@ -43,9 +53,9 @@ public class ForceDropCompletedTripCommandHandler : ICommandHandler<ForceDropCom
         trip.MarkVendorDropCompleted(requiresDropPod);
         await _tripRepository.UpdateAsync(trip, cancellationToken);
         _logger.LogWarning(
-            "[AdminForceDrop] Trip {TripId} force-drop-completed by {Actor} (upperKey {UpperKey}, requiresDropPod={Pod}, alreadyDropped={Already}): {Reason}",
+            "[AdminForceDrop] Trip {TripId} force-drop-completed by {Actor} (upperKey {UpperKey}, requiresDropPod={Pod}): {Reason}",
             trip.Id, request.TriggeredBy ?? "(unknown)", trip.UpperKey ?? "(none)",
-            requiresDropPod?.ToString() ?? "(null)", alreadyDropped, request.Reason);
+            requiresDropPod?.ToString() ?? "(null)", request.Reason);
         return Result.Success();
     }
 }

@@ -40,6 +40,29 @@ public class OutboxMessage
     /// </summary>
     public string? TraceParent { get; private set; }
 
+    /// <summary>
+    /// Phase S.5 (B2) — outbound route override for source callbacks. When set,
+    /// the <c>HttpSourceCallbackDispatcher</c> POSTs to
+    /// <c>{CallbackBaseUrl}{CallbackPath}</c> instead of the default
+    /// <c>/events</c>; NULL = default. The fan-out producer copies these from
+    /// the formatter's <c>CallbackPayload</c> (already resolved, no templating).
+    /// </summary>
+    public string? CallbackPath { get; private set; }
+
+    /// <summary>HTTP verb for the callback (e.g. "POST"). NULL = POST.</summary>
+    public string? CallbackMethod { get; private set; }
+
+    /// <summary>
+    /// Phase S.5 — the DeliveryOrder / Trip this callback row relates to, so a
+    /// dispatch-outcome consumer can write the per-order OMS-notification audit
+    /// (the order-detail UI reads it). NULL for callbacks with no order/trip
+    /// context. Carried on the row because the outbox row is the only thing the
+    /// dispatcher sees at HTTP time.
+    /// </summary>
+    public Guid? RelatedOrderId { get; private set; }
+
+    public Guid? RelatedTripId { get; private set; }
+
     public bool HasReachedMaxRetries => RetryCount >= OutboxRetryPolicy.MaxRetries;
 
     private OutboxMessage() { } // For EF Core
@@ -51,7 +74,11 @@ public class OutboxMessage
         DateTime occurredOnUtc,
         string? partitionKey = null,
         Guid? correlationId = null,
-        string? traceParent = null)
+        string? traceParent = null,
+        string? callbackPath = null,
+        string? callbackMethod = null,
+        Guid? relatedOrderId = null,
+        Guid? relatedTripId = null)
     {
         Id = id;
         Type = type;
@@ -60,6 +87,10 @@ public class OutboxMessage
         PartitionKey = partitionKey;
         CorrelationId = correlationId;
         TraceParent = traceParent;
+        CallbackPath = callbackPath;
+        CallbackMethod = callbackMethod;
+        RelatedOrderId = relatedOrderId;
+        RelatedTripId = relatedTripId;
     }
 
     public void MarkAsProcessed(DateTime processedOnUtc)

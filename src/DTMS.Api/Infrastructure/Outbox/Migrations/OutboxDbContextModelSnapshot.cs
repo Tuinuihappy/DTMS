@@ -29,6 +29,14 @@ namespace DTMS.Api.Infrastructure.Outbox.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CallbackMethod")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CallbackPath")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("Content")
                         .IsRequired()
                         .HasColumnType("text");
@@ -51,6 +59,12 @@ namespace DTMS.Api.Infrastructure.Outbox.Migrations
 
                     b.Property<DateTime?>("ProcessedOnUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RelatedOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RelatedTripId")
+                        .HasColumnType("uuid");
 
                     b.Property<int>("RetryCount")
                         .ValueGeneratedOnAdd()

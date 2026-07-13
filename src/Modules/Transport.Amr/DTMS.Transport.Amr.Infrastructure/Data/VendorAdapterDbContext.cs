@@ -42,6 +42,13 @@ public class VendorAdapterDbContext : DbContext
             // doesn't SELECT them.
             b.Ignore(e => e.PartitionKey);
             b.Ignore(e => e.CorrelationId);
+            // Phase S.5 — callback route + order/trip linkage columns are
+            // mapped only on the central OutboxDbContext; this module's
+            // table doesn't have them.
+            b.Ignore(e => e.CallbackPath);
+            b.Ignore(e => e.CallbackMethod);
+            b.Ignore(e => e.RelatedOrderId);
+            b.Ignore(e => e.RelatedTripId);
             // Phase O4 — W3C traceparent captured at write time.
             b.Property(e => e.TraceParent).HasMaxLength(55);
         });

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -67,8 +68,18 @@ public sealed class HttpSourceCallbackDispatcher : ISourceCallbackDispatcher
                 $"SystemCredential for '{systemKey}' has no CallbackBaseUrl. " +
                 "Admin must populate it before subscriptions can fire.");
 
-        var url = new Uri(cred.CallbackBaseUrl.TrimEnd('/') + "/events", UriKind.Absolute);
-        using var req = new HttpRequestMessage(HttpMethod.Post, url);
+        // Phase S.5 (B2) — honor a per-row route override (already resolved by
+        // the formatter, no templating here). Default stays POST /events so
+        // every existing subscriber (delivered/cancelled, all systems) is
+        // unaffected.
+        var path = string.IsNullOrWhiteSpace(message.CallbackPath) ? "/events" : message.CallbackPath!;
+        if (!path.StartsWith('/')) path = "/" + path;
+        var method = string.IsNullOrWhiteSpace(message.CallbackMethod)
+            ? HttpMethod.Post
+            : new HttpMethod(message.CallbackMethod!.ToUpperInvariant());
+
+        var url = new Uri(cred.CallbackBaseUrl.TrimEnd('/') + path, UriKind.Absolute);
+        using var req = new HttpRequestMessage(method, url);
         req.Content = new StringContent(message.Content, Encoding.UTF8, "application/json");
         req.Headers.TryAddWithoutValidation("X-DTMS-Event-Type", message.Type);
         req.Headers.TryAddWithoutValidation("X-DTMS-Event-Id", message.Id.ToString());
@@ -100,10 +111,15 @@ public sealed class HttpSourceCallbackDispatcher : ISourceCallbackDispatcher
 
         try
         {
-            resp.EnsureSuccessStatusCode();
-        }
-        catch (HttpRequestException)
-        {
+            // 2xx AND 409 Conflict both count as delivered. 409 =
+            // "already registered/arrived" (idempotent replay) — matches the
+            // legacy OMS adapter's behaviour; treating it as a failure would
+            // retry a callback the receiver has already accepted. Applies to
+            // every system (delivered/cancelled/erp/sap too — 409 is an
+            // idempotent-replay signal regardless of the event).
+            if (resp.IsSuccessStatusCode || resp.StatusCode == HttpStatusCode.Conflict)
+                return;
+
             // Capture the body for the failure log — admin will want it
             // when triaging "why is OMS rejecting our callback?". Bound
             // the read so a misbehaving receiver returning megabytes of
@@ -120,7 +136,11 @@ public sealed class HttpSourceCallbackDispatcher : ISourceCallbackDispatcher
             _log.LogWarning(
                 "Callback to system={SystemKey} returned {Status} for outbox row {Id}; body={Body}",
                 systemKey, (int)resp.StatusCode, message.Id, body);
-            throw;
+
+            // Throws HttpRequestException carrying StatusCode so the processor
+            // can classify permanent (4xx) vs transient (5xx/timeout) for the
+            // dispatch-outcome audit.
+            resp.EnsureSuccessStatusCode();
         }
         finally
         {

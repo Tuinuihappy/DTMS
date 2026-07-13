@@ -105,6 +105,17 @@ public class Trip : AggregateRoot<Guid>
     public int? PriorityAtDispatch { get; private set; }
     public DateTime? VendorExpectedCompletionAt { get; private set; }
 
+    // Fire-once markers for the vendor pickup/drop signals. The vendor emits
+    // MANY missions that finish at the pickup/drop station (a MOVE arrival
+    // plus one or more ACTs), and both the RIOT3 webhook and the reconciler
+    // can observe the same mission — so MarkVendorPickedUp/DropCompleted would
+    // otherwise re-fire their domain events (double OMS arrive-notify, double
+    // audit) and, on a round-trip template, fire pickup again when the robot
+    // returns to the start station. These timestamps make each signal fire
+    // exactly once; null = not yet observed.
+    public DateTime? VendorPickedUpAt { get; private set; }
+    public DateTime? VendorDroppedAt { get; private set; }
+
     /// <summary>Frozen copy of the JSON DTMS POSTed to RIOT3 at dispatch.
     /// Used for compliance / "what exactly did we send" forensic queries.
     /// </summary>
@@ -352,16 +363,21 @@ public class Trip : AggregateRoot<Guid>
     /// pickup station — items are now physically loaded and in transit.
     /// Doesn't change Trip.Status (the trip is still InProgress) — fires
     /// an integration event so DeliveryOrder can flip its items
-    /// Pending → Picked. Idempotent: the consumer guards on item state,
-    /// and the underlying webhook handler only calls this once the
-    /// pickup station's mission finished.
+    /// Pending → Picked. Fire-once: guarded by <see cref="VendorPickedUpAt"/>
+    /// so the many missions that finish at the pickup station (and duplicate
+    /// webhook / reconciler observations, and a return visit on a round-trip
+    /// template) only fire the pickup event once. All callers dedup, including
+    /// the operator Force command — a force after the vendor already picked up
+    /// is a no-op.
     /// </summary>
     public void MarkVendorPickedUp(string? actor = null, DateTime? actedAt = null)
     {
         // Pickup only makes sense while the trip is in flight. Fail-loud
         // would mask network races; bail quietly instead.
         if (Status is not TripStatus.InProgress) return;
+        if (VendorPickedUpAt is not null) return;   // fire-once
 
+        VendorPickedUpAt = actedAt ?? DateTime.UtcNow;
         RecordEvent("VendorPickupCompleted", actor is null ? null : $"by={actor}", actor, actedAt);
         AddDomainEvent(new TripPickupCompletedDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, DeliveryOrderId));
@@ -384,6 +400,9 @@ public class Trip : AggregateRoot<Guid>
         string? actor = null, DateTime? actedAt = null)
     {
         if (Status is not TripStatus.InProgress) return;
+        if (VendorDroppedAt is not null) return;   // fire-once (see VendorDroppedAt)
+
+        VendorDroppedAt = actedAt ?? DateTime.UtcNow;
         var details = string.Join(" ", new[]
         {
             requiresDropPod is null ? null : $"requiresDropPod={requiresDropPod}",

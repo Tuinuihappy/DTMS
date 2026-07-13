@@ -10,8 +10,11 @@ import { MissionStateBadge } from "./badges";
 // Renders the per-mission timeline returned by /trips/{id}/details.
 // Each row is a single (mission × state) tuple — a mission that goes
 // PROCESSING → FINISHED produces two rows, which is what the audit
-// wants to see. Rows are ordered by missionIndex then changeStateTime
-// (server already sorts; we sort client-side as a defensive double-check).
+// wants to see. Rows are ordered by changeStateTime (the real vendor
+// state-change time, reliable from both the reconciler and the sub-task
+// webhook). missionIndex is NOT usable for ordering/numbering: the sub-task
+// webhook payload carries no index so those rows all hardcode 0. Row numbers
+// are the sorted position, not missionIndex, for the same reason.
 export function MissionTimeline({
   missions,
 }: {
@@ -28,10 +31,10 @@ export function MissionTimeline({
     );
   }
 
-  const sorted = [...missions].sort((a, b) => {
-    if (a.missionIndex !== b.missionIndex) return a.missionIndex - b.missionIndex;
-    return new Date(a.changeStateTime).getTime() - new Date(b.changeStateTime).getTime();
-  });
+  const sorted = [...missions].sort(
+    (a, b) =>
+      new Date(a.changeStateTime).getTime() - new Date(b.changeStateTime).getTime(),
+  );
 
   return (
     <ol className="relative space-y-3 pl-5">
@@ -41,13 +44,13 @@ export function MissionTimeline({
         className="absolute left-[7px] top-2 bottom-2 w-px bg-[var(--color-ink-100)] dark:bg-white/10"
       />
       {sorted.map((m, idx) => (
-        <MissionRow key={`${m.missionKey}-${m.state}-${idx}`} mission={m} />
+        <MissionRow key={`${m.missionKey}-${m.state}-${idx}`} mission={m} seq={idx + 1} />
       ))}
     </ol>
   );
 }
 
-function MissionRow({ mission }: { mission: TripMissionDto }) {
+function MissionRow({ mission, seq }: { mission: TripMissionDto; seq: number }) {
   const isMove = mission.missionType.toUpperCase() === "MOVE";
   const Icon = isMove ? MapPin : Zap;
   const isFailed = ["FAILED"].includes(mission.state.toUpperCase());
@@ -80,7 +83,7 @@ function MissionRow({ mission }: { mission: TripMissionDto }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-400)]">
-                #{mission.missionIndex + 1}
+                #{seq}
               </span>
               <span className="text-[12px] font-semibold text-[var(--color-ink-900)]">
                 {mission.missionType}

@@ -1,3 +1,4 @@
+using DTMS.Dispatch.Application.Projections;
 using DTMS.Dispatch.Domain.Entities;
 using DTMS.Dispatch.Domain.Enums;
 using DTMS.Dispatch.Domain.Repositories;
@@ -138,5 +139,139 @@ public class Riot3ReconciliationStateMappingTests
 
         transition.Should().Be(Riot3ReconciliationService.Transition.Completed);
         trip.Status.Should().Be(TripStatus.Completed);
+    }
+
+    // Fix A: the live PROCESSING paths must read ResolvedVehicle, not
+    // ProcessingVehicle directly. Some RIOT3 deployments never populate
+    // processingVehicle (nor emit a TASK_PROCESSING webhook) — they report the
+    // executing robot only under executeVehicle*. Reading ProcessingVehicle
+    // left the vehicle null for the whole run (this is order 4411's bug).
+    [Fact]
+    public async Task ApplyVendorState_Processing_CreatedTrip_CapturesExecuteVehicle_WhenNoProcessingVehicle()
+    {
+        var trip = Trip.CreateForEnvelope(Guid.NewGuid(), "upper-G1", "RIOT3-ABC");   // Created, no vehicle
+        var data = new Riot3OrderQueryData
+        {
+            State = "PROCESSING",
+            ExecuteVehicleKey = "1ee96f0f",
+            ExecuteVehicleName = "FAN1_STANDARD_NO3",     // ← robot lives here, not processingVehicle
+        };
+        var snapshots = Substitute.For<ITripItemSnapshotProvider>();
+
+        var transition = await Riot3ReconciliationService.ApplyVendorStateAsync(
+            trip, data, snapshots, CancellationToken.None);
+
+        transition.Should().Be(Riot3ReconciliationService.Transition.Started);
+        trip.Status.Should().Be(TripStatus.InProgress);
+        trip.VendorVehicleKey.Should().Be("1ee96f0f");
+        trip.VendorVehicleName.Should().Be("FAN1_STANDARD_NO3");
+    }
+
+    [Fact]
+    public async Task ApplyVendorState_Processing_InProgressTripMissingVehicle_BackfillsExecuteVehicle()
+    {
+        var trip = InProgressTrip();   // InProgress, no vehicle captured yet
+        trip.VendorVehicleKey.Should().BeNull();
+        var data = new Riot3OrderQueryData
+        {
+            State = "PROCESSING",
+            ExecuteVehicleKey = "1ee96f0f",
+            ExecuteVehicleName = "FAN1_STANDARD_NO3",
+        };
+        var snapshots = Substitute.For<ITripItemSnapshotProvider>();
+
+        var transition = await Riot3ReconciliationService.ApplyVendorStateAsync(
+            trip, data, snapshots, CancellationToken.None);
+
+        transition.Should().Be(Riot3ReconciliationService.Transition.VehicleReassigned);
+        trip.VendorVehicleKey.Should().Be("1ee96f0f");
+        trip.VendorVehicleName.Should().Be("FAN1_STANDARD_NO3");
+    }
+
+    [Fact]
+    public async Task ApplyVendorState_Processing_PrefersProcessingVehicleOverExecute()
+    {
+        // Regression guard: when RIOT3 DOES send processingVehicle, the live
+        // value still wins over the terminal executeVehicle* fallback.
+        var trip = Trip.CreateForEnvelope(Guid.NewGuid(), "upper-G1", "RIOT3-ABC");
+        var data = new Riot3OrderQueryData
+        {
+            State = "PROCESSING",
+            ProcessingVehicle = new Riot3NotifyProcessingVehicle { Key = "live-key", Name = "LiveBot" },
+            ExecuteVehicleKey = "terminal-key",
+            ExecuteVehicleName = "TerminalBot",
+        };
+        var snapshots = Substitute.For<ITripItemSnapshotProvider>();
+
+        await Riot3ReconciliationService.ApplyVendorStateAsync(
+            trip, data, snapshots, CancellationToken.None);
+
+        trip.VendorVehicleKey.Should().Be("live-key");
+        trip.VendorVehicleName.Should().Be("LiveBot");
+    }
+}
+
+// Item 2: the reconciler mission upsert must stamp each mission with the REAL
+// RIOT3 time. The order-level GET reports startedTime/finishedTime and has NO
+// "changeStateTime" field, so the old code fell to DateTime.UtcNow (poll time)
+// and collapsed the timeline onto the poll instant — mis-ordering it against
+// the sub-task webhook rows (which carry real times).
+public class Riot3ReconciliationMissionUpsertTests
+{
+    [Fact]
+    public async Task UpsertMissions_UsesRealFinishedTime_NotPollTime()
+    {
+        var captured = new List<TripMissionEvent>();
+        var repo = Substitute.For<ITripMissionEventRepository>();
+        repo.AddIfNotExistsAsync(Arg.Do<TripMissionEvent>(e => captured.Add(e)), Arg.Any<CancellationToken>())
+            .Returns(true);
+        var publisher = Substitute.For<ITripRealtimePublisher>();
+
+        var data = new Riot3OrderQueryData
+        {
+            Missions = new List<Riot3OrderMission>
+            {
+                new()
+                {
+                    MissionKey = "m0", MissionIndex = 0, Type = "MOVE", State = "FINISHED",
+                    StartedTime = "2026-07-09T08:31:41Z", FinishedTime = "2026-07-09T08:33:18Z",
+                },
+            },
+        };
+
+        await Riot3ReconciliationService.UpsertMissionsAsync(
+            repo, publisher, Guid.NewGuid(), data, CancellationToken.None);
+
+        captured.Should().ContainSingle();
+        captured[0].ChangeStateTime.Should().Be(new DateTime(2026, 7, 9, 8, 33, 18, DateTimeKind.Utc));
+        captured[0].MissionIndex.Should().Be(0);   // real index from the order query is preserved
+    }
+
+    [Fact]
+    public async Task UpsertMissions_ProcessingMission_FallsBackToStartedTime()
+    {
+        var captured = new List<TripMissionEvent>();
+        var repo = Substitute.For<ITripMissionEventRepository>();
+        repo.AddIfNotExistsAsync(Arg.Do<TripMissionEvent>(e => captured.Add(e)), Arg.Any<CancellationToken>())
+            .Returns(true);
+        var publisher = Substitute.For<ITripRealtimePublisher>();
+
+        var data = new Riot3OrderQueryData
+        {
+            Missions = new List<Riot3OrderMission>
+            {
+                new()
+                {
+                    MissionKey = "m5", MissionIndex = 5, Type = "MOVE", State = "PROCESSING",
+                    StartedTime = "2026-07-09T08:33:43Z",   // no finishedTime yet
+                },
+            },
+        };
+
+        await Riot3ReconciliationService.UpsertMissionsAsync(
+            repo, publisher, Guid.NewGuid(), data, CancellationToken.None);
+
+        captured.Should().ContainSingle();
+        captured[0].ChangeStateTime.Should().Be(new DateTime(2026, 7, 9, 8, 33, 43, DateTimeKind.Utc));
     }
 }

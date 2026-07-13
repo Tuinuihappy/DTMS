@@ -10,13 +10,16 @@ public class GetTripsQueueQueryHandler : IQueryHandler<GetTripsQueueQuery, Trips
 
     private readonly ITripQueueReadRepository _readRepository;
     private readonly IOperatorDirectory _operatorDirectory;
+    private readonly IDeliveryOrderDirectory _deliveryOrderDirectory;
 
     public GetTripsQueueQueryHandler(
         ITripQueueReadRepository readRepository,
-        IOperatorDirectory operatorDirectory)
+        IOperatorDirectory operatorDirectory,
+        IDeliveryOrderDirectory deliveryOrderDirectory)
     {
         _readRepository = readRepository;
         _operatorDirectory = operatorDirectory;
+        _deliveryOrderDirectory = deliveryOrderDirectory;
     }
 
     public async Task<Result<TripsQueueResult>> Handle(GetTripsQueueQuery request, CancellationToken cancellationToken)
@@ -53,6 +56,18 @@ public class GetTripsQueueQueryHandler : IQueryHandler<GetTripsQueueQuery, Trips
             ? await _operatorDirectory.GetDisplayNamesAsync(operatorIds, cancellationToken)
             : (IReadOnlyDictionary<Guid, string>)new Dictionary<Guid, string>();
 
+        // Order requester + transport mode — one batched round trip for the
+        // whole page so manual / self-managed trips (no vehicle, no claiming
+        // operator) can fall back to the requester, while AMR trips carry the
+        // mode so the UI never shows a requester in the vehicle column.
+        var deliveryOrderIds = page.Items
+            .Select(t => t.DeliveryOrderId)
+            .Distinct()
+            .ToList();
+        var orderInfo = deliveryOrderIds.Count > 0
+            ? await _deliveryOrderDirectory.GetTripInfoAsync(deliveryOrderIds, cancellationToken)
+            : (IReadOnlyDictionary<Guid, DeliveryOrderTripInfo>)new Dictionary<Guid, DeliveryOrderTripInfo>();
+
         var items = page.Items
             .Select(t => new TripQueueItemDto(
                 t.Id,
@@ -66,6 +81,8 @@ public class GetTripsQueueQueryHandler : IQueryHandler<GetTripsQueueQuery, Trips
                 t.ClaimedByOperatorId is { } opId && operatorNames.TryGetValue(opId, out var name)
                     ? name
                     : null,
+                orderInfo.TryGetValue(t.DeliveryOrderId, out var info) ? info.RequestedBy : null,
+                orderInfo.TryGetValue(t.DeliveryOrderId, out var modeInfo) ? modeInfo.TransportMode : null,
                 t.Status.ToString(),
                 t.AttemptNumber,
                 t.PreviousAttemptId,

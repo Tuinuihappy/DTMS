@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Dispatch.IntegrationEvents;
+using DTMS.Transport.Amr.Models;
 using DTMS.Transport.Amr.Services;
 using MassTransit;
 using Microsoft.Extensions.Logging;
@@ -90,11 +91,24 @@ public sealed class CaptureFinalSnapshotConsumer :
 
         var expectedCompletion = TryExtractFinalTime(raw);
         trip.CaptureFinalSnapshot(raw, expectedCompletion);
+
+        // Backfill the vendor vehicle from the SAME raw we just fetched, before
+        // this save seals the trip. Capturing the snapshot flips
+        // VendorFinalSnapshot non-null, which drops the trip out of the
+        // reconciler's self-heal query (GetTerminalTripsMissingVehicleAsync
+        // gates on VendorFinalSnapshot == null) — so if we don't recover the
+        // robot here, the self-heal path never gets another chance and the
+        // vehicle stays null forever. Fill-only-if-empty + no-op on a null key,
+        // so a trip that already captured its robot mid-run is untouched.
+        var (vKey, vName) = TryExtractResolvedVehicle(raw);
+        var backfilled = trip.BackfillVendorVehicle(vKey, vName, "final-snapshot");
+
         await _tripRepository.UpdateAsync(trip, cancellationToken);
 
         _logger.LogInformation(
-            "[FinalSnapshot] ✓ Captured for Trip {TripId} (upperKey {UpperKey}, state {State}, size {Bytes}B)",
-            tripId, trip.UpperKey, terminalState, raw.Length);
+            "[FinalSnapshot] ✓ Captured for Trip {TripId} (upperKey {UpperKey}, state {State}, size {Bytes}B, vehicle {Vehicle})",
+            tripId, trip.UpperKey, terminalState, raw.Length,
+            backfilled ? $"backfilled → '{vName ?? vKey}'" : "unchanged");
     }
 
     /// <summary>
@@ -118,6 +132,27 @@ public sealed class CaptureFinalSnapshotConsumer :
         catch
         {
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Best-effort extraction of the executing robot from the raw payload,
+    /// applying the same fallback order as
+    /// <see cref="Riot3OrderQueryData.ResolvedVehicle"/> (live processingVehicle,
+    /// else the terminal executeVehicle*). Returns (null, null) on any parse
+    /// failure — the raw blob still carries the data, so BackfillVendorVehicle
+    /// simply no-ops and the snapshot is preserved.
+    /// </summary>
+    private static (string? Key, string? Name) TryExtractResolvedVehicle(string raw)
+    {
+        try
+        {
+            var payload = JsonSerializer.Deserialize<Riot3OrderQueryResponse>(raw);
+            return payload?.Data?.ResolvedVehicle ?? (null, null);
+        }
+        catch
+        {
+            return (null, null);
         }
     }
 }

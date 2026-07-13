@@ -85,6 +85,11 @@ public sealed class Riot3ReconciliationService : BackgroundService
         // Phase P5.3 — used when reconciler observes PROCESSING for a trip
         // that's still Created (we missed the TASK_PROCESSING webhook).
         var itemSnapshotProvider = scope.ServiceProvider.GetRequiredService<ITripItemSnapshotProvider>();
+        // Pickup/drop detection safety net — the reconciler runs the SAME
+        // station-match logic as the webhook so a dropped sub-task webhook
+        // doesn't lose the pickup/drop signal (or fire it on the wrong visit).
+        var facilityReadService = scope.ServiceProvider.GetRequiredService<DTMS.Facility.Application.Services.IFacilityReadService>();
+        var orderReader = scope.ServiceProvider.GetRequiredService<DTMS.Dispatch.Application.Services.IDeliveryOrderStatusReader>();
 
         var staleCutoff = DateTime.UtcNow.AddHours(-opts.StaleThresholdHours);
         var inFlight = await tripRepo.GetInFlightEnvelopeTripsAsync(staleCutoff, ct);
@@ -152,6 +157,12 @@ public sealed class Riot3ReconciliationService : BackgroundService
             // have arrived; upsert is idempotent so duplicates are safe.
             await UpsertMissionsAsync(missionRepo, realtimePublisher, trip.Id, data, ct);
 
+            // Pickup/drop detection safety net — fire-once at the Trip means a
+            // signal the webhook already recorded is a no-op here; this only
+            // catches the ones the webhook dropped.
+            var stationFired = await DetectStationTransitionsAsync(
+                trip, data, facilityReadService, orderReader, ct);
+
             var transition = await ApplyVendorStateAsync(trip, data, itemSnapshotProvider, ct);
             switch (transition)
             {
@@ -168,17 +179,19 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     // ops can quantify webhook loss (the root cause).
                     _logger.LogWarning(
                         "[Reconciler] Trip {TripId} (upperKey {UpperKey}) vehicle drift corrected → now '{Vehicle}' (missed reassignment webhook)",
-                        trip.Id, trip.UpperKey, data.ProcessingVehicle?.Name ?? data.ProcessingVehicle?.Key ?? "(unknown)");
+                        trip.Id, trip.UpperKey, data.ResolvedVehicle.Name ?? data.ResolvedVehicle.Key ?? "(unknown)");
                     break;
                 case Transition.None: break;   // mission upsert may still have run
             }
 
-            if (transition != Transition.None)
+            // Persist when the vendor state transitioned OR a pickup/drop signal
+            // fired (the latter mutates the Trip without a status transition).
+            if (transition != Transition.None || stationFired)
             {
                 try
                 {
                     await tripRepo.UpdateAsync(trip, ct);
-                    reconciled++;
+                    if (transition != Transition.None) reconciled++;
                 }
                 catch (Exception ex) when (!ct.IsCancellationRequested)
                 {
@@ -290,6 +303,14 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     return Transition.Cancelled;
 
                 case "PROCESSING":
+                    // Robot identity: prefer the live processingVehicle, but fall
+                    // back to executeVehicleKey/Name. Some RIOT3 deployments never
+                    // populate processingVehicle at the order level (nor emit a
+                    // task-level TASK_PROCESSING webhook) — they only ever report
+                    // the executing robot under executeVehicle*. Reading
+                    // ProcessingVehicle directly here left the vehicle null for
+                    // the entire run on those vendors; ResolvedVehicle covers both.
+                    var (vehKey, vehName) = data.ResolvedVehicle;
                     if (trip.Status == DTMS.Dispatch.Domain.Enums.TripStatus.Created)
                     {
                         // Same as the webhook: capture the vendor deviceKey
@@ -298,8 +319,8 @@ public sealed class Riot3ReconciliationService : BackgroundService
                         var itemSnapshots = await itemSnapshotProvider.GetForTripAsync(trip.Id, ct);
                         trip.MarkVendorStarted(
                             vehicleId: null,
-                            vendorVehicleKey: data.ProcessingVehicle?.Key,
-                            vendorVehicleName: data.ProcessingVehicle?.Name,
+                            vendorVehicleKey: vehKey,
+                            vendorVehicleName: vehName,
                             items: itemSnapshots);
                         return Transition.Started;
                     }
@@ -310,20 +331,18 @@ public sealed class Riot3ReconciliationService : BackgroundService
                         // map correctly. Also reconcile the robot in case the
                         // resume rode in on a reassignment we didn't see.
                         trip.Resume();
-                        trip.ReconcileVehicleAssignment(
-                            data.ProcessingVehicle?.Key, data.ProcessingVehicle?.Name, source: "reconciler");
+                        trip.ReconcileVehicleAssignment(vehKey, vehName, source: "reconciler");
                         return Transition.Resumed;
                     }
                     // Trip already InProgress — backstop a MISSED reassignment
-                    // TASK_PROCESSING webhook. RIOT3's order-level
-                    // processingVehicle is the current robot; keep DTMS's cache
-                    // pointer in sync so operator PASS/CANCEL commands (and the
-                    // trip board) target the robot actually running the job.
-                    // Idempotent — no-ops (returns false) when the robot is
-                    // unchanged, so a steady-state poll produces no transition.
+                    // TASK_PROCESSING webhook. RIOT3's order-level resolved
+                    // vehicle is the current robot; keep DTMS's cache pointer in
+                    // sync so operator PASS/CANCEL commands (and the trip board)
+                    // target the robot actually running the job. Idempotent —
+                    // no-ops (returns false) when the robot is unchanged, so a
+                    // steady-state poll produces no transition.
                     if (trip.Status == DTMS.Dispatch.Domain.Enums.TripStatus.InProgress
-                        && trip.ReconcileVehicleAssignment(
-                            data.ProcessingVehicle?.Key, data.ProcessingVehicle?.Name, source: "reconciler"))
+                        && trip.ReconcileVehicleAssignment(vehKey, vehName, source: "reconciler"))
                     {
                         return Transition.VehicleReassigned;
                     }
@@ -441,7 +460,10 @@ public sealed class Riot3ReconciliationService : BackgroundService
 
     // ── Mission diff + final snapshot helpers ────────────────────────────
 
-    private static async Task UpsertMissionsAsync(
+    // internal (not private) so the unit tests can assert the mission upsert
+    // records the REAL vendor time (finishedTime/startedTime) instead of the
+    // poll instant — the bug that collapsed the timeline ordering.
+    internal static async Task UpsertMissionsAsync(
         ITripMissionEventRepository repo,
         ITripRealtimePublisher realtimePublisher,
         Guid tripId,
@@ -469,7 +491,11 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     missionKey: m.MissionKey!,
                     missionType: string.IsNullOrWhiteSpace(m.Type) ? "UNKNOWN" : m.Type!,
                     state: state,
-                    changeStateTime: TryParseRiot3Time(m.ChangeStateTime) ?? DateTime.UtcNow,
+                    // Real RIOT3 time (finishedTime/startedTime) — NOT the poll
+                    // time. The order GET has no "changeStateTime" field, so the
+                    // old TryParse(m.ChangeStateTime) always fell to UtcNow and
+                    // collapsed every reconciler mission onto the poll instant.
+                    changeStateTime: TryParseRiot3Time(m.MissionChangeTime) ?? DateTime.UtcNow,
                     stationName: m.StationName,
                     actionName: m.ActionName,
                     actionType: m.ActionType,
@@ -505,6 +531,39 @@ public sealed class Riot3ReconciliationService : BackgroundService
                 // this one rather than abort the whole tick.
             }
         }
+    }
+
+    // Pickup/drop detection safety net for dropped sub-task webhooks. Runs the
+    // SAME station-match logic as the webhook (TripStationTransitionDetector)
+    // over the order-query missions, using each mission's real time. Returns
+    // true if a pickup or drop actually fired so the caller persists the Trip.
+    //
+    // Cheap-skip once both signals have fired: the per-mission helper early-outs
+    // anyway (fire-once), but bailing here avoids the station/POD lookups on
+    // every steady-state poll after pickup+drop are both done.
+    internal async Task<bool> DetectStationTransitionsAsync(
+        Trip trip,
+        Riot3OrderQueryData data,
+        DTMS.Facility.Application.Services.IFacilityReadService facilityReadService,
+        DTMS.Dispatch.Application.Services.IDeliveryOrderStatusReader orderReader,
+        CancellationToken ct)
+    {
+        if (trip.VendorPickedUpAt is not null && trip.VendorDroppedAt is not null) return false;
+        if (data.Missions is null || data.Missions.Count == 0) return false;
+
+        var fired = false;
+        foreach (var m in data.Missions)
+        {
+            if (ct.IsCancellationRequested) break;
+            var actedAt = TryParseRiot3Time(m.MissionChangeTime);
+            if (await TripStationTransitionDetector.TryApplyAsync(
+                    trip, m.Type, m.State, m.StationId,
+                    facilityReadService, orderReader, actedAt, _logger, ct))
+            {
+                fired = true;
+            }
+        }
+        return fired;
     }
 
     private static bool IsTerminalVendorState(string? state)

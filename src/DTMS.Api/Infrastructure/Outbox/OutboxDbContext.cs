@@ -31,6 +31,13 @@ public class OutboxDbContext : DbContext
             e.HasIndex(m => m.NextRetryAtUtc);
             // Phase O4 — W3C traceparent captured at write time.
             e.Property(m => m.TraceParent).HasMaxLength(55);
+            // Phase S.5 (B2) — per-callback route override + order/trip linkage
+            // for dispatch-outcome auditing. All nullable; default path is
+            // "/events" (see HttpSourceCallbackDispatcher).
+            e.Property(m => m.CallbackPath).HasMaxLength(500);
+            e.Property(m => m.CallbackMethod).HasMaxLength(10);
+            e.Property(m => m.RelatedOrderId);
+            e.Property(m => m.RelatedTripId);
         });
 
         modelBuilder.Entity<DeadLetterMessage>(e =>

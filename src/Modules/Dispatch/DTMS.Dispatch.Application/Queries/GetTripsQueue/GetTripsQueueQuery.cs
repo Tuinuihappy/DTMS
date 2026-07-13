@@ -40,6 +40,13 @@ public sealed record TripQueueItemDto(
     // unclaimed trips — those use the vendorVehicle* fields instead).
     Guid? ClaimedByOperatorId,
     string? ClaimedByOperatorName,
+    // Order requester (DeliveryOrder.RequestedBy). Last-resort label for the
+    // Vehicle/Operator column when a manual / self-managed trip carries no
+    // vendor vehicle and was never claimed by a pool operator.
+    string? RequestedBy,
+    // Order transport mode ("Amr" | "Manual" | "Fleet"). Lets the UI interpret
+    // the executor label per mode — AMR trips must NOT fall back to RequestedBy.
+    string? TransportMode,
     string Status,
     int AttemptNumber,
     Guid? PreviousAttemptId,

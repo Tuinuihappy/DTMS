@@ -155,6 +155,37 @@ public class TripTests
     }
 
     [Fact]
+    public void MarkVendorPickedUp_CalledTwice_FiresOnce()
+    {
+        // Fire-once: the robot finishes several missions at the pickup station
+        // (and a round-trip template revisits it), so the signal must not
+        // re-fire the domain event / audit row.
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted();
+
+        trip.MarkVendorPickedUp();
+        trip.MarkVendorPickedUp();   // duplicate — no-op
+
+        trip.Events.Count(e => e.EventType == "VendorPickupCompleted").Should().Be(1);
+        trip.VendorPickedUpAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void MarkVendorDropCompleted_CalledTwice_FiresOnce()
+    {
+        // This is order 4411's bug: MOVE-arrival + ACT at the drop station both
+        // fired drop → duplicate OMS arrive-notify. Fire-once stops the second.
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted();
+
+        trip.MarkVendorDropCompleted(requiresDropPod: false);
+        trip.MarkVendorDropCompleted(requiresDropPod: false);   // duplicate — no-op
+
+        trip.Events.Count(e => e.EventType == "VendorDropCompleted").Should().Be(1);
+        trip.VendorDroppedAt.Should().NotBeNull();
+    }
+
+    [Fact]
     public void MarkVendorCompleted_WithActor_StampsAuditEvent()
     {
         var trip = NewEnvelopeTrip();

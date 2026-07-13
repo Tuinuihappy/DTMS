@@ -30,7 +30,12 @@ export function getFailingMissions(missions: TripMissionDto[]): TripMissionDto[]
   }
   return Array.from(latestByKey.values())
     .filter((m) => isAlertMissionState(m.state))
-    .sort((a, b) => a.missionIndex - b.missionIndex);
+    // Order by real state-change time, not missionIndex — webhook-sourced
+    // rows hardcode index 0 (see MissionTimeline), so an index sort is unstable.
+    .sort(
+      (a, b) =>
+        new Date(a.changeStateTime).getTime() - new Date(b.changeStateTime).getTime(),
+    );
 }
 
 function isLater(a: TripMissionDto, b: TripMissionDto): boolean {

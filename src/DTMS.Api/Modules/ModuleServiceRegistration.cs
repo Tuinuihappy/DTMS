@@ -404,6 +404,12 @@ public static class ModuleServiceRegistration
         // free of a direct WMS.Domain dependency.
         services.AddScoped<DTMS.DeliveryOrder.Application.Services.IWmsLocationLookup,
                            DTMS.DeliveryOrder.Infrastructure.Services.WmsLocationLookup>();
+        // Cross-module read port — lets Dispatch's Trips list / detail resolve
+        // the order requester's name (Trip.DeliveryOrderId → RequestedBy) so
+        // manual / self-managed trips (no vendor vehicle, no claiming operator)
+        // still show who requested the order. Mirrors IOperatorDirectory.
+        services.AddScoped<DTMS.SharedKernel.Operators.IDeliveryOrderDirectory,
+                           DTMS.DeliveryOrder.Infrastructure.Services.DeliveryOrderDirectory>();
         services.AddScoped<IOrderAmendmentRepository, OrderAmendmentRepository>();
         services.AddScoped<IOrderAuditEventRepository, OrderAuditEventRepository>();
         // Phase P5.3 — Dispatch-side bridge so the vendor adapter can
@@ -768,6 +774,13 @@ public static class ModuleServiceRegistration
                         TimeSpan.FromMinutes(5),
                         TimeSpan.FromMinutes(15));
                     r.Ignore<OmsPermanentException>();
+                    // VendorVehicleUnavailableException = TripStarted OMS notify
+                    // with no robot name yet. The in-process UseMessageRetry
+                    // above (~65s) covers the real sub-second save race; if the
+                    // name still isn't there we skip the minutes-scale ladder so
+                    // it dead-letters fast instead of faulting ~21m after the
+                    // trip already completed (audit time-reversal).
+                    r.Ignore<VendorVehicleUnavailableException>();
                 });
                 cfg.UseInMemoryOutbox(context);
                 cfg.UseKillSwitch(s => s
@@ -868,6 +881,17 @@ public static class ModuleServiceRegistration
         services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
                                 DTMS.Iam.Infrastructure.Callbacks.OmsShipmentCancelledFormatter>(
             DTMS.Iam.Infrastructure.Callbacks.OmsShipmentCancelledFormatter.FormatKey);
+        // Phase S.5 (B2) — OMS shipment started/arrived formatters (keep the
+        // legacy /api/shipments + /{id}/arrived contract via RelativePath).
+        services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
+                                DTMS.Iam.Infrastructure.Callbacks.OmsShipmentStartedFormatter>(
+            DTMS.Iam.Infrastructure.Callbacks.OmsShipmentStartedFormatter.FormatKey);
+        services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
+                                DTMS.Iam.Infrastructure.Callbacks.OmsShipmentArrivedFormatter>(
+            DTMS.Iam.Infrastructure.Callbacks.OmsShipmentArrivedFormatter.FormatKey);
+        // Phase S.5 — shipment fan-out feature flag (dark until cutover).
+        services.Configure<DTMS.Api.Infrastructure.Callbacks.ShipmentCallbackOptions>(
+            configuration.GetSection(DTMS.Api.Infrastructure.Callbacks.ShipmentCallbackOptions.SectionName));
 
         if (runOutboxHere)
             services.AddHostedService<DTMS.Api.Infrastructure.Outbox.MultiPartitionOutboxProcessor>();

@@ -9,15 +9,18 @@ public class GetTripDetailsQueryHandler : IQueryHandler<GetTripDetailsQuery, Tri
     private readonly ITripRepository _tripRepository;
     private readonly ITripMissionEventRepository _missionRepository;
     private readonly IOperatorDirectory _operatorDirectory;
+    private readonly IDeliveryOrderDirectory _deliveryOrderDirectory;
 
     public GetTripDetailsQueryHandler(
         ITripRepository tripRepository,
         ITripMissionEventRepository missionRepository,
-        IOperatorDirectory operatorDirectory)
+        IOperatorDirectory operatorDirectory,
+        IDeliveryOrderDirectory deliveryOrderDirectory)
     {
         _tripRepository = tripRepository;
         _missionRepository = missionRepository;
         _operatorDirectory = operatorDirectory;
+        _deliveryOrderDirectory = deliveryOrderDirectory;
     }
 
     public async Task<Result<TripDetailsDto>> Handle(GetTripDetailsQuery request, CancellationToken cancellationToken)
@@ -34,6 +37,13 @@ public class GetTripDetailsQueryHandler : IQueryHandler<GetTripDetailsQuery, Tri
         var claimedByOperatorName = trip.ClaimedByOperatorId is { } opId
             ? await _operatorDirectory.GetDisplayNameAsync(opId, cancellationToken)
             : null;
+
+        // Order requester + transport mode — requester is the last-resort
+        // label for the "Vehicle / Operator" cell when a manual / self-managed
+        // trip has no vehicle and no claiming operator; mode lets the UI keep
+        // the requester off AMR trips.
+        var orderInfo = await _deliveryOrderDirectory
+            .GetTripInfoAsync(trip.DeliveryOrderId, cancellationToken);
 
         var missionDtos = missions
             .Select(m => new TripMissionDto(
@@ -62,6 +72,8 @@ public class GetTripDetailsQueryHandler : IQueryHandler<GetTripDetailsQuery, Tri
             VendorVehicleName: trip.VendorVehicleName,
             ClaimedByOperatorId: trip.ClaimedByOperatorId,
             ClaimedByOperatorName: claimedByOperatorName,
+            RequestedBy: orderInfo?.RequestedBy,
+            TransportMode: orderInfo?.TransportMode,
             TemplateNameAtDispatch: trip.TemplateNameAtDispatch,
             PriorityAtDispatch: trip.PriorityAtDispatch,
             CreatedAt: trip.CreatedAt,

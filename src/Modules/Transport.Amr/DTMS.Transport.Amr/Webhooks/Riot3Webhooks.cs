@@ -7,6 +7,7 @@ using DTMS.Fleet.IntegrationEvents;
 using DTMS.SharedKernel;
 using DTMS.Transport.Abstractions.Services;
 using DTMS.Transport.Amr.Models;
+using DTMS.Transport.Amr.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -383,42 +384,18 @@ public static class Riot3Webhooks
         // station name: RIOT3 emits the name in its own casing ("Station165")
         // which won't match the upper-cased Code DTMS stores ("STATION165"),
         // and IDs are stable across vendor renames.
+        // Fire-once pickup/drop detection, shared with the reconciler safety net
+        // (Riot3ReconciliationService) via TripStationTransitionDetector so a
+        // dropped sub-task webhook doesn't lose the pickup/drop signal. Gated on
+        // `inserted` so a duplicate webhook (already-stored row) doesn't re-run
+        // detection; the fire-once guard on the Trip covers the rest.
         if (state == "FINISHED" && inserted)
         {
-            var missionType = string.IsNullOrWhiteSpace(subTask.SubTaskType) ? "" : subTask.SubTaskType.ToUpperInvariant();
-            if ((missionType == "ACT" || missionType == "MOVE") && stationId is > 0)
+            if (await TripStationTransitionDetector.TryApplyAsync(
+                    trip, subTask.SubTaskType, state, stationId,
+                    facilityReadService, orderReader, changeTime, logger, cancellationToken))
             {
-                var resolvedId = await facilityReadService.ResolveStationByVendorRefAsync(
-                    stationId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    cancellationToken);
-                var pickupHit = trip.PickupStationId.HasValue && resolvedId == trip.PickupStationId.Value;
-                var dropHit   = trip.DropStationId.HasValue   && resolvedId == trip.DropStationId.Value;
-                if (pickupHit)
-                {
-                    trip.MarkVendorPickedUp();
-                    await tripRepository.UpdateAsync(trip, cancellationToken);
-                    logger.LogInformation(
-                        "[SubTaskWebhook] Trip {TripId} pickup completed at {Station} (vendorId={VendorId}) — items will be marked Picked",
-                        trip.Id, stationName ?? "(unnamed)", stationId);
-                }
-                else if (dropHit)
-                {
-                    // Resolve order POD policy now so the integration event
-                    // carries it (V1.2). Lookup is cheap (cached order query)
-                    // and lets TripItemsProjector + TripDropCompletedConsumer
-                    // decide whether to land items at Delivered directly
-                    // (no POD) or hold at DroppedOff pending /pod-scan,
-                    // without a second cross-module read downstream.
-                    var requiresDropPod = await orderReader.GetRequiresDropPodAsync(
-                        trip.DeliveryOrderId, cancellationToken);
-                    trip.MarkVendorDropCompleted(requiresDropPod);
-                    await tripRepository.UpdateAsync(trip, cancellationToken);
-                    logger.LogInformation(
-                        "[SubTaskWebhook] Trip {TripId} drop completed at {Station} (vendorId={VendorId}, requiresDropPod={RequiresDropPod}) — items will be marked {Target}",
-                        trip.Id, stationName ?? "(unnamed)", stationId,
-                        requiresDropPod?.ToString() ?? "(null)",
-                        requiresDropPod == true ? "DroppedOff" : "Delivered");
-                }
+                await tripRepository.UpdateAsync(trip, cancellationToken);
             }
         }
     }

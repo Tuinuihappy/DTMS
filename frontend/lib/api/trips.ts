@@ -39,6 +39,12 @@ export type TripDetailsDto = {
   // unclaimed trips — those use the vendorVehicle* fields instead).
   claimedByOperatorId: string | null;
   claimedByOperatorName: string | null;
+  // Order requester (DeliveryOrder.RequestedBy). Last-resort label for the
+  // Vehicle/Operator cell on manual / self-managed trips.
+  requestedBy: string | null;
+  // Order transport mode ("Amr" | "Manual" | "Fleet"). Gates the requester
+  // fallback so AMR trips never show a requester in the vehicle column.
+  transportMode: string | null;
   templateNameAtDispatch: string | null;
   priorityAtDispatch: number | null;
   createdAt: string;
@@ -161,6 +167,12 @@ export type TripQueueItemDto = {
   // unclaimed trips — those use the vendorVehicle* fields instead).
   claimedByOperatorId: string | null;
   claimedByOperatorName: string | null;
+  // Order requester (DeliveryOrder.RequestedBy). Last-resort label for the
+  // Vehicle/Operator column on manual / self-managed trips.
+  requestedBy: string | null;
+  // Order transport mode ("Amr" | "Manual" | "Fleet"). Gates the requester
+  // fallback so AMR trips never show a requester in the vehicle column.
+  transportMode: string | null;
   status: TripStatus;
   attemptNumber: number;
   previousAttemptId: string | null;

@@ -114,6 +114,24 @@ public sealed class Riot3OrderMission
     [JsonPropertyName("resultStr")]
     public string? ResultStr { get; init; }
 
+    // Per-mission timestamps. The order-level GET reports these as
+    // startedTime / finishedTime — it does NOT emit "changeStateTime" here
+    // (that field only exists on the notify sub-task payload). Reading only
+    // ChangeStateTime left every reconciler-sourced mission stamped with the
+    // poll time (DateTime.UtcNow fallback), which collapsed the timeline
+    // ordering. MissionChangeTime resolves the best available real time.
+    [JsonPropertyName("startedTime")]
+    public string? StartedTime { get; init; }
+
+    [JsonPropertyName("finishedTime")]
+    public string? FinishedTime { get; init; }
+
     [JsonPropertyName("changeStateTime")]
     public string? ChangeStateTime { get; init; }
+
+    // The real state-change time for this mission, mirroring the notify
+    // webhook's precedence (finishedTime wins for terminal states, else the
+    // start, else the notify-only changeStateTime). Null when RIOT3 sent none.
+    [JsonIgnore]
+    public string? MissionChangeTime => FinishedTime ?? StartedTime ?? ChangeStateTime;
 }

@@ -45,9 +45,16 @@ public sealed class TripMissionEventRepository : ITripMissionEventRepository
     }
 
     public Task<List<TripMissionEvent>> GetByTripIdAsync(Guid tripId, CancellationToken cancellationToken = default)
+        // Order by the real vendor state-change time, NOT MissionIndex. Index
+        // is authoritative only on reconciler (order-query) rows; sub-task
+        // webhook rows hardcode 0 (the payload carries no index), so an
+        // index-first sort scrambled the timeline and mislabeled every webhook
+        // mission as "#1". ChangeStateTime is real from both sources. ReceivedAt
+        // breaks ties deterministically; MissionIndex is a last-resort tiebreak.
         => _context.TripMissionEvents
             .Where(e => e.TripId == tripId)
-            .OrderBy(e => e.MissionIndex)
-            .ThenBy(e => e.ChangeStateTime)
+            .OrderBy(e => e.ChangeStateTime)
+            .ThenBy(e => e.ReceivedAt)
+            .ThenBy(e => e.MissionIndex)
             .ToListAsync(cancellationToken);
 }

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Net.Http;
 using System.Threading.Channels;
 using DTMS.Iam.Application.Callbacks;
 using DTMS.Iam.Application.Repositories;
@@ -249,10 +250,13 @@ public sealed class MultiPartitionOutboxProcessor : BackgroundService
 
             foreach (var msg in batch)
             {
+                bool success;
+                Exception? failure = null;
                 try
                 {
                     await dispatcher.DispatchAsync(systemKey, msg, ct);
                     msg.MarkAsProcessed(DateTime.UtcNow);
+                    success = true;
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
@@ -268,6 +272,32 @@ public sealed class MultiPartitionOutboxProcessor : BackgroundService
                         "Dispatch failed for outbox row {Id} (system={SystemKey}, attempt={Attempt})",
                         msg.Id, systemKey, msg.RetryCount + 1);
                     msg.MarkAsFailed(DateTime.UtcNow, ex.Message);
+                    success = false;
+                    failure = ex;
+                }
+
+                // Phase S.5 — emit a dispatch-outcome for callback rows tied to
+                // an order, so the owning module can write per-order audit. Fire
+                // on success (once) or on TERMINAL failure only (retries
+                // exhausted → MarkAsFailed set ProcessedOnUtc); a non-terminal
+                // failure will retry, so we stay quiet. The row is a null-
+                // partition outbox message → the legacy OutboxProcessorService
+                // publishes it through MassTransit.
+                if (msg.RelatedOrderId is { } orderId && (success || msg.ProcessedOnUtc is not null))
+                {
+                    var statusCode = (failure as HttpRequestException)?.StatusCode;
+                    var outcome = new SourceCallbackOutcome(
+                        EventId: Guid.NewGuid(),
+                        OccurredOn: DateTime.UtcNow,
+                        SystemKey: systemKey,
+                        CallbackEventType: msg.Type,
+                        OrderId: orderId,
+                        TripId: msg.RelatedTripId,
+                        Success: success,
+                        StatusCode: statusCode.HasValue ? (int)statusCode.Value : null,
+                        Detail: success ? null : Truncate(failure?.Message),
+                        CorrelationId: msg.CorrelationId);
+                    db.OutboxMessages.Add(OutboxMessageFactory.FromIntegrationEvent(outcome));
                 }
             }
 
@@ -276,4 +306,7 @@ public sealed class MultiPartitionOutboxProcessor : BackgroundService
             return batch.Count;
         });
     }
+
+    private static string? Truncate(string? s) =>
+        s is null ? null : s.Length <= 400 ? s : s[..400] + "…";
 }
