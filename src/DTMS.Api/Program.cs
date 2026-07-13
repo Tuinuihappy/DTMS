@@ -525,6 +525,8 @@ builder.Services.AddDtmsPartitionMaintenance<DTMS.Iam.Infrastructure.Data.IamDbC
 // repos). app.UseWhen wires them into the pipeline below.
 builder.Services.AddTransient<DTMS.Api.Middlewares.SystemClientAuthMiddleware>();
 builder.Services.AddTransient<DTMS.Api.Middlewares.SystemRequestLoggingMiddleware>();
+// Authorization wall — 403s system principals outside /api/v1/source/*.
+builder.Services.AddTransient<DTMS.Api.Middlewares.SystemPrincipalConfinementMiddleware>();
 var rabbitConfig = builder.Configuration.GetSection("RabbitMq");
 var rabbitHost = rabbitConfig["Host"] ?? "localhost";
 var rabbitUser = rabbitConfig["Username"] ?? "guest";
@@ -896,6 +898,13 @@ app.UseRateLimiter();
 app.UseCors(HubsCorsPolicy);
 
 app.UseAuthentication();
+
+// Authorization wall — confine system (M2M) principals to the source
+// data-plane. Runs right after authentication (ctx.User populated) so any
+// system JWT (sub=system:*) presented outside /api/v1/source/* is 403'd
+// structurally, before permission checks — a system can never reach the
+// control-plane even if it was granted an admin permission by mistake.
+app.UseMiddleware<DTMS.Api.Middlewares.SystemPrincipalConfinementMiddleware>();
 
 // Phase S.2 — federated source-system auth + request log. MUST run
 // BEFORE UseAuthorization so SystemClientAuthMiddleware can stamp
