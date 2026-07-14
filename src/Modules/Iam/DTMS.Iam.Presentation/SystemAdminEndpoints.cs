@@ -629,12 +629,22 @@ public static class SystemAdminEndpoints
         //     grant checklist never drifts from what the backend enforces /
         //     auto-grants at create.
         group.MapGet("/{key}/permissions/standard",
-            (string key) => Results.Ok(StandardSystemPermissions.All.Select(t =>
-                new PermissionDto(
-                    StandardSystemPermissions.Resolve(t, key),
-                    "Standard source-system permission (auto-granted at create)",
-                    "Source"))))
-            .RequirePermission(Permissions.Iam.SystemRead);
+            async (string key,
+                   ISystemClientRepository systems,
+                   CancellationToken ct) =>
+            {
+                // 404 for an unknown system, symmetric with grant/revoke —
+                // the templates are the same for every key, so returning them
+                // for a non-existent system would be misleading.
+                if (await systems.GetByKeyAsync(key, ct) is null)
+                    return Results.NotFound(new { error = $"System '{key}' not found." });
+
+                return Results.Ok(StandardSystemPermissions.All.Select(t =>
+                    new PermissionDto(
+                        StandardSystemPermissions.Resolve(t, key),
+                        "Standard source-system permission (auto-granted at create)",
+                        "Source")));
+            }).RequirePermission(Permissions.Iam.SystemRead);
 
         // ── Grant permission to system ──────────────────────────────────
         //     Mirrors role-side POST /roles/{name}/permissions/{code}.

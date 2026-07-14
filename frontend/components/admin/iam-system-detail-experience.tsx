@@ -85,12 +85,18 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
   // (StandardSystemPermissions.All) so the "Source" group in the
   // checklist never drifts from what the backend enforces / auto-grants.
   const [syntheticSystemPerms, setSyntheticSystemPerms] = useState<PermissionDto[]>([]);
+  const [sourcePermsError, setSourcePermsError] = useState<string | null>(null);
   useEffect(() => {
     const abort = new AbortController();
     listStandardSystemPermissions(systemKey, abort.signal)
-      .then(setSyntheticSystemPerms)
-      .catch(() => {
-        // Non-fatal — the "Source" group just won't render its rows.
+      .then((rows) => {
+        setSyntheticSystemPerms(rows);
+        setSourcePermsError(null);
+      })
+      .catch((e) => {
+        // Surface the failure — otherwise the "Source" group silently
+        // vanishes and the operator can't tell why the source perms are gone.
+        if (!abort.signal.aborted) setSourcePermsError((e as Error).message);
       });
     return () => abort.abort();
   }, [systemKey]);
@@ -126,9 +132,9 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
   }, [loadIssuedTokens]);
 
   // Load the global permission catalog once when the page mounts. The
-  // checkbox list below renders catalog rows × this system; if catalog
-  // fetch fails, the standard templates resolved from the system key
-  // are still shown so the page is never empty.
+  // checkbox list below renders catalog rows × this system. The standard
+  // source-system rows load via a separate fetch (above), so a catalog
+  // failure still leaves the "Source" group populated, and vice versa.
   useEffect(() => {
     const abort = new AbortController();
     listPermissions(abort.signal)
@@ -673,6 +679,12 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
       </section>
 
       {/* ── Granted permissions (Phase S.7 — checkbox grid) ───────── */}
+      {sourcePermsError && (
+        <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-300">
+          Source-system permissions failed to load: {sourcePermsError}. The
+          &ldquo;Source&rdquo; group may be missing rows — reload to retry.
+        </div>
+      )}
       <PermissionsChecklist
         granted={data.permissions}
         catalog={catalog}
