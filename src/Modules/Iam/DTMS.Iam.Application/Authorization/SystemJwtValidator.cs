@@ -183,12 +183,32 @@ public sealed class SystemJwtValidator : ISystemJwtValidator, IDisposable
             // survives that. Expiring tokens skip this (Redis + natural exp
             // already bound their blast radius) so the common OAuth path pays
             // no DB cost.
-            if (isPerpetual && !IsPerpetualTokenActive(jti))
+            if (isPerpetual)
             {
-                _log.LogWarning(
-                    "Perpetual system JWT rejected: jti={Jti} not Active in DB allowlist.",
-                    jti);
-                return new SystemJwtValidationResult(false, null, "token not active");
+                bool active;
+                try
+                {
+                    active = IsPerpetualTokenActive(jti);
+                }
+                catch (Exception ex)
+                {
+                    // Symmetric with the Redis path above — a DB outage on the
+                    // durable gate fails CLOSED (clean rejection + structured
+                    // log) rather than throwing an unhandled 500 out of the
+                    // auth middleware.
+                    _log.LogError(ex,
+                        "Perpetual system JWT allowlist check failed (DB outage?) — failing closed for jti={Jti}.",
+                        jti);
+                    return new SystemJwtValidationResult(false, null, "allowlist check unavailable");
+                }
+
+                if (!active)
+                {
+                    _log.LogWarning(
+                        "Perpetual system JWT rejected: jti={Jti} not Active in DB allowlist.",
+                        jti);
+                    return new SystemJwtValidationResult(false, null, "token not active");
+                }
             }
         }
 

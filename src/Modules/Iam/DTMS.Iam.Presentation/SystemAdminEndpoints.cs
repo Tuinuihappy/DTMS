@@ -577,6 +577,7 @@ public static class SystemAdminEndpoints
                    ISystemIssuedTokenRepository issuedTokens,
                    ISystemJwtRevocationList revocationList,
                    IAuditLogRepository audit,
+                   Microsoft.Extensions.Caching.Memory.IMemoryCache cache,
                    CancellationToken ct) =>
             {
                 if (await systems.GetByKeyAsync(key, ct) is null)
@@ -607,6 +608,14 @@ public static class SystemAdminEndpoints
 
                 row.Revoke(ActorOrUnknown(ctx), req?.Reason);
                 await issuedTokens.UpdateAsync(row, ct);
+
+                // Evict the durable-allowlist cache so a perpetual token's
+                // revoke takes hold immediately. SystemJwtValidator caches the
+                // "Active in DB" result for 60s; without this eviction a revoke
+                // wouldn't fully bite until that TTL if Redis were also down —
+                // the exact gap the DB backstop exists to close. Mirrors the
+                // iam:sys-perms:{key} eviction on permission grant/revoke.
+                cache.Remove($"iam:perp-jti:{row.Jti}");
 
                 await audit.AppendAsync(new PermissionAuditEntry(
                     actorEmployeeId: ActorOrUnknown(ctx),
