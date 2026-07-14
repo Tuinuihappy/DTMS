@@ -1,17 +1,18 @@
 using System.Diagnostics;
+using System.Net;
+using System.Net.Http;
+using System.Text;
 using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.DeliveryOrder.Domain;
 using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.Dispatch.Domain.Repositories;
-using DTMS.OmsAdapter.Abstractions;
-using DTMS.OmsAdapter.Abstractions.Exceptions;
-using DTMS.OmsAdapter.Abstractions.Models;
-using DTMS.OmsAdapter.Infrastructure.Options;
+using DTMS.Iam.Application.Callbacks;
 using DTMS.SharedKernel.Messaging;
+using DTMS.SharedKernel.Outbox;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace DTMS.DeliveryOrder.Application.Commands.ResendOmsArrivedNotification;
 
@@ -19,10 +20,12 @@ public class ResendOmsArrivedNotificationCommandHandler
     : ICommandHandler<ResendOmsArrivedNotificationCommand, ResendOmsArrivedNotificationResult>
 {
     private const string AuditEventType = "UpstreamOmsArrivedManuallyResent";
+    // Federated OMS arrived-callback formatter key (see OmsShipmentArrivedFormatter).
+    private const string ArrivedFormatKey = "oms.shipment.arrived.v1";
+    private const string ArrivedEventType = "shipment.arrived.v1";
 
-    private readonly UpstreamOmsOptions _options;
-    private readonly IOmsShipmentClient _client;
-    private readonly IOmsCallbackTargetResolver _targetResolver;
+    private readonly ICallbackPayloadFormatter _formatter;
+    private readonly ISourceCallbackDispatcher _dispatcher;
     private readonly ITripRepository _tripRepository;
     private readonly IDeliveryOrderRepository _orderRepository;
     private readonly IOrderAuditEventRepository _auditRepository;
@@ -30,18 +33,16 @@ public class ResendOmsArrivedNotificationCommandHandler
     private readonly ILogger<ResendOmsArrivedNotificationCommandHandler> _logger;
 
     public ResendOmsArrivedNotificationCommandHandler(
-        IOptions<UpstreamOmsOptions> options,
-        IOmsShipmentClient client,
-        IOmsCallbackTargetResolver targetResolver,
+        [FromKeyedServices(ArrivedFormatKey)] ICallbackPayloadFormatter formatter,
+        ISourceCallbackDispatcher dispatcher,
         ITripRepository tripRepository,
         IDeliveryOrderRepository orderRepository,
         IOrderAuditEventRepository auditRepository,
         IOrderActivityProjectionStore activityStore,
         ILogger<ResendOmsArrivedNotificationCommandHandler> logger)
     {
-        _options = options.Value;
-        _client = client;
-        _targetResolver = targetResolver;
+        _formatter = formatter;
+        _dispatcher = dispatcher;
         _tripRepository = tripRepository;
         _orderRepository = orderRepository;
         _auditRepository = auditRepository;
@@ -52,12 +53,6 @@ public class ResendOmsArrivedNotificationCommandHandler
     public async Task<Result<ResendOmsArrivedNotificationResult>> Handle(
         ResendOmsArrivedNotificationCommand request, CancellationToken cancellationToken)
     {
-        if (!_options.Enabled)
-        {
-            return Result<ResendOmsArrivedNotificationResult>.Failure(
-                "Upstream OMS notifications are disabled. Toggle UpstreamOms:Enabled to resend.");
-        }
-
         var order = await _orderRepository.GetByIdAsync(request.OrderId, cancellationToken);
         if (order is null)
             return Result<ResendOmsArrivedNotificationResult>.Failure($"Order {request.OrderId} not found.");
@@ -111,39 +106,39 @@ public class ResendOmsArrivedNotificationCommandHandler
         // [Option A] Stable shipmentId across retry chain.
         var rootTripId = await _tripRepository.GetRootTripIdAsync(trip.Id, cancellationToken);
         var shipmentId = rootTripId.ToString();
-        var lotPayload = lots.Select(id => new OmsLot(id)).ToList();
 
-        var target = await _targetResolver.ResolveAsync("oms", cancellationToken);
-        if (target is null)
-        {
-            return Result<ResendOmsArrivedNotificationResult>.Failure(
-                "OMS callback target is not configured. Set CallbackBaseUrl on the 'oms' system credential (via /admin/systems/oms → Configure callback) or set UpstreamOms__BaseUrl env.");
-        }
+        // Format via the federated OMS arrived formatter (byte-identical to
+        // legacy — shipmentId in the path, lots in the body) and dispatch
+        // SYNCHRONOUSLY so the operator sees the result immediately.
+        var context = new OmsShipmentArrivedContext(shipmentId, lots);
+        var payload = await _formatter.FormatAsync(context, cancellationToken);
+        var msg = new OutboxMessage(
+            id: Guid.NewGuid(),
+            type: ArrivedEventType,
+            content: Encoding.UTF8.GetString(payload.Body),
+            occurredOnUtc: DateTime.UtcNow,
+            partitionKey: "oms",
+            callbackPath: payload.RelativePath,
+            callbackMethod: payload.HttpMethod,
+            relatedOrderId: order.Id,
+            relatedTripId: trip.Id);
 
         var sw = Stopwatch.StartNew();
         try
         {
-            await _client.NotifyShipmentArrivedAsync(target, shipmentId, lotPayload, cancellationToken);
-        }
-        catch (OmsPermanentException ex)
-        {
-            sw.Stop();
-            var statusCode = (int?)ex.StatusCode ?? 0;
-            _logger.LogWarning(ex,
-                "[OmsArrivedResend] Trip {TripId} rejected by OMS ({Status}): {Body}",
-                trip.Id, statusCode, ex.ResponseBody);
-            return Result<ResendOmsArrivedNotificationResult>.Failure(
-                $"OMS rejected the data ({statusCode}): {ex.ResponseBody}. " +
-                "Fix the data at upstream (SAP/ERP/OMS) before resending — retrying with the same payload will fail again.");
+            await _dispatcher.DispatchAsync("oms", msg, cancellationToken);
         }
         catch (Exception ex)
         {
             sw.Stop();
+            var status = (ex as HttpRequestException)?.StatusCode;
             _logger.LogWarning(ex,
-                "[OmsArrivedResend] Trip {TripId} manual resend failed: {Error}",
-                trip.Id, ex.Message);
+                "[OmsArrivedResend] Trip {TripId} manual resend failed ({Status}): {Error}",
+                trip.Id, status, ex.Message);
             return Result<ResendOmsArrivedNotificationResult>.Failure(
-                $"OMS request failed: {ex.Message}");
+                status is >= HttpStatusCode.BadRequest and < HttpStatusCode.InternalServerError
+                    ? $"OMS rejected the request ({(int)status}): {ex.Message}. Fix the data at upstream before resending."
+                    : $"OMS request failed: {ex.Message}");
         }
         sw.Stop();
 

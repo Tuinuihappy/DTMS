@@ -18,7 +18,6 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using NSubstitute;
 using DomainOrder = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder;
 
@@ -39,7 +38,6 @@ public class ShipmentStartedFanoutConsumerTests
         public required ISubscriptionLookup Lookup { get; init; }
         public required ITripRepository Trips { get; init; }
         public required IDeliveryOrderRepository Orders { get; init; }
-        public required ShipmentCallbackOptions Options { get; init; }
 
         public ShipmentStartedCallbackFanoutConsumer Build()
         {
@@ -49,12 +47,11 @@ public class ShipmentStartedFanoutConsumerTests
                 .BuildServiceProvider();
             return new ShipmentStartedCallbackFanoutConsumer(
                 Lookup, sp, Outbox, Trips, Orders,
-                Microsoft.Extensions.Options.Options.Create(Options),
                 NullLogger<ShipmentStartedCallbackFanoutConsumer>.Instance);
         }
     }
 
-    private static Harness NewHarness(bool enabled, bool subscribed)
+    private static Harness NewHarness(bool subscribed)
     {
         var outbox = new OutboxDbContext(new DbContextOptionsBuilder<OutboxDbContext>()
             .UseInMemoryDatabase("outbox-" + Guid.NewGuid()).Options);
@@ -74,7 +71,6 @@ public class ShipmentStartedFanoutConsumerTests
             Lookup = lookup,
             Trips = trips,
             Orders = Substitute.For<IDeliveryOrderRepository>(),
-            Options = new ShipmentCallbackOptions { ShipmentEventsEnabled = enabled },
         };
     }
 
@@ -120,7 +116,7 @@ public class ShipmentStartedFanoutConsumerTests
     public async Task HappyPath_EnqueuesByteIdenticalRow_RoutedToOms()
     {
         var tripId = Guid.NewGuid();
-        var h = NewHarness(enabled: true, subscribed: true);
+        var h = NewHarness(subscribed: true);
         var order = OmsOrderWithBoundItem(tripId);
         h.Orders.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(order);
         h.Trips.GetByIdAsync(tripId, Arg.Any<CancellationToken>())
@@ -145,22 +141,10 @@ public class ShipmentStartedFanoutConsumerTests
     }
 
     [Fact]
-    public async Task FlagOff_EnqueuesNothing()
-    {
-        var tripId = Guid.NewGuid();
-        var h = NewHarness(enabled: false, subscribed: true);
-
-        await h.Build().Consume(Ctx(tripId, Guid.NewGuid()));
-
-        (await h.Outbox.OutboxMessages.CountAsync()).Should().Be(0);
-        await h.Orders.DidNotReceive().GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
     public async Task SourceNotSubscribed_EnqueuesNothing()
     {
         var tripId = Guid.NewGuid();
-        var h = NewHarness(enabled: true, subscribed: false);
+        var h = NewHarness(subscribed: false);
         var order = OmsOrderWithBoundItem(tripId);
         h.Orders.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(order);
 
@@ -173,7 +157,7 @@ public class ShipmentStartedFanoutConsumerTests
     public async Task PoolTripAlreadyNotifiedAtDispatch_Skips()
     {
         var tripId = Guid.NewGuid();
-        var h = NewHarness(enabled: true, subscribed: true);
+        var h = NewHarness(subscribed: true);
         var order = OmsOrderWithBoundItem(tripId);
         h.Orders.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(order);
         h.Trips.GetByIdAsync(tripId, Arg.Any<CancellationToken>())
@@ -188,7 +172,7 @@ public class ShipmentStartedFanoutConsumerTests
     public async Task MissingVehicleName_ThrowsFastCap()
     {
         var tripId = Guid.NewGuid();
-        var h = NewHarness(enabled: true, subscribed: true);
+        var h = NewHarness(subscribed: true);
         var order = OmsOrderWithBoundItem(tripId);
         h.Orders.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(order);
         h.Trips.GetByIdAsync(tripId, Arg.Any<CancellationToken>())

@@ -1,62 +1,52 @@
 using System.Text;
-using System.Text.Json;
 using DTMS.Iam.Application.Callbacks;
 using DTMS.Iam.Infrastructure.Callbacks;
-using DTMS.OmsAdapter.Abstractions.Models;
 using FluentAssertions;
 
 namespace DTMS.Api.UnitTests;
 
-// Phase S.5 (B2) — the new OMS shipment formatters must emit bodies BYTE-
-// IDENTICAL to what the legacy adapter POSTed (serialization of
-// OmsShipmentNotification / OmsArrivedNotification), so OMS sees no change.
+// Phase S.5 — golden wire-format for the OMS shipment formatters. These bytes
+// were byte-identical to the legacy OmsShipmentNotification / OmsArrivedNotification
+// serialization; after the legacy adapter was removed (Phase 4) the expected
+// JSON is pinned inline so the OMS contract can't drift.
 public class OmsShipmentFormatterByteCompatTests
 {
-    private static string LegacyBytes<T>(T model) =>
-        Encoding.UTF8.GetString(JsonSerializer.SerializeToUtf8Bytes(model));
-
-    private static async Task<CallbackPayload> Format(ICallbackPayloadFormatter f, object ctx) =>
-        await f.FormatAsync(ctx, CancellationToken.None);
+    private static async Task<string> Body(ICallbackPayloadFormatter f, object ctx) =>
+        Encoding.UTF8.GetString((await f.FormatAsync(ctx, CancellationToken.None)).Body);
 
     [Fact]
-    public async Task Started_BodyMatchesLegacy_AndRoutesToShipmentsPath()
+    public async Task Started_BodyMatchesContract_AndRoutesToShipmentsPath()
     {
-        var legacy = LegacyBytes(new OmsShipmentNotification(
-            "root-trip-1", "FAN1_STANDARD_NO3",
-            new[] { new OmsLot("LOT-A"), new OmsLot("LOT-B") }));
-
-        var payload = await Format(new OmsShipmentStartedFormatter(),
+        var payload = await new OmsShipmentStartedFormatter().FormatAsync(
             new OmsShipmentStartedContext("root-trip-1", "FAN1_STANDARD_NO3",
-                new[] { "LOT-A", "LOT-B" }));
+                new[] { "LOT-A", "LOT-B" }), CancellationToken.None);
 
-        Encoding.UTF8.GetString(payload.Body).Should().Be(legacy);
+        Encoding.UTF8.GetString(payload.Body).Should().Be(
+            "{\"shipmentId\":\"root-trip-1\",\"deliveryBy\":\"FAN1_STANDARD_NO3\"," +
+            "\"lots\":[{\"lotNo\":\"LOT-A\"},{\"lotNo\":\"LOT-B\"}]}");
         payload.RelativePath.Should().Be("/api/shipments");
         payload.HttpMethod.Should().BeNull();   // → dispatcher default POST
     }
 
     [Fact]
-    public async Task Started_NullDeliveryBy_SerializesIdentically()
+    public async Task Started_NullDeliveryBy_SerializesNull()
     {
-        var legacy = LegacyBytes(new OmsShipmentNotification(
-            "root-trip-1", null, new[] { new OmsLot("LOT-A") }));
-
-        var payload = await Format(new OmsShipmentStartedFormatter(),
+        var body = await Body(new OmsShipmentStartedFormatter(),
             new OmsShipmentStartedContext("root-trip-1", null, new[] { "LOT-A" }));
 
-        Encoding.UTF8.GetString(payload.Body).Should().Be(legacy);
-        Encoding.UTF8.GetString(payload.Body).Should().Contain("\"deliveryBy\":null");
+        body.Should().Be(
+            "{\"shipmentId\":\"root-trip-1\",\"deliveryBy\":null,\"lots\":[{\"lotNo\":\"LOT-A\"}]}");
     }
 
     [Fact]
-    public async Task Arrived_BodyMatchesLegacy_AndShipmentIdInPath()
+    public async Task Arrived_BodyMatchesContract_AndShipmentIdInPath()
     {
-        var legacy = LegacyBytes(new OmsArrivedNotification(
-            new[] { new OmsLot("LOT-A"), new OmsLot("LOT-B") }));
+        var payload = await new OmsShipmentArrivedFormatter().FormatAsync(
+            new OmsShipmentArrivedContext("root-trip-9", new[] { "LOT-A", "LOT-B" }),
+            CancellationToken.None);
 
-        var payload = await Format(new OmsShipmentArrivedFormatter(),
-            new OmsShipmentArrivedContext("root-trip-9", new[] { "LOT-A", "LOT-B" }));
-
-        Encoding.UTF8.GetString(payload.Body).Should().Be(legacy);
+        Encoding.UTF8.GetString(payload.Body).Should().Be(
+            "{\"lots\":[{\"lotNo\":\"LOT-A\"},{\"lotNo\":\"LOT-B\"}]}");
         payload.RelativePath.Should().Be("/api/shipments/root-trip-9/arrived");
     }
 

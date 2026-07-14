@@ -417,18 +417,9 @@ services:
       - TransportModes__Amr__Enabled=${TransportModes__Amr__Enabled:-true}
       - TransportModes__Manual__Enabled=${TransportModes__Manual__Enabled:-false}
       - TransportModes__Fleet__Enabled=${TransportModes__Fleet__Enabled:-false}
-      # Upstream OMS shipment notification (POST /api/shipments) fired
-      # when a Trip transitions Created → InProgress. BearerToken is a
-      # long-lived JWT supplied by OMS ops — DO NOT commit; pass via
-      # shell env var or .env file.
-      - UpstreamOms__Enabled=${UpstreamOms__Enabled:-true}
-      - UpstreamOms__BaseUrl=${UpstreamOms__BaseUrl:-http://10.204.37.65:5002/}
-      - UpstreamOms__BearerToken=${UpstreamOms__BearerToken:-}
-      - UpstreamOms__TimeoutSeconds=${UpstreamOms__TimeoutSeconds:-10}
-      # Phase S.5 (B2) — federated shipment.started/arrived fan-out. When true
-      # the new pipeline owns OMS started/arrived callbacks (keep UpstreamOms
-      # legacy off to avoid double-send). Dark (false) by default.
-      - Callbacks__ShipmentEventsEnabled=${Callbacks__ShipmentEventsEnabled:-false}
+      # Phase 4 — legacy UpstreamOms__* + Callbacks__ShipmentEventsEnabled env
+      # removed. OMS callbacks run through the federated pipeline (config on the
+      # 'oms' SystemCredential + its shipment.* subscriptions).
       - Dispatch__UseOrderTemplateDispatch=${Dispatch__UseOrderTemplateDispatch:-false}
       # T1.4 — Planning workflow watchdog. Polls every 60s for orders stuck
       # at Status=Planned with no Trip (the OD-0374 / OD-0375 incident shape)
@@ -571,14 +562,6 @@ services:
       - Outbox__PerMessageTimeoutSeconds=${Outbox__PerMessageTimeoutSeconds:-10}
       # The reason this container exists — outbox always runs here.
       - Outbox__RunInThisProcess=true
-      # P4 — the worker also runs the OMS-notify consumers, so it must honor
-      # the same .env kill-switch as the api. Without this line the worker
-      # binds UpstreamOms:Enabled from appsettings (=true) and would still
-      # 404 the real OMS for test/WIP orders with fabricated lot numbers.
-      - UpstreamOms__Enabled=${UpstreamOms__Enabled:-true}
-      # Phase S.5 (B2) — worker runs the shipment fan-out consumers too; honor
-      # the same .env flag as the api.
-      - Callbacks__ShipmentEventsEnabled=${Callbacks__ShipmentEventsEnabled:-false}
       # Phase O2 — LISTEN/NOTIFY. Cuts publish latency from ~1s (poll)
       # to ~50ms by waking the processor the instant Postgres delivers
       # a NOTIFY. Poll interval (=1s here) remains as safety net.

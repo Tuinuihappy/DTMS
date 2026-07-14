@@ -36,7 +36,6 @@ using DTMS.Planning.Infrastructure.Repositories;
 using DTMS.Planning.Infrastructure.Services;
 using DTMS.SharedKernel.Messaging;
 using DTMS.SharedKernel.Outbox;
-using DTMS.OmsAdapter;
 using DTMS.OmsAdapter.Abstractions.Exceptions;
 using DTMS.Transport.Amr.Infrastructure;
 using DTMS.Transport.Amr.Infrastructure.Extensions;
@@ -630,11 +629,11 @@ public static class ModuleServiceRegistration
         // ── VendorAdapter Module ──────────────────────────────────────
         services.AddVendorAdapterInfrastructure(configuration);
 
-        // ── OmsAdapter Module ─────────────────────────────────────────
-        // Outbound notifications to upstream OMS (POST /api/shipments).
-        // Consumer wiring lands in Phase 2; Phase 1 just registers the
-        // HTTP client so DI graph is satisfied.
-        services.AddOmsAdapter(configuration);
+        // ── OmsAdapter Module — REMOVED (Phase 4) ─────────────────────
+        // Outbound OMS callbacks now run through the federated pipeline
+        // (subscriptions + SystemCredentials + ICallbackPayloadFormatter +
+        // ISourceCallbackDispatcher). The legacy HTTP client / options /
+        // target-resolver were deleted; nothing to register here anymore.
 
         // ── MassTransit + RabbitMQ ────────────────────────────────────
         // T1.3 — MassTransitHostOptions controls how the bus integrates with
@@ -748,38 +747,23 @@ public static class ModuleServiceRegistration
                         minInterval: TimeSpan.FromSeconds(1),
                         maxInterval: TimeSpan.FromSeconds(30),
                         intervalDelta: TimeSpan.FromSeconds(5));
-                    // OmsPermanentException = 4xx data-rejected by OMS that
-                    // retry will never fix (e.g. 404 "LotNo not found").
-                    // Skip the retry ladder entirely so a poison message
-                    // dead-letters in ~1s instead of dragging the queue's
-                    // fault rate up and tripping the Kill Switch — which
-                    // would block unrelated trips waiting in the same
-                    // endpoint for up to a minute per cycle.
-                    r.Ignore<OmsPermanentException>();
                 });
-                // Trimmed the 1h bucket: transient OMS errors (5xx, network)
-                // typically recover within minutes. The extra hour-long wait
-                // mostly served as a soft floor for poison messages we now
-                // fast-fail above, so leaving it in just delays real recovery.
-                //
-                // Ignore<OmsPermanentException> must be repeated on the outer
-                // redelivery pipeline — MassTransit treats UseMessageRetry
-                // (in-process) and UseDelayedRedelivery (re-queue) as two
-                // independent filters. Without the ignore here, a 4xx
-                // poison still bounces through 1m/5m/15m before DLQ.
+                // Trimmed the 1h bucket: transient errors (5xx, network)
+                // typically recover within minutes.
                 cfg.UseDelayedRedelivery(r =>
                 {
                     r.Intervals(
                         TimeSpan.FromMinutes(1),
                         TimeSpan.FromMinutes(5),
                         TimeSpan.FromMinutes(15));
-                    r.Ignore<OmsPermanentException>();
-                    // VendorVehicleUnavailableException = TripStarted OMS notify
+                    // VendorVehicleUnavailableException = shipment.started fan-out
                     // with no robot name yet. The in-process UseMessageRetry
                     // above (~65s) covers the real sub-second save race; if the
                     // name still isn't there we skip the minutes-scale ladder so
                     // it dead-letters fast instead of faulting ~21m after the
-                    // trip already completed (audit time-reversal).
+                    // trip already completed (audit time-reversal). Ignore must
+                    // repeat here — MassTransit treats in-process retry and
+                    // delayed redelivery as two independent filters.
                     r.Ignore<VendorVehicleUnavailableException>();
                 });
                 cfg.UseInMemoryOutbox(context);
@@ -889,9 +873,6 @@ public static class ModuleServiceRegistration
         services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
                                 DTMS.Iam.Infrastructure.Callbacks.OmsShipmentArrivedFormatter>(
             DTMS.Iam.Infrastructure.Callbacks.OmsShipmentArrivedFormatter.FormatKey);
-        // Phase S.5 — shipment fan-out feature flag (dark until cutover).
-        services.Configure<DTMS.Api.Infrastructure.Callbacks.ShipmentCallbackOptions>(
-            configuration.GetSection(DTMS.Api.Infrastructure.Callbacks.ShipmentCallbackOptions.SectionName));
 
         if (runOutboxHere)
             services.AddHostedService<DTMS.Api.Infrastructure.Outbox.MultiPartitionOutboxProcessor>();

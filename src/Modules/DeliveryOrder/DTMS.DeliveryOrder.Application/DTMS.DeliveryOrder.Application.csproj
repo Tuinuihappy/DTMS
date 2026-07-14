@@ -16,8 +16,10 @@
          upperKey RIOT3 already accepted (the OD-0381 duplicate-key loop). -->
     <ProjectReference Include="..\..\Planning\DTMS.Planning.Domain\DTMS.Planning.Domain.csproj" />
     <ProjectReference Include="..\DTMS.DeliveryOrder.IntegrationEvents\DTMS.DeliveryOrder.IntegrationEvents.csproj" />
-    <!-- TripStartedOmsNotifyConsumer dispatches POST to upstream OMS via IOmsShipmentClient. -->
-    <ProjectReference Include="..\..\OmsAdapter\DTMS.OmsAdapter.csproj" />
+    <!-- Phase S.5 (B2) — Resend OMS commands dispatch via the federated
+         ICallbackPayloadFormatter + ISourceCallbackDispatcher (Iam.Application),
+         replacing the deleted legacy OMS adapter. -->
+    <ProjectReference Include="..\..\Iam\DTMS.Iam.Application\DTMS.Iam.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

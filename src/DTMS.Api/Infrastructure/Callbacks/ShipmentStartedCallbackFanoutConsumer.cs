@@ -10,7 +10,6 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace DTMS.Api.Infrastructure.Callbacks;
 
@@ -36,7 +35,6 @@ public sealed class ShipmentStartedCallbackFanoutConsumer
     private readonly OutboxDbContext _outbox;
     private readonly ITripRepository _trips;
     private readonly IDeliveryOrderRepository _orders;
-    private readonly ShipmentCallbackOptions _options;
     private readonly ILogger<ShipmentStartedCallbackFanoutConsumer> _log;
 
     public ShipmentStartedCallbackFanoutConsumer(
@@ -45,7 +43,6 @@ public sealed class ShipmentStartedCallbackFanoutConsumer
         OutboxDbContext outbox,
         ITripRepository trips,
         IDeliveryOrderRepository orders,
-        IOptions<ShipmentCallbackOptions> options,
         ILogger<ShipmentStartedCallbackFanoutConsumer> log)
     {
         _lookup = lookup;
@@ -53,14 +50,14 @@ public sealed class ShipmentStartedCallbackFanoutConsumer
         _outbox = outbox;
         _trips = trips;
         _orders = orders;
-        _options = options.Value;
         _log = log;
     }
 
     public async Task Consume(ConsumeContext<TripStartedIntegrationEvent> ctx)
     {
-        if (!_options.ShipmentEventsEnabled) return;   // dark until cutover
-
+        // Gated solely by the oms subscription's Enabled (Phase 4 removed the
+        // transitional Callbacks:ShipmentEventsEnabled flag) — the subscription
+        // lookup below returns nothing when no system subscribes.
         var ct = ctx.CancellationToken;
         var evt = ctx.Message;
         const string eventType = CallbackEventTypes.ShipmentStartedV1;
