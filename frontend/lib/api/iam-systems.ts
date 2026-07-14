@@ -4,6 +4,8 @@
 // existing IAM permission/role admin client stays focused on its
 // surface area.
 
+import type { PermissionDto } from "./iam";
+
 // ── DTOs (mirror SystemAdminEndpoints + SystemSubscriptionEndpoints) ─────
 
 export type SystemSummaryDto = {
@@ -130,6 +132,21 @@ export async function getSystem(
   });
   if (!res.ok) throw new Error(await readError(res));
   return (await res.json()) as SystemDetailDto;
+}
+
+// The source-system permission templates this system can hold (order + trip),
+// resolved for its key. Served from the backend (StandardSystemPermissions.All)
+// so the "Source" grant checklist never drifts from what the backend enforces.
+export async function listStandardSystemPermissions(
+  key: string,
+  signal?: AbortSignal,
+): Promise<PermissionDto[]> {
+  const res = await fetch(
+    `/api/admin/iam/systems/${encodeURIComponent(key)}/permissions/standard`,
+    { signal, cache: "no-store" },
+  );
+  if (!res.ok) throw new Error(`Failed to load standard permissions: ${res.status}`);
+  return (await res.json()) as PermissionDto[];
 }
 
 export async function createSystem(body: CreateSystemRequest): Promise<CreatedSystemResponse> {

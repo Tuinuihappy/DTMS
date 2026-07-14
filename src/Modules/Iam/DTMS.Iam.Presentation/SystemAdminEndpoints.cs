@@ -622,6 +622,20 @@ public static class SystemAdminEndpoints
                 return Results.NoContent();
             }).RequirePermission(Permissions.Iam.SystemWrite);
 
+        // ── Standard source-system permissions (code source of truth) ──
+        //     The permission templates a source system can hold (order + trip),
+        //     from StandardSystemPermissions.All, resolved for {key}. The admin
+        //     UI reads this instead of hard-coding the list, so the "Source"
+        //     grant checklist never drifts from what the backend enforces /
+        //     auto-grants at create.
+        group.MapGet("/{key}/permissions/standard",
+            (string key) => Results.Ok(StandardSystemPermissions.All.Select(t =>
+                new PermissionDto(
+                    StandardSystemPermissions.Resolve(t, key),
+                    "Standard source-system permission (auto-granted at create)",
+                    "Source"))))
+            .RequirePermission(Permissions.Iam.SystemRead);
+
         // ── Grant permission to system ──────────────────────────────────
         //     Mirrors role-side POST /roles/{name}/permissions/{code}.
         //     Catalog existence check intentionally skipped — system perms

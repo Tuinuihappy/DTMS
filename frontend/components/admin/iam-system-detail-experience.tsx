@@ -16,7 +16,7 @@ import {
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   activateSystem,
   deactivateSystem,
@@ -24,6 +24,7 @@ import {
   grantSystemPermission,
   issueToken,
   listIssuedTokens,
+  listStandardSystemPermissions,
   patchSystem,
   revokeSystemPermission,
   revokeToken,
@@ -36,7 +37,6 @@ import {
   type SystemDetailDto,
 } from "@/lib/api/iam-systems";
 import { listPermissions, type PermissionDto } from "@/lib/api/iam";
-import { resolveStandardSystemPermissions } from "@/lib/iam/standard-system-permissions";
 import { OneTimeSecretBanner } from "@/components/admin/one-time-secret-banner";
 import { PermissionsChecklist } from "@/components/admin/permissions-checklist";
 import { cn } from "@/lib/utils";
@@ -80,18 +80,20 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
   // Which JTI was just copied — drives the "✓ copied" glyph for 1.5s.
   const [copiedJti, setCopiedJti] = useState<string | null>(null);
 
-  // Synthesize the runtime-resolved standard system permission rows
-  // (`dtms:source:{key}:order:read|write`) so they appear under a
-  // "Source" group in the checklist alongside catalog perms.
-  const syntheticSystemPerms = useMemo<PermissionDto[]>(
-    () =>
-      resolveStandardSystemPermissions(systemKey).map((code) => ({
-        code,
-        description: "Standard source-system permission (auto-seeded at create)",
-        module: "Source",
-      })),
-    [systemKey],
-  );
+  // The standard source-system permission rows this system can hold
+  // (order + trip, `dtms:source:{key}:...`). Fetched from the backend
+  // (StandardSystemPermissions.All) so the "Source" group in the
+  // checklist never drifts from what the backend enforces / auto-grants.
+  const [syntheticSystemPerms, setSyntheticSystemPerms] = useState<PermissionDto[]>([]);
+  useEffect(() => {
+    const abort = new AbortController();
+    listStandardSystemPermissions(systemKey, abort.signal)
+      .then(setSyntheticSystemPerms)
+      .catch(() => {
+        // Non-fatal — the "Source" group just won't render its rows.
+      });
+    return () => abort.abort();
+  }, [systemKey]);
 
   const load = useCallback(async () => {
     setLoading(true);
