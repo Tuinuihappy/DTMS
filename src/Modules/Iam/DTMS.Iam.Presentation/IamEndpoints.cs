@@ -139,16 +139,17 @@ public static class IamEndpoints
 
         group.MapPost("/roles/{name}/permissions/{code}",
             async (string name, string code, HttpContext ctx, IRoleRepository roleRepo,
-                   IPermissionRepository permRepo, IAuditLogRepository audit,
+                   IAuditLogRepository audit,
                    Microsoft.Extensions.Caching.Memory.IMemoryCache cache,
                    CancellationToken ct) =>
             {
                 if (await roleRepo.GetByNameAsync(name, ct) is null) return Results.NotFound(new { error = $"Role '{name}' not found." });
-                // Wildcards (e.g. dtms:facility:*) are valid grants but
-                // won't be in the Permission catalog — skip the existence
-                // check when the code ends with ':*'.
+                // Validate against the code catalog (Permissions.All) — the
+                // source of truth — not a DB seed. Wildcards (e.g.
+                // dtms:facility:*) are valid grants but aren't catalog
+                // entries, so skip the check when the code ends with ':*'.
                 if (!code.EndsWith(":*", StringComparison.Ordinal)
-                    && await permRepo.GetByCodeAsync(code, ct) is null)
+                    && !Permissions.All.Any(p => string.Equals(p.Code, code, StringComparison.Ordinal)))
                 {
                     return Results.NotFound(new { error = $"Permission '{code}' not found." });
                 }
