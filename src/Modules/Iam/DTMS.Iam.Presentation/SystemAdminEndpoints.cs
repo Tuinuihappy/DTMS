@@ -225,6 +225,7 @@ public static class SystemAdminEndpoints
             async (string key, CallbackConfigRequest req, HttpContext ctx,
                    ISystemClientRepository systems,
                    ISystemCredentialRepository creds,
+                   CachedCredentialReader reader,
                    IAuditLogRepository audit,
                    CancellationToken ct) =>
             {
@@ -282,6 +283,13 @@ public static class SystemAdminEndpoints
                         circuitDurationSeconds: req.CircuitDurationSeconds ?? cred.CircuitDurationSeconds);
                 }
                 await creds.UpdateAsync(cred, ct);
+
+                // Evict the cached credential so the next outbound dispatch
+                // re-reads from DB. Without this the old callback token keeps
+                // being sent for up to the 5-minute L2 TTL — an operator
+                // rotating a token after a 401 sees the 401 continue and has
+                // no way to tell the fix didn't take.
+                await reader.InvalidateAsync(key, ct);
 
                 await audit.AppendAsync(new PermissionAuditEntry(
                     actorEmployeeId: ActorOrUnknown(ctx),
