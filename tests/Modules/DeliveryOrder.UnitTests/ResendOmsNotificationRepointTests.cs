@@ -1,5 +1,6 @@
 using DTMS.DeliveryOrder.Application.Commands.ResendOmsNotification;
 using DTMS.DeliveryOrder.Application.Projections;
+using DTMS.DeliveryOrder.Domain;
 using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Domain.Repositories;
@@ -7,6 +8,7 @@ using DTMS.DeliveryOrder.Domain.ValueObjects;
 using DTMS.Dispatch.Domain.Entities;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Iam.Application.Callbacks;
+using DTMS.SharedKernel.Outbox;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -18,6 +20,10 @@ namespace DeliveryOrder.UnitTests;
 // IOmsShipmentClient onto the federated ISourceCallbackDispatcher (sync). This
 // pins that: a successful resend dispatches to the "oms" partition and writes
 // the UpstreamOmsManuallyResent audit (the UI's "resent" signal).
+//
+// F1 — Phase 4 dropped the old UpstreamOms__Enabled gate without replacing it,
+// so a manual resend used to punch through the subscription off-switch that the
+// auto fan-out honours. These tests pin both sides of that gate.
 public class ResendOmsNotificationRepointTests
 {
     private static readonly Guid Pickup = Guid.NewGuid();
@@ -37,8 +43,24 @@ public class ResendOmsNotificationRepointTests
         return order;
     }
 
-    [Fact]
-    public async Task Resend_Success_DispatchesToOms_AndWritesManuallyResentAudit()
+    private static ISubscriptionLookup NewLookup(bool subscribed)
+    {
+        var lookup = Substitute.For<ISubscriptionLookup>();
+        lookup.GetSubscribersAsync(CallbackEventTypes.ShipmentStartedV1, Arg.Any<CancellationToken>())
+            .Returns(subscribed
+                ? new List<EventSubscriber> { new(WellKnownSourceSystems.Oms, "oms.shipment.started.v1") }
+                : new List<EventSubscriber>());
+        return lookup;
+    }
+
+    private sealed record Harness(
+        ResendOmsNotificationCommandHandler Handler,
+        ISourceCallbackDispatcher Dispatcher,
+        IOrderAuditEventRepository Audit,
+        Guid OrderId,
+        Guid TripId);
+
+    private static Harness NewHarness(bool subscribed)
     {
         var tripId = Guid.NewGuid();
         var order = OmsOrder(tripId, out var orderId);
@@ -62,16 +84,44 @@ public class ResendOmsNotificationRepointTests
         var activity = Substitute.For<IOrderActivityProjectionStore>();
 
         var handler = new ResendOmsNotificationCommandHandler(
-            formatter, dispatcher, trips, orders, audit, activity,
+            formatter, dispatcher, NewLookup(subscribed), trips, orders, audit, activity,
             NullLogger<ResendOmsNotificationCommandHandler>.Instance);
 
-        var result = await handler.Handle(
-            new ResendOmsNotificationCommand(orderId, tripId, "ops@dtms"), CancellationToken.None);
+        return new Harness(handler, dispatcher, audit, orderId, tripId);
+    }
+
+    [Fact]
+    public async Task Resend_Success_DispatchesToOms_AndWritesManuallyResentAudit()
+    {
+        var h = NewHarness(subscribed: true);
+
+        var result = await h.Handler.Handle(
+            new ResendOmsNotificationCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        await dispatcher.Received(1).DispatchAsync("oms", Arg.Any<DTMS.SharedKernel.Outbox.OutboxMessage>(), Arg.Any<CancellationToken>());
-        await audit.Received(1).AddAsync(
+        await h.Dispatcher.Received(1).DispatchAsync(
+            WellKnownSourceSystems.Oms, Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
+        await h.Audit.Received(1).AddAsync(
             Arg.Is<OrderAuditEvent>(e => e.EventType == "UpstreamOmsManuallyResent"),
             Arg.Any<CancellationToken>());
+    }
+
+    // The off-switch must close every path: with the oms subscription disabled
+    // (or absent) the lookup returns empty, so the resend must refuse rather
+    // than POST to OMS behind the operator's back.
+    [Fact]
+    public async Task Resend_SubscriptionDisabled_ReturnsFailure_AndDoesNotDispatch()
+    {
+        var h = NewHarness(subscribed: false);
+
+        var result = await h.Handler.Handle(
+            new ResendOmsNotificationCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("disabled");
+        await h.Dispatcher.DidNotReceive().DispatchAsync(
+            Arg.Any<string>(), Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
+        await h.Audit.DidNotReceive().AddAsync(
+            Arg.Any<OrderAuditEvent>(), Arg.Any<CancellationToken>());
     }
 }

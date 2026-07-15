@@ -21,11 +21,14 @@ public class ResendOmsArrivedNotificationCommandHandler
 {
     private const string AuditEventType = "UpstreamOmsArrivedManuallyResent";
     // Federated OMS arrived-callback formatter key (see OmsShipmentArrivedFormatter).
+    // Kept as a local literal on purpose: [FromKeyedServices] needs a compile-time
+    // const, and the formatter's own FormatKey lives in Iam.Infrastructure, which
+    // this Application layer must not reference.
     private const string ArrivedFormatKey = "oms.shipment.arrived.v1";
-    private const string ArrivedEventType = "shipment.arrived.v1";
 
     private readonly ICallbackPayloadFormatter _formatter;
     private readonly ISourceCallbackDispatcher _dispatcher;
+    private readonly ISubscriptionLookup _lookup;
     private readonly ITripRepository _tripRepository;
     private readonly IDeliveryOrderRepository _orderRepository;
     private readonly IOrderAuditEventRepository _auditRepository;
@@ -35,6 +38,7 @@ public class ResendOmsArrivedNotificationCommandHandler
     public ResendOmsArrivedNotificationCommandHandler(
         [FromKeyedServices(ArrivedFormatKey)] ICallbackPayloadFormatter formatter,
         ISourceCallbackDispatcher dispatcher,
+        ISubscriptionLookup lookup,
         ITripRepository tripRepository,
         IDeliveryOrderRepository orderRepository,
         IOrderAuditEventRepository auditRepository,
@@ -43,6 +47,7 @@ public class ResendOmsArrivedNotificationCommandHandler
     {
         _formatter = formatter;
         _dispatcher = dispatcher;
+        _lookup = lookup;
         _tripRepository = tripRepository;
         _orderRepository = orderRepository;
         _auditRepository = auditRepository;
@@ -70,6 +75,18 @@ public class ResendOmsArrivedNotificationCommandHandler
         {
             return Result<ResendOmsArrivedNotificationResult>.Failure(
                 $"Order is from {order.SourceSystemKey}, not OMS. Use the federated callback admin tools (Phase S.3.1b) to manage non-OMS notifications.");
+        }
+
+        // The oms subscription's Enabled is the sole off-switch for OMS callbacks
+        // (Phase 4 removed UpstreamOms__Enabled). The auto fan-out honours it via
+        // this same lookup; without the check here a manual resend would punch
+        // straight through an emergency stop. Covers "disabled" and "no row" alike
+        // — the lookup filters Enabled at SQL, so both yield an empty list.
+        var subs = await _lookup.GetSubscribersAsync(CallbackEventTypes.ShipmentArrivedV1, cancellationToken);
+        if (!subs.Any(s => string.Equals(s.SystemKey, WellKnownSourceSystems.Oms, StringComparison.OrdinalIgnoreCase)))
+        {
+            return Result<ResendOmsArrivedNotificationResult>.Failure(
+                "OMS shipment-arrived callbacks are disabled (subscription off or not configured). Enable the subscription before resending.");
         }
 
         // Manual transport does not report arrival to OMS (parity with the auto
@@ -114,10 +131,10 @@ public class ResendOmsArrivedNotificationCommandHandler
         var payload = await _formatter.FormatAsync(context, cancellationToken);
         var msg = new OutboxMessage(
             id: Guid.NewGuid(),
-            type: ArrivedEventType,
+            type: CallbackEventTypes.ShipmentArrivedV1,
             content: Encoding.UTF8.GetString(payload.Body),
             occurredOnUtc: DateTime.UtcNow,
-            partitionKey: "oms",
+            partitionKey: WellKnownSourceSystems.Oms,
             callbackPath: payload.RelativePath,
             callbackMethod: payload.HttpMethod,
             relatedOrderId: order.Id,
@@ -126,7 +143,7 @@ public class ResendOmsArrivedNotificationCommandHandler
         var sw = Stopwatch.StartNew();
         try
         {
-            await _dispatcher.DispatchAsync("oms", msg, cancellationToken);
+            await _dispatcher.DispatchAsync(WellKnownSourceSystems.Oms, msg, cancellationToken);
         }
         catch (Exception ex)
         {
