@@ -22,12 +22,20 @@ public sealed record ShipmentArrivedContext(
     IReadOnlyList<string> LotNos);
 
 /// <summary>
-/// Carries no lot list, unlike its siblings — deliberately, not an oversight.
-/// TripCancelledConsumer unbinds the order's items from the trip while handling
-/// the very same TripCancelledIntegrationEvent on its own queue, so a lot lookup
-/// here races it and comes back empty whenever that consumer commits first. A
-/// cancel keyed on the shipment id alone has nothing to race.
+/// Fields mirror the OmsTripCancelledNotification that DTMS posted to
+/// <c>/api/shipments/{id}/cancelled</c> until 0f123c2 removed the outbound chain
+/// (OMS had dropped the endpoint). Kept identical so re-enabling is a switch on
+/// OMS's side rather than a new contract to agree on.
+///
+/// <para>Carries no lot list, unlike its siblings — deliberately, and the old
+/// notification didn't either. TripCancelledConsumer unbinds the order's items
+/// from the trip while handling the very same TripCancelledIntegrationEvent on
+/// its own queue, so a lot lookup here races it and comes back empty whenever
+/// that consumer commits first. A cancel keyed on the shipment id alone has
+/// nothing to race.</para>
 /// </summary>
 public sealed record ShipmentCancelledContext(
     string ShipmentId,
-    string Reason);
+    string Reason,
+    string? CancelledBy,
+    DateTime OccurredAt);

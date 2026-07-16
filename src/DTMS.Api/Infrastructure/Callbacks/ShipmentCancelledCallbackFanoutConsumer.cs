@@ -14,16 +14,27 @@ namespace DTMS.Api.Infrastructure.Callbacks;
 
 /// <summary>
 /// Fans <see cref="TripCancelledIntegrationEvent"/> out to the order's source
-/// system as <c>shipment.cancelled.v1</c>. Until this existed nothing told
-/// upstream a shipment had died: the order-scoped fan-out cannot address an OMS
-/// shipment (one order spans N root trips), so a cancelled shipment stayed "in
-/// progress" upstream forever.
+/// system as <c>shipment.cancelled.v1</c>. Since 0f123c2 nothing told upstream a
+/// shipment had died, so a cancelled shipment stayed "in progress" there
+/// forever. The order-scoped fan-out cannot fill the gap: it cannot address an
+/// OMS shipment, because one order spans N root trips.
+///
+/// <para>This is the federated re-do of the deleted TripCancelledOmsNotifyConsumer,
+/// same event and same root-trip-id contract — 0f123c2 removed it because OMS had
+/// dropped <c>/api/shipments/{id}/cancelled</c>, not because the design was wrong.
+/// Why OMS dropped it is unresolved, so the subscription ships disabled; see
+/// docs/oms-shipment-cancel-contract.md before enabling.</para>
 ///
 /// <para>Trip-scoped like its started/arrived siblings, which is what makes the
 /// id work: shipmentId = root trip id, the same token the subscriber already
 /// received from <c>shipment.started.v1</c>. An order cancellation cascades into
 /// one trip cancellation per active trip, so it fans out as one callback per
 /// shipment — distinct shipments, not duplicates.</para>
+///
+/// <para>Guards are stricter than the deleted consumer, which had none of the
+/// trip-state ones and cancelled unconditionally: pool trips and never-started
+/// trips are skipped here because no <c>started</c> was sent for either, so the
+/// subscriber has never heard of those shipments.</para>
 ///
 /// <para>Not terminal: a retry reuses the root trip id, so a subscriber can see
 /// started(X) → cancelled(X) → started(X). Retries are operator-driven and land
@@ -122,7 +133,8 @@ public sealed class ShipmentCancelledCallbackFanoutConsumer
         // unbinds this trip's items while handling the same event on its own queue.
 
         var shipmentId = (await _trips.GetRootTripIdAsync(evt.TripId, ct)).ToString();
-        var context = new ShipmentCancelledContext(shipmentId, evt.Reason);
+        var context = new ShipmentCancelledContext(
+            shipmentId, evt.Reason, evt.TriggeredBy, evt.OccurredOn);
         var correlationId = ctx.MessageId ?? Guid.NewGuid();
 
         foreach (var sub in subs)

@@ -50,19 +50,38 @@ public class OmsShipmentFormatterByteCompatTests
         payload.RelativePath.Should().Be("/api/shipments/root-trip-9/arrived");
     }
 
-    // The shipmentId must be the root trip id in the path — an earlier revision
-    // sent the DeliveryOrderId in the body with no RelativePath, so it addressed
-    // an id OMS had never seen at /events, a route OMS does not expose.
+    // Wire-identical to the OmsTripCancelledNotification that 0f123c2 deleted, so
+    // OMS can restore the route it already had rather than agree a new contract.
+    // The field names are OMS's — cancelReason, not reason.
     [Fact]
-    public async Task Cancelled_BodyMatchesContract_AndShipmentIdInPath()
+    public async Task Cancelled_BodyMatchesLegacyContract_AndShipmentIdInPath()
     {
         var payload = await new OmsShipmentCancelledFormatter().FormatAsync(
-            new ShipmentCancelledContext("root-trip-9", "vendor cancelled"),
+            new ShipmentCancelledContext(
+                "root-trip-9", "vendor cancelled", "86347852",
+                new DateTime(2026, 7, 15, 9, 7, 9, DateTimeKind.Utc)),
             CancellationToken.None);
 
-        Encoding.UTF8.GetString(payload.Body).Should().Be("{\"reason\":\"vendor cancelled\"}");
-        payload.RelativePath.Should().Be("/api/shipments/root-trip-9/cancel");
+        Encoding.UTF8.GetString(payload.Body).Should().Be(
+            "{\"cancelReason\":\"vendor cancelled\",\"cancelledBy\":\"86347852\"," +
+            "\"occurredAt\":\"2026-07-15T09:07:09Z\"}");
+        payload.RelativePath.Should().Be("/api/shipments/root-trip-9/cancelled");
         payload.HttpMethod.Should().BeNull();   // → dispatcher default POST
+    }
+
+    // TriggeredBy is nullable on the event (vendor-initiated cancels carry no
+    // actor); the legacy DTO's cancelledBy was nullable for the same reason.
+    [Fact]
+    public async Task Cancelled_NullCancelledBy_SerializesNull()
+    {
+        var body = await Body(new OmsShipmentCancelledFormatter(),
+            new ShipmentCancelledContext(
+                "root-trip-9", "vendor cancelled", null,
+                new DateTime(2026, 7, 15, 9, 7, 9, DateTimeKind.Utc)));
+
+        body.Should().Be(
+            "{\"cancelReason\":\"vendor cancelled\",\"cancelledBy\":null," +
+            "\"occurredAt\":\"2026-07-15T09:07:09Z\"}");
     }
 
     [Fact]

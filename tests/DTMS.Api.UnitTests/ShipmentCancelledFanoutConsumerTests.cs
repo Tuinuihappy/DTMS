@@ -29,6 +29,8 @@ public class ShipmentCancelledFanoutConsumerTests
     private static readonly Guid Drop = Guid.NewGuid();
     private const string Root = "11111111-1111-1111-1111-111111111111";
     private const string Reason = "vendor cancelled";
+    private const string Actor = "86347852";
+    private static readonly DateTime OccurredAt = new(2026, 7, 15, 9, 7, 9, DateTimeKind.Utc);
 
     private sealed class Harness
     {
@@ -113,7 +115,8 @@ public class ShipmentCancelledFanoutConsumerTests
         Guid tripId, Guid orderId, bool nullMessageId = false)
     {
         var evt = new TripCancelledIntegrationEvent(
-            Guid.NewGuid(), DateTime.UtcNow, tripId, Guid.NewGuid(), orderId, Reason, "upper-G1");
+            Guid.NewGuid(), OccurredAt, tripId, Guid.NewGuid(), orderId, Reason, "upper-G1",
+            TriggeredBy: Actor);
         var ctx = Substitute.For<ConsumeContext<TripCancelledIntegrationEvent>>();
         ctx.Message.Returns(evt);
         ctx.MessageId.Returns(nullMessageId ? null : Guid.NewGuid());
@@ -137,8 +140,11 @@ public class ShipmentCancelledFanoutConsumerTests
         row.Type.Should().Be("shipment.cancelled.v1");
         row.RelatedOrderId.Should().Be(order.Id);
         row.RelatedTripId.Should().Be(tripId);
+        // Actor and timestamp come off the event, not from DateTime.UtcNow here —
+        // a retried callback must not re-stamp the moment of cancellation.
         row.Content.Should().Be(
-            JsonSerializer.Serialize(new { reason = Reason },
+            JsonSerializer.Serialize(
+                new { cancelReason = Reason, cancelledBy = Actor, occurredAt = OccurredAt },
                 new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
     }
 
@@ -157,7 +163,7 @@ public class ShipmentCancelledFanoutConsumerTests
         await h.Build().Consume(Ctx(tripId, order.Id));
 
         var row = await h.Outbox.OutboxMessages.SingleAsync();
-        row.CallbackPath.Should().Be($"/api/shipments/{Root}/cancel");
+        row.CallbackPath.Should().Be($"/api/shipments/{Root}/cancelled");
         row.CallbackPath.Should().NotContain(tripId.ToString());
     }
 
