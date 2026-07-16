@@ -62,9 +62,6 @@ COPY src/Modules/Iam/DTMS.Iam.Application/DTMS.Iam.Application.csproj src/Module
 COPY src/Modules/Iam/DTMS.Iam.Infrastructure/DTMS.Iam.Infrastructure.csproj src/Modules/Iam/DTMS.Iam.Infrastructure/
 COPY src/Modules/Iam/DTMS.Iam.Presentation/DTMS.Iam.Presentation.csproj src/Modules/Iam/DTMS.Iam.Presentation/
 
-# OmsAdapter
-COPY src/Modules/OmsAdapter/DTMS.OmsAdapter.csproj src/Modules/OmsAdapter/
-
 # Transport.Abstractions (Phase 4.0 rename of VendorAdapter.Abstractions)
 COPY src/Modules/Transport.Abstractions/DTMS.Transport.Abstractions/DTMS.Transport.Abstractions.csproj src/Modules/Transport.Abstractions/DTMS.Transport.Abstractions/
 
