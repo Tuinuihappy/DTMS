@@ -5,6 +5,7 @@ using DTMS.Iam.Domain.Entities;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DTMS.Iam.Presentation;
 
@@ -51,6 +52,7 @@ public static class SystemSubscriptionEndpoints
                    ISystemEventSubscriptionRepository subs,
                    IAuditLogRepository audit,
                    ISubscriptionLookup lookup,
+                   IServiceProviderIsKeyedService keyedProbe,
                    CancellationToken ct) =>
         {
             if (await systems.GetByKeyAsync(key, ct) is null)
@@ -62,6 +64,9 @@ public static class SystemSubscriptionEndpoints
                     error = $"Unknown event type '{req.EventType}'. " +
                             $"Allowed: {string.Join(", ", CallbackEventTypes.All)}"
                 });
+
+            if (UnknownFormatKey(keyedProbe, req.PayloadFormatKey) is { } formatKeyError)
+                return Results.BadRequest(new { error = formatKeyError });
 
             if (await subs.GetAsync(key, req.EventType, ct) is not null)
                 return Results.Conflict(new
@@ -111,10 +116,15 @@ public static class SystemSubscriptionEndpoints
                    ISystemEventSubscriptionRepository subs,
                    IAuditLogRepository audit,
                    ISubscriptionLookup lookup,
+                   IServiceProviderIsKeyedService keyedProbe,
                    CancellationToken ct) =>
         {
             var row = await subs.GetAsync(key, eventType, ct);
             if (row is null) return Results.NotFound();
+
+            if (req.PayloadFormatKey is { Length: > 0 } newKey
+                && UnknownFormatKey(keyedProbe, newKey) is { } formatKeyError)
+                return Results.BadRequest(new { error = formatKeyError });
 
             if (req.Enabled is bool e)
             {
@@ -170,6 +180,32 @@ public static class SystemSubscriptionEndpoints
 
             return Results.NoContent();
         }).RequirePermission(Permissions.Iam.SubscriptionWrite);
+    }
+
+    /// <summary>
+    /// Returns an error message when no formatter is registered under
+    /// <paramref name="formatKey"/>, else null.
+    ///
+    /// <para>Nothing else checks this. EventType is validated against a closed
+    /// registry, but PayloadFormatKey was free text all the way to the fan-out,
+    /// where GetRequiredKeyedService throws for a key that was never registered
+    /// — a fault, a retry, then a dead letter, all long after the admin saw
+    /// 201 Created and moved on. A typo here is an admin mistake and should read
+    /// like one, at the moment it is made.</para>
+    ///
+    /// <para>Probing rather than resolving: we only want to know the key is
+    /// wired, not pay to construct a formatter.</para>
+    /// </summary>
+    private static string? UnknownFormatKey(IServiceProviderIsKeyedService probe, string formatKey)
+    {
+        if (string.IsNullOrWhiteSpace(formatKey))
+            return "payloadFormatKey is required.";
+
+        return probe.IsKeyedService(typeof(ICallbackPayloadFormatter), formatKey)
+            ? null
+            : $"No payload formatter is registered for '{formatKey}'. The fan-out would fail " +
+              "on every callback. Check the key against the formatter's FormatKey constant, " +
+              "or register a formatter for it first.";
     }
 
     private static string ActorOrUnknown(HttpContext ctx)
