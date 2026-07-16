@@ -117,4 +117,24 @@ public class OutboxMessage
             NextRetryAtUtc = null;
         }
     }
+
+    /// <summary>
+    /// Terminal-in-place without backoff — for failures classified as
+    /// deterministic (e.g. HTTP 400/422 from a callback receiver) where
+    /// retrying the identical request can never succeed and would only
+    /// head-block the partition. Same terminal shape as retry exhaustion
+    /// in <see cref="MarkAsFailed"/> (ProcessedOnUtc set + Error non-null
+    /// = "terminal failure"), but RetryCount reflects attempts actually
+    /// made — so <see cref="HasReachedMaxRetries"/> may be false on these
+    /// rows. That asymmetry is intentional: nothing on the partitioned
+    /// path reads it (only OutboxProcessorService.HandleFailureAsync and
+    /// DeadLetterStore do, central pass only).
+    /// </summary>
+    public void MarkAsPermanentlyFailed(DateTime attemptedAtUtc, string error)
+    {
+        RetryCount++;                    // count this attempt (admin UI shows it)
+        Error = error;
+        ProcessedOnUtc = attemptedAtUtc; // terminal — stop polling this row
+        NextRetryAtUtc = null;
+    }
 }

@@ -268,10 +268,31 @@ public sealed class MultiPartitionOutboxProcessor : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    _log.LogWarning(ex,
-                        "Dispatch failed for outbox row {Id} (system={SystemKey}, attempt={Attempt})",
-                        msg.Id, systemKey, msg.RetryCount + 1);
-                    msg.MarkAsFailed(DateTime.UtcNow, ex.Message);
+                    // Classify before marking: a deterministic receiver
+                    // rejection (e.g. 400 from OMS's create-once endpoint)
+                    // goes terminal-in-place immediately instead of burning
+                    // the full backoff (~2h45m) while head-blocking every
+                    // good callback behind it in this ordered partition.
+                    // Transient failures (401/403/404/408/429/5xx/timeouts/
+                    // connection-level/config errors) keep the exact
+                    // pre-classification MarkAsFailed behavior.
+                    var permanent = HttpCallbackFailureClassifier.ApplyFailure(msg, ex, DateTime.UtcNow);
+                    if (permanent)
+                    {
+                        // Warning, not Error: this is a recorded business
+                        // outcome (the audit block below emits it and the
+                        // order UI shows e.g. UpstreamOmsRejected), not
+                        // infra trouble needing a page.
+                        _log.LogWarning(ex,
+                            "Dispatch permanently rejected for outbox row {Id} (system={SystemKey}, status={Status}, attempt={Attempt}); marked terminal without retry",
+                            msg.Id, systemKey, (int?)(ex as HttpRequestException)?.StatusCode, msg.RetryCount);
+                    }
+                    else
+                    {
+                        _log.LogWarning(ex,
+                            "Dispatch failed for outbox row {Id} (system={SystemKey}, attempt={Attempt})",
+                            msg.Id, systemKey, msg.RetryCount);
+                    }
                     success = false;
                     failure = ex;
                 }
