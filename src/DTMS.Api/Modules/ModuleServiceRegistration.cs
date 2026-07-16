@@ -860,9 +860,6 @@ public static class ModuleServiceRegistration
         services.AddScoped<DTMS.Iam.Application.Callbacks.ISubscriptionLookup,
                            DTMS.Iam.Infrastructure.Callbacks.CachedSubscriptionLookup>();
         services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
-                                DTMS.Iam.Infrastructure.Callbacks.OmsShipmentDeliveredFormatter>(
-            DTMS.Iam.Infrastructure.Callbacks.OmsShipmentDeliveredFormatter.FormatKey);
-        services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
                                 DTMS.Iam.Infrastructure.Callbacks.OmsShipmentCancelledFormatter>(
             DTMS.Iam.Infrastructure.Callbacks.OmsShipmentCancelledFormatter.FormatKey);
         // Phase S.5 (B2) — OMS shipment started/arrived formatters (keep the

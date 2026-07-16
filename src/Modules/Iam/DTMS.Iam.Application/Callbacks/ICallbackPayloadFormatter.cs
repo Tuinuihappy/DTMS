@@ -7,7 +7,7 @@ namespace DTMS.Iam.Application.Callbacks;
 /// the admin stored when wiring the subscription.
 ///
 /// <para>Naming convention: <c>{system}.{shape}.v{n}</c> — e.g.
-/// <c>oms.shipment.v1</c>, <c>wms.fulfillment.v2</c>. Multiple
+/// <c>oms.shipment.started.v1</c>, <c>wms.fulfillment.v2</c>. Multiple
 /// subscribers can share one formatter if their schemas match.</para>
 ///
 /// <para>Implementations must be deterministic — the same input event

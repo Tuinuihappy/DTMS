@@ -1,24 +1,26 @@
 using System.Text.Json;
-using DTMS.DeliveryOrder.IntegrationEvents;
 using DTMS.Iam.Application.Callbacks;
 
 namespace DTMS.Iam.Infrastructure.Callbacks;
 
 /// <summary>
-/// Phase S.3.1b follow-up — sibling of
-/// <see cref="OmsShipmentDeliveredFormatter"/> for the cancellation
-/// flow. Resolved by keyed DI under <see cref="FormatKey"/>; admin
-/// wires the subscription with this key when OMS wants the cancel
-/// callback.
+/// Formats a <see cref="ShipmentCancelledContext"/> into OMS's
+/// <c>POST /api/shipments/{shipmentId}/cancel</c> call — shipmentId in the path,
+/// reason in the body, mirroring <see cref="OmsShipmentArrivedFormatter"/>.
+/// Resolved by keyed DI under <see cref="FormatKey"/>.
 ///
-/// <para>Kept as a separate formatter (vs one type-switching
-/// formatter) so each event type's payload contract can evolve
-/// independently — OMS may want extra fields on cancel (reason,
-/// triggeredBy) that don't apply to the happy path.</para>
+/// <para>The shipmentId is the root trip id the fan-out resolved, the same token
+/// OMS received from <c>shipment.started.v1</c>. An earlier revision of this
+/// formatter took the raw order event and sent <c>DeliveryOrderId</c> instead —
+/// an id OMS has never seen — and set no RelativePath, so it POSTed to
+/// <c>/events</c>, which OMS does not expose. It was never subscribed, so it
+/// never fired. FormatKey changed with the fix (<c>oms.shipment.cancel.v1</c> →
+/// <c>oms.shipment.cancelled.v1</c>) so no stale subscription row can resolve
+/// to this class and silently inherit the old contract.</para>
 /// </summary>
 public sealed class OmsShipmentCancelledFormatter : ICallbackPayloadFormatter
 {
-    public const string FormatKey = "oms.shipment.cancel.v1";
+    public const string FormatKey = "oms.shipment.cancelled.v1";
 
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
@@ -28,22 +30,20 @@ public sealed class OmsShipmentCancelledFormatter : ICallbackPayloadFormatter
 
     public Task<CallbackPayload> FormatAsync(object integrationEvent, CancellationToken ct)
     {
-        if (integrationEvent is not DeliveryOrderCancelledIntegrationEventV1 evt)
+        if (integrationEvent is not ShipmentCancelledContext ctx)
             throw new InvalidOperationException(
-                $"{nameof(OmsShipmentCancelledFormatter)} expects {nameof(DeliveryOrderCancelledIntegrationEventV1)} " +
+                $"{nameof(OmsShipmentCancelledFormatter)} expects {nameof(ShipmentCancelledContext)} " +
                 $"but received {integrationEvent.GetType().Name}.");
 
         var payload = new
         {
-            shipmentId = evt.DeliveryOrderId,
-            status = "cancelled",
-            cancelledAt = evt.OccurredOn,
-            reason = evt.Reason,
-            eventId = evt.EventId,
-            triggeredBy = evt.TriggeredBy,
+            reason = ctx.Reason,
         };
 
         var json = JsonSerializer.SerializeToUtf8Bytes(payload, JsonOpts);
-        return Task.FromResult(new CallbackPayload("application/json", json));
+        // shipmentId in the path — escaped defensively (Guid string today).
+        var path = $"/api/shipments/{Uri.EscapeDataString(ctx.ShipmentId)}/cancel";
+        return Task.FromResult(new CallbackPayload(
+            "application/json", json, RelativePath: path));
     }
 }

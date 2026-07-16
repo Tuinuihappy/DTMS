@@ -15,16 +15,17 @@ namespace DTMS.DeliveryOrder.Application.Consumers;
 /// "Upstream OMS notification" UI reads (filtered by <c>relatedTripId</c>,
 /// classified by <c>eventType</c>, latest-wins by <c>occurredAt</c>).
 ///
-/// <para>Only the OMS shipment.started / shipment.arrived outcomes are mirrored
-/// — other callback event types (order.delivered/cancelled, other systems)
-/// map to null and are ignored.</para>
+/// <para>Only the OMS shipment.started / shipment.arrived / shipment.cancelled
+/// outcomes are mirrored — other callback event types (order.delivered/cancelled,
+/// other systems) map to null and are ignored.</para>
 /// </summary>
 public sealed class SourceCallbackOutcomeConsumer : IConsumer<SourceCallbackOutcome>
 {
     // Wire-contract slugs (mirror DTMS.Iam.Application.Callbacks.CallbackEventTypes;
-    // hardcoded to avoid a cross-module reference for two stable strings).
+    // hardcoded to avoid a cross-module reference for a few stable strings).
     private const string ShipmentStartedV1 = "shipment.started.v1";
     private const string ShipmentArrivedV1 = "shipment.arrived.v1";
+    private const string ShipmentCancelledV1 = "shipment.cancelled.v1";
 
     private readonly IOrderAuditEventRepository _auditRepository;
     private readonly IOrderActivityProjectionStore _activityStore;
@@ -91,6 +92,8 @@ public sealed class SourceCallbackOutcomeConsumer : IConsumer<SourceCallbackOutc
                 : permanent ? "UpstreamOmsRejected" : "UpstreamOmsNotifyFailed",
             ShipmentArrivedV1 => success ? "UpstreamOmsArrivedNotified"
                 : permanent ? "UpstreamOmsArrivedRejected" : "UpstreamOmsArrivedNotifyFailed",
+            ShipmentCancelledV1 => success ? "UpstreamOmsCancelledNotified"
+                : permanent ? "UpstreamOmsCancelledRejected" : "UpstreamOmsCancelledNotifyFailed",
             _ => null,
         };
     }

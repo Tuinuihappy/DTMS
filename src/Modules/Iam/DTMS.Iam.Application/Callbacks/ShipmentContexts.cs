@@ -20,3 +20,14 @@ public sealed record ShipmentStartedContext(
 public sealed record ShipmentArrivedContext(
     string ShipmentId,
     IReadOnlyList<string> LotNos);
+
+/// <summary>
+/// Carries no lot list, unlike its siblings — deliberately, not an oversight.
+/// TripCancelledConsumer unbinds the order's items from the trip while handling
+/// the very same TripCancelledIntegrationEvent on its own queue, so a lot lookup
+/// here races it and comes back empty whenever that consumer commits first. A
+/// cancel keyed on the shipment id alone has nothing to race.
+/// </summary>
+public sealed record ShipmentCancelledContext(
+    string ShipmentId,
+    string Reason);
