@@ -120,9 +120,9 @@ public class ResendOmsNotificationCommandHandler
         //
         // Self-managed orders are exempt: the source system executes the
         // transport itself so there is no vendor vehicle. Resend with
-        // DeliveryBy=RequestedBy (the external actor; parity with
-        // TripStartedOmsNotifyConsumer) rather than blocking on a robot name
-        // that will never arrive.
+        // DeliveryBy=RequestedBy (the external actor; parity with the auto
+        // ShipmentStartedCallbackFanoutConsumer) rather than blocking on a
+        // robot name that will never arrive.
         if (!order.SelfManaged && string.IsNullOrWhiteSpace(trip.VendorVehicleName))
         {
             return Result<ResendOmsNotificationResult>.Failure(
@@ -140,7 +140,7 @@ public class ResendOmsNotificationCommandHandler
         // Format via the federated OMS formatter (byte-identical to legacy) and
         // dispatch SYNCHRONOUSLY through the shared callback dispatcher so the
         // operator sees the result immediately (2xx/409 → success, else fail).
-        var context = new OmsShipmentStartedContext(shipmentId, deliveryBy, lots);
+        var context = new ShipmentStartedContext(shipmentId, deliveryBy, lots);
         var payload = await _formatter.FormatAsync(context, cancellationToken);
         var msg = new OutboxMessage(
             id: Guid.NewGuid(),

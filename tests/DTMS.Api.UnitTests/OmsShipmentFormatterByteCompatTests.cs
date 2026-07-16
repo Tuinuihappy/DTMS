@@ -18,7 +18,7 @@ public class OmsShipmentFormatterByteCompatTests
     public async Task Started_BodyMatchesContract_AndRoutesToShipmentsPath()
     {
         var payload = await new OmsShipmentStartedFormatter().FormatAsync(
-            new OmsShipmentStartedContext("root-trip-1", "FAN1_STANDARD_NO3",
+            new ShipmentStartedContext("root-trip-1", "FAN1_STANDARD_NO3",
                 new[] { "LOT-A", "LOT-B" }), CancellationToken.None);
 
         Encoding.UTF8.GetString(payload.Body).Should().Be(
@@ -32,7 +32,7 @@ public class OmsShipmentFormatterByteCompatTests
     public async Task Started_NullDeliveryBy_SerializesNull()
     {
         var body = await Body(new OmsShipmentStartedFormatter(),
-            new OmsShipmentStartedContext("root-trip-1", null, new[] { "LOT-A" }));
+            new ShipmentStartedContext("root-trip-1", null, new[] { "LOT-A" }));
 
         body.Should().Be(
             "{\"shipmentId\":\"root-trip-1\",\"deliveryBy\":null,\"lots\":[{\"lotNo\":\"LOT-A\"}]}");
@@ -42,7 +42,7 @@ public class OmsShipmentFormatterByteCompatTests
     public async Task Arrived_BodyMatchesContract_AndShipmentIdInPath()
     {
         var payload = await new OmsShipmentArrivedFormatter().FormatAsync(
-            new OmsShipmentArrivedContext("root-trip-9", new[] { "LOT-A", "LOT-B" }),
+            new ShipmentArrivedContext("root-trip-9", new[] { "LOT-A", "LOT-B" }),
             CancellationToken.None);
 
         Encoding.UTF8.GetString(payload.Body).Should().Be(

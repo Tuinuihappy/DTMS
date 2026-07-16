@@ -90,8 +90,8 @@ public class ResendOmsArrivedNotificationCommandHandler
         }
 
         // Manual transport does not report arrival to OMS (parity with the auto
-        // TripDropCompletedOmsNotifyConsumer) — OMS owns the arrival signal for
-        // operator-pool / self-managed deliveries.
+        // ShipmentArrivedCallbackFanoutConsumer) — OMS owns the arrival signal
+        // for operator-pool / self-managed deliveries.
         if (order.RequestedTransportMode == TransportMode.Manual)
         {
             return Result<ResendOmsArrivedNotificationResult>.Failure(
@@ -127,7 +127,7 @@ public class ResendOmsArrivedNotificationCommandHandler
         // Format via the federated OMS arrived formatter (byte-identical to
         // legacy — shipmentId in the path, lots in the body) and dispatch
         // SYNCHRONOUSLY so the operator sees the result immediately.
-        var context = new OmsShipmentArrivedContext(shipmentId, lots);
+        var context = new ShipmentArrivedContext(shipmentId, lots);
         var payload = await _formatter.FormatAsync(context, cancellationToken);
         var msg = new OutboxMessage(
             id: Guid.NewGuid(),

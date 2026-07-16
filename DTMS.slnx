@@ -46,7 +46,6 @@
     <Project Path="src/Modules/Planning/DTMS.Planning.IntegrationEvents/DTMS.Planning.IntegrationEvents.csproj" />
     <Project Path="src/Modules/Planning/DTMS.Planning.Presentation/DTMS.Planning.Presentation.csproj" />
   </Folder>
-  <Folder Name="/src/Modules/OmsAdapter/" />
   <Folder Name="/src/Modules/Transport.Abstractions/">
     <Project Path="src/Modules/Transport.Abstractions/DTMS.Transport.Abstractions/DTMS.Transport.Abstractions.csproj" />
   </Folder>

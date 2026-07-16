@@ -93,7 +93,7 @@ public sealed class ShipmentArrivedCallbackFanoutConsumer
         }
 
         var shipmentId = (await _trips.GetRootTripIdAsync(evt.TripId, ct)).ToString();
-        var context = new OmsShipmentArrivedContext(shipmentId, lots);
+        var context = new ShipmentArrivedContext(shipmentId, lots);
         var correlationId = ctx.MessageId ?? Guid.NewGuid();
 
         foreach (var sub in subs)

@@ -4,7 +4,7 @@ using DTMS.Iam.Application.Callbacks;
 namespace DTMS.Iam.Infrastructure.Callbacks;
 
 /// <summary>
-/// Phase S.5 (B2) — formats an <see cref="OmsShipmentArrivedContext"/> into the
+/// Phase S.5 (B2) — formats an <see cref="ShipmentArrivedContext"/> into the
 /// legacy OMS <c>/api/shipments/{shipmentId}/arrived</c> call: the shipmentId
 /// travels in the URL path (resolved here into
 /// <see cref="CallbackPayload.RelativePath"/>) and only the lots travel in the
@@ -24,9 +24,9 @@ public sealed class OmsShipmentArrivedFormatter : ICallbackPayloadFormatter
 
     public Task<CallbackPayload> FormatAsync(object integrationEvent, CancellationToken ct)
     {
-        if (integrationEvent is not OmsShipmentArrivedContext ctx)
+        if (integrationEvent is not ShipmentArrivedContext ctx)
             throw new InvalidOperationException(
-                $"{nameof(OmsShipmentArrivedFormatter)} expects {nameof(OmsShipmentArrivedContext)} " +
+                $"{nameof(OmsShipmentArrivedFormatter)} expects {nameof(ShipmentArrivedContext)} " +
                 $"but received {integrationEvent.GetType().Name}.");
 
         var payload = new

@@ -56,7 +56,6 @@
     <ProjectReference Include="..\Modules\Transport.Manual\DTMS.Transport.Manual.Infrastructure\DTMS.Transport.Manual.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Transport.Manual\DTMS.Transport.Manual.Application\DTMS.Transport.Manual.Application.csproj" />
     <ProjectReference Include="..\Modules\Transport.Manual\DTMS.Transport.Manual.Presentation\DTMS.Transport.Manual.Presentation.csproj" />
-    <ProjectReference Include="..\Modules\OmsAdapter\DTMS.OmsAdapter.csproj" />
     <ProjectReference Include="..\Modules\Iam\DTMS.Iam.Application\DTMS.Iam.Application.csproj" />
     <ProjectReference Include="..\Modules\Iam\DTMS.Iam.Infrastructure\DTMS.Iam.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Iam\DTMS.Iam.Presentation\DTMS.Iam.Presentation.csproj" />

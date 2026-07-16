@@ -1035,15 +1035,23 @@ app.MapHub<DTMS.Api.Realtime.Hubs.ManualBoardHub>("/hubs/manual-board");
 app.MapHub<DTMS.Api.Realtime.Hubs.OperatorPoolHub>("/hubs/operator-pool");
 
 // Phase S.2 smoke test endpoint — returns the authenticated source
-// system's principal id + display name. Guarded by the system-side
-// permission policy so a system that holds `dtms:source:oms:order:read`
-// (or a wildcard above it) passes and any other system gets 403. Doubles
-// as the "test key" probe fired from the admin one-time-secret banner
-// after a client secret is minted or rotated.
+// system's principal id + display name. Doubles as the "test key" probe
+// fired from the admin one-time-secret banner after a client secret is
+// minted or rotated.
 //
 // Phase S.8e (P3) — canonical URL only. The former legacy variant
 // /api/v1/source/{key}/whoami was retired; identity comes from the
 // JWT sub claim so the URL carries no system slug.
+//
+// Phase 5 — authentication only, no permission grant. This used to pin
+// `dtms:source:oms:order:read`, which 403'd every non-OMS system (grants
+// are per-system slugs). No grant is the right gate: reaching this handler
+// already proves a valid system JWT + active SystemClient + registered
+// credential (SystemClientAuthMiddleware, which also overwrites User so a
+// user-JWT can't be replayed here), and the response only ever discloses
+// the caller's OWN identity. It is also a *credential* probe — gating it on
+// a grant would fail a correctly-provisioned client that simply has not
+// been granted order:read.
 app.MapGet("/api/v1/source/whoami",
     (HttpContext ctx) =>
     {
@@ -1056,7 +1064,7 @@ app.MapGet("/api/v1/source/whoami",
             displayName = sp.DisplayName,
             permissions = ctx.User.FindAll("permission").Select(c => c.Value).ToArray(),
         });
-    }).RequirePermissionForSourceSystem("dtms:source:oms:order:read");
+    }).RequireAuthorization();
 
 // (using directive added at the top of Program.cs)
 

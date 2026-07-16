@@ -69,8 +69,8 @@ public class PermissionCatalogTests
     /// No endpoint may hard-code a permission string — it must reference the
     /// catalog so typos become compile errors. Scans every *.Presentation
     /// source file for a raw <c>RequirePermission("dtms:…")</c> literal. The
-    /// source-system path uses RequirePermissionForSourceSystem/FromRouteKey
-    /// with StandardSystemPermissions constants and is unaffected.
+    /// source-system path uses RequirePermissionFromRouteKey with
+    /// StandardSystemPermissions constants and is unaffected.
     /// </summary>
     [Fact]
     public void NoEndpoint_UsesRawPermissionLiteral()

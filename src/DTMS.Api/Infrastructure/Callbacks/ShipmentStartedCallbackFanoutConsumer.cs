@@ -4,7 +4,7 @@ using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Dispatch.IntegrationEvents;
 using DTMS.Iam.Application.Callbacks;
-using DTMS.OmsAdapter.Abstractions.Exceptions;
+using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Outbox;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
@@ -113,7 +113,7 @@ public sealed class ShipmentStartedCallbackFanoutConsumer
         }
 
         var shipmentId = (await _trips.GetRootTripIdAsync(evt.TripId, ct)).ToString();
-        var context = new OmsShipmentStartedContext(shipmentId, deliveryBy, lots);
+        var context = new ShipmentStartedContext(shipmentId, deliveryBy, lots);
         var correlationId = ctx.MessageId ?? Guid.NewGuid();
 
         foreach (var sub in subs)

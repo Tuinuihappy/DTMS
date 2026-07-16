@@ -36,7 +36,7 @@ using DTMS.Planning.Infrastructure.Repositories;
 using DTMS.Planning.Infrastructure.Services;
 using DTMS.SharedKernel.Messaging;
 using DTMS.SharedKernel.Outbox;
-using DTMS.OmsAdapter.Abstractions.Exceptions;
+using DTMS.SharedKernel.Exceptions;
 using DTMS.Transport.Amr.Infrastructure;
 using DTMS.Transport.Amr.Infrastructure.Extensions;
 using MassTransit;

@@ -5,8 +5,10 @@ namespace DTMS.DeliveryOrder.Application.Commands.ResendOmsArrivedNotification;
 /// <summary>
 /// Operator-driven manual resend of the upstream-OMS "arrived"
 /// notification for a specific trip (the /api/shipments/{id}/arrived
-/// endpoint). Use when the automatic consumer dead-lettered the drop
-/// notification and the upstream issue has been resolved.
+/// endpoint). Use when the automatic callback
+/// (ShipmentArrivedCallbackFanoutConsumer → outbox) exhausted its retries
+/// and the upstream issue has been resolved. Dispatched synchronously so
+/// the operator sees the result immediately.
 /// </summary>
 public record ResendOmsArrivedNotificationCommand(
     Guid OrderId,

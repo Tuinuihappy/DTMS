@@ -4,7 +4,7 @@ using DTMS.Iam.Application.Callbacks;
 namespace DTMS.Iam.Infrastructure.Callbacks;
 
 /// <summary>
-/// Phase S.5 (B2) — formats an <see cref="OmsShipmentStartedContext"/> into the
+/// Phase S.5 (B2) — formats an <see cref="ShipmentStartedContext"/> into the
 /// exact body the legacy OMS adapter POSTed to <c>/api/shipments</c>:
 /// <c>{ "shipmentId": ..., "deliveryBy": ..., "lots": [{ "lotNo": ... }] }</c>
 /// (byte-identical to <c>OmsShipmentNotification</c>). Routes to the legacy
@@ -24,9 +24,9 @@ public sealed class OmsShipmentStartedFormatter : ICallbackPayloadFormatter
 
     public Task<CallbackPayload> FormatAsync(object integrationEvent, CancellationToken ct)
     {
-        if (integrationEvent is not OmsShipmentStartedContext ctx)
+        if (integrationEvent is not ShipmentStartedContext ctx)
             throw new InvalidOperationException(
-                $"{nameof(OmsShipmentStartedFormatter)} expects {nameof(OmsShipmentStartedContext)} " +
+                $"{nameof(OmsShipmentStartedFormatter)} expects {nameof(ShipmentStartedContext)} " +
                 $"but received {integrationEvent.GetType().Name}.");
 
         // Field names + order match the legacy OmsShipmentNotification record

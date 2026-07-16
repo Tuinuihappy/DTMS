@@ -4,15 +4,17 @@ namespace DTMS.DeliveryOrder.Application.Commands.ResendOmsNotification;
 
 /// <summary>
 /// Operator-driven manual resend of the upstream-OMS shipment notification
-/// for a specific trip. Use when MassTransit's automatic retry has
-/// dead-lettered (UpstreamOmsNotifyFailed audit) and the underlying OMS
+/// for a specific trip. Use when the automatic callback has exhausted its
+/// outbox retries (UpstreamOmsNotifyFailed audit) and the underlying OMS
 /// issue has since been resolved.
 ///
-/// Unlike <see cref="Consumers.TripStartedOmsNotifyConsumer"/>, this path
-/// calls the OMS client directly so the operator sees immediate
-/// feedback — no message queue / retry indirection. The upstream is
-/// expected to dedupe by shipmentId, so re-firing on a row that
-/// actually succeeded is harmless.
+/// <para>Unlike the automatic path (ShipmentStartedCallbackFanoutConsumer →
+/// outbox → MultiPartitionOutboxProcessor), this one formats the same
+/// payload but dispatches it SYNCHRONOUSLY through
+/// <c>ISourceCallbackDispatcher</c>, so the operator sees the result
+/// immediately — no queue / retry indirection. OMS dedupes by shipmentId
+/// (409 = success), so re-firing a row that actually succeeded is
+/// harmless.</para>
 /// </summary>
 public record ResendOmsNotificationCommand(
     Guid OrderId,

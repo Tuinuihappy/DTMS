@@ -12,7 +12,7 @@ using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Dispatch.IntegrationEvents;
 using DTMS.Iam.Application.Callbacks;
 using DTMS.Iam.Infrastructure.Callbacks;
-using DTMS.OmsAdapter.Abstractions.Exceptions;
+using DTMS.SharedKernel.Exceptions;
 using FluentAssertions;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
