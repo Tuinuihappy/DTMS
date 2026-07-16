@@ -729,21 +729,43 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     }
 
     /// <summary>
-    /// Bring a Failed order back to Confirmed so an operator can retry
-    /// the failed trip(s). Mirrors the Held → Release flow but is an
-    /// explicit admin override: only Failed (terminal) orders qualify.
-    /// Does NOT re-fire the confirmed integration event — the operator
-    /// must trigger Trip-level retry separately so the audit trail
-    /// distinguishes "who reopened" from "who retried".
+    /// Bring a Failed or Cancelled order back to Confirmed so an operator
+    /// can retry the failed/cancelled trip(s). Mirrors the Held → Release
+    /// flow but is an explicit admin override: only Failed / Cancelled
+    /// (terminal) orders qualify — Rejected and the Completed family stay
+    /// locked. Does NOT re-fire the confirmed integration event — the
+    /// operator must trigger Trip-level retry separately so the audit
+    /// trail distinguishes "who reopened" from "who retried".
+    ///
+    /// Reopening a Cancelled order also reinstates items the cancel
+    /// cascade terminated (Cancelled → Pending). AssignItemsToTrip skips
+    /// Cancelled items ("they don't ride retries"), so without this the
+    /// retry trip would dispatch a robot with 0 items bound and the order
+    /// would later recompute straight to Failed. Delivered items are never
+    /// touched; Failed/Returned items are left as-is — the retry rebind
+    /// already resets those to Pending.
     /// </summary>
-    public void Reopen(string reason)
+    /// <returns>Number of Cancelled items reinstated to Pending.</returns>
+    public int Reopen(string reason)
     {
-        if (Status != OrderStatus.Failed)
+        if (Status is not (OrderStatus.Failed or OrderStatus.Cancelled))
             throw new InvalidOperationException(
-                $"Only Failed orders can be reopened. Current status: {Status}.");
+                $"Only Failed or Cancelled orders can be reopened. Current status: {Status}.");
+
+        var reinstated = 0;
+        if (Status == OrderStatus.Cancelled)
+        {
+            foreach (var item in _items)
+            {
+                if (item.Status != ItemStatus.Cancelled) continue;
+                item.ReinstateFromCancel();
+                reinstated++;
+            }
+        }
 
         Status = OrderStatus.Confirmed;
         AddDomainEvent(new DeliveryOrderReopenedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+        return reinstated;
     }
 
     /// <summary>

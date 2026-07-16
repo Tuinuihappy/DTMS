@@ -562,7 +562,7 @@ export function OrderDetailDrawer({
                       Cancel order
                     </DrawerActionButton>
                   )}
-                  {can(data.orderStatus, ["Failed"]) && (
+                  {can(data.orderStatus, ["Failed", "Cancelled"]) && (
                     <DrawerActionButton
                       tone="lavender"
                       icon={<RotateCcw className="h-3.5 w-3.5" strokeWidth={2.4} />}

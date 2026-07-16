@@ -802,9 +802,9 @@ public class ReissueTripGuardTests
 
         result.IsFailure.Should().BeTrue();
         result.Error.Should().Contain("Cancelled");
-        // Cancelled is terminal — the hint says "terminal state", not "reopen"
-        // (you can't reopen a Cancelled order, only a Failed one).
-        result.Error.Should().Contain("terminal");
+        // Cancelled orders are recoverable via /reopen (same as Failed) —
+        // the hint must point the operator at the sanctioned 2-step path.
+        result.Error.Should().Contain("/reopen");
     }
 
     [Theory]

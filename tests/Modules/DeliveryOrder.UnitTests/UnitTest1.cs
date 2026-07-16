@@ -1164,7 +1164,7 @@ public class DeliveryOrderTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*Completed*");
     }
 
-    // ── Reopen (Failed → Confirmed, admin override) ─────────────────────
+    // ── Reopen (Failed/Cancelled → Confirmed, admin override) ───────────
 
     [Fact]
     public void Reopen_FromFailed_TransitionsToConfirmedAndFiresEvent()
@@ -1195,20 +1195,123 @@ public class DeliveryOrderTests
 
         var act = () => order.Reopen("trying to reopen non-failed order");
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*Only Failed*");
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Only Failed or Cancelled*");
     }
 
     [Fact]
-    public void Reopen_FromCancelled_Throws()
+    public void Reopen_FromCancelled_TransitionsToConfirmed_AndReinstatesItems()
+    {
+        // Full cancel cascade shape: items bound to a trip, trip cancelled
+        // → unassign, order Cancelled → CancelUnboundItems.
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.Cancel("operator stopped");
+        order.UnassignItemsFromTrip(tripA);
+        order.CancelUnboundItems();
+        order.Items.Should().OnlyContain(i => i.Status == ItemStatus.Cancelled);
+
+        var reinstated = order.Reopen("cancelled by mistake — resurrect");
+
+        reinstated.Should().Be(3);
+        order.Status.Should().Be(OrderStatus.Confirmed);
+        order.DomainEvents.OfType<DeliveryOrderReopenedDomainEvent>().Should().ContainSingle();
+        order.Items.Should().AllSatisfy(i =>
+        {
+            i.Status.Should().Be(ItemStatus.Pending);   // ready for retry rebind
+            i.TripId.Should().BeNull();
+            i.AttemptNumber.Should().BeNull();
+        });
+    }
+
+    [Fact]
+    public void Reopen_FromCancelled_RetryRebindsReinstatedItems()
+    {
+        // End-to-end domain slice of the reopen→retry flow: the retry
+        // trip must be able to rebind the reinstated items (bound > 0),
+        // otherwise the robot would run empty.
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA1 = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA1, 1, groupA.Pickup, groupA.Drop);
+        order.Cancel("operator stopped");
+        order.UnassignItemsFromTrip(tripA1);
+        order.CancelUnboundItems();
+
+        order.Reopen("resurrect");
+        var tripA2 = Guid.NewGuid();
+        var bound = order.AssignItemsToTrip(tripA2, 2, groupA.Pickup, groupA.Drop);
+
+        bound.Should().Be(2);   // SKU-A1, SKU-A2 — no longer skipped as Cancelled
+        order.Items.Where(i => i.TripId == tripA2).Should().AllSatisfy(i =>
+        {
+            i.Status.Should().Be(ItemStatus.Pending);
+            i.AttemptNumber.Should().Be(2);
+        });
+    }
+
+    [Fact]
+    public void Reopen_FromCancelled_DeliveredItemsAreNotReinstated()
+    {
+        // Group A delivered before the cancel; group B was killed by the
+        // cascade. Reopen must resurrect only group B.
+        var (order, groupA, groupB) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        var tripB = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.AssignItemsToTrip(tripB, 1, groupB.Pickup, groupB.Drop);
+        order.MarkTripItemsDelivered(tripA);
+        order.Cancel("operator stopped mid-flight");
+        order.UnassignItemsFromTrip(tripB);
+        order.CancelUnboundItems();
+
+        var reinstated = order.Reopen("resurrect group B");
+
+        reinstated.Should().Be(1);   // SKU-B1 only
+        order.Items.Where(i => i.TripId == tripA).Should().AllSatisfy(i =>
+            i.Status.Should().Be(ItemStatus.Delivered));   // untouched
+        order.Items.Where(i => i.PickupStationId == groupB.Pickup).Should().AllSatisfy(i =>
+            i.Status.Should().Be(ItemStatus.Pending));
+    }
+
+    [Fact]
+    public void Reopen_FromCancelled_PreDispatch_NoItemsCancelledYet_ReinstatesNothing()
+    {
+        // Order cancelled at Confirmed before any dispatch: no trip, no
+        // cascade, items still Pending. Reopen just flips the status.
+        var (order, _, _) = MultiGroupOrder();
+        order.Cancel("changed mind before dispatch");
+
+        var reinstated = order.Reopen("changed mind again");
+
+        reinstated.Should().Be(0);
+        order.Status.Should().Be(OrderStatus.Confirmed);
+        order.Items.Should().OnlyContain(i => i.Status == ItemStatus.Pending);
+    }
+
+    [Fact]
+    public void Reopen_FromRejected_Throws()
     {
         var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
-            "ENV-REOPEN-CXL", Priority.Normal, serviceWindow: null);
+            "ENV-REOPEN-REJ", Priority.Normal, serviceWindow: null);
         AddTestItem(order, itemSeq: 1, "WH-A", "Pack-1", "SKU-1");
-        order.Cancel("operator stopped");
+        order.Submit();
+        order.Reject("not valid");
 
-        var act = () => order.Reopen("reopen cancelled order");
+        var act = () => order.Reopen("reopen rejected order");
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*Only Failed*");
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Only Failed or Cancelled*");
+    }
+
+    [Fact]
+    public void Reopen_Twice_SecondCallThrows()
+    {
+        var (order, _, _) = MultiGroupOrder();
+        order.Cancel("stop");
+        order.Reopen("first reopen");
+
+        var act = () => order.Reopen("second reopen");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Confirmed*");
     }
 
     // ── Option A: 4-state envelope flow transitions ─────────────────────

@@ -12,13 +12,14 @@ namespace DTMS.Dispatch.Application.Commands.ReissueTrip;
 public class ReissueTripCommandHandler : ICommandHandler<ReissueTripCommand, Guid>
 {
     // Order statuses that block a Trip-level retry. Two groups:
-    //   • Terminal admin-settled: Cancelled / Rejected / Completed /
+    //   • Terminal admin-settled: Rejected / Completed /
     //     PartiallyCompleted — operator already finished this order.
-    //   • Failed: recoverable, but only through /orders/{id}/reopen.
-    //     The 2-step audit trail (reopen + retry) separates "who
-    //     reopened" from "who retried" — collapsing them would lose
-    //     compliance signal. Once reopened, Order = Confirmed and
-    //     retry proceeds normally.
+    //   • Failed / Cancelled: recoverable, but only through
+    //     /orders/{id}/reopen. The 2-step audit trail (reopen + retry)
+    //     separates "who reopened" from "who retried" — collapsing them
+    //     would lose compliance signal. Once reopened, Order = Confirmed
+    //     (Cancelled items reinstated to Pending) and retry proceeds
+    //     normally.
     // Compared as strings so we don't reach for DeliveryOrder.Domain
     // just for the enum.
     private static readonly HashSet<string> NonRetryableOrderStatuses = new(StringComparer.OrdinalIgnoreCase)
@@ -69,16 +70,20 @@ public class ReissueTripCommandHandler : ICommandHandler<ReissueTripCommand, Gui
                 $"Trip is {original.Status}. Only Cancelled or Failed trips can be retried.");
 
         // Bug fix (E2E scenario 5): a Cancelled trip on a Cancelled (or
-        // otherwise terminal-admin) order must not be retried. Without
-        // this guard, an open Trip drawer for the cancelled trip would
-        // happily re-dispatch a robot for an order the admin already
-        // killed — wasting vendor capacity and money.
+        // otherwise terminal-admin) order must not be retried directly.
+        // Without this guard, an open Trip drawer for the cancelled trip
+        // would happily re-dispatch a robot for an order the admin already
+        // killed — wasting vendor capacity and money. The sanctioned path
+        // back is /reopen (Failed and Cancelled orders only), which makes
+        // the resurrection an explicit, separately-audited admin action.
         var orderStatus = await _orderStatus.GetStatusAsync(original.DeliveryOrderId, cancellationToken);
         if (orderStatus is null)
             return Result<Guid>.Failure($"Delivery order {original.DeliveryOrderId} not found.");
         if (NonRetryableOrderStatuses.Contains(orderStatus))
         {
-            var hint = string.Equals(orderStatus, "Failed", StringComparison.OrdinalIgnoreCase)
+            var reopenable = string.Equals(orderStatus, "Failed", StringComparison.OrdinalIgnoreCase)
+                          || string.Equals(orderStatus, "Cancelled", StringComparison.OrdinalIgnoreCase);
+            var hint = reopenable
                 ? "Reopen the order first (POST /delivery-orders/{id}/reopen), then retry."
                 : "This order is in a terminal state and cannot be retried.";
             return Result<Guid>.Failure(

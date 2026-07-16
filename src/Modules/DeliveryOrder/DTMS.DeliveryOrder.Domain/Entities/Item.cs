@@ -176,6 +176,20 @@ public class Item : Entity<Guid>
         Status = ItemStatus.Cancelled;
     }
 
+    /// <summary>Inverse of <see cref="MarkCancelled"/> for the order-level
+    /// Reopen override on a Cancelled order. The cancel cascade left the
+    /// item Cancelled and unbound; put it back to Pending (and defensively
+    /// drop any stale trip binding) so the next /retry can rebind it via
+    /// AssignItemsToTrip — which deliberately skips Cancelled items.</summary>
+    internal void ReinstateFromCancel()
+    {
+        if (Status is not ItemStatus.Cancelled) return;
+        Status = ItemStatus.Pending;
+        TripId = null;
+        AttemptNumber = null;
+        DroppedOffAt = null;
+    }
+
     /// <summary>True when the item has reached one of the irreversible
     /// states the consumer flow stops touching.</summary>
     internal bool IsTerminal =>
