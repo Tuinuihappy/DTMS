@@ -159,25 +159,45 @@ public class ResendOmsArrivedNotificationCommandHandler
         }
         sw.Stop();
 
+        // F2 — OMS has already received the callback; audit/activity are
+        // best-effort from here (see ResendOmsNotificationCommandHandler).
         var auditDetails = $"trip-arrived shipmentId={shipmentId} attempt={trip.AttemptNumber} lots={lots.Count} latencyMs={sw.ElapsedMilliseconds}";
-        await _auditRepository.AddAsync(new OrderAuditEvent(
-            order.Id, AuditEventType, auditDetails, actorId: request.RequestedBy),
-            cancellationToken);
-        await _auditRepository.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _auditRepository.AddAsync(new OrderAuditEvent(
+                order.Id, AuditEventType, auditDetails, actorId: request.RequestedBy),
+                cancellationToken);
+            await _auditRepository.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex,
+                "[OmsArrivedResend] Trip {TripId} resend DELIVERED to OMS but the audit write failed — timeline may miss it",
+                trip.Id);
+        }
 
         // P2.5 mirror: see ResendOmsNotificationCommandHandler for rationale.
-        await _activityStore.AppendAsync(
-            projectorName: "OmsNotifyDirect",
-            eventId: Guid.NewGuid(),
-            orderId: order.Id,
-            category: "OmsNotify",
-            eventType: AuditEventType,
-            details: auditDetails,
-            actorId: request.RequestedBy,
-            occurredAt: DateTime.UtcNow,
-            relatedTripId: trip.Id,
-            attemptNumber: trip.AttemptNumber,
-            cancellationToken: cancellationToken);
+        try
+        {
+            await _activityStore.AppendAsync(
+                projectorName: "OmsNotifyDirect",
+                eventId: Guid.NewGuid(),
+                orderId: order.Id,
+                category: "OmsNotify",
+                eventType: AuditEventType,
+                details: auditDetails,
+                actorId: request.RequestedBy,
+                occurredAt: DateTime.UtcNow,
+                relatedTripId: trip.Id,
+                attemptNumber: trip.AttemptNumber,
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex,
+                "[OmsArrivedResend] Trip {TripId} resend DELIVERED to OMS but the activity write failed — UI may not reflect it",
+                trip.Id);
+        }
 
         _logger.LogInformation(
             "[OmsArrivedResend] Trip {TripId} (attempt {N}) → OMS event=ManualArrivedResend outcome=Success shipmentId={Sid} lots={LotCount} latencyMs={Ms} by={By}",

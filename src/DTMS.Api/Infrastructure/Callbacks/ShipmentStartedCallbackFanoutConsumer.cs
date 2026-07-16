@@ -99,6 +99,16 @@ public sealed class ShipmentStartedCallbackFanoutConsumer
 
         var deliveryBy = order.SelfManaged ? order.RequestedBy : vehicleName;
 
+        // F3 — deliveryBy=null is a shape OMS accepts by design (pool-mode
+        // dispatch sends it deliberately), so don't block; but a self-managed
+        // order with no RequestedBy is a data gap at the source worth a trace.
+        if (order.SelfManaged && string.IsNullOrWhiteSpace(deliveryBy))
+        {
+            _log.LogWarning(
+                "[ShipmentStarted] Order {OrderId} is self-managed with no RequestedBy — sending deliveryBy=null (OMS accepts it; source system should supply RequestedBy)",
+                order.Id);
+        }
+
         var lots = order.Items
             .Where(i => i.TripId == evt.TripId)
             .Select(i => i.ItemId)

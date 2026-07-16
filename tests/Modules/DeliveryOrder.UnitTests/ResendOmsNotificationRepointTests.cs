@@ -7,11 +7,14 @@ using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.DeliveryOrder.Domain.ValueObjects;
 using DTMS.Dispatch.Domain.Entities;
 using DTMS.Dispatch.Domain.Repositories;
+using System.Net;
+using System.Net.Http;
 using DTMS.Iam.Application.Callbacks;
 using DTMS.SharedKernel.Outbox;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using DomainOrder = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder;
 
 namespace DeliveryOrder.UnitTests;
@@ -123,5 +126,57 @@ public class ResendOmsNotificationRepointTests
             Arg.Any<string>(), Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
         await h.Audit.DidNotReceive().AddAsync(
             Arg.Any<OrderAuditEvent>(), Arg.Any<CancellationToken>());
+    }
+
+    // F4 — failure mapping. 4xx = OMS actively rejected (data problem at the
+    // source; retrying without fixing it is pointless) vs 5xx/transport = OMS
+    // unavailable (retrying is reasonable). The operator-facing message must
+    // steer accordingly, and neither may write a ManuallyResent audit row.
+    [Fact]
+    public async Task Resend_OmsRejects4xx_SaysRejected_AndWritesNoAudit()
+    {
+        var h = NewHarness(subscribed: true);
+        h.Dispatcher.DispatchAsync(Arg.Any<string>(), Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("lot not found", null, HttpStatusCode.NotFound));
+
+        var result = await h.Handler.Handle(
+            new ResendOmsNotificationCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("rejected");
+        await h.Audit.DidNotReceive().AddAsync(Arg.Any<OrderAuditEvent>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Resend_OmsUnavailable5xx_SaysRequestFailed_AndWritesNoAudit()
+    {
+        var h = NewHarness(subscribed: true);
+        h.Dispatcher.DispatchAsync(Arg.Any<string>(), Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("bad gateway", null, HttpStatusCode.BadGateway));
+
+        var result = await h.Handler.Handle(
+            new ResendOmsNotificationCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("request failed");
+        await h.Audit.DidNotReceive().AddAsync(Arg.Any<OrderAuditEvent>(), Arg.Any<CancellationToken>());
+    }
+
+    // F2 — once DispatchAsync returns, OMS HAS the callback. An audit/activity
+    // persistence failure after that point must not be reported as a resend
+    // failure (the operator would re-click in confusion); it is logged instead.
+    [Fact]
+    public async Task Resend_AuditWriteFails_AfterDelivery_StillReturnsSuccess()
+    {
+        var h = NewHarness(subscribed: true);
+        h.Audit.AddAsync(Arg.Any<OrderAuditEvent>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("db hiccup"));
+
+        var result = await h.Handler.Handle(
+            new ResendOmsNotificationCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue("OMS already received the callback — persistence trouble must not masquerade as a send failure");
+        await h.Dispatcher.Received(1).DispatchAsync(
+            WellKnownSourceSystems.Oms, Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
     }
 }
