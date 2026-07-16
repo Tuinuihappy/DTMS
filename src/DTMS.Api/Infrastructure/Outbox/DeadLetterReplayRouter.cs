@@ -9,10 +9,14 @@ using Microsoft.EntityFrameworkCore;
 namespace DTMS.Api.Infrastructure.Outbox;
 
 /// <summary>
-/// Phase O3 — routes DLQ replay back to the module that owns the
-/// original OutboxMessages table. Switch on <c>Source</c> string.
-/// Keep this in sync with the module set OutboxProcessorService drains
-/// (see <c>ProcessUnpublishedEventsAsync</c>'s modules array).
+/// Phase O3 — routes DLQ replay back to the table that owns the
+/// original OutboxMessages row. Switch on <c>Source</c> string.
+/// Keep this in sync with the set OutboxProcessorService drains:
+/// the 5 module schemas (see <c>ProcessUnpublishedEventsAsync</c>'s
+/// modules array) plus the central <c>outbox</c> schema
+/// (<c>ProcessCentralOutboxAsync</c> — added alongside the central
+/// drain; before that, replaying a central-row DLQ entry threw
+/// "Unknown DLQ source 'outbox'").
 /// </summary>
 public sealed class DeadLetterReplayRouter : IDeadLetterReplayRouter
 {
@@ -33,6 +37,9 @@ public sealed class DeadLetterReplayRouter : IDeadLetterReplayRouter
             DispatchDbContext.Schema       => scope.ServiceProvider.GetRequiredService<DispatchDbContext>(),
             FleetDbContext.Schema          => scope.ServiceProvider.GetRequiredService<FleetDbContext>(),
             VendorAdapterDbContext.Schema  => scope.ServiceProvider.GetRequiredService<VendorAdapterDbContext>(),
+            // Central `outbox` schema — SourceCallbackOutcome and other
+            // api-level rows drained by ProcessCentralOutboxAsync.
+            OutboxDbContext.Schema         => scope.ServiceProvider.GetRequiredService<OutboxDbContext>(),
             _ => throw new InvalidOperationException(
                 $"Unknown DLQ source '{source}' — cannot route replay. Add the schema to DeadLetterReplayRouter."),
         };

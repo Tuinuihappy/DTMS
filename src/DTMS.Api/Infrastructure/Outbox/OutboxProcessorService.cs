@@ -233,7 +233,7 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
         OutboxOptions opts,
         CancellationToken cancellationToken)
     {
-        const string source = "outbox";
+        const string source = OutboxDbContext.Schema;
         if (!opts.UseSkipLocked)
         {
             var messages = await FetchCentralBatchAsync(db, opts.BatchSize, cancellationToken);

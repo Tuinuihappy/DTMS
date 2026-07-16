@@ -5,6 +5,14 @@ namespace DTMS.Api.Infrastructure.Outbox;
 
 public class OutboxDbContext : DbContext
 {
+    /// <summary>
+    /// Schema name — doubles as the DLQ <c>Source</c> slug for rows that
+    /// originate from this central table (see OutboxProcessorService's
+    /// central pass and DeadLetterReplayRouter). Keep the three in sync
+    /// by referencing this constant.
+    /// </summary>
+    public const string Schema = "outbox";
+
     public OutboxDbContext(DbContextOptions<OutboxDbContext> options) : base(options) { }
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
@@ -15,7 +23,7 @@ public class OutboxDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.HasDefaultSchema("outbox");
+        modelBuilder.HasDefaultSchema(Schema);
 
         modelBuilder.Entity<OutboxMessage>(e =>
         {
