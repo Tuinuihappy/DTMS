@@ -58,6 +58,11 @@ public sealed class WorkflowMetrics : IDisposable
     // coordinating on the meter.
     private long _ordersStuckPlanned;
     private long _outboxPending;
+    // Oldest un-processed outbox row, in seconds, across every schema the
+    // processor owns. Distinct from outbox_age_seconds (recorded only on a
+    // SUCCESSFUL publish, blind to a row nobody drains). Stored as long ticks-
+    // free whole seconds via Interlocked; producer = OutboxProcessorService.
+    private long _outboxOldestPendingAgeSeconds;
     // Phase O3 — DLQ size gauge. Set periodically by DlqSizeReporterService.
     private long _outboxDlqSize;
     // AMR reconciler gauges, set each tick by Riot3ReconciliationService.
@@ -118,6 +123,12 @@ public sealed class WorkflowMetrics : IDisposable
             () => Interlocked.Read(ref _outboxPending),
             unit: "messages",
             description: "Outbox messages with ProcessedOnUtc=null (set by the outbox processor).");
+
+        _meter.CreateObservableGauge(
+            "dtms.workflow.outbox_oldest_pending_age_seconds",
+            () => Interlocked.Read(ref _outboxOldestPendingAgeSeconds),
+            unit: "s",
+            description: "Age of the oldest un-processed outbox row across all owned schemas. Reads the backlog directly (unlike outbox_age_seconds, which only records on successful publish), so it surfaces rows nobody drains. Sustained climb = a strand.");
 
         _meter.CreateObservableGauge(
             "dtms.workflow.outbox_dlq_size",
@@ -182,6 +193,9 @@ public sealed class WorkflowMetrics : IDisposable
 
     public void SetOutboxPending(long count)
         => Interlocked.Exchange(ref _outboxPending, Math.Max(0, count));
+
+    public void SetOutboxOldestPendingAgeSeconds(double ageSeconds)
+        => Interlocked.Exchange(ref _outboxOldestPendingAgeSeconds, (long)Math.Max(0, ageSeconds));
 
     public void SetOutboxDlqSize(long count)
         => Interlocked.Exchange(ref _outboxDlqSize, Math.Max(0, count));

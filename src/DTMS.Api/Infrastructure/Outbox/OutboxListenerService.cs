@@ -42,9 +42,13 @@ public sealed class OutboxListenerService : BackgroundService
     private readonly IOutboxWakeSignal _wakeSignal;
     private readonly ILogger<OutboxListenerService> _log;
 
-    // Same set OutboxProcessorService drains — see ProcessUnpublishedEventsAsync.
-    // OutboxDbContext's `outbox` schema is drained by MultiPartitionOutboxProcessor,
-    // so we don't LISTEN on it here (its rows follow a different path).
+    // The module schemas OutboxProcessorService drains — see
+    // ProcessUnpublishedEventsAsync. We do NOT LISTEN on the central `outbox`
+    // schema: its partitioned rows are driven by MultiPartitionOutboxProcessor's
+    // own loop, and its null-partition rows (SourceCallbackOutcome etc.) are
+    // drained by OutboxProcessorService's central pass on the poll timer. A
+    // NOTIFY channel here would only shave poll latency off that audit-mirror
+    // path — not a correctness gap — so it is intentionally left out for now.
     private static readonly string[] Schemas =
     {
         DeliveryOrderDbContext.Schema,

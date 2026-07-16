@@ -152,12 +152,22 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
         // (an Exception escaping the body would cancel the rest of WhenAll
         // and surface as a noisy "Error processing outbox messages" log
         // every poll until the offending module recovers).
-        // Phase S.3 — central OutboxDbContext is owned by
-        // MultiPartitionOutboxProcessor going forward (it routes
-        // PartitionKey-tagged rows to per-system workers). The legacy
-        // processor stays in charge of the per-module outbox tables,
-        // each of which holds NULL-partition-key domain events going
-        // out via MassTransit.
+        //
+        // Outbox ownership (the real partition of work — by what a row MEANS,
+        // not which schema it happens to live in):
+        //   • MultiPartitionOutboxProcessor owns the PARTITIONED rows in the
+        //     central `outbox` schema (PartitionKey != null) — HTTP callbacks
+        //     fanned to per-system workers.
+        //   • THIS service owns every NULL-partition row = an integration event
+        //     going out via MassTransit. That is the 5 module tables (which
+        //     only ever hold null-partition rows — PartitionKey isn't even
+        //     mapped there) PLUS the null-partition rows in the central `outbox`
+        //     schema (e.g. SourceCallbackOutcome written by MultiPartition).
+        // Before this pass existed, those central null-partition rows were
+        // drained by nobody — each processor's comment assumed the other owned
+        // them — and stranded silently. The central pass MUST filter
+        // PartitionKey IS NULL so it never races MultiPartition for a
+        // partitioned row (double-delivery); see FetchCentralBatch* below.
         var modules = new (DbContext db, string source)[]
         {
             (scope.ServiceProvider.GetRequiredService<DeliveryOrderDbContext>(), DeliveryOrderDbContext.Schema),
@@ -181,12 +191,80 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
             }
         }));
 
-        // T1.6 — aggregate pending count across all schemas per poll so the
-        // dtms_workflow_outbox_pending gauge reflects current backlog. If this
-        // climbs > 500 sustained the outbox is falling behind and ops should
-        // page (see plan section 5).
-        _metrics.SetOutboxPending(perModuleResults.Sum(r => r.Pending));
-        return perModuleResults.Sum(r => r.Processed);
+        // Central `outbox` schema — null-partition rows only. Runs on the same
+        // scope's OutboxDbContext; isolated in its own try/catch so a central
+        // fault doesn't cancel the module results (and vice-versa).
+        var centralOutbox = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
+        (long Pending, int Processed) centralResult;
+        try
+        {
+            centralResult = await ProcessCentralOutboxAsync(centralOutbox, publisher, dlq, opts, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Central outbox tick failed; module drains unaffected");
+            centralResult = (0L, 0);
+        }
+
+        // Aggregate pending across ALL schemas the processor owns — the 5
+        // modules and the central null-partition slice — so the
+        // dtms_workflow_outbox_pending gauge reflects the true backlog. (It
+        // previously summed modules only, so a strand in the central schema
+        // — exactly the failure this pass fixes — was invisible to the gauge.)
+        _metrics.SetOutboxPending(perModuleResults.Sum(r => r.Pending) + centralResult.Pending);
+
+        // Oldest un-processed row age. Unlike outbox_age_seconds (recorded only
+        // on a SUCCESSFUL publish, so it can never see a row that nobody
+        // drains), this reads the backlog directly — the one signal that would
+        // have caught the week-long strand.
+        _metrics.SetOutboxOldestPendingAgeSeconds(await MaxPendingAgeSecondsAsync(centralOutbox, modules, cancellationToken));
+
+        return perModuleResults.Sum(r => r.Processed) + centralResult.Processed;
+    }
+
+    // Central `outbox` schema drain — the ONLY fetch that filters on
+    // PartitionKey (the column exists here; the 5 module schemas Ignore it).
+    // PartitionKey IS NULL is the double-delivery guard: partitioned rows
+    // belong to MultiPartitionOutboxProcessor and must not be published here.
+    internal async Task<(long Pending, int Processed)> ProcessCentralOutboxAsync(
+        OutboxDbContext db,
+        IPublishEndpoint publisher,
+        DTMS.SharedKernel.Outbox.IDeadLetterStore dlq,
+        OutboxOptions opts,
+        CancellationToken cancellationToken)
+    {
+        const string source = "outbox";
+        if (!opts.UseSkipLocked)
+        {
+            var messages = await FetchCentralBatchAsync(db, opts.BatchSize, cancellationToken);
+            if (messages.Count == 0)
+                return (await CountCentralPendingAsync(db, cancellationToken), 0);
+
+            await PublishBatchAsync(messages, publisher, dlq, db, source, opts, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            return (await CountCentralPendingAsync(db, cancellationToken), messages.Count);
+        }
+
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+
+            var messages = await FetchCentralBatchSkipLockedAsync(db, opts.BatchSize, cancellationToken);
+            if (messages.Count == 0)
+            {
+                await tx.RollbackAsync(cancellationToken);
+                return (await CountCentralPendingAsync(db, cancellationToken), 0);
+            }
+
+            _logger.LogDebug("Processing {Count} central outbox messages (SKIP LOCKED)", messages.Count);
+
+            await PublishBatchAsync(messages, publisher, dlq, db, source, opts, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            await tx.CommitAsync(cancellationToken);
+
+            return (await CountCentralPendingAsync(db, cancellationToken), messages.Count);
+        });
     }
 
     private Task<(long Pending, int Processed)> ProcessModuleAsync(
@@ -307,6 +385,66 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
 
     private static Task<int> CountPendingAsync(DbContext db, CancellationToken cancellationToken) =>
         db.Set<OutboxMessage>().CountAsync(m => m.ProcessedOnUtc == null, cancellationToken);
+
+    // Central-schema variants — identical to the module fetches but with the
+    // `PartitionKey IS NULL` guard. Kept separate (not a predicate param on the
+    // shared helpers) because the 5 module contexts Ignore PartitionKey, so the
+    // LINQ path can't translate it and the raw-SQL path hits 42703 there.
+    internal static async Task<List<OutboxMessage>> FetchCentralBatchAsync(
+        OutboxDbContext db, int batchSize, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        return await db.OutboxMessages
+            .Where(m => m.PartitionKey == null
+                        && m.ProcessedOnUtc == null
+                        && (m.NextRetryAtUtc == null || m.NextRetryAtUtc <= now))
+            .OrderBy(m => m.OccurredOnUtc)
+            .Take(batchSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static async Task<List<OutboxMessage>> FetchCentralBatchSkipLockedAsync(
+        OutboxDbContext db, int batchSize, CancellationToken cancellationToken)
+    {
+        const string sql = @"SELECT * FROM outbox.""OutboxMessages""
+                     WHERE ""PartitionKey"" IS NULL
+                       AND ""ProcessedOnUtc"" IS NULL
+                       AND (""NextRetryAtUtc"" IS NULL OR ""NextRetryAtUtc"" <= NOW())
+                     ORDER BY ""OccurredOnUtc""
+                     LIMIT {0}
+                     FOR UPDATE SKIP LOCKED";
+
+        return await db.OutboxMessages
+            .FromSqlRaw(sql, batchSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static Task<int> CountCentralPendingAsync(OutboxDbContext db, CancellationToken cancellationToken) =>
+        db.OutboxMessages.CountAsync(m => m.PartitionKey == null && m.ProcessedOnUtc == null, cancellationToken);
+
+    // Oldest pending row across every schema this service owns, in seconds.
+    // Reads the backlog directly (MIN OccurredOnUtc of unprocessed rows) so a
+    // stranded row is visible even though it is never published — the gap that
+    // let SourceCallbackOutcome rows sit unnoticed for a week.
+    private static async Task<double> MaxPendingAgeSecondsAsync(
+        OutboxDbContext central, (DbContext db, string source)[] modules, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        DateTime? oldest = await central.OutboxMessages
+            .Where(m => m.PartitionKey == null && m.ProcessedOnUtc == null)
+            .MinAsync(m => (DateTime?)m.OccurredOnUtc, cancellationToken);
+
+        foreach (var (db, _) in modules)
+        {
+            var moduleOldest = await db.Set<OutboxMessage>()
+                .Where(m => m.ProcessedOnUtc == null)
+                .MinAsync(m => (DateTime?)m.OccurredOnUtc, cancellationToken);
+            if (moduleOldest is { } mo && (oldest is null || mo < oldest))
+                oldest = mo;
+        }
+
+        return oldest is { } o ? Math.Max(0, (now - o).TotalSeconds) : 0;
+    }
 
     // Two-phase publish: parallel publish + sequential mutate. The DbContext
     // is NOT thread-safe — MarkAsProcessed/MarkAsFailed mutate change-tracked

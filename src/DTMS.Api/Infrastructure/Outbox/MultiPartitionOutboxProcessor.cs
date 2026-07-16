@@ -280,9 +280,13 @@ public sealed class MultiPartitionOutboxProcessor : BackgroundService
                 // an order, so the owning module can write per-order audit. Fire
                 // on success (once) or on TERMINAL failure only (retries
                 // exhausted → MarkAsFailed set ProcessedOnUtc); a non-terminal
-                // failure will retry, so we stay quiet. The row is a null-
-                // partition outbox message → the legacy OutboxProcessorService
-                // publishes it through MassTransit.
+                // failure will retry, so we stay quiet. The row is a NULL-
+                // partition outbox message written into this same `outbox`
+                // schema: OutboxProcessorService's central pass drains
+                // null-partition rows and publishes it through MassTransit (we
+                // own only the partitioned rows here). It is written in the same
+                // transaction as MarkAsProcessed — the callback result and its
+                // audit-emit commit atomically.
                 if (msg.RelatedOrderId is { } orderId && (success || msg.ProcessedOnUtc is not null))
                 {
                     var statusCode = (failure as HttpRequestException)?.StatusCode;
