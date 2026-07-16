@@ -289,7 +289,7 @@ function ExperienceInner() {
   const [cancelTarget, setCancelTarget] = useState<DeliveryOrderListDto | null>(null);
   const [bulkCancelTargets, setBulkCancelTargets] =
     useState<DeliveryOrderListDto[] | null>(null);
-  // Reopen dialog state — admin override for Failed orders. Captures
+  // Reopen dialog state — admin override for Failed/Cancelled orders. Captures
   // reopenedBy + reason; the dialog calls /reopen directly so we don't
   // need to thread another action through runAction's optimistic flow.
   const [reopenTarget, setReopenTarget] = useState<DeliveryOrderListDto | null>(null);
@@ -1137,7 +1137,7 @@ function ExperienceInner() {
           setReopenTarget(null);
           setReopenError(null);
         }}
-        onConfirm={async ({ reopenedBy, reason }) => {
+        onConfirm={async ({ reopenedBy, reason, autoRetry }) => {
           if (!reopenTarget) return;
           setReopenBusy(true);
           setReopenError(null);
@@ -1150,7 +1150,7 @@ function ExperienceInner() {
                   "Content-Type": "application/json",
                   "Idempotency-Key": crypto.randomUUID(),
                 },
-                body: JSON.stringify({ reopenedBy, reason }),
+                body: JSON.stringify({ reopenedBy, reason, autoRetry }),
               },
             );
             if (!res.ok) {
@@ -1159,17 +1159,35 @@ function ExperienceInner() {
               } | null;
               throw new Error(body?.message ?? `Reopen failed (${res.status})`);
             }
+            const result = (await res.json().catch(() => null)) as {
+              reinstatedItems: number;
+              retriedTrips: number;
+              retryErrors: string[];
+            } | null;
             // Optimistic: bump the row to Confirmed so the list reflects
-            // the new state immediately. Next poll will reconcile.
+            // the new state immediately. Next poll will reconcile (a
+            // successful auto-retry moves it further to InProgress).
             setOrders((prev) =>
               prev.map((o) =>
                 o.id === reopenTarget.id ? { ...o, orderStatus: "Confirmed" } : o,
               ),
             );
-            toast.push({
-              tone: "success",
-              message: `${reopenTarget.orderRef} reopened — use Retry on the failed Trip to redispatch.`,
-            });
+            if (result && result.retryErrors.length > 0) {
+              toast.push({
+                tone: "error",
+                message: `${reopenTarget.orderRef} reopened, but retry failed: ${result.retryErrors[0]}`,
+              });
+            } else if (result && result.retriedTrips > 0) {
+              toast.push({
+                tone: "success",
+                message: `${reopenTarget.orderRef} reopened — retrying ${result.retriedTrips} trip(s) now.`,
+              });
+            } else {
+              toast.push({
+                tone: "success",
+                message: `${reopenTarget.orderRef} reopened — use Retry on the failed/cancelled Trip to redispatch.`,
+              });
+            }
             setReopenTarget(null);
           } catch (err) {
             setReopenError((err as Error).message);

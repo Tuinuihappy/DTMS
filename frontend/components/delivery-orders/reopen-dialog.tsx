@@ -5,11 +5,12 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
-// Modal for the admin "Reopen Failed order" action. Required fields:
-// reopenedBy (current user id) + reason (free text). On success the
-// caller refreshes the order; the operator then triggers /retry on the
-// failed Trip separately — the two-step audit trail distinguishes
-// "who reopened" from "who retried".
+// Modal for the admin "Reopen order" action (Failed or Cancelled).
+// Required fields: reopenedBy (current user id) + reason (free text).
+// On success the caller refreshes the order; the operator then triggers
+// /retry on the failed/cancelled Trip separately — the two-step audit
+// trail distinguishes "who reopened" from "who retried". Reopening a
+// Cancelled order also reinstates cascade-cancelled items server-side.
 export function ReopenDialog({
   orderRef,
   currentUser,
@@ -23,17 +24,19 @@ export function ReopenDialog({
   currentUser: string | null;
   open: boolean;
   onClose: () => void;
-  onConfirm: (input: { reopenedBy: string; reason: string }) => Promise<void> | void;
+  onConfirm: (input: { reopenedBy: string; reason: string; autoRetry: boolean }) => Promise<void> | void;
   busy?: boolean;
   error?: string | null;
 }) {
   const [reason, setReason] = useState("");
   const [reopenedBy, setReopenedBy] = useState(currentUser ?? "");
+  const [autoRetry, setAutoRetry] = useState(true);
 
   useEffect(() => {
     if (open) {
       setReason("");
       setReopenedBy(currentUser ?? "");
+      setAutoRetry(true);
     }
   }, [open, currentUser]);
 
@@ -77,7 +80,7 @@ export function ReopenDialog({
                 </span>
                 <div>
                   <h2 className="text-[15px] font-semibold text-[var(--color-ink-900)]">
-                    Reopen failed order
+                    Reopen order
                   </h2>
                   {orderRef && (
                     <p className="mt-0.5 font-mono text-[11px] text-[var(--color-ink-500)]">
@@ -100,15 +103,36 @@ export function ReopenDialog({
               onSubmit={async (e) => {
                 e.preventDefault();
                 if (!canSubmit) return;
-                await onConfirm({ reopenedBy: reopenedBy.trim(), reason: reason.trim() });
+                await onConfirm({ reopenedBy: reopenedBy.trim(), reason: reason.trim(), autoRetry });
               }}
               className="space-y-4 px-5 py-4"
             >
               <p className="rounded-lg bg-[var(--color-pastel-lavender)]/40 px-3 py-2.5 text-[12px] leading-relaxed text-[var(--color-pastel-lavender-ink)]">
-                Reopen sets the order back to <strong>Confirmed</strong>. After this, click
-                <strong> Retry</strong> on the failed Trip to redispatch — the audit log
-                keeps the reopen and retry events separate.
+                Reopen sets the order back to <strong>Confirmed</strong>
+                {autoRetry ? (
+                  <> and immediately retries its failed/cancelled trip(s) — the audit log
+                  still records the reopen and each retry separately.</>
+                ) : (
+                  <>. After this, click <strong>Retry</strong> on the failed or cancelled
+                  Trip to redispatch — the audit log keeps the reopen and retry events
+                  separate.</>
+                )}
               </p>
+
+              <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-[var(--color-ink-100)] px-3 py-2.5 dark:border-white/[0.06]">
+                <input
+                  type="checkbox"
+                  checked={autoRetry}
+                  onChange={(e) => setAutoRetry(e.target.checked)}
+                  className="h-4 w-4 rounded accent-[var(--color-brand-500)]"
+                />
+                <span className="text-[12.5px] font-medium text-[var(--color-ink-900)]">
+                  Retry trips immediately
+                  <span className="block text-[11px] font-normal text-[var(--color-ink-500)]">
+                    Uncheck if you need to fix something (station, template) before redispatching.
+                  </span>
+                </span>
+              </label>
 
               <label className="block">
                 <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-500)]">

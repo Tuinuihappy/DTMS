@@ -36,7 +36,7 @@ public record CancelOrderRequest(string Reason);
 public record RejectOrderRequest(string Reason, string? RejectedBy = null);
 public record HoldOrderRequest(string Reason, string? HeldBy = null);
 public record ReleaseOrderRequest(string? ReleasedBy = null);
-public record ReopenOrderRequest(string ReopenedBy, string Reason);
+public record ReopenOrderRequest(string ReopenedBy, string Reason, bool AutoRetry = false);
 public record AbandonOrderRequest(string AbandonedBy, string Reason);
 public record RedispatchOrderRequest(string RedispatchedBy, string Reason, double WeightFallbackKg = 0);
 public record ResendOmsNotificationRequest(string? RequestedBy = null);
@@ -99,13 +99,19 @@ public static class DeliveryOrderEndpoints
         }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderHold);
 
         // POST /api/v1/delivery-orders/{id}/reopen — admin override: bring a
-        // Failed order back to Confirmed so the operator can call
-        // /dispatch/trips/{tripId}/retry on its failed trip(s). Does NOT
-        // auto-retry — the two actions are audited separately on purpose.
+        // Failed or Cancelled order back to Confirmed so its terminal
+        // trip(s) can be retried. Reopening a Cancelled order reinstates
+        // cascade-cancelled items to Pending so the retry can rebind them.
+        // AutoRetry=true additionally reissues the tip of each retry chain
+        // via ReissueTripCommand(source: "Reopen") — same path as the manual
+        // retry button, still audited separately (OrderReopened +
+        // TripRetryEvent). Rejected while any trip is still active (cancel
+        // cascade racing). Returns { reinstatedItems, retriedTrips,
+        // retryErrors } so the UI can toast the outcome.
         group.MapPost("/{id:guid}/reopen", async (Guid id, [FromBody] ReopenOrderRequest body, ISender sender) =>
         {
-            var result = await sender.Send(new ReopenDeliveryOrderCommand(id, body.ReopenedBy, body.Reason));
-            return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+            var result = await sender.Send(new ReopenDeliveryOrderCommand(id, body.ReopenedBy, body.Reason, body.AutoRetry));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderReopen);
 
         // POST /api/v1/delivery-orders/{id}/abandon-after-trip-cancel —

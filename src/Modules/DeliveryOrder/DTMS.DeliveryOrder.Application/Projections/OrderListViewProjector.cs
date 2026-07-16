@@ -44,6 +44,7 @@ public class OrderListViewProjector :
     IConsumer<DeliveryOrderRejectedIntegrationEventV1>,
     IConsumer<DeliveryOrderHeldIntegrationEventV1>,
     IConsumer<DeliveryOrderReleasedIntegrationEventV1>,
+    IConsumer<DeliveryOrderReopenedIntegrationEventV1>,
     IConsumer<DeliveryOrderAmendedIntegrationEventV1>,
     IConsumer<DeliveryOrderDraftUpdatedIntegrationEventV1>,
     // Trip lifecycle ─────────────────────────────────────────────────────
@@ -139,6 +140,14 @@ public class OrderListViewProjector :
             () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<DeliveryOrderReleasedIntegrationEventV1> ctx)
+        => Run(ctx, ctx.Message.DeliveryOrderId, "Confirmed",
+            () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
+
+    // Reopen (Failed/Cancelled → Confirmed, admin override). Same
+    // refresh-from-aggregate path as Release: the status flips back AND
+    // item states changed (cancelled items reinstated to Pending), so a
+    // plain status write would leave the item counters stale.
+    public Task Consume(ConsumeContext<DeliveryOrderReopenedIntegrationEventV1> ctx)
         => Run(ctx, ctx.Message.DeliveryOrderId, "Confirmed",
             () => _store.RefreshFromAggregateAsync(ctx.Message.DeliveryOrderId, ctx.Message.OccurredOn, ctx.CancellationToken));
 

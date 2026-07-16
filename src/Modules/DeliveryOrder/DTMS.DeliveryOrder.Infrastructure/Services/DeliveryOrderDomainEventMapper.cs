@@ -183,11 +183,20 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
                     TriggeredBy: triggeredBy, CorrelationId: correlationId,
                     Channel: channel, DisplayName: displayName)
             ],
-            // Reopen is an admin action that brings Failed → Confirmed for
-            // retry. We intentionally do NOT re-fire DeliveryOrderConfirmed
-            // here — the operator must explicitly call /trips/{id}/retry
-            // so the audit trail separates "who reopened" from "who retried".
-            DeliveryOrderReopenedDomainEvent         => [],
+            // Reopen is an admin action that brings Failed/Cancelled →
+            // Confirmed for retry. We intentionally do NOT re-fire
+            // DeliveryOrderConfirmed here — Planning would auto-dispatch and
+            // bypass the retry chain (new shipmentId, no PreviousAttemptId).
+            // Instead a dedicated Reopened event goes out so read-model
+            // projectors (OrderListView, status history) track the
+            // Confirmed transition; Planning does not consume it.
+            DeliveryOrderReopenedDomainEvent evt =>
+            [
+                new DeliveryOrderReopenedIntegrationEventV1(
+                    evt.EventId, evt.OccurredOn, evt.OrderId, evt.Reason,
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
+            ],
             // Redispatch is the "no Trip ever materialised" recovery path
             // (e.g. every group failed dispatch). The Redispatch domain
             // method re-fires DeliveryOrderConfirmedDomainEvent alongside

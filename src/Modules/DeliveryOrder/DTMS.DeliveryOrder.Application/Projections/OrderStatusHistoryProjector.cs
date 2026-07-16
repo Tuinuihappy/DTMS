@@ -19,7 +19,7 @@ namespace DTMS.DeliveryOrder.Application.Projections;
 ///     Failed, Cancelled, Rejected, Held, Released, Amended — P1 baseline.
 ///
 /// Coverage gaps (deliberate — internal-only domain events):
-///   - DraftUpdated, PlanningStarted, Planned, Reopened, Redispatched
+///   - DraftUpdated, PlanningStarted, Planned, Redispatched
 ///     (DeliveryOrderDomainEventMapper returns [] for these — no
 ///     integration event reaches the bus.)
 ///
@@ -45,6 +45,7 @@ public class OrderStatusHistoryProjector :
     IConsumer<DeliveryOrderRejectedIntegrationEventV1>,
     IConsumer<DeliveryOrderHeldIntegrationEventV1>,
     IConsumer<DeliveryOrderReleasedIntegrationEventV1>,
+    IConsumer<DeliveryOrderReopenedIntegrationEventV1>,
     IConsumer<DeliveryOrderAmendedIntegrationEventV1>
 {
     public const string Name = nameof(OrderStatusHistoryProjector);
@@ -117,6 +118,10 @@ public class OrderStatusHistoryProjector :
     public Task Consume(ConsumeContext<DeliveryOrderReleasedIntegrationEventV1> ctx)
         // Release returns the order to Confirmed (per DeliveryOrder.cs Release method).
         => Project(ctx, ctx.Message.DeliveryOrderId, "Confirmed", reason: "Released from Held");
+
+    public Task Consume(ConsumeContext<DeliveryOrderReopenedIntegrationEventV1> ctx)
+        // Reopen returns a Failed/Cancelled order to Confirmed (admin override).
+        => Project(ctx, ctx.Message.DeliveryOrderId, "Confirmed", reason: $"Reopened: {ctx.Message.Reason}");
 
     public Task Consume(ConsumeContext<DeliveryOrderAmendedIntegrationEventV1> ctx)
         // Amend doesn't move Status, but it's an interesting timeline event —

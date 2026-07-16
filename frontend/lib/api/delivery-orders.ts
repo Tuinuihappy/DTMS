@@ -554,16 +554,24 @@ export async function releaseOrder(
   return unwrap<{ orderId: string; warnings?: string[] }>(res);
 }
 
+export interface ReopenOrderResult {
+  reinstatedItems: number;
+  retriedTrips: number;
+  retryErrors: string[];
+}
+
 export async function reopenOrder(
   id: string,
-  body: { reopenedBy: string; reason: string },
-): Promise<void> {
+  body: { reopenedBy: string; reason: string; autoRetry?: boolean },
+): Promise<ReopenOrderResult | undefined> {
   const res = await fetch(`/api/delivery-orders/${id}/reopen`, {
     method: "POST",
     headers: mutationHeaders(),
     body: JSON.stringify(body),
   });
-  if (!res.ok && res.status !== 204) await unwrap(res);
+  // Pre-autoRetry API replied 204; current API replies 200 + result body.
+  if (res.status === 204) return undefined;
+  return unwrap<ReopenOrderResult>(res);
 }
 
 export async function redispatchOrder(

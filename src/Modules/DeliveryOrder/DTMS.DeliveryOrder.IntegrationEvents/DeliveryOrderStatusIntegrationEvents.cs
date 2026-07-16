@@ -93,6 +93,19 @@ public record DeliveryOrderReleasedIntegrationEventV1(
     string? DisplayName = null,
     string SchemaVersion = "1.2") : IIntegrationEvent;
 
+// Reopen is the admin override that brings a Failed/Cancelled order back
+// to Confirmed for retry. Deliberately a separate event from Confirmed —
+// Planning's dispatch consumer must NOT react to it (the retry is
+// triggered explicitly, keeping the reopen/retry audit trail split).
+// Consumers today: read-model projectors only.
+public record DeliveryOrderReopenedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string? Channel = null,
+    string? DisplayName = null,
+    string SchemaVersion = "1.2") : IIntegrationEvent;
+
 public record DeliveryOrderRejectedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid DeliveryOrderId, string Reason,
     string? TriggeredBy = null,
