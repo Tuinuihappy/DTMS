@@ -582,7 +582,7 @@ services:
       # in this container. The api container is the single owner of:
       #   Riot3HealthPollerService, VendorHealthBroadcaster,
       #   VendorHealthWebhookNotifier (Program.cs),
-      #   MapStationSyncService, RouteEdgeSyncService,
+      #   MapStationSyncService,
       #   Riot3PositionPollerService (ModuleServiceRegistration.cs),
       #   Riot3ReconciliationService (VendorAdapterServiceRegistration.cs).
       # Without this flag, the worker doubled the RIOT3 API call rate +

@@ -27,11 +27,15 @@ public class SimpleRouteCostCalculator : IRouteCostCalculator
 
         if (!cost.HasValue)
         {
-            _logger.LogWarning(
-                "No RouteEdge found for {From}→{To}. Returning fallback cost 999.0 — " +
-                "vehicle assignment and TSP results will be incorrect. " +
-                "Either populate facility.RouteEdges manually or set VendorRef on Maps/Stations " +
-                "to enable RouteEdgeSyncService auto-sync from RIOT3.",
+            // Expected state, not an error: RIOT3 offers no station-to-station
+            // cost API (RouteEdgeSyncService was deleted 2026-07-17 for calling
+            // a per-robot endpoint by mistake), and routing/distance is RIOT3's
+            // responsibility. facility.RouteEdges is only ever populated
+            // manually; until someone does, every pair costs the same constant
+            // — fine for the legacy planning endpoints that call this, and the
+            // live envelope dispatch path never asks.
+            _logger.LogDebug(
+                "No RouteEdge for {From}→{To} — uniform fallback cost 999.0 (RIOT3 owns real routing).",
                 fromStationId, toStationId);
             return 999.0;
         }

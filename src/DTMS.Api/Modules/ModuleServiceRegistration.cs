@@ -62,7 +62,7 @@ public static class ModuleServiceRegistration
     // MUST wrap the transaction in db.Database.CreateExecutionStrategy()
     // — otherwise EF Core throws because the retry strategy cannot
     // safely replay a user-initiated transaction. See OutboxProcessor
-    // (SKIP LOCKED path) and Facility RouteEdgeSyncService for examples.
+    // (SKIP LOCKED path) for an example.
     private static void ConfigureNpgsql(
         Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.NpgsqlDbContextOptionsBuilder npgsql)
     {
@@ -193,17 +193,18 @@ public static class ModuleServiceRegistration
         .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
         .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
 
-        // Route edge sync — pulls live costs from RIOT3 and upserts into facility.RouteEdges
+        // NOTE: RouteEdgeSyncService (station-to-station route costs) was
+        // DELETED 2026-07-17. It polled GET /api/v4/route/costs/{map}/{station}
+        // believing it returned a station→station cost matrix — per the RIOT3
+        // API doc that endpoint actually returns per-ROBOT costs to reach one
+        // station (requires a deviceKey list), and RIOT3 offers NO
+        // station-to-station cost API at all, so the service failed 100% of
+        // its requests since install (facility.RouteEdges stayed empty).
+        // Routing/distance is RIOT3's job: the live dispatch path
+        // (CreateJobAnchor) never consults route costs, and the legacy
+        // planning endpoints fall back to SimpleRouteCostCalculator's
+        // constant cost — which is exactly the behavior they always had.
         var syncIntervalMinutes = configuration.GetValue<int>("VendorAdapter:Riot3:RouteSync:IntervalMinutes", 30);
-        services.AddHttpClient<IRiot3RouteClient, Riot3RouteClient>(client =>
-        {
-            client.BaseAddress = new Uri(riot3BaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(10);
-            if (!string.IsNullOrWhiteSpace(riot3ApiKey))
-                client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
-        })
-        .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
-        .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
         services.AddHttpClient<DTMS.Facility.Application.Services.IRiot3FacilityClient, Riot3FacilityClient>(client =>
         {
             client.BaseAddress = new Uri(riot3BaseUrl);
@@ -213,19 +214,13 @@ public static class ModuleServiceRegistration
         })
         .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
         .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
-        // MapStationSync runs at 15s delay; RouteEdgeSync runs at 2min delay to ensure stations are synced first.
-        // MapStationSync now dispatches SyncMapStationsCommand per map — same code path as the manual endpoint.
-        // Track C: both poll RIOT3 — gated so only the api container runs them.
+        // MapStationSync dispatches SyncMapStationsCommand per map — same code path as the manual endpoint.
+        // Track C: polls RIOT3 — gated so only the api container runs it.
         if (runVendorPollers)
         {
             services.AddHostedService(sp => new MapStationSyncService(
                 sp.GetRequiredService<IServiceScopeFactory>(),
                 sp.GetRequiredService<ILogger<MapStationSyncService>>(),
-                TimeSpan.FromMinutes(syncIntervalMinutes)));
-            services.AddHostedService(sp => new RouteEdgeSyncService(
-                sp.GetRequiredService<IServiceScopeFactory>(),
-                sp.GetRequiredService<IRiot3RouteClient>(),
-                sp.GetRequiredService<ILogger<RouteEdgeSyncService>>(),
                 TimeSpan.FromMinutes(syncIntervalMinutes)));
         }
 

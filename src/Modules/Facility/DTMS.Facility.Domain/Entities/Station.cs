@@ -13,7 +13,8 @@ public class Station : Entity<Guid>
     public Coordinate Coordinate { get; private set; } = default!;
     public StationType Type { get; private set; }
     public List<string> CompatibleVehicleTypes { get; private set; } = new();
-    // RIOT3 station identifier — used by RouteEdgeSyncService to call /api/v4/route/costs/.../VendorRef
+    // RIOT3 station identifier — dispatch payloads and webhook station
+    // resolution (TripStationTransitionDetector) key on this.
     public string? VendorRef { get; private set; }
     // Human-readable client-facing identifier (e.g. "WH-NORTH") for use in delivery order submissions
     public string? Code { get; private set; }

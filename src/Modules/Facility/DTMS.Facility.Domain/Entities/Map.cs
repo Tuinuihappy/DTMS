@@ -10,7 +10,7 @@ public class Map : AggregateRoot<Guid>
     public double Width { get; private set; }
     public double Height { get; private set; }
     public string MapData { get; private set; } = string.Empty; // JSON grid representation
-    // RIOT3 map identifier — used by RouteEdgeSyncService to call /api/v4/route/costs/{VendorRef}/...
+    // RIOT3 map identifier — dispatch payloads (missions.mapId) key on this.
     public string? VendorRef { get; private set; }
     
     private readonly List<Station> _stations = new();
