@@ -16,12 +16,10 @@ public record CreateTopologyOverlayCommand(
 public class CreateTopologyOverlayCommandHandler : ICommandHandler<CreateTopologyOverlayCommand, Guid>
 {
     private readonly ITopologyOverlayRepository _repo;
-    private readonly IEventBus _eventBus;
 
-    public CreateTopologyOverlayCommandHandler(ITopologyOverlayRepository repo, IEventBus eventBus)
+    public CreateTopologyOverlayCommandHandler(ITopologyOverlayRepository repo)
     {
         _repo = repo;
-        _eventBus = eventBus;
     }
 
     public async Task<Result<Guid>> Handle(CreateTopologyOverlayCommand request, CancellationToken cancellationToken)

@@ -777,8 +777,10 @@ public static class ModuleServiceRegistration
             });
         });
 
-        // Use OutboxEventBus for at-least-once delivery guarantee
-        services.AddScoped<IEventBus, OutboxEventBus>();
+        // IEventBus/OutboxEventBus removed 2026-07-17 — zero callers ever, and
+        // the architecture test bans it in critical commands anyway. Transactional
+        // event publishing is the DomainEventOutboxSaveChangesInterceptor writing
+        // to the module-owned outbox (drained by OutboxProcessorService).
 
         // Outbox infrastructure
         services.AddDbContext<OutboxDbContext>(o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));
