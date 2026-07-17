@@ -16,7 +16,6 @@ public interface IJobRepository
     // Order matters: sorted by GroupIndex asc so the operator UI lines
     // them up the same way as the consumer's dispatch loop.
     Task<List<Job>> GetByDeliveryOrderIdAsync(Guid deliveryOrderId, CancellationToken cancellationToken = default);
-    Task<List<Job>> GetAtRiskJobsAsync(DateTime cutoffTime, CancellationToken cancellationToken = default);
     /// <summary>
     /// Phase b10-frontend.2 queue page — paginated job listing across all
     /// orders. Filters by a status set (empty = all statuses). Default
@@ -34,7 +33,7 @@ public interface IJobRepository
         CancellationToken cancellationToken = default);
     Task AddAsync(Job job, CancellationToken cancellationToken = default);
     Task UpdateAsync(Job job, CancellationToken cancellationToken = default);
-    Task AddDependencyAsync(JobDependency dependency, CancellationToken cancellationToken = default);
-    Task AddMilkRunTemplateAsync(MilkRunTemplate template, CancellationToken cancellationToken = default);
-    Task<List<MilkRunTemplate>> GetActiveMilkRunTemplatesAsync(CancellationToken cancellationToken = default);
+    // NOTE: AddDependencyAsync / milk-run template methods / GetAtRiskJobsAsync
+    // were removed 2026-07-17 with the legacy manual-planning stack — their
+    // only callers were the deleted cross-dock / milk-run / SLA-replan flows.
 }

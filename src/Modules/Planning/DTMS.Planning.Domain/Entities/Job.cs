@@ -48,8 +48,7 @@ public class Job : AggregateRoot<Guid>
     // 1-based group index within the original order's station-pair grouping.
     // Required so Retry() can rebuild the EnvelopeUpperKey with a bumped
     // attempt suffix without re-reading the original DeliveryOrder.
-    // Defaults to 1 for jobs created by the manual CreateJobFromOrder path
-    // (which is single-group by nature).
+    // Defaults to 1 (single-group).
     public int GroupIndex { get; private set; } = 1;
     public Guid? PickupStationId { get; private set; }
     public Guid? DropStationId { get; private set; }

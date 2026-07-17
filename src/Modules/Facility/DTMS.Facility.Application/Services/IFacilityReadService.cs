@@ -57,9 +57,4 @@ public interface IFacilityReadService
     Task<StationVendorTarget?> GetStationVendorTargetAsync(
         Guid stationId,
         CancellationToken cancellationToken = default);
-
-    Task<double?> GetRouteCostAsync(
-        Guid fromStationId,
-        Guid toStationId,
-        CancellationToken cancellationToken = default);
 }

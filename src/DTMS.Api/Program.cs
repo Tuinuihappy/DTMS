@@ -235,7 +235,7 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(DTMS.Facility.Application.Queries.GetRouteCost.GetRouteCostQuery).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(DTMS.Fleet.Application.Consumers.VehicleStateChangedConsumer).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(DTMS.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(DTMS.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(DTMS.Planning.Application.Commands.CreateJobAnchor.CreateJobAnchorCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(DTMS.Dispatch.Application.Commands.CreateEnvelopeTrip.CreateEnvelopeTripCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(DTMS.Transport.Manual.Application.Commands.AcknowledgeTrip.AcknowledgeTripCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(DTMS.Wms.Application.Commands.SyncWmsLocations.SyncWmsLocationsCommand).Assembly);

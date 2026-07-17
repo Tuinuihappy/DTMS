@@ -137,17 +137,4 @@ public sealed class FacilityReadService : IFacilityReadService
 
         return result;
     }
-
-    public async Task<double?> GetRouteCostAsync(
-        Guid fromStationId,
-        Guid toStationId,
-        CancellationToken cancellationToken = default)
-    {
-        var edge = await _db.RouteEdges.AsNoTracking().FirstOrDefaultAsync(e =>
-            (e.SourceStationId == fromStationId && e.TargetStationId == toStationId) ||
-            (e.IsBidirectional && e.SourceStationId == toStationId && e.TargetStationId == fromStationId),
-            cancellationToken);
-
-        return edge?.Cost;
-    }
 }

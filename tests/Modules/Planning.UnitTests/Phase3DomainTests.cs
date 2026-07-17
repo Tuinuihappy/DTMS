@@ -32,32 +32,8 @@ public class Phase3DomainTests
     }
 
     // ── Milk-Run ──
-
-    [Fact]
-    public void MilkRunTemplate_AddsStops()
-    {
-        var template = new MilkRunTemplate("Line-A Morning", "0 8 * * 1-5");
-        template.AddStop(Guid.NewGuid(), 1, TimeSpan.Zero, TimeSpan.FromMinutes(3));
-        template.AddStop(Guid.NewGuid(), 2, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(5));
-        template.AddStop(Guid.NewGuid(), 3, TimeSpan.FromMinutes(25), TimeSpan.FromMinutes(3));
-
-        template.TemplateName.Should().Be("Line-A Morning");
-        template.CronSchedule.Should().Be("0 8 * * 1-5");
-        template.IsActive.Should().BeTrue();
-        template.Stops.Should().HaveCount(3);
-    }
-
-    [Fact]
-    public void MilkRunTemplate_DeactivateActivate()
-    {
-        var template = new MilkRunTemplate("Test", "* * * * *");
-
-        template.Deactivate();
-        template.IsActive.Should().BeFalse();
-
-        template.Activate();
-        template.IsActive.Should().BeTrue();
-    }
+    // (MilkRunTemplate entity tests removed 2026-07-17 with the legacy
+    // manual-planning stack; PatternType.MilkRun on Job remains valid.)
 
     [Fact]
     public void MilkRunJob_HasCorrectPattern()

@@ -30,7 +30,6 @@ using DTMS.Fleet.Infrastructure.Services;
 using FleetServices = DTMS.Fleet.Infrastructure.Services;
 using DTMS.Planning.Application.Services;
 using DTMS.Planning.Domain.Repositories;
-using DTMS.Planning.Domain.Services;
 using DTMS.Planning.Infrastructure.Data;
 using DTMS.Planning.Infrastructure.Repositories;
 using DTMS.Planning.Infrastructure.Services;
@@ -532,14 +531,11 @@ public static class ModuleServiceRegistration
         services.AddScoped<IDispatchOrderTemplateService, DispatchOrderTemplateService>();
         services.Configure<DTMS.Planning.Application.Options.DispatchOptions>(
             configuration.GetSection(DTMS.Planning.Application.Options.DispatchOptions.SectionName));
-        services.AddScoped<ICostModelService, DbCostModelService>();
-        services.AddScoped<IVehicleSelector, GreedyVehicleSelector>();
-        services.AddScoped<SimpleRouteCostCalculator>();
-        services.AddScoped<IRouteCostCalculator, CachedRouteCostCalculator>();
-        services.AddScoped<IPatternClassifier, PatternClassifier>();
-        services.AddScoped<IRouteSolver, NearestNeighborTspSolver>();
-        services.AddScoped<IFleetVehicleProvider, FleetVehicleProvider>();
-        services.AddHostedService<SlaRiskBackgroundService>();
+        // NOTE: the legacy manual-planning services (route-cost calculators,
+        // TSP solver, vehicle selector/provider, SLA-risk replanner, pattern
+        // classifier, cost-model service) were DELETED 2026-07-17 — the whole
+        // chain had no live caller: jobs are envelope anchors (CreateJobAnchor)
+        // and RIOT3 owns routing + robot assignment. See commit for the audit.
         // Phase P3.2 — hourly fleet utilization snapshot (ticks every minute,
         // writes to FleetUtilizationHourly).
         services.AddHostedService<DTMS.Api.Infrastructure.FleetUtilizationSnapshotService>();
@@ -681,7 +677,7 @@ public static class ModuleServiceRegistration
             // Auto-scan consumers from all module Application assemblies
             bus.AddConsumers(
                 typeof(DTMS.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly,
-                typeof(DTMS.Planning.Application.Commands.CreateJobFromOrder.CreateJobFromOrderCommand).Assembly,
+                typeof(DTMS.Planning.Application.Commands.CreateJobAnchor.CreateJobAnchorCommand).Assembly,
                 typeof(DTMS.Dispatch.Application.Commands.CreateEnvelopeTrip.CreateEnvelopeTripCommand).Assembly,
                 typeof(VehicleStateChangedConsumer).Assembly,
                 // Transport.Amr hosts CaptureFinalSnapshotConsumer — must

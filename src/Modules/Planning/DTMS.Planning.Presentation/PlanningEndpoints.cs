@@ -1,25 +1,15 @@
-using DTMS.Planning.Application.Commands.AssignVehicleToJob;
-using DTMS.Planning.Application.Commands.CommitPlan;
-using DTMS.Planning.Application.Commands.ConsolidateOrders;
 using DTMS.Planning.Application.Commands.CreateActionTemplate;
-using DTMS.Planning.Application.Commands.CreateCrossDockJobs;
-using DTMS.Planning.Application.Commands.CreateJobFromOrder;
-using DTMS.Planning.Application.Commands.CreateMilkRun;
-using DTMS.Planning.Application.Commands.CreateMultiPickDropJob;
 using DTMS.Planning.Application.Commands.CreateOrderTemplate;
 using DTMS.Planning.Application.Commands.DeleteActionTemplate;
 using DTMS.Planning.Application.Commands.DeleteOrderTemplate;
 using DTMS.Planning.Application.Commands.InstantiateOrderTemplate;
-using DTMS.Planning.Application.Commands.ReplanJob;
 using DTMS.Planning.Application.Commands.RetryJob;
 using DTMS.Planning.Application.Commands.SetActionTemplateActive;
 using DTMS.Planning.Application.Commands.SetOrderTemplateActive;
 using DTMS.Planning.Application.Commands.UpdateActionTemplate;
-using DTMS.Planning.Application.Commands.UpdateCostModel;
 using DTMS.Planning.Application.Commands.UpdateOrderTemplate;
 using DTMS.Planning.Application.Queries.GetActionTemplateById;
 using DTMS.Planning.Application.Queries.GetActionTemplates;
-using DTMS.Planning.Application.Queries.GetCostModel;
 using DTMS.Planning.Application.Queries.GetJobById;
 using DTMS.Planning.Application.Queries.GetJobsByOrder;
 using DTMS.Planning.Application.Queries.GetJobsQueue;
@@ -42,36 +32,15 @@ public static class PlanningEndpoints
     {
         var group = app.MapGroup("/api/v1/planning/jobs").WithTags("Planning").RequireAuthorization();
 
-        // POST /api/v1/planning/jobs — Create a Job from a DeliveryOrder
-        group.MapPost("/", async (CreateJobFromOrderCommand command, ISender sender) =>
-        {
-            var result = await sender.Send(command);
-            return result.IsSuccess
-                ? Results.Created($"/api/v1/planning/jobs/{result.Value}", result.Value)
-                : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Planning.JobWrite);
-
-        // POST /api/v1/planning/jobs/{id}/assign — Assign a vehicle (Greedy)
-        group.MapPost("/{id:guid}/assign", async (Guid id, ISender sender) =>
-        {
-            var result = await sender.Send(new AssignVehicleToJobCommand(id));
-            return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Planning.JobPlan);
-
-        // POST /api/v1/planning/jobs/{id}/commit — Commit the plan
-        group.MapPost("/{id:guid}/commit", async (Guid id, ISender sender) =>
-        {
-            var result = await sender.Send(new CommitPlanCommand(id));
-            return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Planning.JobPlan);
-
-        // POST /api/v1/planning/jobs/{id}/replan — Replan a committed job
-        group.MapPost("/{id:guid}/replan", async (Guid id, ReplanJobCommand command, ISender sender) =>
-        {
-            if (id != command.JobId) return Results.BadRequest("ID mismatch");
-            var result = await sender.Send(command);
-            return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Planning.JobPlan);
+        // NOTE: the legacy manual-planning flow (POST / to create a Job,
+        // /assign, /commit, /replan, plus /api/planning consolidate /
+        // cross-dock / milk-runs / multi-pick-drop and the cost-model CRUD)
+        // was DELETED 2026-07-17. Jobs are created exclusively by
+        // DeliveryOrderValidatedConsumer via CreateJobAnchor (envelope
+        // dispatch, Phase b8); vehicle choice and routing belong to RIOT3.
+        // None of those endpoints had a caller — the frontend uses only the
+        // GET endpoints + /retry below, and the DB had zero jobs that ever
+        // reached the Assigned/Committed states that flow produced.
 
         // POST /api/v1/planning/jobs/{id}/retry — Re-dispatch a Failed envelope
         // job. Increments AttemptNumber, builds a new UpperKey, calls
@@ -144,59 +113,6 @@ public static class PlanningEndpoints
             var result = await sender.Send(new GetJobsByOrderQuery(orderId.Value));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequirePermission(Permissions.Planning.JobRead);
-
-        // Consolidation + Phase 3 endpoints under /api/planning
-        var planningGroup = app.MapGroup("/api/planning").WithTags("Planning").RequireAuthorization();
-
-        // POST /api/planning/consolidate — Consolidate multiple orders into 1 job
-        planningGroup.MapPost("/consolidate", async (ConsolidateOrdersCommand command, ISender sender) =>
-        {
-            var result = await sender.Send(command);
-            return result.IsSuccess
-                ? Results.Created($"/api/v1/planning/jobs/{result.Value}", result.Value)
-                : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Planning.Consolidate);
-
-        // POST /api/planning/cross-dock — Create linked inbound/outbound cross-dock jobs
-        planningGroup.MapPost("/cross-dock", async (CreateCrossDockJobsCommand command, ISender sender) =>
-        {
-            var result = await sender.Send(command);
-            return result.IsSuccess
-                ? Results.Created($"/api/v1/planning/jobs/{result.Value.InboundJobId}", result.Value)
-                : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Planning.Consolidate);
-
-        // POST /api/planning/milk-runs — Create a milk-run template + initial job
-        planningGroup.MapPost("/milk-runs", async (CreateMilkRunCommand command, ISender sender) =>
-        {
-            var result = await sender.Send(command);
-            return result.IsSuccess
-                ? Results.Created($"/api/planning/milk-runs/{result.Value}", result.Value)
-                : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Planning.Consolidate);
-
-        // POST /api/planning/multi-pick-drop — Create a CVRPPD job with pickup-delivery pairs
-        planningGroup.MapPost("/multi-pick-drop", async (CreateMultiPickDropJobCommand command, ISender sender) =>
-        {
-            var result = await sender.Send(command);
-            return result.IsSuccess
-                ? Results.Created($"/api/v1/planning/jobs/{result.Value}", result.Value)
-                : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Planning.Consolidate);
-
-        // GET /api/planning/cost-model — Get current cost model config
-        planningGroup.MapGet("/cost-model", async (string? vehicleTypeKey, ISender sender) =>
-        {
-            var result = await sender.Send(new GetCostModelQuery(vehicleTypeKey));
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Planning.CostModelRead);
-
-        // PUT /api/planning/cost-model — Update cost model config
-        planningGroup.MapPut("/cost-model", async (UpdateCostModelCommand command, ISender sender) =>
-        {
-            var result = await sender.Send(command);
-            return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Planning.CostModelWrite);
 
         // ── ActionTemplate catalog (Phase 1B) ────────────────────────────────
         // Mirrors RIOT3's /api/v4/order/action-templates — each entry is a

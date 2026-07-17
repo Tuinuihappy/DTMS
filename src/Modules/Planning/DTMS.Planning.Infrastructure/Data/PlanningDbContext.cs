@@ -1,6 +1,5 @@
 using DTMS.Planning.Domain.Entities;
 using DTMS.Planning.Domain.Enums;
-using DTMS.Planning.Infrastructure.Data.Records;
 using DTMS.Planning.Infrastructure.Projections;
 using DTMS.SharedKernel.Outbox;
 using DTMS.SharedKernel.Projection;
@@ -15,11 +14,8 @@ public class PlanningDbContext : DbContext
     public DbSet<Job> Jobs { get; set; } = null!;
     public DbSet<Leg> Legs { get; set; } = null!;
     public DbSet<JobDependency> JobDependencies { get; set; } = null!;
-    public DbSet<MilkRunTemplate> MilkRunTemplates { get; set; } = null!;
-    public DbSet<MilkRunStop> MilkRunStops { get; set; } = null!;
     public DbSet<ActionTemplate> ActionTemplates { get; set; } = null!;
     public DbSet<OrderTemplate> OrderTemplates { get; set; } = null!;
-    public DbSet<CostModelConfigRecord> CostModelConfigs { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     // ── Phase P1 — Event Projection read models ──────────────────────────
@@ -95,22 +91,10 @@ public class PlanningDbContext : DbContext
             builder.HasIndex(d => d.SuccessorJobId);
         });
 
-        modelBuilder.Entity<MilkRunTemplate>(builder =>
-        {
-            builder.HasKey(t => t.Id);
-            builder.Property(t => t.TemplateName).HasMaxLength(100);
-            builder.Property(t => t.CronSchedule).HasMaxLength(50);
-
-            builder.HasMany(t => t.Stops)
-                   .WithOne()
-                   .HasForeignKey(s => s.TemplateId)
-                   .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<MilkRunStop>(builder =>
-        {
-            builder.HasKey(s => s.Id);
-        });
+        // NOTE: MilkRunTemplate/MilkRunStop mappings removed 2026-07-17 with
+        // the legacy manual-planning stack (their only writer was the deleted
+        // CreateMilkRun command). Tables remain in the DB — migrations are
+        // handwritten, nothing will auto-drop them.
 
         modelBuilder.Entity<ActionTemplate>(builder =>
         {
@@ -195,12 +179,12 @@ public class PlanningDbContext : DbContext
             builder.Ignore(t => t.DomainEvents);
         });
 
-        modelBuilder.Entity<CostModelConfigRecord>(b =>
-        {
-            b.HasKey(c => c.Id);
-            // null VehicleTypeKey = the global default config
-            b.HasIndex(c => c.VehicleTypeKey).IsUnique().HasFilter("\"VehicleTypeKey\" IS NOT NULL");
-        });
+        // NOTE: CostModelConfigRecord mapping removed 2026-07-17 with the
+        // legacy manual-planning stack. The planning."CostModelConfigs"
+        // table still exists in the DB (and in historical migration
+        // snapshots) — migrations here are handwritten, so nothing will
+        // auto-generate a DropTable. Recreate the entity if vehicle
+        // scoring ever returns.
 
         modelBuilder.Entity<OutboxMessage>(b =>
         {

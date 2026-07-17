@@ -54,36 +54,6 @@ public class JobRepository : IJobRepository
         await _context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task AddDependencyAsync(JobDependency dependency, CancellationToken cancellationToken = default)
-    {
-        await _context.JobDependencies.AddAsync(dependency, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task AddMilkRunTemplateAsync(MilkRunTemplate template, CancellationToken cancellationToken = default)
-    {
-        await _context.MilkRunTemplates.AddAsync(template, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task<List<MilkRunTemplate>> GetActiveMilkRunTemplatesAsync(CancellationToken cancellationToken = default)
-    {
-        return await _context.MilkRunTemplates
-            .Where(t => t.IsActive)
-            .Include(t => t.Stops)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task<List<Job>> GetAtRiskJobsAsync(DateTime cutoffTime, CancellationToken cancellationToken = default)
-    {
-        return await _context.Jobs
-            .Where(j => (j.Status == JobStatus.Assigned || j.Status == JobStatus.Committed)
-                     && j.SlaDeadline.HasValue
-                     && j.SlaDeadline.Value <= cutoffTime)
-            .Include(j => j.Legs)
-            .ToListAsync(cancellationToken);
-    }
-
     public async Task<(List<Job> Items, int TotalCount)> SearchQueueAsync(
         IReadOnlyList<JobStatus> statuses,
         int page,
