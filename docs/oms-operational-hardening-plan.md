@@ -1,5 +1,7 @@
 # OMS Operational Hardening — Implementation Plan
 
+> **⚠️ HISTORICAL (2026-07-17):** References to the legacy OMS adapter (`IOmsShipmentClient`, `UpstreamOmsOptions`, `TripStarted/DropCompletedOmsNotifyConsumer`, `UpstreamOms__*` env) describe code REMOVED in `a81d009`; the OMS-branded audit labels/permission/routes were made system-neutral in `1bca5b0`. OMS now runs entirely on the federated pipeline (SystemEventSubscriptions + SystemCredentials + keyed formatters). Kept as a planning record — do not implement from this document.
+
 > **Status:** Drafted 2026-06-16 — not started
 > **Predecessor:** [upstream-oms-notification-plan.md](upstream-oms-notification-plan.md) (Phase 1–4 + B3 + B4 shipped)
 > **Trigger:** Before flipping `UpstreamOms.Enabled=true` in prod, close the operational blind-spots that the existing notification flow doesn't cover.

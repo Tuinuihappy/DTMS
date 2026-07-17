@@ -1,5 +1,7 @@
 # Upstream OMS Notification — Implementation Plan
 
+> **⚠️ HISTORICAL (2026-07-17):** References to the legacy OMS adapter (`IOmsShipmentClient`, `UpstreamOmsOptions`, `TripStarted/DropCompletedOmsNotifyConsumer`, `UpstreamOms__*` env) describe code REMOVED in `a81d009`; the OMS-branded audit labels/permission/routes were made system-neutral in `1bca5b0`. OMS now runs entirely on the federated pipeline (SystemEventSubscriptions + SystemCredentials + keyed formatters). Kept as a planning record — do not implement from this document.
+
 > **Status (2026-06-16)**: Phase 1–4 ครบ + B3 (WireMock integration tests, 20 tests) + B4 (TripFailed / TripCancelled / PodCompleted notifications, full backend + frontend) ใน production code แล้ว — ดูตาราง **Status snapshot** ท้ายเอกสาร
 > เหลือเฉพาะ (a) เปิด kill switch `UpstreamOms.Enabled` ใน prod, (b) งานที่ defer: Token refresh (exp ก.ย. 2027), Metrics counters, Backfill tool
 

@@ -99,8 +99,20 @@ public class PermissionCatalogTests
     private static IEnumerable<string> EnumeratePresentationSources()
     {
         var modules = Path.Combine(RepoRoot(), "src", "Modules");
-        return Directory.EnumerateDirectories(modules, "*.Presentation", SearchOption.AllDirectories)
+        var presentation = Directory.EnumerateDirectories(modules, "*.Presentation", SearchOption.AllDirectories)
             .SelectMany(d => Directory.EnumerateFiles(d, "*.cs", SearchOption.AllDirectories));
+
+        // DTMS.Api maps endpoints too (Program.cs, Modules/, Auth/…) and was
+        // originally outside the scan — which is exactly how a hardcoded
+        // `RequirePermissionForSourceSystem("dtms:source:oms:order:read")`
+        // on /source/whoami went unnoticed and 403'd every non-OMS system.
+        // Scan it like a Presentation project (skip build output).
+        var api = Path.Combine(RepoRoot(), "src", "DTMS.Api");
+        var apiSources = Directory.EnumerateFiles(api, "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                     && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"));
+
+        return presentation.Concat(apiSources);
     }
 
     private static string RepoRoot()

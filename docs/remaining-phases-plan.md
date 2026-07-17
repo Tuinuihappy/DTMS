@@ -1,5 +1,7 @@
 # Remaining Phases — Implementation Plans
 
+> **⚠️ HISTORICAL (2026-07-17):** References to the legacy OMS adapter (`IOmsShipmentClient`, `UpstreamOmsOptions`, `TripStarted/DropCompletedOmsNotifyConsumer`, `UpstreamOms__*` env) describe code REMOVED in `a81d009`; the OMS-branded audit labels/permission/routes were made system-neutral in `1bca5b0`. OMS now runs entirely on the federated pipeline (SystemEventSubscriptions + SystemCredentials + keyed formatters). Kept as a planning record — do not implement from this document.
+
 Plans สำหรับงานที่เหลือหลัง OMS Notification + Planning b8/b9/b10-frontend.1 ทุก phase ได้ implementation detail พอที่จะ build ได้ — ปรับ scope ก่อนเริ่มจริงตามข้อมูลใหม่ที่อาจมีเพิ่ม
 
 อ้างอิง `planning-workflow-roadmap.md` สำหรับ priority + impact

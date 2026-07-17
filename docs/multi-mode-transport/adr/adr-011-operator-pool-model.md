@@ -1,5 +1,7 @@
 # ADR-011: Operator Pool Model for Manual/Fleet Dispatch
 
+> **⚠️ HISTORICAL (2026-07-17):** References to the legacy OMS adapter (`IOmsShipmentClient`, `UpstreamOmsOptions`, `TripStarted/DropCompletedOmsNotifyConsumer`, `UpstreamOms__*` env) describe code REMOVED in `a81d009`; the OMS-branded audit labels/permission/routes were made system-neutral in `1bca5b0`. OMS now runs entirely on the federated pipeline (SystemEventSubscriptions + SystemCredentials + keyed formatters). Kept as a planning record — do not implement from this document.
+
 - **Status**: Accepted
 - **Date**: 2026-07-03
 - **Deciders**: Solo dev + product decision

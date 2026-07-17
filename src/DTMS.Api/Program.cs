@@ -74,8 +74,10 @@ builder.Services.AddAuthorization(o =>
 
 // Permission System Phase A — register the per-request claims transformer
 // that pulls role→permission mappings from iam.RolePermissions and the
-// handler that evaluates `.RequirePermission("dtms:...")`. The transformer
-// uses IMemoryCache (registered below) for a 5-minute hot path.
+// handler that evaluates `.RequirePermission(Permissions.<Module>.<Code>)`
+// (always the catalog constant, never a raw string — the architecture test
+// scans for literals). The transformer uses IMemoryCache (registered below)
+// for a 5-minute hot path.
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<
     Microsoft.AspNetCore.Authentication.IClaimsTransformation,
