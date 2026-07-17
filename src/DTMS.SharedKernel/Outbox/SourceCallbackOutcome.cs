@@ -12,8 +12,9 @@ namespace DTMS.SharedKernel.Outbox;
 ///
 /// <para><see cref="Success"/>=false with a 4xx <see cref="StatusCode"/> is a
 /// permanent rejection; 5xx / timeout / null is a transient failure that
-/// exhausted retries. The consumer maps these to the existing audit event
-/// types (e.g. UpstreamOmsNotified / UpstreamOmsRejected).</para>
+/// exhausted retries. The consumer maps these to the system-neutral audit
+/// event types (e.g. UpstreamNotified / UpstreamRejected) with SystemKey
+/// carried in its own column.</para>
 /// </summary>
 public sealed record SourceCallbackOutcome(
     Guid EventId,

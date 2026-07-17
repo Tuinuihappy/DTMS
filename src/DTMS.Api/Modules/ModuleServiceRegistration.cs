@@ -870,6 +870,11 @@ public static class ModuleServiceRegistration
         services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
                                 DTMS.Iam.Infrastructure.Callbacks.OmsShipmentArrivedFormatter>(
             DTMS.Iam.Infrastructure.Callbacks.OmsShipmentArrivedFormatter.FormatKey);
+        // Phase C — runtime-key formatter resolution for Application-layer
+        // resend handlers (they read the key off the subscription row, so
+        // [FromKeyedServices] can't apply).
+        services.AddScoped<DTMS.Iam.Application.Callbacks.ICallbackFormatterResolver,
+                           DTMS.Api.Infrastructure.Callbacks.KeyedCallbackFormatterResolver>();
 
         if (runOutboxHere)
             services.AddHostedService<DTMS.Api.Infrastructure.Outbox.MultiPartitionOutboxProcessor>();

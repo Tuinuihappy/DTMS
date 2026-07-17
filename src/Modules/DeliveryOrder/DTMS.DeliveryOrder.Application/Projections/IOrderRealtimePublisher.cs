@@ -72,7 +72,8 @@ public sealed record OrderActivityEntryDto(
     // S.1 follow-up — Channel + DisplayName mirror the REST read DTO so
     // the live push and the page-load fetch render identical badges.
     string? Channel = null,
-    string? DisplayName = null);
+    string? DisplayName = null,
+    string? SystemKey = null);
 
 /// <summary>
 /// Default null implementation — keeps the projector working when no

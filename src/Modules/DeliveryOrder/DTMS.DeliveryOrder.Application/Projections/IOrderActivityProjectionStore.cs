@@ -22,5 +22,6 @@ public interface IOrderActivityProjectionStore
         int? attemptNumber,
         CancellationToken cancellationToken = default,
         string? channel = null,
-        string? displayName = null);
+        string? displayName = null,
+        string? systemKey = null);
 }

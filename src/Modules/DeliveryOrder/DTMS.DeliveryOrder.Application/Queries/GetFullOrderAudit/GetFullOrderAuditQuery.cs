@@ -36,4 +36,7 @@ public sealed record FullAuditEntryDto(
     // time. Null for rows projected from pre-1.2 events or backfilled
     // from the four legacy sources; UI degrades gracefully.
     string? Channel = null,
-    string? DisplayName = null);
+    string? DisplayName = null,
+    // Phase C (multi-source) — which external system an upstream-callback
+    // row concerns ('oms', 'sap', …). Null for non-callback rows.
+    string? SystemKey = null);

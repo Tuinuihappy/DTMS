@@ -11,8 +11,8 @@ using DTMS.DeliveryOrder.Application.Commands.RedispatchDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.RejectDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.ReleaseDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.ReopenDeliveryOrder;
-using DTMS.DeliveryOrder.Application.Commands.ResendOmsArrivedNotification;
-using DTMS.DeliveryOrder.Application.Commands.ResendOmsNotification;
+using DTMS.DeliveryOrder.Application.Commands.ResendShipmentArrived;
+using DTMS.DeliveryOrder.Application.Commands.ResendShipmentStarted;
 using DTMS.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.UpdateDraftDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
@@ -39,7 +39,7 @@ public record ReleaseOrderRequest(string? ReleasedBy = null);
 public record ReopenOrderRequest(string ReopenedBy, string Reason, bool AutoRetry = false);
 public record AbandonOrderRequest(string AbandonedBy, string Reason);
 public record RedispatchOrderRequest(string RedispatchedBy, string Reason, double WeightFallbackKg = 0);
-public record ResendOmsNotificationRequest(string? RequestedBy = null);
+public record ResendSourceNotificationRequest(string? RequestedBy = null);
 // ScanType: "Pickup" | "Drop" (case-insensitive enum binding); defaults
 // to Drop for backward-compatibility with clients on the pre-pickup-POD
 // schema. Drop semantics match the legacy /pod-scan endpoint exactly.
@@ -182,30 +182,31 @@ public static class DeliveryOrderEndpoints
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
         }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderRedispatch);
 
-        // POST /api/v1/delivery-orders/{id}/trips/{tripId}/notify-oms —
-        // Operator-driven manual resend of the upstream-OMS shipment
-        // notification for a specific trip. Use when the automatic
-        // consumer dead-lettered (UpstreamOmsNotifyFailed audit) and
-        // the upstream OMS issue has since been fixed. Calls the OMS
-        // client synchronously so the operator sees immediate feedback;
-        // upstream is expected to dedupe by shipmentId.
-        group.MapPost("/{id:guid}/trips/{tripId:guid}/notify-oms",
-            async (Guid id, Guid tripId, [FromBody] ResendOmsNotificationRequest? body, ISender sender) =>
+        // POST /api/v1/delivery-orders/{id}/trips/{tripId}/notify-source —
+        // Operator-driven manual resend of the shipment-started callback to
+        // the order's SOURCE SYSTEM (resolved from the order — Phase C removed
+        // the OMS pinning; the former /notify-oms route). Use when the
+        // automatic callback exhausted its retries (UpstreamNotifyFailed
+        // audit) and the upstream issue has since been fixed. Dispatches
+        // synchronously so the operator sees immediate feedback; upstreams
+        // dedupe by shipmentId.
+        group.MapPost("/{id:guid}/trips/{tripId:guid}/notify-source",
+            async (Guid id, Guid tripId, [FromBody] ResendSourceNotificationRequest? body, ISender sender) =>
         {
-            var result = await sender.Send(new ResendOmsNotificationCommand(id, tripId, body?.RequestedBy));
+            var result = await sender.Send(new ResendShipmentStartedCommand(id, tripId, body?.RequestedBy));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderNotifyOms);
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderNotifySource);
 
-        // POST /api/v1/delivery-orders/{id}/trips/{tripId}/notify-oms-arrived —
-        // Mirror of /notify-oms but for the /arrived (drop completed)
-        // endpoint. Surfaces a separate Resend button on the UI for
-        // when the auto consumer dead-lettered the drop notification.
-        group.MapPost("/{id:guid}/trips/{tripId:guid}/notify-oms-arrived",
-            async (Guid id, Guid tripId, [FromBody] ResendOmsNotificationRequest? body, ISender sender) =>
+        // POST /api/v1/delivery-orders/{id}/trips/{tripId}/notify-source-arrived —
+        // Mirror of /notify-source but for the arrived (drop completed)
+        // callback. Surfaces a separate Resend button on the UI for when
+        // the auto callback dead-lettered the drop notification.
+        group.MapPost("/{id:guid}/trips/{tripId:guid}/notify-source-arrived",
+            async (Guid id, Guid tripId, [FromBody] ResendSourceNotificationRequest? body, ISender sender) =>
         {
-            var result = await sender.Send(new ResendOmsArrivedNotificationCommand(id, tripId, body?.RequestedBy));
+            var result = await sender.Send(new ResendShipmentArrivedCommand(id, tripId, body?.RequestedBy));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderNotifyOms);
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderNotifySource);
 
         // POST /api/v1/delivery-orders/upstream was removed in Phase P4 of
         // the SourceSystem migration. External systems now hit the federated

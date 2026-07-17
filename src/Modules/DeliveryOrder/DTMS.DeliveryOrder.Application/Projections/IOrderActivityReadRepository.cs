@@ -12,7 +12,8 @@ public record OrderActivityEntry(
     Guid? RelatedTripId,
     int? AttemptNumber,
     string? Channel = null,
-    string? DisplayName = null);
+    string? DisplayName = null,
+    string? SystemKey = null);
 
 public interface IOrderActivityReadRepository
 {

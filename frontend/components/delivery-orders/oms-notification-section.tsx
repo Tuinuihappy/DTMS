@@ -5,32 +5,40 @@ import { motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getFullOrderAudit,
-  resendOmsArrivedNotification,
-  resendOmsNotification,
+  resendSourceArrivedNotification,
+  resendSourceNotification,
   type FullAuditEntryDto,
 } from "@/lib/api/delivery-orders";
 import { cn } from "@/lib/utils";
 import { DateTime } from "@/components/primitives/date-time";
 
 /**
- * Per-trip view of the upstream-OMS shipment notifications fired across
- * the trip's lifecycle. Rendered inside the Trip detail drawer so each
- * trip owns its own OMS state — multi-trip orders no longer conflate
- * signals from different trips.
+ * Per-trip view of the upstream source-system callbacks fired across the
+ * trip's lifecycle. Rendered inside the Trip detail drawer so each trip owns
+ * its own upstream state — multi-trip orders no longer conflate signals from
+ * different trips.
  *
- * 2 stages — every OMS endpoint DTMS calls today:
+ * Phase C (multi-source) — event types are system-NEUTRAL (UpstreamNotified,
+ * not UpstreamOmsNotified); which system a row concerns rides in its
+ * `systemKey`, and the section header renders that system's name. The same
+ * component serves oms/sap/erp orders without change.
  *
- *   • Started  — POST /api/shipments                  (TASK_PROCESSING)
- *   • Arrived  — POST /api/shipments/{id}/arrived     (SUB_TASK_FINISHED @ drop)
+ * 3 stages:
+ *   • Started   — shipment.started.v1     (fires at trip start)
+ *   • Arrived   — shipment.arrived.v1     (fires at drop completed)
+ *   • Cancelled — shipment.cancelled.v1   (fires at trip cancel; the stage
+ *     renders only when a cancelled callback row actually exists — the
+ *     subscription ships disabled, so an always-on row would show a
+ *     meaningless "Awaiting" on every order)
  *
- * Audit entries are filtered to those whose RelatedTripId matches the
- * trip in scope. Each stage independently shows Notified / Failed-after-retries
- * / Stale (trigger fired but no audit) / Empty. Resend button appears on
- * failed/stale and posts to the stage's resend endpoint; OMS dedupes by
- * shipmentId so re-firing on a row that previously succeeded is safe.
+ * Audit entries are filtered to those whose RelatedTripId matches the trip
+ * in scope. Each stage independently shows Notified / Failed-after-retries /
+ * Stale (trigger fired but no callback row) / Empty. Resend button appears on
+ * failed/stale (started + arrived only) and posts to the stage's resend
+ * endpoint; upstreams dedupe by shipmentId so re-firing is safe.
  */
 
-type StageKey = "started" | "arrived";
+type StageKey = "started" | "arrived" | "cancelled";
 
 type StageConfig = {
   label: string;
@@ -38,46 +46,68 @@ type StageConfig = {
   resentTypes: ReadonlySet<string>;
   failedTypes: ReadonlySet<string>;
   // TripExecution event types that mark this stage as reached on the
-  // vendor side. If the audit shows one of these but no OMS row exists,
-  // the stage is "stale" (gated/skipped/lost).
+  // vendor side. If the audit shows one of these but no callback row
+  // exists, the stage is "stale" (gated/skipped/lost).
   triggerEventTypes: ReadonlySet<string>;
   emptyTitle: string;
   emptyHint: string;
   staleHint: string;
-  resendLabel: string;
+  // Null = no manual resend exists for this stage (cancelled).
+  resendLabel: string | null;
+  // Render the stage only when a callback row (ok/failed) exists — used by
+  // cancelled while its subscription ships disabled.
+  showOnlyWithData: boolean;
 };
 
+// Values mirror UpstreamCallbackAudit on the backend string-for-string —
+// change one side and the other (plus a data migration) must move with it.
 const STAGES: Record<StageKey, StageConfig> = {
   started: {
     label: "Started",
-    notifiedTypes: new Set(["UpstreamOmsNotified"]),
-    resentTypes: new Set(["UpstreamOmsManuallyResent"]),
+    notifiedTypes: new Set(["UpstreamNotified"]),
+    resentTypes: new Set(["UpstreamManuallyResent"]),
     // Both failure flavours render as the same red "Failed" card (Option A).
-    // The audit Details string carries the OMS body so operators can tell
-    // them apart inline:
-    //   - UpstreamOmsNotifyFailed → transient retries exhausted (OMS down)
-    //   - UpstreamOmsRejected     → fast-failed 4xx (bad data, fix upstream)
-    failedTypes: new Set(["UpstreamOmsNotifyFailed", "UpstreamOmsRejected"]),
+    // The audit Details string carries the upstream body so operators can
+    // tell them apart inline:
+    //   - UpstreamNotifyFailed → transient retries exhausted (upstream down)
+    //   - UpstreamRejected     → fast-failed 4xx (bad data, fix upstream)
+    failedTypes: new Set(["UpstreamNotifyFailed", "UpstreamRejected"]),
     triggerEventTypes: new Set(["TripStarted"]),
     emptyTitle: "Awaiting trip start",
-    emptyHint: "OMS will be notified when the first trip transitions to InProgress.",
-    staleHint: "Trip is InProgress but no OMS audit row exists — kill switch may be off, or the notification was gated.",
+    emptyHint: "The source system is notified when the first trip transitions to InProgress.",
+    staleHint:
+      "Trip is InProgress but no callback row exists — the subscription may be disabled, or the notification was gated.",
     resendLabel: "Resend started",
+    showOnlyWithData: false,
   },
   arrived: {
     label: "Arrived",
-    notifiedTypes: new Set(["UpstreamOmsArrivedNotified"]),
-    resentTypes: new Set(["UpstreamOmsArrivedManuallyResent"]),
-    failedTypes: new Set(["UpstreamOmsArrivedNotifyFailed", "UpstreamOmsArrivedRejected"]),
+    notifiedTypes: new Set(["UpstreamArrivedNotified"]),
+    resentTypes: new Set(["UpstreamArrivedManuallyResent"]),
+    failedTypes: new Set(["UpstreamArrivedNotifyFailed", "UpstreamArrivedRejected"]),
     triggerEventTypes: new Set(["TripDropCompleted"]),
     emptyTitle: "Awaiting drop",
-    emptyHint: "OMS will be notified when the trip reaches its drop station.",
-    staleHint: "Trip reached drop but no OMS audit row exists — kill switch may be off, or the notification was gated.",
+    emptyHint: "The source system is notified when the trip reaches its drop station.",
+    staleHint:
+      "Trip reached drop but no callback row exists — the subscription may be disabled, or the notification was gated.",
     resendLabel: "Resend arrived",
+    showOnlyWithData: false,
+  },
+  cancelled: {
+    label: "Cancelled",
+    notifiedTypes: new Set(["UpstreamCancelledNotified"]),
+    resentTypes: new Set<string>(),
+    failedTypes: new Set(["UpstreamCancelledNotifyFailed", "UpstreamCancelledRejected"]),
+    triggerEventTypes: new Set(["TripCancelled"]),
+    emptyTitle: "",
+    emptyHint: "",
+    staleHint: "",
+    resendLabel: null,
+    showOnlyWithData: true,
   },
 };
 
-type OmsStatus =
+type UpstreamStatus =
   | { kind: "loading" }
   | { kind: "empty" }
   | { kind: "notified"; at: string; details: string | null }
@@ -122,19 +152,25 @@ export function OmsNotificationSection({
     return entries.filter((e) => e.relatedTripId === tripId);
   }, [entries, tripId]);
 
-  // Detect orders that don't participate in upstream OMS at all. Internal
-  // orders never produce OMS audit rows, so we hide the section for them.
-  //
-  // Use the order-level audit (not tripEntries) and key off
-  // OrderUpstreamIngested — written at ingest, ~hours before any OMS row
-  // exists. Otherwise the section stays hidden during the entire window
-  // between trip start and the first successful OMS call, exactly when
-  // the operator needs to see the stale/retrying state.
-  const isOmsRelevant = useMemo(() => {
+  // Detect orders that don't participate in upstream callbacks at all.
+  // Internal orders never produce callback rows, so hide the section for
+  // them. Uses the order-level audit (not tripEntries) and keys off
+  // OrderUpstreamIngested — written at ingest, ~hours before any callback
+  // row exists — so the section is already visible during the window
+  // between trip start and the first callback, exactly when the operator
+  // needs to see the stale/retrying state.
+  const isUpstreamRelevant = useMemo(() => {
     if (entries === null) return null;
     return entries.some(
-      (e) => OMS_EVENT_TYPES.has(e.eventType) || e.eventType === "OrderUpstreamIngested",
+      (e) => UPSTREAM_EVENT_TYPES.has(e.eventType) || e.eventType === "OrderUpstreamIngested",
     );
+  }, [entries]);
+
+  // The system this order's callbacks concern, straight off the audit rows
+  // ('oms' → "OMS"). Falls back to a neutral phrase until a row carries one.
+  const systemLabel = useMemo(() => {
+    const key = entries?.find((e) => e.systemKey)?.systemKey;
+    return key ? key.toUpperCase() : "source system";
   }, [entries]);
 
   const refresh = useCallback(() => setReloadToken((t) => t + 1), []);
@@ -147,6 +183,12 @@ export function OmsNotificationSection({
     () => deriveStatus(tripEntries, STAGES.arrived),
     [tripEntries],
   );
+  const cancelledStatus = useMemo(
+    () => deriveStatus(tripEntries, STAGES.cancelled),
+    [tripEntries],
+  );
+  const showCancelled =
+    cancelledStatus.kind === "notified" || cancelledStatus.kind === "failed";
 
   const makeResendHandler = (
     setState: (s: ResendState) => void,
@@ -163,23 +205,23 @@ export function OmsNotificationSection({
   };
 
   const onResendStarted = useCallback(
-    makeResendHandler(setStartedResend, (o, t) => resendOmsNotification(o, t)),
+    makeResendHandler(setStartedResend, (o, t) => resendSourceNotification(o, t)),
     [orderId, tripId, refresh],
   );
   const onResendArrived = useCallback(
-    makeResendHandler(setArrivedResend, (o, t) => resendOmsArrivedNotification(o, t)),
+    makeResendHandler(setArrivedResend, (o, t) => resendSourceArrivedNotification(o, t)),
     [orderId, tripId, refresh],
   );
 
   if (error) return null;
-  if (isOmsRelevant === false) return null;
+  if (isUpstreamRelevant === false) return null;
 
   return (
     <section>
       <h4 className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--color-ink-400)]">
         <span className="inline-flex items-center gap-1.5">
           <CloudUpload className="h-3 w-3" strokeWidth={2.4} />
-          Upstream OMS notification
+          Upstream {systemLabel} notification
         </span>
       </h4>
       <motion.div
@@ -202,29 +244,40 @@ export function OmsNotificationSection({
           resendState={arrivedResend}
           onResend={onResendArrived}
         />
+        {showCancelled && (
+          <StageRow
+            config={STAGES.cancelled}
+            status={cancelledStatus}
+            resendTripId={null}
+            resendState={{ kind: "idle" }}
+            onResend={() => {}}
+          />
+        )}
       </motion.div>
     </section>
   );
 }
 
-// Every OMS-related event type across both stages. Used to decide
-// whether the order participates in upstream OMS at all — if none of
-// these ever appear on the trip's audit, the order is internal and the
+// Every upstream-callback event type across all stages. Used to decide
+// whether the order participates in upstream callbacks at all — if none of
+// these ever appear on the order's audit, the order is internal and the
 // section should not render.
-const OMS_EVENT_TYPES = new Set<string>([
+const UPSTREAM_EVENT_TYPES = new Set<string>([
   ...STAGES.started.notifiedTypes,
   ...STAGES.started.resentTypes,
   ...STAGES.started.failedTypes,
   ...STAGES.arrived.notifiedTypes,
   ...STAGES.arrived.resentTypes,
   ...STAGES.arrived.failedTypes,
+  ...STAGES.cancelled.notifiedTypes,
+  ...STAGES.cancelled.failedTypes,
 ]);
 
 // Latest-wins per stage — pick the most recent of notified/resent vs
 // failed. A success after a failure overrides (retry recovered). If
-// neither OMS event fires but the trigger event did (e.g. TripStarted
+// neither callback event fires but the trigger event did (e.g. TripStarted
 // for the started stage), surface as "stale" so ops can investigate.
-function deriveStatus(entries: FullAuditEntryDto[] | null, cfg: StageConfig): OmsStatus {
+function deriveStatus(entries: FullAuditEntryDto[] | null, cfg: StageConfig): UpstreamStatus {
   if (entries === null) return { kind: "loading" };
 
   let latestOk: FullAuditEntryDto | null = null;
@@ -261,13 +314,15 @@ function StageRow({
   onResend,
 }: {
   config: StageConfig;
-  status: OmsStatus;
+  status: UpstreamStatus;
   resendTripId: string | null;
   resendState: ResendState;
   onResend: () => void;
 }) {
   const showResend =
-    (status.kind === "failed" || status.kind === "stale") && resendTripId;
+    (status.kind === "failed" || status.kind === "stale") &&
+    resendTripId &&
+    config.resendLabel !== null;
   return (
     <div>
       <StatusCard config={config} status={status} />
@@ -312,7 +367,7 @@ function StageBadge({ children }: { children: React.ReactNode }) {
   );
 }
 
-function StatusCard({ config, status }: { config: StageConfig; status: OmsStatus }) {
+function StatusCard({ config, status }: { config: StageConfig; status: UpstreamStatus }) {
   if (status.kind === "loading") {
     return (
       <div className="flex items-center gap-2 rounded-xl bg-[var(--color-ink-100)]/40 px-4 py-3 dark:bg-white/[0.04]">
@@ -413,4 +468,3 @@ function StatusCard({ config, status }: { config: StageConfig; status: OmsStatus
     </div>
   );
 }
-

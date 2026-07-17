@@ -9,11 +9,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   try {
     body = await req.json();
   } catch {
-    // Body is optional — backend accepts empty payload.
+    // Body is optional — backend accepts empty payload (RequestedBy defaults to null).
   }
   return proxyToBackend({
     method: "POST",
-    path: `/api/v1/delivery-orders/${id}/trips/${tripId}/notify-oms-arrived`,
+    path: `/api/v1/delivery-orders/${id}/trips/${tripId}/notify-source`,
     body,
     inbound: req,
   });

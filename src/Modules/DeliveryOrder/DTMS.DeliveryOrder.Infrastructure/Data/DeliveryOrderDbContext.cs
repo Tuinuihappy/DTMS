@@ -203,6 +203,7 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(e => e.ActorId).HasMaxLength(200);
             b.Property(e => e.Channel).HasMaxLength(30);
             b.Property(e => e.DisplayName).HasMaxLength(200);
+            b.Property(e => e.SystemKey).HasMaxLength(50);
             b.HasIndex(e => e.DeliveryOrderId);
         });
 
@@ -286,6 +287,7 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(e => e.AttemptNumber);
             b.Property(e => e.Channel).HasMaxLength(30);
             b.Property(e => e.DisplayName).HasMaxLength(200);
+            b.Property(e => e.SystemKey).HasMaxLength(50);
             // Primary lookup — timeline-by-order, newest first.
             b.HasIndex(e => new { e.OrderId, e.OccurredAt }).IsDescending(false, true);
             // Secondary — category filter (UI chips) within an order.

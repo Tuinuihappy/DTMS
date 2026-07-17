@@ -8,16 +8,18 @@ using Microsoft.Extensions.Logging;
 namespace DTMS.DeliveryOrder.Application.Consumers;
 
 /// <summary>
-/// Phase S.5 — writes the per-order OMS-notification audit from a federated
-/// callback's terminal outcome, replacing the direct writes the legacy
-/// TripStarted/TripDropCompleted OMS-notify (+fault) consumers did. The
-/// federated dispatch path only logs; this restores the rows the order-detail
-/// "Upstream OMS notification" UI reads (filtered by <c>relatedTripId</c>,
-/// classified by <c>eventType</c>, latest-wins by <c>occurredAt</c>).
+/// Phase S.5 — writes the per-order upstream-notification audit from a
+/// federated callback's terminal outcome. The federated dispatch path only
+/// logs; this produces the rows the order-detail upstream-notification UI
+/// reads (filtered by <c>relatedTripId</c>, classified by <c>eventType</c>,
+/// latest-wins by <c>occurredAt</c>).
 ///
-/// <para>Only the OMS shipment.started / shipment.arrived / shipment.cancelled
-/// outcomes are mirrored — other callback event types (order.delivered/cancelled,
-/// other systems) map to null and are ignored.</para>
+/// <para>Phase C — system-neutral: the labels come from
+/// <see cref="UpstreamCallbackAudit"/> and the system lands in the
+/// <c>SystemKey</c> column, so a sap/erp outcome writes the same vocabulary
+/// tagged with its own key instead of masquerading as OMS. Only the
+/// shipment.* event types are mirrored — order.delivered/cancelled outcomes
+/// map to null and are ignored (known gap, deliberate).</para>
 /// </summary>
 public sealed class SourceCallbackOutcomeConsumer : IConsumer<SourceCallbackOutcome>
 {
@@ -56,24 +58,25 @@ public sealed class SourceCallbackOutcomeConsumer : IConsumer<SourceCallbackOutc
             (evt.StatusCode is { } sc ? $" status={sc}" : string.Empty) +
             (string.IsNullOrWhiteSpace(evt.Detail) ? string.Empty : $" detail={evt.Detail}");
 
-        await _auditRepository.AddAsync(new OrderAuditEvent(evt.OrderId, auditType, details), ct);
+        await _auditRepository.AddAsync(
+            new OrderAuditEvent(evt.OrderId, auditType, details, systemKey: evt.SystemKey), ct);
         await _auditRepository.SaveChangesAsync(ct);
 
-        // Mirror into the OrderActivity timeline the OmsNotificationSection UI
-        // reads — same projectorName/category/relatedTripId the legacy direct
-        // writes used, so the UI is byte-for-byte unaffected.
+        // Mirror into the OrderActivity timeline the upstream-notification UI
+        // reads — same relatedTripId semantics the legacy direct writes used.
         await _activityStore.AppendAsync(
-            projectorName: "OmsNotifyDirect",
+            projectorName: UpstreamCallbackAudit.ProjectorName,
             eventId: Guid.NewGuid(),
             orderId: evt.OrderId,
-            category: "OmsNotify",
+            category: UpstreamCallbackAudit.Category,
             eventType: auditType,
             details: details,
             actorId: null,
             occurredAt: DateTime.UtcNow,
             relatedTripId: evt.TripId,
             attemptNumber: null,
-            cancellationToken: ct);
+            cancellationToken: ct,
+            systemKey: evt.SystemKey);
 
         _logger.LogInformation(
             "[SourceCallbackOutcome] Order {OrderId} trip {TripId} {EventType} → audit {AuditType}",
@@ -88,12 +91,12 @@ public sealed class SourceCallbackOutcomeConsumer : IConsumer<SourceCallbackOutc
         var permanent = statusCode is >= 400 and < 500;
         return callbackEventType switch
         {
-            ShipmentStartedV1 => success ? "UpstreamOmsNotified"
-                : permanent ? "UpstreamOmsRejected" : "UpstreamOmsNotifyFailed",
-            ShipmentArrivedV1 => success ? "UpstreamOmsArrivedNotified"
-                : permanent ? "UpstreamOmsArrivedRejected" : "UpstreamOmsArrivedNotifyFailed",
-            ShipmentCancelledV1 => success ? "UpstreamOmsCancelledNotified"
-                : permanent ? "UpstreamOmsCancelledRejected" : "UpstreamOmsCancelledNotifyFailed",
+            ShipmentStartedV1 => success ? UpstreamCallbackAudit.Notified
+                : permanent ? UpstreamCallbackAudit.Rejected : UpstreamCallbackAudit.NotifyFailed,
+            ShipmentArrivedV1 => success ? UpstreamCallbackAudit.ArrivedNotified
+                : permanent ? UpstreamCallbackAudit.ArrivedRejected : UpstreamCallbackAudit.ArrivedNotifyFailed,
+            ShipmentCancelledV1 => success ? UpstreamCallbackAudit.CancelledNotified
+                : permanent ? UpstreamCallbackAudit.CancelledRejected : UpstreamCallbackAudit.CancelledNotifyFailed,
             _ => null,
         };
     }

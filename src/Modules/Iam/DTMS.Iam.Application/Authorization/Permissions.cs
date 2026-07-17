@@ -57,7 +57,10 @@ public static class Permissions
         public static readonly PermissionDefinition OrderReplan = new("dtms:deliveryorder:order:replan", "Replan a stuck order (admin override)", "DeliveryOrder");
         public static readonly PermissionDefinition OrderUpstream = new("dtms:deliveryorder:order:create-upstream", "Pipeline create-from-upstream (SAP/OMS)", "DeliveryOrder");
         public static readonly PermissionDefinition OrderBulk = new("dtms:deliveryorder:order:bulk-submit", "Bulk submit orders", "DeliveryOrder");
-        public static readonly PermissionDefinition OrderNotifyOms = new("dtms:deliveryorder:order:notify-oms", "Resend an OMS notification", "DeliveryOrder");
+        // Phase C — renamed from notify-oms: the resend resolves the target
+        // system from the order, so the slug is source-agnostic. Live grants
+        // renamed by migration 20260716150100.
+        public static readonly PermissionDefinition OrderNotifySource = new("dtms:deliveryorder:order:notify-source", "Resend a source-system notification", "DeliveryOrder");
         public static readonly PermissionDefinition OrderPod = new("dtms:deliveryorder:pod:upload", "Upload / manage proof of delivery", "DeliveryOrder");
         public static readonly PermissionDefinition ItemRead = new("dtms:deliveryorder:item:read", "Read order items", "DeliveryOrder");
     }

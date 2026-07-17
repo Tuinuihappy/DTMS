@@ -419,6 +419,9 @@ export type FullAuditEntryDto = {
   // Null on rows projected from pre-1.2 events (backfilled history).
   channel: string | null;
   displayName: string | null;
+  // Phase C (multi-source) — which external system an upstream-callback
+  // row concerns (oms / sap / ...). Null for non-callback rows.
+  systemKey: string | null;
 };
 
 export type FullOrderAuditDto = {
@@ -601,7 +604,7 @@ export async function abandonStuckOrder(
   if (!res.ok && res.status !== 204) await unwrap(res);
 }
 
-export type ResendOmsNotificationResult = {
+export type ResendSourceNotificationResult = {
   shipmentId: string;
   deliveryBy: string;
   lotCount: number;
@@ -612,37 +615,37 @@ export type ResendOmsNotificationResult = {
 // trip. Backend gates: order has OrderRef + trip belongs to order +
 // items are bound. Upstream dedupes by shipmentId, so re-firing on a row
 // that previously succeeded is safe.
-export async function resendOmsNotification(
+export async function resendSourceNotification(
   orderId: string,
   tripId: string,
   requestedBy?: string,
-): Promise<ResendOmsNotificationResult> {
-  const res = await fetch(`/api/delivery-orders/${orderId}/trips/${tripId}/notify-oms`, {
+): Promise<ResendSourceNotificationResult> {
+  const res = await fetch(`/api/delivery-orders/${orderId}/trips/${tripId}/notify-source`, {
     method: "POST",
     headers: mutationHeaders(),
     body: JSON.stringify({ requestedBy: requestedBy ?? null }),
   });
-  return unwrap<ResendOmsNotificationResult>(res);
+  return unwrap<ResendSourceNotificationResult>(res);
 }
 
-export type ResendOmsArrivedNotificationResult = {
+export type ResendSourceArrivedNotificationResult = {
   shipmentId: string;
   lotCount: number;
   latencyMs: number;
 };
 
 // Manual resend of the OMS "arrived" (drop completed) notification.
-// Mirrors resendOmsNotification but hits the /arrived endpoint family.
-export async function resendOmsArrivedNotification(
+// Mirrors resendSourceNotification but hits the /arrived endpoint family.
+export async function resendSourceArrivedNotification(
   orderId: string,
   tripId: string,
   requestedBy?: string,
-): Promise<ResendOmsArrivedNotificationResult> {
-  const res = await fetch(`/api/delivery-orders/${orderId}/trips/${tripId}/notify-oms-arrived`, {
+): Promise<ResendSourceArrivedNotificationResult> {
+  const res = await fetch(`/api/delivery-orders/${orderId}/trips/${tripId}/notify-source-arrived`, {
     method: "POST",
     headers: mutationHeaders(),
     body: JSON.stringify({ requestedBy: requestedBy ?? null }),
   });
-  return unwrap<ResendOmsArrivedNotificationResult>(res);
+  return unwrap<ResendSourceArrivedNotificationResult>(res);
 }
 

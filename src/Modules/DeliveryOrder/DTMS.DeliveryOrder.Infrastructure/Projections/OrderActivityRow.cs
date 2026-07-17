@@ -42,6 +42,12 @@ public class OrderActivityRow
     public string? Channel { get; private set; }
     public string? DisplayName { get; private set; }
 
+    // Phase C (multi-source) — external system an upstream-callback row
+    // concerns ('oms', 'sap', …). The UI renders the system name from this
+    // instead of parsing it out of OMS-branded EventType strings. Null on
+    // rows that aren't about an external system.
+    public string? SystemKey { get; private set; }
+
     private OrderActivityRow() { }   // EF
 
     public OrderActivityRow(
@@ -50,7 +56,8 @@ public class OrderActivityRow
         string? details, string? actorId,
         DateTime occurredAt,
         Guid? relatedTripId, int? attemptNumber,
-        string? channel = null, string? displayName = null)
+        string? channel = null, string? displayName = null,
+        string? systemKey = null)
     {
         if (eventId == Guid.Empty)
             throw new ArgumentException("EventId is required.", nameof(eventId));
@@ -77,5 +84,6 @@ public class OrderActivityRow
         AttemptNumber = attemptNumber;
         Channel = channel;
         DisplayName = displayName;
+        SystemKey = systemKey;
     }
 }

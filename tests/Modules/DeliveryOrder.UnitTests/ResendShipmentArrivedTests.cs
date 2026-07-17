@@ -1,6 +1,6 @@
-using DTMS.DeliveryOrder.Application.Commands.ResendOmsArrivedNotification;
+using DTMS.DeliveryOrder.Application.Commands.ResendShipmentArrived;
+using DTMS.DeliveryOrder.Application.Consumers;
 using DTMS.DeliveryOrder.Application.Projections;
-using DTMS.DeliveryOrder.Domain;
 using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Domain.Repositories;
@@ -16,20 +16,21 @@ using DomainOrder = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder;
 
 namespace DeliveryOrder.UnitTests;
 
-// F4 — the arrived resend handler had no unit test at all. Pins the same
-// contract as the started handler: subscription-gated, dispatches sync to the
-// oms partition, writes the UpstreamOmsArrivedManuallyResent audit — plus its
-// own extra gate: manual transport never reports arrival to OMS.
-public class ResendOmsArrivedNotificationTests
+// Phase C — the arrived resend, source-agnostic like the started one. Pins
+// the happy path (subscription-routed dispatch + ArrivedManuallyResent audit
+// with SystemKey), the off-switch, and its own extra gate: manual transport
+// never reports arrival upstream.
+public class ResendShipmentArrivedTests
 {
     private static readonly Guid Pickup = Guid.NewGuid();
     private static readonly Guid Drop = Guid.NewGuid();
 
-    private static DomainOrder OmsOrder(Guid tripId, out Guid orderId, TransportMode? transportMode = null)
+    private static DomainOrder SourceOrder(
+        Guid tripId, out Guid orderId, string source = "oms", TransportMode? transportMode = null)
     {
         var order = DomainOrder.CreateFromUpstream(
             "OD-RA-" + Guid.NewGuid().ToString("N")[..6], Priority.Normal, serviceWindow: null,
-            sourceSystemKey: "oms", sourceSystemDisplayName: "OMS",
+            sourceSystemKey: source, sourceSystemDisplayName: source.ToUpperInvariant(),
             requestedTransportMode: transportMode);
         order.AddItem("WH-A", "DOCK-1", 1, "LOT-A", null, null, null, 5.0,
             Quantity.Create(1, UnitOfMeasure.EA));
@@ -41,16 +42,17 @@ public class ResendOmsArrivedNotificationTests
     }
 
     private sealed record Harness(
-        ResendOmsArrivedNotificationCommandHandler Handler,
+        ResendShipmentArrivedCommandHandler Handler,
         ISourceCallbackDispatcher Dispatcher,
         IOrderAuditEventRepository Audit,
         Guid OrderId,
         Guid TripId);
 
-    private static Harness NewHarness(bool subscribed, TransportMode? transportMode = null)
+    private static Harness NewHarness(
+        string orderSource = "oms", string? subscribedSystem = "oms", TransportMode? transportMode = null)
     {
         var tripId = Guid.NewGuid();
-        var order = OmsOrder(tripId, out var orderId, transportMode);
+        var order = SourceOrder(tripId, out var orderId, orderSource, transportMode);
 
         var trip = Trip.CreateForEnvelope(orderId, "upper-G2", "ORD-2", Pickup, Drop);
 
@@ -65,47 +67,50 @@ public class ResendOmsArrivedNotificationTests
             .Returns(new CallbackPayload("application/json",
                 System.Text.Encoding.UTF8.GetBytes("{\"lots\":[]}"),
                 RelativePath: "/api/shipments/x/arrived"));
+        var resolver = Substitute.For<ICallbackFormatterResolver>();
+        resolver.Resolve(Arg.Any<string>()).Returns(formatter);
 
         var lookup = Substitute.For<ISubscriptionLookup>();
         lookup.GetSubscribersAsync(CallbackEventTypes.ShipmentArrivedV1, Arg.Any<CancellationToken>())
-            .Returns(subscribed
-                ? new List<EventSubscriber> { new(WellKnownSourceSystems.Oms, "oms.shipment.arrived.v1") }
-                : new List<EventSubscriber>());
+            .Returns(subscribedSystem is null
+                ? new List<EventSubscriber>()
+                : new List<EventSubscriber> { new(subscribedSystem, $"{subscribedSystem}.shipment.arrived.v1") });
 
         var dispatcher = Substitute.For<ISourceCallbackDispatcher>();   // no throw = 2xx
         var audit = Substitute.For<IOrderAuditEventRepository>();
         var activity = Substitute.For<IOrderActivityProjectionStore>();
 
-        var handler = new ResendOmsArrivedNotificationCommandHandler(
-            formatter, dispatcher, lookup, trips, orders, audit, activity,
-            NullLogger<ResendOmsArrivedNotificationCommandHandler>.Instance);
+        var handler = new ResendShipmentArrivedCommandHandler(
+            resolver, dispatcher, lookup, trips, orders, audit, activity,
+            NullLogger<ResendShipmentArrivedCommandHandler>.Instance);
 
         return new Harness(handler, dispatcher, audit, orderId, tripId);
     }
 
     [Fact]
-    public async Task ArrivedResend_Success_DispatchesToOms_AndWritesArrivedManuallyResentAudit()
+    public async Task ArrivedResend_Success_DispatchesToSource_AndWritesArrivedManuallyResentAudit()
     {
-        var h = NewHarness(subscribed: true);
+        var h = NewHarness();
 
         var result = await h.Handler.Handle(
-            new ResendOmsArrivedNotificationCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+            new ResendShipmentArrivedCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         await h.Dispatcher.Received(1).DispatchAsync(
-            WellKnownSourceSystems.Oms, Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
+            "oms", Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
         await h.Audit.Received(1).AddAsync(
-            Arg.Is<OrderAuditEvent>(e => e.EventType == "UpstreamOmsArrivedManuallyResent"),
+            Arg.Is<OrderAuditEvent>(e =>
+                e.EventType == UpstreamCallbackAudit.ArrivedManuallyResent && e.SystemKey == "oms"),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task ArrivedResend_SubscriptionDisabled_ReturnsFailure_AndDoesNotDispatch()
     {
-        var h = NewHarness(subscribed: false);
+        var h = NewHarness(subscribedSystem: null);
 
         var result = await h.Handler.Handle(
-            new ResendOmsArrivedNotificationCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+            new ResendShipmentArrivedCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("disabled");
@@ -113,15 +118,15 @@ public class ResendOmsArrivedNotificationTests
             Arg.Any<string>(), Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
     }
 
-    // Manual transport never reports arrival to OMS (OMS owns the arrival
-    // signal for operator-pool deliveries) — the resend must refuse, not send.
+    // Manual transport never reports arrival upstream (the source system owns
+    // the arrival signal for operator-pool deliveries) — refuse, don't send.
     [Fact]
     public async Task ArrivedResend_ManualTransport_IsRefused()
     {
-        var h = NewHarness(subscribed: true, transportMode: TransportMode.Manual);
+        var h = NewHarness(transportMode: TransportMode.Manual);
 
         var result = await h.Handler.Handle(
-            new ResendOmsArrivedNotificationCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+            new ResendShipmentArrivedCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("Manual transport");
