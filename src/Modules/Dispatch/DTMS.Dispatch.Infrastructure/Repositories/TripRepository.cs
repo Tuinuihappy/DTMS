@@ -62,6 +62,39 @@ public class TripRepository : ITripRepository
                 cancellationToken);
     }
 
+    public async Task<TripSubTaskLookup?> GetSubTaskLookupAsync(
+        string? upperKey, string? vendorOrderKey, CancellationToken cancellationToken = default)
+    {
+        // IgnoreQueryFilters: vendor callbacks carry no tenant claim (same
+        // reasoning as GetByUpperKeyAsync). AsNoTracking single-row
+        // projection — this runs on EVERY sub-task frame, so it must stay a
+        // cheap indexed SELECT with no Includes.
+        if (!string.IsNullOrWhiteSpace(upperKey))
+        {
+            var byUpper = await _context.Trips
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(t => t.UpperKey == upperKey)
+                .Select(t => new TripSubTaskLookup(t.Id, t.VendorPickedUpAt, t.VendorDroppedAt))
+                .Cast<TripSubTaskLookup?>()
+                .FirstOrDefaultAsync(cancellationToken);
+            if (byUpper is not null) return byUpper;
+        }
+
+        if (!string.IsNullOrWhiteSpace(vendorOrderKey))
+        {
+            return await _context.Trips
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(t => t.AmrExtension != null && t.AmrExtension.VendorOrderKey == vendorOrderKey)
+                .Select(t => new TripSubTaskLookup(t.Id, t.VendorPickedUpAt, t.VendorDroppedAt))
+                .Cast<TripSubTaskLookup?>()
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        return null;
+    }
+
     public async Task<List<Trip>> GetActiveTripsByVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default)
     {
         return await _context.Trips

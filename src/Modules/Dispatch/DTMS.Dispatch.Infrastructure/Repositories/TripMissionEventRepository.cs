@@ -16,32 +16,31 @@ public sealed class TripMissionEventRepository : ITripMissionEventRepository
 
     public async Task<bool> AddIfNotExistsAsync(TripMissionEvent missionEvent, CancellationToken cancellationToken = default)
     {
-        // Race-safe duplicate suppression: pre-check is best-effort, the
-        // unique index is the actual guarantee. We swallow the resulting
-        // unique-violation so concurrent webhook + reconciler writes both
-        // appear to succeed from the caller's perspective.
-        var exists = await _context.TripMissionEvents
-            .IgnoreQueryFilters()
-            .AnyAsync(e =>
-                e.TripId == missionEvent.TripId &&
-                e.MissionKey == missionEvent.MissionKey &&
-                e.State == missionEvent.State,
-                cancellationToken);
-        if (exists) return false;
-
-        await _context.TripMissionEvents.AddAsync(missionEvent, cancellationToken);
-        try
-        {
-            await _context.SaveChangesAsync(cancellationToken);
-            return true;
-        }
-        catch (DbUpdateException)
-        {
-            // Another writer beat us — the unique constraint enforces the
-            // invariant. Detach so the next save doesn't retry this entity.
-            _context.Entry(missionEvent).State = EntityState.Detached;
-            return false;
-        }
+        // Single round trip: the unique index (TripId, MissionKey, State) is
+        // the arbiter, so ON CONFLICT DO NOTHING makes duplicate suppression
+        // the database's job — no pre-SELECT, no race window, no
+        // DbUpdateException dance. Rows-affected tells us whether we won.
+        //
+        // Raw SQL deliberately bypasses the change tracker: the old
+        // Add + SaveChangesAsync would also flush any OTHER entity the
+        // caller's scope happened to be tracking (e.g. a Trip loaded earlier
+        // in the same webhook request) — an invisible coupling this method
+        // never advertised. The statement is idempotent, so it is safe under
+        // EnableRetryOnFailure replaying it after a dropped connection.
+        var rows = await _context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO dispatch."TripMissionEvents"
+                ("Id", "TripId", "MissionIndex", "MissionKey", "MissionType", "State",
+                 "StationName", "ActionName", "ActionType", "ResultCode", "ErrorMessage",
+                 "ChangeStateTime", "ReceivedAt")
+            VALUES
+                ({missionEvent.Id}, {missionEvent.TripId}, {missionEvent.MissionIndex},
+                 {missionEvent.MissionKey}, {missionEvent.MissionType}, {missionEvent.State},
+                 {missionEvent.StationName}, {missionEvent.ActionName}, {missionEvent.ActionType},
+                 {missionEvent.ResultCode}, {missionEvent.ErrorMessage},
+                 {missionEvent.ChangeStateTime}, {missionEvent.ReceivedAt})
+            ON CONFLICT ("TripId", "MissionKey", "State") DO NOTHING
+            """, cancellationToken);
+        return rows > 0;
     }
 
     public Task<List<TripMissionEvent>> GetByTripIdAsync(Guid tripId, CancellationToken cancellationToken = default)

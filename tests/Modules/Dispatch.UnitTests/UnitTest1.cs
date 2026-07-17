@@ -970,6 +970,12 @@ internal sealed class FakeTripRepository : ITripRepository
     public Task<Trip?> GetByVendorOrderKeyAsync(string vendorOrderKey, CancellationToken ct = default)
         => Task.FromResult<Trip?>(vendorOrderKey == _trip.VendorOrderKey ? _trip : null);
 
+    public Task<TripSubTaskLookup?> GetSubTaskLookupAsync(string? upperKey, string? vendorOrderKey, CancellationToken ct = default)
+        => Task.FromResult<TripSubTaskLookup?>(
+            upperKey == _trip.UpperKey || vendorOrderKey == _trip.VendorOrderKey
+                ? new TripSubTaskLookup(_trip.Id, _trip.VendorPickedUpAt, _trip.VendorDroppedAt)
+                : null);
+
     public Task<Guid> GetRootTripIdAsync(Guid tripId, CancellationToken ct = default)
         => Task.FromResult(tripId);
 

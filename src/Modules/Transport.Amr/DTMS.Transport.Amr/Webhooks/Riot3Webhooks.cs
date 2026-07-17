@@ -269,21 +269,23 @@ public static class Riot3Webhooks
         // so payload.Task?.UpperKey is null in practice. Fall back to the
         // vendor-side order key carried on subTask.taskKey (echoes
         // Trip.VendorOrderKey) when the DTMS upperKey is absent.
+        //
+        // Hot-path projection: this handler fires ~22 times per trip but
+        // only the few MOVE-FINISHED frames that can still flip pickup/drop
+        // need the tracked Trip aggregate (heavy Includes). Resolve a cheap
+        // no-tracking lookup here; the full load happens behind the
+        // detector gate at the bottom.
         var upperKey = payload.Task?.UpperKey;
         var vendorOrderKey = subTask.TaskKey;
 
-        Trip? trip = null;
-        if (!string.IsNullOrWhiteSpace(upperKey))
-            trip = await tripRepository.GetByUpperKeyAsync(upperKey, cancellationToken);
-        if (trip is null && !string.IsNullOrWhiteSpace(vendorOrderKey))
-            trip = await tripRepository.GetByVendorOrderKeyAsync(vendorOrderKey, cancellationToken);
-
-        if (trip is null)
+        var lookup = await tripRepository.GetSubTaskLookupAsync(upperKey, vendorOrderKey, cancellationToken);
+        if (lookup is null)
         {
             logger.LogWarning("[SubTaskWebhook] No Trip found for subTask {SubTaskKey} (upperKey {UpperKey}, vendorOrderKey {VendorOrderKey}, event {Event}) — ignored.",
                 subTaskKey, upperKey ?? "(none)", vendorOrderKey ?? "(none)", eventType);
             return;
         }
+        var tripId = lookup.Value.Id;
 
         var state = eventType switch
         {
@@ -311,7 +313,7 @@ public static class Riot3Webhooks
         // Field semantics (station-by-type, time-by-state) live in the
         // shared factory so this path can never drift from the reconciler.
         var missionEvent = Riot3MissionEventFactory.Create(
-            tripId: trip.Id,
+            tripId: tripId,
             missionIndex: 0,
             missionKey: subTaskKey,
             missionType: subTask.SubTaskType,
@@ -329,14 +331,14 @@ public static class Riot3Webhooks
         if (inserted)
         {
             logger.LogInformation("[SubTaskWebhook] Trip {TripId} mission {MissionKey} → {State}",
-                trip.Id, subTaskKey, state);
+                tripId, subTaskKey, state);
 
             // Push to operator drawer so the Mission Timeline + failure
             // banner update without a manual refresh. Fire-and-forget by
             // design — publisher swallows transport errors and the UI
             // catches up on next REST refetch.
             await realtimePublisher.PublishMissionUpdatedAsync(
-                trip.Id,
+                tripId,
                 new TripMissionEventDto(
                     MissionIndex: missionEvent.MissionIndex,
                     MissionKey: missionEvent.MissionKey,
@@ -354,7 +356,7 @@ public static class Riot3Webhooks
         else
         {
             logger.LogDebug("[SubTaskWebhook] Trip {TripId} mission {MissionKey} {State} — duplicate, skipped",
-                trip.Id, subTaskKey, state);
+                tripId, subTaskKey, state);
         }
 
         // ── Item-Picked / DroppedOff detection ─────────────────────────
@@ -388,8 +390,33 @@ public static class Riot3Webhooks
         // dropped sub-task webhook doesn't lose the pickup/drop signal. Gated on
         // `inserted` so a duplicate webhook (already-stored row) doesn't re-run
         // detection; the fire-once guard on the Trip covers the rest.
-        if (state == "FINISHED" && inserted)
+        //
+        // Projection gate: the tracked Trip aggregate (heavy Includes) is
+        // loaded ONLY when this frame could actually flip a signal —
+        // MOVE FINISHED while pickup or drop is still pending per the cheap
+        // lookup. ACT/PROCESSING frames and post-completion MOVEs (the vast
+        // majority) never touch the aggregate. The lookup snapshot may be
+        // stale under concurrency, but the detector re-checks fire-once on
+        // the freshly loaded Trip, so a stale "still pending" only costs one
+        // extra load — never a double fire.
+        if (state == "FINISHED"
+            && inserted
+            && string.Equals(subTask.SubTaskType, "MOVE", StringComparison.OrdinalIgnoreCase)
+            && (lookup.Value.VendorPickedUpAt is null || lookup.Value.VendorDroppedAt is null))
         {
+            Trip? trip = null;
+            if (!string.IsNullOrWhiteSpace(upperKey))
+                trip = await tripRepository.GetByUpperKeyAsync(upperKey, cancellationToken);
+            if (trip is null && !string.IsNullOrWhiteSpace(vendorOrderKey))
+                trip = await tripRepository.GetByVendorOrderKeyAsync(vendorOrderKey, cancellationToken);
+            if (trip is null)
+            {
+                // Trip vanished between lookup and load (deleted mid-flight)
+                // — the mission row is already stored; nothing to mutate.
+                logger.LogWarning("[SubTaskWebhook] Trip {TripId} disappeared before pickup/drop detection — skipped", tripId);
+                return;
+            }
+
             if (await TripStationTransitionDetector.TryApplyAsync(
                     trip, subTask.SubTaskType, state, stationId,
                     facilityReadService, orderReader, missionEvent.ChangeStateTime, logger, cancellationToken))

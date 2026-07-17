@@ -2,6 +2,18 @@ using DTMS.Dispatch.Domain.Entities;
 
 namespace DTMS.Dispatch.Domain.Repositories;
 
+/// <summary>
+/// Lightweight projection for the sub-task webhook hot path: everything the
+/// handler needs to record a mission row and decide whether the pickup/drop
+/// detector could possibly fire — WITHOUT loading the tracked Trip aggregate
+/// (AmrExtension + VehicleAssignments + Events). The full aggregate is only
+/// fetched when the detector will actually mutate the Trip.
+/// </summary>
+public readonly record struct TripSubTaskLookup(
+    Guid Id,
+    DateTime? VendorPickedUpAt,
+    DateTime? VendorDroppedAt);
+
 public interface ITripRepository
 {
     Task<Trip?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
@@ -20,6 +32,16 @@ public interface ITripRepository
     /// owning Trip.
     /// </summary>
     Task<Trip?> GetByVendorOrderKeyAsync(string vendorOrderKey, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// No-tracking projection lookup for the sub-task webhook: resolves the
+    /// owning trip by UpperKey first, then by VendorOrderKey (same key
+    /// semantics as the two full lookups above), returning only the fields
+    /// the handler needs before it knows whether a full aggregate load is
+    /// warranted. Null when neither key matches.
+    /// </summary>
+    Task<TripSubTaskLookup?> GetSubTaskLookupAsync(
+        string? upperKey, string? vendorOrderKey, CancellationToken cancellationToken = default);
 
     Task<List<Trip>> GetActiveTripsByVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default);
 
