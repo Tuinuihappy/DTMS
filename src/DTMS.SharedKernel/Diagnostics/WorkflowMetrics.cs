@@ -22,6 +22,8 @@ namespace DTMS.SharedKernel.Diagnostics;
 ///   - dtms.workflow.reconciler_fetch_error_total  (counter)
 ///   - dtms.workflow.reconciler_reconciled_total   (counter)
 ///   - dtms.workflow.reconciler_backfilled_total   (counter — post-terminal vehicle recovery)
+///   - dtms.workflow.webhook_subtask_frames_total  (counter — every RIOT3 sub-task frame handled)
+///   - dtms.workflow.webhook_full_trip_loads_total (counter — frames that loaded the full Trip aggregate)
 ///
 /// Drives the SLO alerts defined in the Tier 1 plan:
 ///   - orders_stuck_planned &gt; 0 for 5 minutes (P1)
@@ -51,6 +53,14 @@ public sealed class WorkflowMetrics : IDisposable
     // it doesn't correct a live-state divergence, so conflating the two would
     // hide how often TASK_PROCESSING is being dropped.
     private readonly Counter<long> _reconcilerBackfilled;
+    // Sub-task webhook hot path (Riot3Webhooks.HandleSubTaskEvent). The
+    // projection gate should keep full_trip_loads / subtask_frames around
+    // 0.1-0.2 (only MOVE-FINISHED frames arriving while pickup/drop is
+    // still pending load the tracked aggregate). A sustained climb means a
+    // template shape the gate doesn't short-circuit — measure BEFORE
+    // reaching for a bigger refactor.
+    private readonly Counter<long> _webhookSubTaskFrames;
+    private readonly Counter<long> _webhookFullTripLoads;
 
     // Observable gauges read from a snapshot the producer (watchdog, outbox
     // processor) updates. Using a snapshot rather than a callback keeps the
@@ -153,6 +163,14 @@ public sealed class WorkflowMetrics : IDisposable
             "dtms.workflow.reconciler_backfilled_total",
             description: "Trips whose vendor vehicle was recovered post-terminal (missed TASK_PROCESSING, filled from RIOT3's terminal record). Rising = webhook loss during the PROCESSING signal.");
 
+        _webhookSubTaskFrames = _meter.CreateCounter<long>(
+            "dtms.workflow.webhook_subtask_frames_total",
+            description: "RIOT3 sub-task webhook frames handled (after trip correlation). Denominator for the full-load ratio.");
+
+        _webhookFullTripLoads = _meter.CreateCounter<long>(
+            "dtms.workflow.webhook_full_trip_loads_total",
+            description: "Sub-task frames that loaded the full tracked Trip aggregate (pickup/drop detection). Ratio to webhook_subtask_frames_total should stay ~0.1-0.2; a climb means the projection gate stopped short-circuiting.");
+
         _meter.CreateObservableGauge(
             "dtms.workflow.trips_stuck_reconcile",
             () => Interlocked.Read(ref _reconcilerTripsStuck),
@@ -209,6 +227,14 @@ public sealed class WorkflowMetrics : IDisposable
         if (reconciled > 0) _reconcilerReconciled.Add(reconciled);
         if (fetchErrors > 0) _reconcilerFetchError.Add(fetchErrors);
         if (backfilled > 0) _reconcilerBackfilled.Add(backfilled);
+    }
+
+    /// <summary>One sub-task webhook frame handled; fullTripLoad = true when
+    /// the projection gate let it load the tracked Trip aggregate.</summary>
+    public void RecordWebhookSubTaskFrame(bool fullTripLoad)
+    {
+        _webhookSubTaskFrames.Add(1);
+        if (fullTripLoad) _webhookFullTripLoads.Add(1);
     }
 
     private static KeyValuePair<string, object?> Tag(string key, string value)

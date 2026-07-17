@@ -39,6 +39,7 @@ public static class Riot3Webhooks
             DTMS.Facility.Application.Services.IFacilityReadService facilityReadService,
             DTMS.Dispatch.Application.Services.IDeliveryOrderStatusReader orderReader,
             ITripRealtimePublisher realtimePublisher,
+            DTMS.SharedKernel.Diagnostics.WorkflowMetrics metrics,
             ILogger<Riot3NotifyPayload> logger,
             CancellationToken cancellationToken) =>
         {
@@ -52,7 +53,7 @@ public static class Riot3Webhooks
                     break;
 
                 case "subtask":
-                    await HandleSubTaskEvent(payload, tripRepository, missionEventRepository, facilityReadService, orderReader, realtimePublisher, logger, cancellationToken);
+                    await HandleSubTaskEvent(payload, tripRepository, missionEventRepository, facilityReadService, orderReader, realtimePublisher, metrics, logger, cancellationToken);
                     break;
 
                 case "vehicle":
@@ -252,6 +253,7 @@ public static class Riot3Webhooks
         DTMS.Facility.Application.Services.IFacilityReadService facilityReadService,
         DTMS.Dispatch.Application.Services.IDeliveryOrderStatusReader orderReader,
         ITripRealtimePublisher realtimePublisher,
+        DTMS.SharedKernel.Diagnostics.WorkflowMetrics metrics,
         ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -399,10 +401,16 @@ public static class Riot3Webhooks
         // stale under concurrency, but the detector re-checks fire-once on
         // the freshly loaded Trip, so a stale "still pending" only costs one
         // extra load — never a double fire.
-        if (state == "FINISHED"
+        var fullTripLoad = state == "FINISHED"
             && inserted
             && string.Equals(subTask.SubTaskType, "MOVE", StringComparison.OrdinalIgnoreCase)
-            && (lookup.Value.VendorPickedUpAt is null || lookup.Value.VendorDroppedAt is null))
+            && (lookup.Value.VendorPickedUpAt is null || lookup.Value.VendorDroppedAt is null);
+        // full-load ratio observability (dtms.workflow.webhook_*): should sit
+        // around 0.1-0.2 — a sustained climb means the gate stopped
+        // short-circuiting for some template shape.
+        metrics.RecordWebhookSubTaskFrame(fullTripLoad);
+
+        if (fullTripLoad)
         {
             Trip? trip = null;
             if (!string.IsNullOrWhiteSpace(upperKey))
