@@ -9,6 +9,7 @@ import {
   useActionNameIndex,
   type ActionNameIndex,
 } from "@/lib/vendor/riot3-action-names";
+import { sortMissionRows } from "@/lib/mission-order";
 import { DateTime } from "@/components/primitives/date-time";
 import { MissionStateBadge } from "./badges";
 
@@ -43,10 +44,9 @@ export function MissionTimeline({
     );
   }
 
-  const sorted = [...missions].sort(
-    (a, b) =>
-      new Date(a.changeStateTime).getTime() - new Date(b.changeStateTime).getTime(),
-  );
+  // Shared comparator (lib/mission-order) — the failure banner numbers rows
+  // from the same sort, so "#12" up there is guaranteed to be row #12 here.
+  const sorted = sortMissionRows(missions);
 
   return (
     <ol className="relative space-y-3 pl-5">

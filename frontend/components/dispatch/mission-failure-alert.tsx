@@ -3,6 +3,8 @@
 import { AlertTriangle, ArrowDown } from "lucide-react";
 import type { TripMissionDto } from "@/lib/api/trips";
 import { resolveRiot3ErrorAction } from "@/lib/vendor/riot3-error-codes";
+import { parseActCode, useActionNameIndex } from "@/lib/vendor/riot3-action-names";
+import { buildRowNumberIndex, missionRowKey, compareMissionRows } from "@/lib/mission-order";
 
 export const MISSION_TIMELINE_ANCHOR = "mission-timeline-anchor";
 
@@ -30,19 +32,12 @@ export function getFailingMissions(missions: TripMissionDto[]): TripMissionDto[]
   }
   return Array.from(latestByKey.values())
     .filter((m) => isAlertMissionState(m.state))
-    // Order by real state-change time, not missionIndex — webhook-sourced
-    // rows hardcode index 0 (see MissionTimeline), so an index sort is unstable.
-    .sort(
-      (a, b) =>
-        new Date(a.changeStateTime).getTime() - new Date(b.changeStateTime).getTime(),
-    );
+    // Shared comparator (lib/mission-order) — same order the timeline uses.
+    .sort(compareMissionRows);
 }
 
 function isLater(a: TripMissionDto, b: TripMissionDto): boolean {
-  const ac = new Date(a.changeStateTime).getTime();
-  const bc = new Date(b.changeStateTime).getTime();
-  if (ac !== bc) return ac > bc;
-  return new Date(a.receivedAt).getTime() > new Date(b.receivedAt).getTime();
+  return compareMissionRows(a, b) > 0;
 }
 
 // Banner shown at the top of the Trip drawer when any mission is in an
@@ -55,6 +50,18 @@ export function MissionFailureAlert({
   missions: TripMissionDto[];
 }) {
   const failing = getFailingMissions(missions);
+  // ACT rows carry no station (RIOT3's station on ACT frames is a stale
+  // lagging dock — deliberately discarded at ingest), so their only human
+  // context is the ActionTemplate name for the [id,p0,p1] code. Same
+  // resolver + cache the timeline uses; fetch only when an ACT is failing.
+  const actionNames = useActionNameIndex(
+    failing.some((m) => parseActCode(m.actionName) !== null),
+  );
+  // Row numbers = position in the SAME sort the timeline renders, so the
+  // banner's "#12" is row #12 below. missionIndex is unusable (webhook rows
+  // hardcode 0 — the old always-"#1" bug); missing lookup → show no number.
+  const rowNumbers = buildRowNumberIndex(missions);
+
   if (failing.length === 0) return null;
 
   const scrollToTimeline = () => {
@@ -73,11 +80,23 @@ export function MissionFailureAlert({
           <ul className="mt-1.5 space-y-1.5">
             {failing.map((m, idx) => {
               const action = resolveRiot3ErrorAction(m.resultCode);
+              const seq = rowNumbers.get(missionRowKey(m));
+              // Target label: MOVE → station; ACT → template name + code
+              // (same convention as the timeline rows); raw actionName as
+              // the last resort so unknown codes stay debuggable.
+              const actCode = parseActCode(m.actionName);
+              const resolvedName = actCode ? actionNames.get(actCode) : undefined;
               return (
                 <li key={`${m.missionKey}-${m.state}-${idx}`} className="font-medium">
                   <span className="font-mono text-[11px] uppercase tracking-[0.04em] opacity-80">
-                    #{m.missionIndex + 1} {m.missionType}
-                    {m.stationName ? ` → ${m.stationName}` : ""}
+                    {seq != null ? `#${seq} ` : ""}{m.missionType}
+                    {m.stationName
+                      ? ` → ${m.stationName}`
+                      : resolvedName
+                        ? ` → ${resolvedName} [${actCode}]`
+                        : m.actionName
+                          ? ` → ${m.actionName}`
+                          : ""}
                   </span>
                   <span className="ml-1.5 rounded-full bg-white/60 px-1.5 py-[1px] text-[10.5px] font-semibold uppercase tracking-[0.06em] dark:bg-white/[0.08]">
                     {m.state}

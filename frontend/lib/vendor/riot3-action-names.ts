@@ -50,24 +50,46 @@ export function buildActionNameIndex(templates: ActionTemplateDto[]): ActionName
   return index;
 }
 
-// Fetch-once hook for timeline renders. includeInactive so a template that
-// was deactivated after a trip ran still names that trip's history. Errors
-// degrade silently to an empty index — rows fall back to the raw code.
+// Module-level cache: memoize the in-flight PROMISE (not just the result)
+// so the failure banner and the timeline mounting in the same render share
+// one fetch, and reopening a drawer within the TTL costs no network at all.
+// Only a SUCCESSFUL fetch is cached — on failure the slot is cleared so the
+// next mount retries instead of pinning an empty index until the TTL.
+const INDEX_TTL_MS = 60_000;
+let cachedAt = 0;
+let cachedIndex: Promise<ActionNameIndex> | null = null;
+
+function fetchActionNameIndex(): Promise<ActionNameIndex> {
+  if (cachedIndex && Date.now() - cachedAt < INDEX_TTL_MS) return cachedIndex;
+  cachedAt = Date.now();
+  cachedIndex = listActionTemplates({ page: 1, size: 500, includeInactive: true })
+    .then((paged) => buildActionNameIndex(paged.records))
+    .catch((err) => {
+      cachedIndex = null; // don't cache failures — retry on next mount
+      throw err;
+    });
+  return cachedIndex;
+}
+
+// Cached-fetch hook for timeline/banner renders. includeInactive so a
+// template deactivated after a trip ran still names that trip's history.
+// Errors degrade silently to an empty index — rows fall back to raw codes.
 export function useActionNameIndex(enabled: boolean): ActionNameIndex {
   const [index, setIndex] = useState<ActionNameIndex>(new Map());
 
   useEffect(() => {
     if (!enabled) return;
-    const ctrl = new AbortController();
-    listActionTemplates(
-      { page: 1, size: 500, includeInactive: true },
-      ctrl.signal,
-    )
-      .then((paged) => setIndex(buildActionNameIndex(paged.records)))
+    let cancelled = false;
+    fetchActionNameIndex()
+      .then((idx) => {
+        if (!cancelled) setIndex(idx);
+      })
       .catch(() => {
         /* silent — raw codes remain readable */
       });
-    return () => ctrl.abort();
+    return () => {
+      cancelled = true;
+    };
   }, [enabled]);
 
   return index;
