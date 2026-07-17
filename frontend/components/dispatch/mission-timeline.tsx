@@ -4,6 +4,11 @@ import { ArrowRight, CircleAlert, MapPin, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TripMissionDto } from "@/lib/api/trips";
 import { resolveRiot3ErrorAction } from "@/lib/vendor/riot3-error-codes";
+import {
+  parseActCode,
+  useActionNameIndex,
+  type ActionNameIndex,
+} from "@/lib/vendor/riot3-action-names";
 import { DateTime } from "@/components/primitives/date-time";
 import { MissionStateBadge } from "./badges";
 
@@ -20,6 +25,13 @@ export function MissionTimeline({
 }: {
   missions: TripMissionDto[];
 }) {
+  // ACT rows carry only the RIOT3 code ("ACT [4,1,0]") — resolve the
+  // operator-named ActionTemplate for the same [id,param0,param1] triple
+  // and show name + code together. Fetched once, only when an ACT row
+  // exists; unresolved codes render as-is.
+  const hasActRows = missions.some((m) => parseActCode(m.actionName) !== null);
+  const actionNames = useActionNameIndex(hasActRows);
+
   if (missions.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--color-ink-100)] px-4 py-6 text-center text-[12px] text-[var(--color-ink-500)] dark:border-white/10">
@@ -44,18 +56,35 @@ export function MissionTimeline({
         className="absolute left-[7px] top-2 bottom-2 w-px bg-[var(--color-ink-100)] dark:bg-white/10"
       />
       {sorted.map((m, idx) => (
-        <MissionRow key={`${m.missionKey}-${m.state}-${idx}`} mission={m} seq={idx + 1} />
+        <MissionRow
+          key={`${m.missionKey}-${m.state}-${idx}`}
+          mission={m}
+          seq={idx + 1}
+          actionNames={actionNames}
+        />
       ))}
     </ol>
   );
 }
 
-function MissionRow({ mission, seq }: { mission: TripMissionDto; seq: number }) {
+function MissionRow({
+  mission,
+  seq,
+  actionNames,
+}: {
+  mission: TripMissionDto;
+  seq: number;
+  actionNames: ActionNameIndex;
+}) {
   const isMove = mission.missionType.toUpperCase() === "MOVE";
   const Icon = isMove ? MapPin : Zap;
   const isFailed = ["FAILED"].includes(mission.state.toUpperCase());
   const hasError = mission.errorMessage || mission.resultCode === "1";
   const action = resolveRiot3ErrorAction(mission.resultCode);
+  // "ACT [4,1,0]" → template name ("LIFTUP WITH CAMERA") + code chip.
+  // Unresolved (index still loading / unknown code) → raw actionName only.
+  const actCode = parseActCode(mission.actionName);
+  const resolvedActionName = actCode ? actionNames.get(actCode) : undefined;
 
   return (
     <li className="relative">
@@ -105,9 +134,20 @@ function MissionRow({ mission, seq }: { mission: TripMissionDto; seq: number }) 
                     className="h-3 w-3 text-[var(--color-ink-300)]"
                     strokeWidth={2.4}
                   />
-                  <span className="font-mono text-[11.5px] font-medium text-[var(--color-ink-700)]">
-                    {mission.actionName}
-                  </span>
+                  {resolvedActionName ? (
+                    <>
+                      <span className="text-[11.5px] font-medium text-[var(--color-ink-700)]">
+                        {resolvedActionName}
+                      </span>
+                      <span className="font-mono text-[10.5px] text-[var(--color-ink-400)]">
+                        [{actCode}]
+                      </span>
+                    </>
+                  ) : (
+                    <span className="font-mono text-[11.5px] font-medium text-[var(--color-ink-700)]">
+                      {mission.actionName}
+                    </span>
+                  )}
                 </>
               )}
             </div>
