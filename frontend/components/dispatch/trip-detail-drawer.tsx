@@ -255,11 +255,19 @@ export function TripDetailDrawer({
                   {/* Mission timeline sits right under the Status timeline
                       so operators see vendor-side failures inline with
                       DTMS state transitions. Anchor id is the target of
-                      the MissionFailureAlert scroll-to-anchor button. */}
-                  <section id={MISSION_TIMELINE_ANCHOR}>
-                    <SectionTitle>Mission timeline ({mergedMissions.length})</SectionTitle>
-                    <MissionTimeline missions={mergedMissions} />
-                  </section>
+                      the MissionFailureAlert scroll-to-anchor button.
+                      AMR-only: missions come from RIOT3 sub-task webhooks,
+                      so a Manual / self-managed trip has none by design —
+                      showing the "webhooks populate this list as the robot
+                      moves" empty state there just confuses operators. Kept
+                      visible if a non-AMR trip somehow HAS missions (data
+                      honesty beats tidiness). */}
+                  {(data.transportMode === "Amr" || mergedMissions.length > 0) && (
+                    <section id={MISSION_TIMELINE_ANCHOR}>
+                      <SectionTitle>Mission timeline ({mergedMissions.length})</SectionTitle>
+                      <MissionTimeline missions={mergedMissions} />
+                    </section>
+                  )}
 
                   {/* Upstream-OMS shipment notification status. Auto-hides
                       when the order is internal (no OMS rows in audit).
