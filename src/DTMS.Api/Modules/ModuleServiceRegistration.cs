@@ -697,7 +697,7 @@ public static class ModuleServiceRegistration
                 // outbound callbacks (next to OutboxDbContext which it
                 // writes to). Must be scanned explicitly because the
                 // consumer is in the api assembly, not a module.
-                typeof(DTMS.Api.Infrastructure.Callbacks.OrderDeliveredCallbackFanoutConsumer).Assembly
+                typeof(DTMS.Api.Infrastructure.Callbacks.ShipmentStartedCallbackFanoutConsumer).Assembly
             );
 
             // T2 POC — opt-in Saga registration. While disabled the saga's

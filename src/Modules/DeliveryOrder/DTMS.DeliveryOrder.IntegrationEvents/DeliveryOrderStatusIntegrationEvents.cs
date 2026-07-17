@@ -31,7 +31,7 @@ namespace DTMS.DeliveryOrder.IntegrationEvents;
 // SourceSystem field now carries the lowercase SystemClient.Key slug
 // (e.g. "oms") instead of the enum PascalCase name ("Oms"). Wire shape
 // unchanged (still nullable string). Downstream fan-out consumers
-// (OrderCancelledCallbackFanoutConsumer, OrderDeliveredCallbackFanoutConsumer)
+// (the Shipment* callback fan-out consumers; the order-scoped pair was removed — no subscriber ever existed)
 // already compare with StringComparison.OrdinalIgnoreCase — safe.
 
 public record DeliveryOrderCancelledIntegrationEventV1(

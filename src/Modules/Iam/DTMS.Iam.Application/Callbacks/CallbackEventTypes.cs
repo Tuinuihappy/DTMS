@@ -24,11 +24,12 @@ namespace DTMS.Iam.Application.Callbacks;
 /// </summary>
 public static class CallbackEventTypes
 {
-    /// <summary>Order has finished delivery successfully — terminal happy path.</summary>
-    public const string OrderDeliveredV1 = "order.delivered.v1";
-
-    /// <summary>Order was cancelled before completion.</summary>
-    public const string OrderCancelledV1 = "order.cancelled.v1";
+    // order.delivered.v1 / order.cancelled.v1 were removed 2026-07-17: the
+    // order-scoped pair never had a subscriber, its fan-out consumers never
+    // stamped RelatedOrderId (so outcomes could not be audited), and every
+    // live integration is trip-scoped via the shipment.* family below. If an
+    // order-scoped callback is ever really needed, reintroduce it with the
+    // full chain: fan-out consumer + RelatedOrderId + outcome audit labels.
 
     /// <summary>Shipment started — trip Created → InProgress (Phase S.5, was the
     /// legacy OMS <c>POST /api/shipments</c>).</summary>
@@ -40,7 +41,7 @@ public static class CallbackEventTypes
 
     /// <summary>A started shipment's trip was cancelled. Trip-scoped like its
     /// started/arrived siblings, so the shipmentId is the same root trip id
-    /// they carry — the order-scoped <see cref="OrderCancelledV1"/> cannot
+    /// they carry — an order-scoped cancel event could not
     /// address an OMS shipment (an order spans N root trips).
     ///
     /// <para>NOT terminal: a retry reuses the root trip id, so a subscriber can
@@ -51,8 +52,6 @@ public static class CallbackEventTypes
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
-        OrderDeliveredV1,
-        OrderCancelledV1,
         ShipmentStartedV1,
         ShipmentArrivedV1,
         ShipmentCancelledV1,

@@ -17,9 +17,12 @@ namespace DTMS.DeliveryOrder.Application.Consumers;
 /// <para>Phase C — system-neutral: the labels come from
 /// <see cref="UpstreamCallbackAudit"/> and the system lands in the
 /// <c>SystemKey</c> column, so a sap/erp outcome writes the same vocabulary
-/// tagged with its own key instead of masquerading as OMS. Only the
-/// shipment.* event types are mirrored — order.delivered/cancelled outcomes
-/// map to null and are ignored (known gap, deliberate).</para>
+/// tagged with its own key instead of masquerading as OMS. The shipment.*
+/// family is the ENTIRE callback vocabulary (the order-scoped pair was
+/// removed 2026-07-17 — never subscribed, never audited-able); the null arm
+/// below is a defensive guard for unknown future types, and adding a type
+/// without a label here would strand its outcomes silently — extend the
+/// switch in the same commit.</para>
 /// </summary>
 public sealed class SourceCallbackOutcomeConsumer : IConsumer<SourceCallbackOutcome>
 {
