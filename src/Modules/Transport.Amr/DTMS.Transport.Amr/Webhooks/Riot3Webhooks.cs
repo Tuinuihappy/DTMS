@@ -304,26 +304,26 @@ public static class Riot3Webhooks
         var stationName = subTask.Station?.Station?.Name;
         var stationId   = subTask.Station?.Station?.Id;
 
-        // RIOT3 timestamps come as strings; tolerate missing or malformed.
-        var changeTime = ParseRiot3Time(subTask.FinishedTime)
-                         ?? ParseRiot3Time(subTask.StartedTime)
-                         ?? DateTime.UtcNow;
-
         // MissionIndex isn't on the sub-task payload — fall back to 0 so
         // the row is still stored. The detail endpoint orders by
         // ChangeStateTime when index ties.
-        var missionEvent = TripMissionEvent.Record(
+        //
+        // Field semantics (station-by-type, time-by-state) live in the
+        // shared factory so this path can never drift from the reconciler.
+        var missionEvent = Riot3MissionEventFactory.Create(
             tripId: trip.Id,
             missionIndex: 0,
             missionKey: subTaskKey,
-            missionType: string.IsNullOrWhiteSpace(subTask.SubTaskType) ? "UNKNOWN" : subTask.SubTaskType,
+            missionType: subTask.SubTaskType,
             state: state,
-            changeStateTime: changeTime,
+            startedTime: subTask.StartedTime,
+            finishedTime: subTask.FinishedTime,
             stationName: stationName,
             actionName: subTask.ActionName,
             actionType: subTask.ActionType,
             resultCode: failResult?.ErrorCode ?? actResult?.Code,
-            errorMessage: failResult?.ErrorDescription);
+            errorMessage: failResult?.ErrorDescription,
+            logger: logger);
 
         var inserted = await missionEventRepository.AddIfNotExistsAsync(missionEvent, cancellationToken);
         if (inserted)
@@ -360,24 +360,23 @@ public static class Riot3Webhooks
         // ── Item-Picked / DroppedOff detection ─────────────────────────
         // Once a pickup/drop sub-mission finishes at the trip's pickup OR
         // drop station, fire the matching domain event so the DeliveryOrder
-        // side flips item status. Both ACT and MOVE qualify:
-        //   • ACT FINISHED  → vendor ran a pickup/drop action (e.g. lift,
-        //     load, dispense) AT the station — items physically loaded/dropped.
-        //   • MOVE FINISHED → robot arrived at the station. For
-        //     operator-confirm templates (e.g. Confirm-X-to-Y, which use
-        //     WaitingConfirm — an ACT with no stationId), the MOVE
-        //     completion is the closest available "reached pickup/drop"
-        //     signal: WaitingConfirm itself fires no station-tagged event.
-        //     Treating MOVE arrival as pickup/drop is a small semantic
-        //     stretch (robot is at the dock, operator may still be loading),
-        //     but it's the only signal RIOT3 emits before TASK_FINISHED
-        //     gaps every item straight to Delivered.
+        // side flips item status. Only MOVE qualifies:
+        //   • MOVE FINISHED → robot arrived at the station. Treating arrival
+        //     as pickup/drop is a small semantic stretch (robot is at the
+        //     dock, operator may still be loading), but it's the only signal
+        //     RIOT3 emits before TASK_FINISHED gaps every item straight to
+        //     Delivered — and the only one with a trustworthy station.
+        //   • ACT FINISHED is deliberately NOT a signal: the station object
+        //     on ACT frames is a stale last-registered dock that lags the
+        //     robot by one leg (see TripStationTransitionDetector for the
+        //     trip 5018 evidence) — it could fire pickup/drop on the wrong
+        //     visit.
         // Ignored when:
         //   • state != FINISHED         (only completion counts)
-        //   • mission type not ACT/MOVE (other types carry no station)
+        //   • mission type not MOVE     (ACT stations untrustworthy, others carry none)
         //   • duplicate webhook         (already-stored row, no event)
         //   • trip has no pickup/drop   (pre-Gap-3 trip — degrade silently)
-        //   • station id missing        (ACT WaitingConfirm-style → no station bound)
+        //   • station id missing
         //   • station resolves to neither pickup nor drop
         //
         // Resolves via the vendor-side station id (VendorRef) rather than
@@ -393,21 +392,11 @@ public static class Riot3Webhooks
         {
             if (await TripStationTransitionDetector.TryApplyAsync(
                     trip, subTask.SubTaskType, state, stationId,
-                    facilityReadService, orderReader, changeTime, logger, cancellationToken))
+                    facilityReadService, orderReader, missionEvent.ChangeStateTime, logger, cancellationToken))
             {
                 await tripRepository.UpdateAsync(trip, cancellationToken);
             }
         }
-    }
-
-    private static DateTime? ParseRiot3Time(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return null;
-        return DateTime.TryParse(value, null,
-            System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal,
-            out var dt)
-            ? dt
-            : null;
     }
 
     private static async Task HandleVehicleEvent(

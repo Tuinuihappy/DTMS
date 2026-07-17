@@ -248,7 +248,7 @@ public class Riot3ReconciliationMissionUpsertTests
     }
 
     [Fact]
-    public async Task UpsertMissions_ProcessingMission_FallsBackToStartedTime()
+    public async Task UpsertMissions_ProcessingMission_UsesStartedTime()
     {
         var captured = new List<TripMissionEvent>();
         var repo = Substitute.For<ITripMissionEventRepository>();

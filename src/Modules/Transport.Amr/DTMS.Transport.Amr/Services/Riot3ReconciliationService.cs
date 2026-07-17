@@ -212,7 +212,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     var raw = await queryService.GetRawByUpperKeyAsync(trip.UpperKey!, ct);
                     if (!string.IsNullOrWhiteSpace(raw))
                     {
-                        var expectedCompletion = TryParseRiot3Time(data.OrderStateChangeTime ?? data.FinalTime);
+                        var expectedCompletion = Riot3MissionEventFactory.ParseRiot3Time(data.OrderStateChangeTime ?? data.FinalTime);
                         trip.CaptureFinalSnapshot(raw, expectedCompletion);
 
                         // Recover the robot from the terminal record for trips
@@ -426,7 +426,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
 
                 // Snapshot FIRST — this is the write that removes the trip from
                 // the self-heal query for good, even when no vehicle exists.
-                var expectedCompletion = TryParseRiot3Time(data.OrderStateChangeTime ?? data.FinalTime);
+                var expectedCompletion = Riot3MissionEventFactory.ParseRiot3Time(data.OrderStateChangeTime ?? data.FinalTime);
                 trip.CaptureFinalSnapshot(raw, expectedCompletion);
 
                 var (vKey, vName) = data.ResolvedVehicle;
@@ -485,22 +485,26 @@ public sealed class Riot3ReconciliationService : BackgroundService
 
             try
             {
-                var ev = TripMissionEvent.Record(
+                // Field semantics (station-by-type, time-by-state) live in the
+                // shared factory so this path can never drift from the webhook.
+                var ev = Riot3MissionEventFactory.Create(
                     tripId: tripId,
                     missionIndex: m.MissionIndex ?? i,
                     missionKey: m.MissionKey!,
-                    missionType: string.IsNullOrWhiteSpace(m.Type) ? "UNKNOWN" : m.Type!,
+                    missionType: m.Type,
                     state: state,
-                    // Real RIOT3 time (finishedTime/startedTime) — NOT the poll
-                    // time. The order GET has no "changeStateTime" field, so the
-                    // old TryParse(m.ChangeStateTime) always fell to UtcNow and
-                    // collapsed every reconciler mission onto the poll instant.
-                    changeStateTime: TryParseRiot3Time(m.MissionChangeTime) ?? DateTime.UtcNow,
+                    startedTime: m.StartedTime,
+                    finishedTime: m.FinishedTime,
                     stationName: m.StationName,
                     actionName: m.ActionName,
                     actionType: m.ActionType,
                     resultCode: m.ResultCode,
-                    errorMessage: m.ResultStr);
+                    errorMessage: m.ResultStr,
+                    // Order-GET ACT missions carry no station (null already) —
+                    // the factory's discarded-station debug log has nothing to
+                    // say on this path, so a null logger keeps the static
+                    // signature unchanged for the unit tests.
+                    logger: Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
                 var inserted = await repo.AddIfNotExistsAsync(ev, ct);
                 if (inserted)
                 {
@@ -555,7 +559,9 @@ public sealed class Riot3ReconciliationService : BackgroundService
         foreach (var m in data.Missions)
         {
             if (ct.IsCancellationRequested) break;
-            var actedAt = TryParseRiot3Time(m.MissionChangeTime);
+            // Detector only accepts FINISHED missions, so finishedTime IS the
+            // acted-at moment (MissionChangeTime's blanket fallback is gone).
+            var actedAt = Riot3MissionEventFactory.ParseRiot3Time(m.FinishedTime);
             if (await TripStationTransitionDetector.TryApplyAsync(
                     trip, m.Type, m.State, m.StationId,
                     facilityReadService, orderReader, actedAt, _logger, ct))
@@ -573,14 +579,6 @@ public sealed class Riot3ReconciliationService : BackgroundService
         // "SUCCEEDED" is the order-level orderState success token (the notify
         // task.state uses "FINISHED"); both must gate snapshot + vehicle backfill.
         return s is "FINISHED" or "SUCCEEDED" or "FAILED" or "CANCELED" or "CANCELLED" or "REJECTED";
-    }
-
-    private static DateTime? TryParseRiot3Time(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return null;
-        return DateTime.TryParse(value, null,
-            System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal,
-            out var dt) ? dt : null;
     }
 
     internal enum Transition { None, Completed, Failed, Cancelled, Started, Paused, Resumed, VehicleReassigned }

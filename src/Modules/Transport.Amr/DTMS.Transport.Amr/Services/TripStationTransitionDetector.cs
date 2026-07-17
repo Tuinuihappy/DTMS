@@ -46,10 +46,16 @@ public static class TripStationTransitionDetector
             return false;
 
         var type = string.IsNullOrWhiteSpace(missionType) ? "" : missionType.ToUpperInvariant();
-        // ACT FINISHED = vendor ran a pickup/drop action at the station.
-        // MOVE FINISHED = robot arrived at the station (the closest "reached"
-        // signal for operator-confirm templates that emit no station-tagged ACT).
-        if (type != "ACT" && type != "MOVE")
+        // MOVE FINISHED = robot arrived at the station — the ONLY mission type
+        // whose station is trustworthy. ACT frames DO carry a station object,
+        // but it is a stale "last registered dock" that lags the robot by one
+        // leg (trip 5018, 2026-07-16: act…d2 carried STF_13 — the trip's drop
+        // station — while the robot was actually at SHELF3_STANBY; RIOT3's own
+        // order record binds no station to ACT missions at all). Accepting ACT
+        // here risked firing pickup/drop on the wrong visit, so ACT is gated
+        // out; MOVE arrival covers every observed template, and the reconciler
+        // remains the safety net for dropped MOVE webhooks.
+        if (type != "MOVE")
             return false;
 
         if (vendorStationId is not > 0)

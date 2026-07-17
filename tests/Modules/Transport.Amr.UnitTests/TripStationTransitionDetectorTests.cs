@@ -53,9 +53,9 @@ public class TripStationTransitionDetectorTests
         trip.VendorPickedUpAt.Should().NotBeNull();
         trip.Events.Count(e => e.EventType == "VendorPickupCompleted").Should().Be(1);
 
-        // Second observation of the same signal is a no-op.
+        // Second observation of the same signal is a no-op (fire-once guard).
         var again = await TripStationTransitionDetector.TryApplyAsync(
-            trip, "ACT", "FINISHED", PickupVendorId,
+            trip, "MOVE", "FINISHED", PickupVendorId,
             Facility(pickup, drop), orderReader, actedAt: null,
             NullLogger.Instance, CancellationToken.None);
         again.Should().BeFalse();
@@ -63,7 +63,7 @@ public class TripStationTransitionDetectorTests
     }
 
     [Fact]
-    public async Task ActFinishedAtDropStation_FiresDropWithPodPolicy()
+    public async Task MoveFinishedAtDropStation_FiresDropWithPodPolicy()
     {
         var (trip, pickup, drop) = InProgressTripWithStations();
         var orderReader = Substitute.For<IDeliveryOrderStatusReader>();
@@ -71,7 +71,7 @@ public class TripStationTransitionDetectorTests
             .Returns((bool?)false);
 
         var fired = await TripStationTransitionDetector.TryApplyAsync(
-            trip, "ACT", "FINISHED", DropVendorId,
+            trip, "MOVE", "FINISHED", DropVendorId,
             Facility(pickup, drop), orderReader, actedAt: null,
             NullLogger.Instance, CancellationToken.None);
 
@@ -82,7 +82,9 @@ public class TripStationTransitionDetectorTests
 
     [Theory]
     [InlineData("MOVE", "PROCESSING", PickupVendorId)]   // not finished
-    [InlineData("WAIT", "FINISHED", PickupVendorId)]     // not ACT/MOVE
+    [InlineData("WAIT", "FINISHED", PickupVendorId)]     // not MOVE
+    [InlineData("ACT", "FINISHED", DropVendorId)]        // ACT station is a stale lagging dock — never a signal
+    [InlineData("ACT", "FINISHED", PickupVendorId)]      // same for pickup side
     [InlineData("MOVE", "FINISHED", 0)]                   // no station
     [InlineData("MOVE", "FINISHED", 999)]                // resolves to neither pickup nor drop
     public async Task NonQualifyingMission_DoesNotFire(string type, string state, int vendorStationId)
