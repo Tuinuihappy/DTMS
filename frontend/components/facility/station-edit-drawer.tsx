@@ -161,7 +161,7 @@ export function StationEditDrawer({
             className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-[var(--color-canvas)]/95 backdrop-blur-2xl shadow-[-20px_0_60px_-20px_rgba(15,23,42,0.35)] dark:bg-[var(--color-canvas)]/90"
           >
             {/* Header */}
-            <div className="relative overflow-hidden">
+            <div className="relative shrink-0 overflow-hidden">
               <div
                 aria-hidden
                 className="absolute inset-0 pointer-events-none"
@@ -213,7 +213,7 @@ export function StationEditDrawer({
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-7">
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 space-y-7">
               {/* Profile section */}
               <section>
                 <SectionLabel

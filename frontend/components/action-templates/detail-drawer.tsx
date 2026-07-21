@@ -103,7 +103,7 @@ export function ActionTemplateDrawer({
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 space-y-6">
               <Section title="Parameters">
                 {template.actionParameters.length === 0 ? (
                   <p className="text-[12.5px] italic text-[var(--color-ink-400)]">
@@ -184,7 +184,7 @@ export function ActionTemplateDrawer({
               </Section>
             </div>
 
-            <div className="border-t border-white/60 bg-white/30 px-6 py-4 dark:border-white/[0.06] dark:bg-white/[0.02]">
+            <div className="shrink-0 border-t border-white/60 bg-white/30 px-6 py-4 dark:border-white/[0.06] dark:bg-white/[0.02]">
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <DrawerAction
                   variant="ghost"

@@ -192,7 +192,7 @@ export function OrderDetailDrawer({
               "shadow-[0_30px_80px_-20px_rgba(15,23,42,0.5)]",
             )}
           >
-            <header className="flex items-start justify-between gap-3 border-b border-[var(--color-ink-100)] px-6 py-5 dark:border-white/[0.06]">
+            <header className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--color-ink-100)] px-6 py-5 dark:border-white/[0.06]">
               <div className="min-w-0 flex-1">
                 <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--color-ink-400)]">
                   Delivery order
@@ -223,7 +223,7 @@ export function OrderDetailDrawer({
               </button>
             </header>
 
-            <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
               {error && (
                 <div className="rounded-xl bg-[var(--color-coral-soft)] px-4 py-3 text-[12.5px] font-medium text-[var(--color-coral)]">
                   {error}
@@ -532,7 +532,7 @@ export function OrderDetailDrawer({
 
             {/* Action footer */}
             {data && (
-              <footer className="border-t border-[var(--color-ink-100)] px-6 py-4 dark:border-white/[0.06]">
+              <footer className="shrink-0 border-t border-[var(--color-ink-100)] px-6 py-4 dark:border-white/[0.06]">
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   {can(data.orderStatus, ["Draft"]) && (
                     <DrawerActionButton
