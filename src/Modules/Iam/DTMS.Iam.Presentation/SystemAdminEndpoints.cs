@@ -307,6 +307,45 @@ public static class SystemAdminEndpoints
                 return Results.NoContent();
             }).RequirePermission(Permissions.Iam.SystemWrite);
 
+        // ── Reveal stored outbound callback token ─────────────────────
+        // Deliberately its own endpoint + its own permission, never part
+        // of SystemDetailDto: the detail payload stays metadata-only, so
+        // the token only crosses the wire when an operator explicitly
+        // asks — and every reveal lands in the audit log.
+        group.MapGet("/{key}/callback/token",
+            async (string key, HttpContext ctx,
+                   ISystemClientRepository systems,
+                   ISystemCredentialRepository creds,
+                   IAuditLogRepository audit,
+                   CancellationToken ct) =>
+            {
+                if (await systems.GetByKeyAsync(key, ct) is null) return Results.NotFound();
+
+                // Straight from the repository, not CachedCredentialReader —
+                // "what token is stored right now" must reflect the DB, and
+                // the cached copy can lag a rotation by up to 5 minutes.
+                var cred = await creds.GetBySystemKeyAsync(key, ct);
+                if (cred is null) return Results.NotFound();
+
+                if (!string.Equals(cred.CallbackAuthScheme, "bearer", StringComparison.OrdinalIgnoreCase))
+                    return Results.Conflict(new { error = $"System '{key}' has no bearer callback auth configured — nothing to reveal." });
+
+                var token = TryReadStoredToken(cred.CallbackAuthConfig);
+                if (token is null)
+                    return Results.Conflict(new { error = $"Stored CallbackAuthConfig for '{key}' is empty or malformed — re-save the token via PUT /callback." });
+
+                // Never log token plaintext — actor + system only.
+                await audit.AppendAsync(new PermissionAuditEntry(
+                    actorEmployeeId: ActorOrUnknown(ctx),
+                    action: "system-callback-token-revealed",
+                    permissionCode: null,
+                    details: $"{{\"systemKey\":\"{key}\"}}"), ct);
+
+                return Results.Ok(new RevealedCallbackTokenResponse(
+                    Token: token,
+                    ExpiresAt: TryReadJwtExpiry(cred.CallbackAuthConfig)));
+            }).RequirePermission(Permissions.Iam.SystemRevealSecret);
+
         // ── Hard delete (only when inactive) ─────────────────────────
         // Soft delete via /deactivate is the routine path. Hard delete
         // is the rare cleanup operation (test data, GDPR purge, retired
@@ -796,6 +835,29 @@ public static class SystemAdminEndpoints
     /// — the OMS issuer holds that key, and a tampered token would just
     /// fail at OMS-side validation. This decode is for UX surfacing only.
     /// </summary>
+    /// <summary>
+    /// Reads the plaintext token out of the <c>{"token":"..."}</c> shape in
+    /// <c>SystemCredentials.CallbackAuthConfig</c>. Null for empty or
+    /// malformed config — the reveal endpoint translates that into a 409
+    /// with re-save guidance.
+    /// </summary>
+    private static string? TryReadStoredToken(string? callbackAuthConfig)
+    {
+        if (string.IsNullOrWhiteSpace(callbackAuthConfig)) return null;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(callbackAuthConfig);
+            if (!doc.RootElement.TryGetProperty("token", out var tokenEl)) return null;
+            if (tokenEl.ValueKind != System.Text.Json.JsonValueKind.String) return null;
+            var token = tokenEl.GetString();
+            return string.IsNullOrWhiteSpace(token) ? null : token;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static DateTime? TryReadJwtExpiry(string? callbackAuthConfig)
     {
         if (string.IsNullOrWhiteSpace(callbackAuthConfig)) return null;
@@ -910,6 +972,16 @@ public sealed record SystemDetailDto(
     IReadOnlyList<string> Permissions,
     IReadOnlyList<SubscriptionSummary> Subscriptions,
     CredentialSummary? Credential);
+
+public sealed record RevealedCallbackTokenResponse(
+    // The ONLY response that carries the stored outbound token. Keep it out
+    // of SystemDetailDto/CredentialSummary — the detail payload is
+    // deliberately metadata-only so the secret never rides along with a
+    // routine page load.
+    string Token,
+    // Best-effort JWT exp decode (same source as CredentialSummary's
+    // CallbackTokenExpiresAt); null when the token is not a JWT.
+    DateTime? ExpiresAt);
 
 public sealed record RotateCredentialResponse(
     // See CreatedSystemResponse for the Secret/AuthScheme contract.

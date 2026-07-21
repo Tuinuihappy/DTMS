@@ -118,6 +118,7 @@ public static class Permissions
         public static readonly PermissionDefinition AuditRead = new("dtms:iam:audit:read", "Read the permission audit log", "Iam");
         public static readonly PermissionDefinition SystemRead = new("dtms:iam:system:read", "Read system clients", "Iam");
         public static readonly PermissionDefinition SystemWrite = new("dtms:iam:system:write", "Manage system clients", "Iam");
+        public static readonly PermissionDefinition SystemRevealSecret = new("dtms:iam:system:reveal-secret", "Reveal a system's stored outbound callback token", "Iam");
         public static readonly PermissionDefinition SubscriptionRead = new("dtms:iam:subscription:read", "Read event subscriptions", "Iam");
         public static readonly PermissionDefinition SubscriptionWrite = new("dtms:iam:subscription:write", "Manage event subscriptions", "Iam");
         public static readonly PermissionDefinition ProjectionManage = new("dtms:iam:projection:manage", "Inspect / replay / rebuild projections", "Iam");

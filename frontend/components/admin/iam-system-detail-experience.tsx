@@ -6,6 +6,8 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  Eye,
+  EyeOff,
   KeyRound,
   Pencil,
   Power,
@@ -26,6 +28,7 @@ import {
   listIssuedTokens,
   listStandardSystemPermissions,
   patchSystem,
+  revealCallbackToken,
   revokeSystemPermission,
   revokeToken,
   rotateCredential,
@@ -79,6 +82,11 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
   const [revokingJti, setRevokingJti] = useState<string | null>(null);
   // Which JTI was just copied — drives the "✓ copied" glyph for 1.5s.
   const [copiedJti, setCopiedJti] = useState<string | null>(null);
+  // Stored outbound callback token, fetched on explicit Reveal only
+  // (backend audit-logs every fetch). Cleared on reload so a token
+  // rotated via Configure can't linger stale on screen.
+  const [revealedToken, setRevealedToken] = useState<string | null>(null);
+  const [revealingToken, setRevealingToken] = useState(false);
 
   // The standard source-system permission rows this system can hold
   // (order + trip, `dtms:source:{key}:...`). Fetched from the backend
@@ -104,12 +112,26 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setRevealedToken(null);
     try {
       setData(await getSystem(systemKey));
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
+    }
+  }, [systemKey]);
+
+  const onRevealToken = useCallback(async () => {
+    setRevealingToken(true);
+    setError(null);
+    try {
+      const r = await revealCallbackToken(systemKey);
+      setRevealedToken(r.token);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setRevealingToken(false);
     }
   }, [systemKey]);
 
@@ -632,6 +654,26 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
             {data.credential.callbackTokenExpiresAt && (
               <TokenExpiryBadge expiresAt={data.credential.callbackTokenExpiresAt} />
             )}
+            {data.credential.callbackAuthScheme?.toLowerCase() === "bearer" && (
+              revealedToken ? (
+                <RevealedTokenRow token={revealedToken} onHide={() => setRevealedToken(null)} />
+              ) : (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => void onRevealToken()}
+                    disabled={revealingToken || busy}
+                    className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)] disabled:opacity-50"
+                  >
+                    <Eye className="h-3 w-3" strokeWidth={2.2} />
+                    {revealingToken ? "Revealing…" : "Reveal token"}
+                  </button>
+                  <span className="ml-2 text-[10.5px] text-[var(--color-ink-400)]">
+                    Every reveal is audit-logged.
+                  </span>
+                </div>
+              )
+            )}
           </>
         ) : (
           <p className="mt-3 text-[12px] text-[var(--color-ink-400)]">
@@ -762,6 +804,85 @@ function TokenExpiryBadge({ expiresAt }: { expiresAt: string }) {
     <div className={`mt-3 inline-flex items-center gap-2 rounded border px-3 py-1.5 text-[11.5px] ${color}`}>
       <span className="font-semibold">Outbound token:</span>
       <span>{label}</span>
+    </div>
+  );
+}
+
+/**
+ * Fetched-on-demand display of the stored outbound callback token.
+ * Lighter than OneTimeSecretBanner on purpose: that banner's "won't be
+ * shown again" warning copy is for one-time minted secrets, while this
+ * value is re-fetchable (each fetch audit-logged server-side). Same
+ * mask + Eye/Copy mechanics, though.
+ */
+function RevealedTokenRow({ token, onHide }: { token: string; onHide: () => void }) {
+  const [visible, setVisible] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [copiedHeader, setCopiedHeader] = useState(false);
+
+  const masked = token.length <= 12 ? "•".repeat(token.length) : token.slice(0, 8) + "•".repeat(20) + token.slice(-4);
+
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(token);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard not available — user can still reveal + select */
+    }
+  };
+
+  // Same foot-gun guard as OneTimeSecretBanner: Swagger/curl users need
+  // the "Bearer " prefix, so offer the exact header value in one click.
+  const onCopyAsHeader = async () => {
+    try {
+      await navigator.clipboard.writeText(`Bearer ${token}`);
+      setCopiedHeader(true);
+      setTimeout(() => setCopiedHeader(false), 2000);
+    } catch { /* same fallback as onCopy */ }
+  };
+
+  return (
+    <div className="mt-3">
+      <div className="flex items-stretch gap-2">
+        <code className="flex-1 select-all break-all rounded border border-[var(--color-ink-100)] bg-[var(--color-surface-1)] px-3 py-2 font-mono text-xs text-[var(--color-ink-700)]">
+          {visible ? token : masked}
+        </code>
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          className="rounded border border-[var(--color-ink-100)] bg-white px-3 text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+          aria-label={visible ? "Hide token" : "Show token"}
+        >
+          {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+        <button
+          type="button"
+          onClick={onCopy}
+          className="rounded border border-[var(--color-ink-100)] bg-white px-3 text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+          aria-label="Copy token to clipboard"
+        >
+          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        </button>
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onCopyAsHeader}
+          className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2.5 py-1 text-[11px] font-medium text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+        >
+          {copiedHeader ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+          Copy as header
+        </button>
+        <button
+          type="button"
+          onClick={onHide}
+          className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2.5 py-1 text-[11px] text-[var(--color-ink-500)] hover:bg-[var(--color-ink-50)]"
+        >
+          <EyeOff className="h-3 w-3" />
+          Hide
+        </button>
+      </div>
     </div>
   );
 }

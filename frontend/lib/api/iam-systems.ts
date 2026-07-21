@@ -414,6 +414,25 @@ export async function testCredential(
   return (await res.json()) as TestCredentialResult;
 }
 
+// ── reveal stored callback token ─────────────────────────────────────────
+
+export type RevealedCallbackToken = { token: string; expiresAt: string | null };
+
+/**
+ * Fetch the stored outbound callback bearer token. Backend gates this
+ * behind `dtms:iam:system:reveal-secret` and audit-logs every reveal —
+ * call it only on an explicit operator action (Reveal button), never as
+ * part of routine page load.
+ */
+export async function revealCallbackToken(key: string): Promise<RevealedCallbackToken> {
+  const res = await fetch(
+    `/api/admin/iam/systems/${encodeURIComponent(key)}/callback/token`,
+    { cache: "no-store" },
+  );
+  if (!res.ok) throw new Error(await readError(res));
+  return (await res.json()) as RevealedCallbackToken;
+}
+
 // ── permission grant / revoke (Phase S.7) ────────────────────────────────
 
 export async function grantSystemPermission(key: string, code: string): Promise<void> {
