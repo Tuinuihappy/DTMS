@@ -135,13 +135,26 @@ export async function proxyToBackend({
       }
       return "";
     };
+    // A raw string body on a 5xx is an unhandled backend error (HTML error
+    // page, stack text) — never forward it to the client. 4xx string bodies
+    // are intentional Result failures (e.g. GEOFENCE_REJECTED) and stay.
+    const rawString =
+      typeof payload === "string" && upstream.status < 500 ? payload : "";
     const message =
       fromField("message") ||
       fromField("Error") ||
       fromField("error") ||
-      (typeof payload === "string" ? payload : "") ||
-      `Upstream error ${upstream.status}`;
-    return NextResponse.json({ message }, { status: upstream.status });
+      rawString ||
+      (upstream.status >= 500
+        ? "Server error"
+        : `Upstream error ${upstream.status}`);
+    // Preserve the backend correlation id (ProblemDetails.traceId) so a user
+    // reporting a server error can quote it and support can find the log line.
+    const traceId = fromField("traceId");
+    return NextResponse.json(
+      traceId ? { message, traceId } : { message },
+      { status: upstream.status },
+    );
   }
 
   if (payload === null) {
