@@ -4,15 +4,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Audit the whole graph, not just direct references. The default missed
+         three vulnerable transitive packages that ship in production (SignalR
+         MessagePack DoS among them) while still failing the build over a
+         design-time-only one — exactly backwards. -->
+    <NuGetAuditMode>all</NuGetAuditMode>
     <!-- Use artifacts output layout -->
     <UseArtifactsOutput>true</UseArtifactsOutput>
   </PropertyGroup>
-  <!-- Suppress CVE in System.Security.Cryptography.Xml brought in by Microsoft.Build.Tasks.Core via
-       Microsoft.EntityFrameworkCore.Design. This package is design-time-only tooling (EF migrations CLI);
-       it is not deployed to production and our code never calls XML signing APIs. Re-evaluate when a
-       patched Microsoft.EntityFrameworkCore.Design is available. -->
-  <ItemGroup>
-    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-37gx-xxp4-5rgx" />
-    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-w3x6-4m5h-cxqf" />
-  </ItemGroup>
+  <!-- NuGetAuditSuppress entries for System.Security.Cryptography.Xml were removed
+       on 2026-07-21. The vulnerable 9.0.0 that Microsoft.EntityFrameworkCore.Design
+       pulled in is now lifted to a patched version by a transitive pin in
+       Directory.Packages.props, so there is nothing left to silence. Prefer that
+       approach over suppression: suppressing keeps the vulnerable assembly and
+       needs a new entry each time another advisory is filed against it. -->
 </Project>

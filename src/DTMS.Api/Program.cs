@@ -398,7 +398,11 @@ var redisConn = builder.Configuration.GetConnectionString("Redis") ?? "localhost
 // ── P0 Day 3 — SignalR realtime hub stack ──────────────────────────────
 // Hubs: 5 focused hubs map to bounded contexts (OrderHub, JobHub, TripHub,
 // DashboardHub, FleetHub). Hot-path optimisations:
-//   - MessagePack + LZ4: 30-60% smaller payloads, 3-5× faster parse vs JSON.
+//   - MessagePack binary protocol: smaller payloads + faster parse vs JSON.
+//     LZ4 compression is deliberately NOT enabled — AddMessagePackProtocol()
+//     below uses the default options. Turning it on would pull in the LZ4
+//     decompression path (GHSA-hv8m-jj95-wg3x), which is reachable from
+//     hostile WebSocket input, so it needs a conscious decision, not a default.
 //   - Redis backplane (env-var gated): enables multi-instance scale-out
 //     without per-instance sticky sessions. Defaults to in-memory for the
 //     single-container Docker layout. Flip via SignalR__UseRedisBackplane=true.
