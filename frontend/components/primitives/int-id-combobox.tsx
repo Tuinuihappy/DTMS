@@ -11,7 +11,8 @@
 
 import { AlertTriangle, ChevronDown, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import { ComboboxListPortal } from "@/components/primitives/combobox-list-portal";
+import { cn, normalizeSearchText } from "@/lib/utils";
 
 export type IntIdOption = {
   vendorId: number;
@@ -55,6 +56,9 @@ export function IntIdCombobox({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
+  // Autofill guard — see StationCombobox: readOnly until focused so
+  // Chrome autofill can't desync the DOM text from the filter query.
+  const [autofillGuard, setAutofillGuard] = useState(true);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -62,19 +66,22 @@ export function IntIdCombobox({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (!wrapperRef.current?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      // List lives in a body portal — clicks there count as "inside".
+      if (!wrapperRef.current?.contains(t) && !listRef.current?.contains(t))
+        setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizeSearchText(query);
     if (!q) return options;
     return options.filter((o) => {
       if (String(o.vendorId).includes(q)) return true;
-      if (o.label.toLowerCase().includes(q)) return true;
-      if (o.secondary && o.secondary.toLowerCase().includes(q)) return true;
+      if (normalizeSearchText(o.label).includes(q)) return true;
+      if (o.secondary && normalizeSearchText(o.secondary).includes(q)) return true;
       return false;
     });
   }, [query, options]);
@@ -148,11 +155,15 @@ export function IntIdCombobox({
             setQuery(e.target.value);
             if (!open) setOpen(true);
           }}
-          onFocus={() => {
+          onFocus={(e) => {
+            e.currentTarget.readOnly = false;
+            setAutofillGuard(false);
             setQuery("");
             setOpen(true);
           }}
+          onBlur={() => setAutofillGuard(true)}
           onKeyDown={onKeyDown}
+          readOnly={autofillGuard}
           disabled={isDisabled}
           placeholder={
             loading ? loadingPlaceholder : error ? "Failed to load" : placeholder
@@ -188,11 +199,11 @@ export function IntIdCombobox({
         )}
       </div>
 
-      {open && !loading && !error && (
+      <ComboboxListPortal open={open && !loading && !error} anchorRef={wrapperRef}>
         <ul
           ref={listRef}
           role="listbox"
-          className="absolute left-0 right-0 z-30 mt-1 max-h-56 overflow-y-auto rounded-[var(--radius-sm)] border border-white/80 bg-[var(--color-popover)]/95 shadow-[0_18px_42px_-14px_rgba(15,23,42,0.3)] backdrop-blur-md border-[var(--color-ink-100)]"
+          className="max-h-56 overflow-y-auto rounded-[var(--radius-sm)] border border-white/80 bg-[var(--color-popover)]/95 shadow-[0_18px_42px_-14px_rgba(15,23,42,0.3)] backdrop-blur-md border-[var(--color-ink-100)]"
         >
           {filtered.length === 0 ? (
             <li className="px-3 py-2 text-[12px] italic text-[var(--color-ink-400)]">
@@ -238,7 +249,7 @@ export function IntIdCombobox({
             ))
           )}
         </ul>
-      )}
+      </ComboboxListPortal>
 
       {error && (
         <p className="mt-1 inline-flex items-center gap-1 text-[10.5px] text-[var(--color-coral)]">

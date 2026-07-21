@@ -17,6 +17,7 @@ import {
   useWmsLocationSearch,
   type WmsLocationSummaryDto,
 } from "@/lib/api/wms-locations";
+import { ComboboxListPortal } from "@/components/primitives/combobox-list-portal";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -37,11 +38,15 @@ export function WmsLocationCombobox({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
+  // Autofill guard — see StationCombobox: readOnly until focused so
+  // Chrome autofill can't desync the DOM text from the search query.
+  const [autofillGuard, setAutofillGuard] = useState(true);
   const [selectedDetail, setSelectedDetail] =
     useState<WmsLocationSummaryDto | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const { items, loading, error } = useWmsLocationSearch(query, {
     pageSize: 20,
@@ -74,7 +79,10 @@ export function WmsLocationCombobox({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (!wrapperRef.current?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      // Panel lives in a body portal — clicks there count as "inside".
+      if (!wrapperRef.current?.contains(t) && !panelRef.current?.contains(t))
+        setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
@@ -168,8 +176,14 @@ export function WmsLocationCombobox({
             setQuery(e.target.value);
             if (!open) setOpen(true);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={(e) => {
+            e.currentTarget.readOnly = false;
+            setAutofillGuard(false);
+            setOpen(true);
+          }}
+          onBlur={() => setAutofillGuard(true)}
           onKeyDown={onKeyDown}
+          readOnly={autofillGuard}
           placeholder={placeholder}
           disabled={disabled}
           className="min-w-0 flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-gray-400"
@@ -197,8 +211,11 @@ export function WmsLocationCombobox({
         />
       </div>
 
-      {open && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+      <ComboboxListPortal open={open} anchorRef={wrapperRef}>
+        <div
+          ref={panelRef}
+          className="max-h-64 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
+        >
           {error && (
             <div className="flex items-center gap-1.5 border-b border-gray-100 bg-red-50 px-2.5 py-1.5 text-xs text-red-700">
               <AlertTriangle className="h-3 w-3" />
@@ -269,7 +286,7 @@ export function WmsLocationCombobox({
             })}
           </ul>
         </div>
-      )}
+      </ComboboxListPortal>
     </div>
   );
 }

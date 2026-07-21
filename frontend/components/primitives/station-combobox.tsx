@@ -8,7 +8,8 @@
 import { AlertTriangle, ChevronDown, MapPin, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { StationOption } from "@/lib/api/facility";
-import { cn } from "@/lib/utils";
+import { ComboboxListPortal } from "@/components/primitives/combobox-list-portal";
+import { cn, normalizeSearchText } from "@/lib/utils";
 
 type Props = {
   value: string;
@@ -34,6 +35,12 @@ export function StationCombobox({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
+  // Chrome autofill can write into the DOM without firing React's
+  // onChange, leaving the visible text out of sync with the filter
+  // query. Autofill skips readOnly inputs, so stay readOnly until the
+  // field is actually focused (the DOM node is unlocked directly in
+  // onFocus so the first keystroke never races the re-render).
+  const [autofillGuard, setAutofillGuard] = useState(true);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -41,19 +48,23 @@ export function StationCombobox({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (!wrapperRef.current?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      // The list lives in a body portal, so it is NOT inside wrapperRef —
+      // treat clicks in either region as "inside".
+      if (!wrapperRef.current?.contains(t) && !listRef.current?.contains(t))
+        setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizeSearchText(query);
     if (!q) return stations;
     return stations.filter(
       (s) =>
-        s.code.toLowerCase().includes(q) ||
-        s.name.toLowerCase().includes(q),
+        normalizeSearchText(s.code).includes(q) ||
+        normalizeSearchText(s.name).includes(q),
     );
   }, [query, stations]);
 
@@ -114,11 +125,15 @@ export function StationCombobox({
             setQuery(e.target.value);
             if (!open) setOpen(true);
           }}
-          onFocus={() => {
+          onFocus={(e) => {
+            e.currentTarget.readOnly = false;
+            setAutofillGuard(false);
             setQuery("");
             setOpen(true);
           }}
+          onBlur={() => setAutofillGuard(true)}
           onKeyDown={onKeyDown}
+          readOnly={autofillGuard}
           disabled={isDisabled}
           placeholder={
             loading
@@ -157,11 +172,11 @@ export function StationCombobox({
         )}
       </div>
 
-      {open && !loading && !error && (
+      <ComboboxListPortal open={open && !loading && !error} anchorRef={wrapperRef}>
         <ul
           ref={listRef}
           role="listbox"
-          className="absolute left-0 right-0 z-30 mt-1 max-h-56 overflow-y-auto rounded-[var(--radius-sm)] border border-white/80 bg-[var(--color-popover)]/95 shadow-[0_18px_42px_-14px_rgba(15,23,42,0.3)] backdrop-blur-md border-[var(--color-ink-100)]"
+          className="max-h-56 overflow-y-auto rounded-[var(--radius-sm)] border border-white/80 bg-[var(--color-popover)]/95 shadow-[0_18px_42px_-14px_rgba(15,23,42,0.3)] backdrop-blur-md border-[var(--color-ink-100)]"
         >
           {filtered.length === 0 ? (
             <li className="px-3 py-2 text-[12px] italic text-[var(--color-ink-400)]">
@@ -203,7 +218,7 @@ export function StationCombobox({
             ))
           )}
         </ul>
-      )}
+      </ComboboxListPortal>
 
       {error && (
         <p className="mt-1 inline-flex items-center gap-1 text-[10.5px] text-[var(--color-coral)]">
