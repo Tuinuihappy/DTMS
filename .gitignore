@@ -1,10 +1,12 @@
 ## .NET Build Outputs
+# Use ** so nested module projects are covered too — the old src/*/obj/ globs
+# only matched one level deep, so every src/Modules/<Area>/<Project>/obj/ was
+# silently committed. Those stale assets froze restore state and hid dependency
+# drift until a clean restore blew up.
 artifacts/bin/
 artifacts/obj/
-src/*/bin/
-src/*/obj/
-tests/*/bin/
-tests/*/obj/
+**/bin/
+**/obj/
 
 ## Local-only data
 backups/
