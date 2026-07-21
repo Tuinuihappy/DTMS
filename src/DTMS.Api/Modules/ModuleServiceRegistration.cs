@@ -479,6 +479,7 @@ public static class ModuleServiceRegistration
                            DTMS.Planning.Infrastructure.Projections.JobFactsProjectionStore>();
         services.AddScoped<IActionTemplateRepository, ActionTemplateRepository>();
         services.AddScoped<IOrderTemplateRepository, OrderTemplateRepository>();
+        services.AddScoped<IDispatchClaimRepository, DispatchClaimRepository>();
         services.AddScoped<IOrderTemplateResolver, OrderTemplateResolver>();
         // Vendor seam: swap to a no-op adapter when VendorAdapter:Riot3:Enabled=false
         // so load tests / dev scenarios can drive orders through the full DTMS
@@ -490,6 +491,13 @@ public static class ModuleServiceRegistration
             services.AddScoped<IRobotOrderDispatcher, DTMS.Api.Adapters.Riot3OrderDispatcherAdapter>();
         else
             services.AddScoped<IRobotOrderDispatcher, DTMS.Api.Adapters.NoOpOrderDispatcherAdapter>();
+
+        // In-doubt resolution for manual template dispatch: asks the vendor
+        // whether an order with a given upperKey exists. Registered in both
+        // modes — IRiot3OrderQueryService itself has a NoOp variant, so the
+        // adapter simply reports NotFound when RIOT3 is disabled.
+        services.AddScoped<DTMS.Planning.Application.Services.IRobotOrderStatusQuery,
+            DTMS.Api.Adapters.Riot3OrderStatusQueryAdapter>();
 
         // Log which vendor adapters got picked at boot so it's visible without
         // having to trigger an order first. Single line at INF level.

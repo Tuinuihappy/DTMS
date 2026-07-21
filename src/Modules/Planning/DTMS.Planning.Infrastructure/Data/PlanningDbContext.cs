@@ -16,6 +16,7 @@ public class PlanningDbContext : DbContext
     public DbSet<JobDependency> JobDependencies { get; set; } = null!;
     public DbSet<ActionTemplate> ActionTemplates { get; set; } = null!;
     public DbSet<OrderTemplate> OrderTemplates { get; set; } = null!;
+    public DbSet<DispatchClaim> DispatchClaims => Set<DispatchClaim>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     // ── Phase P1 — Event Projection read models ──────────────────────────
@@ -177,6 +178,34 @@ public class PlanningDbContext : DbContext
                 .IsRequired();
 
             builder.Ignore(t => t.DomainEvents);
+        });
+
+        modelBuilder.Entity<DispatchClaim>(builder =>
+        {
+            builder.HasKey(c => c.Id);
+            builder.Property(c => c.IdempotencyKey).HasMaxLength(200).IsRequired();
+            // The dedup guard. Scoped to the key ALONE — never to
+            // OrderTemplateId, because dispatching the same template several
+            // times in a row is normal operation and must not be blocked.
+            builder.HasIndex(c => c.IdempotencyKey)
+                .IsUnique()
+                .HasDatabaseName("IX_DispatchClaims_IdempotencyKey_Unique");
+            builder.Property(c => c.OrderTemplateId).IsRequired();
+            builder.Property(c => c.UpperKey).HasMaxLength(64).IsRequired();
+            builder.Property(c => c.Status)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .IsRequired();
+            builder.Property(c => c.VendorOrderKey).HasMaxLength(100);
+            builder.Property(c => c.RequestHash).HasMaxLength(64).IsRequired();
+            builder.Property(c => c.FailureReason).HasMaxLength(1000);
+            builder.Property(c => c.CreatedAt).IsRequired();
+            builder.Property(c => c.CompletedAt);
+            // Serves "latest dispatch for this template" shown in the
+            // dispatch dialog so operators can see the previous outcome.
+            builder.HasIndex(c => new { c.OrderTemplateId, c.CreatedAt })
+                .IsDescending(false, true);
+            builder.Ignore(c => c.DomainEvents);
         });
 
         // NOTE: CostModelConfigRecord mapping removed 2026-07-17 with the

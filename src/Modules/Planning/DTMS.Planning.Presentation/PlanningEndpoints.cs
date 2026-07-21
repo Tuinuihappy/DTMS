@@ -14,6 +14,7 @@ using DTMS.Planning.Application.Queries.GetJobById;
 using DTMS.Planning.Application.Queries.GetJobsByOrder;
 using DTMS.Planning.Application.Queries.GetJobsQueue;
 using DTMS.Planning.Application.Queries.GetJobStatusHistory;
+using DTMS.Planning.Application.Queries.GetLastDispatch;
 using DTMS.Planning.Application.Queries.GetOrderTemplateById;
 using DTMS.Planning.Application.Queries.GetOrderTemplates;
 using DTMS.Iam.Application.Authorization;
@@ -21,6 +22,7 @@ using DTMS.Planning.Domain.Entities;
 using DTMS.Planning.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
@@ -432,9 +434,28 @@ public static class PlanningEndpoints
         // the catalog and POST the full envelope to RIOT3. dryRun=true skips
         // the vendor call so operators can preview the resolved missions.
         orderTemplates.MapPost("/{id:guid}/create",
-            async (Guid id, InstantiateOrderTemplateRequest? req, ISender sender) =>
+            async (Guid id,
+                   InstantiateOrderTemplateRequest? req,
+                   ISender sender,
+                   HttpContext http,
+                   IConfiguration configuration) =>
             {
                 req ??= new InstantiateOrderTemplateRequest();
+                var dryRun = req.DryRun ?? false;
+
+                // The Idempotency-Key IS the identity of the operator's intent:
+                // stable across retries of the same click, fresh for a genuinely
+                // new dispatch. Without it the server cannot tell those apart,
+                // and RIOT3 will happily create a duplicate robot order.
+                // Preview needs no key — it never reaches the vendor.
+                var idempotencyKey = http.Request.Headers["Idempotency-Key"].FirstOrDefault();
+                var strict = configuration.GetValue("Planning:StrictIdempotency", true);
+                if (!dryRun && strict && string.IsNullOrWhiteSpace(idempotencyKey))
+                {
+                    return RiotEnvelope.BadRequest(
+                        "Idempotency-Key header is required for dispatch.");
+                }
+
                 var result = await sender.Send(new InstantiateOrderTemplateCommand(
                     OrderTemplateId: id,
                     PriorityOverride: req.Priority,
@@ -444,11 +465,34 @@ public static class PlanningEndpoints
                     AppointVehicleGroupNameOverride: req.AppointVehicleGroupName,
                     AppointQueueWaitAreaOverride: req.AppointQueueWaitArea,
                     UpperKey: req.UpperKey,
-                    DryRun: req.DryRun ?? false));
-                return result.IsSuccess
-                    ? RiotEnvelope.Ok(result.Value)
-                    : RiotEnvelope.BadRequest(result.Error);
+                    DryRun: dryRun,
+                    IdempotencyKey: idempotencyKey));
+
+                if (result.IsSuccess) return RiotEnvelope.Ok(result.Value);
+
+                // Map the two idempotency outcomes to their own codes/statuses.
+                // "In progress" is a state the UI shows calmly; a body mismatch
+                // is a caller mistake worth a distinct 422.
+                var error = result.Error ?? string.Empty;
+                if (error.StartsWith(InstantiateFailureCodes.InProgress, StringComparison.Ordinal))
+                    return RiotEnvelope.Coded(InstantiateFailureCodes.InProgress, StatusCodes.Status409Conflict, error);
+                if (error.StartsWith(InstantiateFailureCodes.BodyMismatch, StringComparison.Ordinal))
+                    return RiotEnvelope.Coded(InstantiateFailureCodes.BodyMismatch, StatusCodes.Status422UnprocessableEntity, error);
+
+                return RiotEnvelope.BadRequest(error);
             }).RequirePermission(Permissions.Planning.OrderTemplateCreate);
+
+        // GET /{id}/last-dispatch — the previous attempt for this template.
+        // Informational only: it exists so an operator who is unsure whether
+        // their last click worked can look instead of firing again. It must
+        // never gate or block a new dispatch.
+        orderTemplates.MapGet("/{id:guid}/last-dispatch", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new GetLastDispatchQuery(id));
+            return result.IsSuccess
+                ? RiotEnvelope.Ok(result.Value)
+                : RiotEnvelope.BadRequest(result.Error);
+        }).RequirePermission(Permissions.Planning.OrderTemplateRead);
     }
 }
 
@@ -753,4 +797,12 @@ internal static class RiotEnvelope
 
     public static IResult NotFound(string? message)
         => Results.NotFound(new RiotEnvelope<object?>(FailureCode, null, message ?? "Not Found"));
+
+    /// <summary>
+    /// Failure that carries its own machine-readable code so the client can
+    /// distinguish it from a generic error — e.g. "dispatch still being
+    /// confirmed" is a state to show, not a red banner.
+    /// </summary>
+    public static IResult Coded(string code, int statusCode, string? message)
+        => Results.Json(new RiotEnvelope<object?>(code, null, message ?? code), statusCode: statusCode);
 }

@@ -89,6 +89,61 @@ namespace DTMS.Planning.Infrastructure.Migrations
                     b.ToTable("ActionTemplates", "planning");
                 });
 
+            modelBuilder.Entity("DTMS.Planning.Domain.Entities.DispatchClaim", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("OrderTemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("UpperKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("VendorOrderKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_DispatchClaims_IdempotencyKey_Unique");
+
+                    b.HasIndex("OrderTemplateId", "CreatedAt")
+                        .IsDescending(false, true);
+
+                    b.ToTable("DispatchClaims", "planning");
+                });
+
             modelBuilder.Entity("DTMS.Planning.Domain.Entities.Job", b =>
                 {
                     b.Property<Guid>("Id")
@@ -252,60 +307,12 @@ namespace DTMS.Planning.Infrastructure.Migrations
                     b.ToTable("Legs", "planning");
                 });
 
-            modelBuilder.Entity("DTMS.Planning.Domain.Entities.MilkRunStop", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<TimeSpan>("DwellTime")
-                        .HasColumnType("interval");
-
-                    b.Property<TimeSpan?>("PlannedArrivalOffset")
-                        .HasColumnType("interval");
-
-                    b.Property<int>("SequenceOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("StationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TemplateId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TemplateId");
-
-                    b.ToTable("MilkRunStops", "planning");
-                });
-
-            modelBuilder.Entity("DTMS.Planning.Domain.Entities.MilkRunTemplate", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CronSchedule")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("TemplateName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("MilkRunTemplates", "planning");
-                });
+            // NOTE: MilkRunStop / MilkRunTemplate / CostModelConfigRecord entity
+            // blocks were removed here on 2026-07-21 to match the DbContext, whose
+            // mappings went away with the legacy manual-planning stack (36ee540).
+            // Leaving them made EF report PendingModelChangesWarning and abort the
+            // next migration. The tables themselves stay in the database — this
+            // module's migrations are handwritten, so nothing drops them.
 
             modelBuilder.Entity("DTMS.Planning.Domain.Entities.OrderTemplate", b =>
                 {
@@ -393,39 +400,6 @@ namespace DTMS.Planning.Infrastructure.Migrations
                     b.HasIndex("PickupStationId", "DropStationId", "IsActive");
 
                     b.ToTable("OrderTemplates", "planning");
-                });
-
-            modelBuilder.Entity("DTMS.Planning.Infrastructure.Data.Records.CostModelConfigRecord", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<double>("BatteryBurnWeight")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("CriticalBatteryThresholdPct")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("LowBatteryThresholdPct")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("SlaPenaltyWeight")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("TravelDistanceWeight")
-                        .HasColumnType("double precision");
-
-                    b.Property<string>("VehicleTypeKey")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("VehicleTypeKey")
-                        .IsUnique()
-                        .HasFilter("\"VehicleTypeKey\" IS NOT NULL");
-
-                    b.ToTable("CostModelConfigs", "planning");
                 });
 
             modelBuilder.Entity("DTMS.Planning.Infrastructure.Projections.JobFactsRow", b =>
@@ -649,23 +623,9 @@ namespace DTMS.Planning.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("DTMS.Planning.Domain.Entities.MilkRunStop", b =>
-                {
-                    b.HasOne("DTMS.Planning.Domain.Entities.MilkRunTemplate", null)
-                        .WithMany("Stops")
-                        .HasForeignKey("TemplateId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("DTMS.Planning.Domain.Entities.Job", b =>
                 {
                     b.Navigation("Legs");
-                });
-
-            modelBuilder.Entity("DTMS.Planning.Domain.Entities.MilkRunTemplate", b =>
-                {
-                    b.Navigation("Stops");
                 });
 #pragma warning restore 612, 618
         }

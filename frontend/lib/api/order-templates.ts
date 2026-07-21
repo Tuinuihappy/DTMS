@@ -61,7 +61,10 @@ type RiotEnvelope<T> = { code: string; data: T | null; message: string };
 
 const JSON_HEADERS = { "Content-Type": "application/json", Accept: "application/json" };
 
-function idempotencyKey(): string {
+// crypto.randomUUID only exists in a secure context, so it is missing when the
+// app is opened over plain http on a LAN IP (how tablets reach it here).
+// Falling back keeps dispatch working instead of throwing.
+export function idempotencyKey(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
@@ -244,14 +247,15 @@ export type ResolvedMission = {
   actionParameters?: ResolvedActionParameter[] | null;
 };
 
+// Flat, matching the backend `ResolvedOrder` record — structureType and
+// missions sit at the top level, NOT nested under a transportOrder object
+// (that nesting is the stored-template wire shape, a different thing).
 export type ResolvedOrder = {
   name?: string | null;
   priority?: number | null;
-  transportOrder?: {
-    structureType?: string | null;
-    priority?: number | null;
-    missions?: ResolvedMission[];
-  } | null;
+  structureType?: string | null;
+  transportOrderPriority?: number | null;
+  missions?: ResolvedMission[] | null;
   appointVehicleKey?: string | null;
   appointVehicleName?: string | null;
   appointVehicleGroupKey?: string | null;
@@ -264,18 +268,67 @@ export type CreateFromTemplateResult = {
   riot3OrderKey?: string | null;
   resolvedOrder: ResolvedOrder;
   dryRun: boolean;
+  // True when the backend returned the stored outcome of an earlier identical
+  // request instead of dispatching again.
+  replayed?: boolean;
 };
 
+// Wire code for "an identical dispatch is still being confirmed". Not a
+// failure — the UI shows it as a state so the operator waits and checks
+// rather than firing a second robot order.
+export const DISPATCH_IN_PROGRESS = "DISPATCH_IN_PROGRESS";
+
+export class DispatchInProgressError extends Error {
+  readonly code = DISPATCH_IN_PROGRESS;
+}
+
+// `idempotencyKey` identifies the operator's INTENT, not the HTTP request.
+// The caller owns its lifetime: same key while one dispatch is being retried,
+// a fresh key for a genuinely new dispatch. Repeated dispatch of the same
+// template is normal, so a new key must always go straight through.
 export async function createOrderFromTemplate(
   id: string,
   payload: CreateFromTemplatePayload,
+  opts?: { idempotencyKey?: string; signal?: AbortSignal },
 ): Promise<CreateFromTemplateResult> {
+  const headers: Record<string, string> = { ...JSON_HEADERS };
+  if (opts?.idempotencyKey) headers["Idempotency-Key"] = opts.idempotencyKey;
+
   const res = await fetch(`/api/order-templates/${id}/create`, {
     method: "POST",
-    headers: mutationHeaders(),
+    headers,
     body: JSON.stringify(payload ?? {}),
+    signal: opts?.signal,
   });
+
+  if (res.status === 409) {
+    const body = await res.json().catch(() => null);
+    throw new DispatchInProgressError(
+      body?.message ?? "A dispatch with this key is still being confirmed.",
+    );
+  }
   return unwrap<CreateFromTemplateResult>(res);
+}
+
+export type LastDispatchDto = {
+  status: "InProgress" | "Succeeded" | "Failed" | string;
+  upperKey: string;
+  vendorOrderKey?: string | null;
+  createdAt: string;
+  completedAt?: string | null;
+};
+
+// Informational only — shown so an operator unsure whether their last click
+// landed can look instead of dispatching again. Never gates the dispatch.
+export async function getLastDispatch(
+  id: string,
+  signal?: AbortSignal,
+): Promise<LastDispatchDto | null> {
+  const res = await fetch(`/api/order-templates/${id}/last-dispatch`, {
+    cache: "no-store",
+    signal,
+  });
+  return unwrap<LastDispatchDto | null>(res);
 }
 
 // ── Derived stats (computed client-side from the list) ─────────────────

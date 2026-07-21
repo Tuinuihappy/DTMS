@@ -16,11 +16,16 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { formatRelative } from "@/lib/datetime";
 import {
   createOrderFromTemplate,
+  DispatchInProgressError,
+  getLastDispatch,
+  idempotencyKey as newIdempotencyKey,
   type CreateFromTemplateResult,
+  type LastDispatchDto,
   type OrderTemplateDto,
   type ResolvedMission,
 } from "@/lib/api/order-templates";
@@ -76,23 +81,55 @@ export function CreateFromTemplateDialog({
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<CreateFromTemplateResult | null>(null);
   const [result, setResult] = useState<CreateFromTemplateResult | null>(null);
+  // "Still confirming" is a state, not a failure — kept apart from `error`
+  // so it renders calmly instead of as a red banner.
+  const [pending, setPending] = useState<string | null>(null);
+  const [lastDispatch, setLastDispatch] = useState<LastDispatchDto | null>(null);
+
+  // Identity of ONE dispatch action. Held only while that request is in
+  // flight so a double-click/retry reuses it, then released — the next click
+  // is a new intent and must reach the robot. Dispatching the same template
+  // repeatedly is normal, so this must never outlive a single request.
+  const dispatchKeyRef = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const open = template !== null;
 
   useEffect(() => {
     if (!open) {
+      // Abandon any in-flight request so its resolution can't write state
+      // into a dialog the operator already dismissed.
+      abortRef.current?.abort();
+      abortRef.current = null;
+      dispatchKeyRef.current = null;
       // Reset state shortly after close so the exit animation is clean.
       const t = setTimeout(() => {
         setStep("form");
         setForm(EMPTY_FORM);
         setBusy(false);
         setError(null);
+        setPending(null);
         setPreview(null);
         setResult(null);
+        setLastDispatch(null);
       }, 220);
       return () => clearTimeout(t);
     }
   }, [open]);
+
+  // Show the previous attempt so an operator unsure whether their last click
+  // landed can look instead of firing again. Purely informational — it never
+  // disables the dispatch button.
+  useEffect(() => {
+    if (!open || !template) return;
+    const ctrl = new AbortController();
+    getLastDispatch(template.id, ctrl.signal)
+      .then(setLastDispatch)
+      .catch(() => {
+        /* non-critical hint — stay silent on failure */
+      });
+    return () => ctrl.abort();
+  }, [open, template]);
 
   const effectivePriority = useMemo(() => {
     if (!template) return null;
@@ -102,38 +139,76 @@ export function CreateFromTemplateDialog({
 
   async function runPreview() {
     if (!template) return;
+    const ctrl = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = ctrl;
     setBusy(true);
     setError(null);
     try {
-      const res = await createOrderFromTemplate(template.id, {
-        ...buildPayload(form),
-        dryRun: true,
-      });
+      // Preview never reaches the vendor, so it needs no idempotency key.
+      const res = await createOrderFromTemplate(
+        template.id,
+        { ...buildPayload(form), dryRun: true },
+        { signal: ctrl.signal },
+      );
+      if (ctrl.signal.aborted) return;
       setPreview(res);
       setStep("preview");
     } catch (e) {
+      if (ctrl.signal.aborted) return;
       setError((e as Error).message || "Preview failed.");
     } finally {
-      setBusy(false);
+      if (!ctrl.signal.aborted) setBusy(false);
     }
   }
 
   async function runDispatch() {
     if (!template) return;
+    const ctrl = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = ctrl;
+
+    // One key per dispatch action: reused if this same request is retried,
+    // released as soon as it settles. Keeping it any longer would swallow
+    // the operator's next click, which is a legitimate second order.
+    // Uses the shared helper because crypto.randomUUID is absent outside a
+    // secure context (plain http on a LAN IP) and would throw here.
+    dispatchKeyRef.current ??= newIdempotencyKey();
+    const key = dispatchKeyRef.current;
+
     setBusy(true);
     setError(null);
+    setPending(null);
     try {
-      const res = await createOrderFromTemplate(template.id, {
-        ...buildPayload(form),
-        dryRun: false,
-      });
+      const res = await createOrderFromTemplate(
+        template.id,
+        { ...buildPayload(form), dryRun: false },
+        { idempotencyKey: key, signal: ctrl.signal },
+      );
+      if (ctrl.signal.aborted) return;
       setResult(res);
       setStep("result");
-      onSuccess(`Order dispatched · ${res.upperKey}`);
+      onSuccess(
+        res.replayed
+          ? `Already dispatched · ${res.upperKey}`
+          : `Order dispatched · ${res.upperKey}`,
+      );
+      dispatchKeyRef.current = null;
     } catch (e) {
-      setError((e as Error).message || "Dispatch failed.");
+      if (ctrl.signal.aborted) return;
+      if (e instanceof DispatchInProgressError) {
+        // Not an error: an identical dispatch is still being confirmed. Keep
+        // the key so a retry resolves the same attempt rather than creating
+        // a second order.
+        setPending(e.message);
+      } else {
+        setError((e as Error).message || "Dispatch failed.");
+        // Vendor answered and refused — this attempt is closed, so release
+        // the key and let a corrected retry go through as a new intent.
+        dispatchKeyRef.current = null;
+      }
     } finally {
-      setBusy(false);
+      if (!ctrl.signal.aborted) setBusy(false);
     }
   }
 
@@ -157,8 +232,11 @@ export function CreateFromTemplateDialog({
               className="glass-strong relative flex w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-xl)]"
               style={{ maxHeight: "min(90vh, 760px)" }}
             >
-              {/* Decorative header gradient */}
-              <div className="relative overflow-hidden">
+              {/* Decorative header gradient. shrink-0 keeps the title and step
+                  bar at full height when the body is tall — without it the
+                  header is the item the browser squeezes, and its own
+                  overflow-hidden then clips the title in half. */}
+              <div className="relative shrink-0 overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-pastel-sky)]/55 via-transparent to-[var(--color-pastel-lavender)]/55 pointer-events-none" />
                 <div className="relative flex items-start justify-between gap-3 px-6 pt-6 pb-5">
                   <div className="flex items-start gap-3">
@@ -195,8 +273,11 @@ export function CreateFromTemplateDialog({
                 </div>
               </div>
 
-              {/* Body */}
-              <div className="flex-1 overflow-y-auto px-6 py-5">
+              {/* Body. min-h-0 is what actually lets this scroll: a flex item
+                  defaults to min-height:auto, i.e. "never shrink below my
+                  content", so without it the long mission list refuses to
+                  shrink and the header gets squeezed instead. */}
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                 <AnimatePresence mode="wait">
                   {step === "form" && (
                     <motion.div
@@ -315,6 +396,16 @@ export function CreateFromTemplateDialog({
                   )}
                 </AnimatePresence>
 
+                {pending && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-5 flex items-start gap-2 rounded-[var(--radius-sm)] border border-[var(--color-amber)]/40 bg-[var(--color-amber)]/10 px-3 py-2 text-[12.5px] text-[var(--color-amber)]"
+                  >
+                    <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2.2} />
+                    <span>{pending}</span>
+                  </motion.div>
+                )}
                 {error && (
                   <motion.div
                     initial={{ opacity: 0, y: -6 }}
@@ -325,10 +416,31 @@ export function CreateFromTemplateDialog({
                     <span>{error}</span>
                   </motion.div>
                 )}
+                {step === "form" && lastDispatch && (
+                  <p className="mt-4 text-[11.5px] text-[var(--color-ink-500)]">
+                    Last dispatch{" "}
+                    <span className="font-mono">{formatRelative(lastDispatch.createdAt)}</span>
+                    {" · "}
+                    <span
+                      className={cn(
+                        "font-semibold",
+                        lastDispatch.status === "Succeeded" && "text-[var(--color-pastel-mint-ink)]",
+                        lastDispatch.status === "Failed" && "text-[var(--color-coral)]",
+                        lastDispatch.status === "InProgress" && "text-[var(--color-amber)]",
+                      )}
+                    >
+                      {lastDispatch.status === "InProgress"
+                        ? "outcome unknown"
+                        : lastDispatch.status.toLowerCase()}
+                    </span>
+                    {" · "}
+                    <span className="font-mono">{lastDispatch.upperKey}</span>
+                  </p>
+                )}
               </div>
 
               {/* Footer */}
-              <div className="border-t border-white/60 bg-white/30 px-6 py-4 dark:border-white/[0.06] dark:bg-white/[0.02]">
+              <div className="shrink-0 border-t border-white/60 bg-white/30 px-6 py-4 dark:border-white/[0.06] dark:bg-white/[0.02]">
                 <Footer
                   step={step}
                   busy={busy}
@@ -540,15 +652,12 @@ function ResolvedSummary({
   title?: string;
 }) {
   const order = preview.resolvedOrder;
-  const missions = order.transportOrder?.missions ?? [];
+  const missions = order.missions ?? [];
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
         <ResolvedKV label="Priority" value={order.priority ?? "—"} />
-        <ResolvedKV
-          label="Structure"
-          value={order.transportOrder?.structureType ?? "—"}
-        />
+        <ResolvedKV label="Structure" value={order.structureType ?? "—"} />
         <ResolvedKV label="Missions" value={missions.length} />
         {(order.appointVehicleName || order.appointVehicleKey) && (
           <ResolvedKV
