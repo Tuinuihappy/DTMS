@@ -1,4 +1,5 @@
 using DTMS.Facility.Application.Services;
+using DTMS.Facility.Domain.Services;
 using DTMS.Facility.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,10 +18,18 @@ public sealed class FacilityReadService : IFacilityReadService
         => _db.Stations.AnyAsync(s => s.Id == stationId, cancellationToken);
 
     public Task<Guid?> ResolveStationByCodeAsync(string code, CancellationToken cancellationToken = default)
-        => _db.Stations.AsNoTracking()
-            .Where(s => s.Code == code)
+    {
+        // Stored codes are always TRIM+UPPER (Station.SetCode); normalize the
+        // input the same way so lowercase callers still resolve. Stays an
+        // exact single-code match — never a substring/fuzzy lookup. The Maps
+        // join keeps orphaned stations of a deleted map (whose codes can
+        // duplicate the live map's) from being resolved nondeterministically.
+        var exact = StationCodeSearch.NormalizeExact(code);
+        return _db.Stations.AsNoTracking()
+            .Where(s => s.Code == exact && _db.Maps.Any(m => m.Id == s.MapId))
             .Select(s => (Guid?)s.Id)
             .FirstOrDefaultAsync(cancellationToken);
+    }
 
     public Task<Guid?> ResolveStationByVendorRefAsync(string vendorRef, CancellationToken cancellationToken = default)
         => _db.Stations.AsNoTracking()
@@ -115,7 +124,8 @@ public sealed class FacilityReadService : IFacilityReadService
         {
             var upperCodes = codeInputs.ConvertAll(c => c.ToUpperInvariant());
             var stations = await _db.Stations.AsNoTracking()
-                .Where(s => s.Code != null && upperCodes.Contains(s.Code))
+                .Where(s => s.Code != null && upperCodes.Contains(s.Code)
+                    && _db.Maps.Any(m => m.Id == s.MapId))
                 .Select(s => new
                 {
                     s.Code,

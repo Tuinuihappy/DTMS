@@ -1,5 +1,6 @@
 using DTMS.Facility.Domain.Entities;
 using DTMS.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Services;
 using DTMS.Facility.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,16 +23,27 @@ public class StationRepository : IStationRepository
     public async Task<List<Station>> QueryAsync(Guid? mapId, StationType? type, Guid? zoneId,
         string? compatibleVehicleType, bool includeInactive = false, string? code = null, CancellationToken ct = default)
     {
-        var query = includeInactive
-            ? _db.Stations.AsQueryable()
-            : _db.Stations.Where(s => s.IsActive).AsQueryable();
+        // Exclude stations whose Map row no longer exists. A deleted map can
+        // leave orphaned stations behind whose codes duplicate the live map's
+        // (unique index is per-map) — surfacing them corrupts every code-keyed
+        // consumer (dropdown React keys, code→GUID resolution).
+        var query = _db.Stations.Where(s => _db.Maps.Any(m => m.Id == s.MapId));
+        if (!includeInactive) query = query.Where(s => s.IsActive);
         if (mapId.HasValue) query = query.Where(s => s.MapId == mapId);
         if (type.HasValue) query = query.Where(s => s.Type == type);
         if (zoneId.HasValue) query = query.Where(s => s.ZoneId == zoneId);
         if (compatibleVehicleType != null)
             query = query.Where(s => EF.Property<string>(s, "CompatibleVehicleTypes").Contains(compatibleVehicleType));
         if (code != null)
-            query = query.Where(s => s.Code != null && s.Code.Contains(code));
+        {
+            // Separator/case-insensitive substring search. Stored Code is
+            // already TRIM+UPPER (Station.SetCode), so only separators need
+            // stripping column-side (translates to SQL replace()).
+            var codeQuery = StationCodeSearch.NormalizeQuery(code);
+            if (codeQuery.Length > 0)
+                query = query.Where(s => s.Code != null &&
+                    s.Code.Replace("_", "").Replace("-", "").Replace(" ", "").Contains(codeQuery));
+        }
         return await query.ToListAsync(ct);
     }
 

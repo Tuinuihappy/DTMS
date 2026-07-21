@@ -67,12 +67,23 @@ export async function getStations(opts?: {
 
 // Stations suitable for pickup/drop dropdowns — active, not force-offline,
 // has a non-null code. Sorted by code for predictable order.
+// Deduped by code: the combobox uses code as the React key, and duplicate
+// keys corrupt list reconciliation (seen with orphaned stations of a
+// deleted map). The backend filters those out too — this is insurance.
 export async function getStationOptions(): Promise<StationOption[]> {
   const stations = await getStations();
-  return stations
-    .filter((s) => s.isActive && !s.isManualOverrideActive && s.code)
-    .map((s) => ({ code: s.code as string, name: s.name, type: s.type }))
-    .sort((a, b) => a.code.localeCompare(b.code));
+  return dedupeByCode(
+    stations
+      .filter((s) => s.isActive && !s.isManualOverrideActive && s.code)
+      .map((s) => ({ code: s.code as string, name: s.name, type: s.type })),
+  ).sort((a, b) => a.code.localeCompare(b.code));
+}
+
+function dedupeByCode(options: StationOption[]): StationOption[] {
+  const seen = new Set<string>();
+  return options.filter((o) =>
+    seen.has(o.code) ? false : (seen.add(o.code), true),
+  );
 }
 
 // React hook — fetches station options once on mount, then exposes the
@@ -107,10 +118,11 @@ export function useStationOptions(): UseStationOptionsResult {
     getStations({ includeInactive: true })
       .then((all) => {
         if (cancelled) return;
-        const active = all
-          .filter((s) => s.isActive && !s.isManualOverrideActive && s.code)
-          .map((s) => ({ code: s.code as string, name: s.name, type: s.type }))
-          .sort((a, b) => a.code.localeCompare(b.code));
+        const active = dedupeByCode(
+          all
+            .filter((s) => s.isActive && !s.isManualOverrideActive && s.code)
+            .map((s) => ({ code: s.code as string, name: s.name, type: s.type })),
+        ).sort((a, b) => a.code.localeCompare(b.code));
         const map = new Map<string, string>();
         for (const s of all) if (s.code) map.set(s.id, s.code);
         setStations(active);
