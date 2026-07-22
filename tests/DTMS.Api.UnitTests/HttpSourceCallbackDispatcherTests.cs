@@ -40,7 +40,10 @@ public class HttpSourceCallbackDispatcherTests
                 CallbackTimeoutMs = 5000,   // non-zero — 0 would time out immediately
                 // CallbackAuthScheme null → no auth header applied
             });
-        var reader = new CachedCredentialReader(cache, Substitute.For<ISystemCredentialRepository>());
+        var reader = new CachedCredentialReader(
+            cache, Substitute.For<ISystemCredentialRepository>(),
+            new DTMS.Iam.Infrastructure.Security.CallbackTokenProtector(
+                new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider()));
 
         var dispatcher = new HttpSourceCallbackDispatcher(
             http, reader, NullLogger<HttpSourceCallbackDispatcher>.Instance);

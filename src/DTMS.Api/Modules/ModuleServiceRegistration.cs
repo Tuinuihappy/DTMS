@@ -148,6 +148,12 @@ public static class ModuleServiceRegistration
         // IConnectionMultiplexer is a singleton and we hold no per-request state.
         services.AddSingleton<DTMS.Iam.Application.Authorization.ISystemJwtRevocationList,
                               DTMS.Iam.Infrastructure.Authorization.RedisSystemJwtRevocationList>();
+        // Encrypt-at-rest — protector for SystemCredentials.CallbackAuthConfig.
+        // Singleton: IDataProtectionProvider is a singleton and the protector
+        // holds no other state. Consumed by IamDbContext's value converter
+        // and CachedCredentialReader (ciphertext in Redis L2).
+        services.AddSingleton<DTMS.Iam.Application.Security.ICallbackTokenProtector,
+                              DTMS.Iam.Infrastructure.Security.CallbackTokenProtector>();
         // CachedCredentialReader takes ITieredCache (singleton) but
         // depends on the scoped ISystemCredentialRepository on cache
         // miss — register scoped so the dependency chain resolves.

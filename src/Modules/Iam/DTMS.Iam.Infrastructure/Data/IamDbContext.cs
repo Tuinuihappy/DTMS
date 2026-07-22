@@ -1,3 +1,4 @@
+using DTMS.Iam.Application.Security;
 using DTMS.Iam.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,7 +25,19 @@ public class IamDbContext : DbContext
     // Phase S.8c — audit + revocation backing store for admin-issued JWTs.
     public DbSet<SystemIssuedToken> SystemIssuedTokens { get; set; } = null!;
 
-    public IamDbContext(DbContextOptions<IamDbContext> options) : base(options) { }
+    // Encrypt-at-rest — protects CallbackAuthConfig via the value converter
+    // below. Nullable + optional ctor so tests and ad-hoc harnesses can spin
+    // the context up without DI; they then read/write plaintext, which the
+    // protector's prefix discrimination keeps interoperable. CAVEAT: EF
+    // caches the model per context type, so the FIRST instance in a process
+    // decides whether the converter exists — never mix protector-less and
+    // protector-ful instances in one process (DI always supplies it; the
+    // singleton registration makes every instance share one protector).
+    private readonly ICallbackTokenProtector? _callbackProtector;
+
+    public IamDbContext(DbContextOptions<IamDbContext> options, ICallbackTokenProtector callbackProtector)
+        : base(options)
+        => _callbackProtector = callbackProtector;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -108,7 +121,20 @@ public class IamDbContext : DbContext
             b.Property(c => c.AuthConfig).HasColumnType("jsonb").IsRequired();
             b.Property(c => c.CallbackBaseUrl).HasMaxLength(500);
             b.Property(c => c.CallbackAuthScheme).HasMaxLength(30);
-            b.Property(c => c.CallbackAuthConfig).HasColumnType("jsonb");
+            // Encrypt-at-rest — column is text (not jsonb) because the
+            // stored value is Data Protection ciphertext ("CfDJ8…"), not
+            // JSON. The converter encrypts on write / decrypts on read so
+            // everything above this layer keeps seeing the plaintext JSON
+            // config. EF never passes NULL through converters, so the
+            // protector's null handling is belt-and-braces only.
+            var callbackConfig = b.Property(c => c.CallbackAuthConfig).HasColumnType("text");
+            if (_callbackProtector is not null)
+            {
+                var protector = _callbackProtector;
+                callbackConfig.HasConversion(
+                    v => protector.Protect(v)!,
+                    v => protector.TryUnprotect(v)!);
+            }
             b.Property(c => c.CallbackTimeoutMs).HasDefaultValue(10_000);
             b.Property(c => c.RetryMaxAttempts).HasDefaultValue(3);
             b.Property(c => c.CircuitFailureThreshold).HasDefaultValue(5);

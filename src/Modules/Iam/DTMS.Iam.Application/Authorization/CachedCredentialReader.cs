@@ -1,4 +1,5 @@
 using DTMS.Iam.Application.Repositories;
+using DTMS.Iam.Application.Security;
 using DTMS.Iam.Domain.Entities;
 using DTMS.SharedKernel.Caching;
 
@@ -19,27 +20,39 @@ public sealed class CachedCredentialReader
 
     private readonly ITieredCache _cache;
     private readonly ISystemCredentialRepository _repo;
+    private readonly ICallbackTokenProtector _protector;
 
-    public CachedCredentialReader(ITieredCache cache, ISystemCredentialRepository repo)
+    public CachedCredentialReader(
+        ITieredCache cache,
+        ISystemCredentialRepository repo,
+        ICallbackTokenProtector protector)
     {
         _cache = cache;
         _repo = repo;
+        _protector = protector;
     }
 
     public async Task<CachedCredential?> GetAsync(string systemKey, CancellationToken ct = default)
     {
         var key = CacheKeyPrefix + systemKey;
 
+        // Encrypt-at-rest — the cached DTO carries CallbackAuthConfig as
+        // ciphertext (Redis persists to the redis-data volume, so a cache
+        // entry is at-rest too). Callers always get a decrypted COPY: the
+        // L1 tier hands back the same object instance it stored, so
+        // mutating the cached DTO would corrupt what later hits read.
         var cached = await _cache.GetAsync<CachedCredential>(key, ct);
         if (cached is not null)
-            return cached;
+            return cached.WithCallbackAuthConfig(_protector.TryUnprotect(cached.CallbackAuthConfig));
 
         var row = await _repo.GetBySystemKeyAsync(systemKey, ct);
         if (row is null)
             return null;
 
+        // The entity already went through the EF converter, so its
+        // CallbackAuthConfig is plaintext here — re-protect for the cache.
         var dto = CachedCredential.FromEntity(row);
-        await _cache.SetAsync(key, dto, L2Ttl, ct);
+        await _cache.SetAsync(key, dto.WithCallbackAuthConfig(_protector.Protect(dto.CallbackAuthConfig)), L2Ttl, ct);
         return dto;
     }
 
@@ -78,5 +91,24 @@ public sealed class CachedCredential
         RetryMaxAttempts = e.RetryMaxAttempts,
         CircuitFailureThreshold = e.CircuitFailureThreshold,
         CircuitDurationSeconds = e.CircuitDurationSeconds,
+    };
+
+    /// <summary>
+    /// Copy with a different <see cref="CallbackAuthConfig"/> — used by the
+    /// reader to swap plaintext↔ciphertext without mutating the instance
+    /// the L1 cache holds.
+    /// </summary>
+    public CachedCredential WithCallbackAuthConfig(string? callbackAuthConfig) => new()
+    {
+        SystemKey = SystemKey,
+        AuthScheme = AuthScheme,
+        AuthConfig = AuthConfig,
+        CallbackBaseUrl = CallbackBaseUrl,
+        CallbackAuthScheme = CallbackAuthScheme,
+        CallbackAuthConfig = callbackAuthConfig,
+        CallbackTimeoutMs = CallbackTimeoutMs,
+        RetryMaxAttempts = RetryMaxAttempts,
+        CircuitFailureThreshold = CircuitFailureThreshold,
+        CircuitDurationSeconds = CircuitDurationSeconds,
     };
 }

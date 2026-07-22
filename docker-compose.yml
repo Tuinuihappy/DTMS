@@ -307,6 +307,11 @@ services:
       - Jwt__SystemTokenIssuer=${Jwt__SystemTokenIssuer:-dtms}
       - Jwt__SystemTokenAudience=${Jwt__SystemTokenAudience:-dtms-api}
       - Jwt__SystemTokenLifetimeSeconds=${Jwt__SystemTokenLifetimeSeconds:-3600}
+      # Encrypt-at-rest — same key ring as api/worker so the callback-token
+      # backfill run here produces ciphertext they can read.
+      - DataProtection__KeyPath=/keys/dp
+    volumes:
+      - dp-keys:/keys/dp
     command: ["dotnet", "DTMS.Api.dll", "--migrate-only"]
 
   api:
@@ -499,6 +504,13 @@ services:
       - Push__Vapid__PublicKey=${Push__Vapid__PublicKey:-}
       - Push__Vapid__PrivateKey=${Push__Vapid__PrivateKey:-}
       - Push__Vapid__Subject=${Push__Vapid__Subject:-mailto:ops@dtms.local}
+      # Encrypt-at-rest — Data Protection key ring shared across
+      # api/worker/migrator via the dp-keys volume. Losing the volume =
+      # stored callback tokens become unreadable; recovery is re-entering
+      # the token via the admin Configure UI (accepted policy).
+      - DataProtection__KeyPath=/keys/dp
+    volumes:
+      - dp-keys:/keys/dp
 
   # Phase D — dedicated outbox-worker container. Same image as api but with
   # Outbox:RunInThisProcess=true (the api container has this set to false
@@ -610,6 +622,12 @@ services:
       - Jwt__SystemTokenIssuer=${Jwt__SystemTokenIssuer:-dtms}
       - Jwt__SystemTokenAudience=${Jwt__SystemTokenAudience:-dtms-api}
       - Jwt__SystemTokenLifetimeSeconds=${Jwt__SystemTokenLifetimeSeconds:-3600}
+      # Encrypt-at-rest — MUST mount the same key ring as api. Without it
+      # this container cannot decrypt callback tokens and every outbound
+      # callback fails with an unprotect error.
+      - DataProtection__KeyPath=/keys/dp
+    volumes:
+      - dp-keys:/keys/dp
 
   # TMS dashboard (Next.js 16 standalone). Currently renders from mock
   # data so it doesn't depend on the .NET API — opt-in via the `prod`
@@ -666,3 +684,7 @@ volumes:
   prometheus-data:
   grafana-data:
   redis-data:
+  # Data Protection key ring (encrypt-at-rest for callback tokens).
+  # NEVER prune this volume — see disk-recovery playbook. If lost,
+  # re-enter callback tokens via the admin Configure UI.
+  dp-keys:

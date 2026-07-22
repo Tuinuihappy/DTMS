@@ -14,6 +14,7 @@ using DTMS.SharedKernel.Auth;
 using DTMS.SharedKernel.Projection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -79,6 +80,21 @@ builder.Services.AddAuthorization(o =>
 // scans for literals). The transformer uses IMemoryCache (registered below)
 // for a 5-minute hot path.
 builder.Services.AddMemoryCache();
+
+// Encrypt-at-rest — Data Protection backs CallbackTokenProtector, which
+// encrypts SystemCredentials.CallbackAuthConfig before it reaches
+// Postgres/Redis. KeyPath must point at the SAME mounted volume on every
+// process that touches the column (api, outbox-worker, migrator) or one
+// of them can't decrypt what another wrote. When unset (local dev, unit
+// tests) keys stay ephemeral: values still round-trip within the process,
+// they just don't survive a restart — acceptable outside docker.
+{
+    var dataProtection = builder.Services.AddDataProtection();
+    dataProtection.SetApplicationName("dtms");
+    var keyPath = builder.Configuration["DataProtection:KeyPath"];
+    if (!string.IsNullOrWhiteSpace(keyPath))
+        dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keyPath));
+}
 builder.Services.AddScoped<
     Microsoft.AspNetCore.Authentication.IClaimsTransformation,
     DTMS.Iam.Application.Authorization.PermissionClaimsTransformer>();
@@ -758,6 +774,12 @@ var app = builder.Build();
 // Seed ActionCatalog defaults (upsert — safe to run every startup)
 await SeedActionCatalogAsync(app.Services);
 
+// Encrypt-at-rest backfill — converts legacy plaintext CallbackAuthConfig
+// rows to Data Protection ciphertext. Idempotent (CfDJ8-prefix check) and
+// safe to skip entirely: the value converter passes plaintext through, so
+// an unconverted row still works — this just closes the at-rest gap.
+await EncryptCallbackConfigsAsync(app.Services);
+
 // --migrate-only — when set the process exits cleanly after migrations
 // + seeds. Used by the dtms-migrator compose service to apply schema
 // changes BEFORE the api container starts (via depends_on
@@ -819,6 +841,43 @@ static async Task SeedActionCatalogAsync(IServiceProvider services)
             await catalog.UpsertAsync(
                 new DTMS.Transport.Abstractions.Models.ActionCatalogEntry(vtKey, action, adapterKey, paramsJson));
     }
+}
+
+static async Task EncryptCallbackConfigsAsync(IServiceProvider services)
+{
+    using var scope = services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<DTMS.Iam.Infrastructure.Data.IamDbContext>();
+    var protector = scope.ServiceProvider.GetRequiredService<DTMS.Iam.Application.Security.ICallbackTokenProtector>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    // Raw ADO for the read — the EF property now runs through the encrypt
+    // converter, which would hide whether the stored value is still
+    // plaintext. left(…,5) <> 'CfDJ8' targets exactly the legacy rows.
+    var pending = new List<(string SystemKey, string Plaintext)>();
+    var conn = db.Database.GetDbConnection();
+    await conn.OpenAsync();
+    await using (var cmd = conn.CreateCommand())
+    {
+        cmd.CommandText = @"SELECT ""SystemKey"", ""CallbackAuthConfig""
+                            FROM iam.""SystemCredentials""
+                            WHERE ""CallbackAuthConfig"" IS NOT NULL
+                              AND left(""CallbackAuthConfig"", 5) <> 'CfDJ8'";
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            pending.Add((reader.GetString(0), reader.GetString(1)));
+    }
+
+    foreach (var (systemKey, plaintext) in pending)
+    {
+        var ciphertext = protector.Protect(plaintext);
+        await db.Database.ExecuteSqlAsync(
+            $@"UPDATE iam.""SystemCredentials"" SET ""CallbackAuthConfig"" = {ciphertext} WHERE ""SystemKey"" = {systemKey}");
+    }
+
+    if (pending.Count > 0)
+        logger.LogInformation(
+            "Encrypt-at-rest backfill: converted {Count} plaintext callback config(s) to ciphertext.",
+            pending.Count);
 }
 
 static async Task ApplyMigrationsAsync(DbContext db, Microsoft.Extensions.Logging.ILogger logger, IWebHostEnvironment env)
