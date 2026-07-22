@@ -1,4 +1,5 @@
 using DTMS.DeliveryOrder.Application.Options;
+using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.DeliveryOrder.Application.QualityIssues;
 using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Services;
@@ -14,8 +15,15 @@ namespace DTMS.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
 
 public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateUpstreamDeliveryOrderCommand, UpstreamOrderAckDto>
 {
+    /// <summary>
+    /// Inbox projector-name stamped on the direct OrderActivity write below —
+    /// same "direct write" convention as <c>UpstreamNotifyDirect</c>.
+    /// </summary>
+    public const string IngestActivityProjectorName = "OrderIngestDirect";
+
     private readonly IDeliveryOrderRepository _repository;
     private readonly IOrderAuditEventRepository _auditRepo;
+    private readonly IOrderActivityProjectionStore _activityStore;
     private readonly IStationValidationService _stationValidation;
     private readonly IUomNormalizer _uomNormalizer;
     private readonly ICurrentUserAccessor _currentUser;
@@ -26,6 +34,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
     public CreateUpstreamDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
         IOrderAuditEventRepository auditRepo,
+        IOrderActivityProjectionStore activityStore,
         IStationValidationService stationValidation,
         IUomNormalizer uomNormalizer,
         ICurrentUserAccessor currentUser,
@@ -35,6 +44,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
     {
         _repository = repository;
         _auditRepo = auditRepo;
+        _activityStore = activityStore;
         _stationValidation = stationValidation;
         _uomNormalizer = uomNormalizer;
         _currentUser = currentUser;
@@ -169,13 +179,36 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
                 order.SetRequiresPickupPod(request.RequiresPickupPod.Value);
 
             await _repository.AddAsync(order, cancellationToken);
+            var ingestedDetails =
+                $"Order '{order.OrderRef}' ingested from {order.SourceSystemKey} by {order.CreatedBy ?? "system"} — auto-confirmed and queued for planning";
             await _auditRepo.AddAsync(new OrderAuditEvent(
-                order.Id, "OrderUpstreamIngested",
-                $"Order '{order.OrderRef}' ingested from {order.SourceSystemKey} by {order.CreatedBy ?? "system"} — auto-confirmed and queued for planning"), cancellationToken);
+                order.Id, "OrderUpstreamIngested", ingestedDetails), cancellationToken);
 
             var warnings = WeightWarningEvaluator.Evaluate(order.Items);
             foreach (var w in warnings)
                 await _auditRepo.AddAsync(new OrderAuditEvent(order.Id, "QualityWarning", $"{w.Code}: {w.Message}"), cancellationToken);
+
+            // Mirror OrderUpstreamIngested into the OrderActivity timeline the
+            // audit-full endpoint reads — the projector can't (no integration
+            // event exists for ingest), and without this row the upstream-
+            // notification panel stays hidden until the first callback lands,
+            // exactly the retry window where operators need it. AppendAsync
+            // saves the shared DbContext, committing order + audit + activity
+            // + inbox in one transaction; the SaveChangesAsync below is then
+            // a no-op flush of the same context.
+            await _activityStore.AppendAsync(
+                projectorName: IngestActivityProjectorName,
+                eventId: Guid.NewGuid(),
+                orderId: order.Id,
+                category: "OrderLifecycle",
+                eventType: "OrderUpstreamIngested",
+                details: ingestedDetails,
+                actorId: null,
+                occurredAt: DateTime.UtcNow,
+                relatedTripId: null,
+                attemptNumber: null,
+                cancellationToken,
+                systemKey: origin.Key);
 
             await _repository.SaveChangesAsync(cancellationToken);
 
