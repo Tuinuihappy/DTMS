@@ -329,18 +329,11 @@ public static class Riot3Webhooks
             errorMessage: failResult?.ErrorDescription,
             logger: logger);
 
-        var upsert = await missionEventRepository.AddIfNotExistsAsync(missionEvent, cancellationToken);
-        var inserted = upsert.Inserted;
+        var inserted = await missionEventRepository.AddIfNotExistsAsync(missionEvent, cancellationToken);
         if (inserted)
         {
-            // RC3: occurrence > 1 = RIOT retried this mission state — the row
-            // the old unique index used to drop silently.
-            if (upsert.Occurrence > 1)
-                logger.LogInformation("[SubTaskWebhook] Trip {TripId} mission {MissionKey} → {State} (retry #{Occurrence})",
-                    tripId, subTaskKey, state, upsert.Occurrence);
-            else
-                logger.LogInformation("[SubTaskWebhook] Trip {TripId} mission {MissionKey} → {State}",
-                    tripId, subTaskKey, state);
+            logger.LogInformation("[SubTaskWebhook] Trip {TripId} mission {MissionKey} → {State}",
+                tripId, subTaskKey, state);
 
             // Push to operator drawer so the Mission Timeline + failure
             // banner update without a manual refresh. Fire-and-forget by
@@ -359,8 +352,7 @@ public static class Riot3Webhooks
                     ResultCode: missionEvent.ResultCode,
                     ErrorMessage: missionEvent.ErrorMessage,
                     ChangeStateTime: missionEvent.ChangeStateTime,
-                    ReceivedAt: missionEvent.ReceivedAt,
-                    Occurrence: upsert.Occurrence),
+                    ReceivedAt: missionEvent.ReceivedAt),
                 cancellationToken);
         }
         else

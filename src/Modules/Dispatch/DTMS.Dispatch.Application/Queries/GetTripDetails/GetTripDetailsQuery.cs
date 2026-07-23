@@ -58,7 +58,4 @@ public sealed record TripMissionDto(
     string? ResultCode,
     string? ErrorMessage,
     DateTime ChangeStateTime,
-    DateTime ReceivedAt,
-    // RC3 — 1-based attempt repeat for (missionKey, state); >1 marks a
-    // RIOT-side retry row (see TripMissionEvent.Occurrence).
-    int Occurrence = 1);
+    DateTime ReceivedAt);

@@ -23,9 +23,6 @@ export type TripMissionDto = {
   errorMessage: string | null;
   changeStateTime: string; // ISO-8601 — vendor's wall clock
   receivedAt: string; // ISO-8601 — DTMS wall clock
-  // RC3 — 1-based attempt repeat for (missionKey, state); >1 marks a
-  // RIOT-side retry row. Part of row identity — see missionRowKey().
-  occurrence: number;
 };
 
 export type TripDetailsDto = {

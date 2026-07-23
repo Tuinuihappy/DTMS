@@ -26,15 +26,11 @@ export function sortMissionRows(missions: TripMissionDto[]): TripMissionDto[] {
   return [...missions].sort(compareMissionRows);
 }
 
-// (missionKey, state, occurrence) is unique across a trip's rows —
-// guaranteed by the backend unique index and re-enforced by the drawer's
-// live-push dedup — so it can key a row → display-number map. Occurrence
-// joined the identity in RC3: a RIOT-side retry re-emits the same
-// (missionKey, state) as a NEW row with occurrence 2..n, so a 2-part key
-// would silently collapse retry rows. `?? 1` guards rows cached by a
-// pre-RC3 tab that lack the field.
+// (missionKey, state) is unique across a trip's rows — guaranteed by the
+// backend unique index and re-enforced by the drawer's live-push dedup —
+// so it can key a row → display-number map.
 export function missionRowKey(m: TripMissionDto): string {
-  return `${m.missionKey}|${m.state}|${m.occurrence ?? 1}`;
+  return `${m.missionKey}|${m.state}`;
 }
 
 // Map every row to its 1-based position in the shared sort order. Callers

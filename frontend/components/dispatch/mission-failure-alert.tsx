@@ -18,20 +18,10 @@ export function isAlertMissionState(state: string | null | undefined): boolean {
   return s !== "" && s !== "PROCESSING" && s !== "FINISHED";
 }
 
-// RC3 — a retry-in-flight row: RIOT re-emitted PROCESSING for a mission it
-// already failed (occurrence > 1 exists only after a FAILED, enforced by
-// the repository). Not a healthy PROCESSING — the operator should keep
-// seeing the mission until the retry resolves.
-export function isRetryingRow(m: TripMissionDto): boolean {
-  return m.state.trim().toUpperCase() === "PROCESSING" && (m.occurrence ?? 1) > 1;
-}
-
 // Pick the latest event per missionKey (by changeStateTime, with
 // receivedAt as tiebreaker) so a mission that went PROCESSING → FAILED →
 // FINISHED doesn't surface its historical FAILED as a still-alerting
-// issue. Returned rows are either alerting states (FAILED/HANG/...) or
-// RC3 retrying rows — a PROCESSING re-attempt keeps the mission in the
-// banner (as RETRYING) instead of silently clearing it mid-retry.
+// issue. Only missions whose *current* state is alerting are returned.
 export function getFailingMissions(missions: TripMissionDto[]): TripMissionDto[] {
   const latestByKey = new Map<string, TripMissionDto>();
   for (const m of missions) {
@@ -41,21 +31,9 @@ export function getFailingMissions(missions: TripMissionDto[]): TripMissionDto[]
     }
   }
   return Array.from(latestByKey.values())
-    .filter((m) => isAlertMissionState(m.state) || isRetryingRow(m))
+    .filter((m) => isAlertMissionState(m.state))
     // Shared comparator (lib/mission-order) — same order the timeline uses.
     .sort(compareMissionRows);
-}
-
-// Latest FAILED row for a mission — the context shown under a RETRYING
-// entry so the operator sees WHAT the robot is retrying from (the
-// PROCESSING re-attempt row itself carries no error fields).
-function latestFailureOf(missions: TripMissionDto[], missionKey: string): TripMissionDto | undefined {
-  let latest: TripMissionDto | undefined;
-  for (const m of missions) {
-    if (m.missionKey !== missionKey || m.state.trim().toUpperCase() !== "FAILED") continue;
-    if (!latest || isLater(m, latest)) latest = m;
-  }
-  return latest;
 }
 
 function isLater(a: TripMissionDto, b: TripMissionDto): boolean {
@@ -101,12 +79,7 @@ export function MissionFailureAlert({
           </div>
           <ul className="mt-1.5 space-y-1.5">
             {failing.map((m, idx) => {
-              // RC3: a retrying entry is the PROCESSING re-attempt row — it
-              // carries no error fields, so the error context (code/message/
-              // suggested action) comes from the mission's latest FAILED row.
-              const retrying = isRetryingRow(m);
-              const failure = retrying ? latestFailureOf(missions, m.missionKey) : m;
-              const action = resolveRiot3ErrorAction(failure?.resultCode ?? null);
+              const action = resolveRiot3ErrorAction(m.resultCode);
               const seq = rowNumbers.get(missionRowKey(m));
               // Target label: MOVE → station; ACT → template name + code
               // (same convention as the timeline rows); raw actionName as
@@ -114,7 +87,7 @@ export function MissionFailureAlert({
               const actCode = parseActCode(m.actionName);
               const resolvedName = actCode ? actionNames.get(actCode) : undefined;
               return (
-                <li key={`${m.missionKey}-${m.state}-${m.occurrence ?? 1}-${idx}`} className="font-medium">
+                <li key={`${m.missionKey}-${m.state}-${idx}`} className="font-medium">
                   <span className="font-mono text-[11px] uppercase tracking-[0.04em] opacity-80">
                     {seq != null ? `#${seq} ` : ""}{m.missionType}
                     {m.stationName
@@ -125,15 +98,9 @@ export function MissionFailureAlert({
                           ? ` → ${m.actionName}`
                           : ""}
                   </span>
-                  {retrying ? (
-                    <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-[1px] text-[10.5px] font-semibold uppercase tracking-[0.06em] text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
-                      retrying #{m.occurrence}
-                    </span>
-                  ) : (
-                    <span className="ml-1.5 rounded-full bg-white/60 px-1.5 py-[1px] text-[10.5px] font-semibold uppercase tracking-[0.06em] dark:bg-white/[0.08]">
-                      {m.state}
-                    </span>
-                  )}
+                  <span className="ml-1.5 rounded-full bg-white/60 px-1.5 py-[1px] text-[10.5px] font-semibold uppercase tracking-[0.06em] dark:bg-white/[0.08]">
+                    {m.state}
+                  </span>
                   {/* Action line (mapped) takes top billing — it tells the
                       operator what to do. Raw code + vendor message stays
                       visible below as a smaller secondary line so IT
@@ -143,13 +110,13 @@ export function MissionFailureAlert({
                       {action}
                     </div>
                   )}
-                  {(failure?.resultCode || failure?.errorMessage) && (
+                  {(m.resultCode || m.errorMessage) && (
                     <div className="mt-0.5 text-[11px] font-normal opacity-75">
-                      {failure.resultCode && (
-                        <span className="font-mono">{failure.resultCode}</span>
+                      {m.resultCode && (
+                        <span className="font-mono">{m.resultCode}</span>
                       )}
-                      {failure.resultCode && failure.errorMessage && <span> · </span>}
-                      {failure.errorMessage}
+                      {m.resultCode && m.errorMessage && <span> · </span>}
+                      {m.errorMessage}
                     </div>
                   )}
                 </li>

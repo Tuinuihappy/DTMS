@@ -43,16 +43,6 @@ public sealed class TripMissionEvent : Entity<Guid>
     /// <summary>"PROCESSING" | "FINISHED" | "FAILED" | "CANCELED".</summary>
     public string State { get; private set; } = string.Empty;
 
-    /// <summary>RC3 — 1-based repeat counter for (TripId, MissionKey, State).
-    /// RIOT retries a failed sub-task under the SAME missionKey, re-emitting
-    /// the same states; before this column the unique index silently dropped
-    /// every re-emission and the retry was invisible. Assigned by the
-    /// REPOSITORY at insert time (who-came-first is a storage concern —
-    /// deliberately not a Record() parameter, so the factory and both ingest
-    /// paths stay attempt-agnostic). Each attempt starts with PROCESSING, so
-    /// the PROCESSING occurrence IS the attempt number the UI shows.</summary>
-    public int Occurrence { get; private set; } = 1;
-
     public string? ResultCode { get; private set; }
     public string? ErrorMessage { get; private set; }
 

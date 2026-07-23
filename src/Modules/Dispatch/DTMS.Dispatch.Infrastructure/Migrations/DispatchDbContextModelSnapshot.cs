@@ -358,9 +358,6 @@ namespace DTMS.Dispatch.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<int>("Occurrence")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime>("ReceivedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -384,7 +381,7 @@ namespace DTMS.Dispatch.Infrastructure.Migrations
 
                     b.HasIndex("TripId", "MissionIndex");
 
-                    b.HasIndex("TripId", "MissionKey", "State", "Occurrence")
+                    b.HasIndex("TripId", "MissionKey", "State")
                         .IsUnique();
 
                     b.ToTable("TripMissionEvents", "dispatch");

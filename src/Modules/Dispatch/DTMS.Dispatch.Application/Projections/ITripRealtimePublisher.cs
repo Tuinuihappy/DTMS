@@ -46,11 +46,7 @@ public sealed record TripMissionEventDto(
     string? ResultCode,
     string? ErrorMessage,
     DateTime ChangeStateTime,
-    DateTime ReceivedAt,
-    // RC3 — 1-based attempt repeat for (missionKey, state); >1 marks a
-    // RIOT-side retry row. Additive (defaulted) so pre-RC3 consumers and
-    // cached clients keep working.
-    int Occurrence = 1);
+    DateTime ReceivedAt);
 
 public sealed class NoopTripRealtimePublisher : ITripRealtimePublisher
 {
