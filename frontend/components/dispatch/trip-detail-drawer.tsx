@@ -19,6 +19,7 @@ import {
   type TripMissionDto,
 } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
+import { missionRowKey } from "@/lib/mission-order";
 import { StatusTimelineSection } from "@/components/projection/status-timeline-section";
 import type { StatusHistoryEntry } from "@/lib/api/status-history";
 import { getTripStatusHistory } from "@/lib/api/status-history";
@@ -68,9 +69,10 @@ export function TripDetailDrawer({
   // Mission events pushed over TripHub.MissionUpdated since the drawer
   // opened. Kept separate from data.missions so a refetch (e.g. user
   // toggles "Include raw") doesn't drop in-flight pushes. Merged with
-  // data.missions at render time; dedup by (missionKey, state) matches
-  // the backend's unique index, so a webhook + reconciler racing to
-  // upsert the same row only produces one timeline entry.
+  // data.missions at render time; dedup by missionRowKey (missionKey,
+  // state, occurrence) matches the backend's unique index, so a webhook +
+  // reconciler racing to upsert the same row only produces one timeline
+  // entry — while a genuine RIOT retry (new occurrence) still comes through.
   const [liveMissionEvents, setLiveMissionEvents] = useState<TripMissionDto[]>([]);
 
   useTripSubscription(tripId, {
@@ -78,8 +80,8 @@ export function TripDetailDrawer({
     MissionUpdated: (event) =>
       setLiveMissionEvents((prev) => {
         const incoming = event as TripMissionDto;
-        if (prev.some((m) => m.missionKey === incoming.missionKey && m.state === incoming.state)) {
-          return prev; // already seen this (missionKey, state) — dedup
+        if (prev.some((m) => missionRowKey(m) === missionRowKey(incoming))) {
+          return prev; // already seen this row — dedup
         }
         return [...prev, incoming];
       }),
@@ -209,13 +211,14 @@ export function TripDetailDrawer({
                 // Fold SignalR pushes into the fetched missions list so
                 // the banner + chip + Mission Timeline reflect new vendor
                 // events without waiting for a manual refresh. Dedup by
-                // (missionKey, state) matches both the backend unique
-                // index and the live-push dedup, so a webhook arriving
-                // microseconds after a fetch is harmless.
-                const seen = new Set(data.missions.map((m) => `${m.missionKey}|${m.state}`));
+                // missionRowKey (missionKey, state, occurrence) matches
+                // both the backend unique index and the live-push dedup,
+                // so a webhook arriving microseconds after a fetch is
+                // harmless while retry rows (new occurrence) still merge in.
+                const seen = new Set(data.missions.map(missionRowKey));
                 const mergedMissions = [
                   ...data.missions,
-                  ...liveMissionEvents.filter((m) => !seen.has(`${m.missionKey}|${m.state}`)),
+                  ...liveMissionEvents.filter((m) => !seen.has(missionRowKey(m))),
                 ];
                 // Compute once per render so the alert banner, the Status
                 // Timeline "N issues" chip, and the Resume button's warning

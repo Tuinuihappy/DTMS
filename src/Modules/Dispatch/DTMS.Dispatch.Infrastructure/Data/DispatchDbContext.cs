@@ -199,8 +199,12 @@ public class DispatchDbContext : DbContext
             builder.Property(e => e.ActionName).HasMaxLength(100);
             builder.Property(e => e.ActionType).HasMaxLength(50);
             builder.Property(e => e.ResultCode).HasMaxLength(20);
-            // Idempotency: webhook + reconciler can both write without coordination.
-            builder.HasIndex(e => new { e.TripId, e.MissionKey, e.State }).IsUnique();
+            // Idempotency: webhook + reconciler can both write without
+            // coordination. RC3 widened the arbiter with Occurrence so a
+            // RIOT-side retry (same missionKey, states re-emitted) can be
+            // stored as occurrence 2..n instead of being silently dropped —
+            // the repository decides duplicate-vs-retry before minting.
+            builder.HasIndex(e => new { e.TripId, e.MissionKey, e.State, e.Occurrence }).IsUnique();
             builder.HasIndex(e => new { e.TripId, e.MissionIndex });
         });
 

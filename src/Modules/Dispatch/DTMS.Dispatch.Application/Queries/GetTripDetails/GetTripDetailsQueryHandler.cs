@@ -57,7 +57,8 @@ public class GetTripDetailsQueryHandler : IQueryHandler<GetTripDetailsQuery, Tri
                 ResultCode: m.ResultCode,
                 ErrorMessage: m.ErrorMessage,
                 ChangeStateTime: m.ChangeStateTime,
-                ReceivedAt: m.ReceivedAt))
+                ReceivedAt: m.ReceivedAt,
+                Occurrence: m.Occurrence))
             .ToList();
 
         var dto = new TripDetailsDto(

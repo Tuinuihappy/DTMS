@@ -57,7 +57,7 @@ export function MissionTimeline({
       />
       {sorted.map((m, idx) => (
         <MissionRow
-          key={`${m.missionKey}-${m.state}-${idx}`}
+          key={`${m.missionKey}-${m.state}-${m.occurrence ?? 1}-${idx}`}
           mission={m}
           seq={idx + 1}
           actionNames={actionNames}
@@ -177,7 +177,16 @@ function MissionRow({
               </div>
             )}
           </div>
-          <MissionStateBadge state={mission.state} />
+          <div className="flex flex-shrink-0 items-center gap-1.5">
+            {/* RC3 — occurrence > 1 marks a RIOT-side retry of this mission
+                state; the row the old unique index used to drop silently. */}
+            {(mission.occurrence ?? 1) > 1 && (
+              <span className="rounded-full bg-amber-100 px-2 py-[2px] text-[10px] font-semibold uppercase tracking-[0.06em] text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+                retry #{mission.occurrence}
+              </span>
+            )}
+            <MissionStateBadge state={mission.state} />
+          </div>
         </div>
         <div className="mt-1.5 flex items-center gap-3 text-[10.5px] tabular-nums text-[var(--color-ink-400)]">
           <DateTime

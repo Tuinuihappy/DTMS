@@ -224,7 +224,7 @@ public class Riot3ReconciliationMissionUpsertTests
         var captured = new List<TripMissionEvent>();
         var repo = Substitute.For<ITripMissionEventRepository>();
         repo.AddIfNotExistsAsync(Arg.Do<TripMissionEvent>(e => captured.Add(e)), Arg.Any<CancellationToken>())
-            .Returns(true);
+            .Returns(new MissionUpsertResult(true, 1));
         var publisher = Substitute.For<ITripRealtimePublisher>();
 
         var data = new Riot3OrderQueryData
@@ -253,7 +253,7 @@ public class Riot3ReconciliationMissionUpsertTests
         var captured = new List<TripMissionEvent>();
         var repo = Substitute.For<ITripMissionEventRepository>();
         repo.AddIfNotExistsAsync(Arg.Do<TripMissionEvent>(e => captured.Add(e)), Arg.Any<CancellationToken>())
-            .Returns(true);
+            .Returns(new MissionUpsertResult(true, 1));
         var publisher = Substitute.For<ITripRealtimePublisher>();
 
         var data = new Riot3OrderQueryData

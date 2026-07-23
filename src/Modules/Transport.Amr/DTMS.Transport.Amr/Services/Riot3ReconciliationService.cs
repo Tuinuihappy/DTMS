@@ -505,8 +505,12 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     // say on this path, so a null logger keeps the static
                     // signature unchanged for the unit tests.
                     logger: Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
-                var inserted = await repo.AddIfNotExistsAsync(ev, ct);
-                if (inserted)
+                // RC3: the order-GET reports each mission with the timestamps
+                // of its LATEST attempt, so a retry the webhook missed lands
+                // here and mints occurrence n+1 through the same repository
+                // rules (5s dedup + must-have-FAILED) — no special casing.
+                var upsert = await repo.AddIfNotExistsAsync(ev, ct);
+                if (upsert.Inserted)
                 {
                     // Mirror webhook behavior: push to the operator drawer
                     // so a missed webhook surfaces in realtime once the
@@ -525,7 +529,8 @@ public sealed class Riot3ReconciliationService : BackgroundService
                             ResultCode: ev.ResultCode,
                             ErrorMessage: ev.ErrorMessage,
                             ChangeStateTime: ev.ChangeStateTime,
-                            ReceivedAt: ev.ReceivedAt),
+                            ReceivedAt: ev.ReceivedAt,
+                            Occurrence: upsert.Occurrence),
                         ct);
                 }
             }

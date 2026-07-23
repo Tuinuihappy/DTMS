@@ -14,33 +14,84 @@ public sealed class TripMissionEventRepository : ITripMissionEventRepository
         _context = context;
     }
 
-    public async Task<bool> AddIfNotExistsAsync(TripMissionEvent missionEvent, CancellationToken cancellationToken = default)
+    public async Task<MissionUpsertResult> AddIfNotExistsAsync(TripMissionEvent missionEvent, CancellationToken cancellationToken = default)
     {
-        // Single round trip: the unique index (TripId, MissionKey, State) is
-        // the arbiter, so ON CONFLICT DO NOTHING makes duplicate suppression
-        // the database's job — no pre-SELECT, no race window, no
-        // DbUpdateException dance. Rows-affected tells us whether we won.
+        // Fast path — single round trip, identical cost to pre-RC3: the
+        // 4-column unique index (TripId, MissionKey, State, Occurrence) is
+        // the arbiter and Occurrence=1 covers every first-seen state.
         //
-        // Raw SQL deliberately bypasses the change tracker: the old
-        // Add + SaveChangesAsync would also flush any OTHER entity the
-        // caller's scope happened to be tracking (e.g. a Trip loaded earlier
-        // in the same webhook request) — an invisible coupling this method
-        // never advertised. The statement is idempotent, so it is safe under
-        // EnableRetryOnFailure replaying it after a dropped connection.
-        var rows = await _context.Database.ExecuteSqlInterpolatedAsync($"""
+        // Raw SQL deliberately bypasses the change tracker (SaveChangesAsync
+        // would flush unrelated tracked entities from the caller's scope) and
+        // every statement here is idempotent, so EnableRetryOnFailure replays
+        // after a dropped connection are safe.
+        var rows = await InsertAsync(missionEvent, occurrence: 1, cancellationToken);
+        if (rows > 0) return new MissionUpsertResult(true, 1);
+
+        // Conflict path (rare — duplicate frame or a genuine RIOT retry).
+        // One SELECT answers all three questions:
+        //   max_occ    — highest stored attempt for this (trip, key, state)
+        //   near_any   — is the incoming time within the threshold of ANY
+        //                stored attempt? Comparing against every attempt (not
+        //                just the latest) is what stops a delayed duplicate of
+        //                attempt 1 — arriving after attempt 2 exists — from
+        //                minting a phantom attempt 3 (RIOT retries callback
+        //                delivery with backoff, so late re-sends are real).
+        //   has_failed — has this mission ever FAILED? RIOT only retries
+        //                after failure; never-failed missions cannot mint.
+        var verdict = await GetConflictVerdictAsync(missionEvent, cancellationToken);
+        if (verdict.MaxOccurrence == 0)
+        {
+            // Conflict on insert but no rows visible: the competing writer's
+            // transaction hasn't committed yet. Treat as duplicate — the
+            // competing row IS this event, occurrence unknown; report 1.
+            return new MissionUpsertResult(false, 1);
+        }
+
+        if (!MissionRetryPolicy.IsGenuineRetry(verdict.NearAnyExistingAttempt, verdict.MissionHasFailed))
+            return new MissionUpsertResult(false, verdict.MaxOccurrence);
+
+        // Genuine retry — mint the next occurrence. A second conflict here
+        // means another writer (webhook vs reconciler carrying the same
+        // attempt) beat us to it; re-check once, bounded, no loop.
+        var nextOccurrence = verdict.MaxOccurrence + 1;
+        rows = await InsertAsync(missionEvent, nextOccurrence, cancellationToken);
+        if (rows > 0) return new MissionUpsertResult(true, nextOccurrence);
+
+        var recheck = await GetConflictVerdictAsync(missionEvent, cancellationToken);
+        return new MissionUpsertResult(false, Math.Max(recheck.MaxOccurrence, 1));
+    }
+
+    private Task<int> InsertAsync(TripMissionEvent missionEvent, int occurrence, CancellationToken cancellationToken)
+        => _context.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO dispatch."TripMissionEvents"
                 ("Id", "TripId", "MissionIndex", "MissionKey", "MissionType", "State",
                  "StationName", "ActionName", "ActionType", "ResultCode", "ErrorMessage",
-                 "ChangeStateTime", "ReceivedAt")
+                 "ChangeStateTime", "ReceivedAt", "Occurrence")
             VALUES
-                ({missionEvent.Id}, {missionEvent.TripId}, {missionEvent.MissionIndex},
+                ({Guid.NewGuid()}, {missionEvent.TripId}, {missionEvent.MissionIndex},
                  {missionEvent.MissionKey}, {missionEvent.MissionType}, {missionEvent.State},
                  {missionEvent.StationName}, {missionEvent.ActionName}, {missionEvent.ActionType},
                  {missionEvent.ResultCode}, {missionEvent.ErrorMessage},
-                 {missionEvent.ChangeStateTime}, {missionEvent.ReceivedAt})
-            ON CONFLICT ("TripId", "MissionKey", "State") DO NOTHING
+                 {missionEvent.ChangeStateTime}, {missionEvent.ReceivedAt}, {occurrence})
+            ON CONFLICT ("TripId", "MissionKey", "State", "Occurrence") DO NOTHING
             """, cancellationToken);
-        return rows > 0;
+
+    private sealed record ConflictVerdict(int MaxOccurrence, bool NearAnyExistingAttempt, bool MissionHasFailed);
+
+    private async Task<ConflictVerdict> GetConflictVerdictAsync(TripMissionEvent missionEvent, CancellationToken cancellationToken)
+    {
+        var rows = await _context.TripMissionEvents
+            .AsNoTracking()
+            .Where(e => e.TripId == missionEvent.TripId && e.MissionKey == missionEvent.MissionKey)
+            .Select(e => new { e.State, e.Occurrence, e.ChangeStateTime })
+            .ToListAsync(cancellationToken);
+
+        var sameState = rows.Where(r => r.State == missionEvent.State).ToList();
+        return new ConflictVerdict(
+            MaxOccurrence: sameState.Count == 0 ? 0 : sameState.Max(r => r.Occurrence),
+            NearAnyExistingAttempt: sameState.Any(r =>
+                MissionRetryPolicy.IsSameAttempt(r.ChangeStateTime, missionEvent.ChangeStateTime)),
+            MissionHasFailed: rows.Any(r => r.State == "FAILED"));
     }
 
     public Task<List<TripMissionEvent>> GetByTripIdAsync(Guid tripId, CancellationToken cancellationToken = default)
