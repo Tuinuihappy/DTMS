@@ -286,6 +286,56 @@ public class ShipmentCancelledFanoutConsumerTests
         row.CorrelationId.Should().NotBeNull();
     }
 
+    // A single cancel action arrives as TWO integration events: the operator
+    // command and RIOT3's TASK_CANCELED echo (which races past Trip.Cancel's
+    // already-cancelled guard — observed live 2026-07-22). Correlation is keyed
+    // on the TripId so both map to the same (PartitionKey, CorrelationId) pair
+    // and Postgres's partial unique index rejects the echo's row. InMemory
+    // can't enforce that index, so the assertion here is the key equality that
+    // makes the rejection happen.
+    [Fact]
+    public async Task OperatorCancelAndVendorEcho_SameTrip_ShareOneCorrelationId()
+    {
+        var tripId = Guid.NewGuid();
+        var h = NewHarness(subscribed: true);
+        var order = OmsOrder(tripId);
+        h.Orders.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(order);
+        h.Trips.GetByIdAsync(tripId, Arg.Any<CancellationToken>()).Returns(StartedTrip(order.Id));
+        var consumer = h.Build();
+
+        await consumer.Consume(Ctx(tripId, order.Id));   // operator cancel
+        await consumer.Consume(Ctx(tripId, order.Id));   // vendor echo — new EventId + MessageId
+
+        var rows = await h.Outbox.OutboxMessages.ToListAsync();
+        rows.Should().HaveCount(2);
+        rows.Select(r => r.CorrelationId).Distinct().Should().HaveCount(1,
+            "same trip must collapse under the (PartitionKey, CorrelationId) unique index");
+    }
+
+    // The dedupe must NOT swallow legitimate per-attempt cancels: a retried
+    // chain that dies again cancels under a NEW trip id, and each attempt's
+    // cancel must reach the subscriber (documented consumer contract).
+    [Fact]
+    public async Task CancelsOnDifferentTrips_GetDistinctCorrelationIds()
+    {
+        var tripA = Guid.NewGuid();
+        var tripB = Guid.NewGuid();
+        var h = NewHarness(subscribed: true);
+        var order = OmsOrder(tripA);
+        h.Orders.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(order);
+        h.Trips.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(_ => StartedTrip(order.Id));
+        var consumer = h.Build();
+
+        await consumer.Consume(Ctx(tripA, order.Id));
+        await consumer.Consume(Ctx(tripB, order.Id));
+
+        var rows = await h.Outbox.OutboxMessages.ToListAsync();
+        rows.Should().HaveCount(2);
+        rows.Select(r => r.CorrelationId).Distinct().Should().HaveCount(2,
+            "a retry attempt's cancel is a distinct shipment event, not a duplicate");
+    }
+
     // Source routing is case-insensitive, matching the started/arrived fan-outs.
     [Fact]
     public async Task TwoSubscribersOnSameSource_EachGetsARow_SameCorrelationId()

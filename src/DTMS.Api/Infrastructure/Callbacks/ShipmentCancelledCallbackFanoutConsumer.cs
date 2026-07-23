@@ -135,7 +135,20 @@ public sealed class ShipmentCancelledCallbackFanoutConsumer
         var shipmentId = (await _trips.GetRootTripIdAsync(evt.TripId, ct)).ToString();
         var context = new ShipmentCancelledContext(
             shipmentId, evt.Reason, evt.TriggeredBy, evt.OccurredOn);
-        var correlationId = ctx.MessageId ?? Guid.NewGuid();
+
+        // Deterministic per (event type, trip): a single cancel action arrives
+        // as TWO integration events — the operator command and RIOT3's
+        // TASK_CANCELED echo (~400ms later, reason "vendor cancelled"), which
+        // races past Trip.Cancel's already-cancelled guard. Verified live
+        // 2026-07-22: both fanned out, so the subscriber got the same shipment
+        // cancelled twice with conflicting reasons. Keying correlation on the
+        // TripId (not ctx.MessageId) makes the second insert hit the
+        // (PartitionKey, CorrelationId) unique index → caught below as the
+        // idempotent no-op. First event wins, which also picks the true
+        // cancel reason — the echo's is a placeholder. A retried trip gets a
+        // new TripId, so per-attempt cancels stay distinct as documented above.
+        var correlationId = CallbackFanout.DeterministicCorrelationId(
+            $"{eventType}:{evt.TripId}");
 
         foreach (var sub in subs)
         {
