@@ -417,6 +417,13 @@ services:
       - Wms__PageSize=${Wms__PageSize:-1000}
       - Wms__SyncIntervalSeconds=${Wms__SyncIntervalSeconds:-300}
       - Wms__Auth__Token=${Wms__Auth__Token:-}
+      # Outbound-token auto-refresh: the api tier does NOT run the sweep (that's
+      # the worker), but the manual "refresh now" endpoint mints here, so it needs
+      # the same SSRF allowlist. The sweep gate stays default-false on api.
+      # PollInterval mirrored so the read-only settings panel (served by api)
+      # reports the same cadence the worker actually sweeps at — keep both in sync.
+      - CallbackTokenRefresh__AllowedMintHosts__0=${CallbackTokenRefresh__MintHost0:-10.204.212.28}
+      - CallbackTokenRefresh__PollIntervalSeconds=${CallbackTokenRefresh__PollIntervalSeconds:-3600}
       # WMS PR-4 — TransportMode feature flags. Frontend calls
       # /api/v1/system/capabilities to read these + hide unavailable modes.
       - TransportModes__Amr__Enabled=${TransportModes__Amr__Enabled:-true}
@@ -600,6 +607,15 @@ services:
       # Without this flag, the worker doubled the RIOT3 API call rate +
       # produced 401 spam in its logs (admin JWT not provisioned here).
       - Workers__VendorPollers__RunInThisProcess=false
+      # Outbound-token auto-refresh sweep runs HERE (single-replica worker), not
+      # on the multi-replica api tier — see Program.cs runTokenRefresh gate. The
+      # loop always runs here; each system's UI "Enable automatic refresh" tick
+      # (stored in TokenRefreshConfig) is the actual on/off — no env master switch.
+      - Workers__CallbackTokenRefresh__RunInThisProcess=true
+      - CallbackTokenRefresh__PollIntervalSeconds=${CallbackTokenRefresh__PollIntervalSeconds:-3600}
+      # SSRF allowlist — mint tokenUrl host must be listed. Deny-all by default;
+      # index-keyed env entries bind to the List<string>. Add more with __1, __2.
+      - CallbackTokenRefresh__AllowedMintHosts__0=${CallbackTokenRefresh__MintHost0:-10.204.212.28}
       # Vendor isolation flag also inherited so worker doesn't accidentally
       # call RIOT3 even if api has it disabled.
       - VendorAdapter__Riot3__Enabled=${VendorAdapter__Riot3__Enabled:-true}

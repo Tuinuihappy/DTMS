@@ -1,10 +1,12 @@
 using System.Text.Json;
 using DTMS.Iam.Application.Authorization;
+using DTMS.Iam.Application.Callbacks;
 using DTMS.Iam.Application.Repositories;
 using DTMS.Iam.Domain.Entities;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Options;
 
 namespace DTMS.Iam.Presentation;
 
@@ -138,14 +140,7 @@ public static class SystemAdminEndpoints
                     Subscriptions: subscriptions
                         .Select(s => new SubscriptionSummary(s.EventType, s.PayloadFormatKey, s.Enabled))
                         .ToList(),
-                    Credential: cred is null ? null : new CredentialSummary(
-                        AuthScheme: cred.AuthScheme,
-                        HasCallbackBaseUrl: !string.IsNullOrWhiteSpace(cred.CallbackBaseUrl),
-                        CallbackBaseUrl: cred.CallbackBaseUrl,
-                        CallbackAuthScheme: cred.CallbackAuthScheme,
-                        CallbackTimeoutMs: cred.CallbackTimeoutMs,
-                        UpdatedAt: cred.UpdatedAt,
-                        CallbackTokenExpiresAt: TryReadJwtExpiry(cred.CallbackAuthConfig))));
+                    Credential: cred is null ? null : BuildCredentialSummary(cred)));
             }).RequirePermission(Permissions.Iam.SystemRead);
 
         // ── Patch metadata ────────────────────────────────────────────
@@ -345,6 +340,131 @@ public static class SystemAdminEndpoints
                     Token: token,
                     ExpiresAt: TryReadJwtExpiry(cred.CallbackAuthConfig)));
             }).RequirePermission(Permissions.Iam.SystemRevealSecret);
+
+        // ── Configure outbound-token auto-refresh ─────────────────────
+        group.MapPut("/{key}/token-refresh",
+            async (string key, TokenRefreshConfigRequest req, HttpContext ctx,
+                   ISystemClientRepository systems,
+                   ISystemCredentialRepository creds,
+                   CachedCredentialReader reader,
+                   IAuditLogRepository audit,
+                   IOptionsMonitor<CallbackTokenRefreshOptions> refreshOptions,
+                   CancellationToken ct) =>
+            {
+                if (await systems.GetByKeyAsync(key, ct) is null) return Results.NotFound();
+
+                var cred = await creds.GetBySystemKeyAsync(key, ct);
+                if (cred is null)
+                    return Results.Conflict(new { error = $"No credential row for '{key}'. POST to /api/v1/iam/systems first." });
+
+                var opts = refreshOptions.CurrentValue;
+
+                // SSRF guard — reject a mint URL whose host isn't allowlisted
+                // (or a non-http scheme) before it's ever stored or called.
+                if (!MintUrlValidator.IsAllowed(req.TokenUrl, opts.AllowedMintHosts, out var urlError))
+                    return Results.BadRequest(new { error = urlError });
+
+                var refreshBefore = req.RefreshBeforeSeconds ?? 28_800;
+                // Must leave enough runway to catch a lapse across sweeps — need
+                // at least two poll intervals inside the refresh window.
+                if (refreshBefore < opts.PollIntervalSeconds * 2)
+                    return Results.BadRequest(new
+                    {
+                        error = $"refreshBeforeSeconds ({refreshBefore}) must be at least 2× the poll interval " +
+                                $"({opts.PollIntervalSeconds}s) so a token can't lapse between sweeps.",
+                    });
+
+                // "Leave password blank to keep current" — preserve the stored
+                // secret on a metadata-only edit; require it the first time.
+                var existing = TokenRefreshSettings.TryParse(cred.TokenRefreshConfig);
+                var password = string.IsNullOrWhiteSpace(req.Password) ? existing?.Password : req.Password;
+                if (string.IsNullOrWhiteSpace(password))
+                    return Results.BadRequest(new
+                    {
+                        error = "password required when configuring auto-refresh for the first time — no existing password to preserve.",
+                    });
+
+                var settings = new TokenRefreshSettings
+                {
+                    TokenUrl = req.TokenUrl,
+                    Username = req.Username,
+                    Password = password,
+                    TokenField = string.IsNullOrWhiteSpace(req.TokenField) ? "token" : req.TokenField!,
+                    RefreshBeforeSeconds = refreshBefore,
+                    Enabled = req.Enabled,
+                };
+
+                cred.SetTokenRefreshConfig(settings.ToJson());
+                await creds.UpdateAsync(cred, ct);
+                await reader.InvalidateAsync(key, ct);
+
+                await audit.AppendAsync(new PermissionAuditEntry(
+                    actorEmployeeId: ActorOrUnknown(ctx),
+                    action: "system-token-refresh-configured",
+                    permissionCode: null,
+                    details: JsonSerializer.Serialize(new
+                    {
+                        systemKey = key,
+                        tokenUrl = req.TokenUrl,
+                        username = req.Username,
+                        enabled = req.Enabled,
+                        refreshBeforeSeconds = refreshBefore,
+                        // Never log the mint password.
+                        passwordSet = !string.IsNullOrWhiteSpace(req.Password),
+                    })), ct);
+
+                return Results.NoContent();
+            }).RequirePermission(Permissions.Iam.SystemWrite);
+
+        // ── Manual "refresh now" ──────────────────────────────────────
+        group.MapPost("/{key}/callback/token-refresh/run",
+            async (string key, HttpContext ctx,
+                   ISystemClientRepository systems,
+                   ICallbackTokenRefresher refresher,
+                   IAuditLogRepository audit,
+                   CancellationToken ct) =>
+            {
+                if (await systems.GetByKeyAsync(key, ct) is null) return Results.NotFound();
+
+                var result = await refresher.RefreshAsync(key, force: true, ct);
+
+                await audit.AppendAsync(new PermissionAuditEntry(
+                    actorEmployeeId: ActorOrUnknown(ctx),
+                    action: "system-token-refreshed",
+                    permissionCode: null,
+                    details: JsonSerializer.Serialize(new
+                    {
+                        systemKey = key,
+                        outcome = result.Outcome.ToString(),
+                    })), ct);
+
+                var body = new TokenRefreshRunResponse(
+                    Status: result.Outcome.ToString(),
+                    ExpiresAt: result.NewExpiresAt,
+                    Message: result.Message);
+
+                // Lock contention is a transient "try again", not a success.
+                return result.Outcome == RefreshOutcome.LockBusy
+                    ? Results.Conflict(body)
+                    : Results.Ok(body);
+            }).RequirePermission(Permissions.Iam.SystemWrite);
+
+        // ── Platform-managed refresh settings (read-only) ─────────────
+        // Surfaces the deployment-level auto-refresh knobs (SSRF allowlist,
+        // sweep cadence) so admins can see them without editing — they are set
+        // via env/deploy on purpose (the allowlist is a security boundary that
+        // must sit above admin privilege). Literal "settings" segment outranks
+        // the "/{key}" parameter route, so no collision.
+        group.MapGet("/settings/token-refresh",
+            (IOptionsMonitor<CallbackTokenRefreshOptions> refreshOptions) =>
+            {
+                var o = refreshOptions.CurrentValue;
+                return Results.Ok(new TokenRefreshPlatformSettings(
+                    AllowedMintHosts: o.AllowedMintHosts,
+                    PollIntervalSeconds: o.PollIntervalSeconds,
+                    MaxParallelism: o.MaxParallelism,
+                    MintTimeoutSeconds: o.MintTimeoutSeconds));
+            }).RequirePermission(Permissions.Iam.SystemRead);
 
         // ── Hard delete (only when inactive) ─────────────────────────
         // Soft delete via /deactivate is the routine path. Hard delete
@@ -841,55 +961,33 @@ public static class SystemAdminEndpoints
     /// malformed config — the reveal endpoint translates that into a 409
     /// with re-save guidance.
     /// </summary>
+    // Decode helpers live in the shared CallbackTokenInspector (Application
+    // layer) so the auto-refresh loop reuses the exact same logic. These thin
+    // wrappers keep the endpoint call sites unchanged.
     private static string? TryReadStoredToken(string? callbackAuthConfig)
-    {
-        if (string.IsNullOrWhiteSpace(callbackAuthConfig)) return null;
-        try
-        {
-            using var doc = System.Text.Json.JsonDocument.Parse(callbackAuthConfig);
-            if (!doc.RootElement.TryGetProperty("token", out var tokenEl)) return null;
-            if (tokenEl.ValueKind != System.Text.Json.JsonValueKind.String) return null;
-            var token = tokenEl.GetString();
-            return string.IsNullOrWhiteSpace(token) ? null : token;
-        }
-        catch
-        {
-            return null;
-        }
-    }
+        => CallbackTokenInspector.ReadStoredToken(callbackAuthConfig);
 
     private static DateTime? TryReadJwtExpiry(string? callbackAuthConfig)
+        => CallbackTokenInspector.ReadExpiryFromConfig(callbackAuthConfig);
+
+    // Maps a credential to its metadata summary. The mint password from
+    // TokenRefreshConfig is deliberately dropped — only non-secret refresh
+    // fields cross the wire on a routine detail load.
+    private static CredentialSummary BuildCredentialSummary(SystemCredential cred)
     {
-        if (string.IsNullOrWhiteSpace(callbackAuthConfig)) return null;
-        try
-        {
-            using var configDoc = System.Text.Json.JsonDocument.Parse(callbackAuthConfig);
-            if (!configDoc.RootElement.TryGetProperty("token", out var tokenEl)) return null;
-            if (tokenEl.ValueKind != System.Text.Json.JsonValueKind.String) return null;
-            var jwt = tokenEl.GetString();
-            if (string.IsNullOrWhiteSpace(jwt)) return null;
-
-            var parts = jwt.Split('.');
-            if (parts.Length < 2) return null;
-
-            // base64url → base64 (RFC 7515): replace -/_ with +/, re-pad
-            var payloadB64 = parts[1].Replace('-', '+').Replace('_', '/');
-            switch (payloadB64.Length % 4) { case 2: payloadB64 += "=="; break; case 3: payloadB64 += "="; break; }
-            var payloadBytes = Convert.FromBase64String(payloadB64);
-
-            using var payloadDoc = System.Text.Json.JsonDocument.Parse(payloadBytes);
-            if (!payloadDoc.RootElement.TryGetProperty("exp", out var expEl)) return null;
-            if (expEl.ValueKind != System.Text.Json.JsonValueKind.Number) return null;
-            var expSeconds = expEl.GetInt64();
-            return DateTimeOffset.FromUnixTimeSeconds(expSeconds).UtcDateTime;
-        }
-        catch
-        {
-            // Any decode/parse failure → silently fall through to null.
-            // The UI shows "no expiry info" rather than an error toast —
-            // this is auxiliary information, not a hard requirement.
-            return null;
-        }
+        var refresh = TokenRefreshSettings.TryParse(cred.TokenRefreshConfig);
+        return new CredentialSummary(
+            AuthScheme: cred.AuthScheme,
+            HasCallbackBaseUrl: !string.IsNullOrWhiteSpace(cred.CallbackBaseUrl),
+            CallbackBaseUrl: cred.CallbackBaseUrl,
+            CallbackAuthScheme: cred.CallbackAuthScheme,
+            CallbackTimeoutMs: cred.CallbackTimeoutMs,
+            UpdatedAt: cred.UpdatedAt,
+            CallbackTokenExpiresAt: TryReadJwtExpiry(cred.CallbackAuthConfig),
+            TokenRefreshEnabled: refresh?.Enabled ?? false,
+            TokenRefreshUrl: refresh?.TokenUrl,
+            TokenRefreshUsername: refresh?.Username,
+            TokenRefreshBeforeSeconds: refresh?.RefreshBeforeSeconds);
     }
 }
 
@@ -958,7 +1056,13 @@ public sealed record CredentialSummary(
     // token is a JWT with an `exp` claim, decode it and surface the expiry
     // so the UI can warn operators before OMS auth starts failing. Null
     // when no callback configured, not a JWT, or no exp claim.
-    DateTime? CallbackTokenExpiresAt);
+    DateTime? CallbackTokenExpiresAt,
+    // Outbound-token auto-refresh state. Metadata only — the mint password is
+    // NEVER surfaced here. Null/false when auto-refresh isn't configured.
+    bool TokenRefreshEnabled,
+    string? TokenRefreshUrl,
+    string? TokenRefreshUsername,
+    int? TokenRefreshBeforeSeconds);
 
 public sealed record SubscriptionSummary(string EventType, string PayloadFormatKey, bool Enabled);
 
@@ -988,6 +1092,30 @@ public sealed record RotateCredentialResponse(
     string Secret,
     string AuthScheme,
     DateTime RotatedAt);
+
+public sealed record TokenRefreshConfigRequest(
+    string TokenUrl,
+    string Username,
+    // Blank = keep the currently stored password (metadata-only edit). Required
+    // the first time auto-refresh is configured.
+    string? Password,
+    // Dotted path to the token in the mint response, e.g. "token" or "data.token".
+    string? TokenField,
+    int? RefreshBeforeSeconds,
+    bool Enabled);
+
+public sealed record TokenRefreshRunResponse(
+    string Status,
+    DateTime? ExpiresAt,
+    string? Message);
+
+// Deployment-level auto-refresh knobs, surfaced read-only. Editing happens via
+// env/deploy — the allowlist especially is a security boundary above admin.
+public sealed record TokenRefreshPlatformSettings(
+    IReadOnlyList<string> AllowedMintHosts,
+    int PollIntervalSeconds,
+    int MaxParallelism,
+    int MintTimeoutSeconds);
 
 public sealed record IssueTokenRequest(
     // Optional override. Default is 90 days when omitted. Bounded by

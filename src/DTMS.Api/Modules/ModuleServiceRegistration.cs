@@ -858,6 +858,26 @@ public static class ModuleServiceRegistration
                 c.Timeout = TimeSpan.FromSeconds(30);
             });
 
+        // ── Outbound-token auto-refresh (Phase S.9) ───────────────────
+        // Options + minter + refresher are registered on EVERY tier (not gated)
+        // so the manual "refresh now" endpoint works on the API tier; only the
+        // background sweep (Program.cs) is gated to a single worker role.
+        services.Configure<DTMS.Iam.Application.Callbacks.CallbackTokenRefreshOptions>(
+            configuration.GetSection(DTMS.Iam.Application.Callbacks.CallbackTokenRefreshOptions.SectionName));
+        services.AddSingleton<DTMS.Iam.Infrastructure.Callbacks.CallbackRefreshMetrics>();
+        services.AddScoped<DTMS.Iam.Application.Callbacks.ICallbackTokenRefresher,
+                           DTMS.Iam.Infrastructure.Callbacks.CallbackTokenRefresher>();
+        services.AddHttpClient<DTMS.Iam.Application.Callbacks.ICallbackTokenMinter,
+                               DTMS.Iam.Infrastructure.Callbacks.HttpCallbackTokenMinter>((sp, c) =>
+            {
+                var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<
+                    DTMS.Iam.Application.Callbacks.CallbackTokenRefreshOptions>>().CurrentValue;
+                c.Timeout = TimeSpan.FromSeconds(Math.Max(1, opts.MintTimeoutSeconds));
+            })
+            // Never let a mint endpoint bounce the credential-bearing POST to an
+            // un-allowlisted host (SSRF defence in depth).
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+
         // Phase S.3.1b — subscription registry: repo + cached lookup +
         // OMS payload formatter (keyed by PayloadFormatKey on the
         // subscription row). Add a new system later = add a new

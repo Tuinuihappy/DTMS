@@ -9,6 +9,7 @@ import {
   Eye,
   EyeOff,
   KeyRound,
+  Lock,
   Pencil,
   Power,
   PowerOff,
@@ -33,11 +34,16 @@ import {
   revokeToken,
   rotateCredential,
   setCallback,
+  configureTokenRefresh,
+  runTokenRefresh,
+  getTokenRefreshPlatformSettings,
   type CallbackConfigRequest,
   type CredentialSummary,
   type IssuedTokenSummary,
   type IssueTokenRequest,
   type SystemDetailDto,
+  type TokenRefreshConfigRequest,
+  type TokenRefreshPlatformSettings,
 } from "@/lib/api/iam-systems";
 import { listPermissions, type PermissionDto } from "@/lib/api/iam";
 import { OneTimeSecretBanner } from "@/components/admin/one-time-secret-banner";
@@ -87,6 +93,12 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
   // rotated via Configure can't linger stale on screen.
   const [revealedToken, setRevealedToken] = useState<string | null>(null);
   const [revealingToken, setRevealingToken] = useState(false);
+  // Phase S.9 — outbound-token auto-refresh: config modal + manual "refresh now".
+  const [editingRefresh, setEditingRefresh] = useState(false);
+  const [refreshingNow, setRefreshingNow] = useState(false);
+  const [refreshNote, setRefreshNote] = useState<string | null>(null);
+  // Platform-managed (env/deploy) refresh knobs, shown read-only for transparency.
+  const [platformSettings, setPlatformSettings] = useState<TokenRefreshPlatformSettings | null>(null);
 
   // The standard source-system permission rows this system can hold
   // (order + trip, `dtms:source:{key}:...`). Fetched from the backend
@@ -135,9 +147,38 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
     }
   }, [systemKey]);
 
+  const onRefreshNow = useCallback(async () => {
+    setRefreshingNow(true);
+    setRefreshNote(null);
+    setError(null);
+    try {
+      const r = await runTokenRefresh(systemKey);
+      setRefreshNote(
+        r.status === "Refreshed"
+          ? `Refreshed — new expiry ${r.expiresAt ? new Date(r.expiresAt).toLocaleString() : "(perpetual)"}.`
+          : `${r.status}${r.message ? ` — ${r.message}` : ""}`,
+      );
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setRefreshingNow(false);
+    }
+  }, [systemKey, load]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const abort = new AbortController();
+    getTokenRefreshPlatformSettings(abort.signal)
+      .then(setPlatformSettings)
+      .catch(() => {
+        // Non-fatal — the read-only panel just stays hidden if it can't load.
+      });
+    return () => abort.abort();
+  }, []);
 
   const loadIssuedTokens = useCallback(async () => {
     try {
@@ -674,6 +715,88 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
                 </div>
               )
             )}
+            {/* ── Auto-refresh (Phase S.9) ─────────────────────────── */}
+            {data.credential.callbackAuthScheme?.toLowerCase() === "bearer" && (
+              <div className="mt-4 rounded-lg border border-[var(--color-ink-100)] bg-[var(--color-ink-50)]/40 p-3 dark:border-white/[0.06] dark:bg-white/[0.02]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="h-3.5 w-3.5 text-[var(--color-ink-500)]" strokeWidth={2.2} />
+                    <span className="text-[12px] font-semibold text-[var(--color-ink-700)]">Token auto-refresh</span>
+                    <span
+                      className={cn(
+                        "inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium",
+                        data.credential.tokenRefreshEnabled
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                          : "bg-[var(--color-ink-100)] text-[var(--color-ink-500)]",
+                      )}
+                    >
+                      {data.credential.tokenRefreshEnabled ? "On" : "Off"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void onRefreshNow()}
+                      disabled={refreshingNow || busy}
+                      className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)] disabled:opacity-50"
+                    >
+                      <RefreshCw className={cn("h-3 w-3", refreshingNow && "animate-spin")} strokeWidth={2.2} />
+                      {refreshingNow ? "Refreshing…" : "Refresh now"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingRefresh(true)}
+                      className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+                    >
+                      <Settings2 className="h-3 w-3" strokeWidth={2.2} />
+                      Configure
+                    </button>
+                  </div>
+                </div>
+                {data.credential.tokenRefreshUrl && (
+                  <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] text-[var(--color-ink-500)]">
+                    <DefRow label="Mint URL" value={data.credential.tokenRefreshUrl} mono />
+                    <DefRow label="Username" value={data.credential.tokenRefreshUsername ?? "—"} mono />
+                    <DefRow
+                      label="Refresh before"
+                      value={
+                        data.credential.tokenRefreshBeforeSeconds
+                          ? `${Math.round(data.credential.tokenRefreshBeforeSeconds / 3600)}h before expiry`
+                          : "—"
+                      }
+                    />
+                  </dl>
+                )}
+                {refreshNote && (
+                  <p className="mt-2 text-[11px] text-[var(--color-ink-500)]">{refreshNote}</p>
+                )}
+                {platformSettings && (
+                  <div className="mt-3 border-t border-[var(--color-ink-100)] pt-2 dark:border-white/[0.06]">
+                    <div className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wide text-[var(--color-ink-400)]">
+                      <Lock className="h-3 w-3" strokeWidth={2.2} />
+                      Platform-managed (set via deployment)
+                    </div>
+                    <dl className="mt-1.5 grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] text-[var(--color-ink-500)]">
+                      <DefRow
+                        label="Allowed mint hosts"
+                        value={platformSettings.allowedMintHosts.join(", ") || "— none —"}
+                        mono
+                      />
+                      <DefRow
+                        label="Sweep interval"
+                        value={`${Math.round(platformSettings.pollIntervalSeconds / 60)} min`}
+                      />
+                      <DefRow label="Max parallel mints" value={String(platformSettings.maxParallelism)} />
+                      <DefRow label="Mint timeout" value={`${platformSettings.mintTimeoutSeconds}s`} />
+                    </dl>
+                    <p className="mt-1.5 text-[10px] text-[var(--color-ink-400)]">
+                      These are read-only. The mint-host allowlist is a security boundary — changing it
+                      requires a deployment update, not a UI edit.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         ) : (
           <p className="mt-3 text-[12px] text-[var(--color-ink-400)]">
@@ -758,6 +881,17 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
           }}
         />
       )}
+      {editingRefresh && (
+        <ConfigureTokenRefreshModal
+          systemKey={data.key}
+          initial={data.credential}
+          onClose={() => setEditingRefresh(false)}
+          onSaved={() => {
+            setEditingRefresh(false);
+            void load();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -777,6 +911,29 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
  * a new one + saving it via "Configure callback". This badge is the
  * heads-up they need to do that before traffic starts 401-ing.
  */
+/**
+ * Format a positive duration (ms) as a compact "d h m" string, showing the two
+ * largest non-zero units so the number stays readable:
+ *   540_000_000  → "6d 6h"
+ *   12_600_000   → "3h 30m"
+ *   90_000       → "1m"   (sub-minute rounds up so it never reads "0m")
+ */
+function formatRemaining(ms: number): string {
+  const totalMinutes = Math.max(1, Math.round(ms / 60000));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  // Only include minutes when they add precision the bigger units don't already
+  // convey — i.e. drop them once we're measuring in days.
+  if (minutes > 0 && days === 0) parts.push(`${minutes}m`);
+
+  return parts.length > 0 ? parts.join(" ") : "0m";
+}
+
 function TokenExpiryBadge({ expiresAt }: { expiresAt: string }) {
   const expDate = new Date(expiresAt);
   const now = new Date();
@@ -784,20 +941,28 @@ function TokenExpiryBadge({ expiresAt }: { expiresAt: string }) {
   const dayMs = 24 * 60 * 60 * 1000;
   const daysRemaining = Math.floor(msRemaining / dayMs);
 
+  // Always surface the exact exp timestamp — inside the last day the whole-day
+  // count floors to "0 days", which reads as "already gone" when the token is
+  // in fact still valid for hours. The absolute date/time removes that ambiguity.
+  const expStamp = expDate.toLocaleString();
+  // Granular remaining time (e.g. "6d 4h 12m", or "3h 5m" in the last day) so
+  // the operator sees exactly how much runway is left, not just a floored day.
+  const remaining = formatRemaining(Math.abs(msRemaining));
+
   let color: string;
   let label: string;
   if (msRemaining < 0) {
     color = "border-rose-400 bg-rose-50 text-rose-800 dark:border-rose-500/40 dark:bg-rose-950/30 dark:text-rose-300";
-    label = `EXPIRED ${Math.abs(daysRemaining)}d ago — rotate immediately`;
+    label = `EXPIRED ${remaining} ago (${expStamp}) — rotate immediately`;
   } else if (daysRemaining <= 7) {
     color = "border-rose-400 bg-rose-50 text-rose-800 dark:border-rose-500/40 dark:bg-rose-950/30 dark:text-rose-300";
-    label = `Expires in ${daysRemaining} day${daysRemaining === 1 ? "" : "s"} — rotate soon`;
+    label = `Expires in ${remaining} — ${expStamp} — rotate soon`;
   } else if (daysRemaining <= 30) {
     color = "border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-300";
-    label = `Expires in ${daysRemaining} days`;
+    label = `Expires in ${remaining} (${expStamp})`;
   } else {
     color = "border-[var(--color-ink-200)] bg-[var(--color-surface-1)] text-[var(--color-ink-600)]";
-    label = `Expires in ${daysRemaining} days (${expDate.toLocaleDateString()})`;
+    label = `Expires in ${remaining} (${expStamp})`;
   }
 
   return (
@@ -1045,6 +1210,99 @@ function ConfigureCallbackModal({
             className="w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 text-[13px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
           />
         </Field>
+      </div>
+      {error && <ErrorBanner message={error} />}
+      <ModalFooter onCancel={onClose} onSave={submit} saving={submitting} />
+    </ModalShell>
+  );
+}
+
+function ConfigureTokenRefreshModal({
+  systemKey,
+  initial,
+  onClose,
+  onSaved,
+}: {
+  systemKey: string;
+  initial: CredentialSummary | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [tokenUrl, setTokenUrl] = useState(initial?.tokenRefreshUrl ?? "");
+  const [username, setUsername] = useState(initial?.tokenRefreshUsername ?? "");
+  const [password, setPassword] = useState("");
+  const [refreshBeforeHours, setRefreshBeforeHours] = useState(
+    Math.round((initial?.tokenRefreshBeforeSeconds ?? 28800) / 3600),
+  );
+  const [enabled, setEnabled] = useState(initial?.tokenRefreshEnabled ?? true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const body: TokenRefreshConfigRequest = {
+        tokenUrl,
+        username,
+        password: password || null,
+        refreshBeforeSeconds: Math.max(1, refreshBeforeHours) * 3600,
+        enabled,
+      };
+      await configureTokenRefresh(systemKey, body);
+      onSaved();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <ModalShell title="Configure token auto-refresh" onClose={onClose}>
+      <p className="mb-3 text-[11.5px] text-[var(--color-ink-500)]">
+        DTMS POSTs <code>&#123;username, password&#125;</code> to the mint URL before the outbound
+        token expires, then stores the returned token automatically. The mint host must be
+        allowlisted server-side. Leave password blank to keep the current one.
+      </p>
+      <div className="space-y-3">
+        <Field label="Mint URL">
+          <input
+            value={tokenUrl}
+            onChange={(e) => setTokenUrl(e.target.value)}
+            placeholder="http://10.204.212.28:15000/auth/login"
+            className="w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 font-mono text-[12px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
+          />
+        </Field>
+        <Field label="Username">
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 font-mono text-[12px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
+          />
+        </Field>
+        <Field label="Password">
+          <input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Leave blank to keep current"
+            type="password"
+            className="w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 font-mono text-[12px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
+          />
+        </Field>
+        <Field label="Refresh before expiry (hours)">
+          <input
+            type="number"
+            value={refreshBeforeHours}
+            onChange={(e) => setRefreshBeforeHours(parseInt(e.target.value || "0", 10))}
+            min={1}
+            className="w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 text-[13px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
+          />
+        </Field>
+        <label className="flex items-center gap-2 text-[12px] text-[var(--color-ink-700)]">
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+          Enable automatic refresh
+        </label>
       </div>
       {error && <ErrorBanner message={error} />}
       <ModalFooter onCancel={onClose} onSave={submit} saving={submitting} />

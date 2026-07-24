@@ -28,7 +28,28 @@ public sealed class SystemCredential
     public int RetryMaxAttempts { get; private set; } = 3;
     public int CircuitFailureThreshold { get; private set; } = 5;
     public int CircuitDurationSeconds { get; private set; } = 30;
+
+    /// <summary>
+    /// Auto-refresh config for the outbound callback bearer token — a JSON
+    /// object (encrypted at rest like <see cref="CallbackAuthConfig"/>) holding
+    /// the external mint endpoint + credentials + threshold. NULL = no
+    /// auto-refresh (the token is rotated manually). Read only by the refresh
+    /// background service and admin endpoints, never by the callback hot-path.
+    /// </summary>
+    public string? TokenRefreshConfig { get; private set; }
+
     public DateTime UpdatedAt { get; private set; }
+
+    /// <summary>
+    /// Postgres <c>xmin</c> system column, mapped as an optimistic-concurrency
+    /// token. Guards against lost updates when two writers (e.g. the manual
+    /// "refresh now" endpoint on the API tier and the background refresh loop
+    /// on the worker) load and re-save this row via the detached
+    /// <c>Update()</c> path, which marks every column modified. A stale value
+    /// makes SaveChanges throw <see cref="Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException"/>
+    /// instead of silently clobbering the other writer.
+    /// </summary>
+    public uint Version { get; private set; }
 
     private SystemCredential() { }
 
@@ -72,6 +93,15 @@ public sealed class SystemCredential
         CallbackAuthConfig = authConfig;
         if (timeoutMs is { } t)
             CallbackTimeoutMs = t;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Set (or clear, with null) the outbound-token auto-refresh
+    /// config. The value is a JSON object; encryption at rest is handled by the
+    /// EF value converter, same as <see cref="CallbackAuthConfig"/>.</summary>
+    public void SetTokenRefreshConfig(string? config)
+    {
+        TokenRefreshConfig = config;
         UpdatedAt = DateTime.UtcNow;
     }
 

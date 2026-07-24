@@ -15,6 +15,12 @@ public sealed class SystemCredentialRepository : ISystemCredentialRepository
         => _db.SystemCredentials.AsNoTracking()
             .FirstOrDefaultAsync(c => c.SystemKey == systemKey, ct);
 
+    public async Task<IReadOnlyList<string>> ListKeysWithTokenRefreshAsync(CancellationToken ct = default)
+        => await _db.SystemCredentials.AsNoTracking()
+            .Where(c => c.TokenRefreshConfig != null)
+            .Select(c => c.SystemKey)
+            .ToListAsync(ct);
+
     // ── Phase S.4 admin CRUD ────────────────────────────────────────────
 
     public async Task AddAsync(SystemCredential credential, CancellationToken ct = default)

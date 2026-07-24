@@ -43,6 +43,10 @@ public class ExceptionHandlingMiddleware
             BusinessRuleViolationException => (StatusCodes.Status400BadRequest, "Business Rule Violation"),
             DomainException => (StatusCodes.Status400BadRequest, "Domain Exception"),
             FluentValidation.ValidationException => (StatusCodes.Status400BadRequest, "Validation Error"),
+            // Optimistic-concurrency clash (xmin token) — another writer changed
+            // the row between load and save. A retriable conflict, not a 500.
+            Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException =>
+                (StatusCodes.Status409Conflict, "Concurrent Update"),
             _ => (StatusCodes.Status500InternalServerError, "Internal Server Error")
         };
 

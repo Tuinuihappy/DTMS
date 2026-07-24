@@ -13,6 +13,12 @@ public interface ISystemCredentialRepository
 {
     Task<SystemCredential?> GetBySystemKeyAsync(string systemKey, CancellationToken ct = default);
 
+    /// <summary>System keys whose row has a <c>TokenRefreshConfig</c> set — the
+    /// candidate set the auto-refresh loop sweeps. Keys only (not full entities)
+    /// so the encrypted config is not decrypted just to enumerate; the refresher
+    /// reloads each row fresh under its lock anyway.</summary>
+    Task<IReadOnlyList<string>> ListKeysWithTokenRefreshAsync(CancellationToken ct = default);
+
     // ── Phase S.4 admin CRUD ────────────────────────────────────────────
 
     Task AddAsync(SystemCredential credential, CancellationToken ct = default);

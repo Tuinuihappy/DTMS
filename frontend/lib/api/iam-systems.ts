@@ -27,6 +27,12 @@ export type CredentialSummary = {
   // Phase S.6 follow-up — when CallbackAuthScheme=bearer + token is a JWT
   // with an exp claim, backend decodes it. Null otherwise.
   callbackTokenExpiresAt: string | null;
+  // Phase S.9 — outbound-token auto-refresh state (metadata only; the mint
+  // password is never surfaced here).
+  tokenRefreshEnabled: boolean;
+  tokenRefreshUrl: string | null;
+  tokenRefreshUsername: string | null;
+  tokenRefreshBeforeSeconds: number | null;
 };
 
 export type SubscriptionSummary = {
@@ -431,6 +437,76 @@ export async function revealCallbackToken(key: string): Promise<RevealedCallback
   );
   if (!res.ok) throw new Error(await readError(res));
   return (await res.json()) as RevealedCallbackToken;
+}
+
+// ── outbound-token auto-refresh (Phase S.9) ──────────────────────────────
+
+export type TokenRefreshConfigRequest = {
+  tokenUrl: string;
+  username: string;
+  // Blank/omitted = keep the currently stored password (metadata-only edit).
+  password?: string | null;
+  // Dotted path to the token in the mint response, e.g. "token" / "data.token".
+  tokenField?: string | null;
+  refreshBeforeSeconds?: number | null;
+  enabled: boolean;
+};
+
+export type TokenRefreshRunResponse = {
+  status: string;
+  expiresAt: string | null;
+  message: string | null;
+};
+
+// Deployment-level knobs, read-only in the UI (set via env/deploy).
+export type TokenRefreshPlatformSettings = {
+  allowedMintHosts: string[];
+  pollIntervalSeconds: number;
+  maxParallelism: number;
+  mintTimeoutSeconds: number;
+};
+
+export async function getTokenRefreshPlatformSettings(
+  signal?: AbortSignal,
+): Promise<TokenRefreshPlatformSettings> {
+  const res = await fetch("/api/admin/iam/systems/settings/token-refresh", {
+    signal,
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return (await res.json()) as TokenRefreshPlatformSettings;
+}
+
+/** Save/enable/disable the outbound-token auto-refresh config for a system. */
+export async function configureTokenRefresh(
+  key: string,
+  body: TokenRefreshConfigRequest,
+): Promise<void> {
+  const res = await fetch(
+    `/api/admin/iam/systems/${encodeURIComponent(key)}/token-refresh`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) throw new Error(await readError(res));
+}
+
+/**
+ * Mint + swap the outbound callback token right now. Returns the outcome
+ * (Refreshed / Skipped / Failed / Rejected / LockBusy) and, on success, the
+ * new expiry. A 409 (lock busy) is surfaced as a thrown error the caller can
+ * present as "try again".
+ */
+export async function runTokenRefresh(key: string): Promise<TokenRefreshRunResponse> {
+  const res = await fetch(
+    `/api/admin/iam/systems/${encodeURIComponent(key)}/callback/token-refresh/run`,
+    { method: "POST" },
+  );
+  const body = (await res.json().catch(() => null)) as TokenRefreshRunResponse | null;
+  if (!res.ok) throw new Error(body?.message ?? (await readError(res)));
+  return body as TokenRefreshRunResponse;
 }
 
 // ── permission grant / revoke (Phase S.7) ────────────────────────────────

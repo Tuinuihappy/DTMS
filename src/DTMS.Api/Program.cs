@@ -610,6 +610,18 @@ if (runVendorPollers)
     // from a never-updated store. Coupled, gated together.
     builder.Services.AddHostedService<VendorHealthBroadcaster>();
 }
+// Outbound-token auto-refresh sweep (Phase S.9). Writes to SystemCredentials,
+// so it must run in exactly one process role — default false keeps multi-replica
+// api pods from each sweeping; the single dtms-outbox-worker sets
+// Workers__CallbackTokenRefresh__RunInThisProcess=true. The manual "refresh now"
+// endpoint uses the same refresher and works on every tier regardless.
+var runTokenRefresh = builder.Configuration
+    .GetValue("Workers:CallbackTokenRefresh:RunInThisProcess", false);
+if (runTokenRefresh)
+{
+    builder.Services.AddHostedService<DTMS.Api.Infrastructure.TokenRefresh.CallbackTokenRefreshService>();
+}
+
 builder.Services.Configure<VendorHealthWebhookOptions>(
     builder.Configuration.GetSection("VendorHealth:Webhook"));
 builder.Services.AddHttpClient(nameof(VendorHealthWebhookNotifier));

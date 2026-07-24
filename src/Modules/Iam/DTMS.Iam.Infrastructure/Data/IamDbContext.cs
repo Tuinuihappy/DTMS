@@ -128,10 +128,18 @@ public class IamDbContext : DbContext
             // config. EF never passes NULL through converters, so the
             // protector's null handling is belt-and-braces only.
             var callbackConfig = b.Property(c => c.CallbackAuthConfig).HasColumnType("text");
+            // TokenRefreshConfig is also a JSON object stored as Data Protection
+            // ciphertext, so it takes the same text column + converter as
+            // CallbackAuthConfig. Same protector is safe: the value is JSON-shaped
+            // ("{…}"), which the protector's prefix discriminator requires.
+            var tokenRefreshConfig = b.Property(c => c.TokenRefreshConfig).HasColumnType("text");
             if (_callbackProtector is not null)
             {
                 var protector = _callbackProtector;
                 callbackConfig.HasConversion(
+                    v => protector.Protect(v)!,
+                    v => protector.TryUnprotect(v)!);
+                tokenRefreshConfig.HasConversion(
                     v => protector.Protect(v)!,
                     v => protector.TryUnprotect(v)!);
             }
@@ -140,6 +148,15 @@ public class IamDbContext : DbContext
             b.Property(c => c.CircuitFailureThreshold).HasDefaultValue(5);
             b.Property(c => c.CircuitDurationSeconds).HasDefaultValue(30);
             b.Property(c => c.UpdatedAt).IsRequired();
+            // Optimistic concurrency via the Postgres xmin system column. The
+            // detached AsNoTracking()+Update() path carries the loaded value into
+            // the UPDATE's WHERE clause, so a concurrent write bumps xmin and this
+            // save throws DbUpdateConcurrencyException instead of lost-updating.
+            b.Property(c => c.Version)
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
         });
 
         modelBuilder.Entity<SystemEventSubscription>(b =>
