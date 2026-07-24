@@ -2,6 +2,7 @@
 
 import { ChevronRight, RotateCcw, Search, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -518,18 +519,18 @@ function JobDetailDrawer({
   }, [jobId, onClose]);
 
   return (
-    <AnimatePresence>
-      {jobId && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.22 }}
-            onClick={onClose}
-            className="fixed inset-0 z-40 bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
-          />
+    <>
+      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
+          rationale. */}
+      <OverlayBackdrop
+        open={!!jobId}
+        onClick={onClose}
+        className="z-40 bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
+      />
+      <AnimatePresence>
+        {jobId && (
           <motion.aside
+            key="job-drawer-panel"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -660,9 +661,9 @@ function JobDetailDrawer({
               </footer>
             )}
           </motion.aside>
-        </>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
