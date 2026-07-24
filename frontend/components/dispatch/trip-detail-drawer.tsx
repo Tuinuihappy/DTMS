@@ -130,18 +130,34 @@ export function TripDetailDrawer({
   };
 
   return (
-    <AnimatePresence>
-      {tripId && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            onClick={onClose}
-            className="fixed inset-0 z-[60] bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
-          />
+    <>
+      {/* Backdrop lives OUTSIDE AnimatePresence and stays permanently
+          mounted. Field repro (2026-07-24): rapid open/close cycles can
+          leave an AnimatePresence-managed backdrop stuck in the DOM —
+          an invisible full-screen div that swallows every click until
+          the page is refreshed. Exiting children are frozen with their
+          last-rendered props, so no className/state can rescue them
+          after the fact. Driving pointer-events from React state (not
+          the animation lifecycle) makes click-blocking impossible even
+          if the fade glitches: worst case is a cosmetic stuck tint.
+          data-trip-drawer-backdrop doubles as a deploy marker — its
+          presence in the DOM while closed proves this build is live. */}
+      <motion.div
+        data-trip-drawer-backdrop={tripId ? "open" : "closed"}
+        initial={false}
+        animate={{ opacity: tripId ? 1 : 0 }}
+        transition={{ duration: 0.25 }}
+        onClick={tripId ? onClose : undefined}
+        aria-hidden={!tripId}
+        className={cn(
+          "fixed inset-0 z-[60] bg-[var(--color-ink-900)]/40 backdrop-blur-sm",
+          !tripId && "pointer-events-none",
+        )}
+      />
+      <AnimatePresence>
+        {tripId && (
           <motion.aside
+            key="trip-drawer-panel"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -441,9 +457,9 @@ export function TripDetailDrawer({
               })()}
             </div>
           </motion.aside>
-        </>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
