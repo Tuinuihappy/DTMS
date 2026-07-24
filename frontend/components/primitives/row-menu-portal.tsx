@@ -110,6 +110,7 @@ export function RowMenuPortal({
     <AnimatePresence>
       {open && anchor && (
         <motion.div
+          key="row-menu"
           ref={menuRef}
           initial={{ opacity: 0, scale: 0.94, y: -4 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}

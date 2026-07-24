@@ -798,6 +798,7 @@ export function CreateOrderDialog({
                           <AnimatePresence initial={false}>
                             {it.advancedOpen && (
                               <motion.div
+                                key="advanced-fields"
                                 initial={{ height: 0, opacity: 0 }}
                                 animate={{ height: "auto", opacity: 1 }}
                                 exit={{ height: 0, opacity: 0 }}

@@ -25,6 +25,7 @@ export function BulkActionBar({
     <AnimatePresence>
       {count > 0 && (
         <motion.div
+          key="bulk-bar"
           initial={{ opacity: 0, y: 28, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 28, scale: 0.96, transition: { duration: 0.18 } }}

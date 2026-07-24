@@ -116,6 +116,7 @@ export function LiveActivityCard() {
               <AnimatePresence>
                 {isActive && (
                   <motion.div
+                    key="activity-tooltip"
                     layoutId="activity-tooltip"
                     initial={{ opacity: 0, y: 6, scale: 0.94 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
