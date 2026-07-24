@@ -25,6 +25,7 @@ public class ResendShipmentArrivedCommandHandler
     private readonly IDeliveryOrderRepository _orderRepository;
     private readonly IOrderAuditEventRepository _auditRepository;
     private readonly IOrderActivityProjectionStore _activityStore;
+    private readonly ISourceCallbackOutboxSuperseder _outboxSuperseder;
     private readonly ILogger<ResendShipmentArrivedCommandHandler> _logger;
 
     public ResendShipmentArrivedCommandHandler(
@@ -35,6 +36,7 @@ public class ResendShipmentArrivedCommandHandler
         IDeliveryOrderRepository orderRepository,
         IOrderAuditEventRepository auditRepository,
         IOrderActivityProjectionStore activityStore,
+        ISourceCallbackOutboxSuperseder outboxSuperseder,
         ILogger<ResendShipmentArrivedCommandHandler> logger)
     {
         _formatterResolver = formatterResolver;
@@ -44,6 +46,7 @@ public class ResendShipmentArrivedCommandHandler
         _orderRepository = orderRepository;
         _auditRepository = auditRepository;
         _activityStore = activityStore;
+        _outboxSuperseder = outboxSuperseder;
         _logger = logger;
     }
 
@@ -185,6 +188,26 @@ public class ResendShipmentArrivedCommandHandler
         {
             _logger.LogError(ex,
                 "[ShipmentArrivedResend] Trip {TripId} resend DELIVERED to {System} but the activity write failed — UI may not reflect it",
+                trip.Id, source);
+        }
+
+        // The resend just delivered shipment.arrived out-of-band. Retire any
+        // fan-out row still queued for this order+system so its next retry
+        // can't re-POST a duplicate and clobber this success. Best-effort (see
+        // the started handler for the full rationale).
+        try
+        {
+            var retired = await _outboxSuperseder.SupersedePendingAsync(
+                source, CallbackEventTypes.ShipmentArrivedV1, order.Id, cancellationToken);
+            if (retired > 0)
+                _logger.LogInformation(
+                    "[ShipmentArrivedResend] Trip {TripId} resend superseded {Count} pending outbox row(s) for order {OrderId} → {System}",
+                    trip.Id, retired, order.Id, source);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex,
+                "[ShipmentArrivedResend] Trip {TripId} resend DELIVERED to {System} but superseding pending outbox rows failed — a queued retry may re-POST and surface a duplicate 400",
                 trip.Id, source);
         }
 

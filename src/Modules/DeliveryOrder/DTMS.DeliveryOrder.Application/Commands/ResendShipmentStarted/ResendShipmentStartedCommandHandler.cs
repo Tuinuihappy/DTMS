@@ -24,6 +24,7 @@ public class ResendShipmentStartedCommandHandler
     private readonly IDeliveryOrderRepository _orderRepository;
     private readonly IOrderAuditEventRepository _auditRepository;
     private readonly IOrderActivityProjectionStore _activityStore;
+    private readonly ISourceCallbackOutboxSuperseder _outboxSuperseder;
     private readonly ILogger<ResendShipmentStartedCommandHandler> _logger;
 
     public ResendShipmentStartedCommandHandler(
@@ -34,6 +35,7 @@ public class ResendShipmentStartedCommandHandler
         IDeliveryOrderRepository orderRepository,
         IOrderAuditEventRepository auditRepository,
         IOrderActivityProjectionStore activityStore,
+        ISourceCallbackOutboxSuperseder outboxSuperseder,
         ILogger<ResendShipmentStartedCommandHandler> logger)
     {
         _formatterResolver = formatterResolver;
@@ -43,6 +45,7 @@ public class ResendShipmentStartedCommandHandler
         _orderRepository = orderRepository;
         _auditRepository = auditRepository;
         _activityStore = activityStore;
+        _outboxSuperseder = outboxSuperseder;
         _logger = logger;
     }
 
@@ -215,6 +218,28 @@ public class ResendShipmentStartedCommandHandler
         {
             _logger.LogError(ex,
                 "[ShipmentStartedResend] Trip {TripId} resend DELIVERED to {System} but the activity write failed — UI may not reflect it",
+                trip.Id, source);
+        }
+
+        // The resend just delivered shipment.started out-of-band. Any fan-out
+        // row still queued for this order+system would, on its next retry,
+        // re-POST the same shipment and draw OMS's create-once 400 — which
+        // clobbers this success with a red card. Retire those pending rows
+        // now. Best-effort: a failure here only risks the old (pre-fix)
+        // behaviour, never the resend itself.
+        try
+        {
+            var retired = await _outboxSuperseder.SupersedePendingAsync(
+                source, CallbackEventTypes.ShipmentStartedV1, order.Id, cancellationToken);
+            if (retired > 0)
+                _logger.LogInformation(
+                    "[ShipmentStartedResend] Trip {TripId} resend superseded {Count} pending outbox row(s) for order {OrderId} → {System}",
+                    trip.Id, retired, order.Id, source);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex,
+                "[ShipmentStartedResend] Trip {TripId} resend DELIVERED to {System} but superseding pending outbox rows failed — a queued retry may re-POST and surface a duplicate 400",
                 trip.Id, source);
         }
 

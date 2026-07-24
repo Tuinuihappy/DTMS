@@ -50,6 +50,7 @@ public class ResendShipmentStartedTests
         ISourceCallbackDispatcher Dispatcher,
         IOrderAuditEventRepository Audit,
         ICallbackFormatterResolver Resolver,
+        ISourceCallbackOutboxSuperseder Superseder,
         Guid OrderId,
         Guid TripId);
 
@@ -86,12 +87,13 @@ public class ResendShipmentStartedTests
         var dispatcher = Substitute.For<ISourceCallbackDispatcher>();   // no throw = 2xx
         var audit = Substitute.For<IOrderAuditEventRepository>();
         var activity = Substitute.For<IOrderActivityProjectionStore>();
+        var superseder = Substitute.For<ISourceCallbackOutboxSuperseder>();
 
         var handler = new ResendShipmentStartedCommandHandler(
-            resolver, dispatcher, lookup, trips, orders, audit, activity,
+            resolver, dispatcher, lookup, trips, orders, audit, activity, superseder,
             NullLogger<ResendShipmentStartedCommandHandler>.Instance);
 
-        return new Harness(handler, dispatcher, audit, resolver, orderId, tripId);
+        return new Harness(handler, dispatcher, audit, resolver, superseder, orderId, tripId);
     }
 
     [Fact]
@@ -212,5 +214,53 @@ public class ResendShipmentStartedTests
         result.IsSuccess.Should().BeTrue();
         await h.Dispatcher.Received(1).DispatchAsync(
             "oms", Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
+    }
+
+    // A successful resend retires any pending fan-out row for this order+system
+    // so its queued retry can't re-POST a duplicate and clobber the success.
+    [Fact]
+    public async Task Resend_Success_SupersedesPendingOutboxRows_ForThisOrderAndSystem()
+    {
+        var h = NewHarness();
+
+        var result = await h.Handler.Handle(
+            new ResendShipmentStartedCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await h.Superseder.Received(1).SupersedePendingAsync(
+            "oms", CallbackEventTypes.ShipmentStartedV1, h.OrderId, Arg.Any<CancellationToken>());
+    }
+
+    // The dispatch never happened, so there is nothing to supersede — a failed
+    // resend must not retire the row that could still recover on its own.
+    [Fact]
+    public async Task Resend_DispatchFails_DoesNotSupersede()
+    {
+        var h = NewHarness();
+        h.Dispatcher.DispatchAsync(Arg.Any<string>(), Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("bad gateway", null, HttpStatusCode.BadGateway));
+
+        var result = await h.Handler.Handle(
+            new ResendShipmentStartedCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        await h.Superseder.DidNotReceive().SupersedePendingAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    // Supersede is best-effort — a failure retiring the pending rows must not
+    // turn a delivered resend into a reported failure.
+    [Fact]
+    public async Task Resend_SupersedeFails_AfterDelivery_StillReturnsSuccess()
+    {
+        var h = NewHarness();
+        h.Superseder.SupersedePendingAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("outbox db hiccup"));
+
+        var result = await h.Handler.Handle(
+            new ResendShipmentStartedCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
     }
 }

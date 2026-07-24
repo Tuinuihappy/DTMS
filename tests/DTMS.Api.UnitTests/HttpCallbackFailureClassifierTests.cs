@@ -160,4 +160,24 @@ public class HttpCallbackFailureClassifierTests
         row.HasReachedMaxRetries.Should().BeFalse();
         row.ProcessedOnUtc.Should().NotBeNull();
     }
+
+    // (8) MarkAsSuperseded terminates the row (removed from the claim query)
+    // but is NOT a failure — a manual resend already delivered the callback,
+    // so re-POSTing would only get the receiver's duplicate rejection. Unlike
+    // the failure mutators it must leave RetryCount untouched.
+    [Fact]
+    public void MarkAsSuperseded_IsTerminal_ButNotAFailure()
+    {
+        var row = Row();
+        row.MarkAsFailed(DateTime.UtcNow, "401 first");   // it was mid-retry when the operator resent
+        row.RetryCount.Should().Be(1);
+
+        var at = DateTime.UtcNow;
+        row.MarkAsSuperseded(at, "[superseded] manual resend delivered");
+
+        row.ProcessedOnUtc.Should().Be(at, "terminal — dropped from the processor's claim query");
+        row.NextRetryAtUtc.Should().BeNull("no further retry may fire");
+        row.RetryCount.Should().Be(1, "superseding is not a delivery attempt — RetryCount must not move");
+        row.Error.Should().Be("[superseded] manual resend delivered");
+    }
 }

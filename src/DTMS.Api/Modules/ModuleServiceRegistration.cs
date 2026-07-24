@@ -882,6 +882,12 @@ public static class ModuleServiceRegistration
         // [FromKeyedServices] can't apply).
         services.AddScoped<DTMS.Iam.Application.Callbacks.ICallbackFormatterResolver,
                            DTMS.Api.Infrastructure.Callbacks.KeyedCallbackFormatterResolver>();
+        // Retires pending fan-out callback rows once a manual resend has
+        // delivered the callback out-of-band, so the queued retry can't
+        // re-POST a duplicate and clobber the resend's success. Impl lives
+        // here (composition root) — only DTMS.Api owns OutboxDbContext.
+        services.AddScoped<DTMS.Iam.Application.Callbacks.ISourceCallbackOutboxSuperseder,
+                           DTMS.Api.Infrastructure.Outbox.SourceCallbackOutboxSuperseder>();
 
         if (runOutboxHere)
             services.AddHostedService<DTMS.Api.Infrastructure.Outbox.MultiPartitionOutboxProcessor>();

@@ -137,4 +137,25 @@ public class OutboxMessage
         ProcessedOnUtc = attemptedAtUtc; // terminal — stop polling this row
         NextRetryAtUtc = null;
     }
+
+    /// <summary>
+    /// Terminal-without-failure — the callback this row would have delivered
+    /// has already been delivered out-of-band (a manual resend dispatched it
+    /// synchronously), so re-POSTing it can only get the receiver's duplicate
+    /// rejection (e.g. OMS's 400 on a create-once shipment) and clobber the
+    /// resend's success. Removes the row from the processor's claim query the
+    /// same way as <see cref="MarkAsProcessed"/> (ProcessedOnUtc set,
+    /// NextRetryAtUtc cleared), but does NOT touch RetryCount — this is not a
+    /// delivery attempt, so it must not count as a failure. The
+    /// <paramref name="reason"/> stays in Error as a forensic marker; nothing
+    /// on the partitioned path reads Error as "failed" (only the central
+    /// OutboxProcessorService/DeadLetterStore pass does, and it skips
+    /// partitioned rows).
+    /// </summary>
+    public void MarkAsSuperseded(DateTime supersededOnUtc, string reason)
+    {
+        ProcessedOnUtc = supersededOnUtc;
+        Error = reason;
+        NextRetryAtUtc = null;
+    }
 }

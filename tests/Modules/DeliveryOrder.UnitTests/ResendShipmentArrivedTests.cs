@@ -8,10 +8,13 @@ using DTMS.DeliveryOrder.Domain.ValueObjects;
 using DTMS.Dispatch.Domain.Entities;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Iam.Application.Callbacks;
+using System.Net;
+using System.Net.Http;
 using DTMS.SharedKernel.Outbox;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using DomainOrder = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder;
 
 namespace DeliveryOrder.UnitTests;
@@ -45,6 +48,7 @@ public class ResendShipmentArrivedTests
         ResendShipmentArrivedCommandHandler Handler,
         ISourceCallbackDispatcher Dispatcher,
         IOrderAuditEventRepository Audit,
+        ISourceCallbackOutboxSuperseder Superseder,
         Guid OrderId,
         Guid TripId);
 
@@ -79,12 +83,13 @@ public class ResendShipmentArrivedTests
         var dispatcher = Substitute.For<ISourceCallbackDispatcher>();   // no throw = 2xx
         var audit = Substitute.For<IOrderAuditEventRepository>();
         var activity = Substitute.For<IOrderActivityProjectionStore>();
+        var superseder = Substitute.For<ISourceCallbackOutboxSuperseder>();
 
         var handler = new ResendShipmentArrivedCommandHandler(
-            resolver, dispatcher, lookup, trips, orders, audit, activity,
+            resolver, dispatcher, lookup, trips, orders, audit, activity, superseder,
             NullLogger<ResendShipmentArrivedCommandHandler>.Instance);
 
-        return new Harness(handler, dispatcher, audit, orderId, tripId);
+        return new Harness(handler, dispatcher, audit, superseder, orderId, tripId);
     }
 
     [Fact]
@@ -132,5 +137,50 @@ public class ResendShipmentArrivedTests
         result.Error.Should().Contain("Manual transport");
         await h.Dispatcher.DidNotReceive().DispatchAsync(
             Arg.Any<string>(), Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
+    }
+
+    // A successful arrived-resend retires the pending arrived fan-out row for
+    // this order+system so its queued retry can't re-POST a duplicate.
+    [Fact]
+    public async Task ArrivedResend_Success_SupersedesPendingOutboxRows_ForThisOrderAndSystem()
+    {
+        var h = NewHarness();
+
+        var result = await h.Handler.Handle(
+            new ResendShipmentArrivedCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await h.Superseder.Received(1).SupersedePendingAsync(
+            "oms", CallbackEventTypes.ShipmentArrivedV1, h.OrderId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ArrivedResend_DispatchFails_DoesNotSupersede()
+    {
+        var h = NewHarness();
+        h.Dispatcher.DispatchAsync(Arg.Any<string>(), Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("bad gateway", null, HttpStatusCode.BadGateway));
+
+        var result = await h.Handler.Handle(
+            new ResendShipmentArrivedCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        await h.Superseder.DidNotReceive().SupersedePendingAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    // Supersede is best-effort — its failure must not fail a delivered resend.
+    [Fact]
+    public async Task ArrivedResend_SupersedeFails_AfterDelivery_StillReturnsSuccess()
+    {
+        var h = NewHarness();
+        h.Superseder.SupersedePendingAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("outbox db hiccup"));
+
+        var result = await h.Handler.Handle(
+            new ResendShipmentArrivedCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
     }
 }
