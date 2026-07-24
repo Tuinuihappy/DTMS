@@ -2,6 +2,7 @@
 
 import { Barcode, CheckCircle2, Keyboard, PenLine, ScanLine, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { PodMethod, PodScanType } from "@/lib/api/delivery-orders";
@@ -118,18 +119,18 @@ export function PodScanDialog({
     (method === "Confirm" || method === "Signature" || reference.trim().length > 0);
 
   return (
-    <AnimatePresence>
-      {open && itemId && (
-        <>
+    <>
+      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
+          rationale. */}
+      <OverlayBackdrop
+        open={open && !!itemId}
+        onClick={onClose}
+        className="z-[80] bg-[var(--color-ink-900)]/50 backdrop-blur-sm"
+      />
+      <AnimatePresence>
+        {open && itemId && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={onClose}
-            className="fixed inset-0 z-[80] bg-[var(--color-ink-900)]/50 backdrop-blur-sm"
-          />
-          <motion.div
+            key="pod-scan-dialog-panel"
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96 }}
@@ -291,9 +292,9 @@ export function PodScanDialog({
               </div>
             </form>
           </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 

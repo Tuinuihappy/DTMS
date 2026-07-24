@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { useEffect, useState } from "react";
 import {
   getOrder,
@@ -169,18 +170,19 @@ export function OrderDetailDrawer({
   const can = (s: string, list: string[]) => list.includes(s);
 
   return (
-    <AnimatePresence>
-      {orderId && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            onClick={onClose}
-            className="fixed inset-0 z-40 bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
-          />
+    <>
+      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
+          rationale (an AnimatePresence-managed backdrop can strand an
+          invisible click-blocking layer when exits are interrupted). */}
+      <OverlayBackdrop
+        open={!!orderId}
+        onClick={onClose}
+        className="z-40 bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
+      />
+      <AnimatePresence>
+        {orderId && (
           <motion.aside
+            key="order-drawer-panel"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -663,23 +665,26 @@ export function OrderDetailDrawer({
               </footer>
             )}
           </motion.aside>
-          {/* Stacked Trip drawer — sits above the order drawer, escape and
-              backdrop close it without dismissing the order drawer. */}
-          <TripDetailDrawer
-            tripId={openTripId}
-            onClose={() => setOpenTripId(null)}
-            onOpenTrip={(id) => setOpenTripId(id)}
-            onOpenOrder={(id) => {
-              // Hop the order drawer to the clicked order. Close the
-              // stacked trip drawer first so the user lands on the new
-              // order's overview, not on a trip from the previous one.
-              setOpenTripId(null);
-              onOpenOrder?.(id);
-            }}
-          />
-        </>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+      {/* Stacked Trip drawer — sits above the order drawer, escape and
+          backdrop close it without dismissing the order drawer. Lives
+          outside the AnimatePresence above because it manages its own
+          presence; the orderId gate keeps it closed whenever the order
+          drawer itself is closed (same visible behavior as before). */}
+      <TripDetailDrawer
+        tripId={orderId ? openTripId : null}
+        onClose={() => setOpenTripId(null)}
+        onOpenTrip={(id) => setOpenTripId(id)}
+        onOpenOrder={(id) => {
+          // Hop the order drawer to the clicked order. Close the
+          // stacked trip drawer first so the user lands on the new
+          // order's overview, not on a trip from the previous one.
+          setOpenTripId(null);
+          onOpenOrder?.(id);
+        }}
+      />
+    </>
   );
 }
 

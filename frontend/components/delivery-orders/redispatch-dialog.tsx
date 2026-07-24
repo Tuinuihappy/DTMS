@@ -2,6 +2,7 @@
 
 import { Send, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -49,18 +50,18 @@ export function RedispatchDialog({
   const canSubmit = reason.trim().length > 0 && redispatchedBy.trim().length > 0 && !busy;
 
   return (
-    <AnimatePresence>
-      {open && (
-        <>
+    <>
+      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
+          rationale. */}
+      <OverlayBackdrop
+        open={open}
+        onClick={onClose}
+        className="z-[80] bg-[var(--color-ink-900)]/50 backdrop-blur-sm"
+      />
+      <AnimatePresence>
+        {open && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={onClose}
-            className="fixed inset-0 z-[80] bg-[var(--color-ink-900)]/50 backdrop-blur-sm"
-          />
-          <motion.div
+            key="redispatch-dialog-panel"
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96 }}
@@ -174,8 +175,8 @@ export function RedispatchDialog({
               </div>
             </form>
           </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
