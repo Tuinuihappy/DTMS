@@ -8,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { useCallback, useEffect, useState } from "react";
 import { PermissionGuard } from "@/components/auth/permission-guard";
 import { Pagination, type PageSize } from "@/components/delivery-orders/pagination";
@@ -336,17 +337,18 @@ function ItemDetailDrawer({
   }, [itemId]);
 
   return (
-    <AnimatePresence>
-      {itemId && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 z-40 bg-[var(--color-ink-900)]/45 backdrop-blur-sm"
-          />
+    <>
+      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
+          rationale. */}
+      <OverlayBackdrop
+        open={!!itemId}
+        onClick={onClose}
+        className="z-40 bg-[var(--color-ink-900)]/45 backdrop-blur-sm"
+      />
+      <AnimatePresence>
+        {itemId && (
           <motion.aside
+            key="item-drawer-panel"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -436,9 +438,9 @@ function ItemDetailDrawer({
               ) : null}
             </div>
           </motion.aside>
-        </>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
