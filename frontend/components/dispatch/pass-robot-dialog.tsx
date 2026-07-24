@@ -2,6 +2,7 @@
 
 import { Bot, ChevronsRight, Loader2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { useEffect, useState } from "react";
 import { acknowledgeRobotPass } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
@@ -61,23 +62,27 @@ export function PassRobotDialog({
   const shortTrip = tripId.slice(0, 8).toUpperCase();
 
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => !busy && onClose()}
-            className="fixed inset-0 z-40 bg-[var(--color-ink-900)]/55 backdrop-blur-md"
-          />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <>
+      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
+          rationale. Wrapper is pointer-events-none (panel re-enables)
+          so a stranded exit can never swallow page clicks. */}
+      <OverlayBackdrop
+        open={open}
+        onClick={() => !busy && onClose()}
+        className="z-40 bg-[var(--color-ink-900)]/55 backdrop-blur-md"
+      />
+      <AnimatePresence>
+        {open && (
+          <div
+            key="pass-robot-dialog"
+            className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
               transition={{ type: "spring", stiffness: 360, damping: 30 }}
-              className="relative w-full max-w-md overflow-hidden rounded-[var(--radius-xl)] glass-strong"
+              className="pointer-events-auto relative w-full max-w-md overflow-hidden rounded-[var(--radius-xl)] glass-strong"
             >
               <header className="flex items-start gap-3 px-6 pt-5">
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--color-success-soft)] text-[var(--color-success)]">
@@ -158,8 +163,8 @@ export function PassRobotDialog({
               </footer>
             </motion.div>
           </div>
-        </>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
