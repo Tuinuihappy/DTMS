@@ -1,7 +1,7 @@
 "use client";
 
 import { HubConnectionState } from "@microsoft/signalr";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DRAIN_CYCLE_EVENT,
   type DrainCycleDetail,
@@ -87,6 +87,19 @@ export function useHubSubscription({
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Live view of the caller's handlers. The subscription effect below
+  // deliberately does NOT depend on handler identity (callers pass inline
+  // closures every render), so the wrapped handlers registered on the
+  // connection must read through this ref — otherwise they'd forever call
+  // the closures captured on the FIRST render. That stale-closure bug made
+  // the trips list refetch with its initial filter/page/sort on every
+  // SignalR hint, flapping the table against the 15s poll during busy
+  // robot windows.
+  const handlersRef = useRef(eventHandlers);
+  useEffect(() => {
+    handlersRef.current = eventHandlers;
+  });
+
   // Stringify args for the effect's dep array — re-subscribes when any
   // arg changes value. Caller is expected to pass primitives or ids,
   // not deep objects.
@@ -94,7 +107,7 @@ export function useHubSubscription({
   // Handler names — re-attach if the SET of events changes. Function
   // identities are not in the dep array on purpose: callers commonly
   // pass inline functions and we don't want to re-subscribe on every
-  // render. Handlers ARE updated through a ref pattern (see below).
+  // render. Handlers ARE updated through handlersRef above.
   const handlerNamesKey = Object.keys(eventHandlers).sort().join("|");
 
   useEffect(() => {
@@ -106,9 +119,12 @@ export function useHubSubscription({
     let cleanupDrainListener: (() => void) | null = null;
 
     const attach = () => {
-      for (const [event, handler] of Object.entries(eventHandlers)) {
+      for (const event of Object.keys(eventHandlers)) {
+        // Dispatch through handlersRef so the connection always calls the
+        // latest closure the caller rendered with, not the one captured
+        // when this effect first ran.
         const wrapped = (...args: unknown[]) =>
-          handler(...(args.map(normalizeKeys) as unknown[]));
+          handlersRef.current[event]?.(...(args.map(normalizeKeys) as unknown[]));
         connection.on(event, wrapped);
         registeredHandlers.push([event, wrapped]);
       }
