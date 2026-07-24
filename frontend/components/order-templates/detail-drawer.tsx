@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
+import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import {
   Activity,
   Anchor,
@@ -48,17 +49,18 @@ export function OrderTemplateDrawer({
   onDelete: (t: OrderTemplateDto) => void;
 }) {
   return (
-    <AnimatePresence>
-      {open && template && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => !busy && onClose()}
-            className="fixed inset-0 z-40 bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
-          />
+    <>
+      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
+          rationale. */}
+      <OverlayBackdrop
+        open={open && !!template}
+        onClick={() => !busy && onClose()}
+        className="z-40 bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
+      />
+      <AnimatePresence>
+        {open && template && (
           <motion.aside
+            key="order-template-drawer-panel"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -261,9 +263,9 @@ export function OrderTemplateDrawer({
               </div>
             </div>
           </motion.aside>
-        </>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
