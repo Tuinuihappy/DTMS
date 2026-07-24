@@ -52,7 +52,9 @@ export function MobileCardRow({
 
   return (
     <motion.div
-      layout
+      // No `layout` here on purpose — same rationale as DataRow: list
+      // pages refetch on SignalR hints, and a position tween lets cards
+      // slide out from under an in-flight tap. Reorders snap instantly.
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
