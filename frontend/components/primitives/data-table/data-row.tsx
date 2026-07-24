@@ -48,7 +48,11 @@ export function DataRow({
 
   return (
     <motion.tr
-      layout
+      // No `layout` here on purpose: list pages refetch on SignalR hints
+      // while robots are active, and a 400ms position tween lets rows
+      // slide out from under an in-flight click (mousedown and mouseup
+      // land on different rows → the browser never fires click). Reorders
+      // snap instantly instead, keeping rows hit-testable.
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, transition: { duration: 0.18 } }}
