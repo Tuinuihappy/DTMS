@@ -197,8 +197,12 @@ public class ResendShipmentArrivedCommandHandler
         // the started handler for the full rationale).
         try
         {
+            // Use sub.SystemKey (the exact value the fan-out wrote to
+            // PartitionKey), not `source` — the subscription lookup matches
+            // OrdinalIgnoreCase, so order.SourceSystemKey may differ in casing
+            // and a case-sensitive SQL match would silently miss the row.
             var retired = await _outboxSuperseder.SupersedePendingAsync(
-                source, CallbackEventTypes.ShipmentArrivedV1, order.Id, cancellationToken);
+                sub.SystemKey, CallbackEventTypes.ShipmentArrivedV1, order.Id, cancellationToken);
             if (retired > 0)
                 _logger.LogInformation(
                     "[ShipmentArrivedResend] Trip {TripId} resend superseded {Count} pending outbox row(s) for order {OrderId} → {System}",

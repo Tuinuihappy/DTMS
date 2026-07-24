@@ -231,6 +231,25 @@ public class ResendShipmentStartedTests
             "oms", CallbackEventTypes.ShipmentStartedV1, h.OrderId, Arg.Any<CancellationToken>());
     }
 
+    // Casing guard — the fan-out wrote PartitionKey = sub.SystemKey ("oms"),
+    // but the order's SourceSystemKey may differ in case ("OMS"). Supersede
+    // must key off the SUBSCRIPTION's SystemKey so the case-sensitive SQL
+    // match hits the row; keying off order.SourceSystemKey would miss it.
+    [Fact]
+    public async Task Resend_Success_SupersedesUsingSubscriptionKey_NotOrderCasing()
+    {
+        var h = NewHarness(orderSource: "OMS", subscribedSystem: "oms");
+
+        var result = await h.Handler.Handle(
+            new ResendShipmentStartedCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await h.Superseder.Received(1).SupersedePendingAsync(
+            "oms", CallbackEventTypes.ShipmentStartedV1, h.OrderId, Arg.Any<CancellationToken>());
+        await h.Superseder.DidNotReceive().SupersedePendingAsync(
+            "OMS", Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
     // The dispatch never happened, so there is nothing to supersede — a failed
     // resend must not retire the row that could still recover on its own.
     [Fact]
