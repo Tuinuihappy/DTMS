@@ -23,6 +23,7 @@ import { StatusTimelineSection } from "@/components/projection/status-timeline-s
 import type { StatusHistoryEntry } from "@/lib/api/status-history";
 import { getTripStatusHistory } from "@/lib/api/status-history";
 import { useTripSubscription } from "@/lib/realtime/hubs/trip-hub";
+import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { AttemptBadge, RetryChainNav, TripStatusBadge } from "./badges";
 import {
   MissionFailureAlert,
@@ -131,28 +132,15 @@ export function TripDetailDrawer({
 
   return (
     <>
-      {/* Backdrop lives OUTSIDE AnimatePresence and stays permanently
-          mounted. Field repro (2026-07-24): rapid open/close cycles can
-          leave an AnimatePresence-managed backdrop stuck in the DOM —
-          an invisible full-screen div that swallows every click until
-          the page is refreshed. Exiting children are frozen with their
-          last-rendered props, so no className/state can rescue them
-          after the fact. Driving pointer-events from React state (not
-          the animation lifecycle) makes click-blocking impossible even
-          if the fade glitches: worst case is a cosmetic stuck tint.
-          data-trip-drawer-backdrop doubles as a deploy marker — its
-          presence in the DOM while closed proves this build is live. */}
-      <motion.div
+      {/* State-driven backdrop (see OverlayBackdrop for the stuck-exit
+          rationale). data-trip-drawer-backdrop doubles as a deploy
+          marker — its presence in the DOM while closed proves this
+          build is live. */}
+      <OverlayBackdrop
+        open={!!tripId}
+        onClick={onClose}
         data-trip-drawer-backdrop={tripId ? "open" : "closed"}
-        initial={false}
-        animate={{ opacity: tripId ? 1 : 0 }}
-        transition={{ duration: 0.25 }}
-        onClick={tripId ? onClose : undefined}
-        aria-hidden={!tripId}
-        className={cn(
-          "fixed inset-0 z-[60] bg-[var(--color-ink-900)]/40 backdrop-blur-sm",
-          !tripId && "pointer-events-none",
-        )}
+        className="z-[60] bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
       />
       <AnimatePresence>
         {tripId && (
