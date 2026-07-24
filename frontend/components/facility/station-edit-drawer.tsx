@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import {
   AlertTriangle,
   BatteryCharging,
@@ -141,19 +142,18 @@ export function StationEditDrawer({
   }
 
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            key="backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => !busy && onClose()}
-            className="fixed inset-0 z-40 bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
-          />
+    <>
+      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
+          rationale. */}
+      <OverlayBackdrop
+        open={open}
+        onClick={() => !busy && onClose()}
+        className="z-40 bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
+      />
+      <AnimatePresence>
+        {open && (
           <motion.aside
-            key="drawer"
+            key="station-edit-drawer-panel"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -433,9 +433,9 @@ export function StationEditDrawer({
               </section>
             </div>
           </motion.aside>
-        </>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
