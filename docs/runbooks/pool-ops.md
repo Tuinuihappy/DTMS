@@ -231,7 +231,7 @@ SELECT t."Id"                                       AS "TripId",
        AGE(NOW(), t."ClaimedAt")                    AS "InProgressFor"
   FROM dispatch."Trips" t
   JOIN transportmanual."Operators" o ON o."Id" = t."ClaimedByOperatorId"
- WHERE t."Status" IN ('InProgress', 'Paused')
+ WHERE t."Status" IN ('InProgress', 'Hang', 'Held')
  ORDER BY t."ClaimedAt";
 ```
 

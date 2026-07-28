@@ -1,4 +1,8 @@
 -- ============================================================================
+-- HISTORICAL ONE-OFF (already run). 'Paused' below refers to the pre-2026-07-28
+-- TripStatus, since split into Hang/Held by 20260728130000_SplitTripPausedIntoHangHeld.
+-- Do not re-run against a post-split database without adapting the status list.
+-- ============================================================================
 -- Phase P5.2 backfill — seed bi."TripFacts" by joining dispatch."Trips"
 -- with dispatch.TripStatusHistory for the timeline timestamps.
 --

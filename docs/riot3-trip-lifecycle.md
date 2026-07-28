@@ -32,9 +32,14 @@ Webhook เข้าจุดเดียว: `POST /api/webhooks/riot3/notify/{
 
 ## Level 1 — Order ↔ `Trip.Status`
 
-`Trip.Status` มี 7 ค่า: `Created, InProgress, Paused, Completed, Failed, Cancelled, Rejected`
-(`DispatchEnums.cs`) — `Rejected` เพิ่ม 2026-07-28: vendor ปฏิเสธก่อนได้ execute
-(แยกจาก `Failed` = ทำแล้วล้ม) ฝั่ง DeliveryOrder ตอบสนองเหมือน Failed ทุกประการ
+`Trip.Status` มี 8 ค่า: `Created, InProgress, Hang, Held, Completed, Failed, Cancelled, Rejected`
+(`DispatchEnums.cs`)
+- `Rejected` เพิ่ม 2026-07-28: vendor ปฏิเสธก่อนได้ execute (แยกจาก `Failed` = ทำแล้วล้ม)
+  ฝั่ง DeliveryOrder ตอบสนองเหมือน Failed ทุกประการ
+- `Hang`/`Held` แทน `Paused` เดิม (แยก 2026-07-28): `Hang` = ระบบหยุดเอง (TASK_HANG),
+  `Held` = คนสั่งหยุด (TASK_HELD / ปุ่ม Pause) — status เป็น source of truth ของคำสั่ง resume
+  (`CONTINUE_FROM_HANG` vs `CONTINUE_FROM_HELD`, สลับกันโดน E639999); รองรับ **re-flavour**
+  เมื่อ vendor เปลี่ยน HANG↔HELD กลางทาง (event ติดธง Reflavour, PauseCount ไม่บวกซ้ำ)
 
 RIOT3 พูดถึง order ด้วย **2 vocabulary ที่ไม่ตรงกัน**:
 - **notify webhook** → field `taskEventType` (เช่น `TASK_FINISHED`)
@@ -50,8 +55,8 @@ RIOT3 พูดถึง order ด้วย **2 vocabulary ที่ไม่ต
 | `TASK_FAILED`   | `FAILED`    | `MarkVendorFailed()` | **`Failed`** |
 | `TASK_REJECTED` | `REJECTED`  | `MarkVendorRejected()` | **`Rejected`** |
 | `TASK_CANCELED` | **`CANCELLED`** ⚠️ | `Cancel()` | **`Cancelled`** |
-| `TASK_HANG`     | `HANG`      | `Pause(Hang)` | **`Paused`** |
-| `TASK_HELD`     | `HELD`      | `Pause(Held)` | **`Paused`** |
+| `TASK_HANG`     | `HANG`      | `Pause(Hang)` | **`Hang`** |
+| `TASK_HELD`     | `HELD`      | `Pause(Held)` | **`Held`** |
 | `TASK_HANG_TO_CONTINUE` | *(กลับเป็น `PROCESSING`)* | `Resume()` | **`InProgress`** |
 | `TASK_HELD_TO_CONTINUE` | *(กลับเป็น `PROCESSING`)* | `Resume()` | **`InProgress`** |
 
@@ -64,8 +69,12 @@ RIOT3 พูดถึง order ด้วย **2 vocabulary ที่ไม่ต
 stateDiagram-v2
     [*] --> Created: dispatch (pre-vendor, DTMS สร้าง Trip)
     Created --> InProgress: TASK_PROCESSING / orderState=PROCESSING
-    InProgress --> Paused: TASK_HANG (system) / TASK_HELD (operator)
-    Paused --> InProgress: TASK_*_TO_CONTINUE / Resume()
+    InProgress --> Hang: TASK_HANG (system)
+    InProgress --> Held: TASK_HELD (operator / ปุ่ม Pause)
+    Hang --> Held: re-flavour (vendor drift)
+    Held --> Hang: re-flavour (vendor drift)
+    Hang --> InProgress: TASK_HANG_TO_CONTINUE / Resume()
+    Held --> InProgress: TASK_HELD_TO_CONTINUE / Resume()
     InProgress --> Completed: TASK_FINISHED / SUCCEEDED
     InProgress --> Failed: TASK_FAILED
     Created --> Rejected: TASK_REJECTED (ปฏิเสธก่อน execute)
@@ -87,8 +96,9 @@ stateDiagram-v2
   / Level 3 (`systemState=BUSY`)
 - **`MarkVendorStarted()` flip status แค่ครั้งแรก** (`Created → InProgress`). `TASK_PROCESSING` ซ้ำ
   จะ **ไม่** re-fire event แต่ยังอัปเดต vehicle assignment (ดู reassignment ด้านล่าง)
-- **Pause 2 flavor** ยุบเป็น `Paused` เดียว แต่เก็บ `VendorPauseSource` (Hang/Held) ไว้เลือก resume
-  command ให้ตรง — ส่งผิดได้ error `E639999`
+- **Pause 2 flavor แยก status เต็มตัวแล้ว (2026-07-28)** — `Hang`/`Held` ตรงตาม vendor;
+  resume เลือกคำสั่งจาก status ตรง ๆ (ส่งผิดได้ error `E639999`) `VendorPauseSource` เขียนคู่ขนาน
+  ไว้เป็น rollback path 1 release แล้วจะ drop; แถวประวัติ `toStatus="Paused"` ยุคเก่าคงไว้ตามเดิม
 - **Failure 3 flavor แยกสถานะครบ (ตั้งแต่ 2026-07-28)** → `TASK_FAILED` เป็น `Failed` (ทำแล้วล้ม);
   `TASK_REJECTED` เป็น `Rejected` (ปฏิเสธก่อนได้ทำ — order ยัง propagate เป็น Failed เหมือนกัน,
   retry ผ่าน Reopen ได้เหมือนกัน); `TASK_CANCELED` เป็น `Cancelled` (ปล่อย DeliveryOrder ให้ re-dispatch ได้)

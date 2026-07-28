@@ -1,4 +1,8 @@
 -- ============================================================================
+-- HISTORICAL ONE-OFF (already run). 'Paused' below refers to the pre-2026-07-28
+-- TripStatus, since split into Hang/Held by 20260728130000_SplitTripPausedIntoHangHeld.
+-- Do not re-run against a post-split database without adapting the status list.
+-- ============================================================================
 -- Phase b11 backfill: terminate orders stranded at an in-flight status with
 -- zero active trips remaining (every Trip already Completed/Failed/Cancelled).
 --
