@@ -31,11 +31,10 @@ public class ResumeTripCommandHandler : ICommandHandler<ResumeTripCommand>
         var trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);
         if (trip == null) return Result.Failure($"Trip {request.TripId} not found.");
 
-        // Capture pause source BEFORE Resume() clears it — we need it to
-        // pick the matching RIOT3 command below. Null means a legacy row
-        // paused before the column existed; default to Held (the original
-        // hard-coded behaviour) so old data still resumes correctly.
-        var pauseSource = trip.VendorPauseSource ?? VendorPauseSource.Held;
+        // Capture the flavour BEFORE Resume() flips the status back to
+        // InProgress. Status is the single source of truth since the
+        // Hang/Held split — no legacy-null fallback ambiguity anymore.
+        var wasHang = trip.Status == TripStatus.Hang;
 
         try { trip.Resume(); }
         catch (InvalidOperationException ex) { return Result.Failure(ex.Message); }
@@ -48,10 +47,10 @@ public class ResumeTripCommandHandler : ICommandHandler<ResumeTripCommand>
                 "Cannot resume — the vendor never minted an order key for this trip.");
         }
 
-        // Branch by vendor-side state: HELD → CONTINUE_FROM_HELD;
-        // HANG → CONTINUE_FROM_HANG. Crossing them produces E639999
+        // Branch by vendor-side state: Held → CONTINUE_FROM_HELD;
+        // Hang → CONTINUE_FROM_HANG. Crossing them produces E639999
         // "multi-level template fill error" from RIOT3.
-        var vendorResult = pauseSource == VendorPauseSource.Hang
+        var vendorResult = wasHang
             ? await _vendorOps.ResumeFromHangAsync(trip.VendorOrderKey, cancellationToken)
             : await _vendorOps.ResumeAsync(trip.VendorOrderKey, cancellationToken);
         if (vendorResult.IsFailure)
@@ -82,7 +81,7 @@ public class ResumeTripCommandHandler : ICommandHandler<ResumeTripCommand>
 
         await _tripRepository.UpdateAsync(trip, cancellationToken);
         _logger.LogInformation("Trip {TripId} resumed (vendorOrderKey {OrderKey}, source {Source})",
-            trip.Id, trip.VendorOrderKey, pauseSource);
+            trip.Id, trip.VendorOrderKey, wasHang ? "Hang" : "Held");
         return Result.Success();
     }
 }

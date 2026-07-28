@@ -4,17 +4,39 @@ namespace DTMS.Dispatch.Domain.Enums;
 //   Created    — trip persisted, awaiting acceptance. AMR: RIOT3 TASK_PROCESSING;
 //                Manual pool: an operator to Acknowledge from the pool.
 //   InProgress — vendor / operator has taken the trip and is executing it.
-//   Paused     — vendor placed the trip in a hold/hang state.
+//   Hang       — system pause (RIOT3 TASK_HANG, e.g. obstacle / robot mode
+//                change). Resume must send CMD_ORDER_CONTINUE_FROM_HANG.
+//   Held       — operator pause (RIOT3 TASK_HELD or the DTMS Pause button).
+//                Resume must send CMD_ORDER_CONTINUE_FROM_HELD. Crossing the
+//                two resume commands returns vendor E639999. Replaces the
+//                former single "Paused" (split 2026-07-28; the flavour used
+//                to live in VendorPauseSource).
 //   Completed / Failed / Cancelled / Rejected — terminal states.
 //   Rejected   — vendor refused the trip post-dispatch, before execution
 //                (AMR: RIOT3 TASK_REJECTED / orderState REJECTED). Order-side
 //                propagation is identical to Failed; kept distinct so ops and
 //                reports can tell "refused before doing" from "failed doing".
 //
+// Values are pinned explicitly: 2 was the removed "Paused" and stays a hole,
+// Hang/Held take fresh values at the end. The status is persisted and
+// serialized as a string everywhere, but pinning keeps every pre-existing
+// ordinal stable so the entire class of reorder bugs is off the table.
+//
 // The "in pool" signal for Manual/Fleet is NOT a distinct status — it is
 // derived from (Status = Created ∧ DispatchedAt IS NOT NULL ∧
 // ClaimedByOperatorId IS NULL). See IX_Trips_Pool.
-public enum TripStatus { Created, InProgress, Paused, Completed, Failed, Cancelled, Rejected }
+public enum TripStatus
+{
+    Created = 0,
+    InProgress = 1,
+    // 2 = the former Paused — retired 2026-07-28, do not reuse.
+    Completed = 3,
+    Failed = 4,
+    Cancelled = 5,
+    Rejected = 6,
+    Hang = 7,
+    Held = 8,
+}
 
 // Why the trip is in Paused state. The vendor exposes two distinct paused
 // flavours on its order state machine and each pairs with a DIFFERENT

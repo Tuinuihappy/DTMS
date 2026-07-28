@@ -11,10 +11,17 @@ namespace DTMS.Planning.Application.Consumers;
 /// only carry TripId, so we reverse-look-up via
 /// <see cref="IJobRepository.GetByTripIdAsync"/>.
 ///
+/// JobStatus deliberately stays a single <c>Paused</c> — the Hang/Held
+/// flavour split lives at Trip level only; both flavours (and the
+/// deprecated TripPaused shim) funnel into the same MarkPaused.
+///
 /// Idempotent + safe under out-of-order webhooks — Job.MarkPaused
 /// itself ignores duplicate/inappropriate-state calls.
 /// </summary>
-public class TripPausedJobConsumer : IConsumer<TripPausedIntegrationEventV1>
+public class TripPausedJobConsumer :
+    IConsumer<TripPausedIntegrationEventV1>,
+    IConsumer<TripHangIntegrationEventV1>,
+    IConsumer<TripHeldIntegrationEventV1>
 {
     private readonly IJobRepository _jobRepository;
     private readonly ILogger<TripPausedJobConsumer> _logger;
@@ -25,21 +32,29 @@ public class TripPausedJobConsumer : IConsumer<TripPausedIntegrationEventV1>
         _logger = logger;
     }
 
-    public async Task Consume(ConsumeContext<TripPausedIntegrationEventV1> context)
+    public Task Consume(ConsumeContext<TripPausedIntegrationEventV1> context)
+        => HandleAsync(context, context.Message.TripId, "TripPaused");
+
+    public Task Consume(ConsumeContext<TripHangIntegrationEventV1> context)
+        => HandleAsync(context, context.Message.TripId, "TripHang");
+
+    public Task Consume(ConsumeContext<TripHeldIntegrationEventV1> context)
+        => HandleAsync(context, context.Message.TripId, "TripHeld");
+
+    private async Task HandleAsync(ConsumeContext context, Guid tripId, string eventName)
     {
-        var evt = context.Message;
-        var job = await _jobRepository.GetByTripIdAsync(evt.TripId, context.CancellationToken);
+        var job = await _jobRepository.GetByTripIdAsync(tripId, context.CancellationToken);
         if (job is null)
         {
             // Common during legacy data — Trips that pre-date Phase b8
             // were never linked to a Job. Not a bug.
-            _logger.LogDebug("[JobSync] TripPaused for Trip {TripId} — no linked Job", evt.TripId);
+            _logger.LogDebug("[JobSync] {EventName} for Trip {TripId} — no linked Job", eventName, tripId);
             return;
         }
 
-        job.MarkPaused(evt.TripId);
+        job.MarkPaused(tripId);
         await _jobRepository.UpdateAsync(job, context.CancellationToken);
-        _logger.LogInformation("[JobSync] Job {JobId} → Paused (mirrored from Trip {TripId})",
-            job.Id, evt.TripId);
+        _logger.LogInformation("[JobSync] Job {JobId} → Paused (mirrored from Trip {TripId} via {EventName})",
+            job.Id, tripId, eventName);
     }
 }

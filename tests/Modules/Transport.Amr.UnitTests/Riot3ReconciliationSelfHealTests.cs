@@ -141,6 +141,67 @@ public class Riot3ReconciliationStateMappingTests
         trip.Status.Should().Be(TripStatus.Completed);
     }
 
+    [Fact]
+    public async Task ApplyVendorState_Hang_FromInProgress_SetsHang()
+    {
+        var trip = InProgressTrip();
+        var data = new Riot3OrderQueryData { State = "HANG" };
+        var snapshots = Substitute.For<ITripItemSnapshotProvider>();
+
+        var transition = await Riot3ReconciliationService.ApplyVendorStateAsync(
+            trip, data, snapshots, CancellationToken.None);
+
+        transition.Should().Be(Riot3ReconciliationService.Transition.Hang);
+        trip.Status.Should().Be(TripStatus.Hang);
+    }
+
+    // Flavour drift: vendor moved the order HELD while DTMS holds Hang —
+    // the poll re-flavours the trip so the resume command stays correct.
+    [Fact]
+    public async Task ApplyVendorState_Held_WhileTripHang_Reflavours()
+    {
+        var trip = InProgressTrip();
+        trip.Pause(DTMS.Dispatch.Domain.Enums.VendorPauseSource.Hang);
+        var data = new Riot3OrderQueryData { State = "HELD" };
+        var snapshots = Substitute.For<ITripItemSnapshotProvider>();
+
+        var transition = await Riot3ReconciliationService.ApplyVendorStateAsync(
+            trip, data, snapshots, CancellationToken.None);
+
+        transition.Should().Be(Riot3ReconciliationService.Transition.Held);
+        trip.Status.Should().Be(TripStatus.Held);
+    }
+
+    [Fact]
+    public async Task ApplyVendorState_Hang_WhileTripAlreadyHang_IsNoOp()
+    {
+        var trip = InProgressTrip();
+        trip.Pause(DTMS.Dispatch.Domain.Enums.VendorPauseSource.Hang);
+        var data = new Riot3OrderQueryData { State = "HANG" };
+        var snapshots = Substitute.For<ITripItemSnapshotProvider>();
+
+        var transition = await Riot3ReconciliationService.ApplyVendorStateAsync(
+            trip, data, snapshots, CancellationToken.None);
+
+        transition.Should().Be(Riot3ReconciliationService.Transition.None);
+        trip.Status.Should().Be(TripStatus.Hang);
+    }
+
+    [Fact]
+    public async Task ApplyVendorState_Processing_FromHang_Resumes()
+    {
+        var trip = InProgressTrip();
+        trip.Pause(DTMS.Dispatch.Domain.Enums.VendorPauseSource.Hang);
+        var data = new Riot3OrderQueryData { State = "PROCESSING" };
+        var snapshots = Substitute.For<ITripItemSnapshotProvider>();
+
+        var transition = await Riot3ReconciliationService.ApplyVendorStateAsync(
+            trip, data, snapshots, CancellationToken.None);
+
+        transition.Should().Be(Riot3ReconciliationService.Transition.Resumed);
+        trip.Status.Should().Be(TripStatus.InProgress);
+    }
+
     // First-ever coverage of the REJECTED mapping — the vendor refused the
     // order post-dispatch. Distinct Rejected status since 2026-07; reason
     // precedence mirrors the webhook: ErrorDescription → ErrorCode → default.

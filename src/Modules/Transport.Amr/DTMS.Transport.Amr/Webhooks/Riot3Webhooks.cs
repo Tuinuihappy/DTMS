@@ -179,12 +179,12 @@ public static class Riot3Webhooks
 
                 case "TASK_HANG":
                 case "TASK_HELD":
-                    // Vendor paused the order — mirror to Trip.Paused, but
-                    // capture WHICH flavour so the resume handler picks the
-                    // matching RIOT3 command. TASK_HELD = operator pause →
-                    // CONTINUE_FROM_HELD; TASK_HANG = system pause (e.g.
-                    // E230025 mode change) → CONTINUE_FROM_HANG. Crossing
-                    // them returns E639999 "multi-level template fill error".
+                    // Vendor paused the order — the flavour drives the status:
+                    // TASK_HELD = operator pause → Trip.Held (resume sends
+                    // CONTINUE_FROM_HELD); TASK_HANG = system pause (e.g.
+                    // E230025 mode change) → Trip.Hang (CONTINUE_FROM_HANG).
+                    // Crossing them returns E639999. Trip.Pause also handles
+                    // mid-pause re-flavouring (vendor drift Hang↔Held).
                     var hangReason = payload.Task?.HangReason;
                     var pauseSource = eventType == "TASK_HANG"
                         ? DTMS.Dispatch.Domain.Enums.VendorPauseSource.Hang

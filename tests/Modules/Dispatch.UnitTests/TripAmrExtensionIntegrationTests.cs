@@ -90,7 +90,7 @@ public class TripAmrExtensionIntegrationTests
         trip.AmrExtension.Should().NotBeNull();
         trip.AmrExtension!.VendorPauseSource.Should().Be(VendorPauseSource.Hang);
         trip.VendorPauseSource.Should().Be(VendorPauseSource.Hang);  // delegated
-        trip.Status.Should().Be(TripStatus.Paused);
+        trip.Status.Should().Be(TripStatus.Hang);
     }
 
     [Fact]

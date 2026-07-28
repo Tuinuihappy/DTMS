@@ -468,25 +468,43 @@ public class Trip : AggregateRoot<Guid>
             Guid.NewGuid(), DateTime.UtcNow, Id, JobId, DeliveryOrderId, reason, UpperKey));
     }
 
+    // Pause with the RIOT3 flavour driving the status: Hang (system) / Held
+    // (operator). Three legal shapes:
+    //   InProgress → Hang|Held      — fresh pause (raises the flavour event)
+    //   Hang ⇄ Held                 — vendor re-flavoured the pause mid-way
+    //                                 (drift); status follows, event carries
+    //                                 Reflavour=true so PauseCount stays put
+    //   same flavour again          — idempotent no-op (webhooks duplicate)
+    // Anything else (Created / terminal) still throws.
     public void Pause(VendorPauseSource source)
     {
-        if (Status != TripStatus.InProgress)
+        // NB: fully qualified — the VendorPauseSource *property* on this class
+        // shadows the enum type name inside instance members.
+        var target = source == Enums.VendorPauseSource.Hang ? TripStatus.Hang : TripStatus.Held;
+        if (Status == target)
+            return;
+
+        var reflavour = Status is TripStatus.Hang or TripStatus.Held;
+        if (Status != TripStatus.InProgress && !reflavour)
             throw new InvalidOperationException("Only InProgress trips can be paused.");
 
-        Status = TripStatus.Paused;
-        // Phase 3b — pause source lives on the AMR extension. Manual /
-        // Fleet pauses (Phase 4 / 5) will populate their own extension's
-        // equivalent column; the Trip-level Status flip is mode-agnostic.
+        Status = target;
+        // Dual-write during the Hang/Held transition release — the column is
+        // the rollback path (remap SQL restores Paused + reads the flavour
+        // back from here). Drop together with the column in the cleanup.
         AmrExtension ??= AmrTripExtension.Create(Id);
         AmrExtension.SetPauseSource(source);
-        AddDomainEvent(new TripPausedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
-        RecordEvent("TripPaused", source.ToString());
+        if (target == TripStatus.Hang)
+            AddDomainEvent(new TripHangDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reflavour));
+        else
+            AddDomainEvent(new TripHeldDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reflavour));
+        RecordEvent("TripPaused", reflavour ? $"{source} (re-flavoured)" : source.ToString());
     }
 
     public void Resume()
     {
-        if (Status != TripStatus.Paused)
-            throw new InvalidOperationException("Only Paused trips can be resumed.");
+        if (Status is not (TripStatus.Hang or TripStatus.Held))
+            throw new InvalidOperationException("Only Hang/Held trips can be resumed.");
 
         Status = TripStatus.InProgress;
         AmrExtension?.ClearPauseSource();

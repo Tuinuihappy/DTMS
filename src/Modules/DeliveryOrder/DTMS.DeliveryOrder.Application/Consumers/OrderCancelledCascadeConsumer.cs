@@ -41,11 +41,11 @@ public class OrderCancelledCascadeConsumer : IConsumer<DeliveryOrderCancelledInt
         var evt = context.Message;
 
         // Active = not-yet-terminal trips of this order. Created /
-        // InProgress / Paused all qualify; Completed/Failed/Cancelled
+        // InProgress / Hang / Held all qualify; Completed/Failed/Cancelled
         // are already done.
         var trips = await _tripRepository.GetByDeliveryOrderIdAsync(evt.DeliveryOrderId, context.CancellationToken);
         var activeTrips = trips
-            .Where(t => t.Status is TripStatus.Created or TripStatus.InProgress or TripStatus.Paused)
+            .Where(t => t.Status is TripStatus.Created or TripStatus.InProgress or TripStatus.Hang or TripStatus.Held)
             .ToList();
 
         if (activeTrips.Count == 0)

@@ -22,6 +22,8 @@ namespace DTMS.Dispatch.Application.Projections;
 public class TripStatusHistoryProjector :
     IConsumer<TripStartedIntegrationEvent>,
     IConsumer<TripPausedIntegrationEventV1>,
+    IConsumer<TripHangIntegrationEventV1>,
+    IConsumer<TripHeldIntegrationEventV1>,
     IConsumer<TripResumedIntegrationEventV1>,
     IConsumer<TripRobotPassAcknowledgedIntegrationEventV1>,
     IConsumer<TripCompletedIntegrationEvent>,
@@ -55,10 +57,19 @@ public class TripStatusHistoryProjector :
             reason: ctx.Message.VehicleId == Guid.Empty ? null : $"vehicle={ctx.Message.VehicleId}");
 
     public Task Consume(ConsumeContext<TripPausedIntegrationEventV1> ctx)
-        // Paused payload doesn't carry order/job ids — projector reads them
-        // from the latest history row via the store.
+        // Deprecated shim — drains pre-split outbox rows only. The old event
+        // carries no flavour; write "Held" (the legacy null-source default)
+        // rather than reintroducing "Paused" into live rows post-remap.
         => Project(ctx, ctx.Message.TripId, deliveryOrderId: null, jobId: null,
-            "Paused", reason: null);
+            "Held", reason: "Legacy paused event (pre Hang/Held split)");
+
+    public Task Consume(ConsumeContext<TripHangIntegrationEventV1> ctx)
+        => Project(ctx, ctx.Message.TripId, deliveryOrderId: null, jobId: null,
+            "Hang", reason: ctx.Message.Reflavour ? "Vendor re-flavoured from Held" : null);
+
+    public Task Consume(ConsumeContext<TripHeldIntegrationEventV1> ctx)
+        => Project(ctx, ctx.Message.TripId, deliveryOrderId: null, jobId: null,
+            "Held", reason: ctx.Message.Reflavour ? "Vendor re-flavoured from Hang" : null);
 
     public Task Consume(ConsumeContext<TripResumedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.TripId, deliveryOrderId: null, jobId: null,

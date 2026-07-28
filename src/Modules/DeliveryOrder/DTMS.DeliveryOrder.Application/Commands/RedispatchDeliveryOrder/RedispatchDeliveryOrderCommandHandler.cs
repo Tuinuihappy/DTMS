@@ -45,7 +45,8 @@ public class RedispatchDeliveryOrderCommandHandler : ICommandHandler<RedispatchD
         var hasActiveTrip = trips.Any(t =>
             t.Status is TripStatus.Created
                 or TripStatus.InProgress
-                or TripStatus.Paused);
+                or TripStatus.Hang
+                or TripStatus.Held);
         if (hasActiveTrip)
             return Result.Failure(
                 "Cannot redispatch — at least one trip on this order is still active. " +

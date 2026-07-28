@@ -146,6 +146,18 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     evt.EventId, evt.OccurredOn, evt.TripId,
                     TriggeredBy: triggeredBy, CorrelationId: correlationId)
             ],
+            TripHangDomainEvent evt =>
+            [
+                new TripHangIntegrationEventV1(
+                    evt.EventId, evt.OccurredOn, evt.TripId, evt.Reflavour,
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+            ],
+            TripHeldDomainEvent evt =>
+            [
+                new TripHeldIntegrationEventV1(
+                    evt.EventId, evt.OccurredOn, evt.TripId, evt.Reflavour,
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+            ],
             // Operator acknowledged a robot waiting at a checkpoint (PASS).
             // Status unchanged on the Trip — the projector still appends a
             // history row so the operator's intervention shows in the timeline.

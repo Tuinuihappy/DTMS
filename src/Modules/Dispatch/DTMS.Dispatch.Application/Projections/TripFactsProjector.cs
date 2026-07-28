@@ -16,6 +16,8 @@ namespace DTMS.Dispatch.Application.Projections;
 public class TripFactsProjector :
     IConsumer<TripStartedIntegrationEvent>,
     IConsumer<TripPausedIntegrationEventV1>,
+    IConsumer<TripHangIntegrationEventV1>,
+    IConsumer<TripHeldIntegrationEventV1>,
     IConsumer<TripResumedIntegrationEventV1>,
     IConsumer<TripCompletedIntegrationEvent>,
     IConsumer<TripFailedIntegrationEvent>,
@@ -49,8 +51,22 @@ public class TripFactsProjector :
             ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<TripPausedIntegrationEventV1> ctx)
+        // Deprecated shim — drains pre-split outbox rows only. No flavour on
+        // the old event; record as "Held" (legacy null-source default) so the
+        // "Paused" literal never reappears in live rows post-remap.
         => Run(ctx, () => _store.RecordPausedAsync(
-            ctx.Message.TripId, ctx.Message.OccurredOn, ctx.CancellationToken));
+            ctx.Message.TripId, ctx.Message.OccurredOn,
+            "Held", false, ctx.CancellationToken));
+
+    public Task Consume(ConsumeContext<TripHangIntegrationEventV1> ctx)
+        => Run(ctx, () => _store.RecordPausedAsync(
+            ctx.Message.TripId, ctx.Message.OccurredOn,
+            "Hang", ctx.Message.Reflavour, ctx.CancellationToken));
+
+    public Task Consume(ConsumeContext<TripHeldIntegrationEventV1> ctx)
+        => Run(ctx, () => _store.RecordPausedAsync(
+            ctx.Message.TripId, ctx.Message.OccurredOn,
+            "Held", ctx.Message.Reflavour, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<TripResumedIntegrationEventV1> ctx)
         => Run(ctx, () => _store.RecordResumedAsync(

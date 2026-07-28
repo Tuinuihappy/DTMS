@@ -120,7 +120,8 @@ public sealed class Riot3ReconciliationService : BackgroundService
         var rejected = 0;
         var cancelled = 0;
         var started = 0;
-        var paused = 0;
+        var hang = 0;
+        var held = 0;
         var resumed = 0;
         var vehicleReassigned = 0;
         var vehicleBackfilled = 0;
@@ -172,7 +173,8 @@ public sealed class Riot3ReconciliationService : BackgroundService
                 case Transition.Rejected: rejected++; break;
                 case Transition.Cancelled: cancelled++; break;
                 case Transition.Started: started++; break;
-                case Transition.Paused: paused++; break;
+                case Transition.Hang: hang++; break;
+                case Transition.Held: held++; break;
                 case Transition.Resumed: resumed++; break;
                 case Transition.VehicleReassigned:
                     vehicleReassigned++;
@@ -254,8 +256,8 @@ public sealed class Riot3ReconciliationService : BackgroundService
 
         var stale = await CountStaleTripsAsync(scope, staleCutoff, ct);
         _logger.LogInformation(
-            "[Reconciler] tick: in-flight={InFlight} reconciled={Reconciled} (completed={Completed} failed={Failed} rejected={Rejected} cancelled={Cancelled} started={Started} paused={Paused} resumed={Resumed} vehicleReassigned={VehicleReassigned} vehicleBackfilled={VehicleBackfilled}) noVendor={NoVendor} fetchErr={FetchErr} stale-skipped={Stale}",
-            inFlight.Count, reconciled, completed, failed, rejected, cancelled, started, paused, resumed, vehicleReassigned, vehicleBackfilled, skippedNoVendorRecord, skippedFetchError, stale);
+            "[Reconciler] tick: in-flight={InFlight} reconciled={Reconciled} (completed={Completed} failed={Failed} rejected={Rejected} cancelled={Cancelled} started={Started} hang={Hang} held={Held} resumed={Resumed} vehicleReassigned={VehicleReassigned} vehicleBackfilled={VehicleBackfilled}) noVendor={NoVendor} fetchErr={FetchErr} stale-skipped={Stale}",
+            inFlight.Count, reconciled, completed, failed, rejected, cancelled, started, hang, held, resumed, vehicleReassigned, vehicleBackfilled, skippedNoVendorRecord, skippedFetchError, stale);
 
         // Publish tick outcome to Prometheus (WorkflowMetrics / DTMS.Workflow).
         // trips_stuck (=stale) drives the "AMR order stuck past reconcile window"
@@ -326,7 +328,8 @@ public sealed class Riot3ReconciliationService : BackgroundService
                             items: itemSnapshots);
                         return Transition.Started;
                     }
-                    if (trip.Status == DTMS.Dispatch.Domain.Enums.TripStatus.Paused)
+                    if (trip.Status is DTMS.Dispatch.Domain.Enums.TripStatus.Hang
+                                     or DTMS.Dispatch.Domain.Enums.TripStatus.Held)
                     {
                         // Vendor resumed and we missed the HANG/HELD_TO_CONTINUE
                         // webhook — sync back to InProgress so operator commands
@@ -352,19 +355,32 @@ public sealed class Riot3ReconciliationService : BackgroundService
 
                 case "HANG":
                 case "HELD":
-                    // Vendor paused — only transition if Trip is currently
-                    // InProgress. Created/Paused/terminal states are no-ops.
-                    // Capture pause flavour so the resume command picks the
-                    // right CONTINUE_FROM_* — see Riot3Webhooks for context.
-                    if (trip.Status == DTMS.Dispatch.Domain.Enums.TripStatus.InProgress)
+                    // Vendor paused — transition from InProgress (fresh pause)
+                    // or from the OTHER pause flavour (vendor re-flavoured the
+                    // pause mid-way; Trip.Pause handles the drift and flags the
+                    // event Reflavour). Same flavour again / Created / terminal
+                    // are no-ops. The status now carries the flavour that the
+                    // resume command derives CONTINUE_FROM_* from.
                     {
                         var pauseSource = state == "HANG"
                             ? DTMS.Dispatch.Domain.Enums.VendorPauseSource.Hang
                             : DTMS.Dispatch.Domain.Enums.VendorPauseSource.Held;
-                        trip.Pause(pauseSource);
-                        return Transition.Paused;
+                        var pauseTarget = state == "HANG"
+                            ? DTMS.Dispatch.Domain.Enums.TripStatus.Hang
+                            : DTMS.Dispatch.Domain.Enums.TripStatus.Held;
+                        var eligible = trip.Status == DTMS.Dispatch.Domain.Enums.TripStatus.InProgress
+                            || (trip.Status is DTMS.Dispatch.Domain.Enums.TripStatus.Hang
+                                             or DTMS.Dispatch.Domain.Enums.TripStatus.Held
+                                && trip.Status != pauseTarget);
+                        if (eligible)
+                        {
+                            trip.Pause(pauseSource);
+                            return pauseTarget == DTMS.Dispatch.Domain.Enums.TripStatus.Hang
+                                ? Transition.Hang
+                                : Transition.Held;
+                        }
+                        return Transition.None;
                     }
-                    return Transition.None;
 
                 case "REJECTED":
                     // Vendor refused the task post-dispatch, before execution.
@@ -584,5 +600,5 @@ public sealed class Riot3ReconciliationService : BackgroundService
         return s is "FINISHED" or "SUCCEEDED" or "FAILED" or "CANCELED" or "CANCELLED" or "REJECTED";
     }
 
-    internal enum Transition { None, Completed, Failed, Rejected, Cancelled, Started, Paused, Resumed, VehicleReassigned }
+    internal enum Transition { None, Completed, Failed, Rejected, Cancelled, Started, Hang, Held, Resumed, VehicleReassigned }
 }

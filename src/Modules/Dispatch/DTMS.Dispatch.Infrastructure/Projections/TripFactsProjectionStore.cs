@@ -49,6 +49,10 @@ public class TripFactsProjectionStore : ITripFactsProjectionStore
     public async Task RecordPausedAsync(Guid tripId, DateTime at, CancellationToken ct)
         => (await Find(tripId, ct))?.RecordPaused(at);
 
+    public async Task RecordPausedAsync(
+        Guid tripId, DateTime at, string finalStatus, bool reflavour, CancellationToken ct)
+        => (await Find(tripId, ct))?.RecordPaused(at, finalStatus, reflavour);
+
     public async Task RecordResumedAsync(Guid tripId, DateTime at, CancellationToken ct)
         => (await Find(tripId, ct))?.RecordResumed(at);
 

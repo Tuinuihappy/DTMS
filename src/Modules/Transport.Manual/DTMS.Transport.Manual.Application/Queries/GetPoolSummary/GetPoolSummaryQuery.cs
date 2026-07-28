@@ -25,7 +25,7 @@ public sealed record PoolSummaryDto(
     // scan and is deferred to PR-I.
     int ActiveOperators,
 
-    // How many InProgress/Paused trips have an operator bound (across all
+    // How many InProgress/Hang/Held trips have an operator bound (across all
     // operators). Gives the dispatcher a "how busy is the floor" number
     // paired with PoolDepth.
     int ClaimedInFlight);

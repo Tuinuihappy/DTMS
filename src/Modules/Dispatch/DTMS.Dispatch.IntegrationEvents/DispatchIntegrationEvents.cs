@@ -130,20 +130,45 @@ public record PodCapturedIntegrationEvent(
     IReadOnlyList<string> ScannedIds) : IIntegrationEvent;
 
 // Phase P1 (b12) — pause/resume transitions surface to the projector so
-// the Trip status timeline covers every state in the TripStatus enum
-// (Created/InProgress/Paused/Completed/Failed/Cancelled). No existing
-// consumer reacts to these — only TripStatusHistoryProjector does today.
+// the Trip status timeline covers every state in the TripStatus enum.
+//
+// DEPRECATED SHIM: TripPausedIntegrationEventV1 is replaced by the
+// flavour-split TripHang/TripHeldIntegrationEventV1 below. The record must
+// stay until the outbox + DLQ are drained of rows carrying this CLR type
+// name — OutboxProcessorService resolves messages via Type.GetType, so
+// deleting the record poisons the drain. Remove together with the old
+// consumer arms in the cleanup release.
 public record TripPausedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid TripId,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
     string SchemaVersion = "1.1") : IIntegrationEvent;
 
+// Resume is NOT split — target state is always InProgress; the history
+// projector derives the from-flavour (Hang/Held) from the latest row.
 public record TripResumedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid TripId,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
     string SchemaVersion = "1.1") : IIntegrationEvent;
+
+// Flavour split of TripPaused: Hang = system pause (RIOT3 TASK_HANG),
+// Held = operator pause (TASK_HELD / DTMS Pause button). Reflavour=true
+// marks a Hang↔Held drift transition — projectors record the new status
+// but must NOT count it as a fresh pause.
+public record TripHangIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid TripId,
+    bool Reflavour = false,
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
+
+public record TripHeldIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid TripId,
+    bool Reflavour = false,
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
 
 // Operator acknowledged a robot waiting at a checkpoint (RIOT3 PASS).
 // Trip.Status remains InProgress — TripStatusHistoryProjector still

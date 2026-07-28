@@ -78,7 +78,7 @@ public class TripCancelledConsumer : IConsumer<TripCancelledIntegrationEvent>
                     order.Id, context.CancellationToken);
                 var hasActiveSibling = siblingTrips.Any(t =>
                     t.Id != evt.TripId &&
-                    t.Status is TripStatus.Created or TripStatus.InProgress or TripStatus.Paused);
+                    t.Status is TripStatus.Created or TripStatus.InProgress or TripStatus.Hang or TripStatus.Held);
 
                 if (!hasActiveSibling)
                 {

@@ -146,7 +146,7 @@ public static class AdminWorkflowEndpoints
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         })
         .WithName("AdminForceCompleteTrip")
-        .WithSummary("Force-complete a Trip stuck at InProgress/Paused because TASK_FINISHED webhook was dropped. Does NOT notify upstream OMS.")
+        .WithSummary("Force-complete a Trip stuck at InProgress/Hang/Held because TASK_FINISHED webhook was dropped. Does NOT notify upstream OMS.")
         .RequirePermission(Permissions.Dispatch.TripForce);
 
         // G1 Phase 1 — pod drain. Called by K8s preStop hook (curl from

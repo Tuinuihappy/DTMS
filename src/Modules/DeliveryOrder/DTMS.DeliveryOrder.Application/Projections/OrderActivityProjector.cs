@@ -67,6 +67,8 @@ public class OrderActivityProjector :
     IConsumer<TripRejectedIntegrationEventV1>,
     IConsumer<TripCancelledIntegrationEvent>,
     IConsumer<TripPausedIntegrationEventV1>,
+    IConsumer<TripHangIntegrationEventV1>,
+    IConsumer<TripHeldIntegrationEventV1>,
     IConsumer<TripResumedIntegrationEventV1>,
     IConsumer<TripRobotPassAcknowledgedIntegrationEventV1>,
     IConsumer<ExceptionRaisedIntegrationEvent>,
@@ -255,6 +257,22 @@ public class OrderActivityProjector :
     {
         _logger.LogDebug(
             "TripResumed {EventId} for Trip {TripId} skipped — no DeliveryOrderId in payload",
+            ctx.Message.EventId, ctx.Message.TripId);
+        await Task.CompletedTask;
+    }
+
+    public async Task Consume(ConsumeContext<TripHangIntegrationEventV1> ctx)
+    {
+        _logger.LogDebug(
+            "TripHang {EventId} for Trip {TripId} skipped — no DeliveryOrderId in payload",
+            ctx.Message.EventId, ctx.Message.TripId);
+        await Task.CompletedTask;
+    }
+
+    public async Task Consume(ConsumeContext<TripHeldIntegrationEventV1> ctx)
+    {
+        _logger.LogDebug(
+            "TripHeld {EventId} for Trip {TripId} skipped — no DeliveryOrderId in payload",
             ctx.Message.EventId, ctx.Message.TripId);
         await Task.CompletedTask;
     }

@@ -23,6 +23,16 @@ public interface ITripFactsProjectionStore
         string? vendorVehicleKey, CancellationToken ct);
 
     Task RecordPausedAsync(Guid tripId, DateTime at, CancellationToken ct);
+
+    /// <summary>
+    /// Flavour-aware pause (Hang/Held split). <paramref name="finalStatus"/>
+    /// lands in FinalStatus; <paramref name="reflavour"/>=true records a
+    /// Hang↔Held drift transition — status updates but PauseCount and
+    /// FirstPausedAt are left alone (it is not a fresh pause).
+    /// </summary>
+    Task RecordPausedAsync(
+        Guid tripId, DateTime at, string finalStatus, bool reflavour, CancellationToken ct);
+
     Task RecordResumedAsync(Guid tripId, DateTime at, CancellationToken ct);
 
     Task SetCompletedAtAsync(

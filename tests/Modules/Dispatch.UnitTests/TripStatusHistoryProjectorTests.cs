@@ -51,15 +51,68 @@ public class TripStatusHistoryProjectorTests
 
         await projector.Consume(Ctx(evt));
 
+        // Deprecated shim drains old TripPaused rows as "Held" (legacy
+        // null-source default) — never "Paused", post-remap.
         await store.Received(1).AppendAsync(
             TripStatusHistoryProjector.Name,
             evt.EventId, tripId,
             deliveryOrderId: orderId,
             jobId: jobId,
             fromStatus: "InProgress",
-            toStatus: "Paused",
+            toStatus: "Held",
+            evt.OccurredOn,
+            reason: "Legacy paused event (pre Hang/Held split)",
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TripHang_AppendsHangRow()
+    {
+        var (projector, store) = Build();
+        var tripId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        store.GetLatestForTripAsync(tripId, Arg.Any<CancellationToken>())
+            .Returns(new TripHistoryLatest("InProgress", DateTime.UtcNow.AddMinutes(-5), orderId, null));
+
+        var evt = new TripHangIntegrationEventV1(Guid.NewGuid(), DateTime.UtcNow, tripId);
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).AppendAsync(
+            TripStatusHistoryProjector.Name,
+            evt.EventId, tripId,
+            deliveryOrderId: orderId,
+            jobId: (Guid?)null,
+            fromStatus: "InProgress",
+            toStatus: "Hang",
             evt.OccurredOn,
             reason: null,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TripHeld_Reflavour_AppendsRowWithDriftReason()
+    {
+        var (projector, store) = Build();
+        var tripId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        store.GetLatestForTripAsync(tripId, Arg.Any<CancellationToken>())
+            .Returns(new TripHistoryLatest("Hang", DateTime.UtcNow.AddMinutes(-1), orderId, null));
+
+        var evt = new TripHeldIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, tripId, Reflavour: true);
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).AppendAsync(
+            TripStatusHistoryProjector.Name,
+            evt.EventId, tripId,
+            deliveryOrderId: orderId,
+            jobId: (Guid?)null,
+            fromStatus: "Hang",
+            toStatus: "Held",
+            evt.OccurredOn,
+            reason: "Vendor re-flavoured from Hang",
             Arg.Any<CancellationToken>());
     }
 

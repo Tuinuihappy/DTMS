@@ -56,7 +56,7 @@ internal sealed class PoolSummaryQueryHandler
         var claimedInFlight = await _dispatch.Trips
             .AsNoTracking()
             .Where(t => t.ClaimedByOperatorId != null
-                     && (t.Status == TripStatus.InProgress || t.Status == TripStatus.Paused))
+                     && (t.Status == TripStatus.InProgress || t.Status == TripStatus.Hang || t.Status == TripStatus.Held))
             .CountAsync(cancellationToken);
 
         // Active operator count — potential claimants. Not the same as

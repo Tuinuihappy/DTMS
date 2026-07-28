@@ -13,7 +13,7 @@ public interface ITripClient
 
     /// <summary>
     /// Trip's overall <c>TripStatus</c> changed
-    /// (Created/InProgress/Paused/Completed/Failed/Cancelled).
+    /// (Created/InProgress/Hang/Held/Completed/Failed/Cancelled/Rejected).
     /// </summary>
     Task StatusChanged(object change);
 

@@ -78,8 +78,36 @@ public class TripFactsProjectorTests
 
         await projector.Consume(Ctx(evt));
 
+        // Deprecated shim records old TripPaused rows as "Held".
         await store.Received(1).RecordPausedAsync(
-            tripId, evt.OccurredOn, Arg.Any<CancellationToken>());
+            tripId, evt.OccurredOn, "Held", false, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TripHang_RecordsPauseWithHangStatus()
+    {
+        var (projector, store) = Build();
+        var tripId = Guid.NewGuid();
+        var evt = new TripHangIntegrationEventV1(Guid.NewGuid(), DateTime.UtcNow, tripId);
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).RecordPausedAsync(
+            tripId, evt.OccurredOn, "Hang", false, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TripHeld_Reflavour_PassesReflavourFlag()
+    {
+        var (projector, store) = Build();
+        var tripId = Guid.NewGuid();
+        var evt = new TripHeldIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, tripId, Reflavour: true);
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).RecordPausedAsync(
+            tripId, evt.OccurredOn, "Held", true, Arg.Any<CancellationToken>());
     }
 
     [Fact]

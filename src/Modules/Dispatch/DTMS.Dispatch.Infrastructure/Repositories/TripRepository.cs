@@ -119,7 +119,8 @@ public class TripRepository : ITripRepository
                 .ThenInclude(e => e!.VehicleAssignments)
             .Where(t => (t.Status == TripStatus.Created
                          || t.Status == TripStatus.InProgress
-                         || t.Status == TripStatus.Paused)
+                         || t.Status == TripStatus.Hang
+                         || t.Status == TripStatus.Held)
                         && t.CreatedAt >= staleCutoffUtc)
             .ToListAsync(cancellationToken);
     }

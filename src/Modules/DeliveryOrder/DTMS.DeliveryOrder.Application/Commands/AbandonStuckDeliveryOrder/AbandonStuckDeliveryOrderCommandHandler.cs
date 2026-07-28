@@ -45,7 +45,7 @@ public class AbandonStuckDeliveryOrderCommandHandler : ICommandHandler<AbandonSt
 
         var trips = await _tripRepository.GetByDeliveryOrderIdAsync(order.Id, cancellationToken);
         var activeTrips = trips
-            .Where(t => t.Status is TripStatus.Created or TripStatus.InProgress or TripStatus.Paused)
+            .Where(t => t.Status is TripStatus.Created or TripStatus.InProgress or TripStatus.Hang or TripStatus.Held)
             .ToList();
         if (activeTrips.Count > 0)
             return Result.Failure(

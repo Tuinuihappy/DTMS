@@ -60,8 +60,24 @@ public record TripRejectedDomainEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId,
     string Reason, string VendorUpperKey) : IDomainEvent;
 
+// Deprecated pending removal — replaced by TripHangDomainEvent /
+// TripHeldDomainEvent (the pause flavour is carried by the event type).
+// Still raised until the Hang/Held producer flip lands; delete together
+// with the old integration-event shim once the outbox has drained.
 public record TripPausedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId) : IDomainEvent;
+// Resume is NOT split — the target state is always InProgress and the
+// history projector derives the from-flavour from the latest row.
 public record TripResumedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId) : IDomainEvent;
+
+// Split of TripPaused by RIOT3 pause flavour: Hang = system pause
+// (TASK_HANG, e.g. obstacle / mode change), Held = operator pause
+// (TASK_HELD or the DTMS Pause button). Reflavour=true marks a
+// Hang↔Held transition (vendor drift) rather than a fresh pause —
+// the facts projector must not bump PauseCount for those.
+public record TripHangDomainEvent(
+    Guid EventId, DateTime OccurredOn, Guid TripId, bool Reflavour = false) : IDomainEvent;
+public record TripHeldDomainEvent(
+    Guid EventId, DateTime OccurredOn, Guid TripId, bool Reflavour = false) : IDomainEvent;
 
 // Operator confirmed a robot waiting at a checkpoint may proceed (RIOT3 PASS).
 // Trip.Status is intentionally unchanged — this is an interactive nudge at

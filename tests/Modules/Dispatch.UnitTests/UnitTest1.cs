@@ -562,16 +562,71 @@ public class TripTests
     }
 
     [Fact]
-    public void PauseAndResume_RoundTrip()
+    public void PauseAndResume_Held_RoundTrip()
     {
         var trip = NewEnvelopeTrip();
         trip.MarkVendorStarted();
 
         trip.Pause(VendorPauseSource.Held);
-        trip.Status.Should().Be(TripStatus.Paused);
+        trip.Status.Should().Be(TripStatus.Held);
+        trip.DomainEvents.OfType<TripHeldDomainEvent>().Single().Reflavour.Should().BeFalse();
 
         trip.Resume();
         trip.Status.Should().Be(TripStatus.InProgress);
+    }
+
+    [Fact]
+    public void PauseAndResume_Hang_RoundTrip()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted();
+
+        trip.Pause(VendorPauseSource.Hang);
+        trip.Status.Should().Be(TripStatus.Hang);
+        trip.DomainEvents.OfType<TripHangDomainEvent>().Single().Reflavour.Should().BeFalse();
+
+        trip.Resume();
+        trip.Status.Should().Be(TripStatus.InProgress);
+    }
+
+    // Vendor flavour drift — RIOT3 can move an order HELD↔HANG mid-pause.
+    // Status follows the vendor; the event is flagged Reflavour so the
+    // facts projector doesn't count it as a fresh pause.
+    [Fact]
+    public void Pause_Reflavour_HangToHeld_FlipsStatusAndFlagsEvent()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted();
+        trip.Pause(VendorPauseSource.Hang);
+
+        trip.Pause(VendorPauseSource.Held);
+
+        trip.Status.Should().Be(TripStatus.Held);
+        trip.VendorPauseSource.Should().Be(VendorPauseSource.Held);
+        trip.DomainEvents.OfType<TripHeldDomainEvent>().Single().Reflavour.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Pause_SameFlavourAgain_IsIdempotentNoOp()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted();
+        trip.Pause(VendorPauseSource.Hang);
+
+        trip.Pause(VendorPauseSource.Hang);
+
+        trip.Status.Should().Be(TripStatus.Hang);
+        trip.DomainEvents.OfType<TripHangDomainEvent>().Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Pause_FromCreated_Throws()
+    {
+        var trip = NewEnvelopeTrip();
+
+        var act = () => trip.Pause(VendorPauseSource.Hang);
+
+        act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
@@ -808,6 +863,44 @@ public class PauseAndResumeTripHandlerTests
         // Handler routes envelope ops through vendorOrderKey not upperKey
         // (per commit 107675e — RIOT3 silently no-ops upperKey route).
         vendor.ResumeCalls.Should().ContainSingle().Which.Should().Be(trip.VendorOrderKey);
+        // E639999 net: a Held trip must NEVER produce CONTINUE_FROM_HANG.
+        vendor.ResumeFromHangCalls.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Resume_FromHang_SendsContinueFromHangOnly()
+    {
+        var trip = NewTripInProgress();
+        trip.Pause(VendorPauseSource.Hang);
+        var repo = new FakeTripRepository(trip);
+        var vendor = new StubVendorOps();
+
+        var handler = new ResumeTripCommandHandler(repo, vendor, NullLogger<ResumeTripCommandHandler>.Instance);
+        var result = await handler.Handle(new ResumeTripCommand(trip.Id), default);
+
+        result.IsSuccess.Should().BeTrue();
+        vendor.ResumeFromHangCalls.Should().ContainSingle().Which.Should().Be(trip.VendorOrderKey);
+        // E639999 net: a Hang trip must NEVER produce CONTINUE_FROM_HELD.
+        vendor.ResumeCalls.Should().BeEmpty();
+    }
+
+    // Drift + resume: vendor re-flavoured Hang→Held mid-pause; the resume
+    // command must follow the CURRENT status, not the original flavour.
+    [Fact]
+    public async Task Resume_AfterReflavourHangToHeld_SendsContinueFromHeld()
+    {
+        var trip = NewTripInProgress();
+        trip.Pause(VendorPauseSource.Hang);
+        trip.Pause(VendorPauseSource.Held);   // drift
+        var repo = new FakeTripRepository(trip);
+        var vendor = new StubVendorOps();
+
+        var handler = new ResumeTripCommandHandler(repo, vendor, NullLogger<ResumeTripCommandHandler>.Instance);
+        var result = await handler.Handle(new ResumeTripCommand(trip.Id), default);
+
+        result.IsSuccess.Should().BeTrue();
+        vendor.ResumeCalls.Should().ContainSingle();
+        vendor.ResumeFromHangCalls.Should().BeEmpty();
     }
 
     [Fact]

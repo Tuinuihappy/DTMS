@@ -40,6 +40,38 @@ public class TripPauseResumeJobConsumerTests
         await repo.DidNotReceive().UpdateAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>());
     }
 
+    // Hang/Held split (Trip level) — JobStatus deliberately stays a single
+    // Paused; both flavours land on the same MarkPaused.
+    [Fact]
+    public async Task TripHang_LinkedJob_FlipsToPaused()
+    {
+        var (consumer, repo) = BuildPause();
+        var tripId = Guid.NewGuid();
+        var job = BuildExecutingJob(tripId);
+        repo.GetByTripIdAsync(tripId, Arg.Any<CancellationToken>()).Returns(job);
+        var evt = new TripHangIntegrationEventV1(Guid.NewGuid(), DateTime.UtcNow, tripId);
+
+        await consumer.Consume(Ctx(evt));
+
+        job.Status.Should().Be(JobStatus.Paused);
+        await repo.Received(1).UpdateAsync(job, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TripHeld_LinkedJob_FlipsToPaused()
+    {
+        var (consumer, repo) = BuildPause();
+        var tripId = Guid.NewGuid();
+        var job = BuildExecutingJob(tripId);
+        repo.GetByTripIdAsync(tripId, Arg.Any<CancellationToken>()).Returns(job);
+        var evt = new TripHeldIntegrationEventV1(Guid.NewGuid(), DateTime.UtcNow, tripId);
+
+        await consumer.Consume(Ctx(evt));
+
+        job.Status.Should().Be(JobStatus.Paused);
+        await repo.Received(1).UpdateAsync(job, Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task TripResumed_PausedJob_FlipsToExecuting()
     {

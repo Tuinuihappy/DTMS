@@ -27,7 +27,7 @@ public class ForceCompleteTripCommandHandler : ICommandHandler<ForceCompleteTrip
         // permissive (it also accepts Created), but force-completing a
         // Trip that never started is almost always operator error — refuse
         // it here and surface the real action (start it first).
-        if (trip.Status is not (TripStatus.InProgress or TripStatus.Paused))
+        if (trip.Status is not (TripStatus.InProgress or TripStatus.Hang or TripStatus.Held))
             return Result.Failure(
                 $"Cannot force-complete a trip in {trip.Status} status. " +
                 "Only InProgress or Paused trips can be force-completed.");

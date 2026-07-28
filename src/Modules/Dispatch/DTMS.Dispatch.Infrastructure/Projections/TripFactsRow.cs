@@ -88,11 +88,17 @@ public class TripFactsRow
         UpdatedAt = at;
     }
 
-    public void RecordPaused(DateTime at)
+    // finalStatus: "Paused" (legacy shim) or the flavour-split "Hang"/"Held".
+    // reflavour=true = Hang↔Held drift transition — the trip was already
+    // paused, so the pause metrics must not move; only the status label does.
+    public void RecordPaused(DateTime at, string finalStatus = "Paused", bool reflavour = false)
     {
-        FirstPausedAt ??= at;
-        PauseCount += 1;
-        FinalStatus = "Paused";
+        if (!reflavour)
+        {
+            FirstPausedAt ??= at;
+            PauseCount += 1;
+        }
+        FinalStatus = finalStatus;
         UpdatedAt = at;
     }
 

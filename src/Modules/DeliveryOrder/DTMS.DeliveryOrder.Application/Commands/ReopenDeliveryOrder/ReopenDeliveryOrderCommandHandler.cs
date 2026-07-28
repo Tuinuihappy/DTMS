@@ -52,7 +52,7 @@ public class ReopenDeliveryOrderCommandHandler
         // trips are terminal by construction, so this is a no-op there.
         var trips = await _tripRepository.GetByDeliveryOrderIdAsync(order.Id, cancellationToken);
         var activeTrips = trips
-            .Count(t => t.Status is TripStatus.Created or TripStatus.InProgress or TripStatus.Paused);
+            .Count(t => t.Status is TripStatus.Created or TripStatus.InProgress or TripStatus.Hang or TripStatus.Held);
         if (activeTrips > 0)
             return Result<ReopenOrderResult>.Failure(
                 $"Order still has {activeTrips} active trip(s). Wait for the cancel cascade to finish (or cancel them), then reopen.");
