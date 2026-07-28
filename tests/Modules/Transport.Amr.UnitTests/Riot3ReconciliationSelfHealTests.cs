@@ -141,6 +141,62 @@ public class Riot3ReconciliationStateMappingTests
         trip.Status.Should().Be(TripStatus.Completed);
     }
 
+    // First-ever coverage of the REJECTED mapping — the vendor refused the
+    // order post-dispatch. Distinct Rejected status since 2026-07; reason
+    // precedence mirrors the webhook: ErrorDescription → ErrorCode → default.
+    [Fact]
+    public async Task ApplyVendorState_Rejected_RejectsTripWithVendorReason()
+    {
+        var trip = InProgressTrip();
+        var data = new Riot3OrderQueryData
+        {
+            State = "REJECTED",
+            FailReason = new Riot3FailResult { ErrorDescription = "station disabled" },
+        };
+        var snapshots = Substitute.For<ITripItemSnapshotProvider>();
+
+        var transition = await Riot3ReconciliationService.ApplyVendorStateAsync(
+            trip, data, snapshots, CancellationToken.None);
+
+        transition.Should().Be(Riot3ReconciliationService.Transition.Rejected);
+        trip.Status.Should().Be(TripStatus.Rejected);
+        trip.FailureReason.Should().Be("station disabled");
+    }
+
+    [Fact]
+    public async Task ApplyVendorState_Rejected_FallsBackToErrorCode()
+    {
+        var trip = InProgressTrip();
+        var data = new Riot3OrderQueryData
+        {
+            State = "REJECTED",
+            FailReason = new Riot3FailResult { ErrorCode = "E700404" },
+        };
+        var snapshots = Substitute.For<ITripItemSnapshotProvider>();
+
+        await Riot3ReconciliationService.ApplyVendorStateAsync(
+            trip, data, snapshots, CancellationToken.None);
+
+        trip.FailureReason.Should().Be("E700404");
+    }
+
+    // Webhook TASK_FAILED vs reconciler REJECTED race — first terminal
+    // failure wins; the poll's REJECTED must not flip an already-Failed trip.
+    [Fact]
+    public async Task ApplyVendorState_Rejected_AfterFailed_KeepsFailed()
+    {
+        var trip = InProgressTrip();
+        trip.MarkVendorFailed("robot stuck");
+        var data = new Riot3OrderQueryData { State = "REJECTED" };
+        var snapshots = Substitute.For<ITripItemSnapshotProvider>();
+
+        await Riot3ReconciliationService.ApplyVendorStateAsync(
+            trip, data, snapshots, CancellationToken.None);
+
+        trip.Status.Should().Be(TripStatus.Failed);
+        trip.FailureReason.Should().Be("robot stuck");
+    }
+
     // Fix A: the live PROCESSING paths must read ResolvedVehicle, not
     // ProcessingVehicle directly. Some RIOT3 deployments never populate
     // processingVehicle (nor emit a TASK_PROCESSING webhook) — they report the

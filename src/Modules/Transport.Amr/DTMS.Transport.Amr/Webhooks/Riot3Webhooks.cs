@@ -208,12 +208,13 @@ public static class Riot3Webhooks
                 case "TASK_REJECTED":
                     // Vendor refused the task post-dispatch (rare — usually
                     // POST /orders catches bad payloads; REJECTED would be
-                    // a late vendor-side issue). Treat as failure so the
-                    // DeliveryOrder reflects the operational outcome.
+                    // a late vendor-side issue). Distinct Rejected status;
+                    // the DeliveryOrder still propagates to Failed via
+                    // TripRejectedIntegrationEventV1.
                     var rejectReason = payload.Task?.FailReason?.ErrorDescription
                                        ?? payload.Task?.FailReason?.ErrorCode
                                        ?? "vendor rejected task";
-                    trip.MarkVendorFailed(rejectReason);
+                    trip.MarkVendorRejected(rejectReason);
                     logger.LogWarning("[EnvelopeWebhook] Trip {TripId} rejected by vendor (upperKey {UpperKey}): {Reason}",
                         trip.Id, upperKey, rejectReason);
                     break;

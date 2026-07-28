@@ -117,6 +117,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
         var reconciled = 0;
         var completed = 0;
         var failed = 0;
+        var rejected = 0;
         var cancelled = 0;
         var started = 0;
         var paused = 0;
@@ -168,6 +169,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
             {
                 case Transition.Completed: completed++; break;
                 case Transition.Failed: failed++; break;
+                case Transition.Rejected: rejected++; break;
                 case Transition.Cancelled: cancelled++; break;
                 case Transition.Started: started++; break;
                 case Transition.Paused: paused++; break;
@@ -252,8 +254,8 @@ public sealed class Riot3ReconciliationService : BackgroundService
 
         var stale = await CountStaleTripsAsync(scope, staleCutoff, ct);
         _logger.LogInformation(
-            "[Reconciler] tick: in-flight={InFlight} reconciled={Reconciled} (completed={Completed} failed={Failed} cancelled={Cancelled} started={Started} paused={Paused} resumed={Resumed} vehicleReassigned={VehicleReassigned} vehicleBackfilled={VehicleBackfilled}) noVendor={NoVendor} fetchErr={FetchErr} stale-skipped={Stale}",
-            inFlight.Count, reconciled, completed, failed, cancelled, started, paused, resumed, vehicleReassigned, vehicleBackfilled, skippedNoVendorRecord, skippedFetchError, stale);
+            "[Reconciler] tick: in-flight={InFlight} reconciled={Reconciled} (completed={Completed} failed={Failed} rejected={Rejected} cancelled={Cancelled} started={Started} paused={Paused} resumed={Resumed} vehicleReassigned={VehicleReassigned} vehicleBackfilled={VehicleBackfilled}) noVendor={NoVendor} fetchErr={FetchErr} stale-skipped={Stale}",
+            inFlight.Count, reconciled, completed, failed, rejected, cancelled, started, paused, resumed, vehicleReassigned, vehicleBackfilled, skippedNoVendorRecord, skippedFetchError, stale);
 
         // Publish tick outcome to Prometheus (WorkflowMetrics / DTMS.Workflow).
         // trips_stuck (=stale) drives the "AMR order stuck past reconcile window"
@@ -365,13 +367,14 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     return Transition.None;
 
                 case "REJECTED":
-                    // Vendor refused the task post-dispatch. Treat as failure
-                    // so the DeliveryOrder propagates to Failed.
+                    // Vendor refused the task post-dispatch, before execution.
+                    // Distinct Rejected status (order-side propagation still
+                    // mirrors Failed via TripRejectedIntegrationEventV1).
                     var rejectReason = data.FailReason?.ErrorDescription
                                        ?? data.FailReason?.ErrorCode
                                        ?? "vendor rejected task";
-                    trip.MarkVendorFailed(rejectReason);
-                    return Transition.Failed;
+                    trip.MarkVendorRejected(rejectReason);
+                    return Transition.Rejected;
 
                 default:
                     return Transition.None;
@@ -581,5 +584,5 @@ public sealed class Riot3ReconciliationService : BackgroundService
         return s is "FINISHED" or "SUCCEEDED" or "FAILED" or "CANCELED" or "CANCELLED" or "REJECTED";
     }
 
-    internal enum Transition { None, Completed, Failed, Cancelled, Started, Paused, Resumed, VehicleReassigned }
+    internal enum Transition { None, Completed, Failed, Rejected, Cancelled, Started, Paused, Resumed, VehicleReassigned }
 }

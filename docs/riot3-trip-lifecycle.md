@@ -32,8 +32,9 @@ Webhook เข้าจุดเดียว: `POST /api/webhooks/riot3/notify/{
 
 ## Level 1 — Order ↔ `Trip.Status`
 
-`Trip.Status` มี 6 ค่า: `Created, InProgress, Paused, Completed, Failed, Cancelled`
-(`DispatchEnums.cs`)
+`Trip.Status` มี 7 ค่า: `Created, InProgress, Paused, Completed, Failed, Cancelled, Rejected`
+(`DispatchEnums.cs`) — `Rejected` เพิ่ม 2026-07-28: vendor ปฏิเสธก่อนได้ execute
+(แยกจาก `Failed` = ทำแล้วล้ม) ฝั่ง DeliveryOrder ตอบสนองเหมือน Failed ทุกประการ
 
 RIOT3 พูดถึง order ด้วย **2 vocabulary ที่ไม่ตรงกัน**:
 - **notify webhook** → field `taskEventType` (เช่น `TASK_FINISHED`)
@@ -47,7 +48,7 @@ RIOT3 พูดถึง order ด้วย **2 vocabulary ที่ไม่ต
 | `TASK_PROCESSING` | `PROCESSING` | `MarkVendorStarted()` | **`InProgress`** |
 | `TASK_FINISHED` | **`SUCCEEDED`** ⚠️ | `MarkVendorCompleted()` | **`Completed`** |
 | `TASK_FAILED`   | `FAILED`    | `MarkVendorFailed()` | **`Failed`** |
-| `TASK_REJECTED` | `REJECTED`  | `MarkVendorFailed()` | **`Failed`** |
+| `TASK_REJECTED` | `REJECTED`  | `MarkVendorRejected()` | **`Rejected`** |
 | `TASK_CANCELED` | **`CANCELLED`** ⚠️ | `Cancel()` | **`Cancelled`** |
 | `TASK_HANG`     | `HANG`      | `Pause(Hang)` | **`Paused`** |
 | `TASK_HELD`     | `HELD`      | `Pause(Held)` | **`Paused`** |
@@ -66,10 +67,13 @@ stateDiagram-v2
     InProgress --> Paused: TASK_HANG (system) / TASK_HELD (operator)
     Paused --> InProgress: TASK_*_TO_CONTINUE / Resume()
     InProgress --> Completed: TASK_FINISHED / SUCCEEDED
-    InProgress --> Failed: TASK_FAILED / TASK_REJECTED
+    InProgress --> Failed: TASK_FAILED
+    Created --> Rejected: TASK_REJECTED (ปฏิเสธก่อน execute)
+    InProgress --> Rejected: TASK_REJECTED
     InProgress --> Cancelled: TASK_CANCELED
     Completed --> [*]
     Failed --> [*]
+    Rejected --> [*]
     Cancelled --> [*]
 ```
 
@@ -85,8 +89,14 @@ stateDiagram-v2
   จะ **ไม่** re-fire event แต่ยังอัปเดต vehicle assignment (ดู reassignment ด้านล่าง)
 - **Pause 2 flavor** ยุบเป็น `Paused` เดียว แต่เก็บ `VendorPauseSource` (Hang/Held) ไว้เลือก resume
   command ให้ตรง — ส่งผิดได้ error `E639999`
-- **Failure 3 flavor** → `TASK_FAILED` + `TASK_REJECTED` เป็น `Failed`; `TASK_CANCELED` เป็น
-  `Cancelled` (แยกกันเพราะ cancel ปล่อย DeliveryOrder ให้ re-dispatch ได้ แต่ fail propagate ไปทำ order Failed)
+- **Failure 3 flavor แยกสถานะครบ (ตั้งแต่ 2026-07-28)** → `TASK_FAILED` เป็น `Failed` (ทำแล้วล้ม);
+  `TASK_REJECTED` เป็น `Rejected` (ปฏิเสธก่อนได้ทำ — order ยัง propagate เป็น Failed เหมือนกัน,
+  retry ผ่าน Reopen ได้เหมือนกัน); `TASK_CANCELED` เป็น `Cancelled` (ปล่อย DeliveryOrder ให้ re-dispatch ได้)
+- **First-terminal-failure-wins** — `MarkVendorFailed`/`MarkVendorRejected` no-op เมื่อ Trip อยู่
+  terminal ใดแล้ว (`Failed`/`Rejected`/`Cancelled`): webhook กับ reconciler ส่ง terminal ขัดกันได้
+  ตัวที่มาทีหลังห้าม flip status หรือยิง order-failing event ซ้ำ **รวมถึง fix เดิม:
+  `TASK_FAILED` ที่มาช้าหลัง operator cancel จะไม่ทับ `Cancelled` เป็น `Failed` อีกต่อไป**
+  (เดิมทับได้ → order โดนลาก Failed ทั้งที่ cancel ปล่อย items คืนแล้ว)
 
 ### Vehicle reassignment (VendorVehicleKey เปลี่ยนได้ระหว่างทาง)
 
@@ -180,6 +190,7 @@ Pending → Picked → DroppedOff → Delivered        (+ Failed, Returned, Canc
 | Drop ที่ drop station | `TripDropCompletedConsumer` | POD required: `Picked → DroppedOff`; ไม่ต้อง POD: `Picked → Delivered` |
 | `TripCompleted` (จาก `MarkVendorCompleted`) | `TripCompletedConsumer` | `MarkTripItemsDeliveredOrLeaveForPod()` + `RecomputeStatusFromItems()` / `MarkAsCompleted()` → `Completed` / `PartiallyCompleted` / `Failed` |
 | `TripFailed` (จาก `MarkVendorFailed`) | `TripFailedConsumer` | `MarkFailed()` → `Failed` |
+| `TripRejected` (จาก `MarkVendorRejected`) | `TripFailedConsumer` (handler เดียวกัน) | เหมือน `TripFailed` ทุกประการ — ต่างแค่ Trip.Status/history/facts บันทึกเป็น `Rejected` |
 | `TripCancelled` (จาก `Cancel`) | `TripCancelledConsumer` | ปล่อย items ออกจาก trip (`UnassignItemsFromTrip`) + `RecomputeStatusFromItems()`; **ไม่ auto-fail** — order ยัง eligible re-dispatch. cascade เป็น `Cancelled` เฉพาะเมื่อเป็น trip สุดท้ายและ order ยัง in-flight |
 
 หมายเหตุ:
