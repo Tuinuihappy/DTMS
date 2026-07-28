@@ -12,14 +12,13 @@ namespace DTMS.Planning.Application.Consumers;
 /// <see cref="IJobRepository.GetByTripIdAsync"/>.
 ///
 /// JobStatus deliberately stays a single <c>Paused</c> — the Hang/Held
-/// flavour split lives at Trip level only; both flavours (and the
-/// deprecated TripPaused shim) funnel into the same MarkPaused.
+/// flavour split lives at Trip level only; both flavours funnel into the
+/// same MarkPaused.
 ///
 /// Idempotent + safe under out-of-order webhooks — Job.MarkPaused
 /// itself ignores duplicate/inappropriate-state calls.
 /// </summary>
 public class TripPausedJobConsumer :
-    IConsumer<TripPausedIntegrationEventV1>,
     IConsumer<TripHangIntegrationEventV1>,
     IConsumer<TripHeldIntegrationEventV1>
 {
@@ -31,9 +30,6 @@ public class TripPausedJobConsumer :
         _jobRepository = jobRepository;
         _logger = logger;
     }
-
-    public Task Consume(ConsumeContext<TripPausedIntegrationEventV1> context)
-        => HandleAsync(context, context.Message.TripId, "TripPaused");
 
     public Task Consume(ConsumeContext<TripHangIntegrationEventV1> context)
         => HandleAsync(context, context.Message.TripId, "TripHang");

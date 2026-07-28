@@ -66,7 +66,6 @@ public class OrderActivityProjector :
     IConsumer<TripFailedIntegrationEvent>,
     IConsumer<TripRejectedIntegrationEventV1>,
     IConsumer<TripCancelledIntegrationEvent>,
-    IConsumer<TripPausedIntegrationEventV1>,
     IConsumer<TripHangIntegrationEventV1>,
     IConsumer<TripHeldIntegrationEventV1>,
     IConsumer<TripResumedIntegrationEventV1>,
@@ -242,19 +241,11 @@ public class OrderActivityProjector :
             "TripCancelled", ctx.Message.Reason,
             relatedTripId: ctx.Message.TripId);
 
-    public async Task Consume(ConsumeContext<TripPausedIntegrationEventV1> ctx)
+    public async Task Consume(ConsumeContext<TripResumedIntegrationEventV1> ctx)
     {
         // Pause/Resume payload doesn't carry DeliveryOrderId. The activity
         // timeline is order-scoped — without an OrderId we have nothing to
         // attach the row to. Skip with a warning rather than fabricating.
-        _logger.LogDebug(
-            "TripPaused {EventId} for Trip {TripId} skipped — no DeliveryOrderId in payload",
-            ctx.Message.EventId, ctx.Message.TripId);
-        await Task.CompletedTask;
-    }
-
-    public async Task Consume(ConsumeContext<TripResumedIntegrationEventV1> ctx)
-    {
         _logger.LogDebug(
             "TripResumed {EventId} for Trip {TripId} skipped — no DeliveryOrderId in payload",
             ctx.Message.EventId, ctx.Message.TripId);

@@ -36,11 +36,6 @@ public class AmrTripExtension
     public string? VendorVehicleKey { get; private set; }
     public string? VendorVehicleName { get; private set; }
 
-    // Records WHICH vendor event paused this trip so Resume can pick
-    // the matching command type. Null while not paused (cleared on
-    // Resume / terminal transitions).
-    public VendorPauseSource? VendorPauseSource { get; private set; }
-
     // Phase 3d — full audit of every vehicleKey reassignment. Append-only;
     // populated by RecordVehicleAssignment (idempotent — duplicate
     // webhooks don't grow the history). Operator dashboards can render
@@ -109,8 +104,4 @@ public class AmrTripExtension
         VendorVehicleKey = vendorVehicleKey;
         VendorVehicleName = vendorVehicleName;
     }
-
-    public void SetPauseSource(VendorPauseSource source) => VendorPauseSource = source;
-
-    public void ClearPauseSource() => VendorPauseSource = null;
 }

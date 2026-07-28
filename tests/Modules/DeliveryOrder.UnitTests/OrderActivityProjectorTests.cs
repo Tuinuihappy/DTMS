@@ -179,10 +179,10 @@ public class OrderActivityProjectorTests
     }
 
     [Fact]
-    public async Task TripPaused_IsSkipped_NoDeliveryOrderInPayload()
+    public async Task TripHang_IsSkipped_NoDeliveryOrderInPayload()
     {
         var (projector, store) = Build();
-        var evt = new TripPausedIntegrationEventV1(
+        var evt = new TripHangIntegrationEventV1(
             Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid());
 
         await projector.Consume(Ctx(evt));

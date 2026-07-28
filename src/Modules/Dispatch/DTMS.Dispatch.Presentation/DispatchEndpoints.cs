@@ -43,16 +43,6 @@ public static class DispatchEndpoints
             foreach (var token in rawStatuses)
             {
                 if (string.IsNullOrWhiteSpace(token)) continue;
-                // Backward-compat shim: "Paused" was split into Hang/Held —
-                // cached frontend bundles (≤30 days) still send the old token.
-                // Map it to both flavours instead of a 400. Remove together
-                // with the other Hang/Held shims in the cleanup release.
-                if (string.Equals(token, "Paused", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (!statuses.Contains(TripStatus.Hang)) statuses.Add(TripStatus.Hang);
-                    if (!statuses.Contains(TripStatus.Held)) statuses.Add(TripStatus.Held);
-                    continue;
-                }
                 if (!Enum.TryParse<TripStatus>(token, ignoreCase: true, out var parsed))
                     return Results.BadRequest($"Unknown TripStatus '{token}'.");
                 if (!statuses.Contains(parsed)) statuses.Add(parsed);

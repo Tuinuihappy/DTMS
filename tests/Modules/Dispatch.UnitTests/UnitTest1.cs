@@ -602,7 +602,6 @@ public class TripTests
         trip.Pause(VendorPauseSource.Held);
 
         trip.Status.Should().Be(TripStatus.Held);
-        trip.VendorPauseSource.Should().Be(VendorPauseSource.Held);
         trip.DomainEvents.OfType<TripHeldDomainEvent>().Single().Reflavour.Should().BeTrue();
     }
 

@@ -74,36 +74,21 @@ public class TripAmrExtensionIntegrationTests
         trip.Status.Should().Be(TripStatus.InProgress);   // status still advances
     }
 
+    // Pause no longer writes the AmrExtension — the flavour lives entirely
+    // on Trip.Status since the Hang/Held split. A Manual-shape trip (no
+    // vendor key) must still pause/resume cleanly without growing an
+    // extension row as a side effect.
     [Fact]
-    public void Pause_CreatesExtension_AndSetsSource()
+    public void PauseResume_WithoutVendorKey_DoesNotTouchExtension()
     {
-        // Even for a trip created with no vendor key (Manual / Fleet
-        // shape), a Pause must persist its source. The lazy-creation
-        // pattern means Manual / Fleet eventually grow an AmrExtension
-        // row — that's OK; Phase 4 will introduce a ManualTripExtension
-        // and the Manual pause flow will write there instead.
         var trip = Trip.CreateForEnvelope(Guid.NewGuid(), "upper-G1", null);
         trip.MarkVendorStarted();   // Created → InProgress
 
         trip.Pause(VendorPauseSource.Hang);
-
-        trip.AmrExtension.Should().NotBeNull();
-        trip.AmrExtension!.VendorPauseSource.Should().Be(VendorPauseSource.Hang);
-        trip.VendorPauseSource.Should().Be(VendorPauseSource.Hang);  // delegated
         trip.Status.Should().Be(TripStatus.Hang);
-    }
-
-    [Fact]
-    public void Resume_ClearsPauseSource_OnExtension()
-    {
-        var trip = Trip.CreateForEnvelope(Guid.NewGuid(), "upper-G1", "RIOT3-ABC");
-        trip.MarkVendorStarted();
-        trip.Pause(VendorPauseSource.Held);
+        trip.AmrExtension.Should().BeNull();
 
         trip.Resume();
-
-        trip.VendorPauseSource.Should().BeNull();
-        trip.AmrExtension!.VendorPauseSource.Should().BeNull();
         trip.Status.Should().Be(TripStatus.InProgress);
     }
 
@@ -224,7 +209,7 @@ public class TripAmrExtensionIntegrationTests
     public void DelegatingProperties_AllReturnNull_When_NoExtension()
     {
         // Sanity check for the read-side delegation pattern. Trip core
-        // exposes 4 vendor properties as expression-bodied delegations;
+        // exposes vendor properties as expression-bodied delegations;
         // every one must short-circuit cleanly to null when the navigation
         // is unset (otherwise EF-loaded trips with no extension throw NRE).
         var trip = Trip.CreateForEnvelope(Guid.NewGuid(), "upper-G1", null);
@@ -233,6 +218,5 @@ public class TripAmrExtensionIntegrationTests
         trip.VendorOrderKey.Should().BeNull();
         trip.VendorVehicleKey.Should().BeNull();
         trip.VendorVehicleName.Should().BeNull();
-        trip.VendorPauseSource.Should().BeNull();
     }
 }

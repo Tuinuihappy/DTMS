@@ -132,10 +132,6 @@ public class DispatchDbContext : DbContext
             builder.Property(e => e.VendorOrderKey).HasMaxLength(100);
             builder.Property(e => e.VendorVehicleKey).HasMaxLength(100);
             builder.Property(e => e.VendorVehicleName).HasMaxLength(100);
-            // VendorPauseSource — string-coded so DB reads stay intelligible
-            // ("Operator" / "Vendor") and the enum can grow without a
-            // re-numbering migration. Nullable; only set when paused.
-            builder.Property(e => e.VendorPauseSource).HasConversion<string>().HasMaxLength(20);
 
             // Phase 3d — vehicle reassignment history. Cascade delete so
             // dropping the extension also drops its history (extension

@@ -13,27 +13,12 @@ namespace Planning.UnitTests;
 public class TripPauseResumeJobConsumerTests
 {
     [Fact]
-    public async Task TripPaused_LinkedJob_FlipsToPausedAndPersists()
-    {
-        var (consumer, repo) = BuildPause();
-        var tripId = Guid.NewGuid();
-        var job = BuildExecutingJob(tripId);
-        repo.GetByTripIdAsync(tripId, Arg.Any<CancellationToken>()).Returns(job);
-        var evt = new TripPausedIntegrationEventV1(Guid.NewGuid(), DateTime.UtcNow, tripId);
-
-        await consumer.Consume(Ctx(evt));
-
-        job.Status.Should().Be(JobStatus.Paused);
-        await repo.Received(1).UpdateAsync(job, Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task TripPaused_NoLinkedJob_LogsAndReturns()
+    public async Task TripHang_NoLinkedJob_LogsAndReturns()
     {
         var (consumer, repo) = BuildPause();
         var tripId = Guid.NewGuid();
         repo.GetByTripIdAsync(tripId, Arg.Any<CancellationToken>()).Returns((Job?)null);
-        var evt = new TripPausedIntegrationEventV1(Guid.NewGuid(), DateTime.UtcNow, tripId);
+        var evt = new TripHangIntegrationEventV1(Guid.NewGuid(), DateTime.UtcNow, tripId);
 
         await consumer.Consume(Ctx(evt));
 

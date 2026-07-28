@@ -44,7 +44,6 @@ public class Trip : AggregateRoot<Guid>
     public string? VendorOrderKey => AmrExtension?.VendorOrderKey;
     public string? VendorVehicleKey => AmrExtension?.VendorVehicleKey;
     public string? VendorVehicleName => AmrExtension?.VendorVehicleName;
-    public VendorPauseSource? VendorPauseSource => AmrExtension?.VendorPauseSource;
 
     // Route context — the station pair the trip dispatches against.
     // Captured at create time so retry can re-resolve the OrderTemplate
@@ -489,11 +488,6 @@ public class Trip : AggregateRoot<Guid>
             throw new InvalidOperationException("Only InProgress trips can be paused.");
 
         Status = target;
-        // Dual-write during the Hang/Held transition release — the column is
-        // the rollback path (remap SQL restores Paused + reads the flavour
-        // back from here). Drop together with the column in the cleanup.
-        AmrExtension ??= AmrTripExtension.Create(Id);
-        AmrExtension.SetPauseSource(source);
         if (target == TripStatus.Hang)
             AddDomainEvent(new TripHangDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reflavour));
         else
@@ -507,7 +501,6 @@ public class Trip : AggregateRoot<Guid>
             throw new InvalidOperationException("Only Hang/Held trips can be resumed.");
 
         Status = TripStatus.InProgress;
-        AmrExtension?.ClearPauseSource();
         AddDomainEvent(new TripResumedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
         RecordEvent("TripResumed", null);
     }

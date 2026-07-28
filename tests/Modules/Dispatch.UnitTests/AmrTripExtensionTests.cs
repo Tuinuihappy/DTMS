@@ -33,7 +33,6 @@ public class AmrTripExtensionTests
         ext.VendorOrderKey.Should().BeNull();
         ext.VendorVehicleKey.Should().BeNull();
         ext.VendorVehicleName.Should().BeNull();
-        ext.VendorPauseSource.Should().BeNull();
         ext.VehicleAssignments.Should().BeEmpty();
     }
 
@@ -171,29 +170,7 @@ public class AmrTripExtensionTests
         act.Should().Throw<ArgumentException>().WithParameterName("source");
     }
 
-    [Fact]
-    public void SetPauseSource_ThenClear_RoundTrips()
-    {
-        var ext = AmrTripExtension.Create(Guid.NewGuid());
-
-        ext.SetPauseSource(VendorPauseSource.Held);
-        ext.VendorPauseSource.Should().Be(VendorPauseSource.Held);
-
-        ext.ClearPauseSource();
-        ext.VendorPauseSource.Should().BeNull();
-    }
-
-    [Fact]
-    public void SetPauseSource_Overwrites_PreviousSource()
-    {
-        // Unlike VendorOrderKey (first-write-wins), the pause source is
-        // not first-write-wins — a Vendor-driven hang may transition to
-        // an Operator-driven hold without an intervening Resume.
-        var ext = AmrTripExtension.Create(Guid.NewGuid());
-
-        ext.SetPauseSource(VendorPauseSource.Hang);
-        ext.SetPauseSource(VendorPauseSource.Held);
-
-        ext.VendorPauseSource.Should().Be(VendorPauseSource.Held);
-    }
+    // SetPauseSource/ClearPauseSource removed with the Hang/Held split —
+    // the pause flavour lives on Trip.Status now (see Trip pause tests,
+    // incl. the re-flavour drift cases that replaced the overwrite test).
 }

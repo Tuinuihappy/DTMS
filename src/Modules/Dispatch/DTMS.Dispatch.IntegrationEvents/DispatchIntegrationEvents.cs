@@ -131,19 +131,9 @@ public record PodCapturedIntegrationEvent(
 
 // Phase P1 (b12) — pause/resume transitions surface to the projector so
 // the Trip status timeline covers every state in the TripStatus enum.
+// (TripPausedIntegrationEventV1 removed after the Hang/Held split once the
+// outbox drained to zero rows of the old CLR type name.)
 //
-// DEPRECATED SHIM: TripPausedIntegrationEventV1 is replaced by the
-// flavour-split TripHang/TripHeldIntegrationEventV1 below. The record must
-// stay until the outbox + DLQ are drained of rows carrying this CLR type
-// name — OutboxProcessorService resolves messages via Type.GetType, so
-// deleting the record poisons the drain. Remove together with the old
-// consumer arms in the cleanup release.
-public record TripPausedIntegrationEventV1(
-    Guid EventId, DateTime OccurredOn, Guid TripId,
-    string? TriggeredBy = null,
-    Guid? CorrelationId = null,
-    string SchemaVersion = "1.1") : IIntegrationEvent;
-
 // Resume is NOT split — target state is always InProgress; the history
 // projector derives the from-flavour (Hang/Held) from the latest row.
 public record TripResumedIntegrationEventV1(

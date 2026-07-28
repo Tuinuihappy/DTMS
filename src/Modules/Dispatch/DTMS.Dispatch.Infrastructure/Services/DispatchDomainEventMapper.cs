@@ -134,12 +134,6 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
             // Phase P1 (b12) — pause/resume transitions for the Trip status
             // timeline. Domain payload carries only TripId; the projector
             // pulls DeliveryOrderId from the latest history row when needed.
-            TripPausedDomainEvent evt =>
-            [
-                new TripPausedIntegrationEventV1(
-                    evt.EventId, evt.OccurredOn, evt.TripId,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
-            ],
             TripResumedDomainEvent evt =>
             [
                 new TripResumedIntegrationEventV1(

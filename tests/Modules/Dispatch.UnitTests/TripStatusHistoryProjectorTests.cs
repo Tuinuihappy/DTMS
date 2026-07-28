@@ -36,36 +36,6 @@ public class TripStatusHistoryProjectorTests
     }
 
     [Fact]
-    public async Task TripPaused_CarriesForwardOrderIdFromLatest()
-    {
-        var (projector, store) = Build();
-        var tripId = Guid.NewGuid();
-        var orderId = Guid.NewGuid();
-        var jobId = Guid.NewGuid();
-        var t0 = DateTime.UtcNow.AddMinutes(-5);
-        store.GetLatestForTripAsync(tripId, Arg.Any<CancellationToken>())
-            .Returns(new TripHistoryLatest("InProgress", t0, orderId, jobId));
-
-        var evt = new TripPausedIntegrationEventV1(
-            Guid.NewGuid(), DateTime.UtcNow, tripId);
-
-        await projector.Consume(Ctx(evt));
-
-        // Deprecated shim drains old TripPaused rows as "Held" (legacy
-        // null-source default) — never "Paused", post-remap.
-        await store.Received(1).AppendAsync(
-            TripStatusHistoryProjector.Name,
-            evt.EventId, tripId,
-            deliveryOrderId: orderId,
-            jobId: jobId,
-            fromStatus: "InProgress",
-            toStatus: "Held",
-            evt.OccurredOn,
-            reason: "Legacy paused event (pre Hang/Held split)",
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
     public async Task TripHang_AppendsHangRow()
     {
         var (projector, store) = Build();

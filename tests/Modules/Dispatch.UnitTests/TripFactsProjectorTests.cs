@@ -70,20 +70,6 @@ public class TripFactsProjectorTests
     }
 
     [Fact]
-    public async Task TripPaused_RecordsPause()
-    {
-        var (projector, store) = Build();
-        var tripId = Guid.NewGuid();
-        var evt = new TripPausedIntegrationEventV1(Guid.NewGuid(), DateTime.UtcNow, tripId);
-
-        await projector.Consume(Ctx(evt));
-
-        // Deprecated shim records old TripPaused rows as "Held".
-        await store.Received(1).RecordPausedAsync(
-            tripId, evt.OccurredOn, "Held", false, Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
     public async Task TripHang_RecordsPauseWithHangStatus()
     {
         var (projector, store) = Build();

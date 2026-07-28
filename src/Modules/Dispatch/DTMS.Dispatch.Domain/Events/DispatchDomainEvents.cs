@@ -60,11 +60,6 @@ public record TripRejectedDomainEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId,
     string Reason, string VendorUpperKey) : IDomainEvent;
 
-// Deprecated pending removal — replaced by TripHangDomainEvent /
-// TripHeldDomainEvent (the pause flavour is carried by the event type).
-// Still raised until the Hang/Held producer flip lands; delete together
-// with the old integration-event shim once the outbox has drained.
-public record TripPausedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId) : IDomainEvent;
 // Resume is NOT split — the target state is always InProgress and the
 // history projector derives the from-flavour from the latest row.
 public record TripResumedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId) : IDomainEvent;

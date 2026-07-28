@@ -21,7 +21,6 @@ namespace DTMS.Dispatch.Application.Projections;
 /// </summary>
 public class TripStatusHistoryProjector :
     IConsumer<TripStartedIntegrationEvent>,
-    IConsumer<TripPausedIntegrationEventV1>,
     IConsumer<TripHangIntegrationEventV1>,
     IConsumer<TripHeldIntegrationEventV1>,
     IConsumer<TripResumedIntegrationEventV1>,
@@ -55,13 +54,6 @@ public class TripStatusHistoryProjector :
             ctx.Message.JobId == Guid.Empty ? null : ctx.Message.JobId,
             "InProgress",
             reason: ctx.Message.VehicleId == Guid.Empty ? null : $"vehicle={ctx.Message.VehicleId}");
-
-    public Task Consume(ConsumeContext<TripPausedIntegrationEventV1> ctx)
-        // Deprecated shim — drains pre-split outbox rows only. The old event
-        // carries no flavour; write "Held" (the legacy null-source default)
-        // rather than reintroducing "Paused" into live rows post-remap.
-        => Project(ctx, ctx.Message.TripId, deliveryOrderId: null, jobId: null,
-            "Held", reason: "Legacy paused event (pre Hang/Held split)");
 
     public Task Consume(ConsumeContext<TripHangIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.TripId, deliveryOrderId: null, jobId: null,
