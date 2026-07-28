@@ -141,7 +141,7 @@ public class TripRepository : ITripRepository
             .IgnoreQueryFilters()
             .Include(t => t.AmrExtension)
                 .ThenInclude(e => e!.VehicleAssignments)
-            .Where(t => (t.Status == TripStatus.Completed || t.Status == TripStatus.Failed)
+            .Where(t => (t.Status == TripStatus.Completed || t.Status == TripStatus.Failed || t.Status == TripStatus.Rejected)
                         && t.VendorFinalSnapshot == null
                         && (t.AmrExtension == null || t.AmrExtension.VendorVehicleKey == null)
                         && t.UpperKey != ""

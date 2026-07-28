@@ -5,12 +5,16 @@ namespace DTMS.Dispatch.Domain.Enums;
 //                Manual pool: an operator to Acknowledge from the pool.
 //   InProgress — vendor / operator has taken the trip and is executing it.
 //   Paused     — vendor placed the trip in a hold/hang state.
-//   Completed / Failed / Cancelled — terminal states.
+//   Completed / Failed / Cancelled / Rejected — terminal states.
+//   Rejected   — vendor refused the trip post-dispatch, before execution
+//                (AMR: RIOT3 TASK_REJECTED / orderState REJECTED). Order-side
+//                propagation is identical to Failed; kept distinct so ops and
+//                reports can tell "refused before doing" from "failed doing".
 //
 // The "in pool" signal for Manual/Fleet is NOT a distinct status — it is
 // derived from (Status = Created ∧ DispatchedAt IS NOT NULL ∧
 // ClaimedByOperatorId IS NULL). See IX_Trips_Pool.
-public enum TripStatus { Created, InProgress, Paused, Completed, Failed, Cancelled }
+public enum TripStatus { Created, InProgress, Paused, Completed, Failed, Cancelled, Rejected }
 
 // Why the trip is in Paused state. The vendor exposes two distinct paused
 // flavours on its order state machine and each pairs with a DIFFERENT

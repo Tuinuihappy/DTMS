@@ -33,7 +33,7 @@ public sealed class SourceCompleteTripCommandHandler
         // MarkVendorCompleted throws on Cancelled/Failed and no-ops if
         // already Completed — guard the throw path, let the idempotent
         // re-complete succeed.
-        if (trip.Status is TripStatus.Cancelled or TripStatus.Failed)
+        if (trip.Status is TripStatus.Cancelled or TripStatus.Failed or TripStatus.Rejected)
             return Result.Failure(
                 $"Cannot complete a trip in {trip.Status} status.");
 

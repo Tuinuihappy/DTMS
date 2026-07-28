@@ -60,14 +60,14 @@ public class ReissueTripCommandHandler : ICommandHandler<ReissueTripCommand, Gui
         if (original is null)
             return Result<Guid>.Failure($"Trip {request.OriginalTripId} not found.");
 
-        // Cancelled trips retry directly. Failed trips require the parent
-        // order to be moved out of Failed first (POST /orders/{id}/reopen)
+        // Cancelled trips retry directly. Failed/Rejected trips require the
+        // parent order to be moved out of Failed first (POST /orders/{id}/reopen)
         // — the order-status guard a few lines down enforces that. The
         // 2-step audit trail distinguishes "who reopened" from "who
         // retried". Any other Trip state isn't retryable from this command.
-        if (original.Status != TripStatus.Cancelled && original.Status != TripStatus.Failed)
+        if (original.Status is not (TripStatus.Cancelled or TripStatus.Failed or TripStatus.Rejected))
             return Result<Guid>.Failure(
-                $"Trip is {original.Status}. Only Cancelled or Failed trips can be retried.");
+                $"Trip is {original.Status}. Only Cancelled, Failed or Rejected trips can be retried.");
 
         // Bug fix (E2E scenario 5): a Cancelled trip on a Cancelled (or
         // otherwise terminal-admin) order must not be retried directly.

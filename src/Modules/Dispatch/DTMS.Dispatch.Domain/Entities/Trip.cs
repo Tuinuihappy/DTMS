@@ -417,7 +417,7 @@ public class Trip : AggregateRoot<Guid>
     {
         if (Status == TripStatus.Completed)
             return;
-        if (Status == TripStatus.Cancelled || Status == TripStatus.Failed)
+        if (Status is TripStatus.Cancelled or TripStatus.Failed or TripStatus.Rejected)
             throw new InvalidOperationException($"Cannot complete a trip in {Status} status.");
 
         Status = TripStatus.Completed;
@@ -427,9 +427,16 @@ public class Trip : AggregateRoot<Guid>
             Guid.NewGuid(), DateTime.UtcNow, Id, JobId, DeliveryOrderId, UpperKey));
     }
 
+    // First-terminal-failure-wins: Failed / Rejected / Cancelled are all
+    // no-ops here (not throws) because the two vendor channels (webhook +
+    // reconciler poll) can deliver conflicting terminal signals for the same
+    // trip — the second signal must not flip the status or emit a second
+    // order-failing event. Cancelled in particular: a late TASK_FAILED after
+    // an operator cancel used to overwrite Cancelled → Failed and drag the
+    // order down even though the cancel had released its items.
     public void MarkVendorFailed(string reason)
     {
-        if (Status == TripStatus.Failed)
+        if (Status is TripStatus.Failed or TripStatus.Rejected or TripStatus.Cancelled)
             return;
         if (Status == TripStatus.Completed)
             throw new InvalidOperationException("Cannot fail a completed trip.");
@@ -439,6 +446,25 @@ public class Trip : AggregateRoot<Guid>
         CompletedAt = DateTime.UtcNow;
         RecordEvent("VendorFailed", reason);
         AddDomainEvent(new TripFailedDomainEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, JobId, DeliveryOrderId, reason, UpperKey));
+    }
+
+    // Vendor refused the trip post-dispatch, before execution (RIOT3
+    // TASK_REJECTED / orderState REJECTED). Same first-terminal-failure-wins
+    // guard as MarkVendorFailed; order-side propagation is identical to
+    // Failed — only the status (and therefore ops/report visibility) differs.
+    public void MarkVendorRejected(string reason)
+    {
+        if (Status is TripStatus.Rejected or TripStatus.Failed or TripStatus.Cancelled)
+            return;
+        if (Status == TripStatus.Completed)
+            throw new InvalidOperationException("Cannot reject a completed trip.");
+
+        Status = TripStatus.Rejected;
+        FailureReason = reason;
+        CompletedAt = DateTime.UtcNow;
+        RecordEvent("VendorRejected", reason);
+        AddDomainEvent(new TripRejectedDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, JobId, DeliveryOrderId, reason, UpperKey));
     }
 
@@ -495,7 +521,7 @@ public class Trip : AggregateRoot<Guid>
 
     public void Cancel(string reason)
     {
-        if (Status == TripStatus.Completed || Status == TripStatus.Cancelled)
+        if (Status is TripStatus.Completed or TripStatus.Cancelled or TripStatus.Rejected)
             throw new InvalidOperationException($"Cannot cancel a trip in {Status} status.");
 
         Status = TripStatus.Cancelled;
@@ -514,7 +540,7 @@ public class Trip : AggregateRoot<Guid>
         if (vehicleId == Guid.Empty)
             throw new ArgumentException("VehicleId must not be empty.", nameof(vehicleId));
 
-        if (Status == TripStatus.Completed || Status == TripStatus.Cancelled)
+        if (Status is TripStatus.Completed or TripStatus.Cancelled or TripStatus.Rejected)
             throw new InvalidOperationException($"Cannot assign a vehicle to a trip in {Status} status.");
 
         if (VehicleId == vehicleId)
@@ -545,7 +571,7 @@ public class Trip : AggregateRoot<Guid>
     public bool ReconcileVehicleAssignment(string? vendorVehicleKey, string? vendorVehicleName, string source)
     {
         if (string.IsNullOrWhiteSpace(vendorVehicleKey)) return false;
-        if (Status is TripStatus.Completed or TripStatus.Cancelled or TripStatus.Failed) return false;
+        if (Status is TripStatus.Completed or TripStatus.Cancelled or TripStatus.Failed or TripStatus.Rejected) return false;
 
         var before = AmrExtension?.VendorVehicleKey;
         AmrExtension ??= AmrTripExtension.Create(Id);

@@ -52,6 +52,14 @@ public record TripFailedDomainEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId,
     string Reason, string VendorUpperKey) : IDomainEvent;
 
+// Vendor refused the trip post-dispatch, before execution (RIOT3
+// TASK_REJECTED / orderState REJECTED). Order-side propagation mirrors
+// TripFailed; the distinct event keeps status/history/reports honest about
+// "refused before doing" vs "failed doing".
+public record TripRejectedDomainEvent(
+    Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId,
+    string Reason, string VendorUpperKey) : IDomainEvent;
+
 public record TripPausedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId) : IDomainEvent;
 public record TripResumedDomainEvent(Guid EventId, DateTime OccurredOn, Guid TripId) : IDomainEvent;
 

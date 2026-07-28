@@ -96,7 +96,7 @@ public class ReopenDeliveryOrderCommandHandler
             .Select(t => t.PreviousAttemptId!.Value)
             .ToHashSet();
         var chainTips = trips
-            .Where(t => t.Status is TripStatus.Cancelled or TripStatus.Failed)
+            .Where(t => t.Status is TripStatus.Cancelled or TripStatus.Failed or TripStatus.Rejected)
             .Where(t => !previousIds.Contains(t.Id))
             .ToList();
 

@@ -105,6 +105,19 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     TriggeredBy: triggeredBy,
                     CorrelationId: correlationId)
             ],
+            TripRejectedDomainEvent evt =>
+            [
+                new TripRejectedIntegrationEventV1(
+                    evt.EventId,
+                    evt.OccurredOn,
+                    evt.TripId,
+                    evt.JobId,
+                    evt.DeliveryOrderId,
+                    evt.Reason,
+                    evt.VendorUpperKey,
+                    TriggeredBy: triggeredBy,
+                    CorrelationId: correlationId)
+            ],
             TripCancelledDomainEvent evt =>
             [
                 new TripCancelledIntegrationEvent(

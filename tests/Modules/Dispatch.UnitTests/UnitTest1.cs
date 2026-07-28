@@ -411,6 +411,122 @@ public class TripTests
         act.Should().Throw<InvalidOperationException>();
     }
 
+    // First-terminal-failure-wins: a late TASK_FAILED after an operator
+    // cancel must NOT overwrite Cancelled (the cancel already released the
+    // order's items — flipping to Failed would drag the order down).
+    [Fact]
+    public void MarkVendorFailed_FromCancelled_IsNoOp()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.Cancel("ops cancel");
+
+        var act = () => trip.MarkVendorFailed("late vendor failure");
+
+        act.Should().NotThrow();
+        trip.Status.Should().Be(TripStatus.Cancelled);
+        trip.DomainEvents.OfType<TripFailedDomainEvent>().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void MarkVendorRejected_FromCreated_RejectsAndFiresEvent()
+    {
+        var trip = NewEnvelopeTrip("ord-G1");
+
+        trip.MarkVendorRejected("station disabled");
+
+        trip.Status.Should().Be(TripStatus.Rejected);
+        trip.FailureReason.Should().Be("station disabled");
+        trip.CompletedAt.Should().NotBeNull();
+        var evt = trip.DomainEvents.OfType<TripRejectedDomainEvent>().Single();
+        evt.VendorUpperKey.Should().Be("ord-G1");
+        evt.Reason.Should().Be("station disabled");
+    }
+
+    [Fact]
+    public void MarkVendorRejected_AlreadyRejected_IsIdempotent()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorRejected("first");
+
+        var act = () => trip.MarkVendorRejected("second");
+
+        act.Should().NotThrow();
+        trip.FailureReason.Should().Be("first");
+        trip.DomainEvents.OfType<TripRejectedDomainEvent>().Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void MarkVendorRejected_FromCompleted_Throws()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorCompleted();
+
+        var act = () => trip.MarkVendorRejected("late");
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    // Webhook TASK_FAILED and reconciler REJECTED can race for the same
+    // trip — whichever lands first wins; the second must not flip the
+    // status or emit a second order-failing event.
+    [Fact]
+    public void MarkVendorRejected_FromFailed_IsNoOp()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorFailed("robot stuck");
+
+        trip.MarkVendorRejected("late reject");
+
+        trip.Status.Should().Be(TripStatus.Failed);
+        trip.DomainEvents.OfType<TripRejectedDomainEvent>().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void MarkVendorFailed_FromRejected_IsNoOp()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorRejected("station disabled");
+
+        trip.MarkVendorFailed("late failure");
+
+        trip.Status.Should().Be(TripStatus.Rejected);
+        trip.DomainEvents.OfType<TripFailedDomainEvent>().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void MarkVendorRejected_FromCancelled_IsNoOp()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.Cancel("ops cancel");
+
+        trip.MarkVendorRejected("late reject");
+
+        trip.Status.Should().Be(TripStatus.Cancelled);
+        trip.DomainEvents.OfType<TripRejectedDomainEvent>().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void MarkVendorCompleted_FromRejected_Throws()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorRejected("station disabled");
+
+        var act = () => trip.MarkVendorCompleted();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Cancel_FromRejected_Throws()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorRejected("station disabled");
+
+        var act = () => trip.Cancel("ops");
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
     [Fact]
     public void SetAssignedVehicle_FirstAssignment_Binds()
     {

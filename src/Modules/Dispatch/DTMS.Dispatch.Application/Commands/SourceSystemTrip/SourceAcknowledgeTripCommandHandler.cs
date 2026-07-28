@@ -33,7 +33,7 @@ public sealed class SourceAcknowledgeTripCommandHandler
         // Terminal trips can't be (re)started. Created → InProgress transitions;
         // an already-InProgress/Paused trip no-ops idempotently (safe for
         // at-least-once delivery from the source system).
-        if (trip.Status is TripStatus.Completed or TripStatus.Failed or TripStatus.Cancelled)
+        if (trip.Status is TripStatus.Completed or TripStatus.Failed or TripStatus.Cancelled or TripStatus.Rejected)
             return Result.Failure(
                 $"Cannot acknowledge a trip in {trip.Status} status.");
 

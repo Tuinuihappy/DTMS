@@ -102,6 +102,17 @@ public record TripFailedIntegrationEvent(
     string? TriggeredBy = null,
     Guid? CorrelationId = null) : IIntegrationEvent;
 
+// Vendor refused the trip post-dispatch, before execution (RIOT3
+// TASK_REJECTED / orderState REJECTED). Consumers that treat this the same
+// as TripFailed (order propagation, items unbind, snapshot capture) delegate
+// to their Failed handler; history/facts/activity record "Rejected" instead.
+public record TripRejectedIntegrationEventV1(
+    Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId,
+    string Reason, string VendorUpperKey,
+    string? TriggeredBy = null,
+    Guid? CorrelationId = null,
+    string SchemaVersion = "1.0") : IIntegrationEvent;
+
 public record TripCancelledIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId, string Reason, string? VendorUpperKey,
     string? TriggeredBy = null,
