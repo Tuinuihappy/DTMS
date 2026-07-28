@@ -19,6 +19,7 @@ public class TripFactsProjector :
     IConsumer<TripResumedIntegrationEventV1>,
     IConsumer<TripCompletedIntegrationEvent>,
     IConsumer<TripFailedIntegrationEvent>,
+    IConsumer<TripRejectedIntegrationEventV1>,
     IConsumer<TripCancelledIntegrationEvent>,
     IConsumer<TripVehicleBackfilledIntegrationEventV1>
 {
@@ -64,6 +65,13 @@ public class TripFactsProjector :
 
     public Task Consume(ConsumeContext<TripFailedIntegrationEvent> ctx)
         => Run(ctx, () => _store.SetFailedAtAsync(
+            ctx.Message.TripId, ctx.Message.OccurredOn,
+            ctx.Message.DeliveryOrderId == Guid.Empty ? null : ctx.Message.DeliveryOrderId,
+            ctx.Message.JobId == Guid.Empty ? null : ctx.Message.JobId,
+            ctx.Message.VendorUpperKey, ctx.Message.Reason, ctx.CancellationToken));
+
+    public Task Consume(ConsumeContext<TripRejectedIntegrationEventV1> ctx)
+        => Run(ctx, () => _store.SetRejectedAtAsync(
             ctx.Message.TripId, ctx.Message.OccurredOn,
             ctx.Message.DeliveryOrderId == Guid.Empty ? null : ctx.Message.DeliveryOrderId,
             ctx.Message.JobId == Guid.Empty ? null : ctx.Message.JobId,

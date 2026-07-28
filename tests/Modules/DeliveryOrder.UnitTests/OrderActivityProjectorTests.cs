@@ -111,6 +111,32 @@ public class OrderActivityProjectorTests
     }
 
     [Fact]
+    public async Task TripRejected_CarriesReason()
+    {
+        var (projector, store) = Build();
+        var orderId = Guid.NewGuid();
+        var tripId = Guid.NewGuid();
+        var evt = new TripRejectedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, tripId,
+            JobId: Guid.NewGuid(), DeliveryOrderId: orderId,
+            Reason: "station disabled", VendorUpperKey: "UK-1");
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).AppendAsync(
+            OrderActivityProjector.Name,
+            evt.EventId, orderId,
+            category: "TripExecution",
+            eventType: "TripRejected",
+            details: "station disabled",
+            actorId: null,
+            evt.OccurredOn,
+            relatedTripId: tripId,
+            attemptNumber: (int?)null,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task DuplicateEvent_IsSkipped()
     {
         var (projector, store) = Build();

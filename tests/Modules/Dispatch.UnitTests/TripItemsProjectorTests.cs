@@ -221,6 +221,26 @@ public class TripItemsProjectorTests
     }
 
     [Fact]
+    public async Task TripRejected_FlipsItemStatusToUnbound()
+    {
+        var (projector, store) = Build();
+        var tripId = Guid.NewGuid();
+        var evt = new TripRejectedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, tripId,
+            JobId: Guid.NewGuid(), DeliveryOrderId: Guid.NewGuid(),
+            Reason: "station disabled", VendorUpperKey: "U-1");
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).UpdateItemStatusForTripAsync(
+            TripItemsProjector.Name,
+            evt.EventId, tripId,
+            newItemStatus: "Unbound",
+            evt.OccurredOn,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task TripCancelled_FlipsItemStatusToUnbound()
     {
         var (projector, store) = Build();

@@ -155,6 +155,24 @@ public class OrderListViewProjectorTests
     }
 
     [Fact]
+    public async Task TripRejected_SetsHasFailedTripTrue()
+    {
+        var (projector, store) = Build();
+        var orderId = Guid.NewGuid();
+        var tripId = Guid.NewGuid();
+        var evt = new TripRejectedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, tripId,
+            JobId: Guid.NewGuid(), DeliveryOrderId: orderId,
+            Reason: "station disabled", VendorUpperKey: "UK");
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).SetTripDerivedFieldsAsync(
+            orderId, hasFailedTrip: true, latestTripId: tripId,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task TripCompleted_ClearsHasFailedTripFlag()
     {
         var (projector, store) = Build();

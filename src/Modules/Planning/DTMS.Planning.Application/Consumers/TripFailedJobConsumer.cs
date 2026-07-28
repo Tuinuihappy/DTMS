@@ -11,8 +11,12 @@ namespace DTMS.Planning.Application.Consumers;
 /// with the vendor's reason text. Once Failed, the operator can hit
 /// POST /api/v1/planning/jobs/{id}/retry to re-dispatch (Job.Retry()
 /// resets to Created and bumps AttemptNumber).
+/// TripRejected lands on the same Job outcome (VendorExecutionFailed) —
+/// only the reason prefix distinguishes the two on the Job record.
 /// </summary>
-public class TripFailedJobConsumer : IConsumer<TripFailedIntegrationEvent>
+public class TripFailedJobConsumer :
+    IConsumer<TripFailedIntegrationEvent>,
+    IConsumer<TripRejectedIntegrationEventV1>
 {
     private readonly IJobRepository _jobRepository;
     private readonly ILogger<TripFailedJobConsumer> _logger;
@@ -23,30 +27,36 @@ public class TripFailedJobConsumer : IConsumer<TripFailedIntegrationEvent>
         _logger = logger;
     }
 
-    public async Task Consume(ConsumeContext<TripFailedIntegrationEvent> context)
-    {
-        var evt = context.Message;
-        if (evt.JobId == Guid.Empty) return;
+    public Task Consume(ConsumeContext<TripFailedIntegrationEvent> context)
+        => HandleAsync(context, context.Message.JobId, context.Message.TripId,
+            $"vendor execution failed: {context.Message.Reason}", eventName: "TripFailed");
 
-        var job = await _jobRepository.GetByIdAsync(evt.JobId, context.CancellationToken);
+    public Task Consume(ConsumeContext<TripRejectedIntegrationEventV1> context)
+        => HandleAsync(context, context.Message.JobId, context.Message.TripId,
+            $"vendor rejected: {context.Message.Reason}", eventName: "TripRejected");
+
+    private async Task HandleAsync(
+        ConsumeContext context, Guid jobId, Guid tripId, string reason, string eventName)
+    {
+        if (jobId == Guid.Empty) return;
+
+        var job = await _jobRepository.GetByIdAsync(jobId, context.CancellationToken);
         if (job is null)
         {
-            _logger.LogWarning("[JobSync] TripFailed for unknown Job {JobId} (Trip {TripId})", evt.JobId, evt.TripId);
+            _logger.LogWarning("[JobSync] {EventName} for unknown Job {JobId} (Trip {TripId})", eventName, jobId, tripId);
             return;
         }
 
         try
         {
-            job.MarkFailed(
-                $"vendor execution failed: {evt.Reason}",
-                JobFailureCategory.VendorExecutionFailed);
+            job.MarkFailed(reason, JobFailureCategory.VendorExecutionFailed);
             await _jobRepository.UpdateAsync(job, context.CancellationToken);
             _logger.LogInformation("[JobSync] Job {JobId} → Failed (Trip {TripId}, reason {Reason})",
-                job.Id, evt.TripId, evt.Reason);
+                job.Id, tripId, reason);
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning("[JobSync] TripFailed ignored for Job {JobId}: {Err}", evt.JobId, ex.Message);
+            _logger.LogWarning("[JobSync] {EventName} ignored for Job {JobId}: {Err}", eventName, jobId, ex.Message);
         }
     }
 }

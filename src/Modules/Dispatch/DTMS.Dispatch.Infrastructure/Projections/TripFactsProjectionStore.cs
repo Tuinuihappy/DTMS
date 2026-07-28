@@ -81,6 +81,16 @@ public class TripFactsProjectionStore : ITripFactsProjectionStore
         row?.SetFailedAt(at, deliveryOrderId, jobId, vendorUpperKey, reason);
     }
 
+    public async Task SetRejectedAtAsync(
+        Guid tripId, DateTime at,
+        Guid? deliveryOrderId, Guid? jobId,
+        string? vendorUpperKey, string? reason, CancellationToken ct)
+    {
+        await EnsureRowAsync(tripId, at, deliveryOrderId, jobId, ct);
+        var row = await Find(tripId, ct);
+        row?.SetRejectedAt(at, deliveryOrderId, jobId, vendorUpperKey, reason);
+    }
+
     public async Task SetCancelledAtAsync(
         Guid tripId, DateTime at,
         Guid? deliveryOrderId, Guid? jobId,

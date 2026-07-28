@@ -22,7 +22,7 @@ public class TripFactsReadRepository : ITripFactsReadRepository
                 r.VendorUpperKey, r.VendorVehicleKey,
                 r.FinalStatus, r.FailureReason, r.PauseCount,
                 r.CreatedAt, r.StartedAt, r.FirstPausedAt, r.LastResumedAt,
-                r.CompletedAt, r.FailedAt, r.CancelledAt,
+                r.CompletedAt, r.FailedAt, r.CancelledAt, r.RejectedAt,
                 r.TimeToStartSec, r.TimeToCompleteSec, r.SlaCompleteBreached,
                 r.UpdatedAt))
             .ToListAsync(ct);

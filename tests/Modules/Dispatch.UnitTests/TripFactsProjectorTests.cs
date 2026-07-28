@@ -131,6 +131,24 @@ public class TripFactsProjectorTests
     }
 
     [Fact]
+    public async Task TripRejected_SetsRejectedWithReason()
+    {
+        var (projector, store) = Build();
+        var tripId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var evt = new TripRejectedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, tripId,
+            JobId: Guid.NewGuid(), DeliveryOrderId: orderId,
+            Reason: "station disabled", VendorUpperKey: "VENDOR-A");
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).SetRejectedAtAsync(
+            tripId, evt.OccurredOn, orderId, Arg.Any<Guid?>(),
+            "VENDOR-A", "station disabled", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task TripCancelled_SetsCancelledWithReason()
     {
         var (projector, store) = Build();

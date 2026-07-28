@@ -42,6 +42,11 @@ public interface ITripFactsProjectionStore
         Guid? deliveryOrderId, Guid? jobId,
         string? vendorUpperKey, string? reason, CancellationToken ct);
 
+    Task SetRejectedAtAsync(
+        Guid tripId, DateTime at,
+        Guid? deliveryOrderId, Guid? jobId,
+        string? vendorUpperKey, string? reason, CancellationToken ct);
+
     Task SetCancelledAtAsync(
         Guid tripId, DateTime at,
         Guid? deliveryOrderId, Guid? jobId,

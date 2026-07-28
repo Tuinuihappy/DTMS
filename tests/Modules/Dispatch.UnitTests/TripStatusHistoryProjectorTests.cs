@@ -140,6 +140,27 @@ public class TripStatusHistoryProjectorTests
     }
 
     [Fact]
+    public async Task TripRejected_CarriesReason()
+    {
+        var (projector, store) = Build();
+        var tripId = Guid.NewGuid();
+        var evt = new TripRejectedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, tripId,
+            JobId: Guid.NewGuid(), DeliveryOrderId: Guid.NewGuid(),
+            Reason: "station disabled", VendorUpperKey: "UK-1");
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).AppendAsync(
+            TripStatusHistoryProjector.Name,
+            evt.EventId, tripId,
+            Arg.Any<Guid?>(), Arg.Any<Guid?>(),
+            fromStatus: null, toStatus: "Rejected",
+            evt.OccurredOn, reason: "station disabled",
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task DuplicateEvent_IsSkipped()
     {
         var (projector, store) = Build();

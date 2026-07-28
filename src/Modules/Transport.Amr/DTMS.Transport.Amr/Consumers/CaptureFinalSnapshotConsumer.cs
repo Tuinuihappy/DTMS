@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace DTMS.Transport.Amr.Consumers;
 
 /// <summary>
-/// When a Trip reaches a terminal state (Completed / Failed / Cancelled),
+/// When a Trip reaches a terminal state (Completed / Failed / Rejected / Cancelled),
 /// fetch RIOT3's full GET response and persist it on Trip.VendorFinalSnapshot
 /// so the detail UI and compliance queries don't need to call out to the
 /// vendor. Subscribes to the existing Trip*IntegrationEvents so the
@@ -21,6 +21,7 @@ namespace DTMS.Transport.Amr.Consumers;
 public sealed class CaptureFinalSnapshotConsumer :
     IConsumer<TripCompletedIntegrationEvent>,
     IConsumer<TripFailedIntegrationEvent>,
+    IConsumer<TripRejectedIntegrationEventV1>,
     IConsumer<TripCancelledIntegrationEvent>
 {
     private readonly ITripRepository _tripRepository;
@@ -42,6 +43,9 @@ public sealed class CaptureFinalSnapshotConsumer :
 
     public Task Consume(ConsumeContext<TripFailedIntegrationEvent> context)
         => CaptureForTripAsync(context.Message.TripId, "Failed", context.CancellationToken);
+
+    public Task Consume(ConsumeContext<TripRejectedIntegrationEventV1> context)
+        => CaptureForTripAsync(context.Message.TripId, "Rejected", context.CancellationToken);
 
     public Task Consume(ConsumeContext<TripCancelledIntegrationEvent> context)
         => CaptureForTripAsync(context.Message.TripId, "Cancelled", context.CancellationToken);

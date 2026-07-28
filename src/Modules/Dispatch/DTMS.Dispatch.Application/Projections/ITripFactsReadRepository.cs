@@ -33,6 +33,7 @@ public record TripFactsEntry(
     DateTime? CompletedAt,
     DateTime? FailedAt,
     DateTime? CancelledAt,
+    DateTime? RejectedAt,
     int? TimeToStartSec,
     int? TimeToCompleteSec,
     bool? SlaCompleteBreached,

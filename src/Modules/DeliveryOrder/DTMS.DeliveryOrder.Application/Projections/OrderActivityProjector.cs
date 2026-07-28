@@ -64,6 +64,7 @@ public class OrderActivityProjector :
     IConsumer<TripDropCompletedIntegrationEvent>,
     IConsumer<TripCompletedIntegrationEvent>,
     IConsumer<TripFailedIntegrationEvent>,
+    IConsumer<TripRejectedIntegrationEventV1>,
     IConsumer<TripCancelledIntegrationEvent>,
     IConsumer<TripPausedIntegrationEventV1>,
     IConsumer<TripResumedIntegrationEventV1>,
@@ -227,6 +228,11 @@ public class OrderActivityProjector :
     public Task Consume(ConsumeContext<TripFailedIntegrationEvent> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatTripExecution,
             "TripFailed", ctx.Message.Reason,
+            relatedTripId: ctx.Message.TripId);
+
+    public Task Consume(ConsumeContext<TripRejectedIntegrationEventV1> ctx)
+        => Project(ctx, ctx.Message.DeliveryOrderId, CatTripExecution,
+            "TripRejected", ctx.Message.Reason,
             relatedTripId: ctx.Message.TripId);
 
     public Task Consume(ConsumeContext<TripCancelledIntegrationEvent> ctx)

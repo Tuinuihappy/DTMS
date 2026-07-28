@@ -26,6 +26,7 @@ public class TripStatusHistoryProjector :
     IConsumer<TripRobotPassAcknowledgedIntegrationEventV1>,
     IConsumer<TripCompletedIntegrationEvent>,
     IConsumer<TripFailedIntegrationEvent>,
+    IConsumer<TripRejectedIntegrationEventV1>,
     IConsumer<TripCancelledIntegrationEvent>
 {
     public const string Name = nameof(TripStatusHistoryProjector);
@@ -82,6 +83,11 @@ public class TripStatusHistoryProjector :
         => Project(ctx, ctx.Message.TripId, ctx.Message.DeliveryOrderId,
             ctx.Message.JobId == Guid.Empty ? null : ctx.Message.JobId,
             "Failed", ctx.Message.Reason);
+
+    public Task Consume(ConsumeContext<TripRejectedIntegrationEventV1> ctx)
+        => Project(ctx, ctx.Message.TripId, ctx.Message.DeliveryOrderId,
+            ctx.Message.JobId == Guid.Empty ? null : ctx.Message.JobId,
+            "Rejected", ctx.Message.Reason);
 
     public Task Consume(ConsumeContext<TripCancelledIntegrationEvent> ctx)
         => Project(ctx, ctx.Message.TripId, ctx.Message.DeliveryOrderId,

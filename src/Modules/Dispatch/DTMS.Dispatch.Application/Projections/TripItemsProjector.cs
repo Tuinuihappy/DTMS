@@ -40,6 +40,7 @@ public class TripItemsProjector :
     IConsumer<TripDropCompletedIntegrationEvent>,
     IConsumer<TripCompletedIntegrationEvent>,
     IConsumer<TripFailedIntegrationEvent>,
+    IConsumer<TripRejectedIntegrationEventV1>,
     IConsumer<TripCancelledIntegrationEvent>
 {
     public const string Name = nameof(TripItemsProjector);
@@ -201,6 +202,9 @@ public class TripItemsProjector :
 
     public Task Consume(ConsumeContext<TripFailedIntegrationEvent> ctx)
         => RefreshItemStatusAsync(ctx, ctx.Message.TripId, StatusUnbound, nameof(TripFailedIntegrationEvent));
+
+    public Task Consume(ConsumeContext<TripRejectedIntegrationEventV1> ctx)
+        => RefreshItemStatusAsync(ctx, ctx.Message.TripId, StatusUnbound, nameof(TripRejectedIntegrationEventV1));
 
     public Task Consume(ConsumeContext<TripCancelledIntegrationEvent> ctx)
         => RefreshItemStatusAsync(ctx, ctx.Message.TripId, StatusUnbound, nameof(TripCancelledIntegrationEvent));

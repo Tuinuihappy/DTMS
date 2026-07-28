@@ -72,7 +72,7 @@ public static class DispatchReportsEndpoints
             "TripId", "DeliveryOrderId", "JobId", "VehicleId",
             "VendorUpperKey", "FinalStatus", "FailureReason", "PauseCount",
             "CreatedAt", "StartedAt", "FirstPausedAt", "LastResumedAt",
-            "CompletedAt", "FailedAt", "CancelledAt",
+            "CompletedAt", "FailedAt", "CancelledAt", "RejectedAt",
             "TimeToStartSec", "TimeToCompleteSec", "SlaCompleteBreached",
             "UpdatedAt",
         }));
@@ -93,7 +93,7 @@ public static class DispatchReportsEndpoints
                 r.PauseCount.ToString(inv),
                 Dt(r.CreatedAt), Dt(r.StartedAt),
                 Dt(r.FirstPausedAt), Dt(r.LastResumedAt),
-                Dt(r.CompletedAt), Dt(r.FailedAt), Dt(r.CancelledAt),
+                Dt(r.CompletedAt), Dt(r.FailedAt), Dt(r.CancelledAt), Dt(r.RejectedAt),
                 r.TimeToStartSec?.ToString(inv) ?? "",
                 r.TimeToCompleteSec?.ToString(inv) ?? "",
                 r.SlaCompleteBreached?.ToString() ?? "",

@@ -49,6 +49,7 @@ public class OrderListViewProjector :
     IConsumer<DeliveryOrderDraftUpdatedIntegrationEventV1>,
     // Trip lifecycle ─────────────────────────────────────────────────────
     IConsumer<TripFailedIntegrationEvent>,
+    IConsumer<TripRejectedIntegrationEventV1>,
     IConsumer<TripCancelledIntegrationEvent>,
     IConsumer<TripCompletedIntegrationEvent>,
     IConsumer<TripStartedIntegrationEvent>,
@@ -171,6 +172,10 @@ public class OrderListViewProjector :
 
     public Task Consume(ConsumeContext<TripFailedIntegrationEvent> ctx)
         => Run(ctx, ctx.Message.DeliveryOrderId, "TripFailed", () => _store.SetTripDerivedFieldsAsync(
+            ctx.Message.DeliveryOrderId, hasFailedTrip: true, latestTripId: ctx.Message.TripId, ctx.CancellationToken));
+
+    public Task Consume(ConsumeContext<TripRejectedIntegrationEventV1> ctx)
+        => Run(ctx, ctx.Message.DeliveryOrderId, "TripRejected", () => _store.SetTripDerivedFieldsAsync(
             ctx.Message.DeliveryOrderId, hasFailedTrip: true, latestTripId: ctx.Message.TripId, ctx.CancellationToken));
 
     public Task Consume(ConsumeContext<TripCancelledIntegrationEvent> ctx)

@@ -37,6 +37,7 @@ public class TripFactsRow
     public DateTime? CompletedAt { get; private set; }
     public DateTime? FailedAt { get; private set; }
     public DateTime? CancelledAt { get; private set; }
+    public DateTime? RejectedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
     // ── GENERATED STORED (computed by Postgres) ────────────────────────
@@ -123,6 +124,19 @@ public class TripFactsRow
         if (!string.IsNullOrEmpty(vendorUpperKey)) VendorUpperKey = vendorUpperKey;
         FailureReason = reason;
         FinalStatus = "Failed";
+        UpdatedAt = at;
+    }
+
+    public void SetRejectedAt(
+        DateTime at, Guid? deliveryOrderId, Guid? jobId,
+        string? vendorUpperKey, string? reason)
+    {
+        RejectedAt = at;
+        DeliveryOrderId ??= deliveryOrderId;
+        JobId ??= jobId;
+        if (!string.IsNullOrEmpty(vendorUpperKey)) VendorUpperKey = vendorUpperKey;
+        FailureReason = reason;
+        FinalStatus = "Rejected";
         UpdatedAt = at;
     }
 
