@@ -392,18 +392,16 @@ export function TemplateEditor({
                   ? "Duplicate order template"
                   : "New order template"}
             </div>
-            <h1 className="font-display mt-1 text-[1.6rem] font-semibold text-[var(--color-ink-900)] sm:text-[1.8rem]">
-              {isEdit
-                ? existing!.name
-                : isDuplicate
-                  ? `Duplicate of ${duplicating!.name}`
-                  : "Compose a reusable order recipe"}
-            </h1>
-            <p className="mt-1 max-w-md text-[12.5px] text-[var(--color-ink-500)]">
-              {isDuplicate
-                ? "Review and edit the copied data, then save as a new template. The original is unchanged."
-                : "Author missions once, then dispatch live RIOT3 orders in one click — with optional overrides and a dry-run preview."}
-            </p>
+            {(isEdit || isDuplicate) && (
+              <h1 className="font-display mt-1 text-[1.6rem] font-semibold text-[var(--color-ink-900)] sm:text-[1.8rem]">
+                {isEdit ? existing!.name : `Duplicate of ${duplicating!.name}`}
+              </h1>
+            )}
+            {isDuplicate && (
+              <p className="mt-1 max-w-md text-[12.5px] text-[var(--color-ink-500)]">
+                Review and edit the copied data, then save as a new template. The original is unchanged.
+              </p>
+            )}
           </div>
         </div>
 

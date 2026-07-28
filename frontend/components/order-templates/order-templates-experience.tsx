@@ -4,16 +4,13 @@ import { AnimatePresence, motion } from "motion/react";
 import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import {
   AlertTriangle,
-  CircleSlash,
   FileStack,
   Layers,
   Plus,
   Power,
   RefreshCw,
-  Rocket,
   Route,
   Search,
-  Sparkles,
   Trash2,
   Truck,
   X,
@@ -156,14 +153,13 @@ export function OrderTemplatesExperience() {
           return a.name.localeCompare(b.name) * dir;
         case "priority":
           return (a.priority - b.priority) * dir;
-        case "missions":
-          return (
-            ((a.transportOrder?.missions?.length ?? 0) -
-              (b.transportOrder?.missions?.length ?? 0)) *
-            dir
-          );
         case "isActive":
           return (Number(a.isActive) - Number(b.isActive)) * dir;
+        case "createdAt":
+          return (
+            (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) *
+            dir
+          );
         case "modifiedAt":
         default: {
           const at = new Date(a.modifiedAt ?? a.createdAt).getTime();
@@ -237,7 +233,6 @@ export function OrderTemplatesExperience() {
       <SectionLabel
         icon={<FileStack className="h-4 w-4" strokeWidth={2.1} />}
         title="Order templates"
-        subtitle="Reusable order recipes — author once, dispatch in seconds. Missions compose Action templates by reference, so changes propagate automatically."
         action={
           <Link
             href="/delivery-orders/order-templates/new"
@@ -247,14 +242,6 @@ export function OrderTemplatesExperience() {
             New template
           </Link>
         }
-      />
-
-      {/* Hero band — frames the "Create order from template" value prop */}
-      <HeroBand
-        active={stats.active}
-        avgMissions={stats.avgMissions}
-        templates={allRecords}
-        onDispatch={(t) => setDispatching(t)}
       />
 
       {/* KPI strip */}
@@ -457,147 +444,6 @@ export function OrderTemplatesExperience() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-// ── Hero band ──────────────────────────────────────────────────────────
-// A premium "value moment" surface that promotes the headline action
-// (create an order from a template) and shows the catalog at a glance.
-
-function HeroBand({
-  active,
-  avgMissions,
-  templates,
-  onDispatch,
-}: {
-  active: number;
-  avgMissions: number;
-  templates: OrderTemplateDto[];
-  onDispatch: (t: OrderTemplateDto) => void;
-}) {
-  // "Featured" template = active with the most missions, tiebreak by recency.
-  const featured = useMemo(() => {
-    const active = templates.filter((t) => t.isActive);
-    if (active.length === 0) return null;
-    return [...active].sort((a, b) => {
-      const am = a.transportOrder?.missions?.length ?? 0;
-      const bm = b.transportOrder?.missions?.length ?? 0;
-      if (bm !== am) return bm - am;
-      const at = new Date(a.modifiedAt ?? a.createdAt).getTime();
-      const bt = new Date(b.modifiedAt ?? b.createdAt).getTime();
-      return bt - at;
-    })[0];
-  }, [templates]);
-
-  return (
-    <GlassCard
-      variant="strong"
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className="relative p-6 sm:p-7"
-    >
-      {/* Decorative aurora */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
-        <motion.div
-          aria-hidden
-          className="absolute -top-24 -right-16 h-72 w-72 rounded-full bg-[var(--color-brand-500)]/20 blur-3xl"
-          animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0.8, 0.5] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          aria-hidden
-          className="absolute -bottom-20 -left-10 h-64 w-64 rounded-full bg-[var(--color-pastel-peach)] blur-3xl"
-          animate={{ scale: [1, 1.1, 1], opacity: [0.35, 0.55, 0.35] }}
-          transition={{ duration: 9, repeat: Infinity, ease: "easeInOut", delay: 1.4 }}
-        />
-      </div>
-
-      <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-        <div className="max-w-xl">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/60 px-3 py-1 text-[10.5px] font-bold uppercase tracking-[0.14em] text-[var(--color-brand-900)] backdrop-blur dark:bg-white/[0.06] dark:text-[var(--color-brand-500)]">
-            <StatusPulse tone="brand" />
-            Dispatch ready
-          </div>
-          <h2 className="font-display mt-3 text-[1.8rem] leading-tight font-semibold tracking-tight text-[var(--color-ink-900)] sm:text-[2rem]">
-            Turn a template into a live order
-          </h2>
-          <p className="mt-2 max-w-md text-[13.5px] leading-relaxed text-[var(--color-ink-500)]">
-            Pick a template, optionally override priority or vehicle binding, and
-            preview the resolved missions with a dry-run before they hit RIOT3.
-          </p>
-
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            {featured ? (
-              <motion.button
-                type="button"
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => onDispatch(featured)}
-                className="group inline-flex cursor-pointer items-center gap-2 rounded-full bg-[var(--color-brand-900)] px-5 py-2.5 text-[12.5px] font-semibold text-white shadow-[0_10px_28px_-10px_rgba(15,23,42,0.55)] transition-shadow hover:shadow-[0_14px_36px_-10px_rgba(15,23,42,0.65)] dark:bg-[var(--color-brand-500)]"
-              >
-                <Rocket className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" strokeWidth={2.3} />
-                Create order from “{featured.name}”
-              </motion.button>
-            ) : (
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/55 px-4 py-2 text-[12px] font-semibold text-[var(--color-ink-500)] dark:bg-white/[0.04]">
-                <CircleSlash className="h-3.5 w-3.5" strokeWidth={2.3} />
-                No active templates — activate one to dispatch
-              </span>
-            )}
-            <Link
-              href="/delivery-orders/order-templates/new"
-              className="inline-flex items-center gap-1.5 rounded-full bg-white/55 px-4 py-2 text-[12px] font-semibold text-[var(--color-ink-700)] backdrop-blur transition-colors hover:bg-white/80 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
-            >
-              <Sparkles className="h-3.5 w-3.5" strokeWidth={2.3} />
-              Author a new one
-            </Link>
-          </div>
-        </div>
-
-        {/* Live mini-stats */}
-        <div className="grid w-full max-w-xs grid-cols-2 gap-3 md:w-auto">
-          <MiniStat
-            label="Active now"
-            value={
-              <span className="font-mono text-[1.55rem] font-semibold text-[var(--color-ink-900)]">
-                <NumberTicker value={active} />
-              </span>
-            }
-            hint="templates ready"
-          />
-          <MiniStat
-            label="Avg missions"
-            value={
-              <span className="font-mono text-[1.55rem] font-semibold text-[var(--color-ink-900)]">
-                <NumberTicker value={avgMissions} decimals={1} />
-              </span>
-            }
-            hint="per template"
-          />
-        </div>
-      </div>
-    </GlassCard>
-  );
-}
-
-function MiniStat({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: React.ReactNode;
-  hint: string;
-}) {
-  return (
-    <div className="rounded-[var(--radius-sm)] border border-white/60 bg-white/55 px-3 py-2.5 backdrop-blur dark:border-white/[0.06] dark:bg-white/[0.04]">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-ink-400)]">
-        {label}
-      </div>
-      <div className="mt-1 leading-none">{value}</div>
-      <div className="mt-1 text-[10.5px] text-[var(--color-ink-400)]">{hint}</div>
     </div>
   );
 }

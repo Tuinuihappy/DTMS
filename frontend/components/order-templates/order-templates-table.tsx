@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Check,
   ChevronRight,
   Copy,
   FileStack,
@@ -35,7 +36,7 @@ import {
   resolveEmptyStateVariant,
 } from "@/components/primitives/data-table";
 
-export type SortColumn = "name" | "priority" | "missions" | "isActive" | "modifiedAt";
+export type SortColumn = "name" | "priority" | "isActive" | "createdAt" | "modifiedAt";
 export type SortDir = "asc" | "desc";
 
 type RowAction = "toggle" | "delete";
@@ -85,24 +86,26 @@ export function OrderTemplatesTable({
       {/* Desktop table — primitives handle padding/header/sort/keyboard/focus. */}
       <DataTableShell className="hidden md:block">
         <DataTableHead>
+          <TableTh className="normal-case">ID</TableTh>
           <SortableTh col="name" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
-            Template
+            Template name
           </SortableTh>
           <SortableTh col="priority" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
             Priority
           </SortableTh>
-          <SortableTh col="missions" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
-            Missions
-          </SortableTh>
-          <TableTh>Binding</TableTh>
+          <TableTh className="normal-case">Designate robot</TableTh>
+          <TableTh className="normal-case">Designate robot group</TableTh>
           <SortableTh col="isActive" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
             Status
           </SortableTh>
-          <SortableTh col="modifiedAt" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
-            Updated
+          <SortableTh col="createdAt" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
+            Created
           </SortableTh>
-          <TableTh className="w-20" aria-label="Actions">
-            <span className="sr-only">Actions</span>
+          <SortableTh col="modifiedAt" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
+            Modified
+          </SortableTh>
+          <TableTh className="w-20 normal-case" aria-label="Operation">
+            Operation
           </TableTh>
         </DataTableHead>
         <DataTableBody>
@@ -114,6 +117,9 @@ export function OrderTemplatesTable({
                 disabled={!t.isActive}
                 onClick={() => onOpenDetail(t)}
               >
+                <TableTd>
+                  <IdCell id={t.id} />
+                </TableTd>
                 <TableTd>
                   <div className="flex items-center gap-2.5">
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-[var(--color-pastel-sky)] to-[var(--color-pastel-lavender)] text-[var(--color-brand-900)] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
@@ -138,27 +144,48 @@ export function OrderTemplatesTable({
                   <PriorityChip value={t.priority} />
                 </TableTd>
                 <TableTd>
-                  <MissionsSummary template={t} />
+                  <VehicleCell template={t} search={search} />
                 </TableTd>
                 <TableTd>
-                  <BindingChip template={t} search={search} />
+                  <GroupCell template={t} search={search} />
                 </TableTd>
                 <TableTd>
                   <ActiveBadge active={t.isActive} />
                 </TableTd>
                 <TableTd>
                   <DateTime
-                    value={t.modifiedAt ?? t.createdAt}
-                    variant="relative"
+                    value={t.createdAt}
+                    variant="datetime"
                     className="text-[11.5px] text-[var(--color-ink-700)] whitespace-nowrap"
                   />
-                  {(t.modifiedBy ?? t.createdBy) && (
+                  {t.createdBy && (
                     <div
                       className="text-[10.5px] text-[var(--color-ink-400)] truncate max-w-[140px]"
-                      title={`by ${t.modifiedBy ?? t.createdBy}`}
+                      title={`by ${t.createdBy}`}
                     >
-                      by {t.modifiedBy ?? t.createdBy}
+                      by {t.createdBy}
                     </div>
+                  )}
+                </TableTd>
+                <TableTd>
+                  {t.modifiedAt ? (
+                    <>
+                      <DateTime
+                        value={t.modifiedAt}
+                        variant="datetime"
+                        className="text-[11.5px] text-[var(--color-ink-700)] whitespace-nowrap"
+                      />
+                      {t.modifiedBy && (
+                        <div
+                          className="text-[10.5px] text-[var(--color-ink-400)] truncate max-w-[140px]"
+                          title={`by ${t.modifiedBy}`}
+                        >
+                          by {t.modifiedBy}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-[10.5px] italic text-[var(--color-ink-400)]">—</span>
                   )}
                 </TableTd>
                 <TableTd align="right">
@@ -222,7 +249,6 @@ export function OrderTemplatesTable({
                     </div>
                   )}
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <MissionsSummary template={t} />
                     <BindingChip template={t} search={search} compact />
                   </div>
                 </div>
@@ -279,33 +305,119 @@ function PriorityChip({ value }: { value: number }) {
   );
 }
 
-function MissionsSummary({ template }: { template: OrderTemplateDto }) {
-  const missions = template.transportOrder?.missions ?? [];
-  const moves = missions.filter((m) => m.type === "MOVE").length;
-  const acts = missions.length - moves;
-  const structure = template.transportOrder?.structureType ?? "sequence";
+// navigator.clipboard exists only in secure contexts (https / localhost).
+// The dashboard is also reached over plain http on a LAN IP, so fall back
+// to the legacy hidden-textarea + execCommand path there.
+async function copyText(text: string): Promise<boolean> {
+  if (typeof navigator !== "undefined" && navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // fall through to the legacy path
+    }
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function IdCell({ id }: { id: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async (e: React.MouseEvent) => {
+    // The whole row opens the detail drawer on click — keep the copy
+    // action from bubbling up into it.
+    e.stopPropagation();
+    if (await copyText(id)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    }
+  };
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="inline-flex items-center gap-1 rounded-[8px] bg-white/65 px-1.5 py-0.5 text-[10.5px] font-mono font-semibold dark:bg-white/[0.06]">
-        <span className="text-[var(--color-ink-500)]">total</span>
-        <span className="text-[var(--color-ink-800)]">{missions.length}</span>
-      </span>
-      {moves > 0 && (
-        <span className="inline-flex items-center gap-1 rounded-[8px] bg-[var(--color-pastel-mint)]/70 px-1.5 py-0.5 text-[10.5px] font-mono font-semibold text-[var(--color-pastel-mint-ink)]">
-          MOVE {moves}
-        </span>
-      )}
-      {acts > 0 && (
-        <span className="inline-flex items-center gap-1 rounded-[8px] bg-[var(--color-pastel-peach)]/70 px-1.5 py-0.5 text-[10.5px] font-mono font-semibold text-[var(--color-pastel-peach-ink)]">
-          ACT {acts}
-        </span>
-      )}
+    <div className="flex items-center gap-1">
       <span
-        className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-400)]"
-        title={`Structure: ${structure}`}
+        className="font-mono text-[10.5px] text-[var(--color-ink-500)] whitespace-nowrap"
+        title={id}
       >
-        · {structure}
+        {id.slice(0, 8)}
       </span>
+      <button
+        type="button"
+        onClick={handleCopy}
+        title={copied ? "Copied!" : "Copy full ID"}
+        aria-label="Copy full ID"
+        className="grid h-5 w-5 shrink-0 place-items-center rounded-[6px] text-[var(--color-ink-400)] transition-colors hover:bg-[var(--color-ink-100)]/60 hover:text-[var(--color-ink-700)] dark:hover:bg-white/[0.06]"
+      >
+        {copied ? (
+          <Check className="h-3 w-3 text-[var(--color-success)]" strokeWidth={2.6} />
+        ) : (
+          <Copy className="h-3 w-3" strokeWidth={2.2} />
+        )}
+      </button>
+    </div>
+  );
+}
+
+function VehicleCell({
+  template,
+  search,
+}: {
+  template: OrderTemplateDto;
+  search: string;
+}) {
+  const vehicle = template.appointVehicleKey ?? template.appointVehicleName;
+  if (!vehicle) {
+    return <span className="text-[10.5px] italic text-[var(--color-ink-400)]">—</span>;
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-white/65 px-2 py-0.5 text-[10.5px] font-semibold text-[var(--color-ink-700)] dark:bg-white/[0.06]"
+      title={template.appointVehicleName ?? undefined}
+    >
+      <Truck className="h-3 w-3" strokeWidth={2.3} />
+      <Highlight text={vehicle} query={search} />
+    </span>
+  );
+}
+
+function GroupCell({
+  template,
+  search,
+}: {
+  template: OrderTemplateDto;
+  search: string;
+}) {
+  const group = template.appointVehicleGroupKey ?? template.appointVehicleGroupName;
+  const wait = template.appointQueueWaitArea;
+  if (!group && !wait) {
+    return <span className="text-[10.5px] italic text-[var(--color-ink-400)]">—</span>;
+  }
+  return (
+    <div className="flex items-center gap-1">
+      {group && (
+        <span
+          className="inline-flex items-center gap-1 rounded-full bg-white/65 px-2 py-0.5 text-[10.5px] font-semibold text-[var(--color-ink-700)] dark:bg-white/[0.06]"
+          title={template.appointVehicleGroupName ?? undefined}
+        >
+          <Highlight text={group} query={search} />
+        </span>
+      )}
+      {wait && (
+        <span className="rounded-full bg-white/55 px-2 py-0.5 text-[10px] font-mono text-[var(--color-ink-500)] dark:bg-white/[0.04]">
+          @{wait}
+        </span>
+      )}
     </div>
   );
 }

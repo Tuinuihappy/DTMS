@@ -286,11 +286,7 @@ export function TripsExperience() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Header
-        total={totalCount}
-        refreshing={refreshing}
-        onRefresh={() => fetchTrips()}
-      />
+      <Header refreshing={refreshing} onRefresh={() => fetchTrips()} />
 
       <FiltersBar
         statusFilter={statusFilter}
@@ -341,11 +337,9 @@ export function TripsExperience() {
 // ── Sub-components ─────────────────────────────────────────────────────
 
 function Header({
-  total,
   refreshing,
   onRefresh,
 }: {
-  total: number;
   refreshing: boolean;
   onRefresh: () => void;
 }) {
@@ -355,17 +349,9 @@ function Header({
         <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[var(--color-pastel-peach)] to-[#fcb98a] text-[var(--color-pastel-peach-ink)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
           <Route className="h-4 w-4" strokeWidth={2.2} />
         </span>
-        <div>
-          <h1 className="font-display text-[22px] font-semibold tracking-tight text-[var(--color-ink-900)]">
-            Trips
-          </h1>
-          <p className="text-[12px] text-[var(--color-ink-500)]">
-            Envelope dispatches across every order — search, filter, drill.
-            <span className="mx-2 font-mono tabular-nums text-[var(--color-ink-400)]">
-              {total.toLocaleString("en-US")} total
-            </span>
-          </p>
-        </div>
+        <h1 className="font-display text-[22px] font-semibold tracking-tight text-[var(--color-ink-900)]">
+          Trips
+        </h1>
       </div>
       <button
         type="button"

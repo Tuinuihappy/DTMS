@@ -16,7 +16,9 @@ export function SectionLabel({
 }) {
   return (
     <div className={cn("flex items-start justify-between gap-4", className)}>
-      <div className="flex items-start gap-3">
+      {/* With a subtitle the icon aligns to the first line (items-start);
+          a lone title is shorter than the 40px icon box, so center it. */}
+      <div className={cn("flex gap-3", subtitle ? "items-start" : "items-center")}>
         {icon && (
           <span className="grid h-10 w-10 place-items-center rounded-[14px] bg-white/70 text-[var(--color-ink-700)] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_10px_-4px_rgba(15,23,42,0.12)] dark:bg-white/[0.06] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_4px_10px_-4px_rgba(0,0,0,0.5)]">
             {icon}
