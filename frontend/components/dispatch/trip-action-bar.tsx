@@ -40,14 +40,16 @@ export function TripActionBar({
   const [passDialogOpen, setPassDialogOpen] = useState(false);
   const [exceptionDialogOpen, setExceptionDialogOpen] = useState(false);
 
-  const canCancel = status === "Created" || status === "InProgress" || status === "Paused";
+  // Hang = system pause (check the floor first) / Held = operator pause.
+  const isPausedFlavour = status === "Hang" || status === "Held";
+  const canCancel = status === "Created" || status === "InProgress" || isPausedFlavour;
   const canPause = status === "InProgress";
-  const canResume = status === "Paused";
+  const canResume = isPausedFlavour;
   const canRetry = status === "Cancelled";
   const canPass = status === "InProgress" && !!vendorVehicleKey;
   // Annotate a problem on an in-flight trip (doesn't change Trip.Status).
   const canRaiseException =
-    status === "Created" || status === "InProgress" || status === "Paused";
+    status === "Created" || status === "InProgress" || isPausedFlavour;
 
   const run = async (action: Exclude<Action, "pass">, fn: () => Promise<unknown>) => {
     setBusy(action);
@@ -93,7 +95,7 @@ export function TripActionBar({
           title={
             canRaiseException
               ? "Raise an exception on this trip"
-              : "ใช้ได้เฉพาะตอน Trip ยัง active (Created/InProgress/Paused)"
+              : "ใช้ได้เฉพาะตอน Trip ยัง active (Created/InProgress/Hang/Held)"
           }
         />
         <span
@@ -116,9 +118,13 @@ export function TripActionBar({
           busy={busy === "resume"}
           onClick={() => run("resume", () => resumeTrip(tripId))}
           title={
-            canResume && hasVendorIssue
-              ? "Vendor mission ติด FAILED/HANG — Resume อาจ fail จนกว่าจะเคลียร์หุ่นที่หน้างาน"
-              : undefined
+            status === "Hang"
+              ? "ระบบ/หุ่นหยุดเอง (HANG) — ตรวจหน้างานให้เรียบร้อยก่อน Resume ไม่งั้น vendor อาจปฏิเสธ"
+              : canResume && hasVendorIssue
+                ? "Vendor mission ติด FAILED/HANG — Resume อาจ fail จนกว่าจะเคลียร์หุ่นที่หน้างาน"
+                : canResume
+                  ? "งานถูกสั่งหยุดไว้ (HELD) — กดเพื่อสั่งให้ทำต่อ"
+                  : undefined
           }
         />
         <ActionButton

@@ -712,7 +712,7 @@ function ExperienceInner() {
         setCancelTarget(target);
         // Fire-and-forget query for the cascade callout. Soft-fail —
         // dialog renders without the warning if the count isn't ready.
-        const IN_FLIGHT: TripStatus[] = ["Created", "InProgress", "Paused"];
+        const IN_FLIGHT: TripStatus[] = ["Created", "InProgress", "Hang", "Held"];
         void getTripsByOrder(target.id)
           .then((trips) => setCancelTripCount(trips.filter((t) => IN_FLIGHT.includes(t.status)).length))
           .catch(() => setCancelTripCount(0));

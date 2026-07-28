@@ -47,7 +47,8 @@ const STATUS_FILTERS: StatusFilter[] = [
   "Terminal",
   "Created",
   "InProgress",
-  "Paused",
+  "Hang",
+  "Held",
   "Completed",
   "Failed",
   "Rejected",
@@ -55,11 +56,11 @@ const STATUS_FILTERS: StatusFilter[] = [
 ];
 
 // Map UI filter buckets into the concrete TripStatus list the backend
-// understands. "Active" = in-flight (Created/InProgress/Paused);
+// understands. "Active" = in-flight (Created/InProgress/Hang/Held);
 // "Terminal" = finished (Completed/Failed/Rejected/Cancelled); "All" = no filter.
 function filterToStatuses(f: StatusFilter): TripStatus[] | undefined {
   if (f === "All") return undefined;
-  if (f === "Active") return ["Created", "InProgress", "Paused"];
+  if (f === "Active") return ["Created", "InProgress", "Hang", "Held"];
   if (f === "Terminal") return ["Completed", "Failed", "Rejected", "Cancelled"];
   return [f];
 }
@@ -70,7 +71,8 @@ const STATUS_FILTER_LABEL: Record<StatusFilter, string> = {
   Terminal: "Terminal",
   Created: "Created",
   InProgress: "In progress",
-  Paused: "Paused",
+  Hang: "Hang",
+  Held: "Held",
   Completed: "Completed",
   Failed: "Failed",
   Rejected: "Rejected",

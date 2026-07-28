@@ -8,14 +8,19 @@ import type { TripStatus } from "@/lib/api/trips";
 // dashboard stays glance-able. "Live" statuses get a pulsing dot.
 type TripVisual = {
   label: string;
-  tone: "ink" | "sky" | "peach" | "amber" | "success" | "coral" | "wine";
+  tone: "ink" | "sky" | "peach" | "amber" | "success" | "coral" | "wine" | "flame";
   pulse?: boolean;
 };
 
 const TRIP_VISUAL: Record<TripStatus, TripVisual> = {
   Created: { label: "Created", tone: "sky", pulse: true },
   InProgress: { label: "In progress", tone: "peach", pulse: true },
-  Paused: { label: "Paused", tone: "amber" },
+  // Hang = system pause (robot obstacle / mode change) — strong orange,
+  // distinct from Failed's coral and Rejected's wine; the operator likely
+  // needs to visit the floor. Held = operator pause — amber deliberately
+  // matches the order-side Held badge (same "human paused it" semantic).
+  Hang: { label: "Hang", tone: "flame" },
+  Held: { label: "Held", tone: "amber" },
   Completed: { label: "Completed", tone: "success" },
   Failed: { label: "Failed", tone: "coral" },
   Cancelled: { label: "Cancelled", tone: "ink" },
@@ -32,6 +37,7 @@ const TONE_BG: Record<TripVisual["tone"], string> = {
   success: "bg-[var(--color-success-soft)] text-[var(--color-success)]",
   coral: "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
   wine: "bg-[var(--color-wine-soft,#991b1b1a)] text-[var(--color-wine,#991b1b)]",
+  flame: "bg-[var(--color-flame-soft,#ea580c1a)] text-[var(--color-flame,#c2410c)]",
 };
 
 const TONE_DOT: Record<TripVisual["tone"], string> = {
@@ -42,6 +48,7 @@ const TONE_DOT: Record<TripVisual["tone"], string> = {
   success: "bg-[var(--color-success)]",
   coral: "bg-[var(--color-coral)]",
   wine: "bg-[var(--color-wine,#991b1b)]",
+  flame: "bg-[var(--color-flame,#ea580c)]",
 };
 
 export function TripStatusBadge({

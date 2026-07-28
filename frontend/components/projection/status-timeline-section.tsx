@@ -206,7 +206,8 @@ function toneFromStatus(status: string): NonNullable<TimelineEntry["dotTone"]> {
     case "Cancelled":
       return "error";
     case "Held":
-    case "Paused":
+    case "Paused": // historical trip rows pre-Hang/Held split — keep forever
+    case "Hang":
     case "Amended":
       return "warning";
     case "Confirmed":

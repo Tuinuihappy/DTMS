@@ -59,7 +59,7 @@ const ORDER_IN_FLIGHT_STATES = [
   "Dispatched",
   "InProgress",
 ];
-const ACTIVE_TRIP_STATES = ["Created", "InProgress", "Paused"];
+const ACTIVE_TRIP_STATES = ["Created", "InProgress", "Hang", "Held"];
 
 export function OrderDetailDrawer({
   orderId,

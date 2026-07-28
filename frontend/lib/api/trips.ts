@@ -6,11 +6,14 @@
 export type TripStatus =
   | "Created"
   | "InProgress"
-  | "Paused"
+  | "Hang" // system pause (RIOT3 TASK_HANG)
+  | "Held" // operator pause (TASK_HELD / Pause button)
   | "Completed"
   | "Failed"
   | "Cancelled"
   | "Rejected";
+// NB: the retired "Paused" only survives in historical TripStatusHistory
+// rows — the timeline renderer keeps a string-level case for it.
 
 export type TripMissionDto = {
   missionIndex: number;
@@ -379,7 +382,8 @@ export const TRIP_TERMINAL_STATES: ReadonlyArray<TripStatus> = [
 export const TRIP_IN_FLIGHT_STATES: ReadonlyArray<TripStatus> = [
   "Created",
   "InProgress",
-  "Paused",
+  "Hang",
+  "Held",
 ];
 
 export function isTripTerminal(s: TripStatus): boolean {
