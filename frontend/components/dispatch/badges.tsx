@@ -8,7 +8,7 @@ import type { TripStatus } from "@/lib/api/trips";
 // dashboard stays glance-able. "Live" statuses get a pulsing dot.
 type TripVisual = {
   label: string;
-  tone: "ink" | "sky" | "peach" | "amber" | "success" | "coral";
+  tone: "ink" | "sky" | "peach" | "amber" | "success" | "coral" | "wine";
   pulse?: boolean;
 };
 
@@ -19,6 +19,9 @@ const TRIP_VISUAL: Record<TripStatus, TripVisual> = {
   Completed: { label: "Completed", tone: "success" },
   Failed: { label: "Failed", tone: "coral" },
   Cancelled: { label: "Cancelled", tone: "ink" },
+  // Vendor refused pre-execution — darker red than Failed's coral so the
+  // two failure flavours are distinguishable at a glance.
+  Rejected: { label: "Rejected", tone: "wine" },
 };
 
 const TONE_BG: Record<TripVisual["tone"], string> = {
@@ -28,6 +31,7 @@ const TONE_BG: Record<TripVisual["tone"], string> = {
   amber: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
   success: "bg-[var(--color-success-soft)] text-[var(--color-success)]",
   coral: "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
+  wine: "bg-[var(--color-wine-soft,#991b1b1a)] text-[var(--color-wine,#991b1b)]",
 };
 
 const TONE_DOT: Record<TripVisual["tone"], string> = {
@@ -37,6 +41,7 @@ const TONE_DOT: Record<TripVisual["tone"], string> = {
   amber: "bg-[var(--color-amber)]",
   success: "bg-[var(--color-success)]",
   coral: "bg-[var(--color-coral)]",
+  wine: "bg-[var(--color-wine,#991b1b)]",
 };
 
 export function TripStatusBadge({

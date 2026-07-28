@@ -111,6 +111,7 @@ function AttemptRow({
   onOpen?: (tripId: string) => void;
 }) {
   const isFailed = attempt.status === "Failed";
+  const isRejected = attempt.status === "Rejected";
   const isCompleted = attempt.status === "Completed";
   const isCancelled = attempt.status === "Cancelled";
 
@@ -127,9 +128,11 @@ function AttemptRow({
               ? "bg-[var(--color-success)] text-white ring-[var(--color-success-soft)]"
               : isFailed
                 ? "bg-[var(--color-coral)] text-white ring-[var(--color-coral-soft)]"
-                : isCancelled
-                  ? "bg-[var(--color-ink-400)] text-white ring-[var(--color-ink-100)]"
-                  : "bg-[var(--color-surface)] text-[var(--color-ink-700)] ring-[var(--color-ink-100)] dark:ring-white/10",
+                : isRejected
+                  ? "bg-[var(--color-wine,#991b1b)] text-white ring-[var(--color-wine-soft,#991b1b1a)]"
+                  : isCancelled
+                    ? "bg-[var(--color-ink-400)] text-white ring-[var(--color-ink-100)]"
+                    : "bg-[var(--color-surface)] text-[var(--color-ink-700)] ring-[var(--color-ink-100)] dark:ring-white/10",
         )}
       >
         {attempt.attemptNumber}

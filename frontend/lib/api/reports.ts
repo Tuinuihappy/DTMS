@@ -150,6 +150,7 @@ export type VehiclePerformanceRow = {
   totalTrips: number;
   completed: number;
   failed: number;
+  rejected: number;
   cancelled: number;
   successRate: number;
   avgTimeToCompleteSec: number | null;

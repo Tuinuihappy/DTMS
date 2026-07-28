@@ -9,7 +9,8 @@ export type TripStatus =
   | "Paused"
   | "Completed"
   | "Failed"
-  | "Cancelled";
+  | "Cancelled"
+  | "Rejected";
 
 export type TripMissionDto = {
   missionIndex: number;
@@ -372,6 +373,7 @@ export const TRIP_TERMINAL_STATES: ReadonlyArray<TripStatus> = [
   "Completed",
   "Failed",
   "Cancelled",
+  "Rejected",
 ];
 
 export const TRIP_IN_FLIGHT_STATES: ReadonlyArray<TripStatus> = [

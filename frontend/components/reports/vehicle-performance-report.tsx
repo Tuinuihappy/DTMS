@@ -46,6 +46,7 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
     vehicle: r.vendorVehicleKey,
     completed: r.completed,
     failed: r.failed,
+    rejected: r.rejected,
     cancelled: r.cancelled,
   }));
   // "(unassigned)" rows come from trips that never started — surface
@@ -122,6 +123,7 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="completed" stackId="a" name="Completed" fill="var(--color-mint, #4ade80)" />
               <Bar dataKey="failed" stackId="a" name="Failed" fill="var(--color-coral, #f87171)" />
+              <Bar dataKey="rejected" stackId="a" name="Rejected" fill="var(--color-wine, #991b1b)" />
               <Bar dataKey="cancelled" stackId="a" name="Cancelled" fill="var(--color-ink-400, #94a3b8)" />
             </BarChart>
           </ResponsiveContainer>
@@ -135,6 +137,7 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
               <TableTh density="compact" align="right">Trips</TableTh>
               <TableTh density="compact" align="right">Completed</TableTh>
               <TableTh density="compact" align="right">Failed</TableTh>
+              <TableTh density="compact" align="right">Rejected</TableTh>
               <TableTh density="compact" align="right">Cancelled</TableTh>
               <TableTh density="compact" align="right">Success</TableTh>
               <TableTh density="compact" align="right">Avg time</TableTh>
@@ -143,13 +146,13 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
             </DataTableHead>
             <DataTableBody>
               {(data?.rows ?? []).length === 0 && loading && (
-                <TableSkeletonRows colSpan={9} rows={3} />
+                <TableSkeletonRows colSpan={10} rows={3} />
               )}
               {(data?.rows ?? []).length === 0 && !loading && (
                 <tr>
                   <TableTd
                     density="compact"
-                    colSpan={9}
+                    colSpan={10}
                     className="py-6 text-center text-[var(--color-ink-400)]"
                   >
                     No trips in this window.
@@ -169,6 +172,9 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
                     {r.failed.toLocaleString("en-US")}
+                  </TableTd>
+                  <TableTd density="compact" align="right" className="font-mono tabular-nums">
+                    {r.rejected.toLocaleString("en-US")}
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
                     {r.cancelled.toLocaleString("en-US")}

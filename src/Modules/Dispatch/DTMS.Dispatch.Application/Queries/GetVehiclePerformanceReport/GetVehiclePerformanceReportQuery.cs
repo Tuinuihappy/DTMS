@@ -27,6 +27,7 @@ public record VehiclePerformanceRow(
     int TotalTrips,
     int Completed,
     int Failed,
+    int Rejected,
     int Cancelled,
     double SuccessRate,
     double? AvgTimeToCompleteSec,
@@ -66,6 +67,7 @@ public class GetVehiclePerformanceReportQueryHandler
                 var total = g.Count();
                 var completed = g.Count(t => t.FinalStatus == "Completed");
                 var failed = g.Count(t => t.FinalStatus == "Failed");
+                var rejected = g.Count(t => t.FinalStatus == "Rejected");
                 var cancelled = g.Count(t => t.FinalStatus == "Cancelled");
                 var samples = g.Where(t => t.TimeToCompleteSec.HasValue)
                                .Select(t => (double)t.TimeToCompleteSec!.Value)
@@ -77,7 +79,7 @@ public class GetVehiclePerformanceReportQueryHandler
                 // Success rate is over terminal trips only — pending/in-progress
                 // trips would otherwise dilute the number for a vehicle that
                 // has lots of active work.
-                var terminal = completed + failed + cancelled;
+                var terminal = completed + failed + rejected + cancelled;
                 var successRate = terminal > 0 ? (double)completed / terminal : 0;
 
                 return new VehiclePerformanceRow(
@@ -85,6 +87,7 @@ public class GetVehiclePerformanceReportQueryHandler
                     TotalTrips: total,
                     Completed: completed,
                     Failed: failed,
+                    Rejected: rejected,
                     Cancelled: cancelled,
                     SuccessRate: successRate,
                     AvgTimeToCompleteSec: avg,
