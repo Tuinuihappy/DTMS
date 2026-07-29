@@ -27,3 +27,14 @@ scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: [localhost:9090]
+
+  # Host (Windows) metrics — windows_exporter runs on the Docker host as a
+  # user-level scheduled task ("dtms-windows-exporter", D:\dtms-tools; NOT an
+  # MSI service — the machine has no admin elevation). host.docker.internal
+  # is Docker Desktop's built-in host alias. Drives the C:-disk-full alerts
+  # in rules/host-disk.yml (the 2026-07-24 webhook outage was a full C:).
+  - job_name: windows-host
+    static_configs:
+      - targets: [host.docker.internal:9182]
+        labels:
+          service: windows-host

@@ -1,0 +1,49 @@
+# Host disk alerts — the C: drive filling up silently is a proven outage
+# cause: on 2026-07-24 it broke Docker Desktop's inbound port relay and the
+# RIOT3 notify channel went dark for ~2.5 h (fire-and-forget, frames lost).
+# Docker data now lives on D:, but C: still hosts the OS + WSL + temp churn.
+#
+# Same delivery caveat as workflow-slo.yml: no Alertmanager yet — these
+# fire + surface in the Prometheus UI (/alerts) and Grafana only.
+groups:
+  - name: host-disk
+    rules:
+      - alert: HostDiskLowC
+        expr: windows_logical_disk_free_bytes{volume="C:"} < 15e9
+        for: 10m
+        labels:
+          severity: P2
+          service: windows-host
+        annotations:
+          summary: "C: drive low: {{ $value | humanize1024 }}B free"
+          description: >
+            Free space on C: dropped below 15 GB. Run the temp cleanup
+            (scheduled task dtms-temp-cleanup or %TEMP% purge) and check
+            what grew — Docker data is on D: so this is OS/WSL/temp churn.
+
+      - alert: HostDiskCriticalC
+        expr: windows_logical_disk_free_bytes{volume="C:"} < 8e9
+        for: 5m
+        labels:
+          severity: P1
+          service: windows-host
+        annotations:
+          summary: "C: drive CRITICAL: {{ $value | humanize1024 }}B free"
+          description: >
+            Below 8 GB free on C:. At 0 the Docker inbound relay breaks and
+            RIOT3 webhooks are lost (2026-07-24 incident). Free space NOW.
+
+      # The exporter is a user-logon scheduled task, not a service — if the
+      # session logs out or the task dies, disk visibility silently vanishes.
+      # Alert on absence so silence can't be mistaken for health.
+      - alert: HostMetricsAbsent
+        expr: absent(windows_logical_disk_free_bytes{volume="C:"})
+        for: 15m
+        labels:
+          severity: P2
+          service: windows-host
+        annotations:
+          summary: "windows_exporter is not reporting"
+          description: >
+            No host disk metrics for 15m. Restart the dtms-windows-exporter
+            scheduled task (D:\dtms-tools\windows_exporter.exe).
