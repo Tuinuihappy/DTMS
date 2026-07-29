@@ -46,7 +46,14 @@ public static class Riot3Webhooks
             logger.LogDebug("RIOT3 notify: type={Type} taskEvent={TaskEvent} vehicleEvent={VehicleEvent}",
                 payload.Type, payload.TaskEventType, payload.VehicleEventType);
 
-            switch (NormalizeNotifyType(payload.Type))
+            // Channel-liveness pulse — count EVERY frame before any routing or
+            // correlation (incl. frames for RIOT3's own charge/park orders).
+            // The webhook-silence alert fires when this stops moving while
+            // trips are in flight; see ops/prometheus/rules/webhook-silence.yml.
+            var notifyType = NormalizeNotifyType(payload.Type);
+            metrics.RecordNotifyFrame(string.IsNullOrEmpty(notifyType) ? "other" : notifyType);
+
+            switch (notifyType)
             {
                 case "task":
                     await HandleTaskEvent(payload, outbox, tripRepository, tripItemSnapshotProvider, logger, cancellationToken);

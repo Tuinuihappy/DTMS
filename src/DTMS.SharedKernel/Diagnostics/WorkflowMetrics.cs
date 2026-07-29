@@ -24,6 +24,7 @@ namespace DTMS.SharedKernel.Diagnostics;
 ///   - dtms.workflow.reconciler_backfilled_total   (counter — post-terminal vehicle recovery)
 ///   - dtms.workflow.webhook_subtask_frames_total  (counter — every RIOT3 sub-task frame handled)
 ///   - dtms.workflow.webhook_full_trip_loads_total (counter — frames that loaded the full Trip aggregate)
+///   - dtms.workflow.notify_frames_total           (counter — every RIOT3 notify frame at the endpoint, tag: type)
 ///
 /// Drives the SLO alerts defined in the Tier 1 plan:
 ///   - orders_stuck_planned &gt; 0 for 5 minutes (P1)
@@ -61,6 +62,13 @@ public sealed class WorkflowMetrics : IDisposable
     // reaching for a bigger refactor.
     private readonly Counter<long> _webhookSubTaskFrames;
     private readonly Counter<long> _webhookFullTripLoads;
+    // Liveness pulse of the RIOT3 inbound notify channel. Incremented at the
+    // webhook endpoint for EVERY frame (task/subtask/vehicle, incl. frames for
+    // RIOT3's own charge/park orders) BEFORE any correlation/filtering — its
+    // only job is to prove the channel is alive. The webhook-silence alert
+    // fires on increase()==0 while reconciler_inflight > 0 (the 2026-07-24
+    // outage: 2.5 h of silently dropped frames that nothing alerted on).
+    private readonly Counter<long> _notifyFrames;
 
     // Observable gauges read from a snapshot the producer (watchdog, outbox
     // processor) updates. Using a snapshot rather than a callback keeps the
@@ -171,6 +179,10 @@ public sealed class WorkflowMetrics : IDisposable
             "dtms.workflow.webhook_full_trip_loads_total",
             description: "Sub-task frames that loaded the full tracked Trip aggregate (pickup/drop detection). Ratio to webhook_subtask_frames_total should stay ~0.1-0.2; a climb means the projection gate stopped short-circuiting.");
 
+        _notifyFrames = _meter.CreateCounter<long>(
+            "dtms.workflow.notify_frames_total",
+            description: "Every RIOT3 notify frame received at the webhook endpoint, before correlation (tag: type=task|subtask|vehicle|other). Channel-liveness pulse for the webhook-silence alert.");
+
         _meter.CreateObservableGauge(
             "dtms.workflow.trips_stuck_reconcile",
             () => Interlocked.Read(ref _reconcilerTripsStuck),
@@ -228,6 +240,11 @@ public sealed class WorkflowMetrics : IDisposable
         if (fetchErrors > 0) _reconcilerFetchError.Add(fetchErrors);
         if (backfilled > 0) _reconcilerBackfilled.Add(backfilled);
     }
+
+    /// <summary>One RIOT3 notify frame hit the webhook endpoint. Call before
+    /// any correlation/filtering — this is the channel-liveness pulse.</summary>
+    public void RecordNotifyFrame(string type)
+        => _notifyFrames.Add(1, Tag("type", string.IsNullOrEmpty(type) ? "other" : type));
 
     /// <summary>One sub-task webhook frame handled; fullTripLoad = true when
     /// the projection gate let it load the tracked Trip aggregate.</summary>

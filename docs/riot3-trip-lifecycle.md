@@ -422,7 +422,9 @@ sequenceDiagram
    PASS/CANCEL อาจยิงหุ่นผิด (reconciler self-heal แบบ poll)
 3. **Vocabulary drift** — `FINISHED`/`SUCCEEDED`, `CANCELED`/`CANCELLED` ต้องรับทั้งคู่ทุกที่ที่อ่าน state
 4. **Webhook loss** — ทุก transition พึ่ง webhook; reconciler poller (`Riot3ReconciliationService`)
-   เป็น safety-net อ่าน order-query แล้ว re-apply
+   เป็น safety-net อ่าน order-query แล้ว re-apply. **ตั้งแต่ 2026-07-29 มี alert คุมช่องทางเงียบ**:
+   `Riot3NotifyChannelSilent` (P1) fire เมื่อไม่มีเฟรม notify ใด ๆ เกิน 3 นาทีขณะมี trip in-flight
+   (`ops/prometheus/rules/webhook-silence.yml` — บทเรียนจาก outage 24 ก.ค. ที่เงียบ 2.5 ชม. โดยไม่มีใครรู้)
 5. **`Trip.Status` หยาบ** — อยากรู้ "หุ่นทำ mission จริง" ต้องอ่าน Level 2/3 ไม่ใช่ `Trip.Status`
 
 ---

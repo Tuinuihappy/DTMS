@@ -1,0 +1,45 @@
+# RIOT3 notify-channel silence alert.
+#
+# The 2026-07-24 incident: C: filled up, Docker Desktop's inbound port relay
+# broke, and RIOT3 notify frames (fire-and-forget, never retried) were lost
+# for ~2.5 h. Nothing alerted — the reconciler healed order state every 60 s
+# so the system LOOKED healthy, trips_stuck only fires past the 24 h window,
+# and fetch_error watches the outbound direction (which was fine).
+#
+# This rule watches the inbound pulse instead: notify_frames_total counts
+# EVERY frame at the webhook endpoint (task/subtask/vehicle, incl. RIOT3's
+# own charge/park orders) before any correlation. If it flatlines while AMR
+# trips are inside the reconcile window, the channel is almost certainly
+# dead (host relay, RIOT3 notify worker, or inbound network).
+#
+# reconciler_inflight gates the rule: it counts only envelope trips inside
+# the reconcile window (zombie rows without an UpperKey and >24 h stale trips
+# are already filtered out by GetInFlightEnvelopeTripsAsync), so "in flight"
+# reliably implies "frames should be flowing".
+#
+# Same delivery caveat as the other rule files: no Alertmanager — fires in
+# the Prometheus UI (/alerts) + Grafana only.
+groups:
+  - name: riot3-notify-silence
+    rules:
+      - alert: Riot3NotifyChannelSilent
+        # `or vector(0)` guards the freshly-deployed case where the counter
+        # has no samples yet (increase() over a missing series returns no
+        # data, which would silently disable the alert).
+        expr: >
+          (sum(increase(dtms_workflow_notify_frames_total[3m])) or vector(0)) == 0
+          and on() dtms_workflow_reconciler_inflight > 0
+        for: 1m
+        labels:
+          severity: P1
+          service: dtms-api
+        annotations:
+          summary: "RIOT3 notify channel silent for 3m while trips are in flight"
+          description: >
+            No notify frames (task/subtask/vehicle) received for 3 minutes
+            while AMR trips are inside the reconcile window. Frames are
+            fire-and-forget and will NOT be redelivered. Check, in order:
+            host C:/D: disk space + Docker inbound relay (2026-07-24 root
+            cause), RIOT3 notify worker, inbound network path. The
+            reconciler keeps order state converging meanwhile, but pickup/
+            drop signals lag ~60s and mission timelines go sparse.
