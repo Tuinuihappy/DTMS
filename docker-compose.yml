@@ -534,9 +534,13 @@ services:
   # position + reconciliation + map/route sync + webhook notifier) are now
   # gated via Workers__VendorPollers__RunInThisProcess. The api container
   # is their single owner; this worker container skips them. Idempotent
-  # background services (PlanningReconciliation, SlaRisk, FleetUtilization,
+  # background services (PlanningReconciliation, SlaRisk,
   # TopologyOverlayExpiry) still run in both — accepted because they only
-  # touch local DB + are safe to run 2x.
+  # touch local DB + are safe to run 2x. FleetUtilization was on that list
+  # until 2026-07-29: its Remove+Add upsert is NOT safe to run 2x (aligned
+  # ticks → the loser 23505s on IX_FleetUtilizationHourly_BucketHour every
+  # minute), so it is now gated to the api container via
+  # Workers__FleetSnapshot__RunInThisProcess below.
   outbox-worker:
     image: dtms-api          # reuse the api image — no separate build
     container_name: dtms-outbox-worker
@@ -607,6 +611,10 @@ services:
       # Without this flag, the worker doubled the RIOT3 API call rate +
       # produced 401 spam in its logs (admin JWT not provisioned here).
       - Workers__VendorPollers__RunInThisProcess=false
+      # Fleet utilization snapshot writes are single-owner (api) — the
+      # SELECT→Remove→Add upsert races against itself across processes
+      # (23505 on the hour-bucket unique index every aligned tick).
+      - Workers__FleetSnapshot__RunInThisProcess=false
       # Outbound-token auto-refresh sweep runs HERE (single-replica worker), not
       # on the multi-replica api tier — see Program.cs runTokenRefresh gate. The
       # loop always runs here; each system's UI "Enable automatic refresh" tick

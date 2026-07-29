@@ -551,8 +551,17 @@ public static class ModuleServiceRegistration
         // chain had no live caller: jobs are envelope anchors (CreateJobAnchor)
         // and RIOT3 owns routing + robot assignment. See commit for the audit.
         // Phase P3.2 — hourly fleet utilization snapshot (ticks every minute,
-        // writes to FleetUtilizationHourly).
-        services.AddHostedService<DTMS.Api.Infrastructure.FleetUtilizationSnapshotService>();
+        // writes to FleetUtilizationHourly). Gated to a single process: the
+        // writer's SELECT→Remove→Add upsert is NOT concurrency-safe — when the
+        // api and outbox-worker containers both ran it with aligned ticks, the
+        // loser's DELETE hit 0 rows and its INSERT died on
+        // IX_FleetUtilizationHourly_BucketHour (23505) every minute
+        // (2026-07-29 finding). The api container is the sole owner; the
+        // worker sets Workers__FleetSnapshot__RunInThisProcess=false.
+        var runFleetSnapshot = configuration
+            .GetValue("Workers:FleetSnapshot:RunInThisProcess", true);
+        if (runFleetSnapshot)
+            services.AddHostedService<DTMS.Api.Infrastructure.FleetUtilizationSnapshotService>();
 
         // ── Dispatch Module ───────────────────────────────────────────
         services.AddScoped<DispatchDomainEventMapper>();
