@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getFullOrderAudit,
-  resendSourceArrivedNotification,
+  resendSourceDroppedOffNotification,
   resendSourceNotification,
   resendSourcePickedUpNotification,
   type FullAuditEntryDto,
@@ -25,11 +25,13 @@ import { DateTime } from "@/components/primitives/date-time";
  * component serves oms/sap/erp orders without change.
  *
  * 4 stages:
- *   • Started   — shipment.started.v1     (fires at trip start)
- *   • Pickup    — shipment.pickedup.v1    (fires at pickup completed; skipped
+ *   • Started     — shipment.started.v1    (fires at trip start)
+ *   • Pickup      — shipment.pickedup.v1   (fires at pickup completed; skipped
  *     for self-managed orders — their pickup is source-executed)
- *   • Arrived   — shipment.arrived.v1     (fires at drop completed)
- *   • Cancelled — shipment.cancelled.v1   (fires at trip cancel; the stage
+ *   • Dropped off — shipment.droppedoff.v1 (fires at drop completed; renamed
+ *     from shipment.arrived.v1 in 2026-08 — the audit labels stay
+ *     UpstreamArrived* because they are persisted history)
+ *   • Cancelled   — shipment.cancelled.v1  (fires at trip cancel; the stage
  *     renders only when a cancelled callback row actually exists — the
  *     subscription ships disabled, so an always-on row would show a
  *     meaningless "Awaiting" on every order)
@@ -41,7 +43,7 @@ import { DateTime } from "@/components/primitives/date-time";
  * endpoint; upstreams dedupe by shipmentId so re-firing is safe.
  */
 
-type StageKey = "started" | "pickedup" | "arrived" | "cancelled";
+type StageKey = "started" | "pickedup" | "droppedoff" | "cancelled";
 
 type StageConfig = {
   label: string;
@@ -96,17 +98,20 @@ const STAGES: Record<StageKey, StageConfig> = {
     resendLabel: "Resend pickup",
     showOnlyWithData: false,
   },
-  arrived: {
-    label: "Arrived",
+  // Renamed stage (was "arrived") — the notified/resent/failed sets keep the
+  // UpstreamArrived* labels: persisted audit history mirrored string-for-string
+  // with the backend; only the wire event and display text changed.
+  droppedoff: {
+    label: "Dropped off",
     notifiedTypes: new Set(["UpstreamArrivedNotified"]),
     resentTypes: new Set(["UpstreamArrivedManuallyResent"]),
     failedTypes: new Set(["UpstreamArrivedNotifyFailed", "UpstreamArrivedRejected"]),
     triggerEventTypes: new Set(["TripDropCompleted"]),
-    emptyTitle: "Awaiting drop",
+    emptyTitle: "Awaiting drop-off",
     emptyHint: "The source system is notified when the trip reaches its drop station.",
     staleHint:
-      "Trip reached drop but no callback row exists — the subscription may be disabled, or the notification was gated.",
-    resendLabel: "Resend arrived",
+      "Trip reached drop but no callback row exists — self-managed orders are gated by design; otherwise the subscription may be disabled.",
+    resendLabel: "Resend drop-off",
     showOnlyWithData: false,
   },
   cancelled: {
@@ -147,7 +152,7 @@ export function OmsNotificationSection({
   const [reloadToken, setReloadToken] = useState(0);
   const [startedResend, setStartedResend] = useState<ResendState>({ kind: "idle" });
   const [pickedUpResend, setPickedUpResend] = useState<ResendState>({ kind: "idle" });
-  const [arrivedResend, setArrivedResend] = useState<ResendState>({ kind: "idle" });
+  const [droppedOffResend, setDroppedOffResend] = useState<ResendState>({ kind: "idle" });
 
   useEffect(() => {
     let cancelled = false;
@@ -200,8 +205,8 @@ export function OmsNotificationSection({
     () => deriveStatus(tripEntries, STAGES.pickedup),
     [tripEntries],
   );
-  const arrivedStatus = useMemo(
-    () => deriveStatus(tripEntries, STAGES.arrived),
+  const droppedOffStatus = useMemo(
+    () => deriveStatus(tripEntries, STAGES.droppedoff),
     [tripEntries],
   );
   const cancelledStatus = useMemo(
@@ -233,8 +238,8 @@ export function OmsNotificationSection({
     makeResendHandler(setPickedUpResend, (o, t) => resendSourcePickedUpNotification(o, t)),
     [orderId, tripId, refresh],
   );
-  const onResendArrived = useCallback(
-    makeResendHandler(setArrivedResend, (o, t) => resendSourceArrivedNotification(o, t)),
+  const onResendDroppedOff = useCallback(
+    makeResendHandler(setDroppedOffResend, (o, t) => resendSourceDroppedOffNotification(o, t)),
     [orderId, tripId, refresh],
   );
 
@@ -270,11 +275,11 @@ export function OmsNotificationSection({
           onResend={onResendPickedUp}
         />
         <StageRow
-          config={STAGES.arrived}
-          status={arrivedStatus}
+          config={STAGES.droppedoff}
+          status={droppedOffStatus}
           resendTripId={tripId}
-          resendState={arrivedResend}
-          onResend={onResendArrived}
+          resendState={droppedOffResend}
+          onResend={onResendDroppedOff}
         />
         {showCancelled && (
           <StageRow
@@ -301,9 +306,9 @@ const UPSTREAM_EVENT_TYPES = new Set<string>([
   ...STAGES.pickedup.notifiedTypes,
   ...STAGES.pickedup.resentTypes,
   ...STAGES.pickedup.failedTypes,
-  ...STAGES.arrived.notifiedTypes,
-  ...STAGES.arrived.resentTypes,
-  ...STAGES.arrived.failedTypes,
+  ...STAGES.droppedoff.notifiedTypes,
+  ...STAGES.droppedoff.resentTypes,
+  ...STAGES.droppedoff.failedTypes,
   ...STAGES.cancelled.notifiedTypes,
   ...STAGES.cancelled.failedTypes,
 ]);

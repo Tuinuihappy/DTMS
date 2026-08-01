@@ -649,24 +649,25 @@ export async function resendSourcePickedUpNotification(
   return unwrap<ResendSourcePickedUpNotificationResult>(res);
 }
 
-export type ResendSourceArrivedNotificationResult = {
+export type ResendSourceDroppedOffNotificationResult = {
   shipmentId: string;
-  lotCount: number;
+  locationCode: string;
   latencyMs: number;
 };
 
-// Manual resend of the OMS "arrived" (drop completed) notification.
-// Mirrors resendSourceNotification but hits the /arrived endpoint family.
-export async function resendSourceArrivedNotification(
+// Manual resend of the upstream "droppedoff" (drop completed) notification
+// (2026-08, renamed from arrived). Refused for self-managed orders and trips
+// that never reported the drop — the backend returns a clear reason for both.
+export async function resendSourceDroppedOffNotification(
   orderId: string,
   tripId: string,
   requestedBy?: string,
-): Promise<ResendSourceArrivedNotificationResult> {
-  const res = await fetch(`/api/delivery-orders/${orderId}/trips/${tripId}/notify-source-arrived`, {
+): Promise<ResendSourceDroppedOffNotificationResult> {
+  const res = await fetch(`/api/delivery-orders/${orderId}/trips/${tripId}/notify-source-droppedoff`, {
     method: "POST",
     headers: mutationHeaders(),
     body: JSON.stringify({ requestedBy: requestedBy ?? null }),
   });
-  return unwrap<ResendSourceArrivedNotificationResult>(res);
+  return unwrap<ResendSourceDroppedOffNotificationResult>(res);
 }
 
