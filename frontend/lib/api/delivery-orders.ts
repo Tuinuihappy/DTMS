@@ -606,15 +606,14 @@ export async function abandonStuckOrder(
 
 export type ResendSourceNotificationResult = {
   shipmentId: string;
-  deliveryBy: string;
-  lotCount: number;
+  deliveryBy: string | null;
   latencyMs: number;
 };
 
-// Manual resend of the upstream-OMS shipment notification for a specific
-// trip. Backend gates: order has OrderRef + trip belongs to order +
-// items are bound. Upstream dedupes by shipmentId, so re-firing on a row
-// that previously succeeded is safe.
+// Manual resend of the upstream shipment-started notification for a specific
+// trip. Backend gates: order has OrderRef + trip belongs to order. Upstream
+// dedupes by shipmentId, so re-firing on a row that previously succeeded is
+// safe.
 export async function resendSourceNotification(
   orderId: string,
   tripId: string,
