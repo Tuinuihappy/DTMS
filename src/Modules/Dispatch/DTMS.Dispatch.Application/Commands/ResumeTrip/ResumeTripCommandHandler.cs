@@ -2,6 +2,7 @@ using DTMS.Dispatch.Application.Services;
 using DTMS.Dispatch.Domain.Enums;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace DTMS.Dispatch.Application.Commands.ResumeTrip;
@@ -73,13 +74,59 @@ public class ResumeTripCommandHandler : ICommandHandler<ResumeTripCommand>
                 _logger.LogWarning("Auto-reconcile failed for Trip {TripId} after resume NoVendorRecord: {Error}",
                     trip.Id, ex.Message);
             }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Another writer beat the auto-reconcile save. Reload and
+                // re-apply; MarkVendorFailed no-ops if a terminal state
+                // already landed (first-terminal-wins).
+                _tripRepository.ResetTracking();
+                trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);
+                if (trip is not null)
+                {
+                    try
+                    {
+                        trip.MarkVendorFailed(reason);
+                        await _tripRepository.UpdateAsync(trip, cancellationToken);
+                    }
+                    catch (InvalidOperationException) { /* superseded */ }
+                }
+            }
 
             return Result.Failure(
                 "Cannot resume — the vendor has no record of this order. " +
                 "Trip auto-marked Failed; use /reopen on the delivery order then /retry to redispatch if needed.");
         }
 
-        await _tripRepository.UpdateAsync(trip, cancellationToken);
+        try
+        {
+            await _tripRepository.UpdateAsync(trip, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // RIOT3 accepted the resume and its TASK_*_TO_CONTINUE echo
+            // webhook committed before we did. Reload and re-apply: Resume
+            // throws InvalidOperationException when the trip is already
+            // InProgress (echo won), which we treat as intent-satisfied.
+            // Never repeat the vendor call; a second consecutive conflict
+            // propagates (→ HTTP 409).
+            _tripRepository.ResetTracking();
+            trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);
+            if (trip == null) return Result.Failure($"Trip {request.TripId} not found.");
+
+            try { trip.Resume(); }
+            catch (InvalidOperationException) { /* status check below decides */ }
+
+            if (trip.Status != TripStatus.InProgress)
+                return Result.Failure(
+                    $"Resume was superseded by a concurrent update — trip is now {trip.Status}.");
+
+            await _tripRepository.UpdateAsync(trip, cancellationToken);
+            _logger.LogInformation(
+                "Trip {TripId} resumed (vendorOrderKey {OrderKey}, source {Source}) — vendor echo won the race, resolved as no-op",
+                trip.Id, trip.VendorOrderKey, wasHang ? "Hang" : "Held");
+            return Result.Success();
+        }
+
         _logger.LogInformation("Trip {TripId} resumed (vendorOrderKey {OrderKey}, source {Source})",
             trip.Id, trip.VendorOrderKey, wasHang ? "Hang" : "Held");
         return Result.Success();

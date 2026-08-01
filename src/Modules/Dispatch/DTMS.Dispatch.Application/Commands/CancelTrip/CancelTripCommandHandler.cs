@@ -1,6 +1,8 @@
 using DTMS.Dispatch.Application.Services;
+using DTMS.Dispatch.Domain.Enums;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace DTMS.Dispatch.Application.Commands.CancelTrip;
@@ -45,8 +47,15 @@ public class CancelTripCommandHandler : ICommandHandler<CancelTripCommand>
             _logger.LogInformation(
                 "Trip {TripId} cancelled locally — no vendorOrderKey on file (upperKey {UpperKey}): {Reason}",
                 trip.Id, trip.UpperKey, request.Reason);
-            await _tripRepository.UpdateAsync(trip, cancellationToken);
-            return Result.Success();
+            try
+            {
+                await _tripRepository.UpdateAsync(trip, cancellationToken);
+                return Result.Success();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return await RetryCancelAfterConflictAsync(request, cancellationToken);
+            }
         }
 
         var vendorResult = await _vendorOps.CancelAsync(trip.VendorOrderKey, cancellationToken);
@@ -68,7 +77,45 @@ public class CancelTripCommandHandler : ICommandHandler<CancelTripCommand>
             _logger.LogInformation("Trip {TripId} cancelled (vendorOrderKey {OrderKey}): {Reason}",
                 trip.Id, trip.VendorOrderKey, request.Reason);
 
+        try
+        {
+            await _tripRepository.UpdateAsync(trip, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return await RetryCancelAfterConflictAsync(request, cancellationToken);
+        }
+        return Result.Success();
+    }
+
+    // RIOT3's TASK_CANCELED echo (or another writer) committed before our
+    // save. Reload and re-apply: if the trip is already Cancelled the echo
+    // won — the surviving TripCancelled event carries the vendor's
+    // placeholder reason, so we preserve the operator's actual reason as an
+    // audit ExecutionEvent (no second integration event). Never repeats the
+    // vendor call; a second consecutive conflict propagates (→ HTTP 409).
+    private async Task<Result> RetryCancelAfterConflictAsync(
+        CancelTripCommand request, CancellationToken cancellationToken)
+    {
+        _tripRepository.ResetTracking();
+        var trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);
+        if (trip == null) return Result.Failure($"Trip {request.TripId} not found.");
+
+        var superseded = false;
+        try { trip.Cancel(request.Reason); }
+        catch (InvalidOperationException) { superseded = true; }
+
+        if (trip.Status != TripStatus.Cancelled)
+            return Result.Failure(
+                $"Cancel was superseded by a concurrent update — trip is now {trip.Status}.");
+
+        if (superseded)
+            trip.RecordSupersededCancelIntent(request.Reason);
+
         await _tripRepository.UpdateAsync(trip, cancellationToken);
+        _logger.LogInformation(
+            "Trip {TripId} cancelled — concurrent writer won the race, resolved as no-op (operator reason preserved: {Superseded})",
+            trip.Id, superseded);
         return Result.Success();
     }
 }

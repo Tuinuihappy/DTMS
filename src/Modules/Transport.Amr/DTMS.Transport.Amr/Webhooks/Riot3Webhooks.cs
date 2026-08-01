@@ -11,6 +11,7 @@ using DTMS.Transport.Amr.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -135,6 +136,57 @@ public static class Riot3Webhooks
         }
 
         var eventType = payload.TaskEventType?.ToUpperInvariant();
+        if (!await TryApplyTaskEventAsync(trip, payload, eventType, upperKey, tripItemSnapshotProvider, logger, cancellationToken))
+            return;
+
+        try
+        {
+            await tripRepository.UpdateAsync(trip, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another writer (an operator command mid-save, the reconciler, or
+            // a sibling frame) committed between our load and save. Purge the
+            // tracker (a failed save leaves drained OutboxMessage rows queued
+            // as Added — saving them would resurrect the duplicate event the
+            // token just blocked), reload fresh and re-apply: the domain
+            // guards / IOE catch turn an already-applied transition into a
+            // no-op. A second consecutive conflict propagates (webhook 500;
+            // frames are fire-and-forget and the reconciler heals in ≤60s).
+            tripRepository.ResetTracking();
+            trip = await tripRepository.GetByUpperKeyAsync(upperKey, cancellationToken);
+            if (trip is null)
+            {
+                logger.LogWarning(
+                    "[EnvelopeWebhook] Trip for upperKey {UpperKey} disappeared during conflict retry — webhook ignored.",
+                    upperKey);
+                return;
+            }
+
+            if (!await TryApplyTaskEventAsync(trip, payload, eventType, upperKey, tripItemSnapshotProvider, logger, cancellationToken))
+                return;
+
+            await tripRepository.UpdateAsync(trip, cancellationToken);
+            logger.LogInformation(
+                "[EnvelopeWebhook] Trip {TripId} event {Event} applied after conflict retry (upperKey {UpperKey})",
+                trip.Id, eventType, upperKey);
+        }
+    }
+
+    // Applies one RIOT3 task event to the aggregate. Returns true when the
+    // trip was mutated and needs saving; false when the event carries no
+    // state change or the transition was rejected (already applied /
+    // superseded — logged and swallowed). internal for unit tests and reuse
+    // by the conflict-retry path above.
+    internal static async Task<bool> TryApplyTaskEventAsync(
+        Trip trip,
+        Riot3NotifyPayload payload,
+        string? eventType,
+        string upperKey,
+        ITripItemSnapshotProvider tripItemSnapshotProvider,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
         try
         {
             switch (eventType)
@@ -232,17 +284,17 @@ public static class Riot3Webhooks
                     // before dispatch; queueing is intermediate).
                     logger.LogDebug("[EnvelopeWebhook] Trip {TripId} event {Event} — no state change applied.",
                         trip.Id, eventType);
-                    return;
+                    return false;
             }
         }
         catch (InvalidOperationException ex)
         {
             logger.LogWarning("[EnvelopeWebhook] Trip {TripId} state transition rejected for event {Event}: {Error}",
                 trip.Id, eventType, ex.Message);
-            return;
+            return false;
         }
 
-        await tripRepository.UpdateAsync(trip, cancellationToken);
+        return true;
     }
 
     // Persist per-mission lifecycle events for the trip detail UI.
@@ -437,7 +489,40 @@ public static class Riot3Webhooks
                     trip, subTask.SubTaskType, state, stationId,
                     facilityReadService, orderReader, missionEvent.ChangeStateTime, logger, cancellationToken))
             {
-                await tripRepository.UpdateAsync(trip, cancellationToken);
+                try
+                {
+                    await tripRepository.UpdateAsync(trip, cancellationToken);
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    // A task frame / command / reconciler write landed between
+                    // our load and save. Purge the tracker (drops the drained
+                    // outbox rows a failed save leaves behind), reload fresh
+                    // and re-run the detector — its fire-once re-check on the
+                    // fresh trip no-ops if the other writer already recorded
+                    // the pickup/drop signal. Second conflict propagates
+                    // (webhook 500; reconciler heals in ≤60s).
+                    tripRepository.ResetTracking();
+                    Trip? freshTrip = null;
+                    if (!string.IsNullOrWhiteSpace(upperKey))
+                        freshTrip = await tripRepository.GetByUpperKeyAsync(upperKey, cancellationToken);
+                    if (freshTrip is null && !string.IsNullOrWhiteSpace(vendorOrderKey))
+                        freshTrip = await tripRepository.GetByVendorOrderKeyAsync(vendorOrderKey, cancellationToken);
+                    if (freshTrip is null)
+                    {
+                        logger.LogWarning("[SubTaskWebhook] Trip {TripId} disappeared during conflict retry — skipped", tripId);
+                        return;
+                    }
+
+                    if (await TripStationTransitionDetector.TryApplyAsync(
+                            freshTrip, subTask.SubTaskType, state, stationId,
+                            facilityReadService, orderReader, missionEvent.ChangeStateTime, logger, cancellationToken))
+                    {
+                        await tripRepository.UpdateAsync(freshTrip, cancellationToken);
+                        logger.LogInformation(
+                            "[SubTaskWebhook] Trip {TripId} pickup/drop applied after conflict retry", freshTrip.Id);
+                    }
+                }
             }
         }
     }

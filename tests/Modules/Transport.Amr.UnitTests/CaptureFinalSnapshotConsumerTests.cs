@@ -82,6 +82,33 @@ public class CaptureFinalSnapshotConsumerTests
     }
 
     [Fact]
+    public async Task Consume_ConcurrencyConflictOnSave_RethrowsForRedelivery()
+    {
+        // xmin conflict = the reconciler (or a late webhook) committed a
+        // competing write. The consumer must NOT re-save on the same context
+        // (the failed save left drained OutboxMessages queued as Added) —
+        // it rethrows so MassTransit redelivers in a fresh scope, where the
+        // first-write-wins guard short-circuits if the snapshot landed.
+        var trip = TerminalTripMissingVehicle();
+        var repo = Substitute.For<ITripRepository>();
+        repo.GetByIdAsync(trip.Id, Arg.Any<CancellationToken>()).Returns(trip);
+        repo.UpdateAsync(Arg.Any<Trip>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException("xmin conflict")));
+
+        var query = Substitute.For<IRiot3OrderQueryService>();
+        query.GetRawByUpperKeyAsync(trip.UpperKey!, Arg.Any<CancellationToken>())
+            .Returns("{\"code\":\"0\",\"data\":{}}");
+
+        var consumer = new CaptureFinalSnapshotConsumer(
+            repo, query, NullLogger<CaptureFinalSnapshotConsumer>.Instance);
+
+        var act = () => consumer.Consume(CompletedContext(trip));
+
+        await act.Should().ThrowAsync<Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException>();
+        await repo.Received(1).UpdateAsync(Arg.Any<Trip>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Consume_SnapshotAlreadyCaptured_SkipsVendorRefetch()
     {
         // First-writer-wins: the reconciler already sealed the trip, so the

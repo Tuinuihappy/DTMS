@@ -1160,23 +1160,192 @@ internal sealed class StubRetryDispatcher : ITripRetryDispatcher
         => Task.FromResult(Result<Guid>.Success(Guid.NewGuid()));
 }
 
+// ── xmin conflict-retry: command vs vendor-echo webhook race ────────────
+//
+// RIOT3 accepts a pause/resume/cancel and fires its echo webhook
+// (TASK_HELD / *_TO_CONTINUE / TASK_CANCELED) within ~70ms — often before
+// the command's own save commits (2026-07-29 E2E, trip 5974). With the
+// xmin token the command's save throws DbUpdateConcurrencyException; the
+// handler must purge the tracker, reload fresh, re-apply (domain guards
+// turn an already-applied transition into a no-op so NO second domain
+// event is emitted) and still report Success. The vendor call must never
+// be repeated; a second consecutive conflict propagates (middleware 409).
+
+public class TripCommandConflictRetryTests
+{
+    [Fact]
+    public async Task Pause_EchoWonRace_ResolvesAsNoOpSuccess_WithoutSecondEvent()
+    {
+        var trip = NewTripInProgress();
+        var reloaded = NewTripInProgress();
+        reloaded.Pause(VendorPauseSource.Held);   // echo already committed Held
+        reloaded.ClearDomainEvents();             // and its events were drained by that save
+        var repo = new FakeTripRepository(trip) { ConcurrencyThrows = 1, ReloadedTrip = reloaded };
+        var vendor = new StubVendorOps();
+
+        var handler = new PauseTripCommandHandler(repo, vendor, NullLogger<PauseTripCommandHandler>.Instance);
+        var result = await handler.Handle(new PauseTripCommand(trip.Id), default);
+
+        result.IsSuccess.Should().BeTrue();
+        vendor.PauseCalls.Should().HaveCount(1);   // vendor call never repeated
+        repo.ResetTrackingCalls.Should().Be(1);    // poisoned tracker purged before reload
+        repo.UpdateCalls.Should().Be(2);           // failed save + retry save
+        reloaded.Status.Should().Be(TripStatus.Held);
+        reloaded.DomainEvents.Should().BeEmpty();  // same-flavour guard no-opped → no 2nd TripHeld event
+    }
+
+    [Fact]
+    public async Task Pause_ConflictSupersededByTerminal_ReturnsFailureWithActualStatus()
+    {
+        var trip = NewTripInProgress();
+        var reloaded = NewTripInProgress();
+        reloaded.MarkVendorCompleted();            // TASK_FINISHED won the race instead
+        reloaded.ClearDomainEvents();
+        var repo = new FakeTripRepository(trip) { ConcurrencyThrows = 1, ReloadedTrip = reloaded };
+        var vendor = new StubVendorOps();
+
+        var handler = new PauseTripCommandHandler(repo, vendor, NullLogger<PauseTripCommandHandler>.Instance);
+        var result = await handler.Handle(new PauseTripCommand(trip.Id), default);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Contain("superseded").And.Contain("Completed");
+        repo.UpdateCalls.Should().Be(1);           // retry did not save anything
+        reloaded.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Pause_SecondConsecutiveConflict_Propagates()
+    {
+        var trip = NewTripInProgress();
+        var reloaded = NewTripInProgress();        // still InProgress → retry re-applies Pause
+        reloaded.ClearDomainEvents();
+        var repo = new FakeTripRepository(trip) { ConcurrencyThrows = 2, ReloadedTrip = reloaded };
+        var vendor = new StubVendorOps();
+
+        var handler = new PauseTripCommandHandler(repo, vendor, NullLogger<PauseTripCommandHandler>.Instance);
+        var act = () => handler.Handle(new PauseTripCommand(trip.Id), default);
+
+        await act.Should().ThrowAsync<Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException>();
+        vendor.PauseCalls.Should().HaveCount(1);   // still never repeated
+    }
+
+    [Fact]
+    public async Task Resume_EchoWonRace_ResolvesAsNoOpSuccess_WithoutSecondEvent()
+    {
+        var trip = NewTripInProgress();
+        trip.Pause(VendorPauseSource.Held);
+        var reloaded = NewTripInProgress();        // echo already resumed → InProgress
+        reloaded.ClearDomainEvents();
+        var repo = new FakeTripRepository(trip) { ConcurrencyThrows = 1, ReloadedTrip = reloaded };
+        var vendor = new StubVendorOps();
+
+        var handler = new ResumeTripCommandHandler(repo, vendor, NullLogger<ResumeTripCommandHandler>.Instance);
+        var result = await handler.Handle(new ResumeTripCommand(trip.Id), default);
+
+        result.IsSuccess.Should().BeTrue();
+        vendor.ResumeCalls.Should().HaveCount(1);
+        vendor.ResumeFromHangCalls.Should().BeEmpty();
+        repo.ResetTrackingCalls.Should().Be(1);
+        reloaded.Status.Should().Be(TripStatus.InProgress);
+        reloaded.DomainEvents.Should().BeEmpty();  // Resume threw IOE, swallowed → no 2nd TripResumed event
+    }
+
+    [Fact]
+    public async Task Resume_ConflictSupersededByTerminal_ReturnsFailureWithActualStatus()
+    {
+        var trip = NewTripInProgress();
+        trip.Pause(VendorPauseSource.Hang);
+        var reloaded = NewTripInProgress();
+        reloaded.MarkVendorFailed("robot fault");  // TASK_FAILED won the race
+        reloaded.ClearDomainEvents();
+        var repo = new FakeTripRepository(trip) { ConcurrencyThrows = 1, ReloadedTrip = reloaded };
+        var vendor = new StubVendorOps();
+
+        var handler = new ResumeTripCommandHandler(repo, vendor, NullLogger<ResumeTripCommandHandler>.Instance);
+        var result = await handler.Handle(new ResumeTripCommand(trip.Id), default);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Contain("superseded").And.Contain("Failed");
+        reloaded.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Cancel_EchoWonRace_PreservesOperatorReasonAsAuditEvent()
+    {
+        var trip = NewTripInProgress();
+        var reloaded = NewTripInProgress();
+        reloaded.Cancel("vendor cancelled");       // echo's placeholder reason won first-write-wins
+        reloaded.ClearDomainEvents();
+        var repo = new FakeTripRepository(trip) { ConcurrencyThrows = 1, ReloadedTrip = reloaded };
+        var vendor = new StubVendorOps();
+
+        var handler = new CancelTripCommandHandler(repo, vendor, NullLogger<CancelTripCommandHandler>.Instance);
+        var result = await handler.Handle(new CancelTripCommand(trip.Id, "operator stop — wrong station"), default);
+
+        result.IsSuccess.Should().BeTrue();        // operator intent satisfied either way
+        vendor.CancelCalls.Should().HaveCount(1);
+        reloaded.Status.Should().Be(TripStatus.Cancelled);
+        reloaded.DomainEvents.Should().BeEmpty();  // no 2nd TripCancelled integration event
+        // ...but the operator's true reason is preserved as an audit event
+        reloaded.Events.Should().Contain(e =>
+            e.EventType == "OperatorCancelSuperseded" &&
+            e.Details!.Contains("operator stop — wrong station"));
+    }
+
+    [Fact]
+    public async Task Cancel_ConflictWithNonTerminalWinner_AppliesFreshCancel()
+    {
+        var trip = NewTripInProgress();
+        var reloaded = NewTripInProgress();
+        reloaded.Pause(VendorPauseSource.Held);    // a TASK_HELD write won, not a cancel
+        reloaded.ClearDomainEvents();
+        var repo = new FakeTripRepository(trip) { ConcurrencyThrows = 1, ReloadedTrip = reloaded };
+        var vendor = new StubVendorOps();
+
+        var handler = new CancelTripCommandHandler(repo, vendor, NullLogger<CancelTripCommandHandler>.Instance);
+        var result = await handler.Handle(new CancelTripCommand(trip.Id, "ops"), default);
+
+        result.IsSuccess.Should().BeTrue();
+        reloaded.Status.Should().Be(TripStatus.Cancelled);
+        reloaded.DomainEvents.Should().ContainSingle();   // real cancel applied on the fresh state
+        reloaded.Events.Should().Contain(e => e.EventType == "TripCancelled" && e.Details == "ops");
+    }
+
+    private static Trip NewTripInProgress()
+    {
+        var t = Trip.CreateForEnvelope(Guid.NewGuid(), "abc-G1", "ORD-1");
+        t.MarkVendorStarted(Guid.NewGuid());
+        return t;
+    }
+}
+
 // ── Test doubles ────────────────────────────────────────────────────────
 
 internal sealed class FakeTripRepository : ITripRepository
 {
     private readonly Trip _trip;
     public int UpdateCalls { get; private set; }
+    public int ResetTrackingCalls { get; private set; }
+
+    // xmin conflict-retry hooks: the next N UpdateAsync calls throw
+    // DbUpdateConcurrencyException (simulating a vendor-echo webhook winning
+    // the commit race); after ResetTracking, Get* return ReloadedTrip (the
+    // "fresh from DB" instance) when set.
+    public int ConcurrencyThrows { get; set; }
+    public Trip? ReloadedTrip { get; set; }
+
+    private Trip Current => ResetTrackingCalls > 0 && ReloadedTrip is not null ? ReloadedTrip : _trip;
 
     public FakeTripRepository(Trip trip) { _trip = trip; }
 
     public Task<Trip?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => Task.FromResult<Trip?>(id == _trip.Id ? _trip : null);
+        => Task.FromResult<Trip?>(id == _trip.Id ? Current : null);
 
     public Task<Trip?> GetByUpperKeyAsync(string upperKey, CancellationToken ct = default)
-        => Task.FromResult<Trip?>(upperKey == _trip.UpperKey ? _trip : null);
+        => Task.FromResult<Trip?>(upperKey == _trip.UpperKey ? Current : null);
 
     public Task<Trip?> GetByVendorOrderKeyAsync(string vendorOrderKey, CancellationToken ct = default)
-        => Task.FromResult<Trip?>(vendorOrderKey == _trip.VendorOrderKey ? _trip : null);
+        => Task.FromResult<Trip?>(vendorOrderKey == _trip.VendorOrderKey ? Current : null);
 
     public Task<TripSubTaskLookup?> GetSubTaskLookupAsync(string? upperKey, string? vendorOrderKey, CancellationToken ct = default)
         => Task.FromResult<TripSubTaskLookup?>(
@@ -1204,8 +1373,16 @@ internal sealed class FakeTripRepository : ITripRepository
     public Task UpdateAsync(Trip trip, CancellationToken ct = default)
     {
         UpdateCalls++;
+        if (ConcurrencyThrows > 0)
+        {
+            ConcurrencyThrows--;
+            throw new Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException(
+                "simulated xmin conflict — concurrent writer committed first");
+        }
         return Task.CompletedTask;
     }
+
+    public void ResetTracking() => ResetTrackingCalls++;
 
     // WMS PR-4b (PR-F) — Fake CAS: this test double doesn't need pool
     // semantics for the existing suite. Real behavior is covered in

@@ -4,6 +4,7 @@ using DTMS.Dispatch.IntegrationEvents;
 using DTMS.Transport.Amr.Models;
 using DTMS.Transport.Amr.Services;
 using MassTransit;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace DTMS.Transport.Amr.Consumers;
@@ -107,7 +108,22 @@ public sealed class CaptureFinalSnapshotConsumer :
         var (vKey, vName) = TryExtractResolvedVehicle(raw);
         var backfilled = trip.BackfillVendorVehicle(vKey, vName, "final-snapshot");
 
-        await _tripRepository.UpdateAsync(trip, cancellationToken);
+        try
+        {
+            await _tripRepository.UpdateAsync(trip, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // The reconciler (or a late webhook) committed a competing write.
+            // Rethrow so MassTransit redelivers in a FRESH scope — the retry
+            // re-loads the trip and the first-write-wins guard above
+            // short-circuits if the snapshot already landed. Never re-save on
+            // this context: the failed save left drained OutboxMessages
+            // queued as Added.
+            _logger.LogWarning(
+                "[FinalSnapshot] Trip {TripId} lost a write race — rethrowing for MassTransit redelivery.", tripId);
+            throw;
+        }
 
         _logger.LogInformation(
             "[FinalSnapshot] ✓ Captured for Trip {TripId} (upperKey {UpperKey}, state {State}, size {Bytes}B, vehicle {Vehicle})",

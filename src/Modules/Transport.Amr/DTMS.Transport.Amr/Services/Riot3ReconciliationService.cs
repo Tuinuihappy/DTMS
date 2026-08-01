@@ -6,6 +6,7 @@ using DTMS.SharedKernel.Diagnostics;
 using DTMS.Transport.Amr.Options;
 using DTMS.Transport.Amr.Models;
 using DTMS.Transport.Amr.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -197,6 +198,20 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     await tripRepo.UpdateAsync(trip, ct);
                     if (transition != Transition.None) reconciled++;
                 }
+                catch (DbUpdateConcurrencyException)
+                {
+                    // A webhook won the race for this trip. The whole batch
+                    // shares one DbContext, and the failed save leaves the
+                    // conflicted trip Modified + its drained domain events
+                    // queued as Added OutboxMessages — the NEXT trip's save
+                    // would re-throw and/or insert those duplicate events.
+                    // Abort the tick instead of continuing; the next tick
+                    // (≤60s) reloads everything fresh. MUST precede the
+                    // generic catch below.
+                    await AbortTickOnConflictAsync(scope, trip, staleCutoff, inFlight.Count,
+                        reconciled, skippedFetchError, vehicleBackfilled, ct);
+                    return;
+                }
                 catch (Exception ex) when (!ct.IsCancellationRequested)
                 {
                     _logger.LogError(ex, "[Reconciler] persist failed for Trip {TripId} (upperKey {UpperKey})",
@@ -238,6 +253,15 @@ public sealed class Riot3ReconciliationService : BackgroundService
                             "[Reconciler] Captured final snapshot for Trip {TripId} (upperKey {UpperKey}, state {State})",
                             trip.Id, trip.UpperKey, data.State);
                     }
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    // Same poisoned-batch reasoning as the transition save
+                    // above (likely CaptureFinalSnapshotConsumer racing us).
+                    // MUST precede the generic catch below.
+                    await AbortTickOnConflictAsync(scope, trip, staleCutoff, inFlight.Count,
+                        reconciled, skippedFetchError, vehicleBackfilled, ct);
+                    return;
                 }
                 catch (Exception ex) when (!ct.IsCancellationRequested)
                 {
@@ -458,12 +482,40 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     trip.Id, trip.UpperKey,
                     backfilled ? $"→ '{vName ?? vKey}'" : "unavailable — sealed, no re-fetch");
             }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Concurrent writer beat this save. Same shared-context
+                // poisoning as the tick loop (failed save leaves Added
+                // OutboxMessages + a Modified trip in the tracker), so stop
+                // the sweep here — no further saves happen on this scope
+                // after self-heal, and the next tick reloads fresh.
+                // MUST precede the generic catch below.
+                _logger.LogInformation(
+                    "[Reconciler] Self-heal Trip {TripId} lost a write race — sweep stopped, next tick retries", trip.Id);
+                return healed;
+            }
             catch (Exception ex) when (!ct.IsCancellationRequested)
             {
                 _logger.LogWarning(ex, "[Reconciler] Self-heal failed for Trip {TripId} — will retry next tick", trip.Id);
             }
         }
         return healed;
+    }
+
+    // Tick-abort path for optimistic-concurrency conflicts: a webhook (or
+    // the snapshot consumer) committed a competing write while this tick
+    // held stale tracked state. Records the tick metric before returning so
+    // the trips_stuck gauge doesn't go stale when conflicts cluster.
+    private async Task AbortTickOnConflictAsync(
+        IServiceScope scope, Trip trip, DateTime staleCutoff, int inflightCount,
+        int reconciled, int fetchErrors, int backfilled, CancellationToken ct)
+    {
+        _logger.LogInformation(
+            "[Reconciler] Trip {TripId} (upperKey {UpperKey}) lost a write race to a concurrent writer — aborting tick, next tick reconciles",
+            trip.Id, trip.UpperKey);
+        var stale = await CountStaleTripsAsync(scope, staleCutoff, ct);
+        _metrics.RecordReconcilerTick(tripsStuck: stale, inflight: inflightCount,
+            reconciled: reconciled, fetchErrors: fetchErrors, backfilled: backfilled);
     }
 
     private static async Task<int> CountStaleTripsAsync(IServiceScope scope, DateTime cutoff, CancellationToken ct)

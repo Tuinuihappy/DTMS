@@ -204,6 +204,11 @@ public class TripRepository : ITripRepository
 
         if (trackedEntry == null)
         {
+            // NOTE (xmin token): this Attach branch stamps the entity's
+            // CURRENT xmin as the token original value. Never reach it with
+            // an instance that survived ResetTracking() or crossed scopes —
+            // its token is stale (or default 0) and every save will throw
+            // DbUpdateConcurrencyException. Load-then-update in one scope.
             _context.Trips.Attach(trip);
             var entry = _context.Entry(trip);
             entry.Property(t => t.Status).IsModified = true;
@@ -238,6 +243,8 @@ public class TripRepository : ITripRepository
 
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public void ResetTracking() => _context.ChangeTracker.Clear();
 
     // Phase 3d — vehicle reassignment history rows appended via
     // RecordVehicleAssignment land in the in-memory collection but EF's

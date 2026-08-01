@@ -86,6 +86,16 @@ public class DispatchDbContext : DbContext
             builder.HasIndex(t => t.JobId)
                 .HasFilter("\"JobId\" != '00000000-0000-0000-0000-000000000000'");
             builder.Ignore(t => t.DomainEvents);
+            // Optimistic concurrency via the Postgres xmin system column
+            // (same pattern as DeliveryOrder/Iam). Trips are written by HTTP
+            // commands, the RIOT3 webhook, the reconciler and consumers
+            // concurrently; without a token the loser of a race silently
+            // last-writes and duplicate domain events slip past the
+            // in-memory guards (2026-07-29 E2E: command vs vendor-echo
+            // webhook ~70ms apart → Held→Held history rows, PauseCount
+            // double-counted). With the token the late committer gets
+            // DbUpdateConcurrencyException and must reload + re-apply.
+            builder.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion().IsConcurrencyToken();
 
             builder.HasMany(t => t.Events)
                    .WithOne()

@@ -543,6 +543,23 @@ public class Trip : AggregateRoot<Guid>
         RecordEvent("TripCancelled", reason);
     }
 
+    /// <summary>
+    /// Audit-only: preserves the operator's cancel reason when their cancel
+    /// command lost the commit race to the vendor's TASK_CANCELED echo — the
+    /// surviving (first) TripCancelled event then carries the vendor's
+    /// placeholder reason ("vendor cancelled") and the true cause would
+    /// otherwise be lost. Appends an ExecutionEvent; no status change, no
+    /// domain event.
+    /// </summary>
+    public void RecordSupersededCancelIntent(string reason)
+    {
+        if (Status != TripStatus.Cancelled)
+            throw new InvalidOperationException(
+                "Only cancelled trips can record a superseded cancel intent.");
+        RecordEvent("OperatorCancelSuperseded",
+            $"Operator cancel superseded by vendor echo; operator reason: {reason}");
+    }
+
     // Bind the trip to a vehicle the vendor (RIOT3) auto-selected after
     // dispatch. Idempotent: a no-op if the same vehicle is reported again,
     // throws if a different vehicle tries to take over.

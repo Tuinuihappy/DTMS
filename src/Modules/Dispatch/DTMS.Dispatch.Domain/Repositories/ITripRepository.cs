@@ -81,6 +81,21 @@ public interface ITripRepository
     Task UpdateAsync(Trip trip, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Discards ALL tracked state in the underlying unit of work
+    /// (ChangeTracker.Clear). Required before retrying after a
+    /// DbUpdateConcurrencyException: the outbox interceptor drains domain
+    /// events into OutboxMessage rows during SavingChanges (before the DB
+    /// write), so a failed save leaves those rows queued as Added — a
+    /// second save on the same context would insert them and resurrect the
+    /// very duplicate event the concurrency token just prevented. Also
+    /// required after <see cref="TryClaimFromPoolAsync"/> wins its raw-SQL
+    /// CAS (which bumps the row's xmin behind the tracker's back). After
+    /// calling this, re-load the aggregate and REBIND — the old instance's
+    /// concurrency token is stale and will conflict forever.
+    /// </summary>
+    void ResetTracking();
+
+    /// <summary>
     /// Walk back PreviousAttemptId chain to find the first attempt's Id.
     /// Used as the stable shipmentId for upstream OMS notifications so
     /// retries don't appear as new shipments to OMS. Returns the input

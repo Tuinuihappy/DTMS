@@ -136,9 +136,14 @@ internal sealed class AcknowledgeTripCommandHandler : ICommandHandler<Acknowledg
             return Result.Failure(AcknowledgeTripErrorCodes.AlreadyClaimed);
         }
 
-        // Reload — the earlier GetByIdAsync returned a tracked instance
-        // that has stale (pre-CAS) ClaimedByOperatorId/ClaimedAt. Reload
-        // from DB so the aggregate reflects the SQL update before we save.
+        // The CAS is a raw UPDATE: it bumped the row (including its xmin
+        // concurrency token) behind the change tracker's back, and the
+        // earlier GetByIdAsync left a tracked instance whose values AND
+        // token predate the CAS. A plain re-Get would hit EF's identity
+        // map and hand back that same stale instance — and saving it
+        // would throw DbUpdateConcurrencyException on every single claim.
+        // Purge the tracker first so the reload below is a real query.
+        _trips.ResetTracking();
         var trip = await _trips.GetByIdAsync(request.TripId, cancellationToken)
             ?? throw new InvalidOperationException(
                 $"Trip {request.TripId} vanished immediately after CAS — impossible unless a manual DB deletion raced us.");

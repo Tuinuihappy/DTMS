@@ -291,6 +291,12 @@ namespace DTMS.Dispatch.Infrastructure.Migrations
                     b.Property<string>("VendorRequestSnapshot")
                         .HasColumnType("jsonb");
 
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
 
                     b.HasIndex("JobId")

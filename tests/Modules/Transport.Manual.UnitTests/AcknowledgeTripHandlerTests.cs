@@ -132,6 +132,39 @@ public class AcknowledgeTripHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Pool_CasWin_ResetsTrackingBeforeReload()
+    {
+        // xmin regression guard: TryClaimFromPoolAsync is a raw UPDATE that
+        // bumps the row's concurrency token behind the change tracker's
+        // back, and EF's identity map would hand the STALE pre-CAS instance
+        // back on a plain re-Get — making the follow-up UpdateAsync throw
+        // DbUpdateConcurrencyException on EVERY claim. The handler must
+        // purge the tracker (ResetTracking) after winning the CAS and
+        // before reloading.
+        var op = MakeOperator("EMP-006", "Frank");
+        var trip = PooledTrip();
+        _extensions.GetByTripIdAsync(trip.Id, Arg.Any<CancellationToken>()).Returns((ManualTripExtension?)null);
+        _operators.GetByIdAsync(op.Id, Arg.Any<CancellationToken>()).Returns(op);
+        _trips.GetByIdAsync(trip.Id, Arg.Any<CancellationToken>()).Returns(trip);
+        _trips.TryClaimFromPoolAsync(trip.Id, op.Id, Arg.Any<CancellationToken>()).Returns(true);
+
+        var sut = CreateSut();
+        var result = await sut.Handle(new AcknowledgeTripCommand(trip.Id, op.Id), default);
+
+        result.IsSuccess.Should().BeTrue();
+        // GetByIdAsync fires twice (pre-check + post-CAS reload) which trips
+        // InOrder's matching, so pin the critical order without it: the
+        // tracker purge must land between the CAS win and the final save.
+        Received.InOrder(() =>
+        {
+            _trips.TryClaimFromPoolAsync(trip.Id, op.Id, Arg.Any<CancellationToken>());
+            _trips.ResetTracking();
+            _trips.UpdateAsync(Arg.Any<Trip>(), Arg.Any<CancellationToken>());
+        });
+        await _trips.Received(2).GetByIdAsync(trip.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Handle_Pool_TripNeverDispatched_AmrLike_Rejects()
     {
         // AMR trips never enter the pool — DispatchedAt stays null. Guard

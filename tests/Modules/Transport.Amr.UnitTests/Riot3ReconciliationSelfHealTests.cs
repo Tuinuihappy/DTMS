@@ -95,6 +95,38 @@ public class Riot3ReconciliationSelfHealTests
     }
 
     [Fact]
+    public async Task SelfHeal_ConcurrencyConflict_StopsSweep_WithoutTouchingRemainingTrips()
+    {
+        // xmin conflict mid-sweep = a concurrent writer (webhook / snapshot
+        // consumer) won a race. The whole sweep shares one DbContext whose
+        // tracker is now poisoned (failed save leaves drained OutboxMessages
+        // queued as Added), so the sweep must STOP — continuing would make
+        // the next trip's save re-throw and/or insert duplicate events.
+        var trip1 = TerminalTripMissingVehicle("upper-G1");
+        var trip2 = TerminalTripMissingVehicle("upper-G2");
+
+        var repo = Substitute.For<ITripRepository>();
+        repo.GetTerminalTripsMissingVehicleAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Trip> { trip1, trip2 });
+        repo.UpdateAsync(Arg.Any<Trip>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException("xmin conflict")));
+
+        var query = Substitute.For<IRiot3OrderQueryService>();
+        query.GetOrderByUpperKeyAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new Riot3OrderQueryData { State = "COMPLETED" });
+        query.GetRawByUpperKeyAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns("{\"data\":{}}");
+
+        var healed = await BuildService().SelfHealMissingVehiclesAsync(
+            repo, query, new ReconciliationOptions { SelfHealWindowHours = 2 }, CancellationToken.None);
+
+        healed.Should().Be(0);
+        // Sweep stopped at trip1 — trip2 was never fetched from RIOT3.
+        await query.Received(1).GetOrderByUpperKeyAsync("upper-G1", Arg.Any<CancellationToken>());
+        await query.DidNotReceive().GetOrderByUpperKeyAsync("upper-G2", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task SelfHeal_NothingToHeal_IsNoOp()
     {
         var repo = Substitute.For<ITripRepository>();
