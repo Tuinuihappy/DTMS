@@ -31,10 +31,11 @@ public record TripStartedIntegrationEvent(
 
 // WMS PR-4b — Manual/Fleet pool dispatch. Fires when Trip enters the
 // available-pool state (Status → Dispatched). Consumed by:
-//   • TripStartedOmsNotifyConsumer — notifies OMS with DeliveryBy=null
-//     (no vehicle/operator yet — Manual pool doesn't bind at dispatch).
 //   • TripPoolBroadcaster (SignalR) — pushes to operator PWAs so they
 //     can Acknowledge and start immediately without polling (PR-C).
+//   • TripItemsProjector — materializes dispatch.TripItems for the pool card.
+// No upstream callback fires at dispatch — shipment.started goes out at
+// operator claim (TripStarted → ShipmentStartedCallbackFanoutConsumer).
 public record TripDispatchedIntegrationEventV1(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId,
     string? TriggeredBy = null,

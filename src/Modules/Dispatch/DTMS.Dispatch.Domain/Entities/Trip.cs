@@ -62,10 +62,13 @@ public class Trip : AggregateRoot<Guid>
     // Dispatched (see TripStatus.Dispatched) and sit in the pool until an
     // operator clicks "Acknowledge and start" on their PWA.
     //
-    // The claim is a single atomic step: the endpoint runs a SQL CAS that
-    // sets Status → InProgress + ClaimedByOperatorId + ClaimedAt in one
-    // statement so two operators tapping the same row race safely (only
-    // one UPDATE affects a row; the loser gets 0 rowsAffected → 409).
+    // The claim is a single atomic step: the endpoint runs a SQL CAS
+    // (TripRepository.TryClaimFromPoolAsync) that sets ClaimedByOperatorId +
+    // ClaimedAt in one statement so two operators tapping the same row race
+    // safely (only one UPDATE affects a row; the loser gets 0 rowsAffected
+    // → 409). Status stays Created — the handler flips it via
+    // MarkVendorStarted after the reload, so StartedAt + the TripStarted
+    // event stay in the aggregate.
     //
     // DispatchedAt is the pool-order key; operators see FIFO by default.
     // AMR trips leave all three NULL — their own lifecycle is Created →
@@ -229,8 +232,10 @@ public class Trip : AggregateRoot<Guid>
     /// Fires <see cref="TripDispatchedDomainEvent"/> which
     /// <c>DispatchDomainEventMapper</c> forwards as
     /// <c>TripDispatchedIntegrationEventV1</c>. Downstream:
-    ///   • TripStartedOmsNotifyConsumer notifies OMS (DeliveryBy = null).
     ///   • TripPoolBroadcaster (PR-D) pushes to operator PWAs.
+    ///   • TripItemsProjector materializes the pool card's item list.
+    /// No upstream callback fires here — shipment.started goes out at
+    /// operator claim (TripStarted), carrying the operator as deliveryBy.
     ///
     /// Idempotent — subsequent calls no-op via the <c>DispatchedAt</c>
     /// timestamp check. AMR trips must never call this; the guard rejects

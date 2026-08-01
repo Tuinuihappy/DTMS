@@ -29,7 +29,8 @@ public interface ICallbackPayloadFormatter
 /// <para>Phase S.5 (B2) — <see cref="RelativePath"/> and
 /// <see cref="HttpMethod"/> let a formatter override the dispatcher's default
 /// <c>POST {CallbackBaseUrl}/events</c> so systems that expect REST-style
-/// paths (e.g. OMS's <c>/api/shipments</c> + <c>/api/shipments/{id}/arrived</c>)
+/// paths (e.g. OMS's <c>/integrations/tms/shipments/started</c> +
+/// <c>/api/shipments/{id}/arrived</c>)
 /// keep their existing contract. Both null = use the default. The formatter
 /// resolves any path token (e.g. shipmentId) itself, so the dispatcher never
 /// templates — it just concatenates the resolved path.</para>

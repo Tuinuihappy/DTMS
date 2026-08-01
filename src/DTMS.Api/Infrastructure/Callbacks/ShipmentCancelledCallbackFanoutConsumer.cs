@@ -105,11 +105,12 @@ public sealed class ShipmentCancelledCallbackFanoutConsumer
 
         // Only cancel shipments the subscriber was actually told about.
         //
-        // Pool trips: ShipmentStarted skips these too. Its comment claims they
-        // were "already notified at dispatch", but the consumer that did that
-        // (TripStartedOmsNotifyConsumer) is deleted and nothing replaced it —
-        // so no started is sent for them at all, and a cancel would name a
-        // shipment the subscriber has never seen.
+        // Pool trips: since 2026-08 a CLAIMED pool trip does send
+        // shipment.started (at operator claim), so this blanket skip now
+        // over-suppresses cancels for claimed pool trips — a refinement
+        // (skip only when ClaimedByOperatorId is null, i.e. no started was
+        // ever sent) belongs to the cancelled-subscription enablement work;
+        // the subscription ships disabled (docs/oms-shipment-cancel-contract.md).
         if (trip.DispatchedAt is not null)
         {
             _log.LogInformation(

@@ -148,20 +148,28 @@ If present but clients didn't receive:
 
 ## 5. OMS notify duplicated / missing
 
-### Duplicated (rare — should be prevented by the DispatchedAt guard)
+> 2026-08 — pool trips now send `shipment.started` at **operator claim** via
+> `ShipmentStartedCallbackFanoutConsumer` → `POST /integrations/tms/shipments/started`
+> with `deliveryBy = "DisplayName (EmployeeCode)"` of the claiming operator
+> (`null` for an unclaimed force-start). The old dispatch-time notify and its
+> `DispatchedAt` skip guard are gone.
 
-**Symptom:** OMS logs show two `POST /api/shipments` for the same `shipmentId` on a Manual pool trip.
+### Duplicated (rare — OMS treats POST as create-once)
+
+**Symptom:** OMS logs show two `POST /integrations/tms/shipments/started` for the same `shipmentId` on a Manual pool trip.
 
 **Diagnose:**
 ```bash
-docker logs dtms-api --since 30m 2>&1 | grep -E "\[OmsAdapter\] POST.*<shipmentId>"
+docker logs dtms-api --since 30m 2>&1 | grep -E "\[ShipmentStarted\].*<tripId>"
 ```
 
 If two POSTs appear:
-- Consumer's skip guard failed. Check the code: `if (eventType == "TripStarted" && trip?.DispatchedAt is not null) return;`
-- Or the trip's `DispatchedAt` got NULLed post-claim (should never happen — investigate the SQL history).
+- OMS answers the duplicate with 409, which DTMS counts as delivered — so a
+  duplicate is harmless unless OMS reports otherwise.
+- Retry-chain trips share the root `shipmentId` by design; a second POST from
+  attempt #2 drawing 409 is expected, not a bug.
 
-**Fix:** File a bug. Manually PATCH OMS to correct the shipment record if operational.
+**Fix:** Nothing DTMS-side unless OMS's record is wrong; then PATCH OMS manually.
 
 ### Missing (the common case)
 
@@ -169,7 +177,7 @@ If two POSTs appear:
 
 **Diagnose:**
 ```bash
-docker logs dtms-api --since 30m 2>&1 | grep -E "\[OmsNotify\].*<tripId>|\[OmsAdapter\] POST.*shipmentId=<shipmentId>"
+docker logs dtms-api --since 30m 2>&1 | grep -E "\[ShipmentStarted\].*<tripId>|shipmentId=<shipmentId>"
 ```
 
 Look for:
@@ -248,6 +256,4 @@ SELECT t."Id"                                       AS "TripId",
 2. Sign in again with real LDAP credentials.
 3. Retry `/m/pool`.
 
-**Do not**: re-enable `DTMS_AUTH_BYPASS=true` to work around a 401. That flag bypasses LDAP entirely and lets any password log in as anyone; it was explicitly turned off on 2026-07-03 (see [project_auth_bypass_disabled](../../../.claude/projects/d--DTMS/memory/project_auth_bypass_disabled.md) if this repo has it, or ask the dev).
-
-**If LDAP is unreachable in dev**: temporarily re-enable bypass in `.env` (`DTMS_AUTH_BYPASS=true`), recreate the frontend container (`docker compose --profile prod up -d frontend --force-recreate`), do your test, then revert to `false` and recreate again.
+**Note**: the `DTMS_AUTH_BYPASS` dev flag was removed entirely on 2026-08-01 — there is no way to log in without the real External Auth (LDAP) service anymore. If LDAP is unreachable in dev, connect the VPN; API-level verification can go through a scratchpad DbContext harness against localhost:5434 instead.

@@ -30,7 +30,9 @@ namespace DTMS.Api.Adapters;
 //   5. Trip.MarkDispatched(items) → stamps DispatchedAt + fires
 //      TripDispatchedDomainEvent (Status stays Created — parity with AMR).
 //   6. UpdateAsync flushes → outbox emits TripDispatchedIntegrationEventV1
-//      → TripStartedOmsNotifyConsumer notifies OMS with DeliveryBy=null.
+//      (SignalR pool broadcast + TripItems projection — no upstream callback;
+//      shipment.started fires later, at operator claim, with the operator
+//      as deliveryBy via ShipmentStartedCallbackFanoutConsumer).
 //   7. Fire-and-forget SignalR broadcast so every connected operator PWA
 //      inserts the card without waiting for their next REST refresh.
 //

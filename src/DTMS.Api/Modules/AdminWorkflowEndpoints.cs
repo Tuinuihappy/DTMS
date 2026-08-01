@@ -62,9 +62,11 @@ public static class AdminWorkflowEndpoints
         // (integration events → consumers → projections → upstream OMS)
         // fires exactly once and in the same shape. Upstream-OMS reach:
         //
-        //   start   → POST /shipments  (via TripStartedOmsNotifyConsumer)
+        //   start   → POST /integrations/tms/shipments/started
+        //             (via ShipmentStartedCallbackFanoutConsumer)
         //   pickup  → in-DTMS only     (item state Pending → Picked)
-        //   drop    → POST /arrived    (via TripDropCompletedOmsNotifyConsumer)
+        //   drop    → POST /api/shipments/{id}/arrived
+        //             (via ShipmentArrivedCallbackFanoutConsumer)
         //   complete→ in-DTMS only     (cascades to Order + Job terminal state)
 
         group.MapPost("/trips/{id:guid}/force-start", async (

@@ -31,8 +31,8 @@ public static class CallbackEventTypes
     // order-scoped callback is ever really needed, reintroduce it with the
     // full chain: fan-out consumer + RelatedOrderId + outcome audit labels.
 
-    /// <summary>Shipment started — trip Created → InProgress (Phase S.5, was the
-    /// legacy OMS <c>POST /api/shipments</c>).</summary>
+    /// <summary>Shipment started — trip Created → InProgress (Phase S.5; since
+    /// 2026-08 OMS receives it at <c>POST /integrations/tms/shipments/started</c>).</summary>
     public const string ShipmentStartedV1 = "shipment.started.v1";
 
     /// <summary>Shipment arrived at the drop station (Phase S.5, was the legacy

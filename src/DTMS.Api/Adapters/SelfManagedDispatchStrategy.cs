@@ -17,10 +17,10 @@ namespace DTMS.Api.Adapters;
 //
 // Shape mirrors ManualDispatchStrategy (create → bind items → snapshot) but
 // swaps the terminal MarkDispatched(pool) for the AcknowledgeBySource +
-// MarkVendorPickedUp pair. OMS notification still fires: MarkVendorStarted
-// (via AcknowledgeBySource) emits TripStarted → TripStartedOmsNotifyConsumer,
-// and DispatchedAt stays null so that notify is NOT suppressed (parity with
-// AMR's TripStarted-notifies behaviour).
+// MarkVendorPickedUp pair. Upstream notification still fires:
+// MarkVendorStarted (via AcknowledgeBySource) emits TripStarted →
+// ShipmentStartedCallbackFanoutConsumer (deliveryBy = the order's
+// RequestedBy for self-managed).
 //
 // Lives in API/Adapters (not a module) for the same reason as
 // ManualDispatchStrategy: it bridges Dispatch (ITripRepository) and

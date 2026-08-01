@@ -154,13 +154,12 @@ internal sealed class AcknowledgeTripCommandHandler : ICommandHandler<Acknowledg
 
         // Transitions Created → InProgress, sets StartedAt, fires
         // TripStartedDomainEvent → outbox → TripStartedIntegrationEvent.
-        // All vendor-vehicle fields are null on purpose: Manual pool trips
-        // notify OMS ONCE at dispatch time (via TripDispatchedIntegrationEventV1
-        // with DeliveryBy=null). The TripStarted notify at claim is skipped
-        // by the OMS consumer when it detects Trip.DispatchedAt is set —
-        // this avoids a duplicate POST for the same shipmentId. Operator
-        // identity for the trip is stored on ManualTripExtension below;
-        // there is no AMR extension to feed.
+        // All vendor-vehicle fields are null on purpose — there is no AMR
+        // vehicle here. The claim IS the upstream notify point (2026-08):
+        // ShipmentStartedCallbackFanoutConsumer sees ClaimedByOperatorId
+        // (CAS-committed above, so it is always visible by the time the
+        // event drains) and sends shipment.started with deliveryBy =
+        // "DisplayName (EmployeeCode)" of the claiming operator.
         trip.MarkVendorStarted(
             vehicleId: null,
             vendorVehicleKey: null,

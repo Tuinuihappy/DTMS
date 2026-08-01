@@ -113,10 +113,9 @@ public static class ModuleServiceRegistration
         services.AddSingleton<Npgsql.NpgsqlDataSource>(npgsqlDataSource);
 
         // ── Iam Module (permission system, ADR-014 Phase A + B) ───────
-        // Permission storage + role→permission mapping + admin CRUD +
-        // audit log. Hot-path lookup goes through PermissionRepository
-        // (cached at the ClaimsTransformer layer); RoleRepository +
-        // AuditLogRepository back the /api/v1/iam/* admin endpoints.
+        // User permissions come from the External Auth JWT's permission
+        // claim; DTMS stores system-client grants + the audit log.
+        // AuditLogRepository backs the /api/v1/iam/* admin endpoints.
         // Phase S.2 — register the scoped context AND a singleton
         // factory side-by-side. optionsLifetime: Singleton is what
         // unlocks the dual registration: a scoped DbContext consumer
@@ -130,9 +129,6 @@ public static class ModuleServiceRegistration
             optionsLifetime: ServiceLifetime.Singleton);
         services.AddDbContextFactory<IamDbContext>(
             lifetime: ServiceLifetime.Singleton);
-        services.AddScoped<IPermissionRepository, PermissionRepository>();
-        services.AddScoped<DTMS.Iam.Application.Repositories.IRoleRepository,
-                           DTMS.Iam.Infrastructure.Repositories.RoleRepository>();
         services.AddScoped<DTMS.Iam.Application.Repositories.IAuditLogRepository,
                            DTMS.Iam.Infrastructure.Repositories.AuditLogRepository>();
 
@@ -898,8 +894,10 @@ public static class ModuleServiceRegistration
         services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
                                 DTMS.Iam.Infrastructure.Callbacks.OmsShipmentCancelledFormatter>(
             DTMS.Iam.Infrastructure.Callbacks.OmsShipmentCancelledFormatter.FormatKey);
-        // Phase S.5 (B2) — OMS shipment started/arrived formatters (keep the
-        // legacy /api/shipments + /{id}/arrived contract via RelativePath).
+        // Phase S.5 (B2) — OMS shipment started/arrived formatters. Started
+        // targets the 2026-08 /integrations/tms/shipments/started contract;
+        // arrived keeps the legacy /api/shipments/{id}/arrived path until OMS
+        // moves that route too. Routing via each formatter's RelativePath.
         services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
                                 DTMS.Iam.Infrastructure.Callbacks.OmsShipmentStartedFormatter>(
             DTMS.Iam.Infrastructure.Callbacks.OmsShipmentStartedFormatter.FormatKey);
