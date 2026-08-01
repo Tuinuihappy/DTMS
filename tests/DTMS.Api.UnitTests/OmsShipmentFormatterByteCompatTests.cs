@@ -5,37 +5,60 @@ using FluentAssertions;
 
 namespace DTMS.Api.UnitTests;
 
-// Phase S.5 — golden wire-format for the OMS shipment formatters. These bytes
-// were byte-identical to the legacy OmsShipmentNotification / OmsArrivedNotification
-// serialization; after the legacy adapter was removed (Phase 4) the expected
-// JSON is pinned inline so the OMS contract can't drift.
+// Phase S.5 — golden wire-format for the OMS shipment formatters; the expected
+// JSON is pinned inline so the OMS contract can't drift. Started uses the
+// 2026-08 TMS-integration contract (/integrations/tms/shipments/started);
+// arrived/cancelled still pin the legacy /api/shipments/{id}/* shapes until
+// OMS moves those routes too.
 public class OmsShipmentFormatterByteCompatTests
 {
     private static async Task<string> Body(ICallbackPayloadFormatter f, object ctx) =>
         Encoding.UTF8.GetString((await f.FormatAsync(ctx, CancellationToken.None)).Body);
 
+    // 2026-08 contract — POST /integrations/tms/shipments/started with
+    // {shipmentId, orderRef, deliveryBy, occurredAt}. occurredAt is pinned to
+    // millisecond precision with a literal Z (OMS's example: "...T02:17:41.263Z");
+    // a raw DateTime would serialise 7 fractional digits.
     [Fact]
-    public async Task Started_BodyMatchesContract_AndRoutesToShipmentsPath()
+    public async Task Started_BodyMatchesContract_AndRoutesToTmsIntegrationPath()
     {
         var payload = await new OmsShipmentStartedFormatter().FormatAsync(
-            new ShipmentStartedContext("root-trip-1", "FAN1_STANDARD_NO3",
-                new[] { "LOT-A", "LOT-B" }), CancellationToken.None);
+            new ShipmentStartedContext("root-trip-1", "OD-2607-0001", "FAN1_STANDARD_NO3",
+                new DateTime(2026, 7, 15, 9, 7, 9, 263, DateTimeKind.Utc)),
+            CancellationToken.None);
 
         Encoding.UTF8.GetString(payload.Body).Should().Be(
-            "{\"shipmentId\":\"root-trip-1\",\"deliveryBy\":\"FAN1_STANDARD_NO3\"," +
-            "\"lots\":[{\"lotNo\":\"LOT-A\"},{\"lotNo\":\"LOT-B\"}]}");
-        payload.RelativePath.Should().Be("/api/shipments");
+            "{\"shipmentId\":\"root-trip-1\",\"orderRef\":\"OD-2607-0001\"," +
+            "\"deliveryBy\":\"FAN1_STANDARD_NO3\",\"occurredAt\":\"2026-07-15T09:07:09.263Z\"}");
+        payload.RelativePath.Should().Be("/integrations/tms/shipments/started");
         payload.HttpMethod.Should().BeNull();   // → dispatcher default POST
     }
 
+    // deliveryBy=null is a deliberate shape (self-managed order without
+    // RequestedBy; pool trip started before any operator claimed it).
     [Fact]
     public async Task Started_NullDeliveryBy_SerializesNull()
     {
         var body = await Body(new OmsShipmentStartedFormatter(),
-            new ShipmentStartedContext("root-trip-1", null, new[] { "LOT-A" }));
+            new ShipmentStartedContext("root-trip-1", "OD-2607-0001", null,
+                new DateTime(2026, 7, 15, 9, 7, 9, 263, DateTimeKind.Utc)));
 
         body.Should().Be(
-            "{\"shipmentId\":\"root-trip-1\",\"deliveryBy\":null,\"lots\":[{\"lotNo\":\"LOT-A\"}]}");
+            "{\"shipmentId\":\"root-trip-1\",\"orderRef\":\"OD-2607-0001\"," +
+            "\"deliveryBy\":null,\"occurredAt\":\"2026-07-15T09:07:09.263Z\"}");
+    }
+
+    // A bus round-trip can hand the formatter Kind=Unspecified for a value that
+    // was stamped UTC at the source — it must be re-stamped, not shifted by the
+    // server's local offset, and still serialise with the trailing Z.
+    [Fact]
+    public async Task Started_UnspecifiedKind_TreatedAsUtc_NotShifted()
+    {
+        var body = await Body(new OmsShipmentStartedFormatter(),
+            new ShipmentStartedContext("root-trip-1", "OD-2607-0001", "FAN1_STANDARD_NO3",
+                new DateTime(2026, 7, 15, 9, 7, 9, 263, DateTimeKind.Unspecified)));
+
+        body.Should().Contain("\"occurredAt\":\"2026-07-15T09:07:09.263Z\"");
     }
 
     [Fact]

@@ -31,7 +31,8 @@ public class ResendShipmentStartedTests
     private static readonly Guid Pickup = Guid.NewGuid();
     private static readonly Guid Drop = Guid.NewGuid();
 
-    private static DomainOrder SourceOrder(Guid tripId, out Guid orderId, string source = "oms")
+    private static DomainOrder SourceOrder(Guid tripId, out Guid orderId, string source = "oms",
+        bool bindItems = true)
     {
         var order = DomainOrder.CreateFromUpstream(
             "OD-R-" + Guid.NewGuid().ToString("N")[..6], Priority.Normal, serviceWindow: null,
@@ -40,7 +41,8 @@ public class ResendShipmentStartedTests
             Quantity.Create(1, UnitOfMeasure.EA));
         order.MarkAsValidated(new Dictionary<string, Guid> { ["WH-A"] = Pickup, ["DOCK-1"] = Drop });
         order.Confirm(weightFallbackKg: 5.0);
-        order.AssignItemsToTrip(tripId, attemptNumber: 1, pickupStationId: Pickup, dropStationId: Drop);
+        if (bindItems)
+            order.AssignItemsToTrip(tripId, attemptNumber: 1, pickupStationId: Pickup, dropStationId: Drop);
         orderId = order.Id;
         return order;
     }
@@ -51,15 +53,19 @@ public class ResendShipmentStartedTests
         IOrderAuditEventRepository Audit,
         ICallbackFormatterResolver Resolver,
         ISourceCallbackOutboxSuperseder Superseder,
+        ICallbackPayloadFormatter Formatter,
+        DomainOrder Order,
+        Trip Trip,
         Guid OrderId,
         Guid TripId);
 
     // subscribedSystem = which system holds an ENABLED shipment.started
     // subscription (null = nobody, the off-switch case).
-    private static Harness NewHarness(string orderSource = "oms", string? subscribedSystem = "oms")
+    private static Harness NewHarness(string orderSource = "oms", string? subscribedSystem = "oms",
+        bool bindItems = true)
     {
         var tripId = Guid.NewGuid();
-        var order = SourceOrder(tripId, out var orderId, orderSource);
+        var order = SourceOrder(tripId, out var orderId, orderSource, bindItems);
 
         var trip = Trip.CreateForEnvelope(orderId, "upper-G1", "ORD-1", Pickup, Drop);
         trip.MarkVendorStarted(vendorVehicleKey: "device-1", vendorVehicleName: "FAN1_NO3");
@@ -74,7 +80,7 @@ public class ResendShipmentStartedTests
         formatter.FormatAsync(Arg.Any<object>(), Arg.Any<CancellationToken>())
             .Returns(new CallbackPayload("application/json",
                 System.Text.Encoding.UTF8.GetBytes("{\"shipmentId\":\"x\"}"),
-                RelativePath: "/api/shipments"));
+                RelativePath: "/integrations/tms/shipments/started"));
         var resolver = Substitute.For<ICallbackFormatterResolver>();
         resolver.Resolve(Arg.Any<string>()).Returns(formatter);
 
@@ -93,7 +99,43 @@ public class ResendShipmentStartedTests
             resolver, dispatcher, lookup, trips, orders, audit, activity, superseder,
             NullLogger<ResendShipmentStartedCommandHandler>.Instance);
 
-        return new Harness(handler, dispatcher, audit, resolver, superseder, orderId, tripId);
+        return new Harness(handler, dispatcher, audit, resolver, superseder, formatter,
+            order, trip, orderId, tripId);
+    }
+
+    // 2026-08 contract — the handler must hand the formatter the full context:
+    // the order's own OrderRef and the trip's StartedAt (business event time,
+    // NOT the resend click time — a resend hours later reports the original).
+    [Fact]
+    public async Task Resend_PassesOrderRefAndTripStartedAt_ToFormatter()
+    {
+        var h = NewHarness();
+
+        var result = await h.Handler.Handle(
+            new ResendShipmentStartedCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await h.Formatter.Received(1).FormatAsync(
+            Arg.Is<ShipmentStartedContext>(c =>
+                c.OrderRef == h.Order.OrderRef &&
+                c.DeliveryBy == "FAN1_NO3" &&
+                c.OccurredAt == h.Trip.StartedAt!.Value),
+            Arg.Any<CancellationToken>());
+    }
+
+    // The wire payload no longer carries lots — a trip with no bound items is
+    // resendable (the old guard returned Failure "No items are bound...").
+    [Fact]
+    public async Task Resend_NoBoundItems_StillSucceeds()
+    {
+        var h = NewHarness(bindItems: false);
+
+        var result = await h.Handler.Handle(
+            new ResendShipmentStartedCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await h.Dispatcher.Received(1).DispatchAsync(
+            "oms", Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

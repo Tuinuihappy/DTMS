@@ -26,5 +26,4 @@ public sealed record ResendShipmentStartedResult(
     // Null for self-managed orders — the source system executes transport
     // itself, so there is no vendor vehicle (DeliveryBy sent as null).
     string? DeliveryBy,
-    int LotCount,
     long LatencyMs);

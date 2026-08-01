@@ -93,18 +93,6 @@ public class ResendShipmentStartedCommandHandler
                 $"Trip {request.TripId} does not belong to order {request.OrderId}.");
         }
 
-        var lots = order.Items
-            .Where(i => i.TripId == request.TripId)
-            .Select(i => i.ItemId)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .ToList();
-
-        if (lots.Count == 0)
-        {
-            return Result<ResendShipmentStartedResult>.Failure(
-                "No items are bound to this trip — nothing to send.");
-        }
-
         // Name + Key are captured together from the vendor's first progress
         // report (first-write-wins). A missing Name means the vendor hasn't
         // reported the assigned robot yet — return Failure so the operator
@@ -142,7 +130,12 @@ public class ResendShipmentStartedCommandHandler
         // SYNCHRONOUSLY so the operator sees the result immediately
         // (2xx/409 → success, else fail).
         var formatter = _formatterResolver.Resolve(sub.PayloadFormatKey);
-        var context = new ShipmentStartedContext(shipmentId, deliveryBy, lots);
+        // Resend has no source event to read a timestamp from — use the trip's
+        // own start time so a resend hours later still reports when the
+        // shipment actually started. DispatchedAt covers a pool trip resent
+        // before anyone claimed it; UtcNow is the never-started edge case.
+        var occurredAt = trip.StartedAt ?? trip.DispatchedAt ?? DateTime.UtcNow;
+        var context = new ShipmentStartedContext(shipmentId, order.OrderRef!, deliveryBy, occurredAt);
         var payload = await formatter.FormatAsync(context, cancellationToken);
         var msg = new OutboxMessage(
             id: Guid.NewGuid(),
@@ -179,7 +172,7 @@ public class ResendShipmentStartedCommandHandler
         // doesn't also drop the activity row the UI reads). A persistence
         // hiccup is logged, never surfaced as a resend failure. Re-clicking
         // stays harmless — upstreams dedupe by shipmentId (409 = success).
-        var auditDetails = $"trip-started shipmentId={shipmentId} attempt={trip.AttemptNumber} vehicle={deliveryBy} lots={lots.Count} latencyMs={sw.ElapsedMilliseconds}";
+        var auditDetails = $"trip-started shipmentId={shipmentId} attempt={trip.AttemptNumber} vehicle={deliveryBy} orderRef={order.OrderRef} latencyMs={sw.ElapsedMilliseconds}";
         try
         {
             await _auditRepository.AddAsync(new OrderAuditEvent(
@@ -248,14 +241,13 @@ public class ResendShipmentStartedCommandHandler
         }
 
         _logger.LogInformation(
-            "[ShipmentStartedResend] Trip {TripId} (attempt {N}) → {System} outcome=Success shipmentId={Sid} vehicle={VehName} lots={LotCount} latencyMs={Ms} by={By}",
-            trip.Id, trip.AttemptNumber, source, shipmentId, deliveryBy, lots.Count, sw.ElapsedMilliseconds,
+            "[ShipmentStartedResend] Trip {TripId} (attempt {N}) → {System} outcome=Success shipmentId={Sid} vehicle={VehName} latencyMs={Ms} by={By}",
+            trip.Id, trip.AttemptNumber, source, shipmentId, deliveryBy, sw.ElapsedMilliseconds,
             request.RequestedBy ?? "(anonymous)");
 
         return Result<ResendShipmentStartedResult>.Success(new ResendShipmentStartedResult(
             ShipmentId: shipmentId,
             DeliveryBy: deliveryBy,
-            LotCount: lots.Count,
             LatencyMs: sw.ElapsedMilliseconds));
     }
 }

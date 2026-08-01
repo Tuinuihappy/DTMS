@@ -15,17 +15,17 @@ namespace DTMS.Api.Infrastructure.Callbacks;
 
 /// <summary>
 /// Phase S.5 (B2) — fans <see cref="TripStartedIntegrationEvent"/> out to the
-/// order's source system as <c>shipment.started.v1</c>, replacing the legacy
-/// <c>TripStartedOmsNotifyConsumer</c>. Source-routed via subscriptions (so the
-/// old inline <c>SourceSystemKey==Oms</c> gate is gone — only a system that
-/// subscribes gets the callback), and the OMS formatter keeps the legacy
-/// <c>POST /api/shipments</c> contract byte-identical.
+/// order's source system as <c>shipment.started.v1</c>. Source-routed via
+/// subscriptions — only a system that subscribes gets the callback; the OMS
+/// formatter targets <c>POST /integrations/tms/shipments/started</c>
+/// (2026-08 contract: shipmentId, orderRef, deliveryBy, occurredAt — no lots).
 ///
-/// <para>Enrichment mirrors the legacy consumer exactly: shipmentId = root trip
-/// id (retry chain), deliveryBy = vendor vehicle name (self-managed → the
-/// order's RequestedBy), lots = the order items bound to this trip. The same
-/// skips apply (pool trip already notified at dispatch, no bound items yet,
-/// missing vehicle name → fast-cap retry).</para>
+/// <para>Enrichment: shipmentId = root trip id (retry chain), orderRef = the
+/// order's upstream reference, deliveryBy = vendor vehicle name (self-managed
+/// → the order's RequestedBy), occurredAt = Trip.StartedAt. Item binding is
+/// NOT required — the payload no longer carries lots, so a trip that starts
+/// before binding still notifies. Skips: pool trip (DispatchedAt set — see
+/// guard note below), missing vehicle name → fast-cap retry.</para>
 /// </summary>
 public sealed class ShipmentStartedCallbackFanoutConsumer
     : IConsumer<TripStartedIntegrationEvent>
@@ -109,21 +109,13 @@ public sealed class ShipmentStartedCallbackFanoutConsumer
                 order.Id);
         }
 
-        var lots = order.Items
-            .Where(i => i.TripId == evt.TripId)
-            .Select(i => i.ItemId)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .ToList();
-        if (lots.Count == 0)
-        {
-            _log.LogInformation(
-                "[ShipmentStarted] Order {OrderId} Trip {TripId} has no bound items — pre-binding row, skipping.",
-                order.Id, evt.TripId);
-            return;
-        }
-
         var shipmentId = (await _trips.GetRootTripIdAsync(evt.TripId, ct)).ToString();
-        var context = new ShipmentStartedContext(shipmentId, deliveryBy, lots);
+        // Business event time, not send time — stable across consumer retries
+        // and outbox drains. Null trip is only reachable for self-managed
+        // orders (the vendor path throws above); the event's OccurredOn was
+        // stamped in the same code block as StartedAt, microseconds apart.
+        var occurredAt = trip?.StartedAt ?? evt.OccurredOn;
+        var context = new ShipmentStartedContext(shipmentId, order.OrderRef!, deliveryBy, occurredAt);
         var correlationId = ctx.MessageId ?? Guid.NewGuid();
 
         foreach (var sub in subs)
