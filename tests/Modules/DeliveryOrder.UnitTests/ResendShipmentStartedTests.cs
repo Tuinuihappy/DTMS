@@ -11,6 +11,9 @@ using DTMS.Dispatch.Domain.Entities;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Iam.Application.Callbacks;
 using DTMS.SharedKernel.Outbox;
+using DTMS.Transport.Manual.Domain.Entities;
+using DTMS.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Domain.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -54,21 +57,31 @@ public class ResendShipmentStartedTests
         ICallbackFormatterResolver Resolver,
         ISourceCallbackOutboxSuperseder Superseder,
         ICallbackPayloadFormatter Formatter,
+        IOperatorRepository Operators,
         DomainOrder Order,
         Trip Trip,
         Guid OrderId,
         Guid TripId);
 
     // subscribedSystem = which system holds an ENABLED shipment.started
-    // subscription (null = nobody, the off-switch case).
+    // subscription (null = nobody, the off-switch case). tripFactory
+    // overrides the default AMR trip (e.g. a claimed pool trip).
     private static Harness NewHarness(string orderSource = "oms", string? subscribedSystem = "oms",
-        bool bindItems = true)
+        bool bindItems = true, Func<Guid, Trip>? tripFactory = null)
     {
         var tripId = Guid.NewGuid();
         var order = SourceOrder(tripId, out var orderId, orderSource, bindItems);
 
-        var trip = Trip.CreateForEnvelope(orderId, "upper-G1", "ORD-1", Pickup, Drop);
-        trip.MarkVendorStarted(vendorVehicleKey: "device-1", vendorVehicleName: "FAN1_NO3");
+        Trip trip;
+        if (tripFactory is not null)
+        {
+            trip = tripFactory(orderId);
+        }
+        else
+        {
+            trip = Trip.CreateForEnvelope(orderId, "upper-G1", "ORD-1", Pickup, Drop);
+            trip.MarkVendorStarted(vendorVehicleKey: "device-1", vendorVehicleName: "FAN1_NO3");
+        }
 
         var orders = Substitute.For<IDeliveryOrderRepository>();
         orders.GetByIdAsync(orderId, Arg.Any<CancellationToken>()).Returns(order);
@@ -94,13 +107,14 @@ public class ResendShipmentStartedTests
         var audit = Substitute.For<IOrderAuditEventRepository>();
         var activity = Substitute.For<IOrderActivityProjectionStore>();
         var superseder = Substitute.For<ISourceCallbackOutboxSuperseder>();
+        var operators = Substitute.For<IOperatorRepository>();
 
         var handler = new ResendShipmentStartedCommandHandler(
-            resolver, dispatcher, lookup, trips, orders, audit, activity, superseder,
+            resolver, dispatcher, lookup, trips, orders, operators, audit, activity, superseder,
             NullLogger<ResendShipmentStartedCommandHandler>.Instance);
 
         return new Harness(handler, dispatcher, audit, resolver, superseder, formatter,
-            order, trip, orderId, tripId);
+            operators, order, trip, orderId, tripId);
     }
 
     // 2026-08 contract — the handler must hand the formatter the full context:
@@ -136,6 +150,37 @@ public class ResendShipmentStartedTests
         result.IsSuccess.Should().BeTrue();
         await h.Dispatcher.Received(1).DispatchAsync(
             "oms", Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
+    }
+
+    // Claimed pool trip: dispatched, claimed (reflection — prod writes this
+    // via a raw SQL CAS), started at claim with no vendor vehicle.
+    private static Trip ClaimedPoolTrip(Guid orderId, Guid operatorId)
+    {
+        var trip = Trip.CreateForEnvelope(orderId, "upper-G1", "ORD-1", Pickup, Drop);
+        trip.MarkDispatched();
+        typeof(Trip).GetProperty(nameof(Trip.ClaimedByOperatorId))!.SetValue(trip, operatorId);
+        trip.MarkVendorStarted(vendorVehicleKey: null, vendorVehicleName: null);
+        return trip;
+    }
+
+    // Manual pool trip resend — deliveryBy resolves the claiming operator
+    // ("DisplayName (EmployeeCode)"), same ladder as the auto fan-out. The
+    // old handler failed these with "no VendorVehicleName".
+    [Fact]
+    public async Task Resend_ClaimedPoolTrip_UsesOperatorName()
+    {
+        var operatorId = Guid.NewGuid();
+        var h = NewHarness(tripFactory: orderId => ClaimedPoolTrip(orderId, operatorId));
+        h.Operators.GetByIdAsync(operatorId, Arg.Any<CancellationToken>())
+            .Returns(Operator.CreateFromJwtClaims("EMP0142", "สมชาย ใจดี", OperatorRole.Operator));
+
+        var result = await h.Handler.Handle(
+            new ResendShipmentStartedCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await h.Formatter.Received(1).FormatAsync(
+            Arg.Is<ShipmentStartedContext>(c => c.DeliveryBy == "สมชาย ใจดี (EMP0142)"),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

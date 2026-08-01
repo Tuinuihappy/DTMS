@@ -20,6 +20,10 @@
          ICallbackPayloadFormatter + ISourceCallbackDispatcher (Iam.Application),
          replacing the deleted legacy OMS adapter. -->
     <ProjectReference Include="..\..\Iam\DTMS.Iam.Application\DTMS.Iam.Application.csproj" />
+    <!-- 2026-08 — ResendShipmentStarted resolves the pool operator's
+         DisplayName/EmployeeCode for deliveryBy (Transport.Manual core only
+         references SharedKernel, so no cycle). -->
+    <ProjectReference Include="..\..\Transport.Manual\DTMS.Transport.Manual\DTMS.Transport.Manual.csproj" />
   </ItemGroup>
 
   <ItemGroup>

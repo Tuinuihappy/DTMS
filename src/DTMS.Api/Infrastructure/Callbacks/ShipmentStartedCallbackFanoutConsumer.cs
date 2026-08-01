@@ -6,6 +6,7 @@ using DTMS.Dispatch.IntegrationEvents;
 using DTMS.Iam.Application.Callbacks;
 using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Outbox;
+using DTMS.Transport.Manual.Domain.Repositories;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,11 +22,13 @@ namespace DTMS.Api.Infrastructure.Callbacks;
 /// (2026-08 contract: shipmentId, orderRef, deliveryBy, occurredAt — no lots).
 ///
 /// <para>Enrichment: shipmentId = root trip id (retry chain), orderRef = the
-/// order's upstream reference, deliveryBy = vendor vehicle name (self-managed
-/// → the order's RequestedBy), occurredAt = Trip.StartedAt. Item binding is
-/// NOT required — the payload no longer carries lots, so a trip that starts
-/// before binding still notifies. Skips: pool trip (DispatchedAt set — see
-/// guard note below), missing vehicle name → fast-cap retry.</para>
+/// order's upstream reference, occurredAt = Trip.StartedAt, deliveryBy by
+/// execution mode: self-managed → RequestedBy; pool trip claimed by an
+/// operator → "DisplayName (EmployeeCode)"; pool trip started without a claim
+/// → null; AMR → vendor vehicle name (missing name → fast-cap retry). Item
+/// binding is NOT required — the payload no longer carries lots, so a trip
+/// that starts before binding still notifies. Pool trips notify HERE, at
+/// claim time — the legacy dispatch-time notifier is gone.</para>
 /// </summary>
 public sealed class ShipmentStartedCallbackFanoutConsumer
     : IConsumer<TripStartedIntegrationEvent>
@@ -35,6 +38,7 @@ public sealed class ShipmentStartedCallbackFanoutConsumer
     private readonly OutboxDbContext _outbox;
     private readonly ITripRepository _trips;
     private readonly IDeliveryOrderRepository _orders;
+    private readonly IOperatorRepository _operators;
     private readonly ILogger<ShipmentStartedCallbackFanoutConsumer> _log;
 
     public ShipmentStartedCallbackFanoutConsumer(
@@ -43,6 +47,7 @@ public sealed class ShipmentStartedCallbackFanoutConsumer
         OutboxDbContext outbox,
         ITripRepository trips,
         IDeliveryOrderRepository orders,
+        IOperatorRepository operators,
         ILogger<ShipmentStartedCallbackFanoutConsumer> log)
     {
         _lookup = lookup;
@@ -50,6 +55,7 @@ public sealed class ShipmentStartedCallbackFanoutConsumer
         _outbox = outbox;
         _trips = trips;
         _orders = orders;
+        _operators = operators;
         _log = log;
     }
 
@@ -78,35 +84,48 @@ public sealed class ShipmentStartedCallbackFanoutConsumer
 
         var trip = await _trips.GetByIdAsync(evt.TripId, ct);
 
-        // Pool trips are notified once at dispatch time; the later TripStarted
-        // must not re-POST for the same shipment (legacy DispatchedAt guard).
-        if (trip?.DispatchedAt is not null)
+        // deliveryBy — who moves the goods, resolved by execution mode:
+        //   self-managed  → the upstream's own RequestedBy (null tolerated);
+        //   pool, claimed → the claiming operator (ClaimedByOperatorId is
+        //                   CAS-committed before TripStarted exists — no race);
+        //   pool, unclaimed → null (admin force-start before any claim; the
+        //                   shipment DID start, and the upstream is
+        //                   create-once, so a skip here would be forever);
+        //   AMR           → vendor vehicle name; missing = sub-second race
+        //                   with MarkVendorStarted → fast-capped throw so the
+        //                   in-process retry re-reads.
+        string? deliveryBy;
+        if (order.SelfManaged)
         {
-            _log.LogInformation(
-                "[ShipmentStarted] Trip {TripId} — pool trip already notified at dispatch; skipping.",
-                evt.TripId);
-            return;
+            deliveryBy = order.RequestedBy;
+            if (string.IsNullOrWhiteSpace(deliveryBy))
+                _log.LogWarning(
+                    "[ShipmentStarted] Order {OrderId} is self-managed with no RequestedBy — sending deliveryBy=null (OMS accepts it; source system should supply RequestedBy)",
+                    order.Id);
         }
-
-        // deliveryBy: AMR → vendor vehicle name; self-managed → RequestedBy.
-        // Missing name on a vendor trip = sub-second race with MarkVendorStarted
-        // → throw the fast-capped exception so the in-process retry re-reads.
-        var requireName = !order.SelfManaged;
-        var vehicleName = trip?.VendorVehicleName;
-        if (requireName && string.IsNullOrWhiteSpace(vehicleName))
-            throw new VendorVehicleUnavailableException(
-                $"Trip {evt.TripId} has no VendorVehicleName yet — race with MarkVendorStarted save. Will retry (fast-capped).");
-
-        var deliveryBy = order.SelfManaged ? order.RequestedBy : vehicleName;
-
-        // F3 — deliveryBy=null is a shape OMS accepts by design (pool-mode
-        // dispatch sends it deliberately), so don't block; but a self-managed
-        // order with no RequestedBy is a data gap at the source worth a trace.
-        if (order.SelfManaged && string.IsNullOrWhiteSpace(deliveryBy))
+        else if (trip?.ClaimedByOperatorId is Guid operatorId)
         {
+            var op = await _operators.GetByIdAsync(operatorId, ct);
+            deliveryBy = op is null ? null : $"{op.DisplayName} ({op.EmployeeCode})";
+            if (op is null)
+                _log.LogWarning(
+                    "[ShipmentStarted] Trip {TripId} claimed by operator {OperatorId} but no Operator row exists — sending deliveryBy=null",
+                    evt.TripId, operatorId);
+        }
+        else if (trip?.DispatchedAt is not null)
+        {
+            deliveryBy = null;
             _log.LogWarning(
-                "[ShipmentStarted] Order {OrderId} is self-managed with no RequestedBy — sending deliveryBy=null (OMS accepts it; source system should supply RequestedBy)",
-                order.Id);
+                "[ShipmentStarted] Trip {TripId} is a pool trip started without an operator claim — sending deliveryBy=null",
+                evt.TripId);
+        }
+        else
+        {
+            var vehicleName = trip?.VendorVehicleName;
+            if (string.IsNullOrWhiteSpace(vehicleName))
+                throw new VendorVehicleUnavailableException(
+                    $"Trip {evt.TripId} has no VendorVehicleName yet — race with MarkVendorStarted save. Will retry (fast-capped).");
+            deliveryBy = vehicleName;
         }
 
         var shipmentId = (await _trips.GetRootTripIdAsync(evt.TripId, ct)).ToString();

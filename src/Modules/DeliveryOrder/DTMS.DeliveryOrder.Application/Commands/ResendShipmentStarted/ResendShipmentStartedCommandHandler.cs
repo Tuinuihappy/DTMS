@@ -10,6 +10,7 @@ using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Iam.Application.Callbacks;
 using DTMS.SharedKernel.Messaging;
 using DTMS.SharedKernel.Outbox;
+using DTMS.Transport.Manual.Domain.Repositories;
 using Microsoft.Extensions.Logging;
 
 namespace DTMS.DeliveryOrder.Application.Commands.ResendShipmentStarted;
@@ -22,6 +23,7 @@ public class ResendShipmentStartedCommandHandler
     private readonly ISubscriptionLookup _lookup;
     private readonly ITripRepository _tripRepository;
     private readonly IDeliveryOrderRepository _orderRepository;
+    private readonly IOperatorRepository _operatorRepository;
     private readonly IOrderAuditEventRepository _auditRepository;
     private readonly IOrderActivityProjectionStore _activityStore;
     private readonly ISourceCallbackOutboxSuperseder _outboxSuperseder;
@@ -33,6 +35,7 @@ public class ResendShipmentStartedCommandHandler
         ISubscriptionLookup lookup,
         ITripRepository tripRepository,
         IDeliveryOrderRepository orderRepository,
+        IOperatorRepository operatorRepository,
         IOrderAuditEventRepository auditRepository,
         IOrderActivityProjectionStore activityStore,
         ISourceCallbackOutboxSuperseder outboxSuperseder,
@@ -43,6 +46,7 @@ public class ResendShipmentStartedCommandHandler
         _lookup = lookup;
         _tripRepository = tripRepository;
         _orderRepository = orderRepository;
+        _operatorRepository = operatorRepository;
         _auditRepository = auditRepository;
         _activityStore = activityStore;
         _outboxSuperseder = outboxSuperseder;
@@ -93,31 +97,48 @@ public class ResendShipmentStartedCommandHandler
                 $"Trip {request.TripId} does not belong to order {request.OrderId}.");
         }
 
-        // Name + Key are captured together from the vendor's first progress
-        // report (first-write-wins). A missing Name means the vendor hasn't
-        // reported the assigned robot yet — return Failure so the operator
-        // sees a clear reason instead of the upstream receiving a placeholder
-        // that would clobber a prior real value.
-        //
-        // Self-managed orders are exempt: the source system executes the
-        // transport itself so there is no vendor vehicle. Resend with
-        // DeliveryBy=RequestedBy (the external actor; parity with the auto
-        // ShipmentStartedCallbackFanoutConsumer).
-        if (!order.SelfManaged && string.IsNullOrWhiteSpace(trip.VendorVehicleName))
+        // deliveryBy — same 4-rung ladder as the auto fan-out
+        // (ShipmentStartedCallbackFanoutConsumer): self-managed → RequestedBy;
+        // pool claimed → the operator; pool unclaimed → null; AMR → vendor
+        // vehicle name. The AMR rung stays a Failure (not a throw) so the
+        // operator sees a clear reason instead of the upstream receiving a
+        // placeholder that would clobber a prior real value.
+        string? deliveryBy;
+        if (order.SelfManaged)
+        {
+            deliveryBy = order.RequestedBy;
+            if (string.IsNullOrWhiteSpace(deliveryBy))
+            {
+                _logger.LogWarning(
+                    "[ShipmentStartedResend] Order {OrderId} is self-managed with no RequestedBy — resending with deliveryBy=null (source system should supply RequestedBy)",
+                    order.Id);
+            }
+        }
+        else if (trip.ClaimedByOperatorId is Guid operatorId)
+        {
+            var op = await _operatorRepository.GetByIdAsync(operatorId, cancellationToken);
+            deliveryBy = op is null ? null : $"{op.DisplayName} ({op.EmployeeCode})";
+            if (op is null)
+            {
+                _logger.LogWarning(
+                    "[ShipmentStartedResend] Trip {TripId} claimed by operator {OperatorId} but no Operator row exists — resending with deliveryBy=null",
+                    trip.Id, operatorId);
+            }
+        }
+        else if (trip.DispatchedAt is not null)
+        {
+            // Pool trip that never got (or hasn't yet got) an operator claim —
+            // resendable with a null carrier; upstreams accept that shape.
+            deliveryBy = null;
+        }
+        else if (string.IsNullOrWhiteSpace(trip.VendorVehicleName))
         {
             return Result<ResendShipmentStartedResult>.Failure(
                 "Trip has no VendorVehicleName yet — vendor has not reported the assigned robot. Retry after the trip starts.");
         }
-        var deliveryBy = order.SelfManaged ? order.RequestedBy : trip.VendorVehicleName;
-
-        // F3 — deliveryBy=null is a shape upstreams accept by design
-        // (pool-mode dispatch sends it deliberately), so don't block; but a
-        // self-managed order with no RequestedBy is a data gap worth a trace.
-        if (order.SelfManaged && string.IsNullOrWhiteSpace(deliveryBy))
+        else
         {
-            _logger.LogWarning(
-                "[ShipmentStartedResend] Order {OrderId} is self-managed with no RequestedBy — resending with deliveryBy=null (source system should supply RequestedBy)",
-                order.Id);
+            deliveryBy = trip.VendorVehicleName;
         }
 
         // [Option A] Use root tripId so manual resend updates the same

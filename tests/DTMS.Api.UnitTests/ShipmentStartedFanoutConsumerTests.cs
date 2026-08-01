@@ -14,6 +14,9 @@ using DTMS.Dispatch.IntegrationEvents;
 using DTMS.Iam.Application.Callbacks;
 using DTMS.Iam.Infrastructure.Callbacks;
 using DTMS.SharedKernel.Exceptions;
+using DTMS.Transport.Manual.Domain.Entities;
+using DTMS.Transport.Manual.Domain.Enums;
+using DTMS.Transport.Manual.Domain.Repositories;
 using FluentAssertions;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
@@ -44,6 +47,7 @@ public class ShipmentStartedFanoutConsumerTests
         public required ISubscriptionLookup Lookup { get; init; }
         public required ITripRepository Trips { get; init; }
         public required IDeliveryOrderRepository Orders { get; init; }
+        public required IOperatorRepository Operators { get; init; }
 
         public ShipmentStartedCallbackFanoutConsumer Build()
         {
@@ -52,7 +56,7 @@ public class ShipmentStartedFanoutConsumerTests
                     OmsShipmentStartedFormatter.FormatKey)
                 .BuildServiceProvider();
             return new ShipmentStartedCallbackFanoutConsumer(
-                Lookup, sp, Outbox, Trips, Orders,
+                Lookup, sp, Outbox, Trips, Orders, Operators,
                 NullLogger<ShipmentStartedCallbackFanoutConsumer>.Instance);
         }
     }
@@ -77,7 +81,23 @@ public class ShipmentStartedFanoutConsumerTests
             Lookup = lookup,
             Trips = trips,
             Orders = Substitute.For<IDeliveryOrderRepository>(),
+            Operators = Substitute.For<IOperatorRepository>(),
         };
+    }
+
+    // Pool trip: dispatched into the pool, then started at claim time — the
+    // manual claim path calls MarkVendorStarted with all vehicle fields null
+    // (AcknowledgeTripCommandHandler). ClaimedByOperatorId is written by a raw
+    // SQL CAS in prod, so tests set it via reflection (same idiom as
+    // AcknowledgeTripHandlerTests.ClaimedTrip).
+    private static Trip PoolTrip(Guid orderId, Guid? claimedBy)
+    {
+        var trip = Trip.CreateForEnvelope(orderId, "upper-G1", "ORD-1", Pickup, Drop);
+        trip.MarkDispatched();
+        if (claimedBy is not null)
+            typeof(Trip).GetProperty(nameof(Trip.ClaimedByOperatorId))!.SetValue(trip, claimedBy);
+        trip.MarkVendorStarted(vendorVehicleKey: null, vendorVehicleName: null);
+        return trip;
     }
 
     // Order (source=oms) with one item bound to the trip.
@@ -95,10 +115,9 @@ public class ShipmentStartedFanoutConsumerTests
         return order;
     }
 
-    private static Trip AmrTrip(Guid orderId, string? vehicleName, bool pooled = false)
+    private static Trip AmrTrip(Guid orderId, string? vehicleName)
     {
         var trip = Trip.CreateForEnvelope(orderId, "upper-G1", "ORD-1", Pickup, Drop);
-        if (pooled) trip.MarkDispatched();   // sets DispatchedAt (pool path)
         // Key + name arrive together from RIOT3; pass both so VendorVehicleName
         // populates (null name = the fast-cap case).
         trip.MarkVendorStarted(
@@ -208,19 +227,70 @@ public class ShipmentStartedFanoutConsumerTests
         (await h.Outbox.OutboxMessages.CountAsync()).Should().Be(0);
     }
 
+    // Pool trips notify at claim time (2026-08 — the legacy dispatch-time
+    // notifier is long gone, so the old DispatchedAt skip silently dropped
+    // every pool shipment.started forever). deliveryBy = the claiming
+    // operator as "DisplayName (EmployeeCode)".
     [Fact]
-    public async Task PoolTripAlreadyNotifiedAtDispatch_Skips()
+    public async Task PoolTripClaimed_EnqueuesWithOperatorName()
+    {
+        var tripId = Guid.NewGuid();
+        var operatorId = Guid.NewGuid();
+        var h = NewHarness(subscribed: true);
+        var order = OmsOrderWithBoundItem(tripId);
+        h.Orders.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(order);
+        h.Trips.GetByIdAsync(tripId, Arg.Any<CancellationToken>())
+            .Returns(PoolTrip(order.Id, claimedBy: operatorId));
+        h.Operators.GetByIdAsync(operatorId, Arg.Any<CancellationToken>())
+            .Returns(Operator.CreateFromJwtClaims("EMP0142", "สมชาย ใจดี", OperatorRole.Operator));
+
+        await h.Build().Consume(Ctx(tripId, order.Id));
+
+        var row = await h.Outbox.OutboxMessages.SingleAsync();
+        row.CallbackPath.Should().Be("/integrations/tms/shipments/started");
+        // STJ escapes non-ASCII on the wire (ส...) — assert the decoded
+        // value, not the raw bytes.
+        using var doc = JsonDocument.Parse(row.Content);
+        doc.RootElement.GetProperty("deliveryBy").GetString()
+            .Should().Be("สมชาย ใจดี (EMP0142)");
+    }
+
+    // Admin force-start before any claim: the shipment did start and the
+    // upstream is create-once, so send with a null carrier instead of
+    // dropping the callback forever.
+    [Fact]
+    public async Task PoolTripUnclaimed_EnqueuesWithNullDeliveryBy()
     {
         var tripId = Guid.NewGuid();
         var h = NewHarness(subscribed: true);
         var order = OmsOrderWithBoundItem(tripId);
         h.Orders.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(order);
         h.Trips.GetByIdAsync(tripId, Arg.Any<CancellationToken>())
-            .Returns(AmrTrip(order.Id, "FAN1", pooled: true));
+            .Returns(PoolTrip(order.Id, claimedBy: null));
 
         await h.Build().Consume(Ctx(tripId, order.Id));
 
-        (await h.Outbox.OutboxMessages.CountAsync()).Should().Be(0);
+        var row = await h.Outbox.OutboxMessages.SingleAsync();
+        row.Content.Should().Contain("\"deliveryBy\":null");
+    }
+
+    // Operator row vanished between claim and consume (or was never synced) —
+    // the name is display data, not worth blocking the callback over.
+    [Fact]
+    public async Task PoolTripClaimed_OperatorRowMissing_EnqueuesWithNullDeliveryBy()
+    {
+        var tripId = Guid.NewGuid();
+        var h = NewHarness(subscribed: true);
+        var order = OmsOrderWithBoundItem(tripId);
+        h.Orders.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(order);
+        h.Trips.GetByIdAsync(tripId, Arg.Any<CancellationToken>())
+            .Returns(PoolTrip(order.Id, claimedBy: Guid.NewGuid()));
+        // Operators.GetByIdAsync returns null (substitute default).
+
+        await h.Build().Consume(Ctx(tripId, order.Id));
+
+        var row = await h.Outbox.OutboxMessages.SingleAsync();
+        row.Content.Should().Contain("\"deliveryBy\":null");
     }
 
     [Fact]
