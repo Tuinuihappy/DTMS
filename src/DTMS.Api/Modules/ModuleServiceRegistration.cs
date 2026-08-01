@@ -904,6 +904,10 @@ public static class ModuleServiceRegistration
         services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
                                 DTMS.Iam.Infrastructure.Callbacks.OmsShipmentArrivedFormatter>(
             DTMS.Iam.Infrastructure.Callbacks.OmsShipmentArrivedFormatter.FormatKey);
+        // 2026-08 — pickup notification (/integrations/tms/shipments/{id}/pickup-arrived).
+        services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
+                                DTMS.Iam.Infrastructure.Callbacks.OmsShipmentPickedUpFormatter>(
+            DTMS.Iam.Infrastructure.Callbacks.OmsShipmentPickedUpFormatter.FormatKey);
         // Phase C — runtime-key formatter resolution for Application-layer
         // resend handlers (they read the key off the subscription row, so
         // [FromKeyedServices] can't apply).

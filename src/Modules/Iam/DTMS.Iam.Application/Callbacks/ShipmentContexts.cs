@@ -21,6 +21,19 @@ public sealed record ShipmentStartedContext(
     string? DeliveryBy,
     DateTime OccurredAt);
 
+/// <summary>
+/// 2026-08 — pickup notification. <c>LocationCode</c> is the pickup code the
+/// SOURCE SYSTEM itself submitted on the order item (Item.PickupLocationCode,
+/// e.g. "WH-A"), so the value round-trips the subscriber's own vocabulary —
+/// never a DTMS-internal station/WMS id. <c>OccurredAt</c> = Trip.VendorPickedUpAt
+/// (AMR: the vendor's mission ChangeStateTime; Manual: the operator's tap).
+/// </summary>
+public sealed record ShipmentPickedUpContext(
+    string ShipmentId,
+    string OrderRef,
+    string LocationCode,
+    DateTime OccurredAt);
+
 public sealed record ShipmentArrivedContext(
     string ShipmentId,
     IReadOnlyList<string> LotNos);

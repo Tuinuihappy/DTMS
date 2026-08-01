@@ -35,6 +35,15 @@ public static class CallbackEventTypes
     /// 2026-08 OMS receives it at <c>POST /integrations/tms/shipments/started</c>).</summary>
     public const string ShipmentStartedV1 = "shipment.started.v1";
 
+    /// <summary>Shipment picked up — vendor/operator reached the pickup point
+    /// (2026-08; OMS receives it at
+    /// <c>POST /integrations/tms/shipments/{id}/pickup-arrived</c>). Semantics
+    /// per transport mode: AMR = robot arrived at the pickup dock (the only
+    /// pre-completion signal RIOT3 emits), Manual = operator confirmed loading
+    /// (geofence-verified). Self-managed orders never emit it — their pickup is
+    /// auto-fired at dispatch and carries no physical meaning.</summary>
+    public const string ShipmentPickedUpV1 = "shipment.pickedup.v1";
+
     /// <summary>Shipment arrived at the drop station (Phase S.5, was the legacy
     /// OMS <c>POST /api/shipments/{id}/arrived</c>).</summary>
     public const string ShipmentArrivedV1 = "shipment.arrived.v1";
@@ -53,6 +62,7 @@ public static class CallbackEventTypes
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
         ShipmentStartedV1,
+        ShipmentPickedUpV1,
         ShipmentArrivedV1,
         ShipmentCancelledV1,
     };

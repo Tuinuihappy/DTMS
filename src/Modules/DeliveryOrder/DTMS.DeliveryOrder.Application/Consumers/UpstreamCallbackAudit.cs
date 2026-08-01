@@ -20,6 +20,11 @@ public static class UpstreamCallbackAudit
     public const string Rejected = "UpstreamRejected";
     public const string NotifyFailed = "UpstreamNotifyFailed";
 
+    // shipment.pickedup.v1 outcomes (2026-08)
+    public const string PickedUpNotified = "UpstreamPickedUpNotified";
+    public const string PickedUpRejected = "UpstreamPickedUpRejected";
+    public const string PickedUpNotifyFailed = "UpstreamPickedUpNotifyFailed";
+
     // shipment.arrived.v1 outcomes
     public const string ArrivedNotified = "UpstreamArrivedNotified";
     public const string ArrivedRejected = "UpstreamArrivedRejected";
@@ -32,6 +37,7 @@ public static class UpstreamCallbackAudit
 
     // operator-driven resends (sync path, written by the resend handlers)
     public const string ManuallyResent = "UpstreamManuallyResent";
+    public const string PickedUpManuallyResent = "UpstreamPickedUpManuallyResent";
     public const string ArrivedManuallyResent = "UpstreamArrivedManuallyResent";
 
     /// <summary>OrderActivity category for every row above.</summary>

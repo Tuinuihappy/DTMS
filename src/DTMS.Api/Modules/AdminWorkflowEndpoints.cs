@@ -64,7 +64,9 @@ public static class AdminWorkflowEndpoints
         //
         //   start   → POST /integrations/tms/shipments/started
         //             (via ShipmentStartedCallbackFanoutConsumer)
-        //   pickup  → in-DTMS only     (item state Pending → Picked)
+        //   pickup  → POST /integrations/tms/shipments/{id}/pickup-arrived
+        //             (via ShipmentPickedUpCallbackFanoutConsumer; also flips
+        //             item state Pending → Picked in-DTMS)
         //   drop    → POST /api/shipments/{id}/arrived
         //             (via ShipmentArrivedCallbackFanoutConsumer)
         //   complete→ in-DTMS only     (cascades to Order + Job terminal state)
@@ -108,7 +110,7 @@ public static class AdminWorkflowEndpoints
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         })
         .WithName("AdminForcePickupCompletedTrip")
-        .WithSummary("Force-pickup-complete a Trip whose pickup sub-task webhook was dropped. Does NOT notify upstream OMS.")
+        .WithSummary("Force-pickup-complete a Trip whose pickup sub-task webhook was dropped. Notifies the source system (shipment.pickedup.v1).")
         .RequirePermission(Permissions.Dispatch.TripForce);
 
         group.MapPost("/trips/{id:guid}/force-drop-completed", async (

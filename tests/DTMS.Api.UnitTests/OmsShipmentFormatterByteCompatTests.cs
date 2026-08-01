@@ -61,6 +61,43 @@ public class OmsShipmentFormatterByteCompatTests
         body.Should().Contain("\"occurredAt\":\"2026-07-15T09:07:09.263Z\"");
     }
 
+    // 2026-08 — pickup contract: shipmentId in the PATH (like arrived), body
+    // {orderRef, locationCode, occurredAt} with millisecond-pinned occurredAt.
+    [Fact]
+    public async Task PickedUp_BodyMatchesContract_AndShipmentIdInPath()
+    {
+        var payload = await new OmsShipmentPickedUpFormatter().FormatAsync(
+            new ShipmentPickedUpContext("root-trip-7", "OD-2607-0001", "WH-A",
+                new DateTime(2026, 7, 15, 9, 7, 9, 263, DateTimeKind.Utc)),
+            CancellationToken.None);
+
+        Encoding.UTF8.GetString(payload.Body).Should().Be(
+            "{\"orderRef\":\"OD-2607-0001\",\"locationCode\":\"WH-A\"," +
+            "\"occurredAt\":\"2026-07-15T09:07:09.263Z\"}");
+        payload.RelativePath.Should().Be("/integrations/tms/shipments/root-trip-7/pickup-arrived");
+        payload.HttpMethod.Should().BeNull();   // → dispatcher default POST
+    }
+
+    [Fact]
+    public async Task PickedUp_UnspecifiedKind_TreatedAsUtc_NotShifted()
+    {
+        var payload = await new OmsShipmentPickedUpFormatter().FormatAsync(
+            new ShipmentPickedUpContext("root-trip-7", "OD-2607-0001", "WH-A",
+                new DateTime(2026, 7, 15, 9, 7, 9, 263, DateTimeKind.Unspecified)),
+            CancellationToken.None);
+
+        Encoding.UTF8.GetString(payload.Body)
+            .Should().Contain("\"occurredAt\":\"2026-07-15T09:07:09.263Z\"");
+    }
+
+    [Fact]
+    public async Task PickedUpFormatter_RejectsWrongContextType()
+    {
+        var act = async () => await new OmsShipmentPickedUpFormatter()
+            .FormatAsync("not-a-context", CancellationToken.None);
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
     [Fact]
     public async Task Arrived_BodyMatchesContract_AndShipmentIdInPath()
     {
@@ -133,6 +170,7 @@ public class OmsShipmentFormatterByteCompatTests
     public void FormatKeys_MatchTheValuesSeededInMigrations()
     {
         OmsShipmentStartedFormatter.FormatKey.Should().Be("oms.shipment.started.v1");
+        OmsShipmentPickedUpFormatter.FormatKey.Should().Be("oms.shipment.pickedup.v1");
         OmsShipmentArrivedFormatter.FormatKey.Should().Be("oms.shipment.arrived.v1");
         OmsShipmentCancelledFormatter.FormatKey.Should().Be("oms.shipment.cancelled.v1");
     }

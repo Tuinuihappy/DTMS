@@ -29,6 +29,7 @@ public sealed class SourceCallbackOutcomeConsumer : IConsumer<SourceCallbackOutc
     // Wire-contract slugs (mirror DTMS.Iam.Application.Callbacks.CallbackEventTypes;
     // hardcoded to avoid a cross-module reference for a few stable strings).
     private const string ShipmentStartedV1 = "shipment.started.v1";
+    private const string ShipmentPickedUpV1 = "shipment.pickedup.v1";
     private const string ShipmentArrivedV1 = "shipment.arrived.v1";
     private const string ShipmentCancelledV1 = "shipment.cancelled.v1";
 
@@ -96,6 +97,8 @@ public sealed class SourceCallbackOutcomeConsumer : IConsumer<SourceCallbackOutc
         {
             ShipmentStartedV1 => success ? UpstreamCallbackAudit.Notified
                 : permanent ? UpstreamCallbackAudit.Rejected : UpstreamCallbackAudit.NotifyFailed,
+            ShipmentPickedUpV1 => success ? UpstreamCallbackAudit.PickedUpNotified
+                : permanent ? UpstreamCallbackAudit.PickedUpRejected : UpstreamCallbackAudit.PickedUpNotifyFailed,
             ShipmentArrivedV1 => success ? UpstreamCallbackAudit.ArrivedNotified
                 : permanent ? UpstreamCallbackAudit.ArrivedRejected : UpstreamCallbackAudit.ArrivedNotifyFailed,
             ShipmentCancelledV1 => success ? UpstreamCallbackAudit.CancelledNotified
