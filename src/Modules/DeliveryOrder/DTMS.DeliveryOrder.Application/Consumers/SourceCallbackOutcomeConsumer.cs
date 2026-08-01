@@ -30,6 +30,10 @@ public sealed class SourceCallbackOutcomeConsumer : IConsumer<SourceCallbackOutc
     // hardcoded to avoid a cross-module reference for a few stable strings).
     private const string ShipmentStartedV1 = "shipment.started.v1";
     private const string ShipmentPickedUpV1 = "shipment.pickedup.v1";
+    private const string ShipmentDroppedOffV1 = "shipment.droppedoff.v1";
+    // TRANSITIONAL — renamed to shipment.droppedoff.v1 (2026-08). Outbox rows
+    // enqueued under the old name may still deliver; without this arm their
+    // outcomes silently vanish from the timeline. Remove with the cleanup.
     private const string ShipmentArrivedV1 = "shipment.arrived.v1";
     private const string ShipmentCancelledV1 = "shipment.cancelled.v1";
 
@@ -99,7 +103,11 @@ public sealed class SourceCallbackOutcomeConsumer : IConsumer<SourceCallbackOutc
                 : permanent ? UpstreamCallbackAudit.Rejected : UpstreamCallbackAudit.NotifyFailed,
             ShipmentPickedUpV1 => success ? UpstreamCallbackAudit.PickedUpNotified
                 : permanent ? UpstreamCallbackAudit.PickedUpRejected : UpstreamCallbackAudit.PickedUpNotifyFailed,
-            ShipmentArrivedV1 => success ? UpstreamCallbackAudit.ArrivedNotified
+            // droppedoff (new name) and arrived (transitional old name) map to
+            // the SAME Arrived* audit family — those labels are persisted
+            // history mirrored string-for-string in the frontend; renaming
+            // them buys nothing on the wire.
+            ShipmentDroppedOffV1 or ShipmentArrivedV1 => success ? UpstreamCallbackAudit.ArrivedNotified
                 : permanent ? UpstreamCallbackAudit.ArrivedRejected : UpstreamCallbackAudit.ArrivedNotifyFailed,
             ShipmentCancelledV1 => success ? UpstreamCallbackAudit.CancelledNotified
                 : permanent ? UpstreamCallbackAudit.CancelledRejected : UpstreamCallbackAudit.CancelledNotifyFailed,

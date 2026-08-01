@@ -6,10 +6,10 @@ using FluentAssertions;
 namespace DTMS.Api.UnitTests;
 
 // Phase S.5 — golden wire-format for the OMS shipment formatters; the expected
-// JSON is pinned inline so the OMS contract can't drift. Started uses the
-// 2026-08 TMS-integration contract (/integrations/tms/shipments/started);
-// arrived/cancelled still pin the legacy /api/shipments/{id}/* shapes until
-// OMS moves those routes too.
+// JSON is pinned inline so the OMS contract can't drift. Started, pickedup and
+// droppedoff use the 2026-08 TMS-integration contracts
+// (/integrations/tms/shipments/*); cancelled still pins the legacy
+// /api/shipments/{id}/cancelled shape until OMS moves that route too.
 public class OmsShipmentFormatterByteCompatTests
 {
     private static async Task<string> Body(ICallbackPayloadFormatter f, object ctx) =>
@@ -98,16 +98,42 @@ public class OmsShipmentFormatterByteCompatTests
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
+    // 2026-08 — drop-off contract (renamed from arrived): shipmentId in the
+    // PATH, body {orderRef, locationCode, occurredAt} with millisecond-pinned
+    // occurredAt. The legacy /api/shipments/{id}/arrived lot-list shape is gone.
     [Fact]
-    public async Task Arrived_BodyMatchesContract_AndShipmentIdInPath()
+    public async Task DroppedOff_BodyMatchesContract_AndShipmentIdInPath()
     {
-        var payload = await new OmsShipmentArrivedFormatter().FormatAsync(
-            new ShipmentArrivedContext("root-trip-9", new[] { "LOT-A", "LOT-B" }),
+        var payload = await new OmsShipmentDroppedOffFormatter().FormatAsync(
+            new ShipmentDroppedOffContext("root-trip-9", "OD-2607-0001", "STF_09",
+                new DateTime(2026, 7, 15, 9, 7, 9, 263, DateTimeKind.Utc)),
             CancellationToken.None);
 
         Encoding.UTF8.GetString(payload.Body).Should().Be(
-            "{\"lots\":[{\"lotNo\":\"LOT-A\"},{\"lotNo\":\"LOT-B\"}]}");
-        payload.RelativePath.Should().Be("/api/shipments/root-trip-9/arrived");
+            "{\"orderRef\":\"OD-2607-0001\",\"locationCode\":\"STF_09\"," +
+            "\"occurredAt\":\"2026-07-15T09:07:09.263Z\"}");
+        payload.RelativePath.Should().Be("/integrations/tms/shipments/root-trip-9/dropoff-arrived");
+        payload.HttpMethod.Should().BeNull();   // → dispatcher default POST
+    }
+
+    [Fact]
+    public async Task DroppedOff_UnspecifiedKind_TreatedAsUtc_NotShifted()
+    {
+        var payload = await new OmsShipmentDroppedOffFormatter().FormatAsync(
+            new ShipmentDroppedOffContext("root-trip-9", "OD-2607-0001", "STF_09",
+                new DateTime(2026, 7, 15, 9, 7, 9, 263, DateTimeKind.Unspecified)),
+            CancellationToken.None);
+
+        Encoding.UTF8.GetString(payload.Body)
+            .Should().Contain("\"occurredAt\":\"2026-07-15T09:07:09.263Z\"");
+    }
+
+    [Fact]
+    public async Task DroppedOffFormatter_RejectsWrongContextType()
+    {
+        var act = async () => await new OmsShipmentDroppedOffFormatter()
+            .FormatAsync("not-a-context", CancellationToken.None);
+        await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
     // Wire-identical to the OmsTripCancelledNotification that 0f123c2 deleted, so
@@ -171,7 +197,9 @@ public class OmsShipmentFormatterByteCompatTests
     {
         OmsShipmentStartedFormatter.FormatKey.Should().Be("oms.shipment.started.v1");
         OmsShipmentPickedUpFormatter.FormatKey.Should().Be("oms.shipment.pickedup.v1");
-        OmsShipmentArrivedFormatter.FormatKey.Should().Be("oms.shipment.arrived.v1");
+        // droppedoff's DB literal is written by the 20260801170000 rename
+        // migration (UPDATE), not a seed INSERT.
+        OmsShipmentDroppedOffFormatter.FormatKey.Should().Be("oms.shipment.droppedoff.v1");
         OmsShipmentCancelledFormatter.FormatKey.Should().Be("oms.shipment.cancelled.v1");
     }
 

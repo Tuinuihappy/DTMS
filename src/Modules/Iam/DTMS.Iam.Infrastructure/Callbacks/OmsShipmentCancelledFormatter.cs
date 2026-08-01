@@ -6,8 +6,10 @@ namespace DTMS.Iam.Infrastructure.Callbacks;
 /// <summary>
 /// Formats a <see cref="ShipmentCancelledContext"/> into OMS's
 /// <c>POST /api/shipments/{shipmentId}/cancelled</c> call — shipmentId in the
-/// path, the rest in the body, mirroring <see cref="OmsShipmentArrivedFormatter"/>.
-/// Resolved by keyed DI under <see cref="FormatKey"/>.
+/// path, the rest in the body (the last formatter still on the legacy
+/// /api/shipments route family; started/pickedup/droppedoff moved to
+/// /integrations/tms/* in 2026-08). Resolved by keyed DI under
+/// <see cref="FormatKey"/>.
 ///
 /// <para>Path and body are not a new contract: they reproduce the
 /// <c>OmsTripCancelledNotification</c> DTMS posted to this exact route until

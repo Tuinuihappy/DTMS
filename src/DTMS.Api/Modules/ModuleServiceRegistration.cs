@@ -894,17 +894,16 @@ public static class ModuleServiceRegistration
         services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
                                 DTMS.Iam.Infrastructure.Callbacks.OmsShipmentCancelledFormatter>(
             DTMS.Iam.Infrastructure.Callbacks.OmsShipmentCancelledFormatter.FormatKey);
-        // Phase S.5 (B2) — OMS shipment started/arrived formatters. Started
-        // targets the 2026-08 /integrations/tms/shipments/started contract;
-        // arrived keeps the legacy /api/shipments/{id}/arrived path until OMS
-        // moves that route too. Routing via each formatter's RelativePath.
+        // 2026-08 — the whole shipment family now targets OMS's TMS
+        // integration routes (/integrations/tms/shipments/*): started (flat),
+        // pickedup + droppedoff (shipmentId in the path). Routing via each
+        // formatter's RelativePath.
         services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
                                 DTMS.Iam.Infrastructure.Callbacks.OmsShipmentStartedFormatter>(
             DTMS.Iam.Infrastructure.Callbacks.OmsShipmentStartedFormatter.FormatKey);
         services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
-                                DTMS.Iam.Infrastructure.Callbacks.OmsShipmentArrivedFormatter>(
-            DTMS.Iam.Infrastructure.Callbacks.OmsShipmentArrivedFormatter.FormatKey);
-        // 2026-08 — pickup notification (/integrations/tms/shipments/{id}/pickup-arrived).
+                                DTMS.Iam.Infrastructure.Callbacks.OmsShipmentDroppedOffFormatter>(
+            DTMS.Iam.Infrastructure.Callbacks.OmsShipmentDroppedOffFormatter.FormatKey);
         services.AddKeyedScoped<DTMS.Iam.Application.Callbacks.ICallbackPayloadFormatter,
                                 DTMS.Iam.Infrastructure.Callbacks.OmsShipmentPickedUpFormatter>(
             DTMS.Iam.Infrastructure.Callbacks.OmsShipmentPickedUpFormatter.FormatKey);

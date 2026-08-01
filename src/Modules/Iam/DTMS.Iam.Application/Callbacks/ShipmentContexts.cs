@@ -34,9 +34,19 @@ public sealed record ShipmentPickedUpContext(
     string LocationCode,
     DateTime OccurredAt);
 
-public sealed record ShipmentArrivedContext(
+/// <summary>
+/// 2026-08 — drop-off notification (renamed from ShipmentArrivedContext when
+/// OMS moved the route; the lot list left the wire with it). Field semantics
+/// mirror <see cref="ShipmentPickedUpContext"/>: <c>LocationCode</c> is the
+/// DROP code the source system itself submitted (Item.DropLocationCode);
+/// <c>OccurredAt</c> = Trip.VendorDroppedAt (AMR: the vendor's mission
+/// ChangeStateTime; Manual: the operator's tap).
+/// </summary>
+public sealed record ShipmentDroppedOffContext(
     string ShipmentId,
-    IReadOnlyList<string> LotNos);
+    string OrderRef,
+    string LocationCode,
+    DateTime OccurredAt);
 
 /// <summary>
 /// Fields mirror the OmsTripCancelledNotification that DTMS posted to

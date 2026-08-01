@@ -5,7 +5,6 @@ using System.Text;
 using DTMS.DeliveryOrder.Application.Consumers;
 using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.DeliveryOrder.Domain.Entities;
-using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Iam.Application.Callbacks;
@@ -13,10 +12,10 @@ using DTMS.SharedKernel.Messaging;
 using DTMS.SharedKernel.Outbox;
 using Microsoft.Extensions.Logging;
 
-namespace DTMS.DeliveryOrder.Application.Commands.ResendShipmentArrived;
+namespace DTMS.DeliveryOrder.Application.Commands.ResendShipmentDroppedOff;
 
-public class ResendShipmentArrivedCommandHandler
-    : ICommandHandler<ResendShipmentArrivedCommand, ResendShipmentArrivedResult>
+public class ResendShipmentDroppedOffCommandHandler
+    : ICommandHandler<ResendShipmentDroppedOffCommand, ResendShipmentDroppedOffResult>
 {
     private readonly ICallbackFormatterResolver _formatterResolver;
     private readonly ISourceCallbackDispatcher _dispatcher;
@@ -26,9 +25,9 @@ public class ResendShipmentArrivedCommandHandler
     private readonly IOrderAuditEventRepository _auditRepository;
     private readonly IOrderActivityProjectionStore _activityStore;
     private readonly ISourceCallbackOutboxSuperseder _outboxSuperseder;
-    private readonly ILogger<ResendShipmentArrivedCommandHandler> _logger;
+    private readonly ILogger<ResendShipmentDroppedOffCommandHandler> _logger;
 
-    public ResendShipmentArrivedCommandHandler(
+    public ResendShipmentDroppedOffCommandHandler(
         ICallbackFormatterResolver formatterResolver,
         ISourceCallbackDispatcher dispatcher,
         ISubscriptionLookup lookup,
@@ -37,7 +36,7 @@ public class ResendShipmentArrivedCommandHandler
         IOrderAuditEventRepository auditRepository,
         IOrderActivityProjectionStore activityStore,
         ISourceCallbackOutboxSuperseder outboxSuperseder,
-        ILogger<ResendShipmentArrivedCommandHandler> logger)
+        ILogger<ResendShipmentDroppedOffCommandHandler> logger)
     {
         _formatterResolver = formatterResolver;
         _dispatcher = dispatcher;
@@ -50,65 +49,72 @@ public class ResendShipmentArrivedCommandHandler
         _logger = logger;
     }
 
-    public async Task<Result<ResendShipmentArrivedResult>> Handle(
-        ResendShipmentArrivedCommand request, CancellationToken cancellationToken)
+    public async Task<Result<ResendShipmentDroppedOffResult>> Handle(
+        ResendShipmentDroppedOffCommand request, CancellationToken cancellationToken)
     {
         var order = await _orderRepository.GetByIdAsync(request.OrderId, cancellationToken);
         if (order is null)
-            return Result<ResendShipmentArrivedResult>.Failure($"Order {request.OrderId} not found.");
+            return Result<ResendShipmentDroppedOffResult>.Failure($"Order {request.OrderId} not found.");
 
         if (string.IsNullOrWhiteSpace(order.OrderRef))
         {
-            return Result<ResendShipmentArrivedResult>.Failure(
+            return Result<ResendShipmentDroppedOffResult>.Failure(
                 "Order has no OrderRef — only upstream-originated orders can be resent to their source system.");
         }
 
-        // Phase C — target system from the ORDER; the subscription row is
-        // routing record + off-switch in one (see the started handler).
+        // Self-managed drop is reported INTO DTMS by the source system — the
+        // auto fan-out skips it, so the resend must refuse too.
+        if (order.SelfManaged)
+        {
+            return Result<ResendShipmentDroppedOffResult>.Failure(
+                "Self-managed orders do not send drop-off notifications — the source system reports the drop itself.");
+        }
+
         var source = order.SourceSystemKey;
         if (string.IsNullOrWhiteSpace(source))
         {
-            return Result<ResendShipmentArrivedResult>.Failure(
+            return Result<ResendShipmentDroppedOffResult>.Failure(
                 "Order has no source system — nothing to notify.");
         }
 
-        var subs = await _lookup.GetSubscribersAsync(CallbackEventTypes.ShipmentArrivedV1, cancellationToken);
+        var subs = await _lookup.GetSubscribersAsync(CallbackEventTypes.ShipmentDroppedOffV1, cancellationToken);
         var sub = subs.FirstOrDefault(s => string.Equals(s.SystemKey, source, StringComparison.OrdinalIgnoreCase));
         if (sub is null)
         {
-            return Result<ResendShipmentArrivedResult>.Failure(
-                $"Shipment-arrived callbacks for '{source}' are disabled (subscription off or not configured). Enable the subscription before resending.");
-        }
-
-        // Manual transport does not report arrival upstream (parity with the
-        // auto ShipmentArrivedCallbackFanoutConsumer) — the source system owns
-        // the arrival signal for operator-pool / self-managed deliveries.
-        if (order.RequestedTransportMode == TransportMode.Manual)
-        {
-            return Result<ResendShipmentArrivedResult>.Failure(
-                "Manual transport does not send arrival notifications to the source system.");
+            return Result<ResendShipmentDroppedOffResult>.Failure(
+                $"Shipment-droppedoff callbacks for '{source}' are disabled (subscription off or not configured). Enable the subscription before resending.");
         }
 
         var trip = await _tripRepository.GetByIdAsync(request.TripId, cancellationToken);
         if (trip is null)
-            return Result<ResendShipmentArrivedResult>.Failure($"Trip {request.TripId} not found.");
+            return Result<ResendShipmentDroppedOffResult>.Failure($"Trip {request.TripId} not found.");
 
         if (trip.DeliveryOrderId != request.OrderId)
         {
-            return Result<ResendShipmentArrivedResult>.Failure(
+            return Result<ResendShipmentDroppedOffResult>.Failure(
                 $"Trip {request.TripId} does not belong to order {request.OrderId}.");
         }
 
-        var lots = order.Items
-            .Where(i => i.TripId == request.TripId)
-            .Select(i => i.ItemId)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .ToList();
-
-        if (lots.Count == 0)
+        // A trip that never reported the drop has nothing truthful to resend —
+        // occurredAt would be fabricated.
+        if (trip.VendorDroppedAt is null)
         {
-            return Result<ResendShipmentArrivedResult>.Failure(
-                "No items are bound to this trip — nothing to send.");
+            return Result<ResendShipmentDroppedOffResult>.Failure(
+                "Trip has not reported drop-off yet — nothing to resend.");
+        }
+
+        // locationCode is REQUIRED by the endpoint: the drop code the source
+        // system itself submitted on the order items (Item.DropLocationCode).
+        var locationCode = order.Items
+            .Where(i => i.TripId == request.TripId)
+            .Select(i => i.DropLocationCode)
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Distinct()
+            .FirstOrDefault();
+        if (locationCode is null)
+        {
+            return Result<ResendShipmentDroppedOffResult>.Failure(
+                "No items are bound to this trip — locationCode is required by the upstream endpoint.");
         }
 
         // [Option A] Stable shipmentId across retry chain.
@@ -118,11 +124,12 @@ public class ResendShipmentArrivedCommandHandler
         // Format via the SUBSCRIPTION's formatter and dispatch SYNCHRONOUSLY
         // so the operator sees the result immediately.
         var formatter = _formatterResolver.Resolve(sub.PayloadFormatKey);
-        var context = new ShipmentArrivedContext(shipmentId, lots);
+        var context = new ShipmentDroppedOffContext(
+            shipmentId, order.OrderRef!, locationCode, trip.VendorDroppedAt.Value);
         var payload = await formatter.FormatAsync(context, cancellationToken);
         var msg = new OutboxMessage(
             id: Guid.NewGuid(),
-            type: CallbackEventTypes.ShipmentArrivedV1,
+            type: CallbackEventTypes.ShipmentDroppedOffV1,
             content: Encoding.UTF8.GetString(payload.Body),
             occurredOnUtc: DateTime.UtcNow,
             partitionKey: sub.SystemKey,
@@ -141,9 +148,9 @@ public class ResendShipmentArrivedCommandHandler
             sw.Stop();
             var status = (ex as HttpRequestException)?.StatusCode;
             _logger.LogWarning(ex,
-                "[ShipmentArrivedResend] Trip {TripId} manual resend to {System} failed ({Status}): {Error}",
+                "[ShipmentDroppedOffResend] Trip {TripId} manual resend to {System} failed ({Status}): {Error}",
                 trip.Id, source, status, ex.Message);
-            return Result<ResendShipmentArrivedResult>.Failure(
+            return Result<ResendShipmentDroppedOffResult>.Failure(
                 status is >= HttpStatusCode.BadRequest and < HttpStatusCode.InternalServerError
                     ? $"{source} rejected the request ({(int)status}): {ex.Message}. Fix the data at upstream before resending."
                     : $"Callback to {source} failed: {ex.Message}");
@@ -151,8 +158,9 @@ public class ResendShipmentArrivedCommandHandler
         sw.Stop();
 
         // F2 — the upstream has the callback; audit/activity are best-effort
-        // from here (see the started handler).
-        var auditDetails = $"trip-arrived shipmentId={shipmentId} attempt={trip.AttemptNumber} lots={lots.Count} latencyMs={sw.ElapsedMilliseconds}";
+        // from here (see the started handler). Label stays ArrivedManuallyResent
+        // — the Arrived* audit family serves the droppedoff wire name too.
+        var auditDetails = $"trip-droppedoff shipmentId={shipmentId} attempt={trip.AttemptNumber} location={locationCode} latencyMs={sw.ElapsedMilliseconds}";
         try
         {
             await _auditRepository.AddAsync(new OrderAuditEvent(
@@ -164,7 +172,7 @@ public class ResendShipmentArrivedCommandHandler
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex,
-                "[ShipmentArrivedResend] Trip {TripId} resend DELIVERED to {System} but the audit write failed — timeline may miss it",
+                "[ShipmentDroppedOffResend] Trip {TripId} resend DELIVERED to {System} but the audit write failed — timeline may miss it",
                 trip.Id, source);
         }
 
@@ -187,42 +195,42 @@ public class ResendShipmentArrivedCommandHandler
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex,
-                "[ShipmentArrivedResend] Trip {TripId} resend DELIVERED to {System} but the activity write failed — UI may not reflect it",
+                "[ShipmentDroppedOffResend] Trip {TripId} resend DELIVERED to {System} but the activity write failed — UI may not reflect it",
                 trip.Id, source);
         }
 
-        // The resend just delivered shipment.arrived out-of-band. Retire any
-        // fan-out row still queued for this order+system so its next retry
-        // can't re-POST a duplicate and clobber this success. Best-effort (see
-        // the started handler for the full rationale).
+        // Retire pending fan-out rows for this order+system — BOTH names: the
+        // new one and the transitional shipment.arrived.v1, whose frozen rows
+        // still target the retired OMS path and must never re-POST after this
+        // out-of-band delivery. Best-effort.
         try
         {
             // Use sub.SystemKey (the exact value the fan-out wrote to
-            // PartitionKey), not `source` — the subscription lookup matches
-            // OrdinalIgnoreCase, so order.SourceSystemKey may differ in casing
-            // and a case-sensitive SQL match would silently miss the row.
+            // PartitionKey), not `source` — casing may differ.
             var retired = await _outboxSuperseder.SupersedePendingAsync(
+                sub.SystemKey, CallbackEventTypes.ShipmentDroppedOffV1, order.Id, cancellationToken);
+            retired += await _outboxSuperseder.SupersedePendingAsync(
                 sub.SystemKey, CallbackEventTypes.ShipmentArrivedV1, order.Id, cancellationToken);
             if (retired > 0)
                 _logger.LogInformation(
-                    "[ShipmentArrivedResend] Trip {TripId} resend superseded {Count} pending outbox row(s) for order {OrderId} → {System}",
+                    "[ShipmentDroppedOffResend] Trip {TripId} resend superseded {Count} pending outbox row(s) for order {OrderId} → {System}",
                     trip.Id, retired, order.Id, source);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex,
-                "[ShipmentArrivedResend] Trip {TripId} resend DELIVERED to {System} but superseding pending outbox rows failed — a queued retry may re-POST and surface a duplicate 400",
+                "[ShipmentDroppedOffResend] Trip {TripId} resend DELIVERED to {System} but superseding pending outbox rows failed — a queued retry may re-POST a duplicate",
                 trip.Id, source);
         }
 
         _logger.LogInformation(
-            "[ShipmentArrivedResend] Trip {TripId} (attempt {N}) → {System} outcome=Success shipmentId={Sid} lots={LotCount} latencyMs={Ms} by={By}",
-            trip.Id, trip.AttemptNumber, source, shipmentId, lots.Count, sw.ElapsedMilliseconds,
+            "[ShipmentDroppedOffResend] Trip {TripId} (attempt {N}) → {System} outcome=Success shipmentId={Sid} location={LocationCode} latencyMs={Ms} by={By}",
+            trip.Id, trip.AttemptNumber, source, shipmentId, locationCode, sw.ElapsedMilliseconds,
             request.RequestedBy ?? "(anonymous)");
 
-        return Result<ResendShipmentArrivedResult>.Success(new ResendShipmentArrivedResult(
+        return Result<ResendShipmentDroppedOffResult>.Success(new ResendShipmentDroppedOffResult(
             ShipmentId: shipmentId,
-            LotCount: lots.Count,
+            LocationCode: locationCode,
             LatencyMs: sw.ElapsedMilliseconds));
     }
 }

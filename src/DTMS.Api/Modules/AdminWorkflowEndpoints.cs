@@ -67,8 +67,8 @@ public static class AdminWorkflowEndpoints
         //   pickup  → POST /integrations/tms/shipments/{id}/pickup-arrived
         //             (via ShipmentPickedUpCallbackFanoutConsumer; also flips
         //             item state Pending → Picked in-DTMS)
-        //   drop    → POST /api/shipments/{id}/arrived
-        //             (via ShipmentArrivedCallbackFanoutConsumer)
+        //   drop    → POST /integrations/tms/shipments/{id}/dropoff-arrived
+        //             (via ShipmentDroppedOffCallbackFanoutConsumer)
         //   complete→ in-DTMS only     (cascades to Order + Job terminal state)
 
         group.MapPost("/trips/{id:guid}/force-start", async (

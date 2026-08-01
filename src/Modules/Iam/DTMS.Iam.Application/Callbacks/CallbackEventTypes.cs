@@ -44,8 +44,19 @@ public static class CallbackEventTypes
     /// auto-fired at dispatch and carries no physical meaning.</summary>
     public const string ShipmentPickedUpV1 = "shipment.pickedup.v1";
 
-    /// <summary>Shipment arrived at the drop station (Phase S.5, was the legacy
-    /// OMS <c>POST /api/shipments/{id}/arrived</c>).</summary>
+    /// <summary>Shipment dropped off at the drop station (2026-08; OMS receives
+    /// it at <c>POST /integrations/tms/shipments/{id}/dropoff-arrived</c>).
+    /// Renamed from <see cref="ShipmentArrivedV1"/> when OMS moved the route.
+    /// Semantics per transport mode mirror pickedup: AMR = robot reached the
+    /// drop dock, Manual = operator confirmed drop (geofence-verified);
+    /// self-managed orders never emit it — their drop is reported INTO DTMS by
+    /// the source system, so sending it back would only echo.</summary>
+    public const string ShipmentDroppedOffV1 = "shipment.droppedoff.v1";
+
+    /// <summary>TRANSITIONAL — retired 2026-08, renamed to
+    /// <see cref="ShipmentDroppedOffV1"/>. Stays registered so outbox rows
+    /// enqueued under the old name keep auditing and remain supersedable until
+    /// the backlog drains; remove in the post-cutover cleanup commit.</summary>
     public const string ShipmentArrivedV1 = "shipment.arrived.v1";
 
     /// <summary>A started shipment's trip was cancelled. Trip-scoped like its
@@ -63,7 +74,8 @@ public static class CallbackEventTypes
     {
         ShipmentStartedV1,
         ShipmentPickedUpV1,
-        ShipmentArrivedV1,
+        ShipmentDroppedOffV1,
+        ShipmentArrivedV1,   // transitional — see the const's doc
         ShipmentCancelledV1,
     };
 

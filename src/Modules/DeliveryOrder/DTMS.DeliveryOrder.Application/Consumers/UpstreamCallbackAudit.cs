@@ -25,7 +25,11 @@ public static class UpstreamCallbackAudit
     public const string PickedUpRejected = "UpstreamPickedUpRejected";
     public const string PickedUpNotifyFailed = "UpstreamPickedUpNotifyFailed";
 
-    // shipment.arrived.v1 outcomes
+    // Drop-off outcomes. Serves BOTH wire names: shipment.droppedoff.v1
+    // (2026-08 rename) and the transitional shipment.arrived.v1 — the labels
+    // stay "Arrived" because they are persisted history in OrderAuditEvents /
+    // OrderActivity and mirrored string-for-string in the frontend; renaming
+    // them costs a data migration for zero contract benefit.
     public const string ArrivedNotified = "UpstreamArrivedNotified";
     public const string ArrivedRejected = "UpstreamArrivedRejected";
     public const string ArrivedNotifyFailed = "UpstreamArrivedNotifyFailed";

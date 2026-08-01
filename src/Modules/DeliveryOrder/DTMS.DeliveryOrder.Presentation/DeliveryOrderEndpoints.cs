@@ -11,7 +11,7 @@ using DTMS.DeliveryOrder.Application.Commands.RedispatchDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.RejectDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.ReleaseDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.ReopenDeliveryOrder;
-using DTMS.DeliveryOrder.Application.Commands.ResendShipmentArrived;
+using DTMS.DeliveryOrder.Application.Commands.ResendShipmentDroppedOff;
 using DTMS.DeliveryOrder.Application.Commands.ResendShipmentPickedUp;
 using DTMS.DeliveryOrder.Application.Commands.ResendShipmentStarted;
 using DTMS.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
@@ -209,14 +209,15 @@ public static class DeliveryOrderEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderNotifySource);
 
-        // POST /api/v1/delivery-orders/{id}/trips/{tripId}/notify-source-arrived —
-        // Mirror of /notify-source but for the arrived (drop completed)
-        // callback. Surfaces a separate Resend button on the UI for when
-        // the auto callback dead-lettered the drop notification.
-        group.MapPost("/{id:guid}/trips/{tripId:guid}/notify-source-arrived",
+        // POST /api/v1/delivery-orders/{id}/trips/{tripId}/notify-source-droppedoff —
+        // Mirror of /notify-source but for the droppedoff (drop completed)
+        // callback (2026-08, renamed from /notify-source-arrived). Refused for
+        // self-managed orders (their drop is source-reported) and for trips
+        // that never reported the drop.
+        group.MapPost("/{id:guid}/trips/{tripId:guid}/notify-source-droppedoff",
             async (Guid id, Guid tripId, [FromBody] ResendSourceNotificationRequest? body, ISender sender) =>
         {
-            var result = await sender.Send(new ResendShipmentArrivedCommand(id, tripId, body?.RequestedBy));
+            var result = await sender.Send(new ResendShipmentDroppedOffCommand(id, tripId, body?.RequestedBy));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderNotifySource);
 
