@@ -627,6 +627,28 @@ export async function resendSourceNotification(
   return unwrap<ResendSourceNotificationResult>(res);
 }
 
+export type ResendSourcePickedUpNotificationResult = {
+  shipmentId: string;
+  locationCode: string;
+  latencyMs: number;
+};
+
+// Manual resend of the upstream "pickedup" (pickup-arrived) notification
+// (2026-08). Refused for self-managed orders and trips that never reported
+// pickup — the backend returns a clear reason for both.
+export async function resendSourcePickedUpNotification(
+  orderId: string,
+  tripId: string,
+  requestedBy?: string,
+): Promise<ResendSourcePickedUpNotificationResult> {
+  const res = await fetch(`/api/delivery-orders/${orderId}/trips/${tripId}/notify-source-pickedup`, {
+    method: "POST",
+    headers: mutationHeaders(),
+    body: JSON.stringify({ requestedBy: requestedBy ?? null }),
+  });
+  return unwrap<ResendSourcePickedUpNotificationResult>(res);
+}
+
 export type ResendSourceArrivedNotificationResult = {
   shipmentId: string;
   lotCount: number;

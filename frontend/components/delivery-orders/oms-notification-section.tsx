@@ -7,6 +7,7 @@ import {
   getFullOrderAudit,
   resendSourceArrivedNotification,
   resendSourceNotification,
+  resendSourcePickedUpNotification,
   type FullAuditEntryDto,
 } from "@/lib/api/delivery-orders";
 import { cn } from "@/lib/utils";
@@ -23,8 +24,10 @@ import { DateTime } from "@/components/primitives/date-time";
  * `systemKey`, and the section header renders that system's name. The same
  * component serves oms/sap/erp orders without change.
  *
- * 3 stages:
+ * 4 stages:
  *   • Started   — shipment.started.v1     (fires at trip start)
+ *   • Pickup    — shipment.pickedup.v1    (fires at pickup completed; skipped
+ *     for self-managed orders — their pickup is source-executed)
  *   • Arrived   — shipment.arrived.v1     (fires at drop completed)
  *   • Cancelled — shipment.cancelled.v1   (fires at trip cancel; the stage
  *     renders only when a cancelled callback row actually exists — the
@@ -38,7 +41,7 @@ import { DateTime } from "@/components/primitives/date-time";
  * endpoint; upstreams dedupe by shipmentId so re-firing is safe.
  */
 
-type StageKey = "started" | "arrived" | "cancelled";
+type StageKey = "started" | "pickedup" | "arrived" | "cancelled";
 
 type StageConfig = {
   label: string;
@@ -78,6 +81,19 @@ const STAGES: Record<StageKey, StageConfig> = {
     staleHint:
       "Trip is InProgress but no callback row exists — the subscription may be disabled, or the notification was gated.",
     resendLabel: "Resend started",
+    showOnlyWithData: false,
+  },
+  pickedup: {
+    label: "Pickup",
+    notifiedTypes: new Set(["UpstreamPickedUpNotified"]),
+    resentTypes: new Set(["UpstreamPickedUpManuallyResent"]),
+    failedTypes: new Set(["UpstreamPickedUpNotifyFailed", "UpstreamPickedUpRejected"]),
+    triggerEventTypes: new Set(["TripPickupCompleted"]),
+    emptyTitle: "Awaiting pickup",
+    emptyHint: "The source system is notified when the trip reaches its pickup point.",
+    staleHint:
+      "Pickup completed but no callback row exists — self-managed orders are gated by design; otherwise the subscription may be disabled.",
+    resendLabel: "Resend pickup",
     showOnlyWithData: false,
   },
   arrived: {
@@ -130,6 +146,7 @@ export function OmsNotificationSection({
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [startedResend, setStartedResend] = useState<ResendState>({ kind: "idle" });
+  const [pickedUpResend, setPickedUpResend] = useState<ResendState>({ kind: "idle" });
   const [arrivedResend, setArrivedResend] = useState<ResendState>({ kind: "idle" });
 
   useEffect(() => {
@@ -179,6 +196,10 @@ export function OmsNotificationSection({
     () => deriveStatus(tripEntries, STAGES.started),
     [tripEntries],
   );
+  const pickedUpStatus = useMemo(
+    () => deriveStatus(tripEntries, STAGES.pickedup),
+    [tripEntries],
+  );
   const arrivedStatus = useMemo(
     () => deriveStatus(tripEntries, STAGES.arrived),
     [tripEntries],
@@ -206,6 +227,10 @@ export function OmsNotificationSection({
 
   const onResendStarted = useCallback(
     makeResendHandler(setStartedResend, (o, t) => resendSourceNotification(o, t)),
+    [orderId, tripId, refresh],
+  );
+  const onResendPickedUp = useCallback(
+    makeResendHandler(setPickedUpResend, (o, t) => resendSourcePickedUpNotification(o, t)),
     [orderId, tripId, refresh],
   );
   const onResendArrived = useCallback(
@@ -238,6 +263,13 @@ export function OmsNotificationSection({
           onResend={onResendStarted}
         />
         <StageRow
+          config={STAGES.pickedup}
+          status={pickedUpStatus}
+          resendTripId={tripId}
+          resendState={pickedUpResend}
+          onResend={onResendPickedUp}
+        />
+        <StageRow
           config={STAGES.arrived}
           status={arrivedStatus}
           resendTripId={tripId}
@@ -266,6 +298,9 @@ const UPSTREAM_EVENT_TYPES = new Set<string>([
   ...STAGES.started.notifiedTypes,
   ...STAGES.started.resentTypes,
   ...STAGES.started.failedTypes,
+  ...STAGES.pickedup.notifiedTypes,
+  ...STAGES.pickedup.resentTypes,
+  ...STAGES.pickedup.failedTypes,
   ...STAGES.arrived.notifiedTypes,
   ...STAGES.arrived.resentTypes,
   ...STAGES.arrived.failedTypes,

@@ -12,6 +12,7 @@ using DTMS.DeliveryOrder.Application.Commands.RejectDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.ReleaseDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.ReopenDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.ResendShipmentArrived;
+using DTMS.DeliveryOrder.Application.Commands.ResendShipmentPickedUp;
 using DTMS.DeliveryOrder.Application.Commands.ResendShipmentStarted;
 using DTMS.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.UpdateDraftDeliveryOrder;
@@ -194,6 +195,17 @@ public static class DeliveryOrderEndpoints
             async (Guid id, Guid tripId, [FromBody] ResendSourceNotificationRequest? body, ISender sender) =>
         {
             var result = await sender.Send(new ResendShipmentStartedCommand(id, tripId, body?.RequestedBy));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderNotifySource);
+
+        // POST /api/v1/delivery-orders/{id}/trips/{tripId}/notify-source-pickedup —
+        // Mirror of /notify-source but for the pickedup callback (2026-08).
+        // Refused for self-managed orders (their pickup is source-executed)
+        // and for trips that never reported pickup.
+        group.MapPost("/{id:guid}/trips/{tripId:guid}/notify-source-pickedup",
+            async (Guid id, Guid tripId, [FromBody] ResendSourceNotificationRequest? body, ISender sender) =>
+        {
+            var result = await sender.Send(new ResendShipmentPickedUpCommand(id, tripId, body?.RequestedBy));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderNotifySource);
 
