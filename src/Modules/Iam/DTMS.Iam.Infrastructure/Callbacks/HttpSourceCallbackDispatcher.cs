@@ -34,6 +34,11 @@ namespace DTMS.Iam.Infrastructure.Callbacks;
 ///         OutboxRetryPolicy.</item>
 /// </list>
 /// </para>
+///
+/// <para>2026-08 — a 401 additionally triggers ONE reactive token refresh
+/// (<see cref="ICallbackTokenRefresher"/>, force-mint) + immediate retry:
+/// receivers like OMS expire sessions on idle time, which the exp-scheduled
+/// refresh loop cannot anticipate.</para>
 /// </summary>
 public sealed class HttpSourceCallbackDispatcher : ISourceCallbackDispatcher
 {
@@ -44,81 +49,57 @@ public sealed class HttpSourceCallbackDispatcher : ISourceCallbackDispatcher
 
     private readonly HttpClient _http;
     private readonly CachedCredentialReader _credReader;
+    private readonly ICallbackTokenRefresher _tokenRefresher;
     private readonly ILogger<HttpSourceCallbackDispatcher> _log;
 
     public HttpSourceCallbackDispatcher(
         HttpClient http,
         CachedCredentialReader credReader,
+        ICallbackTokenRefresher tokenRefresher,
         ILogger<HttpSourceCallbackDispatcher> log)
     {
         _http = http;
         _credReader = credReader;
+        _tokenRefresher = tokenRefresher;
         _log = log;
     }
 
     public async Task DispatchAsync(string systemKey, OutboxMessage message, CancellationToken ct)
     {
-        var cred = await _credReader.GetAsync(systemKey, ct)
-            ?? throw new InvalidOperationException(
-                $"No SystemCredential for '{systemKey}' — cannot dispatch outbound callback. " +
-                "This is a configuration error; admin must set CallbackBaseUrl + CallbackAuth* on the credential row.");
+        var cred = await ReadCredAsync(systemKey, ct);
 
-        if (string.IsNullOrWhiteSpace(cred.CallbackBaseUrl))
-            throw new InvalidOperationException(
-                $"SystemCredential for '{systemKey}' has no CallbackBaseUrl. " +
-                "Admin must populate it before subscriptions can fire.");
-
-        // Phase S.5 (B2) — honor a per-row route override (already resolved by
-        // the formatter, no templating here). Default stays POST /events so
-        // every existing subscriber (delivered/cancelled, all systems) is
-        // unaffected.
-        var path = string.IsNullOrWhiteSpace(message.CallbackPath) ? "/events" : message.CallbackPath!;
-        if (!path.StartsWith('/')) path = "/" + path;
-        var method = string.IsNullOrWhiteSpace(message.CallbackMethod)
-            ? HttpMethod.Post
-            : new HttpMethod(message.CallbackMethod!.ToUpperInvariant());
-
-        var url = new Uri(cred.CallbackBaseUrl.TrimEnd('/') + path, UriKind.Absolute);
-        using var req = new HttpRequestMessage(method, url);
-        req.Content = new StringContent(message.Content, Encoding.UTF8, "application/json");
-        req.Headers.TryAddWithoutValidation("X-DTMS-Event-Type", message.Type);
-        req.Headers.TryAddWithoutValidation("X-DTMS-Event-Id", message.Id.ToString());
-        if (message.CorrelationId is { } cid)
-            req.Headers.TryAddWithoutValidation("X-DTMS-Correlation-Id", cid.ToString());
-
-        ApplyAuth(req, cred);
-
-        // Bound the per-call timeout to the credential's configured value
-        // (defaults to 10s). Use a linked cts so caller cancellation also
-        // tears down the request.
-        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(cred.CallbackTimeoutMs));
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
-
-        _log.LogInformation(
-            "Dispatching outbox row {Id} (type={Type}) to system={SystemKey} URL={Url}",
-            message.Id, message.Type, systemKey, url);
-
-        HttpResponseMessage resp;
+        var resp = await SendOnceAsync(cred, systemKey, message, ct);
         try
         {
-            resp = await _http.SendAsync(req, linked.Token);
-        }
-        catch (TaskCanceledException) when (timeoutCts.IsCancellationRequested && !ct.IsCancellationRequested)
-        {
-            throw new TimeoutException(
-                $"Callback to '{systemKey}' ({url}) timed out after {cred.CallbackTimeoutMs}ms.");
-        }
+            if (IsDelivered(resp)) return;
 
-        try
-        {
-            // 2xx AND 409 Conflict both count as delivered. 409 =
-            // "already registered/arrived" (idempotent replay) — matches the
-            // legacy OMS adapter's behaviour; treating it as a failure would
-            // retry a callback the receiver has already accepted. Applies to
-            // every system (delivered/cancelled/erp/sap too — 409 is an
-            // idempotent-replay signal regardless of the event).
-            if (resp.IsSuccessStatusCode || resp.StatusCode == HttpStatusCode.Conflict)
-                return;
+            // Reactive token refresh (2026-08): receivers like OMS expire
+            // sessions on IDLE time, not on the token's exp — so the scheduled
+            // refresh loop can't see it coming and the first callback after a
+            // quiet hour draws 401. Force-mint once and retry immediately;
+            // anything but a successful mint falls through to the normal
+            // failure path (the outbox retry ladder picks it up with whatever
+            // token the background loop has by then).
+            if (resp.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                var refresh = await _tokenRefresher.RefreshAsync(systemKey, force: true, ct);
+                if (refresh.Outcome == RefreshOutcome.Refreshed)
+                {
+                    _log.LogInformation(
+                        "Callback to system={SystemKey} drew 401 for outbox row {Id}; token refreshed reactively (new exp={Exp}) — retrying once",
+                        systemKey, message.Id, refresh.NewExpiresAt?.ToString("o") ?? "(perpetual)");
+                    resp.Dispose();
+                    cred = await ReadCredAsync(systemKey, ct);   // refresher invalidated the cache
+                    resp = await SendOnceAsync(cred, systemKey, message, ct);
+                    if (IsDelivered(resp)) return;
+                }
+                else
+                {
+                    _log.LogWarning(
+                        "Callback to system={SystemKey} drew 401 for outbox row {Id}; reactive refresh did not mint ({Outcome}: {Message}) — failing normally",
+                        systemKey, message.Id, refresh.Outcome, refresh.Message);
+                }
+            }
 
             // Capture the body for the failure log — admin will want it
             // when triaging "why is OMS rejecting our callback?". Bound
@@ -145,6 +126,74 @@ public sealed class HttpSourceCallbackDispatcher : ISourceCallbackDispatcher
         finally
         {
             resp.Dispose();
+        }
+    }
+
+    // 2xx AND 409 Conflict both count as delivered. 409 = "already
+    // registered/arrived" (idempotent replay) — matches the legacy OMS
+    // adapter's behaviour; treating it as a failure would retry a callback
+    // the receiver has already accepted. Applies to every system.
+    private static bool IsDelivered(HttpResponseMessage resp)
+        => resp.IsSuccessStatusCode || resp.StatusCode == HttpStatusCode.Conflict;
+
+    private async Task<CachedCredential> ReadCredAsync(string systemKey, CancellationToken ct)
+    {
+        var cred = await _credReader.GetAsync(systemKey, ct)
+            ?? throw new InvalidOperationException(
+                $"No SystemCredential for '{systemKey}' — cannot dispatch outbound callback. " +
+                "This is a configuration error; admin must set CallbackBaseUrl + CallbackAuth* on the credential row.");
+
+        if (string.IsNullOrWhiteSpace(cred.CallbackBaseUrl))
+            throw new InvalidOperationException(
+                $"SystemCredential for '{systemKey}' has no CallbackBaseUrl. " +
+                "Admin must populate it before subscriptions can fire.");
+        return cred;
+    }
+
+    // One attempt: build the request from the (possibly re-read) credential
+    // and send it. HttpRequestMessage is single-use, so the reactive-refresh
+    // retry rebuilds from scratch rather than resending.
+    private async Task<HttpResponseMessage> SendOnceAsync(
+        CachedCredential cred, string systemKey, OutboxMessage message, CancellationToken ct)
+    {
+        // Phase S.5 (B2) — honor a per-row route override (already resolved by
+        // the formatter, no templating here). Default stays POST /events so
+        // every existing subscriber (delivered/cancelled, all systems) is
+        // unaffected.
+        var path = string.IsNullOrWhiteSpace(message.CallbackPath) ? "/events" : message.CallbackPath!;
+        if (!path.StartsWith('/')) path = "/" + path;
+        var method = string.IsNullOrWhiteSpace(message.CallbackMethod)
+            ? HttpMethod.Post
+            : new HttpMethod(message.CallbackMethod!.ToUpperInvariant());
+
+        var url = new Uri(cred.CallbackBaseUrl!.TrimEnd('/') + path, UriKind.Absolute);
+        using var req = new HttpRequestMessage(method, url);
+        req.Content = new StringContent(message.Content, Encoding.UTF8, "application/json");
+        req.Headers.TryAddWithoutValidation("X-DTMS-Event-Type", message.Type);
+        req.Headers.TryAddWithoutValidation("X-DTMS-Event-Id", message.Id.ToString());
+        if (message.CorrelationId is { } cid)
+            req.Headers.TryAddWithoutValidation("X-DTMS-Correlation-Id", cid.ToString());
+
+        ApplyAuth(req, cred);
+
+        // Bound the per-call timeout to the credential's configured value
+        // (defaults to 10s). Use a linked cts so caller cancellation also
+        // tears down the request.
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(cred.CallbackTimeoutMs));
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+
+        _log.LogInformation(
+            "Dispatching outbox row {Id} (type={Type}) to system={SystemKey} URL={Url}",
+            message.Id, message.Type, systemKey, url);
+
+        try
+        {
+            return await _http.SendAsync(req, linked.Token);
+        }
+        catch (TaskCanceledException) when (timeoutCts.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"Callback to '{systemKey}' ({url}) timed out after {cred.CallbackTimeoutMs}ms.");
         }
     }
 
