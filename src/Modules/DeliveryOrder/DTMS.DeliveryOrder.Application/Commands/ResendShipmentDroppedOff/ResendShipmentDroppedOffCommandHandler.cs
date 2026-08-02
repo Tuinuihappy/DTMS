@@ -199,18 +199,15 @@ public class ResendShipmentDroppedOffCommandHandler
                 trip.Id, source);
         }
 
-        // Retire pending fan-out rows for this order+system — BOTH names: the
-        // new one and the transitional shipment.arrived.v1, whose frozen rows
-        // still target the retired OMS path and must never re-POST after this
-        // out-of-band delivery. Best-effort.
+        // Retire any fan-out row still queued for this order+system so its
+        // next retry can't re-POST a duplicate and clobber this success.
+        // Best-effort.
         try
         {
             // Use sub.SystemKey (the exact value the fan-out wrote to
             // PartitionKey), not `source` — casing may differ.
             var retired = await _outboxSuperseder.SupersedePendingAsync(
                 sub.SystemKey, CallbackEventTypes.ShipmentDroppedOffV1, order.Id, cancellationToken);
-            retired += await _outboxSuperseder.SupersedePendingAsync(
-                sub.SystemKey, CallbackEventTypes.ShipmentArrivedV1, order.Id, cancellationToken);
             if (retired > 0)
                 _logger.LogInformation(
                     "[ShipmentDroppedOffResend] Trip {TripId} resend superseded {Count} pending outbox row(s) for order {OrderId} → {System}",

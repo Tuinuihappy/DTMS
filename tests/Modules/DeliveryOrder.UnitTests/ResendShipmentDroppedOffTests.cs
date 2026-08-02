@@ -23,8 +23,7 @@ namespace DeliveryOrder.UnitTests;
 // (subscription-routed dispatch + ArrivedManuallyResent audit — the Arrived*
 // audit family serves the new wire name), the off-switch, its gates
 // (self-managed refused, never-dropped refused, locationCode required), and
-// the DUAL supersede: pending rows under both the new name and the
-// transitional shipment.arrived.v1 must be retired.
+// the supersede of pending fan-out rows.
 public class ResendShipmentDroppedOffTests
 {
     private static readonly Guid Pickup = Guid.NewGuid();
@@ -213,11 +212,8 @@ public class ResendShipmentDroppedOffTests
             Arg.Any<string>(), Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
     }
 
-    // DUAL supersede — pending rows under BOTH the new name and the
-    // transitional old name must be retired, or a frozen old-name row could
-    // later re-POST to the path OMS retired.
     [Fact]
-    public async Task Resend_Success_SupersedesBothEventNames()
+    public async Task Resend_Success_SupersedesPendingOutboxRows_ForThisOrderAndSystem()
     {
         var h = NewHarness();
 
@@ -227,8 +223,6 @@ public class ResendShipmentDroppedOffTests
         result.IsSuccess.Should().BeTrue();
         await h.Superseder.Received(1).SupersedePendingAsync(
             "oms", CallbackEventTypes.ShipmentDroppedOffV1, h.OrderId, Arg.Any<CancellationToken>());
-        await h.Superseder.Received(1).SupersedePendingAsync(
-            "oms", CallbackEventTypes.ShipmentArrivedV1, h.OrderId, Arg.Any<CancellationToken>());
     }
 
     [Fact]

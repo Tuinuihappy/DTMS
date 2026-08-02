@@ -49,10 +49,6 @@ public class SourceCallbackOutcomeConsumerTests
     [InlineData("shipment.droppedoff.v1", true, null, UpstreamCallbackAudit.ArrivedNotified)]
     [InlineData("shipment.droppedoff.v1", false, 422, UpstreamCallbackAudit.ArrivedRejected)]
     [InlineData("shipment.droppedoff.v1", false, 500, UpstreamCallbackAudit.ArrivedNotifyFailed)]
-    // transitional — old-name rows still in flight must keep auditing
-    [InlineData("shipment.arrived.v1", true, null, UpstreamCallbackAudit.ArrivedNotified)]
-    [InlineData("shipment.arrived.v1", false, 422, UpstreamCallbackAudit.ArrivedRejected)]
-    [InlineData("shipment.arrived.v1", false, 500, UpstreamCallbackAudit.ArrivedNotifyFailed)]
     [InlineData("shipment.cancelled.v1", true, null, UpstreamCallbackAudit.CancelledNotified)]
     [InlineData("shipment.cancelled.v1", false, 409, UpstreamCallbackAudit.CancelledRejected)]
     [InlineData("shipment.cancelled.v1", false, 502, UpstreamCallbackAudit.CancelledNotifyFailed)]
