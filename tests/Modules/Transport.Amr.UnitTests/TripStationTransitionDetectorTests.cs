@@ -63,9 +63,10 @@ public class TripStationTransitionDetectorTests
     }
 
     [Fact]
-    public async Task MoveFinishedAtDropStation_FiresDropWithPodPolicy()
+    public async Task MoveFinishedAtDropStation_AfterPickup_FiresDropWithPodPolicy()
     {
         var (trip, pickup, drop) = InProgressTripWithStations();
+        trip.MarkVendorPickedUp();
         var orderReader = Substitute.For<IDeliveryOrderStatusReader>();
         orderReader.GetRequiresDropPodAsync(trip.DeliveryOrderId, Arg.Any<CancellationToken>())
             .Returns((bool?)false);
@@ -78,6 +79,71 @@ public class TripStationTransitionDetectorTests
         fired.Should().BeTrue();
         trip.VendorDroppedAt.Should().NotBeNull();
         trip.Events.Count(e => e.EventType == "VendorDropCompleted").Should().Be(1);
+    }
+
+    // Trip 6435 regression (2026-08-05): round-trip FG templates visit the drop
+    // station FIRST to fetch the empty rack. That visit must not fire the drop
+    // — OMS rejects a droppedoff callback before pickup, and the fire-once
+    // guard would then swallow the real drop visit.
+    [Fact]
+    public async Task MoveFinishedAtDropStation_BeforePickup_DoesNotFire()
+    {
+        var (trip, pickup, drop) = InProgressTripWithStations();
+        var orderReader = Substitute.For<IDeliveryOrderStatusReader>();
+        orderReader.GetRequiresDropPodAsync(trip.DeliveryOrderId, Arg.Any<CancellationToken>())
+            .Returns((bool?)false);
+
+        // Rack-fetch visit: MOVE finishes at the drop station before any pickup.
+        var fetchVisit = await TripStationTransitionDetector.TryApplyAsync(
+            trip, "MOVE", "FINISHED", DropVendorId,
+            Facility(pickup, drop), orderReader, actedAt: null,
+            NullLogger.Instance, CancellationToken.None);
+
+        fetchVisit.Should().BeFalse();
+        trip.VendorDroppedAt.Should().BeNull();
+
+        // Pickup happens, then the robot returns to the drop station — the
+        // real drop visit fires normally.
+        var pickedUp = await TripStationTransitionDetector.TryApplyAsync(
+            trip, "MOVE", "FINISHED", PickupVendorId,
+            Facility(pickup, drop), orderReader, actedAt: null,
+            NullLogger.Instance, CancellationToken.None);
+        pickedUp.Should().BeTrue();
+
+        var realDrop = await TripStationTransitionDetector.TryApplyAsync(
+            trip, "MOVE", "FINISHED", DropVendorId,
+            Facility(pickup, drop), orderReader, actedAt: null,
+            NullLogger.Instance, CancellationToken.None);
+
+        realDrop.Should().BeTrue();
+        trip.VendorDroppedAt.Should().NotBeNull();
+        trip.Events.Count(e => e.EventType == "VendorDropCompleted").Should().Be(1);
+    }
+
+    // Legacy trips persisted before retry support carry no PickupStationId —
+    // pickup can never fire on them, so the ordering gate must not apply.
+    [Fact]
+    public async Task MoveFinishedAtDropStation_NoPickupLeg_StillFires()
+    {
+        var drop = Guid.NewGuid();
+        var trip = Trip.CreateForEnvelope(
+            Guid.NewGuid(), "upper-G1", "ORD-1", pickupStationId: null, dropStationId: drop);
+        trip.MarkVendorStarted();
+
+        var facility = Substitute.For<IFacilityReadService>();
+        facility.ResolveStationByVendorRefAsync(DropVendorId.ToString(), Arg.Any<CancellationToken>())
+            .Returns(drop);
+        var orderReader = Substitute.For<IDeliveryOrderStatusReader>();
+        orderReader.GetRequiresDropPodAsync(trip.DeliveryOrderId, Arg.Any<CancellationToken>())
+            .Returns((bool?)false);
+
+        var fired = await TripStationTransitionDetector.TryApplyAsync(
+            trip, "MOVE", "FINISHED", DropVendorId,
+            facility, orderReader, actedAt: null,
+            NullLogger.Instance, CancellationToken.None);
+
+        fired.Should().BeTrue();
+        trip.VendorDroppedAt.Should().NotBeNull();
     }
 
     [Theory]
@@ -142,6 +208,56 @@ public class Riot3ReconciliationStationDetectionTests
 
         fired.Should().BeTrue();
         trip.VendorPickedUpAt.Should().Be(new DateTime(2026, 7, 9, 8, 33, 18, DateTimeKind.Utc));
+    }
+
+    // Round-trip heal: when every webhook was dropped, the reconciler replays
+    // the full mission list in template order. The rack-fetch visit to the drop
+    // station (before pickup) must be skipped; drop must stamp the FINAL visit's
+    // time, not the fetch visit's.
+    [Fact]
+    public async Task DetectStationTransitions_RoundTripTemplate_DropUsesFinalVisitNotRackFetch()
+    {
+        var pickup = Guid.NewGuid();
+        var drop = Guid.NewGuid();
+        var trip = Trip.CreateForEnvelope(Guid.NewGuid(), "upper-G1", "ORD-1", pickup, drop);
+        trip.MarkVendorStarted();
+
+        var facility = Substitute.For<IFacilityReadService>();
+        facility.ResolveStationByVendorRefAsync("159", Arg.Any<CancellationToken>()).Returns(pickup);
+        facility.ResolveStationByVendorRefAsync("151", Arg.Any<CancellationToken>()).Returns(drop);
+        var orderReader = Substitute.For<IDeliveryOrderStatusReader>();
+        orderReader.GetRequiresDropPodAsync(trip.DeliveryOrderId, Arg.Any<CancellationToken>())
+            .Returns((bool?)false);
+
+        var data = new Riot3OrderQueryData
+        {
+            Missions = new List<Riot3OrderMission>
+            {
+                // Rack fetch at the drop station, then pickup, then real drop.
+                new()
+                {
+                    MissionKey = "m0", MissionIndex = 0, Type = "MOVE", State = "FINISHED",
+                    StationId = 151, FinishedTime = "2026-08-05T10:56:57Z",
+                },
+                new()
+                {
+                    MissionKey = "m1", MissionIndex = 1, Type = "MOVE", State = "FINISHED",
+                    StationId = 159, FinishedTime = "2026-08-05T11:02:29Z",
+                },
+                new()
+                {
+                    MissionKey = "m2", MissionIndex = 2, Type = "MOVE", State = "FINISHED",
+                    StationId = 151, FinishedTime = "2026-08-05T11:06:01Z",
+                },
+            },
+        };
+
+        var fired = await BuildService().DetectStationTransitionsAsync(
+            trip, data, facility, orderReader, CancellationToken.None);
+
+        fired.Should().BeTrue();
+        trip.VendorPickedUpAt.Should().Be(new DateTime(2026, 8, 5, 11, 2, 29, DateTimeKind.Utc));
+        trip.VendorDroppedAt.Should().Be(new DateTime(2026, 8, 5, 11, 6, 1, DateTimeKind.Utc));
     }
 
     [Fact]

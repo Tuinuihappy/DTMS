@@ -20,6 +20,10 @@ namespace DTMS.Transport.Amr.Services;
 /// — never double-fire. This helper additionally short-circuits before the POD
 /// lookup once dropped.
 ///
+/// Ordering: drop is gated on pickup having already fired (when the trip has a
+/// pickup leg) — round-trip templates visit the drop station first to fetch the
+/// empty rack, and that visit must not count as the drop.
+///
 /// Resolves via the vendor-side station id (VendorRef) rather than station name:
 /// RIOT3 emits the name in its own casing ("Station165") which won't match the
 /// upper-cased Code DTMS stores, and IDs are stable across vendor renames.
@@ -81,6 +85,22 @@ public static class TripStationTransitionDetector
         if (dropHit)
         {
             if (trip.VendorDroppedAt is not null) return false;   // fire-once — already dropped
+
+            // Round-trip templates (e.g. STF39_FG_TO_SHELF_FG1) visit the drop
+            // station FIRST to fetch the empty rack before heading to pickup.
+            // A drop can never precede the pickup, so that fetch visit must not
+            // fire — trip 6435 (2026-08-05) stamped VendorDroppedAt on it and
+            // OMS rejected the premature droppedoff callback (400 "not ready"),
+            // while the real drop visit was then swallowed by the fire-once
+            // guard. Gate only when the trip has a pickup leg: legacy rows
+            // without PickupStationId can never satisfy it.
+            if (trip.PickupStationId.HasValue && trip.VendorPickedUpAt is null)
+            {
+                logger.LogInformation(
+                    "[StationTransition] Trip {TripId} MOVE finished at drop station (vendorId={VendorId}) before pickup — rack-fetch visit on a round-trip template, not firing drop",
+                    trip.Id, vendorStationId);
+                return false;
+            }
             // Resolve the order's POD policy so the integration event carries it
             // (no POD → items land at Delivered; POD → hold at DroppedOff).
             var requiresDropPod = await orderReader.GetRequiresDropPodAsync(
