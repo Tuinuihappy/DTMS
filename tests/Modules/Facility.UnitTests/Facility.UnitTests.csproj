@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="xunit" />
@@ -23,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Modules\Facility\DTMS.Facility.Application\DTMS.Facility.Application.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Facility\DTMS.Facility.Domain\DTMS.Facility.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Facility\DTMS.Facility.Infrastructure\DTMS.Facility.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

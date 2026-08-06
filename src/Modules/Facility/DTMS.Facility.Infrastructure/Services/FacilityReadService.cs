@@ -32,8 +32,15 @@ public sealed class FacilityReadService : IFacilityReadService
     }
 
     public Task<Guid?> ResolveStationByVendorRefAsync(string vendorRef, CancellationToken cancellationToken = default)
+        // Same Maps join as ResolveStationByCodeAsync: deleting a map leaves
+        // its Stations rows behind, and a re-imported map reuses RIOT3's
+        // numeric station ids — so a VendorRef can match both a live row and
+        // an orphan (13 such pairs found 2026-08-05, e.g. 177 = SHELF_FG_1 +
+        // orphaned SHELF10). Without the join FirstOrDefault picks
+        // nondeterministically; resolving the orphan would silently break
+        // pickup/drop detection (its Guid matches neither trip station).
         => _db.Stations.AsNoTracking()
-            .Where(s => s.VendorRef == vendorRef)
+            .Where(s => s.VendorRef == vendorRef && _db.Maps.Any(m => m.Id == s.MapId))
             .Select(s => (Guid?)s.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
