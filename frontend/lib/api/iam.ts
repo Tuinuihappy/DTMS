@@ -10,12 +10,6 @@ export type PermissionDto = {
   module: string;
 };
 
-export type RoleDto = {
-  name: string;
-  description: string;
-  isSystem: boolean;
-};
-
 export type AuditLogEntryDto = {
   id: string;
   occurredAt: string;
@@ -49,59 +43,6 @@ export async function listPermissions(signal?: AbortSignal): Promise<PermissionD
   const res = await fetch("/api/admin/iam/permissions", { signal, cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to load permissions: ${res.status}`);
   return (await res.json()) as PermissionDto[];
-}
-
-// ── Roles ────────────────────────────────────────────────────────────────
-
-export async function listRoles(signal?: AbortSignal): Promise<RoleDto[]> {
-  const res = await fetch("/api/admin/iam/roles", { signal, cache: "no-store" });
-  if (!res.ok) throw new Error(`Failed to load roles: ${res.status}`);
-  return (await res.json()) as RoleDto[];
-}
-
-export async function createRole(body: { name: string; description: string }): Promise<RoleDto> {
-  const res = await fetch("/api/admin/iam/roles", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(await readError(res));
-  return (await res.json()) as RoleDto;
-}
-
-export async function deleteRole(name: string): Promise<void> {
-  const res = await fetch(`/api/admin/iam/roles/${encodeURIComponent(name)}`, {
-    method: "DELETE",
-  });
-  if (!res.ok) throw new Error(await readError(res));
-}
-
-export async function getRolePermissions(
-  name: string,
-  signal?: AbortSignal,
-): Promise<string[]> {
-  const res = await fetch(
-    `/api/admin/iam/roles/${encodeURIComponent(name)}/permissions`,
-    { signal, cache: "no-store" },
-  );
-  if (!res.ok) throw new Error(`Failed to load role permissions: ${res.status}`);
-  return (await res.json()) as string[];
-}
-
-export async function grantPermission(role: string, code: string): Promise<void> {
-  const res = await fetch(
-    `/api/admin/iam/roles/${encodeURIComponent(role)}/permissions/${encodeURIComponent(code)}`,
-    { method: "POST" },
-  );
-  if (!res.ok) throw new Error(await readError(res));
-}
-
-export async function revokePermission(role: string, code: string): Promise<void> {
-  const res = await fetch(
-    `/api/admin/iam/roles/${encodeURIComponent(role)}/permissions/${encodeURIComponent(code)}`,
-    { method: "DELETE" },
-  );
-  if (!res.ok) throw new Error(await readError(res));
 }
 
 // ── Audit log ────────────────────────────────────────────────────────────
@@ -141,11 +82,3 @@ export function matches(held: string, required: string): boolean {
   return required.startsWith(prefix);
 }
 
-async function readError(res: Response): Promise<string> {
-  try {
-    const body = (await res.json()) as { error?: string; message?: string };
-    return body.error ?? body.message ?? `Request failed: ${res.status}`;
-  } catch {
-    return `Request failed: ${res.status}`;
-  }
-}

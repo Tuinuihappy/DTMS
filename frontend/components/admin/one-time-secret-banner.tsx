@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AlertCircle, Check, CheckCircle2, Copy, Eye, EyeOff, ShieldCheck, X } from "lucide-react";
 import { testCredential, type TestCredentialMode } from "@/lib/api/iam-systems";
+import { copyText } from "@/lib/clipboard";
 
 /**
  * Phase S.6 — banner that shows a freshly minted plaintext secret ONCE
@@ -55,12 +56,9 @@ export function OneTimeSecretBanner({
   const masked = secret.length <= 12 ? "•".repeat(secret.length) : secret.slice(0, 8) + "•".repeat(20) + secret.slice(-4);
 
   const onCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(secret);
+    if (await copyText(secret)) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* clipboard not available — user can still reveal + select */
     }
   };
 
@@ -69,11 +67,10 @@ export function OneTimeSecretBanner({
   // to remember to prepend "Bearer " (a recurring 401-in-Swagger
   // foot-gun: Swagger sends the Authorize value verbatim, no auto-prefix).
   const onCopyAsHeader = async () => {
-    try {
-      await navigator.clipboard.writeText(`Bearer ${secret}`);
+    if (await copyText(`Bearer ${secret}`)) {
       setCopiedHeader(true);
       setTimeout(() => setCopiedHeader(false), 2000);
-    } catch { /* same fallback as onCopy */ }
+    }
   };
 
   const onTest = async () => {

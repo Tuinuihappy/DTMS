@@ -5,7 +5,6 @@
 export const Permissions = {
   Iam: {
     SystemRead: "dtms:iam:system:read",
-    RoleRead: "dtms:iam:role:read",
     SubscriptionRead: "dtms:iam:subscription:read",
   },
   DeliveryOrder: {

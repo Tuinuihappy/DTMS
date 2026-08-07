@@ -11,6 +11,7 @@ import {
   getOrder,
   getOrderStats,
   holdOrder,
+  idempotencyKey,
   listOrders,
   rejectOrder,
   releaseOrder,
@@ -1148,7 +1149,7 @@ function ExperienceInner() {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
-                  "Idempotency-Key": crypto.randomUUID(),
+                  "Idempotency-Key": idempotencyKey(),
                 },
                 body: JSON.stringify({ reopenedBy, reason, autoRetry }),
               },
@@ -1218,7 +1219,7 @@ function ExperienceInner() {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
-                  "Idempotency-Key": crypto.randomUUID(),
+                  "Idempotency-Key": idempotencyKey(),
                 },
                 body: JSON.stringify({ redispatchedBy, reason }),
               },

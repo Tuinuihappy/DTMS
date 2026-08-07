@@ -1,25 +1,11 @@
-import { createHmac } from "node:crypto";
 import { NextResponse } from "next/server";
 import { decodeJwt } from "@/lib/auth/jwt";
 import {
-  SESSION_COOKIE,
   isSecureRequest,
+  writeSessionCookies,
   type AuthUser,
   type LoginResponse,
 } from "@/lib/auth/session";
-
-function base64Url(buf: Buffer): string {
-  return buf.toString("base64").replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
-}
-
-function signDevJwt(claims: Record<string, unknown>, secret: string): string {
-  const header = { alg: "HS256", typ: "JWT" };
-  const headerSeg = base64Url(Buffer.from(JSON.stringify(header)));
-  const payloadSeg = base64Url(Buffer.from(JSON.stringify(claims)));
-  const signingInput = `${headerSeg}.${payloadSeg}`;
-  const sig = createHmac("sha256", secret).update(signingInput).digest();
-  return `${signingInput}.${base64Url(sig)}`;
-}
 
 export async function POST(req: Request) {
   let body: { username?: unknown; password?: unknown };
@@ -38,42 +24,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Dev-only short-circuit: when the external auth service is unreachable
-  // (e.g. local docker without VPN), set DTMS_AUTH_BYPASS=true to issue a
-  // self-signed JWT for whatever username was typed. Backend honors this
-  // because Auth__Disable=true uses DevAuthenticationHandler and ignores
-  // the bearer signature in Development.
-  if (process.env.DTMS_AUTH_BYPASS === "true") {
-    const secret = process.env.DTMS_JWT_SECRET ?? "dev-only-secret-min-32-chars-placeholder!";
-    const nowSec = Math.floor(Date.now() / 1000);
-    const expSec = nowSec + 24 * 60 * 60;
-    const token = signDevJwt(
-      {
-        EmployeeId: username,
-        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name": username,
-        "http://schemas.microsoft.com/ws/2008/06/identity/claims/role": "Admin",
-        iat: nowSec,
-        exp: expSec,
-      },
-      secret,
-    );
-    const user: AuthUser = {
-      employeeCode: username,
-      displayName: username,
-      role: "Admin",
-      thumbnailPhoto: "",
-    };
-    const res = NextResponse.json({ user });
-    res.cookies.set(SESSION_COOKIE, token, {
-      httpOnly: true,
-      secure: isSecureRequest(req),
-      sameSite: "lax",
-      path: "/",
-      expires: new Date(expSec * 1000),
-    });
-    return res;
-  }
-
   const apiBase = process.env.DTMS_API_BASE_URL;
   if (!apiBase) {
     return NextResponse.json(
@@ -83,7 +33,10 @@ export async function POST(req: Request) {
   }
 
   const t0 = Date.now();
-  console.log(`[auth/login] → ${apiBase}/auth/login (user=${username})`);
+  // Truncated: a user who types their password into the username field
+  // shouldn't leave it in the logs at full length.
+  const logUser = username.slice(0, 32);
+  console.log(`[auth/login] → ${apiBase}/auth/login (user=${logUser})`);
 
   let upstream: Response;
   const controller = new AbortController();
@@ -115,7 +68,7 @@ export async function POST(req: Request) {
   }
 
   console.log(
-    `[auth/login] upstream ${upstream.status} in ${Date.now() - t0}ms (user=${username})`,
+    `[auth/login] upstream ${upstream.status} in ${Date.now() - t0}ms (user=${logUser})`,
   );
 
   if (!upstream.ok) {
@@ -159,11 +112,8 @@ export async function POST(req: Request) {
   };
 
   const res = NextResponse.json({ user });
-  res.cookies.set(SESSION_COOKIE, token, {
-    httpOnly: true,
+  writeSessionCookies(res.cookies, token, {
     secure: isSecureRequest(req),
-    sameSite: "lax",
-    path: "/",
     expires: new Date(claims.exp * 1000),
   });
   return res;

@@ -112,9 +112,6 @@ public static class Permissions
     public static class Iam
     {
         public static readonly PermissionDefinition PermissionRead = new("dtms:iam:permission:read", "Read the permission catalog", "Iam");
-        public static readonly PermissionDefinition PermissionWrite = new("dtms:iam:permission:write", "Manage permissions", "Iam");
-        public static readonly PermissionDefinition RoleRead = new("dtms:iam:role:read", "Read roles", "Iam");
-        public static readonly PermissionDefinition RoleWrite = new("dtms:iam:role:write", "Manage roles and grants", "Iam");
         public static readonly PermissionDefinition AuditRead = new("dtms:iam:audit:read", "Read the permission audit log", "Iam");
         public static readonly PermissionDefinition SystemRead = new("dtms:iam:system:read", "Read system clients", "Iam");
         public static readonly PermissionDefinition SystemWrite = new("dtms:iam:system:write", "Manage system clients", "Iam");

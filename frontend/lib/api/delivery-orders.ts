@@ -127,10 +127,7 @@ export async function confirmItemPod(
 ): Promise<void> {
   const res = await fetch(`/api/delivery-orders/${orderId}/items/${itemId}/pod-scan`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Idempotency-Key": crypto.randomUUID(),
-    },
+    headers: mutationHeaders(),
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -240,10 +237,10 @@ const JSON_HEADERS = { "Content-Type": "application/json", Accept: "application/
 // Idempotency-Key — one fresh UUID per mutation call. The backend caches
 // the response keyed by (key + method + path + args hash); a network
 // retry with the same key replays the cached result instead of double-
-// submitting. Browsers expose crypto.randomUUID on every modern engine
-// we ship to; fall back to a Math.random-derived id for older runtimes
-// just to keep the contract non-null.
-function idempotencyKey(): string {
+// submitting. crypto.randomUUID only exists in secure contexts (HTTPS or
+// localhost), so plain-HTTP access via a LAN IP needs the Math.random
+// fallback. Always go through this helper — never call it directly.
+export function idempotencyKey(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }

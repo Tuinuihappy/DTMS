@@ -1,12 +1,11 @@
 namespace DTMS.Iam.Domain.Entities;
 
 /// <summary>
-/// One row per <c>(SystemKey, PermissionCode)</c> grant. Parallel to
-/// <see cref="RolePermission"/> on the user side — same permission
-/// catalog, different principal type. Admin grants/revokes via the
-/// admin UI (Phase S.4); enforcement runs through
-/// <c>.RequirePermission(...)</c> after the auth middleware identifies
-/// the caller as a <c>SystemPrincipal</c>.
+/// One row per <c>(SystemKey, PermissionCode)</c> grant — the sole
+/// DTMS-side permission store (user permissions live in the External
+/// Auth JWT). Admin grants/revokes via the admin UI (Phase S.4);
+/// enforcement runs through <c>.RequirePermission(...)</c> after the
+/// auth middleware identifies the caller as a <c>SystemPrincipal</c>.
 /// </summary>
 public sealed class SystemClientPermission
 {

@@ -3,6 +3,7 @@
 import { Bookmark, BookmarkPlus, Check, Trash2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import { idempotencyKey } from "@/lib/api/delivery-orders";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "orders:saved-filters";
@@ -66,7 +67,7 @@ export function SavedFiltersMenu({
     if (!name) return;
     const next: SavedFilter[] = [
       ...filters,
-      { id: crypto.randomUUID(), name, snapshot: currentSnapshot },
+      { id: idempotencyKey(), name, snapshot: currentSnapshot },
     ];
     setFilters(next);
     persist(next);

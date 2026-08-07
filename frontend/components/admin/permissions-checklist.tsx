@@ -6,9 +6,9 @@ import { type PermissionDto } from "@/lib/api/iam";
 import { cn } from "@/lib/utils";
 
 /**
- * Phase S.7 — inline checkbox checklist for granted permissions. Reused
- * by both `/admin/systems/[key]` and `/admin/roles/[name]` so the grant
- * / revoke UX is identical regardless of principal type.
+ * Phase S.7 — inline checkbox checklist for granted permissions, used by
+ * `/admin/systems/[key]`. (Previously also backed the roles admin page,
+ * removed 2026-08-01 — user permissions now live on the External Auth side.)
  *
  * - **`granted`** — permission codes currently held by the principal.
  * - **`catalog`** — every row in the static `iam.permissions` table.

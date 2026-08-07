@@ -689,10 +689,6 @@ services:
       # AllowedOrigins entry (Cors__HubsAllowedOrigins env on api). For
       # dev: API exposed at host port 5219.
       - NEXT_PUBLIC_DTMS_HUBS_URL=${NEXT_PUBLIC_DTMS_HUBS_URL:-http://localhost:5219}
-      # WMS PR-4 — dev bypass for testing without Delta VPN. Any
-      # credentials pass; the Next.js proxy signs a local JWT.
-      - DTMS_AUTH_BYPASS=${DTMS_AUTH_BYPASS:-false}
-      - DTMS_JWT_SECRET=${DTMS_JWT_SECRET:-}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/"]

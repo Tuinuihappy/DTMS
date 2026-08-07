@@ -49,6 +49,7 @@ import { listPermissions, type PermissionDto } from "@/lib/api/iam";
 import { OneTimeSecretBanner } from "@/components/admin/one-time-secret-banner";
 import { PermissionsChecklist } from "@/components/admin/permissions-checklist";
 import { cn } from "@/lib/utils";
+import { copyText } from "@/lib/clipboard";
 
 // Phase S.6 — single-system detail page. Three cards: metadata,
 // credential + rotate, callback config. Subscriptions live on a
@@ -299,14 +300,11 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
   };
 
   const onCopyJti = async (jti: string) => {
-    try {
-      await navigator.clipboard.writeText(jti);
+    if (await copyText(jti)) {
       setCopiedJti(jti);
       // Auto-clear the ✓ glyph so a stale "copied" state doesn't
       // confuse the next click.
       setTimeout(() => setCopiedJti(c => (c === jti ? null : c)), 1500);
-    } catch {
-      /* clipboard blocked (rare) — user can still select+copy the text */
     }
   };
 
@@ -988,23 +986,19 @@ function RevealedTokenRow({ token, onHide }: { token: string; onHide: () => void
   const masked = token.length <= 12 ? "•".repeat(token.length) : token.slice(0, 8) + "•".repeat(20) + token.slice(-4);
 
   const onCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(token);
+    if (await copyText(token)) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* clipboard not available — user can still reveal + select */
     }
   };
 
   // Same foot-gun guard as OneTimeSecretBanner: Swagger/curl users need
   // the "Bearer " prefix, so offer the exact header value in one click.
   const onCopyAsHeader = async () => {
-    try {
-      await navigator.clipboard.writeText(`Bearer ${token}`);
+    if (await copyText(`Bearer ${token}`)) {
       setCopiedHeader(true);
       setTimeout(() => setCopiedHeader(false), 2000);
-    } catch { /* same fallback as onCopy */ }
+    }
   };
 
   return (

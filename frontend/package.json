@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "prebuild": "node scripts/check-route-protection.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:routes": "node scripts/check-route-protection.mjs"
   },
   "dependencies": {
     "@microsoft/signalr": "^10.0.0",

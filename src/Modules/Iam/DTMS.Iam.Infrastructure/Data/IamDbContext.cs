@@ -8,9 +8,6 @@ public class IamDbContext : DbContext
 {
     public const string Schema = "iam";
 
-    public DbSet<Permission> Permissions { get; set; } = null!;
-    public DbSet<RolePermission> RolePermissions { get; set; } = null!;
-    public DbSet<Role> Roles { get; set; } = null!;
     public DbSet<PermissionAuditEntry> AuditLog { get; set; } = null!;
 
     // Phase S.2 — federated source-system integration.
@@ -42,36 +39,6 @@ public class IamDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
-
-        modelBuilder.Entity<Permission>(b =>
-        {
-            b.ToTable("Permissions");
-            b.HasKey(p => p.Code);
-            b.Property(p => p.Code).HasMaxLength(120).IsRequired();
-            b.Property(p => p.Description).HasMaxLength(300).IsRequired();
-            b.Property(p => p.Module).HasMaxLength(50).IsRequired();
-            b.Property(p => p.CreatedAt).IsRequired();
-            b.HasIndex(p => p.Module);
-        });
-
-        modelBuilder.Entity<RolePermission>(b =>
-        {
-            b.ToTable("RolePermissions");
-            b.HasKey(rp => new { rp.Role, rp.PermissionCode });
-            b.Property(rp => rp.Role).HasMaxLength(50).IsRequired();
-            b.Property(rp => rp.PermissionCode).HasMaxLength(120).IsRequired();
-            b.HasIndex(rp => rp.Role);
-        });
-
-        modelBuilder.Entity<Role>(b =>
-        {
-            b.ToTable("Roles");
-            b.HasKey(r => r.Name);
-            b.Property(r => r.Name).HasMaxLength(50).IsRequired();
-            b.Property(r => r.Description).HasMaxLength(300).IsRequired();
-            b.Property(r => r.IsSystem).IsRequired();
-            b.Property(r => r.CreatedAt).IsRequired();
-        });
 
         modelBuilder.Entity<PermissionAuditEntry>(b =>
         {

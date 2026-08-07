@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { sanitizeReturnPath } from "@/lib/auth/session";
 
 // Phase 4.5 — Operator login. Reuses the existing /api/auth/login
 // endpoint (External Auth → JWT cookie); operator vs admin role is
@@ -15,6 +16,7 @@ import { useRouter } from "next/navigation";
 //   - Visual styling matches the dark operator shell.
 export function OperatorLoginForm() {
   const router = useRouter();
+  const params = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +38,11 @@ export function OperatorLoginForm() {
         setError(body?.message ?? "Sign-in failed.");
         return;
       }
-      router.replace("/m/trips");
+      // Honour ?from= so a notification tap that landed here with an
+      // expired session (sw.js opens /m/trips/<id>) resumes at the trip the
+      // operator was paged about, not the generic list. Constrained to /m/
+      // so this can't be used to bounce elsewhere.
+      router.replace(sanitizeReturnPath(params?.get("from"), "/m/trips", "/m/"));
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error.");

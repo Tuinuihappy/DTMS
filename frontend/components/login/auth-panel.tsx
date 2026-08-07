@@ -3,8 +3,9 @@
 import { AlertCircle, ArrowRight, Check, Eye, EyeOff, Loader2, Truck } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
+import { sanitizeReturnPath } from "@/lib/auth/session";
 
 /* -------------------------------------------------------------------------- */
 /* AuthPanel — the right-hand form panel.                                      */
@@ -50,6 +51,19 @@ export function AuthPanel() {
   const [signUpConfirmPassword, setSignUpConfirmPassword] = useState("");
   const [signUpError, setSignUpError] = useState<string | null>(null);
 
+  // Safety net for the post-login redirect. If the auth proxy bounces the
+  // navigation straight back to /login (e.g. the browser refused the
+  // session cookie), the pathname never changes, this component never
+  // unmounts, and the button would freeze at its success state forever.
+  // A successful navigation unmounts us and the cleanup cancels the timer.
+  const bounceTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (bounceTimer.current !== null) window.clearTimeout(bounceTimer.current);
+    },
+    [],
+  );
+
   // Sign-in: call /api/auth/login, then push to from-param or /dashboard.
   const handleSignInSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -66,8 +80,16 @@ export function AuthPanel() {
       return;
     }
     setStatus("success");
-    const dest = params?.get("from") || "/dashboard";
+    // `from` is attacker-controllable via the URL — sanitize before
+    // navigating so /login?from=//evil.com can't bounce the user off-origin.
+    const dest = sanitizeReturnPath(params?.get("from"), "/dashboard");
     window.setTimeout(() => router.push(dest), 650);
+    bounceTimer.current = window.setTimeout(() => {
+      setStatus("idle");
+      setError(
+        "Signed in, but the session didn't stick in this browser. Please try again — if it keeps happening, contact the DTMS admin.",
+      );
+    }, 4000);
   };
 
   // Sign-up: theatrical only — no backend endpoint exists yet. On "success"

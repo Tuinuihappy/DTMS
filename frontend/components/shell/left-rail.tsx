@@ -28,7 +28,6 @@ import {
   Server,
   ShieldCheck,
   Truck,
-  Users,
   Warehouse,
   Workflow,
   X,
@@ -195,12 +194,6 @@ const actions: RailAction[] = [
     icon: <ShieldCheck className="h-4 w-4" strokeWidth={2} />,
     label: "Access control",
     children: [
-      {
-        icon: <Users className="h-3.5 w-3.5" strokeWidth={2.1} />,
-        label: "Roles",
-        href: "/admin/roles",
-        hint: "Map role → permission",
-      },
       {
         icon: <KeyRound className="h-3.5 w-3.5" strokeWidth={2.1} />,
         label: "Permissions",

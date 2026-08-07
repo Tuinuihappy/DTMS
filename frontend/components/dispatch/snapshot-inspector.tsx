@@ -3,6 +3,7 @@
 import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { copyText } from "@/lib/clipboard";
 
 // Collapsible JSON viewer for vendor request / final snapshots. Default
 // collapsed because the blobs can be megabytes — operators only expand
@@ -30,12 +31,9 @@ export function SnapshotInspector({
 
   const handleCopy = async () => {
     if (!payload) return;
-    try {
-      await navigator.clipboard.writeText(payload);
+    if (await copyText(payload)) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
-    } catch {
-      // clipboard may be unavailable in unsecure contexts; silent fail
     }
   };
 

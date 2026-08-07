@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { SESSION_COOKIE } from "@/lib/auth/session";
+import { requireSession } from "@/lib/auth/server-session";
 import { OperatorShellHeader } from "@/components/operator-pwa/operator-shell-header";
 import { TripDetail } from "@/components/operator-pwa/trip-detail";
 
@@ -13,10 +11,7 @@ export default async function OperatorTripDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const jar = await cookies();
-  if (!jar.get(SESSION_COOKIE)?.value) {
-    redirect("/m/login");
-  }
+  await requireSession("/m/login");
   const { id } = await params;
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col">
