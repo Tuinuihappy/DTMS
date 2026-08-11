@@ -101,32 +101,54 @@ public sealed class HttpSourceCallbackDispatcher : ISourceCallbackDispatcher
                 }
             }
 
-            // Capture the body for the failure log — admin will want it
-            // when triaging "why is OMS rejecting our callback?". Bound
-            // the read so a misbehaving receiver returning megabytes of
-            // HTML can't blow the log line size.
+            // The body is the only place a receiver explains ITSELF — OMS
+            // answers 400 with "FG order is not ready for dropoff arrival.",
+            // which tells the operator exactly what to do, while the status
+            // alone does not.
             string? body = null;
             try
             {
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-                body = await resp.Content.ReadAsStringAsync(cts.Token);
-                if (body.Length > 1000) body = body[..1000] + "…(truncated)";
+                body = Flatten(await resp.Content.ReadAsStringAsync(cts.Token));
             }
-            catch { /* best-effort logging only */ }
+            catch { /* best-effort — an unreadable body must not mask the status */ }
 
             _log.LogWarning(
                 "Callback to system={SystemKey} returned {Status} for outbox row {Id}; body={Body}",
                 systemKey, (int)resp.StatusCode, message.Id, body);
 
-            // Throws HttpRequestException carrying StatusCode so the processor
-            // can classify permanent (4xx) vs transient (5xx/timeout) for the
-            // dispatch-outcome audit.
-            resp.EnsureSuccessStatusCode();
+            // Thrown rather than EnsureSuccessStatusCode() so the body travels
+            // with the failure: this message becomes the outbox row's Error AND
+            // SourceCallbackOutcome.Detail (MultiPartitionOutboxProcessor), which
+            // is what the order timeline shows. EnsureSuccessStatusCode's generic
+            // "Response status code does not indicate success" left operators
+            // reading container logs to find out why a callback was rejected.
+            // StatusCode is preserved because HttpCallbackFailureClassifier keys
+            // permanent-vs-transient entirely off it.
+            throw new HttpRequestException(
+                string.IsNullOrWhiteSpace(body)
+                    ? $"{(int)resp.StatusCode} {resp.ReasonPhrase} (no response body)"
+                    : body,
+                inner: null,
+                statusCode: resp.StatusCode);
         }
         finally
         {
             resp.Dispose();
         }
+    }
+
+    // Receivers answer with anything — JSON, an HTML error page, a multi-line
+    // stack trace. Collapse to one line so the log entry and the audit row stay
+    // single-line, and bound the length so one misbehaving response can't
+    // dominate either (SourceCallbackOutcome.Detail caps again at 400).
+    private const int BodyLimit = 1000;
+
+    private static string? Flatten(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var collapsed = string.Join(' ', raw.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return collapsed.Length <= BodyLimit ? collapsed : collapsed[..BodyLimit] + "…(truncated)";
     }
 
     // 2xx AND 409 Conflict both count as delivered. 409 = "already

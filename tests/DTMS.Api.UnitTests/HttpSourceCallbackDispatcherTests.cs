@@ -17,24 +17,29 @@ public class HttpSourceCallbackDispatcherTests
 {
     private sealed class CapturingHandler : HttpMessageHandler
     {
-        private readonly Queue<HttpStatusCode> _scripted = new();
+        private readonly Queue<(HttpStatusCode Status, string Body)> _scripted = new();
         public List<HttpRequestMessage> Requests { get; } = new();
         public HttpRequestMessage? Last => Requests.Count > 0 ? Requests[^1] : null;
 
         /// <summary>Queue responses; when empty, answers 200 OK.</summary>
         public void Script(params HttpStatusCode[] statuses)
         {
-            foreach (var s in statuses) _scripted.Enqueue(s);
+            foreach (var s in statuses) _scripted.Enqueue((s, "{}"));
         }
+
+        /// <summary>Queue one response with a specific body.</summary>
+        public void Script(HttpStatusCode status, string body) => _scripted.Enqueue((status, body));
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Requests.Add(request);
-            var status = _scripted.Count > 0 ? _scripted.Dequeue() : HttpStatusCode.OK;
+            var (status, body) = _scripted.Count > 0
+                ? _scripted.Dequeue()
+                : (HttpStatusCode.OK, "{}");
             return Task.FromResult(new HttpResponseMessage(status)
             {
-                Content = new StringContent("{}"),
+                Content = new StringContent(body),
             });
         }
     }
@@ -156,6 +161,83 @@ public class HttpSourceCallbackDispatcherTests
             .Which.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         handler.Requests.Should().HaveCount(1);
         await refresher.Received(1).RefreshAsync("oms", true, Arg.Any<CancellationToken>());
+    }
+
+    // 2026-08-11 — the receiver's own explanation must ride along on the
+    // exception, because that message becomes the outbox row's Error and
+    // SourceCallbackOutcome.Detail, i.e. what the order timeline shows. OMS
+    // rejects FG drop-offs with a sentence that tells the operator exactly
+    // what happened; before this it was only in the container logs.
+    [Fact]
+    public async Task Dispatch_RejectedWithBody_PutsBodyOnTheException()
+    {
+        var (dispatcher, handler, _) = Build("http://oms.local:5002");
+        handler.Script(HttpStatusCode.BadRequest, "FG order is not ready for dropoff arrival.");
+
+        var act = async () => await dispatcher.DispatchAsync("oms", Row(), CancellationToken.None);
+
+        var ex = (await act.Should().ThrowAsync<HttpRequestException>()).Which;
+        ex.Message.Should().Be("FG order is not ready for dropoff arrival.");
+        // StatusCode must survive — HttpCallbackFailureClassifier keys
+        // permanent-vs-transient entirely off it.
+        ex.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Dispatch_RejectedWithoutBody_FallsBackToStatusText()
+    {
+        var (dispatcher, handler, _) = Build("http://oms.local:5002");
+        handler.Script(HttpStatusCode.BadRequest, "   ");   // whitespace only
+
+        var act = async () => await dispatcher.DispatchAsync("oms", Row(), CancellationToken.None);
+
+        var ex = (await act.Should().ThrowAsync<HttpRequestException>()).Which;
+        ex.Message.Should().Contain("400").And.Contain("no response body");
+        ex.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    // Receivers answer with JSON, HTML error pages, stack traces. The audit
+    // row and the log line are single-line formats, so the body is flattened.
+    [Fact]
+    public async Task Dispatch_MultiLineBody_IsCollapsedToOneLine()
+    {
+        var (dispatcher, handler, _) = Build("http://oms.local:5002");
+        handler.Script(HttpStatusCode.UnprocessableEntity, "{\n  \"error\":\n\t\"bad shipment\"\n}");
+
+        var act = async () => await dispatcher.DispatchAsync("oms", Row(), CancellationToken.None);
+
+        var ex = (await act.Should().ThrowAsync<HttpRequestException>()).Which;
+        ex.Message.Should().Be("{ \"error\": \"bad shipment\" }");
+        ex.Message.Should().NotContain("\n");
+    }
+
+    // One misbehaving receiver returning megabytes of HTML must not dominate
+    // the log line or the audit row.
+    [Fact]
+    public async Task Dispatch_HugeBody_IsTruncated()
+    {
+        var (dispatcher, handler, _) = Build("http://oms.local:5002");
+        handler.Script(HttpStatusCode.BadRequest, new string('x', 5000));
+
+        var act = async () => await dispatcher.DispatchAsync("oms", Row(), CancellationToken.None);
+
+        var ex = (await act.Should().ThrowAsync<HttpRequestException>()).Which;
+        ex.Message.Should().EndWith("…(truncated)");
+        ex.Message.Length.Should().BeLessThan(1100);
+    }
+
+    // 409 stays "delivered" (idempotent replay) — the new throw path must not
+    // change that.
+    [Fact]
+    public async Task Dispatch_Conflict_StillCountsAsDelivered()
+    {
+        var (dispatcher, handler, _) = Build("http://oms.local:5002");
+        handler.Script(HttpStatusCode.Conflict, "shipment already registered");
+
+        var act = async () => await dispatcher.DispatchAsync("oms", Row(), CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
+        handler.Requests.Should().HaveCount(1);
     }
 
     // A second 401 after a successful mint must NOT loop — one reactive
