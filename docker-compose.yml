@@ -10,6 +10,13 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: dtms-postgres
+    # Host sleep/reboot takes the whole stack down at once (2026-08-07: every
+    # infra container exited 255 in the same instant). Without a policy these
+    # stay down while api/outbox-worker — which DO restart — spin against a
+    # missing DB until they segfault. depends_on/service_healthy only orders
+    # `compose up`, never daemon-initiated restarts, so the restart policy is
+    # what makes the stack converge on its own after a reboot.
+    restart: unless-stopped
     ports:
       - "5434:5432"
     mem_limit: 1g
@@ -60,6 +67,7 @@ services:
   pgbouncer:
     image: edoburu/pgbouncer:latest
     container_name: dtms-pgbouncer
+    restart: unless-stopped
     ports:
       - "6432:5432"
     mem_limit: 128m
@@ -125,6 +133,7 @@ services:
     # with PRECONDITION_FAILED, leaving fault consumers in a Degraded state.
     image: masstransit/rabbitmq:3.13
     container_name: dtms-rabbitmq
+    restart: unless-stopped
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -150,6 +159,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: dtms-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     mem_limit: 128m
@@ -184,6 +194,7 @@ services:
   jaeger:
     image: jaegertracing/all-in-one:1.57
     container_name: dtms-jaeger
+    restart: unless-stopped
     ports:
       - "16686:16686"
       - "4317:4317"
@@ -253,6 +264,7 @@ services:
   minio:
     image: minio/minio:RELEASE.2025-01-20T14-49-07Z
     container_name: dtms-minio
+    restart: unless-stopped
     ports:
       - "9000:9000"   # S3 API
       - "9001:9001"   # Console UI
