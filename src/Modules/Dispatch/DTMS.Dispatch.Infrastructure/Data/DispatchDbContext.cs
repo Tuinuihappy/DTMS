@@ -64,6 +64,12 @@ public class DispatchDbContext : DbContext
             builder.Property(t => t.DropWmsLocationId);
             builder.Property(t => t.PickupStationId);
             builder.Property(t => t.DropStationId);
+            // 2026-08 — the source system's own location code strings, frozen
+            // at create time; feed pickedup/droppedoff callbacks so they
+            // survive item unbinding on cancel. Max length mirrors
+            // deliveryorder.Items.Pickup/DropLocationCode.
+            builder.Property(t => t.PickupLocationCode).HasMaxLength(50);
+            builder.Property(t => t.DropLocationCode).HasMaxLength(50);
             // WMS PR-4b — pool dispatch tracking. The partial index that
             // powers the "available trips" pool query lives in the
             // migration (EF fluent HasIndex can't express the composite

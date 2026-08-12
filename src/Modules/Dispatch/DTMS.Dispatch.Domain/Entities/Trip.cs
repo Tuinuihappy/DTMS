@@ -58,6 +58,16 @@ public class Trip : AggregateRoot<Guid>
     public Guid? PickupWmsLocationId { get; private set; }
     public Guid? DropWmsLocationId { get; private set; }
 
+    // 2026-08 — the SOURCE SYSTEM's own location code strings (e.g. "SHELF1",
+    // "STF_09"), frozen at create time from the order's dispatch group. Feed
+    // the shipment.pickedup/droppedoff callbacks so those survive item
+    // unbinding on cancel — never read items or master data at send time.
+    // Never updated after creation. NULL only on trips created before this
+    // column existed (backfilled where possible) or when the creation path
+    // could not resolve a code (callback falls back to an item scan).
+    public string? PickupLocationCode { get; private set; }
+    public string? DropLocationCode { get; private set; }
+
     // WMS PR-4b — pool-dispatch tracking. Manual/Fleet trips are born
     // Dispatched (see TripStatus.Dispatched) and sit in the pool until an
     // operator clicks "Acknowledge and start" on their PWA.
@@ -152,7 +162,9 @@ public class Trip : AggregateRoot<Guid>
         string? vendorRequestSnapshot = null,
         Guid? jobId = null,
         Guid? pickupWmsLocationId = null,
-        Guid? dropWmsLocationId = null)
+        Guid? dropWmsLocationId = null,
+        string? pickupLocationCode = null,
+        string? dropLocationCode = null)
     {
         if (string.IsNullOrWhiteSpace(upperKey))
             throw new ArgumentException("UpperKey must not be empty.", nameof(upperKey));
@@ -177,6 +189,8 @@ public class Trip : AggregateRoot<Guid>
             DropStationId = dropStationId,
             PickupWmsLocationId = pickupWmsLocationId,
             DropWmsLocationId = dropWmsLocationId,
+            PickupLocationCode = string.IsNullOrWhiteSpace(pickupLocationCode) ? null : pickupLocationCode.Trim(),
+            DropLocationCode = string.IsNullOrWhiteSpace(dropLocationCode) ? null : dropLocationCode.Trim(),
             AttemptNumber = attemptNumber,
             PreviousAttemptId = previousAttemptId,
             TemplateNameAtDispatch = string.IsNullOrWhiteSpace(templateNameAtDispatch) ? null : templateNameAtDispatch.Trim(),

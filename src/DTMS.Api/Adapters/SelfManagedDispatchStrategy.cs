@@ -1,4 +1,5 @@
 using DTMS.DeliveryOrder.Application.Commands.AssignItemsToTrip;
+using DTMS.DeliveryOrder.Application.Queries.GetGroupLocationCodes;
 using DTMS.Dispatch.Application.Services;
 using DTMS.Dispatch.Domain.Entities;
 using DTMS.Dispatch.Domain.Repositories;
@@ -71,6 +72,16 @@ internal sealed class SelfManagedDispatchStrategy : ISelfManagedDispatchService
                 TripId: existing.Id, VendorOrderKey: null, TemplateName: "self-managed"));
         }
 
+        // 2026-08 — freeze the source system's own location codes onto the
+        // Trip (matched by the group's WMS pair). Soft lookup — null codes
+        // just mean the callback code falls back to an item scan.
+        var codes = await _sender.Send(
+            new GetGroupLocationCodesQuery(
+                request.DeliveryOrderId,
+                PickupWmsLocationId: request.PickupWmsLocationId,
+                DropWmsLocationId: request.DropWmsLocationId),
+            cancellationToken);
+
         var trip = Trip.CreateForEnvelope(
             deliveryOrderId: request.DeliveryOrderId,
             upperKey: request.UpperKey,
@@ -84,7 +95,9 @@ internal sealed class SelfManagedDispatchStrategy : ISelfManagedDispatchService
             vendorRequestSnapshot: null,
             jobId: request.JobId,
             pickupWmsLocationId: request.PickupWmsLocationId,
-            dropWmsLocationId: request.DropWmsLocationId);
+            dropWmsLocationId: request.DropWmsLocationId,
+            pickupLocationCode: codes.IsSuccess ? codes.Value?.PickupCode : null,
+            dropLocationCode: codes.IsSuccess ? codes.Value?.DropCode : null);
         await _trips.AddAsync(trip, cancellationToken);
 
         // Bind items first so the snapshot below is non-empty (rides the

@@ -104,6 +104,19 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
         // delivery order.
         // Snapshot data — template name, priority, and the exact request
         // JSON DTMS sent — go into Trip.* fields for compliance / detail UI.
+        // 2026-08 — freeze the source system's own location codes onto the
+        // Trip (matched by the same station pair the item binding below uses).
+        // Soft lookup: (null, null) when unmatched — the callback code falls
+        // back to an item scan, so dispatch never blocks on a display string.
+        // Resolving here covers every DispatchByRouteAsync caller (validated
+        // consumer, admin redispatch, RetryJob, trip retry) in one place.
+        var codes = await _sender.Send(
+            new DTMS.DeliveryOrder.Application.Queries.GetGroupLocationCodes.GetGroupLocationCodesQuery(
+                deliveryOrderId,
+                PickupStationId: pickupStationId,
+                DropStationId: dropStationId),
+            cancellationToken);
+
         var tripCreate = await _sender.Send(
             new CreateEnvelopeTripCommand(
                 deliveryOrderId,
@@ -116,7 +129,9 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
                 TemplateNameAtDispatch: template.Name,
                 PriorityAtDispatch: resolved.Priority,
                 VendorRequestSnapshot: requestJson,
-                JobId: jobId),
+                JobId: jobId,
+                PickupLocationCode: codes.IsSuccess ? codes.Value?.PickupCode : null,
+                DropLocationCode: codes.IsSuccess ? codes.Value?.DropCode : null),
             cancellationToken);
         var tripId = tripCreate.IsSuccess ? tripCreate.Value : Guid.Empty;
         if (!tripCreate.IsSuccess)

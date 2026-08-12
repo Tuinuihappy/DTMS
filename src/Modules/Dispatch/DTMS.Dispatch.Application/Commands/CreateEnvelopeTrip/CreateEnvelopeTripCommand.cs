@@ -23,5 +23,9 @@ public record CreateEnvelopeTripCommand(
     string? TemplateNameAtDispatch = null,
     int? PriorityAtDispatch = null,
     string? VendorRequestSnapshot = null,
-    Guid? JobId = null
+    Guid? JobId = null,
+    // 2026-08 — the source system's own location codes, frozen onto the Trip
+    // for the pickedup/droppedoff callbacks (survive item unbinding on cancel).
+    string? PickupLocationCode = null,
+    string? DropLocationCode = null
 ) : ICommand<Guid>;

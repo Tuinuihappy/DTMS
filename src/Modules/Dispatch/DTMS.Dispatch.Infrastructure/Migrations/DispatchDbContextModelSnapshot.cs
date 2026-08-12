@@ -231,6 +231,10 @@ namespace DTMS.Dispatch.Infrastructure.Migrations
                     b.Property<DateTime?>("DispatchedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("DropLocationCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<Guid?>("DropStationId")
                         .HasColumnType("uuid");
 
@@ -243,6 +247,10 @@ namespace DTMS.Dispatch.Infrastructure.Migrations
 
                     b.Property<Guid>("JobId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("PickupLocationCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<Guid?>("PickupStationId")
                         .HasColumnType("uuid");
