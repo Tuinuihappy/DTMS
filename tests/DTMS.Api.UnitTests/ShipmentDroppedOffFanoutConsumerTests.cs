@@ -184,8 +184,29 @@ public class ShipmentDroppedOffFanoutConsumerTests
         (await h.Outbox.OutboxMessages.CountAsync()).Should().Be(1);
     }
 
-    // locationCode is REQUIRED — no bound items (post-cancel unbind, or a
-    // pre-binding row) cannot produce one, so skip rather than send null.
+    // 2026-08 — the code frozen onto the Trip is the PRIMARY source: it wins
+    // over the item scan and survives a cancel's unbinding.
+    [Fact]
+    public async Task TripCode_Primary_SurvivesUnboundItems()
+    {
+        var tripId = Guid.NewGuid();
+        var h = NewHarness(subscribed: true);
+        var order = OmsOrder(bindTripId: Guid.NewGuid());   // nothing bound to THIS trip
+        var trip = Trip.CreateForEnvelope(order.Id, "upper-G1", "ORD-1", Pickup, Drop,
+            pickupLocationCode: "SHELF1", dropLocationCode: "STF_09");
+        trip.MarkVendorStarted(vendorVehicleKey: "device-1", vendorVehicleName: "FAN1_NO3");
+        trip.MarkVendorPickedUp();
+        trip.MarkVendorDropCompleted();
+        h.Orders.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(order);
+        h.Trips.GetByIdAsync(tripId, Arg.Any<CancellationToken>()).Returns(trip);
+
+        await h.Build().Consume(Ctx(tripId, order.Id));
+
+        var row = await h.Outbox.OutboxMessages.SingleAsync();
+        row.Content.Should().Contain("\"locationCode\":\"STF_09\"");
+    }
+
+    // locationCode is REQUIRED — no trip code AND no bound items → skip.
     [Fact]
     public async Task NoBoundItems_Skips()
     {

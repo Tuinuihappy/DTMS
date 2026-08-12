@@ -105,18 +105,21 @@ public class ResendShipmentPickedUpCommandHandler
                 "Trip has not reported pickup yet — nothing to resend.");
         }
 
-        // locationCode is REQUIRED by the endpoint: the pickup code the source
-        // system itself submitted on the order items (Item.PickupLocationCode).
-        var locationCode = order.Items
-            .Where(i => i.TripId == request.TripId)
-            .Select(i => i.PickupLocationCode)
-            .Where(c => !string.IsNullOrWhiteSpace(c))
-            .Distinct()
-            .FirstOrDefault();
+        // locationCode is REQUIRED by the endpoint. Primary source (2026-08):
+        // the code frozen onto the Trip at creation — survives a cancel's item
+        // unbinding, which used to make this resend impossible. Fallback for
+        // legacy trips: scan the still-bound items.
+        var locationCode = trip.PickupLocationCode
+            ?? order.Items
+                .Where(i => i.TripId == request.TripId)
+                .Select(i => i.PickupLocationCode)
+                .Where(c => !string.IsNullOrWhiteSpace(c))
+                .Distinct()
+                .FirstOrDefault();
         if (locationCode is null)
         {
             return Result<ResendShipmentPickedUpResult>.Failure(
-                "No items are bound to this trip — locationCode is required by the upstream endpoint.");
+                "No pickup code on the trip and no items are bound — locationCode is required by the upstream endpoint.");
         }
 
         // [Option A] Stable shipmentId across retry chain.

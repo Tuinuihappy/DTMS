@@ -49,13 +49,54 @@ public class ResendShipmentDroppedOffTests
         return order;
     }
 
-    private static Trip DroppedTrip(Guid orderId, DateTime? actedAt = null)
+    private static Trip DroppedTrip(Guid orderId, DateTime? actedAt = null, string? dropCode = null)
     {
-        var trip = Trip.CreateForEnvelope(orderId, "upper-G4", "ORD-4", Pickup, Drop);
+        var trip = Trip.CreateForEnvelope(orderId, "upper-G4", "ORD-4", Pickup, Drop,
+            dropLocationCode: dropCode);
         trip.MarkVendorStarted(vendorVehicleKey: "device-1", vendorVehicleName: "FAN1_NO3");
         trip.MarkVendorPickedUp();
         trip.MarkVendorDropCompleted(actedAt: actedAt);
         return trip;
+    }
+
+    // 2026-08 — the original bug this feature fixes: a cancel unbinds the
+    // items, but the trip's own frozen code keeps the resend working.
+    [Fact]
+    public async Task Resend_AfterCancelUnbind_UsesTripCode_Succeeds()
+    {
+        var tripId = Guid.NewGuid();
+        var order = SourceOrder(tripId, out var orderId, bindItems: false);   // post-cancel shape
+        var trip = DroppedTrip(orderId,
+            actedAt: new DateTime(2026, 8, 12, 9, 0, 0, DateTimeKind.Utc), dropCode: "STF_09");
+
+        var orders = Substitute.For<IDeliveryOrderRepository>();
+        orders.GetByIdAsync(orderId, Arg.Any<CancellationToken>()).Returns(order);
+        var trips = Substitute.For<ITripRepository>();
+        trips.GetByIdAsync(tripId, Arg.Any<CancellationToken>()).Returns(trip);
+        trips.GetRootTripIdAsync(tripId, Arg.Any<CancellationToken>()).Returns(tripId);
+        var formatter = Substitute.For<ICallbackPayloadFormatter>();
+        formatter.FormatAsync(Arg.Any<object>(), Arg.Any<CancellationToken>())
+            .Returns(new CallbackPayload("application/json",
+                System.Text.Encoding.UTF8.GetBytes("{}"), RelativePath: "/x"));
+        var resolver = Substitute.For<ICallbackFormatterResolver>();
+        resolver.Resolve(Arg.Any<string>()).Returns(formatter);
+        var lookup = Substitute.For<ISubscriptionLookup>();
+        lookup.GetSubscribersAsync(CallbackEventTypes.ShipmentDroppedOffV1, Arg.Any<CancellationToken>())
+            .Returns(new List<EventSubscriber> { new("oms", "oms.shipment.droppedoff.v1") });
+        var handler = new ResendShipmentDroppedOffCommandHandler(
+            resolver, Substitute.For<ISourceCallbackDispatcher>(), lookup, trips, orders,
+            Substitute.For<IOrderAuditEventRepository>(), Substitute.For<IOrderActivityProjectionStore>(),
+            Substitute.For<ISourceCallbackOutboxSuperseder>(),
+            NullLogger<ResendShipmentDroppedOffCommandHandler>.Instance);
+
+        var result = await handler.Handle(
+            new ResendShipmentDroppedOffCommand(orderId, tripId, "ops@dtms"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.LocationCode.Should().Be("STF_09");
+        await formatter.Received(1).FormatAsync(
+            Arg.Is<ShipmentDroppedOffContext>(c => c.LocationCode == "STF_09"),
+            Arg.Any<CancellationToken>());
     }
 
     private sealed record Harness(

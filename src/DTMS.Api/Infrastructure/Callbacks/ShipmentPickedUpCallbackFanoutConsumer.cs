@@ -89,33 +89,35 @@ public sealed class ShipmentPickedUpCallbackFanoutConsumer
             .ToList();
         if (subs.Count == 0) return;   // source system not subscribed → nothing to send
 
-        // locationCode is REQUIRED by the endpoint, so unlike started we must
-        // skip when no item is bound — in practice unreachable: binding happens
-        // at dispatch, pickup long after.
-        var locationCodes = order.Items
-            .Where(i => i.TripId == evt.TripId)
-            .Select(i => i.PickupLocationCode)
-            .Where(c => !string.IsNullOrWhiteSpace(c))
-            .Distinct()
-            .ToList();
-        if (locationCodes.Count == 0)
+        var trip = await _trips.GetByIdAsync(evt.TripId, ct);
+
+        // locationCode is REQUIRED by the endpoint. Primary source (2026-08):
+        // the code frozen onto the Trip at creation — trip-scoped, immune to
+        // item unbinding on cancel and to mixed-code item sets. NULL only on
+        // legacy trips the backfill couldn't reach or when a creation funnel
+        // couldn't resolve a code — fall back to scanning the bound items,
+        // and log so a leaking funnel is visible.
+        var locationCode = trip?.PickupLocationCode;
+        if (locationCode is null)
+        {
+            locationCode = order.Items
+                .Where(i => i.TripId == evt.TripId)
+                .Select(i => i.PickupLocationCode)
+                .Where(c => !string.IsNullOrWhiteSpace(c))
+                .Distinct()
+                .FirstOrDefault();
+            if (locationCode is not null)
+                _log.LogInformation(
+                    "[ShipmentPickedUp] Trip {TripId} has no denormalized pickup code (legacy trip?) — fell back to item scan.",
+                    evt.TripId);
+        }
+        if (locationCode is null)
         {
             _log.LogWarning(
-                "[ShipmentPickedUp] Order {OrderId} Trip {TripId} has no bound items with a pickup code — skipping (locationCode is required by the endpoint).",
+                "[ShipmentPickedUp] Order {OrderId} Trip {TripId} has no pickup code on the trip nor on bound items — skipping (locationCode is required by the endpoint).",
                 order.Id, evt.TripId);
             return;
         }
-        if (locationCodes.Count > 1)
-        {
-            // 1 trip = 1 pickup group by the dispatch grouping key — seeing two
-            // codes means that invariant broke somewhere upstream.
-            _log.LogWarning(
-                "[ShipmentPickedUp] Trip {TripId} items carry {N} distinct pickup codes ({Codes}) — using the first.",
-                evt.TripId, locationCodes.Count, string.Join(",", locationCodes));
-        }
-        var locationCode = locationCodes[0];
-
-        var trip = await _trips.GetByIdAsync(evt.TripId, ct);
         var shipmentId = (await _trips.GetRootTripIdAsync(evt.TripId, ct)).ToString();
         // Business event time, not send time: VendorPickedUpAt carries the
         // vendor's ChangeStateTime for AMR (correct even when the webhook was

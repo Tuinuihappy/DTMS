@@ -88,33 +88,35 @@ public sealed class ShipmentDroppedOffCallbackFanoutConsumer
             .ToList();
         if (subs.Count == 0) return;   // source system not subscribed → nothing to send
 
-        // locationCode is REQUIRED by the endpoint, so skip when no item is
-        // bound — in practice unreachable at drop time (binding happens at
-        // dispatch), except after a cancel unbinds items.
-        var locationCodes = order.Items
-            .Where(i => i.TripId == evt.TripId)
-            .Select(i => i.DropLocationCode)
-            .Where(c => !string.IsNullOrWhiteSpace(c))
-            .Distinct()
-            .ToList();
-        if (locationCodes.Count == 0)
+        var trip = await _trips.GetByIdAsync(evt.TripId, ct);
+
+        // locationCode is REQUIRED by the endpoint. Primary source (2026-08):
+        // the code frozen onto the Trip at creation — trip-scoped, immune to
+        // item unbinding on cancel and to mixed-code item sets. NULL only on
+        // legacy trips the backfill couldn't reach or when a creation funnel
+        // couldn't resolve a code — fall back to scanning the bound items,
+        // and log so a leaking funnel is visible.
+        var locationCode = trip?.DropLocationCode;
+        if (locationCode is null)
+        {
+            locationCode = order.Items
+                .Where(i => i.TripId == evt.TripId)
+                .Select(i => i.DropLocationCode)
+                .Where(c => !string.IsNullOrWhiteSpace(c))
+                .Distinct()
+                .FirstOrDefault();
+            if (locationCode is not null)
+                _log.LogInformation(
+                    "[ShipmentDroppedOff] Trip {TripId} has no denormalized drop code (legacy trip?) — fell back to item scan.",
+                    evt.TripId);
+        }
+        if (locationCode is null)
         {
             _log.LogWarning(
-                "[ShipmentDroppedOff] Order {OrderId} Trip {TripId} has no bound items with a drop code — skipping (locationCode is required by the endpoint).",
+                "[ShipmentDroppedOff] Order {OrderId} Trip {TripId} has no drop code on the trip nor on bound items — skipping (locationCode is required by the endpoint).",
                 order.Id, evt.TripId);
             return;
         }
-        if (locationCodes.Count > 1)
-        {
-            // 1 trip = 1 drop group by the dispatch grouping key — seeing two
-            // codes means that invariant broke somewhere upstream.
-            _log.LogWarning(
-                "[ShipmentDroppedOff] Trip {TripId} items carry {N} distinct drop codes ({Codes}) — using the first.",
-                evt.TripId, locationCodes.Count, string.Join(",", locationCodes));
-        }
-        var locationCode = locationCodes[0];
-
-        var trip = await _trips.GetByIdAsync(evt.TripId, ct);
         var shipmentId = (await _trips.GetRootTripIdAsync(evt.TripId, ct)).ToString();
         // Business event time, not send time: VendorDroppedAt carries the
         // vendor's ChangeStateTime for AMR (correct even when the webhook was

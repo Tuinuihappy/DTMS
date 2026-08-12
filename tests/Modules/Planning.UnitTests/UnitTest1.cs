@@ -1345,7 +1345,7 @@ public class DispatchOrderTemplateServiceTests
     }
 
     // Minimal MediatR ISender stub — DispatchOrderTemplateService uses it
-    // to send CreateEnvelopeTripCommand into the Dispatch module. Tests
+    // to send commands/queries into the Dispatch/DeliveryOrder modules. Tests
     // DispatchOrderTemplateService now sends two commands:
     //   CreateEnvelopeTripCommand   → Result<Guid>
     //   AssignItemsToTripCommand    → Result<int>
@@ -1359,6 +1359,13 @@ public class DispatchOrderTemplateServiceTests
                 response = DTMS.SharedKernel.Messaging.Result<Guid>.Success(Guid.NewGuid());
             else if (typeof(TResponse) == typeof(DTMS.SharedKernel.Messaging.Result<int>))
                 response = DTMS.SharedKernel.Messaging.Result<int>.Success(0);
+            else if (typeof(TResponse) == typeof(DTMS.SharedKernel.Messaging.Result<
+                DTMS.DeliveryOrder.Application.Queries.GetGroupLocationCodes.GroupLocationCodes>))
+                // 2026-08 — soft location-code lookup at trip creation; the
+                // service tolerates nulls (callback code falls back to items).
+                response = DTMS.SharedKernel.Messaging.Result<
+                    DTMS.DeliveryOrder.Application.Queries.GetGroupLocationCodes.GroupLocationCodes>.Success(
+                        new DTMS.DeliveryOrder.Application.Queries.GetGroupLocationCodes.GroupLocationCodes(null, null));
             else
                 throw new NotSupportedException($"StubSender doesn't model {typeof(TResponse).Name}.");
             return Task.FromResult((TResponse)response);
