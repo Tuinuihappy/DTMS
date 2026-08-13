@@ -188,8 +188,8 @@ public class ShipmentDroppedOffFanoutConsumerTests
         (await h.Outbox.OutboxMessages.CountAsync()).Should().Be(1);
     }
 
-    // 2026-08 — the code frozen onto the Trip is the PRIMARY source: it wins
-    // over the item scan and survives a cancel's unbinding.
+    // 2026-08 — the code frozen onto the Trip is the SOLE source and survives
+    // a cancel's unbinding.
     [Fact]
     public async Task TripCode_Primary_SurvivesUnboundItems()
     {
