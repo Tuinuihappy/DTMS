@@ -103,21 +103,14 @@ public class ResendShipmentDroppedOffCommandHandler
                 "Trip has not reported drop-off yet — nothing to resend.");
         }
 
-        // locationCode is REQUIRED by the endpoint. Primary source (2026-08):
-        // the code frozen onto the Trip at creation — survives a cancel's item
-        // unbinding, which used to make this resend impossible. Fallback for
-        // legacy trips: scan the still-bound items.
-        var locationCode = trip.DropLocationCode
-            ?? order.Items
-                .Where(i => i.TripId == request.TripId)
-                .Select(i => i.DropLocationCode)
-                .Where(c => !string.IsNullOrWhiteSpace(c))
-                .Distinct()
-                .FirstOrDefault();
+        // locationCode is REQUIRED by the endpoint — read from the Trip alone
+        // (frozen at creation, survives a cancel's item unbinding; the
+        // item-scan fallback was retired 2026-08-13).
+        var locationCode = trip.DropLocationCode;
         if (locationCode is null)
         {
             return Result<ResendShipmentDroppedOffResult>.Failure(
-                "No drop code on the trip and no items are bound — locationCode is required by the upstream endpoint.");
+                "Trip carries no drop code — locationCode is required by the upstream endpoint.");
         }
 
         // [Option A] Stable shipmentId across retry chain.

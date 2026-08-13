@@ -95,10 +95,13 @@ public class ShipmentDroppedOffFanoutConsumerTests
         return order;
     }
 
-    // AMR trip that started, picked up, then reported drop.
-    private static Trip DroppedTrip(Guid orderId, DateTime? actedAt = null)
+    // AMR trip that started, picked up, then reported drop. Carries the
+    // denormalized codes like every real trip born after 2026-08.
+    private static Trip DroppedTrip(Guid orderId, DateTime? actedAt = null,
+        string? dropCode = "STF_09")
     {
-        var trip = Trip.CreateForEnvelope(orderId, "upper-G1", "ORD-1", Pickup, Drop);
+        var trip = Trip.CreateForEnvelope(orderId, "upper-G1", "ORD-1", Pickup, Drop,
+            pickupLocationCode: "WH-A", dropLocationCode: dropCode);
         trip.MarkVendorStarted(vendorVehicleKey: "device-1", vendorVehicleName: "FAN1_NO3");
         trip.MarkVendorPickedUp();
         trip.MarkVendorDropCompleted(actedAt: actedAt);
@@ -171,7 +174,8 @@ public class ShipmentDroppedOffFanoutConsumerTests
         var tripId = Guid.NewGuid();
         var h = NewHarness(subscribed: true);
         var order = OmsOrder(bindTripId: tripId);
-        var trip = Trip.CreateForEnvelope(order.Id, "upper-G1", "ORD-1", Pickup, Drop);
+        var trip = Trip.CreateForEnvelope(order.Id, "upper-G1", "ORD-1", Pickup, Drop,
+            pickupLocationCode: "WH-A", dropLocationCode: "STF_09");
         trip.MarkDispatched();
         trip.MarkVendorStarted(vendorVehicleKey: null, vendorVehicleName: null);
         trip.MarkVendorPickedUp();
@@ -206,16 +210,18 @@ public class ShipmentDroppedOffFanoutConsumerTests
         row.Content.Should().Contain("\"locationCode\":\"STF_09\"");
     }
 
-    // locationCode is REQUIRED — no trip code AND no bound items → skip.
+    // locationCode is REQUIRED by the endpoint and reads from the Trip alone
+    // (item-scan fallback retired 2026-08-13) — a code-less trip skips even
+    // though items are bound.
     [Fact]
-    public async Task NoBoundItems_Skips()
+    public async Task NoTripCode_Skips()
     {
         var tripId = Guid.NewGuid();
         var h = NewHarness(subscribed: true);
-        var order = OmsOrder(bindTripId: Guid.NewGuid());   // bound to a DIFFERENT trip
+        var order = OmsOrder(bindTripId: tripId);   // items bound — irrelevant now
         h.Orders.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(order);
         h.Trips.GetByIdAsync(tripId, Arg.Any<CancellationToken>())
-            .Returns(DroppedTrip(order.Id));
+            .Returns(DroppedTrip(order.Id, dropCode: null));
 
         await h.Build().Consume(Ctx(tripId, order.Id));
 
@@ -235,10 +241,11 @@ public class ShipmentDroppedOffFanoutConsumerTests
         (await h.Outbox.OutboxMessages.CountAsync()).Should().Be(0);
     }
 
-    // Trip row missing (theoretical) — occurredAt falls back to the event's
-    // OccurredOn rather than crashing or sending default(DateTime).
+    // Trip row missing (theoretical) — without a trip there is no location
+    // code, so the consumer skips loudly rather than guessing (the item-scan
+    // fallback that used to cover this was retired 2026-08-13).
     [Fact]
-    public async Task NullTrip_FallsBackToEventOccurredOn()
+    public async Task NullTrip_Skips()
     {
         var tripId = Guid.NewGuid();
         var h = NewHarness(subscribed: true);
@@ -246,12 +253,8 @@ public class ShipmentDroppedOffFanoutConsumerTests
         h.Orders.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(order);
         // Trips.GetByIdAsync returns null (substitute default).
 
-        var evt = new TripDropCompletedIntegrationEvent(
-            Guid.NewGuid(), new DateTime(2026, 8, 1, 8, 51, 0, 386, DateTimeKind.Utc),
-            tripId, order.Id);
-        await h.Build().Consume(Ctx(evt));
+        await h.Build().Consume(Ctx(tripId, order.Id));
 
-        var row = await h.Outbox.OutboxMessages.SingleAsync();
-        row.Content.Should().Contain("\"occurredAt\":\"2026-08-01T08:51:00.386Z\"");
+        (await h.Outbox.OutboxMessages.CountAsync()).Should().Be(0);
     }
 }

@@ -49,7 +49,8 @@ public class ResendShipmentDroppedOffTests
         return order;
     }
 
-    private static Trip DroppedTrip(Guid orderId, DateTime? actedAt = null, string? dropCode = null)
+    // Default carries a code like every real trip born after 2026-08.
+    private static Trip DroppedTrip(Guid orderId, DateTime? actedAt = null, string? dropCode = "STF_09")
     {
         var trip = Trip.CreateForEnvelope(orderId, "upper-G4", "ORD-4", Pickup, Drop,
             dropLocationCode: dropCode);
@@ -112,7 +113,8 @@ public class ResendShipmentDroppedOffTests
 
     private static Harness NewHarness(
         string orderSource = "oms", string? subscribedSystem = "oms",
-        bool selfManaged = false, bool bindItems = true, bool dropped = true)
+        bool selfManaged = false, bool bindItems = true, bool dropped = true,
+        string? tripDropCode = "STF_09")
     {
         var tripId = Guid.NewGuid();
         var order = SourceOrder(tripId, out var orderId, orderSource, selfManaged, bindItems);
@@ -120,7 +122,8 @@ public class ResendShipmentDroppedOffTests
         Trip trip;
         if (dropped)
         {
-            trip = DroppedTrip(orderId, new DateTime(2026, 8, 1, 16, 42, 11, 208, DateTimeKind.Utc));
+            trip = DroppedTrip(orderId, new DateTime(2026, 8, 1, 16, 42, 11, 208, DateTimeKind.Utc),
+                dropCode: tripDropCode);
         }
         else
         {
@@ -227,10 +230,12 @@ public class ResendShipmentDroppedOffTests
             Arg.Any<string>(), Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
     }
 
+    // Reads from the Trip alone (item-scan fallback retired 2026-08-13) — a
+    // code-less trip refuses even with items still bound.
     [Fact]
-    public async Task Resend_NoBoundItems_ReturnsFailure()
+    public async Task Resend_NoTripCode_ReturnsFailure()
     {
-        var h = NewHarness(bindItems: false);
+        var h = NewHarness(tripDropCode: null);
 
         var result = await h.Handler.Handle(
             new ResendShipmentDroppedOffCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);

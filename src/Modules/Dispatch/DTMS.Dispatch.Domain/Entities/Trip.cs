@@ -63,8 +63,10 @@ public class Trip : AggregateRoot<Guid>
     // the shipment.pickedup/droppedoff callbacks so those survive item
     // unbinding on cancel — never read items or master data at send time.
     // Never updated after creation. NULL only on trips created before this
-    // column existed (backfilled where possible) or when the creation path
-    // could not resolve a code (callback falls back to an item scan).
+    // column existed that the backfill couldn't reach (all verified Cancelled
+    // + never picked up) or when a creation funnel failed to resolve a code —
+    // the callback consumers then skip loudly (no item-scan fallback since
+    // 2026-08-13).
     public string? PickupLocationCode { get; private set; }
     public string? DropLocationCode { get; private set; }
 

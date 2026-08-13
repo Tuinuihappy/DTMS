@@ -90,30 +90,16 @@ public sealed class ShipmentDroppedOffCallbackFanoutConsumer
 
         var trip = await _trips.GetByIdAsync(evt.TripId, ct);
 
-        // locationCode is REQUIRED by the endpoint. Primary source (2026-08):
-        // the code frozen onto the Trip at creation — trip-scoped, immune to
-        // item unbinding on cancel and to mixed-code item sets. NULL only on
-        // legacy trips the backfill couldn't reach or when a creation funnel
-        // couldn't resolve a code — fall back to scanning the bound items,
-        // and log so a leaking funnel is visible.
+        // locationCode is REQUIRED by the endpoint — read from the Trip alone
+        // (frozen at creation; the item-scan fallback was retired 2026-08-13
+        // after verifying every code-less trip is a never-picked-up Cancelled
+        // one). A NULL here means a creation funnel failed to resolve a code:
+        // skip loudly rather than guess.
         var locationCode = trip?.DropLocationCode;
         if (locationCode is null)
         {
-            locationCode = order.Items
-                .Where(i => i.TripId == evt.TripId)
-                .Select(i => i.DropLocationCode)
-                .Where(c => !string.IsNullOrWhiteSpace(c))
-                .Distinct()
-                .FirstOrDefault();
-            if (locationCode is not null)
-                _log.LogInformation(
-                    "[ShipmentDroppedOff] Trip {TripId} has no denormalized drop code (legacy trip?) — fell back to item scan.",
-                    evt.TripId);
-        }
-        if (locationCode is null)
-        {
             _log.LogWarning(
-                "[ShipmentDroppedOff] Order {OrderId} Trip {TripId} has no drop code on the trip nor on bound items — skipping (locationCode is required by the endpoint).",
+                "[ShipmentDroppedOff] Order {OrderId} Trip {TripId} carries no drop code — skipping (locationCode is required by the endpoint; check the trip-creation funnel).",
                 order.Id, evt.TripId);
             return;
         }

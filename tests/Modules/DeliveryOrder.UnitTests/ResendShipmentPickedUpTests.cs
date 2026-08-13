@@ -48,7 +48,8 @@ public class ResendShipmentPickedUpTests
         return order;
     }
 
-    private static Trip PickedUpTrip(Guid orderId, DateTime? actedAt = null, string? pickupCode = null)
+    // Default carries a code like every real trip born after 2026-08.
+    private static Trip PickedUpTrip(Guid orderId, DateTime? actedAt = null, string? pickupCode = "WH-A")
     {
         var trip = Trip.CreateForEnvelope(orderId, "upper-G3", "ORD-3", Pickup, Drop,
             pickupLocationCode: pickupCode);
@@ -110,7 +111,8 @@ public class ResendShipmentPickedUpTests
 
     private static Harness NewHarness(
         string orderSource = "oms", string? subscribedSystem = "oms",
-        bool selfManaged = false, bool bindItems = true, bool pickedUp = true)
+        bool selfManaged = false, bool bindItems = true, bool pickedUp = true,
+        string? tripPickupCode = "WH-A")
     {
         var tripId = Guid.NewGuid();
         var order = SourceOrder(tripId, out var orderId, orderSource, selfManaged, bindItems);
@@ -118,7 +120,8 @@ public class ResendShipmentPickedUpTests
         Trip trip;
         if (pickedUp)
         {
-            trip = PickedUpTrip(orderId, new DateTime(2026, 8, 1, 9, 24, 3, 512, DateTimeKind.Utc));
+            trip = PickedUpTrip(orderId, new DateTime(2026, 8, 1, 9, 24, 3, 512, DateTimeKind.Utc),
+                pickupCode: tripPickupCode);
         }
         else
         {
@@ -224,10 +227,12 @@ public class ResendShipmentPickedUpTests
             Arg.Any<string>(), Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
     }
 
+    // Reads from the Trip alone (item-scan fallback retired 2026-08-13) — a
+    // code-less trip refuses even with items still bound.
     [Fact]
-    public async Task Resend_NoBoundItems_ReturnsFailure()
+    public async Task Resend_NoTripCode_ReturnsFailure()
     {
-        var h = NewHarness(bindItems: false);
+        var h = NewHarness(tripPickupCode: null);
 
         var result = await h.Handler.Handle(
             new ResendShipmentPickedUpCommand(h.OrderId, h.TripId, "ops@dtms"), CancellationToken.None);

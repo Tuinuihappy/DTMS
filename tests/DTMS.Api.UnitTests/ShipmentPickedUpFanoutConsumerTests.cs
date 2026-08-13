@@ -94,9 +94,12 @@ public class ShipmentPickedUpFanoutConsumerTests
     }
 
     // AMR trip that started then reported pickup (MOVE FINISHED at the dock).
-    private static Trip PickedUpTrip(Guid orderId, DateTime? actedAt = null)
+    // Carries the denormalized codes like every real trip born after 2026-08.
+    private static Trip PickedUpTrip(Guid orderId, DateTime? actedAt = null,
+        string? pickupCode = "WH-A")
     {
-        var trip = Trip.CreateForEnvelope(orderId, "upper-G1", "ORD-1", Pickup, Drop);
+        var trip = Trip.CreateForEnvelope(orderId, "upper-G1", "ORD-1", Pickup, Drop,
+            pickupLocationCode: pickupCode, dropLocationCode: "DOCK-1");
         trip.MarkVendorStarted(vendorVehicleKey: "device-1", vendorVehicleName: "FAN1_NO3");
         trip.MarkVendorPickedUp(actedAt: actedAt);
         return trip;
@@ -168,7 +171,8 @@ public class ShipmentPickedUpFanoutConsumerTests
         var tripId = Guid.NewGuid();
         var h = NewHarness(subscribed: true);
         var order = OmsOrder(bindTripId: tripId);
-        var trip = Trip.CreateForEnvelope(order.Id, "upper-G1", "ORD-1", Pickup, Drop);
+        var trip = Trip.CreateForEnvelope(order.Id, "upper-G1", "ORD-1", Pickup, Drop,
+            pickupLocationCode: "WH-A", dropLocationCode: "DOCK-1");
         trip.MarkDispatched();
         trip.MarkVendorStarted(vendorVehicleKey: null, vendorVehicleName: null);
         trip.MarkVendorPickedUp();   // operator tap → UtcNow
@@ -202,17 +206,18 @@ public class ShipmentPickedUpFanoutConsumerTests
         row.Content.Should().Contain("\"locationCode\":\"SHELF1\"");
     }
 
-    // locationCode is REQUIRED by the endpoint — no trip code AND no bound
-    // items (legacy pre-binding row) → skip.
+    // locationCode is REQUIRED by the endpoint and reads from the Trip alone
+    // (item-scan fallback retired 2026-08-13) — a code-less trip skips even
+    // though items are bound.
     [Fact]
-    public async Task NoBoundItems_Skips()
+    public async Task NoTripCode_Skips()
     {
         var tripId = Guid.NewGuid();
         var h = NewHarness(subscribed: true);
-        var order = OmsOrder(bindTripId: Guid.NewGuid());   // bound to a DIFFERENT trip
+        var order = OmsOrder(bindTripId: tripId);   // items bound — irrelevant now
         h.Orders.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(order);
         h.Trips.GetByIdAsync(tripId, Arg.Any<CancellationToken>())
-            .Returns(PickedUpTrip(order.Id));
+            .Returns(PickedUpTrip(order.Id, pickupCode: null));
 
         await h.Build().Consume(Ctx(tripId, order.Id));
 
@@ -232,10 +237,11 @@ public class ShipmentPickedUpFanoutConsumerTests
         (await h.Outbox.OutboxMessages.CountAsync()).Should().Be(0);
     }
 
-    // Trip row missing (theoretical) — occurredAt falls back to the event's
-    // OccurredOn rather than crashing or sending default(DateTime).
+    // Trip row missing (theoretical) — without a trip there is no location
+    // code, so the consumer skips loudly rather than guessing (the item-scan
+    // fallback that used to cover this was retired 2026-08-13).
     [Fact]
-    public async Task NullTrip_FallsBackToEventOccurredOn()
+    public async Task NullTrip_Skips()
     {
         var tripId = Guid.NewGuid();
         var h = NewHarness(subscribed: true);
@@ -243,12 +249,8 @@ public class ShipmentPickedUpFanoutConsumerTests
         h.Orders.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(order);
         // Trips.GetByIdAsync returns null (substitute default).
 
-        var evt = new TripPickupCompletedIntegrationEvent(
-            Guid.NewGuid(), new DateTime(2026, 8, 1, 7, 28, 59, 989, DateTimeKind.Utc),
-            tripId, order.Id);
-        await h.Build().Consume(Ctx(evt));
+        await h.Build().Consume(Ctx(tripId, order.Id));
 
-        var row = await h.Outbox.OutboxMessages.SingleAsync();
-        row.Content.Should().Contain("\"occurredAt\":\"2026-08-01T07:28:59.989Z\"");
+        (await h.Outbox.OutboxMessages.CountAsync()).Should().Be(0);
     }
 }
