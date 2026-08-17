@@ -157,44 +157,6 @@ namespace DTMS.Dispatch.Infrastructure.Migrations
                     b.ToTable("ProofsOfDelivery", "dispatch");
                 });
 
-            modelBuilder.Entity("DTMS.Dispatch.Domain.Entities.ShelfManifest", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("AssignedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("JobId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("PackageBarcodes")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("ReleasedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ShelfRfid")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<Guid?>("TripId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("JobId")
-                        .IsUnique();
-
-                    b.HasIndex("TripId")
-                        .HasFilter("\"TripId\" IS NOT NULL");
-
-                    b.ToTable("ShelfManifests", "dispatch");
-                });
-
             modelBuilder.Entity("DTMS.Dispatch.Domain.Entities.Trip", b =>
                 {
                     b.Property<Guid>("Id")

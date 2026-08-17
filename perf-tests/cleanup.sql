@@ -18,7 +18,6 @@ TRUNCATE
   dispatch."TripExceptions",
   dispatch."ExecutionEvents",
   dispatch."ProofsOfDelivery",
-  dispatch."ShelfManifests",
   dispatch."OutboxMessages",
   dispatch."ProjectionInbox"
 RESTART IDENTITY CASCADE;

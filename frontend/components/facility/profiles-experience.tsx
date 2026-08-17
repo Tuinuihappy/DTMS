@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowRight, Boxes, Loader2, Plus, Route as RouteIcon, Layers } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Boxes, Loader2, Plus, Layers } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { PermissionGuard } from "@/components/auth/permission-guard";
 import {
@@ -13,14 +13,11 @@ import {
 } from "@/components/primitives/data-table/table-shell";
 import { TableEmptyState } from "@/components/primitives/data-table/table-empty-state";
 import { GlassCard } from "@/components/primitives/glass-card";
-import { getStations, type StationDto } from "@/lib/api/facility";
 import {
   getCarrierTypeProfiles,
   getLoadUnitProfiles,
-  getRouteCost,
   type CarrierTypeProfile,
   type LoadUnitProfile,
-  type RouteCost,
 } from "@/lib/api/facility-profiles";
 import { Permissions } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
@@ -39,7 +36,6 @@ export function FacilityProfilesExperience() {
 
 function Inner() {
   const { hasPermission } = useAuth();
-  const canRouteCost = hasPermission(Permissions.Facility.MapRead);
   const canWrite = hasPermission(Permissions.Facility.ProfileWrite);
 
   const [carriers, setCarriers] = useState<CarrierTypeProfile[]>([]);
@@ -90,12 +86,10 @@ function Inner() {
             Facility reference
           </h1>
           <p className="text-[12.5px] text-[var(--color-ink-500)]">
-            Carrier & load-unit profiles{canRouteCost ? " · route cost" : ""}.
+            Carrier & load-unit profiles.
           </p>
         </div>
       </header>
-
-      {canRouteCost && <RouteCostCard />}
 
       {error ? (
         <GlassCard className="px-6 py-10 text-center">
@@ -255,92 +249,6 @@ function Inner() {
   );
 }
 
-// ── Route cost calculator ─────────────────────────────────────────────────
-function RouteCostCard() {
-  const [stations, setStations] = useState<StationDto[]>([]);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [result, setResult] = useState<RouteCost | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    getStations({ includeInactive: true })
-      .then((s) => setStations(s.filter((x) => x.code).sort((a, b) => (a.code ?? "").localeCompare(b.code ?? ""))))
-      .catch(() => {
-        /* station load failure leaves an empty picker */
-      });
-  }, []);
-
-  const options = useMemo(
-    () => stations.map((s) => ({ id: s.id, label: `${s.code} · ${s.name}` })),
-    [stations],
-  );
-
-  const calc = async () => {
-    if (!from || !to || from === to) return;
-    setBusy(true);
-    setErr(null);
-    setResult(null);
-    try {
-      setResult(await getRouteCost(from, to));
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <GlassCard className="px-4 py-3">
-      <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-400)]">
-        <RouteIcon className="h-3.5 w-3.5" strokeWidth={2.2} />
-        Route cost
-      </div>
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-1 flex-col gap-1" style={{ minWidth: 200 }}>
-          <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-400)]">From</span>
-          <select value={from} onChange={(e) => setFrom(e.target.value)} className={inputClass}>
-            <option value="">Select station</option>
-            {options.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-1 flex-col gap-1" style={{ minWidth: 200 }}>
-          <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-400)]">To</span>
-          <select value={to} onChange={(e) => setTo(e.target.value)} className={inputClass}>
-            <option value="">Select station</option>
-            {options.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" onClick={calc} disabled={!from || !to || from === to || busy} className={primaryBtn}>
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2.4} /> : <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.4} />}
-          Calculate
-        </button>
-      </div>
-      {(result || err) && (
-        <div className="mt-3 text-[12.5px]">
-          {err ? (
-            <span className="font-medium text-[var(--color-coral)]">{err}</span>
-          ) : result ? (
-            <span className="text-[var(--color-ink-700)]">
-              Cost <b className="font-mono">{result.cost}</b> · Distance{" "}
-              <b className="font-mono">{result.distanceMm.toLocaleString("en-US")} mm</b>
-            </span>
-          ) : null}
-        </div>
-      )}
-    </GlassCard>
-  );
-}
-
 function Section({
   title,
   icon: Icon,
@@ -373,9 +281,6 @@ function Section({
 
 const inputClass =
   "h-9 rounded-md border border-white/70 bg-white/60 px-2.5 text-[12.5px] text-[var(--color-ink-900)] backdrop-blur-md focus:border-[var(--color-brand-500)]/30 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/40 dark:border-white/10 dark:bg-white/[0.05]";
-
-const primaryBtn =
-  "inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-4 text-[12px] font-semibold text-white transition-all hover:shadow-[0_14px_36px_-12px_rgba(15,23,42,0.6)] disabled:opacity-40 disabled:cursor-not-allowed dark:bg-[var(--color-brand-500)]";
 
 const registerBtn =
   "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-3 text-[11.5px] font-semibold text-white transition-all hover:shadow-[0_10px_28px_-12px_rgba(15,23,42,0.5)] dark:bg-[var(--color-brand-500)]";

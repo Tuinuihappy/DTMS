@@ -9,7 +9,6 @@ export type StationDto = {
   vendorRef: string | null;
   code: string | null;
   isActive: boolean;
-  zoneId: string | null;
   compatibleVehicleTypes: string[];
   manualOverrideOffline: boolean;
   isManualOverrideActive: boolean;

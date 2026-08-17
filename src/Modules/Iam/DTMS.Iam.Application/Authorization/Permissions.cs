@@ -100,13 +100,15 @@ public static class Permissions
         public static readonly PermissionDefinition StationRead = new("dtms:facility:station:read", "Read stations", "Facility");
         public static readonly PermissionDefinition StationWrite = new("dtms:facility:station:write", "Manage stations", "Facility");
         public static readonly PermissionDefinition StationForceOffline = new("dtms:facility:station:force-offline", "Force a station offline", "Facility");
-        public static readonly PermissionDefinition WarehouseRead = new("dtms:facility:warehouse:read", "Read warehouses", "Facility");
+        // NOTE: WarehouseWrite gates the WMS location-sync endpoint
+        // (WmsLocationEndpoints) — the code segment says "facility" but the
+        // consumer is the WMS module. Its "warehouse:read" sibling died with
+        // the Warehouse aggregate (20260703) and was removed 2026-08-14
+        // together with topology-overlay:write / shelf:release /
+        // resource:write when those Facility domains were deleted.
         public static readonly PermissionDefinition WarehouseWrite = new("dtms:facility:warehouse:write", "Manage warehouses", "Facility");
-        public static readonly PermissionDefinition TopologyOverlayWrite = new("dtms:facility:topology-overlay:write", "Manage topology overlays", "Facility");
-        public static readonly PermissionDefinition ShelfRelease = new("dtms:facility:shelf:release", "Release a shelf", "Facility");
         public static readonly PermissionDefinition ProfileRead = new("dtms:facility:profile:read", "Read facility profiles", "Facility");
         public static readonly PermissionDefinition ProfileWrite = new("dtms:facility:profile:write", "Manage facility profiles", "Facility");
-        public static readonly PermissionDefinition ResourceWrite = new("dtms:facility:resource:write", "Manage facility resources", "Facility");
     }
 
     public static class Iam

@@ -62,38 +62,6 @@ namespace DTMS.Facility.Infrastructure.Migrations
                     b.ToTable("CarrierTypeProfiles", "facility");
                 });
 
-            modelBuilder.Entity("DTMS.Facility.Domain.Entities.FacilityResource", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<Guid>("MapId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ResourceKey")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("ResourceType")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<string>("VendorRef")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("FacilityResources", "facility");
-                });
-
             modelBuilder.Entity("DTMS.Facility.Domain.Entities.LoadUnitProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -176,73 +144,6 @@ namespace DTMS.Facility.Infrastructure.Migrations
                     b.ToTable("Maps", "facility");
                 });
 
-            modelBuilder.Entity("DTMS.Facility.Domain.Entities.RouteEdge", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<double>("Cost")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("Distance")
-                        .HasColumnType("double precision");
-
-                    b.Property<bool>("IsBidirectional")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("MapId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("SourceStationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TargetStationId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("RouteEdges", "facility");
-                });
-
-            modelBuilder.Entity("DTMS.Facility.Domain.Entities.Shelf", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("CurrentStationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("MapId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("MaxSlots")
-                        .HasColumnType("integer");
-
-                    b.Property<double>("MaxWeightKg")
-                        .HasColumnType("double precision");
-
-                    b.Property<string>("Rfid")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MapId");
-
-                    b.HasIndex("Rfid")
-                        .IsUnique();
-
-                    b.ToTable("Shelves", "facility");
-                });
-
             modelBuilder.Entity("DTMS.Facility.Domain.Entities.Station", b =>
                 {
                     b.Property<Guid>("Id")
@@ -302,9 +203,6 @@ namespace DTMS.Facility.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<Guid?>("ZoneId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
 
                     b.HasIndex("ManualOverrideExpiresAt")
@@ -321,66 +219,6 @@ namespace DTMS.Facility.Infrastructure.Migrations
                         .HasFilter("\"VendorRef\" IS NOT NULL");
 
                     b.ToTable("Stations", "facility");
-                });
-
-            modelBuilder.Entity("DTMS.Facility.Domain.Entities.TopologyOverlay", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("AffectedStationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("MapId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("PolygonJson")
-                        .HasColumnType("jsonb");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<DateTime>("ValidFrom")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("ValidUntil")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MapId", "ValidUntil");
-
-                    b.ToTable("TopologyOverlays", "facility");
-                });
-
-            modelBuilder.Entity("DTMS.Facility.Domain.Entities.Zone", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("MapId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<double?>("SpeedLimit")
-                        .HasColumnType("double precision");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Zones", "facility");
                 });
 
             modelBuilder.Entity("DTMS.Facility.Domain.Entities.Station", b =>

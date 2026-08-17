@@ -3,7 +3,6 @@
   <ItemGroup>
     <ProjectReference Include="..\DTMS.Dispatch.Domain\DTMS.Dispatch.Domain.csproj" />
     <ProjectReference Include="..\DTMS.Dispatch.Application\DTMS.Dispatch.Application.csproj" />
-    <ProjectReference Include="..\..\Facility\DTMS.Facility.Application\DTMS.Facility.Application.csproj" />
     <ProjectReference Include="..\..\Transport.Abstractions\DTMS.Transport.Abstractions\DTMS.Transport.Abstractions.csproj" />
   </ItemGroup>
 

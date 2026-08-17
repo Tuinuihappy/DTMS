@@ -13,7 +13,7 @@ public sealed record StationActionDto(
 public record StationDto(
     Guid Id, Guid MapId, string Name, StationType Type, double X, double Y, double? Theta,
     string? VendorRef, string? Code, bool IsActive,
-    Guid? ZoneId, List<string> CompatibleVehicleTypes,
+    List<string> CompatibleVehicleTypes,
     // Manual override surface — exposes ops force-offline state to UI/dashboards.
     bool ManualOverrideOffline,
     bool IsManualOverrideActive,   // computed: ManualOverrideOffline && not expired
@@ -25,7 +25,7 @@ public record StationDto(
     // Null/empty = pure MOVE waypoint.
     IReadOnlyDictionary<string, StationActionDto>? Actions);
 
-public record GetStationsQuery(Guid? MapId, StationType? Type, Guid? ZoneId, string? CompatibleVehicleType, bool IncludeInactive = false, string? Code = null) : IQuery<List<StationDto>>;
+public record GetStationsQuery(Guid? MapId, StationType? Type, string? CompatibleVehicleType, bool IncludeInactive = false, string? Code = null) : IQuery<List<StationDto>>;
 
 public class GetStationsQueryHandler : IQueryHandler<GetStationsQuery, List<StationDto>>
 {
@@ -34,13 +34,13 @@ public class GetStationsQueryHandler : IQueryHandler<GetStationsQuery, List<Stat
 
     public async Task<Result<List<StationDto>>> Handle(GetStationsQuery request, CancellationToken cancellationToken)
     {
-        var stations = await _repo.QueryAsync(request.MapId, request.Type, request.ZoneId, request.CompatibleVehicleType, request.IncludeInactive, request.Code, cancellationToken);
+        var stations = await _repo.QueryAsync(request.MapId, request.Type, request.CompatibleVehicleType, request.IncludeInactive, request.Code, cancellationToken);
         var now = DateTime.UtcNow;
         var dtos = stations.Select(s => new StationDto(
             s.Id, s.MapId, s.Name, s.Type,
             s.Coordinate.X, s.Coordinate.Y, s.Coordinate.Theta,
             s.VendorRef, s.Code, s.IsActive,
-            s.ZoneId, s.CompatibleVehicleTypes,
+            s.CompatibleVehicleTypes,
             s.ManualOverrideOffline,
             s.IsCurrentlyManualOffline(now),
             s.ManualOverrideReason,

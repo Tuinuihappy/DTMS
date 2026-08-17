@@ -16,12 +16,6 @@ public class Map : AggregateRoot<Guid>
     private readonly List<Station> _stations = new();
     public IReadOnlyCollection<Station> Stations => _stations.AsReadOnly();
 
-    private readonly List<Zone> _zones = new();
-    public IReadOnlyCollection<Zone> Zones => _zones.AsReadOnly();
-
-    private readonly List<RouteEdge> _routeEdges = new();
-    public IReadOnlyCollection<RouteEdge> RouteEdges => _routeEdges.AsReadOnly();
-
     private Map() { }
 
     public Map(Guid id, string name, string version, double width, double height, string mapData) : base(id)
@@ -44,22 +38,5 @@ public class Map : AggregateRoot<Guid>
         AddDomainEvent(new StationAddedDomainEvent(this.Id, station.Id));
     }
 
-    public void AddZone(Zone zone)
-    {
-        _zones.Add(zone);
-    }
-
     public void SetVendorRef(string vendorRef) => VendorRef = vendorRef;
-
-    public void AddRouteEdge(RouteEdge edge)
-    {
-        // Verify source and target stations exist in this map
-        if (!_stations.Any(s => s.Id == edge.SourceStationId) || 
-            !_stations.Any(s => s.Id == edge.TargetStationId))
-        {
-            throw new ArgumentException("Source or Target station does not exist in this map.");
-        }
-
-        _routeEdges.Add(edge);
-    }
 }

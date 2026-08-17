@@ -43,16 +43,26 @@ TRUNCATE TABLE
   dispatch."TripRetryEvents",
   dispatch."ExecutionEvents",
   dispatch."ProofsOfDelivery",
-  dispatch."ShelfManifests",
   dispatch."ProjectionInbox",
   dispatch."OutboxMessages",
-  -- Saga orchestration ──────────────────────────────────────────────
-  orchestration."DeliveryOrderSagas",
   -- BI fact tables ──────────────────────────────────────────────────
   bi."OrderFacts",
   bi."JobFacts",
   bi."TripFacts"
 RESTART IDENTITY CASCADE;
+
+-- Saga orchestration (T2 POC) ────────────────────────────────────────
+-- orchestration."DeliveryOrderSagas" only exists when the Workflow:UseSaga
+-- flag is on (OrchestrationSchemaInitializer creates it at startup). It is
+-- kept OUT of the single TRUNCATE above on purpose: naming a missing
+-- relation there aborts the whole statement, so with the flag off nothing
+-- would be wiped at all. Truncate it only when present.
+DO $$
+BEGIN
+  IF to_regclass('orchestration."DeliveryOrderSagas"') IS NOT NULL THEN
+    EXECUTE 'TRUNCATE TABLE orchestration."DeliveryOrderSagas"';
+  END IF;
+END $$;
 
 COMMIT;
 

@@ -13,7 +13,6 @@ using DTMS.Dispatch.Infrastructure.Repositories;
 using DTMS.Dispatch.Infrastructure.Services;
 using DTMS.Facility.Application.Services;
 using DTMS.Facility.Domain.Repositories;
-using DTMS.Facility.Domain.Services;
 using DTMS.Facility.Infrastructure.Data;
 using DTMS.Facility.Infrastructure.Repositories;
 using DTMS.Facility.Infrastructure.Services;
@@ -176,36 +175,13 @@ public static class ModuleServiceRegistration
         services.AddDbContext<FacilityDbContext>(o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));
         services.AddScoped<IMapRepository, MapRepository>();
         services.AddScoped<IStationRepository, StationRepository>();
-        services.AddScoped<IRouteEdgeRepository, RouteEdgeRepository>();
-        services.AddScoped<ITopologyOverlayRepository, TopologyOverlayRepository>();
-        services.AddScoped<IFacilityResourceRepository, FacilityResourceRepository>();
-        services.AddScoped<IShelfRepository, ShelfRepository>();
         services.AddScoped<ICarrierTypeProfileRepository, CarrierTypeProfileRepository>();
         services.AddScoped<ILoadUnitProfileRepository, LoadUnitProfileRepository>();
         services.AddScoped<IFacilityReadService, FacilityReadService>();
         var riot3BaseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
         var riot3ApiKey = configuration.GetValue<string>("VendorAdapter:Riot3:ApiKey");
-        services.AddHttpClient<IFacilityResourceCommandService, Riot3FacilityResourceCommandService>(client =>
-        {
-            client.BaseAddress = new Uri(riot3BaseUrl);
-            if (!string.IsNullOrWhiteSpace(riot3ApiKey))
-                client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", riot3ApiKey);
-        })
-        .AddPolicyHandler(ResilienceExtensions.GetRetryPolicy())
-        .AddPolicyHandler(ResilienceExtensions.GetCircuitBreakerPolicy());
 
-        // NOTE: RouteEdgeSyncService (station-to-station route costs) was
-        // DELETED 2026-07-17. It polled GET /api/v4/route/costs/{map}/{station}
-        // believing it returned a station→station cost matrix — per the RIOT3
-        // API doc that endpoint actually returns per-ROBOT costs to reach one
-        // station (requires a deviceKey list), and RIOT3 offers NO
-        // station-to-station cost API at all, so the service failed 100% of
-        // its requests since install (facility.RouteEdges stayed empty).
-        // Routing/distance is RIOT3's job: the live dispatch path
-        // (CreateJobAnchor) never consults route costs, and the legacy
-        // planning endpoints fall back to SimpleRouteCostCalculator's
-        // constant cost — which is exactly the behavior they always had.
-        var syncIntervalMinutes = configuration.GetValue<int>("VendorAdapter:Riot3:RouteSync:IntervalMinutes", 30);
+        var syncIntervalMinutes = configuration.GetValue<int>("VendorAdapter:Riot3:MapStationSync:IntervalMinutes", 30);
         services.AddHttpClient<DTMS.Facility.Application.Services.IRiot3FacilityClient, Riot3FacilityClient>(client =>
         {
             client.BaseAddress = new Uri(riot3BaseUrl);
@@ -224,8 +200,6 @@ public static class ModuleServiceRegistration
                 sp.GetRequiredService<ILogger<MapStationSyncService>>(),
                 TimeSpan.FromMinutes(syncIntervalMinutes)));
         }
-
-        services.AddHostedService<TopologyOverlayExpiryService>();
 
         // ── WMS Module ────────────────────────────────────────────────
         // Snapshot cache of the external WMS (Warehouse Management System)
@@ -634,7 +608,6 @@ public static class ModuleServiceRegistration
         // Cancelled-order's Trip could still be retried.
         services.AddScoped<DTMS.Dispatch.Application.Services.IDeliveryOrderStatusReader,
             DTMS.Api.Adapters.DeliveryOrderStatusReader>();
-        services.AddScoped<IShelfManifestRepository, ShelfManifestRepository>();
 
         // ── VendorAdapter Module ──────────────────────────────────────
         services.AddVendorAdapterInfrastructure(configuration);

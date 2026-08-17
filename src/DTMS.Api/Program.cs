@@ -248,7 +248,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 // Configure MediatR — scan all module Application assemblies
 builder.Services.AddMediatR(cfg =>
 {
-    cfg.RegisterServicesFromAssembly(typeof(DTMS.Facility.Application.Queries.GetRouteCost.GetRouteCostQuery).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(DTMS.Facility.Application.Queries.GetStations.GetStationsQuery).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(DTMS.Fleet.Application.Consumers.VehicleStateChangedConsumer).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(DTMS.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(DTMS.Planning.Application.Commands.CreateJobAnchor.CreateJobAnchorCommand).Assembly);
@@ -259,7 +259,7 @@ builder.Services.AddMediatR(cfg =>
 });
 
 // Register FluentValidation validators from all module Application assemblies
-builder.Services.AddValidatorsFromAssembly(typeof(DTMS.Facility.Application.Queries.GetRouteCost.GetRouteCostQuery).Assembly);
+builder.Services.AddValidatorsFromAssembly(typeof(DTMS.Facility.Application.Queries.GetStations.GetStationsQuery).Assembly);
 builder.Services.AddValidatorsFromAssembly(typeof(DTMS.DeliveryOrder.Application.Commands.SubmitDeliveryOrder.SubmitDeliveryOrderCommand).Assembly);
 
 // Register all module services (DbContexts, Repositories, Domain Services, HttpClients)

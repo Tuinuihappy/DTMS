@@ -20,7 +20,7 @@ public class StationRepository : IStationRepository
     public Task<List<Station>> GetAllByMapAsync(Guid mapId, CancellationToken ct = default)
         => _db.Stations.Where(s => s.MapId == mapId).ToListAsync(ct);
 
-    public async Task<List<Station>> QueryAsync(Guid? mapId, StationType? type, Guid? zoneId,
+    public async Task<List<Station>> QueryAsync(Guid? mapId, StationType? type,
         string? compatibleVehicleType, bool includeInactive = false, string? code = null, CancellationToken ct = default)
     {
         // Exclude stations whose Map row no longer exists. A deleted map can
@@ -31,7 +31,6 @@ public class StationRepository : IStationRepository
         if (!includeInactive) query = query.Where(s => s.IsActive);
         if (mapId.HasValue) query = query.Where(s => s.MapId == mapId);
         if (type.HasValue) query = query.Where(s => s.Type == type);
-        if (zoneId.HasValue) query = query.Where(s => s.ZoneId == zoneId);
         if (compatibleVehicleType != null)
             query = query.Where(s => EF.Property<string>(s, "CompatibleVehicleTypes").Contains(compatibleVehicleType));
         if (code != null)

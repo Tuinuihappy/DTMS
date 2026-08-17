@@ -9,11 +9,6 @@ public class FacilityDbContext : DbContext
 
     public DbSet<Map> Maps { get; set; } = null!;
     public DbSet<Station> Stations { get; set; } = null!;
-    public DbSet<Zone> Zones { get; set; } = null!;
-    public DbSet<RouteEdge> RouteEdges { get; set; } = null!;
-    public DbSet<TopologyOverlay> TopologyOverlays { get; set; } = null!;
-    public DbSet<FacilityResource> FacilityResources { get; set; } = null!;
-    public DbSet<Shelf> Shelves { get; set; } = null!;
     public DbSet<CarrierTypeProfile> CarrierTypeProfiles { get; set; } = null!;
     public DbSet<LoadUnitProfile> LoadUnitProfiles { get; set; } = null!;
 
@@ -33,8 +28,6 @@ public class FacilityDbContext : DbContext
             b.HasIndex(m => m.VendorRef).IsUnique().HasFilter("\"VendorRef\" IS NOT NULL");
             b.Ignore(m => m.DomainEvents);
             b.Ignore(m => m.Stations);
-            b.Ignore(m => m.Zones);
-            b.Ignore(m => m.RouteEdges);
         });
 
         modelBuilder.Entity<Station>(b =>
@@ -84,48 +77,6 @@ public class FacilityDbContext : DbContext
                               v,
                               (System.Text.Json.JsonSerializerOptions?)null))
                 .HasColumnType("jsonb");
-        });
-
-        modelBuilder.Entity<Zone>(b =>
-        {
-            b.HasKey(z => z.Id);
-            b.Property(z => z.Name).HasMaxLength(100).IsRequired();
-            b.Ignore(z => z.Polygon);
-        });
-
-        modelBuilder.Entity<RouteEdge>(b =>
-        {
-            b.HasKey(e => e.Id);
-        });
-
-        modelBuilder.Entity<TopologyOverlay>(b =>
-        {
-            b.HasKey(o => o.Id);
-            b.Property(o => o.Type).HasConversion<string>().HasMaxLength(30);
-            b.Property(o => o.Reason).HasMaxLength(500);
-            b.Property(o => o.PolygonJson).HasColumnType("jsonb");
-            b.HasIndex(o => new { o.MapId, o.ValidUntil });
-        });
-
-        modelBuilder.Entity<FacilityResource>(b =>
-        {
-            b.HasKey(r => r.Id);
-            b.Property(r => r.ResourceKey).HasMaxLength(100).IsRequired();
-            b.Property(r => r.ResourceType).HasConversion<string>().HasMaxLength(30);
-            b.Property(r => r.VendorRef).HasMaxLength(200);
-            b.Property(r => r.Description).HasMaxLength(500);
-        });
-
-        modelBuilder.Entity<Shelf>(b =>
-        {
-            b.HasKey(s => s.Id);
-            b.Ignore(s => s.DomainEvents);
-            b.Property(s => s.Rfid).HasMaxLength(100).IsRequired();
-            b.HasIndex(s => s.Rfid).IsUnique();
-            b.HasIndex(s => s.MapId);
-            b.Property(s => s.MaxWeightKg).IsRequired();
-            b.Property(s => s.MaxSlots).IsRequired();
-            b.Property(s => s.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
         });
 
         modelBuilder.Entity<CarrierTypeProfile>(b =>
