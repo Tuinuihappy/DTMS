@@ -117,8 +117,19 @@ services:
       # earlier values "delivery_order" / "vendor_adapter" silently excluded
       # those schemas from every nightly dump. `bi` added because the
       # projection tables there are not recoverable from event replay.
-      POSTGRES_EXTRA_OPTS: "-Z9 --schema=public --schema=auth --schema=outbox --schema=facility --schema=fleet --schema=deliveryorder --schema=planning --schema=dispatch --schema=vendoradapter --schema=bi --blobs"
-      SCHEDULE: "@daily"
+      # 2026-08-17: `iam`, `wms`, `transportmanual` were MISSING (added after
+      # this list was written) so system clients, callback auth config,
+      # event subscriptions, WMS locations and operators were never backed
+      # up; the non-existent `auth` schema is dropped. Any new DbContext
+      # schema MUST be appended here — pg_dump --schema is an allowlist.
+      POSTGRES_EXTRA_OPTS: "-Z9 --schema=public --schema=outbox --schema=iam --schema=facility --schema=fleet --schema=deliveryorder --schema=planning --schema=dispatch --schema=vendoradapter --schema=wms --schema=transportmanual --schema=bi --blobs"
+      # Every 6h at 00/06/12/18 (go-cron 6-field: sec min hour dom mon dow).
+      # Was @daily — a single midnight snapshot meant an accidental wipe at
+      # 15:00 lost the whole day (2026-08-17). BACKUP_KEEP_MINS keeps every
+      # intra-day dump for 24h in /backups/last; daily/weekly/monthly tiers
+      # are unchanged.
+      SCHEDULE: "0 0 */6 * * *"
+      BACKUP_KEEP_MINS: 1440
       BACKUP_KEEP_DAYS: 7
       BACKUP_KEEP_WEEKS: 4
       BACKUP_KEEP_MONTHS: 6
