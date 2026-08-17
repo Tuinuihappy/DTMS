@@ -399,6 +399,19 @@ function StageRow({
   );
 }
 
+// Relative ("6 minutes ago") for at-a-glance recency, followed by the exact
+// wall-clock time with seconds — operators reconcile these callbacks against
+// upstream logs, so the absolute timestamp must be readable without hovering.
+function StageTimestamp({ at, className }: { at: string; className: string }) {
+  return (
+    <span className={cn("inline-flex items-baseline gap-1.5 font-mono text-[10.5px]", className)}>
+      <DateTime value={at} variant="relative" showTooltip={false} />
+      <span aria-hidden className="opacity-60">·</span>
+      <DateTime value={at} variant="datetime-seconds" className="whitespace-nowrap" />
+    </span>
+  );
+}
+
 function StageBadge({ children }: { children: React.ReactNode }) {
   return (
     <span className="inline-flex rounded-md bg-white/60 px-1.5 py-[1px] text-[9.5px] font-bold uppercase tracking-[0.08em] text-[var(--color-ink-500)] dark:bg-white/10 dark:text-[var(--color-ink-400)]">
@@ -442,11 +455,7 @@ function StatusCard({ config, status }: { config: StageConfig; status: UpstreamS
             <div className="flex items-center gap-2 flex-wrap">
               <StageBadge>{config.label}</StageBadge>
               <span className="text-[12px] font-semibold text-[var(--color-success)]">Notified</span>
-              <DateTime
-                value={status.at}
-                variant="relative"
-                className="font-mono text-[10.5px] text-[var(--color-success)]/70"
-              />
+              <StageTimestamp at={status.at} className="text-[var(--color-success)]/70" />
             </div>
             {status.details && (
               <p className="mt-1 break-words font-mono text-[10.5px] text-[var(--color-success)]/80">
@@ -470,11 +479,7 @@ function StatusCard({ config, status }: { config: StageConfig; status: UpstreamS
               <span className="text-[12px] font-semibold text-[var(--color-coral)]">
                 Failed after retries
               </span>
-              <DateTime
-                value={status.at}
-                variant="relative"
-                className="font-mono text-[10.5px] text-[var(--color-coral)]/70"
-              />
+              <StageTimestamp at={status.at} className="text-[var(--color-coral)]/70" />
             </div>
             {status.details && (
               <p className="mt-1 break-words font-mono text-[10.5px] leading-snug text-[var(--color-coral)]/80">
@@ -496,11 +501,7 @@ function StatusCard({ config, status }: { config: StageConfig; status: UpstreamS
           <div className="flex items-center gap-2 flex-wrap">
             <StageBadge>{config.label}</StageBadge>
             <span className="text-[12px] font-semibold text-[var(--color-amber)]">Not sent</span>
-            <DateTime
-              value={status.at}
-              variant="relative"
-              className="font-mono text-[10.5px] text-[var(--color-amber)]/80"
-            />
+            <StageTimestamp at={status.at} className="text-[var(--color-amber)]/80" />
           </div>
           <p className="mt-1 text-[10.5px] text-[var(--color-amber)]/90">{config.staleHint}</p>
         </div>
