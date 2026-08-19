@@ -190,12 +190,29 @@ builder.Services.ConfigureHttpJsonOptions(options =>
             };
             options.Events = new JwtBearerEvents
             {
-                // SignalR cannot send custom Authorization headers on the
-                // WebSocket upgrade. Browsers pass the JWT via ?access_token=...
-                // on the negotiate + connection URLs, so re-hydrate the token
-                // into ctx.Token when the request targets a /hubs/* path.
                 OnMessageReceived = ctx =>
                 {
+                    // /api/v1/source/* is the system (M2M) data-plane. Its
+                    // sole authenticator is SystemClientAuthMiddleware (see
+                    // app.UseWhen below), which validates the system JWT with
+                    // SystemJwtValidator and overwrites ctx.User. Running the
+                    // user-JWT rules here as well is redundant — and noisy:
+                    // perpetual system tokens (Phase S.8d, no exp claim) fail
+                    // ValidateLifetime and log a spurious "JWT rejected"
+                    // warning on every successful source call. NoResult()
+                    // makes the handler return before token validation, so
+                    // no OnAuthenticationFailed fires; SystemClientAuthMiddleware
+                    // still 401s a bad/missing token exactly as before.
+                    if (ctx.HttpContext.Request.Path.StartsWithSegments("/api/v1/source"))
+                    {
+                        ctx.NoResult();
+                        return Task.CompletedTask;
+                    }
+
+                    // SignalR cannot send custom Authorization headers on the
+                    // WebSocket upgrade. Browsers pass the JWT via ?access_token=...
+                    // on the negotiate + connection URLs, so re-hydrate the token
+                    // into ctx.Token when the request targets a /hubs/* path.
                     var accessToken = ctx.Request.Query["access_token"];
                     if (!string.IsNullOrEmpty(accessToken) &&
                         ctx.HttpContext.Request.Path.StartsWithSegments("/hubs"))
