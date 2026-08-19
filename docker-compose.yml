@@ -447,11 +447,11 @@ services:
       # reports the same cadence the worker actually sweeps at — keep both in sync.
       - CallbackTokenRefresh__AllowedMintHosts__0=${CallbackTokenRefresh__MintHost0:-10.204.212.28}
       - CallbackTokenRefresh__PollIntervalSeconds=${CallbackTokenRefresh__PollIntervalSeconds:-3600}
-      # WMS PR-4 — TransportMode feature flags. Frontend calls
-      # /api/v1/system/capabilities to read these + hide unavailable modes.
-      - TransportModes__Amr__Enabled=${TransportModes__Amr__Enabled:-true}
-      - TransportModes__Manual__Enabled=${TransportModes__Manual__Enabled:-false}
-      - TransportModes__Fleet__Enabled=${TransportModes__Fleet__Enabled:-false}
+      # WMS PR-4's TransportModes__{mode}__Enabled flags were removed
+      # 2026-08-19 along with their sole reader, /api/v1/system/capabilities
+      # (never consumed by any UI component). Manual-mode dispatch is gated
+      # separately via TransportModes:Manual:Dispatch:EnableDispatch in
+      # appsettings.json.
       # Phase 4 — legacy UpstreamOms__* + Callbacks__ShipmentEventsEnabled env
       # removed. OMS callbacks run through the federated pipeline (config on the
       # 'oms' SystemCredential + its shipment.* subscriptions).
