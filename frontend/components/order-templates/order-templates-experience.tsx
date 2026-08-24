@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { NumberTicker } from "@/components/primitives/number-ticker";
 import { SectionLabel } from "@/components/primitives/section-label";
@@ -27,8 +27,9 @@ import {
   activateOrderTemplate,
   deactivateOrderTemplate,
   deleteOrderTemplate,
-  deriveStats,
+  getOrderTemplateStats,
   listOrderTemplates,
+  type ListOrderTemplatesParams,
   type OrderTemplateDto,
   type OrderTemplateStats,
 } from "@/lib/api/order-templates";
@@ -67,10 +68,13 @@ function useDebouncedValue<T>(value: T, delay = 250): T {
 }
 
 export function OrderTemplatesExperience() {
-  // The backend list endpoint doesn't support search/sort yet, so we
-  // fetch the full catalog (size up to backend's 200 max) and do all
-  // filtering / sorting / paging in-memory. Catalogue is small enough.
-  const [allRecords, setAllRecords] = useState<OrderTemplateDto[]>([]);
+  // Search / status filter / sort / paging all run server-side (the
+  // catalog outgrew the backend's 200-per-page clamp, so fetching it
+  // whole is no longer an option). Each filter change refetches the
+  // current page; the KPI strip comes from the /stats endpoint.
+  const [records, setRecords] = useState<OrderTemplateDto[]>([]);
+  const [total, setTotal] = useState(0);
+  const [stats, setStats] = useState<OrderTemplateStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,90 +103,74 @@ export function OrderTemplatesExperience() {
     setPage(1);
   }, [statusFilter, debouncedSearch, pageSize, sortBy, sortDir]);
 
-  const refresh = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
-    setError(null);
+  const fetchList = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params: ListOrderTemplatesParams = {
+          page,
+          size: pageSize,
+          search: debouncedSearch,
+          sortBy,
+          sortDir,
+        };
+        if (statusFilter === "All") params.includeInactive = true;
+        else params.isActive = statusFilter === "Active";
+        const result = await listOrderTemplates(params, signal);
+        setRecords(result.records ?? []);
+        setTotal(result.total ?? 0);
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        setError((e as Error).message || "Failed to load templates.");
+        setRecords([]);
+        setTotal(0);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [page, pageSize, debouncedSearch, sortBy, sortDir, statusFilter],
+  );
+
+  useEffect(() => {
+    const ac = new AbortController();
+    void fetchList(ac.signal);
+    return () => ac.abort();
+  }, [fetchList]);
+
+  // KPI strip — system-wide counters, independent of the list filter.
+  // A failed stats fetch falls back to zeros rather than blocking the
+  // page: the list error banner already covers the backend-down case.
+  const refreshStats = useCallback(async (signal?: AbortSignal) => {
     try {
-      const result = await listOrderTemplates(
-        { page: 1, size: 200, includeInactive: true },
-        signal,
-      );
-      setAllRecords(result.records ?? []);
+      setStats(await getOrderTemplateStats(signal));
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
-      setError((e as Error).message || "Failed to load templates.");
-      setAllRecords([]);
-    } finally {
-      setLoading(false);
+      setStats((cur) => cur ?? EMPTY_STATS);
     }
   }, []);
 
   useEffect(() => {
     const ac = new AbortController();
-    void refresh(ac.signal);
+    void refreshStats(ac.signal);
     return () => ac.abort();
-  }, [refresh]);
+  }, [refreshStats]);
 
-  // Derived: stats from full set; filtered/sorted/paged view from filters.
-  const stats = useMemo<OrderTemplateStats>(
-    () => deriveStats(allRecords),
-    [allRecords],
-  );
+  // Full reload — Refresh button and post-mutation callbacks.
+  const refresh = useCallback(async () => {
+    await Promise.all([fetchList(), refreshStats()]);
+  }, [fetchList, refreshStats]);
 
-  const filteredSorted = useMemo(() => {
-    const q = debouncedSearch.trim().toLowerCase();
-    let rows = allRecords;
-    if (statusFilter === "Active") rows = rows.filter((r) => r.isActive);
-    else if (statusFilter === "Inactive") rows = rows.filter((r) => !r.isActive);
-    if (q) {
-      rows = rows.filter(
-        (r) =>
-          r.name.toLowerCase().includes(q) ||
-          (r.description ?? "").toLowerCase().includes(q) ||
-          (r.appointVehicleName ?? "").toLowerCase().includes(q) ||
-          (r.appointVehicleGroupName ?? "").toLowerCase().includes(q) ||
-          (r.transportOrder?.missions ?? []).some((m) =>
-            (m.actionTemplateName ?? "").toLowerCase().includes(q),
-          ),
-      );
-    }
-    const dir = sortDir === "asc" ? 1 : -1;
-    const sorted = [...rows].sort((a, b) => {
-      switch (sortBy) {
-        case "name":
-          return a.name.localeCompare(b.name) * dir;
-        case "priority":
-          return (a.priority - b.priority) * dir;
-        case "isActive":
-          return (Number(a.isActive) - Number(b.isActive)) * dir;
-        case "createdAt":
-          return (
-            (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) *
-            dir
-          );
-        case "modifiedAt":
-        default: {
-          const at = new Date(a.modifiedAt ?? a.createdAt).getTime();
-          const bt = new Date(b.modifiedAt ?? b.createdAt).getTime();
-          return (at - bt) * dir;
-        }
-      }
-    });
-    return sorted;
-  }, [allRecords, statusFilter, debouncedSearch, sortBy, sortDir]);
+  const totalCount = total;
 
-  const totalCount = filteredSorted.length;
-  const pageStart = (page - 1) * pageSize;
-  const paged = useMemo(
-    () => filteredSorted.slice(pageStart, pageStart + pageSize),
-    [filteredSorted, pageStart, pageSize],
-  );
-
+  // Deleting the last row of the last page leaves `page` past the end;
+  // clamp back so the operator isn't stranded on an empty page.
   useEffect(() => {
     const lastPage = Math.max(1, Math.ceil(totalCount / pageSize));
     if (page > lastPage) setPage(lastPage);
   }, [totalCount, page, pageSize]);
 
+  const kpi = stats ?? EMPTY_STATS;
   const hasFilters = statusFilter !== "All" || debouncedSearch.trim().length > 0;
   const clearFilters = () => {
     setStatusFilter("All");
@@ -249,36 +237,36 @@ export function OrderTemplatesExperience() {
         <KpiTile
           icon={<Layers className="h-4 w-4" strokeWidth={2.2} />}
           label="Total templates"
-          value={stats.total}
+          value={kpi.total}
           tone="brand"
           delay={0}
-          loading={loading && allRecords.length === 0}
+          loading={stats === null}
         />
         <KpiTile
           icon={<Power className="h-4 w-4" strokeWidth={2.2} />}
           label="Active"
-          value={stats.active}
+          value={kpi.active}
           tone="success"
           delay={0.05}
-          loading={loading && allRecords.length === 0}
-          live={stats.active > 0 && !loading}
+          loading={stats === null}
+          live={kpi.active > 0 && stats !== null}
         />
         <KpiTile
           icon={<Route className="h-4 w-4" strokeWidth={2.2} />}
           label="Avg missions"
-          value={stats.avgMissions}
+          value={kpi.avgMissions}
           decimals={1}
           tone="lavender"
           delay={0.1}
-          loading={loading && allRecords.length === 0}
+          loading={stats === null}
         />
         <KpiTile
           icon={<Truck className="h-4 w-4" strokeWidth={2.2} />}
           label="Vehicle-bound"
-          value={stats.withVehicleBinding}
+          value={kpi.withVehicleBinding}
           tone="peach"
           delay={0.15}
-          loading={loading && allRecords.length === 0}
+          loading={stats === null}
         />
       </div>
 
@@ -358,7 +346,7 @@ export function OrderTemplatesExperience() {
       {/* Table + pagination */}
       <div className="space-y-0">
         <OrderTemplatesTable
-          templates={paged}
+          templates={records}
           loading={loading}
           busyId={busyId}
           sortBy={sortBy}

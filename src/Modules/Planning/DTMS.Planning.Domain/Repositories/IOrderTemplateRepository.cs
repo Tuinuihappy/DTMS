@@ -13,15 +13,31 @@ public interface IOrderTemplateRepository
     /// <summary>
     /// Paged list with total count. Returns the page slice plus the
     /// unfiltered-by-paging total so the caller can compute page count
-    /// for the RIOT3-style envelope. Accepts an optional sort column +
-    /// direction (default name asc when omitted).
+    /// for the RIOT3-style envelope. <paramref name="search"/> is a
+    /// case-insensitive substring match against Name, Description, the
+    /// appoint-vehicle/group names, and mission actionTemplateName
+    /// references. <paramref name="isActive"/> filters to exactly that
+    /// state when set and takes precedence over
+    /// <paramref name="includeInactive"/>; when null the legacy
+    /// includeInactive semantics apply (false → active only). Accepts an
+    /// optional sort column + direction (default name asc when omitted).
     /// </summary>
     Task<(IReadOnlyList<OrderTemplate> Items, long Total)> ListPagedAsync(
         int page,
         int size,
         bool includeInactive = false,
+        string? search = null,
+        bool? isActive = null,
         string? sortBy = null,
         bool sortDescending = false,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Unfiltered catalog counters for the KPI strip: total, active,
+    /// average missions per template, and how many templates carry any
+    /// vehicle/queue binding hint.
+    /// </summary>
+    Task<(int Total, int Active, double AvgMissions, int WithVehicleBinding)> GetStatsAsync(
         CancellationToken cancellationToken = default);
 
     /// <summary>

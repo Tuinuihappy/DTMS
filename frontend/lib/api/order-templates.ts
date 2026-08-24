@@ -111,6 +111,12 @@ export type ListOrderTemplatesParams = {
   page?: number;
   size?: number;
   includeInactive?: boolean;
+  // Tri-state filter: true/false narrow to exactly that state (server-side
+  // this beats includeInactive); undefined falls back to includeInactive.
+  isActive?: boolean;
+  // Case-insensitive substring match on name, description, vehicle/group
+  // names, and mission actionTemplateName references.
+  search?: string;
   sortBy?: OrderTemplateSortKey;
   sortDir?: "asc" | "desc";
 };
@@ -123,6 +129,8 @@ export async function listOrderTemplates(
   if (params.page) qs.set("page", String(params.page));
   if (params.size) qs.set("size", String(params.size));
   if (params.includeInactive) qs.set("includeInactive", "true");
+  if (params.isActive !== undefined) qs.set("isActive", String(params.isActive));
+  if (params.search?.trim()) qs.set("search", params.search.trim());
   if (params.sortBy) qs.set("sortBy", params.sortBy);
   if (params.sortDir) qs.set("sortDir", params.sortDir);
   const res = await fetch(`/api/order-templates?${qs}`, { cache: "no-store", signal });
@@ -331,10 +339,10 @@ export async function getLastDispatch(
   return unwrap<LastDispatchDto | null>(res);
 }
 
-// ── Derived stats (computed client-side from the list) ─────────────────
-// Backend doesn't expose a /stats endpoint for OrderTemplate yet, so the
-// KPI strip derives counters from the fetched records. Templates catalog
-// is small (clamped at 200 in the handler) so this is cheap.
+// ── Catalog stats (GET /stats) ─────────────────────────────────────────
+// System-wide counters for the KPI strip — always unfiltered, mirroring
+// the ActionTemplate stats contract. The list itself is server-paged so
+// the strip can no longer be derived from the fetched page.
 
 export type OrderTemplateStats = {
   total: number;
@@ -344,28 +352,9 @@ export type OrderTemplateStats = {
   withVehicleBinding: number;
 };
 
-export function deriveStats(records: OrderTemplateDto[]): OrderTemplateStats {
-  const total = records.length;
-  const active = records.filter((r) => r.isActive).length;
-  const totalMissions = records.reduce(
-    (acc, r) => acc + (r.transportOrder?.missions?.length ?? 0),
-    0,
-  );
-  const withBinding = records.filter(
-    (r) =>
-      !!(
-        r.appointVehicleKey ||
-        r.appointVehicleName ||
-        r.appointVehicleGroupKey ||
-        r.appointVehicleGroupName ||
-        r.appointQueueWaitArea
-      ),
-  ).length;
-  return {
-    total,
-    active,
-    inactive: total - active,
-    avgMissions: total === 0 ? 0 : Math.round((totalMissions / total) * 10) / 10,
-    withVehicleBinding: withBinding,
-  };
+export async function getOrderTemplateStats(
+  signal?: AbortSignal,
+): Promise<OrderTemplateStats> {
+  const res = await fetch(`/api/order-templates/stats`, { cache: "no-store", signal });
+  return unwrap<OrderTemplateStats>(res);
 }

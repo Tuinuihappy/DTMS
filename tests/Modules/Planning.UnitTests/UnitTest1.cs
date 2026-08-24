@@ -1315,8 +1315,10 @@ public class DispatchOrderTemplateServiceTests
         public Task<OrderTemplate?> GetByIdAsync(Guid id, CancellationToken c = default) => Task.FromResult<OrderTemplate?>(null);
         public Task<OrderTemplate?> GetByNameAsync(string name, CancellationToken c = default) => Task.FromResult<OrderTemplate?>(null);
         public Task<bool> NameExistsAsync(string name, Guid? excludeId = null, CancellationToken c = default) => Task.FromResult(false);
-        public Task<(IReadOnlyList<OrderTemplate> Items, long Total)> ListPagedAsync(int page, int size, bool includeInactive = false, string? sortBy = null, bool sortDescending = false, CancellationToken c = default)
+        public Task<(IReadOnlyList<OrderTemplate> Items, long Total)> ListPagedAsync(int page, int size, bool includeInactive = false, string? search = null, bool? isActive = null, string? sortBy = null, bool sortDescending = false, CancellationToken c = default)
             => Task.FromResult<(IReadOnlyList<OrderTemplate>, long)>((Array.Empty<OrderTemplate>(), 0));
+        public Task<(int Total, int Active, double AvgMissions, int WithVehicleBinding)> GetStatsAsync(CancellationToken c = default)
+            => Task.FromResult((0, 0, 0d, 0));
         public Task AddAsync(OrderTemplate t, CancellationToken c = default) => Task.CompletedTask;
         public void Update(OrderTemplate t) { }
         public void Remove(OrderTemplate t) { }

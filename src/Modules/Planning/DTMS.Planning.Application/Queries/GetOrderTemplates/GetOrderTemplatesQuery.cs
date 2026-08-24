@@ -60,6 +60,8 @@ public record GetOrderTemplatesQuery(
     int Page = 1,
     int Size = 20,
     bool IncludeInactive = false,
+    string? Search = null,
+    bool? IsActive = null,
     string? SortBy = null,
     bool SortDescending = false) : IQuery<PagedOrderTemplates>;
 
@@ -84,6 +86,8 @@ public class GetOrderTemplatesQueryHandler : IQueryHandler<GetOrderTemplatesQuer
             page,
             size,
             request.IncludeInactive,
+            string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim(),
+            request.IsActive,
             string.IsNullOrWhiteSpace(request.SortBy) ? null : request.SortBy.Trim(),
             request.SortDescending,
             cancellationToken);
@@ -93,6 +97,41 @@ public class GetOrderTemplatesQueryHandler : IQueryHandler<GetOrderTemplatesQuer
         var pages = total == 0 ? 1 : (total + size - 1) / size;
         return Result<PagedOrderTemplates>.Success(
             new PagedOrderTemplates(page, pages, size, total, records));
+    }
+}
+
+// System-wide catalog counters shown in the KPI strip. Always unfiltered —
+// mirrors the ActionTemplate stats pattern where the strip is a fixed
+// overview, not a narrowed view of the current filter selection.
+public sealed record OrderTemplateStatsDto(
+    int Total,
+    int Active,
+    int Inactive,
+    double AvgMissions,
+    int WithVehicleBinding);
+
+public record GetOrderTemplateStatsQuery() : IQuery<OrderTemplateStatsDto>;
+
+public class GetOrderTemplateStatsQueryHandler
+    : IQueryHandler<GetOrderTemplateStatsQuery, OrderTemplateStatsDto>
+{
+    private readonly IOrderTemplateRepository _repo;
+
+    public GetOrderTemplateStatsQueryHandler(IOrderTemplateRepository repo) => _repo = repo;
+
+    public async Task<Result<OrderTemplateStatsDto>> Handle(
+        GetOrderTemplateStatsQuery request,
+        CancellationToken cancellationToken)
+    {
+        var stats = await _repo.GetStatsAsync(cancellationToken);
+        return Result<OrderTemplateStatsDto>.Success(new OrderTemplateStatsDto(
+            stats.Total,
+            stats.Active,
+            stats.Total - stats.Active,
+            // One decimal is all the KPI tile shows; rounding here keeps the
+            // wire value stable instead of a 15-digit double.
+            Math.Round(stats.AvgMissions, 1),
+            stats.WithVehicleBinding));
     }
 }
 
