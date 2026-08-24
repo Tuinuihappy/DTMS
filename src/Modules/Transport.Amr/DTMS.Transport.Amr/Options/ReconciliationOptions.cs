@@ -20,8 +20,13 @@ public class ReconciliationOptions
     public int PollIntervalSeconds { get; set; } = 60;
 
     /// <summary>
-    /// Trips whose CreatedAt is older than this many hours are skipped
-    /// (no longer chased by the poller). Ops handles those manually.
+    /// Classification threshold only — the poller reconciles EVERY
+    /// non-terminal envelope trip regardless of age (a late vendor-side
+    /// cancel past a skip window used to wedge trips forever when its
+    /// webhook dropped). Trips whose CreatedAt is older than this many
+    /// hours count into the trips_stuck gauge (P1 "needs a human look"
+    /// alert) and drop out of the inflight gauge that gates the
+    /// notify-silence alert.
     /// </summary>
     public int StaleThresholdHours { get; set; } = 24;
 

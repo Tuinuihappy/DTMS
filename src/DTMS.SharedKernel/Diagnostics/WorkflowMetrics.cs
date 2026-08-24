@@ -84,9 +84,10 @@ public sealed class WorkflowMetrics : IDisposable
     // Phase O3 — DLQ size gauge. Set periodically by DlqSizeReporterService.
     private long _outboxDlqSize;
     // AMR reconciler gauges, set each tick by Riot3ReconciliationService.
-    // trips_stuck = in-flight envelope trips PAST the reconcile window (created
-    // > StaleThresholdHours ago) — these are silently abandoned, the true
-    // "order stuck" signal. inflight = trips inside the window being reconciled.
+    // trips_stuck = in-flight envelope trips older than StaleThresholdHours —
+    // still polled every tick (no age cutoff on reconciliation), but wedged
+    // long enough that a human should look. inflight = fresh trips only; it
+    // gates the notify-silence alert, so stale trips are kept out on purpose.
     private long _reconcilerTripsStuck;
     private long _reconcilerInflight;
 
@@ -186,12 +187,12 @@ public sealed class WorkflowMetrics : IDisposable
         _meter.CreateObservableGauge(
             "dtms.workflow.trips_stuck_reconcile",
             () => Interlocked.Read(ref _reconcilerTripsStuck),
-            description: "In-flight envelope trips PAST the reconcile window (created > StaleThresholdHours ago) — silently abandoned by the reconciler. > 0 = orders stuck. Set by Riot3ReconciliationService.");
+            description: "In-flight envelope trips older than StaleThresholdHours — still polled every tick, but non-terminal for suspiciously long. > 0 = orders needing a human decision. Set by Riot3ReconciliationService.");
 
         _meter.CreateObservableGauge(
             "dtms.workflow.reconciler_inflight",
             () => Interlocked.Read(ref _reconcilerInflight),
-            description: "In-flight envelope trips INSIDE the reconcile window being checked each tick. Set by Riot3ReconciliationService.");
+            description: "In-flight envelope trips fresher than StaleThresholdHours. Gates the notify-silence alert (stale trips are excluded on purpose — they legitimately go quiet). Set by Riot3ReconciliationService.");
     }
 
     public void RecordConsumerRetry(string consumerType)

@@ -47,7 +47,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Riot3ReconciliationService started (enabled={Enabled}, interval={Interval}s, stale>{Stale}h)",
+        _logger.LogInformation("Riot3ReconciliationService started (enabled={Enabled}, interval={Interval}s, stuck-alert>{Stale}h)",
             _options.CurrentValue.Enabled,
             _options.CurrentValue.PollIntervalSeconds,
             _options.CurrentValue.StaleThresholdHours);
@@ -92,24 +92,33 @@ public sealed class Riot3ReconciliationService : BackgroundService
         var facilityReadService = scope.ServiceProvider.GetRequiredService<DTMS.Facility.Application.Services.IFacilityReadService>();
         var orderReader = scope.ServiceProvider.GetRequiredService<DTMS.Dispatch.Application.Services.IDeliveryOrderStatusReader>();
 
+        // EVERY non-terminal envelope trip is polled, regardless of age — a
+        // vendor-side terminal transition that lands late (e.g. an operator
+        // cancels a long-HANG order in the RIOT3 console days after dispatch)
+        // plus a dropped webhook used to wedge the trip forever once it aged
+        // past the old skip window. StaleThresholdHours now only classifies:
+        //   - stale → trips_stuck gauge (the "needs a human look" alert)
+        //   - fresh → inflight gauge, which gates the notify-silence alert;
+        //     counting a long-stuck HANG trip there would hold the gate open
+        //     while it legitimately produces no frames (false P1).
         var staleCutoff = DateTime.UtcNow.AddHours(-opts.StaleThresholdHours);
-        var inFlight = await tripRepo.GetInFlightEnvelopeTripsAsync(staleCutoff, ct);
+        var inFlight = await tripRepo.GetInFlightEnvelopeTripsAsync(ct);
+        var stale = inFlight.Count(t => t.CreatedAt < staleCutoff);
+        var fresh = inFlight.Count - stale;
 
         if (inFlight.Count == 0)
         {
-            // Nothing in the reconcile window this tick. TWO things must still
-            // run before bailing:
-            //   1. The self-heal backstop targets TERMINAL trips (a webhook
-            //      drove completion), independent of in-flight traffic — so an
-            //      empty window does NOT mean there's nothing to heal. Skipping
-            //      it here meant a trip that completed during a quiet window was
-            //      never backfilled until unrelated in-flight traffic reappeared,
-            //      and could age out of the SelfHealWindowHours window for good.
-            //   2. Refresh trips_stuck; otherwise the gauge goes stale at its
-            //      last non-empty-tick value and the alert could miss / false-fire.
+            // Nothing in flight this tick. The self-heal backstop must still
+            // run before bailing: it targets TERMINAL trips (a webhook drove
+            // completion), independent of in-flight traffic — so an empty
+            // list does NOT mean there's nothing to heal. Skipping it here
+            // meant a trip that completed during a quiet window was never
+            // backfilled until unrelated in-flight traffic reappeared, and
+            // could age out of the SelfHealWindowHours window for good.
+            // trips_stuck is also refreshed (trivially 0) so the gauge never
+            // goes stale at its last non-empty-tick value.
             var healedQuiet = await SelfHealMissingVehiclesAsync(tripRepo, queryService, opts, ct);
-            var staleOnly = await CountStaleTripsAsync(scope, staleCutoff, ct);
-            _metrics.RecordReconcilerTick(tripsStuck: staleOnly, inflight: 0, reconciled: 0, fetchErrors: 0);
+            _metrics.RecordReconcilerTick(tripsStuck: 0, inflight: 0, reconciled: 0, fetchErrors: 0);
             if (healedQuiet > 0)
                 _logger.LogInformation("[Reconciler] tick: in-flight=0, self-healed {Healed} terminal trip(s) missing a vehicle", healedQuiet);
             return;
@@ -208,8 +217,8 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     // Abort the tick instead of continuing; the next tick
                     // (≤60s) reloads everything fresh. MUST precede the
                     // generic catch below.
-                    await AbortTickOnConflictAsync(scope, trip, staleCutoff, inFlight.Count,
-                        reconciled, skippedFetchError, vehicleBackfilled, ct);
+                    AbortTickOnConflict(trip, stale, fresh,
+                        reconciled, skippedFetchError, vehicleBackfilled);
                     return;
                 }
                 catch (Exception ex) when (!ct.IsCancellationRequested)
@@ -259,8 +268,8 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     // Same poisoned-batch reasoning as the transition save
                     // above (likely CaptureFinalSnapshotConsumer racing us).
                     // MUST precede the generic catch below.
-                    await AbortTickOnConflictAsync(scope, trip, staleCutoff, inFlight.Count,
-                        reconciled, skippedFetchError, vehicleBackfilled, ct);
+                    AbortTickOnConflict(trip, stale, fresh,
+                        reconciled, skippedFetchError, vehicleBackfilled);
                     return;
                 }
                 catch (Exception ex) when (!ct.IsCancellationRequested)
@@ -278,16 +287,18 @@ public sealed class Riot3ReconciliationService : BackgroundService
         // captured here, so this never grows into a per-tick re-fetch loop.
         vehicleBackfilled += await SelfHealMissingVehiclesAsync(tripRepo, queryService, opts, ct);
 
-        var stale = await CountStaleTripsAsync(scope, staleCutoff, ct);
         _logger.LogInformation(
-            "[Reconciler] tick: in-flight={InFlight} reconciled={Reconciled} (completed={Completed} failed={Failed} rejected={Rejected} cancelled={Cancelled} started={Started} hang={Hang} held={Held} resumed={Resumed} vehicleReassigned={VehicleReassigned} vehicleBackfilled={VehicleBackfilled}) noVendor={NoVendor} fetchErr={FetchErr} stale-skipped={Stale}",
-            inFlight.Count, reconciled, completed, failed, rejected, cancelled, started, hang, held, resumed, vehicleReassigned, vehicleBackfilled, skippedNoVendorRecord, skippedFetchError, stale);
+            "[Reconciler] tick: in-flight={InFlight} (fresh={Fresh} stale={Stale}) reconciled={Reconciled} (completed={Completed} failed={Failed} rejected={Rejected} cancelled={Cancelled} started={Started} hang={Hang} held={Held} resumed={Resumed} vehicleReassigned={VehicleReassigned} vehicleBackfilled={VehicleBackfilled}) noVendor={NoVendor} fetchErr={FetchErr}",
+            inFlight.Count, fresh, stale, reconciled, completed, failed, rejected, cancelled, started, hang, held, resumed, vehicleReassigned, vehicleBackfilled, skippedNoVendorRecord, skippedFetchError);
 
         // Publish tick outcome to Prometheus (WorkflowMetrics / DTMS.Workflow).
         // trips_stuck (=stale) drives the "AMR order stuck past reconcile window"
-        // alert; fetch_error is the leading indicator of RIOT connectivity trouble;
-        // backfilled counts post-terminal vehicle recoveries (webhook loss volume).
-        _metrics.RecordReconcilerTick(tripsStuck: stale, inflight: inFlight.Count, reconciled: reconciled, fetchErrors: skippedFetchError, backfilled: vehicleBackfilled);
+        // alert — such trips ARE still polled, the alert just asks a human to
+        // find out why they've been non-terminal this long. inflight counts
+        // fresh trips only (gates the notify-silence alert). fetch_error is the
+        // leading indicator of RIOT connectivity trouble; backfilled counts
+        // post-terminal vehicle recoveries (webhook loss volume).
+        _metrics.RecordReconcilerTick(tripsStuck: stale, inflight: fresh, reconciled: reconciled, fetchErrors: skippedFetchError, backfilled: vehicleBackfilled);
     }
 
     // internal (not private) so the unit tests can assert the orderState →
@@ -506,27 +517,15 @@ public sealed class Riot3ReconciliationService : BackgroundService
     // the snapshot consumer) committed a competing write while this tick
     // held stale tracked state. Records the tick metric before returning so
     // the trips_stuck gauge doesn't go stale when conflicts cluster.
-    private async Task AbortTickOnConflictAsync(
-        IServiceScope scope, Trip trip, DateTime staleCutoff, int inflightCount,
-        int reconciled, int fetchErrors, int backfilled, CancellationToken ct)
+    private void AbortTickOnConflict(
+        Trip trip, int stale, int fresh,
+        int reconciled, int fetchErrors, int backfilled)
     {
         _logger.LogInformation(
             "[Reconciler] Trip {TripId} (upperKey {UpperKey}) lost a write race to a concurrent writer — aborting tick, next tick reconciles",
             trip.Id, trip.UpperKey);
-        var stale = await CountStaleTripsAsync(scope, staleCutoff, ct);
-        _metrics.RecordReconcilerTick(tripsStuck: stale, inflight: inflightCount,
+        _metrics.RecordReconcilerTick(tripsStuck: stale, inflight: fresh,
             reconciled: reconciled, fetchErrors: fetchErrors, backfilled: backfilled);
-    }
-
-    private static async Task<int> CountStaleTripsAsync(IServiceScope scope, DateTime cutoff, CancellationToken ct)
-    {
-        var tripRepo = scope.ServiceProvider.GetRequiredService<ITripRepository>();
-        // We compute "stale" as in-flight envelope trips OLDER than the cutoff.
-        // The repository's in-flight query already excludes them — so to count
-        // staleness we re-query with a very old floor and subtract. Cheap enough
-        // for ops visibility; if perf ever matters we'll add a dedicated count.
-        var allEver = await tripRepo.GetInFlightEnvelopeTripsAsync(DateTime.MinValue, ct);
-        return allEver.Count(t => t.CreatedAt < cutoff);
     }
 
     // ── Mission diff + final snapshot helpers ────────────────────────────

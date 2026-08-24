@@ -12,9 +12,10 @@
 # trips are inside the reconcile window, the channel is almost certainly
 # dead (host relay, RIOT3 notify worker, or inbound network).
 #
-# reconciler_inflight gates the rule: it counts only envelope trips inside
-# the reconcile window (zombie rows without an UpperKey and >24 h stale trips
-# are already filtered out by GetInFlightEnvelopeTripsAsync), so "in flight"
+# reconciler_inflight gates the rule: it counts only envelope trips FRESHER
+# than StaleThresholdHours (the reconciler polls stale trips too, but keeps
+# them out of this gauge on purpose — a long-stuck HANG trip legitimately
+# produces no frames and must not hold this gate open), so "in flight"
 # reliably implies "frames should be flowing".
 #
 # Same delivery caveat as the other rule files: no Alertmanager — fires in

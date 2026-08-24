@@ -102,7 +102,7 @@ public class TripRepository : ITripRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<List<Trip>> GetInFlightEnvelopeTripsAsync(DateTime staleCutoffUtc, CancellationToken cancellationToken = default)
+    public async Task<List<Trip>> GetInFlightEnvelopeTripsAsync(CancellationToken cancellationToken = default)
     {
         // IgnoreQueryFilters: the reconciler runs as a system service with no
         // tenant context.
@@ -113,6 +113,12 @@ public class TripRepository : ITripRepository
         // note on GetByUpperKeyAsync). Without the Include, MarkVendorStarted /
         // ReconcileVehicleAssignment would Create() a fresh extension and
         // collide with the existing row's PK on save.
+        // UpperKey filter keeps this to AMR envelope trips (Manual/Fleet never
+        // set it and can't be queried against RIOT3) — previously the caller
+        // skipped them per-row; filtering here keeps them out of the stale
+        // count too. No age cutoff: a trip that goes terminal at the vendor
+        // long after dispatch must still be reconcilable (a dropped cancel
+        // webhook past the old 24h window used to wedge the trip forever).
         return await _context.Trips
             .IgnoreQueryFilters()
             .Include(t => t.AmrExtension)
@@ -121,7 +127,7 @@ public class TripRepository : ITripRepository
                          || t.Status == TripStatus.InProgress
                          || t.Status == TripStatus.Hang
                          || t.Status == TripStatus.Held)
-                        && t.CreatedAt >= staleCutoffUtc)
+                        && t.UpperKey != "")
             .ToListAsync(cancellationToken);
     }
 

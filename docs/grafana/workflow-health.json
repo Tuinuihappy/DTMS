@@ -10,8 +10,8 @@
   "panels": [
     {
       "type": "stat",
-      "title": "Trips stuck past reconcile window (now)",
-      "description": "In-flight envelope trips created > StaleThresholdHours ago — the reconciler no longer polls RIOT3 for them, so a dropped webhook here never self-heals. Any value > 0 is a real stuck order. Drives the AmrTripsStuckBeyondReconcileWindow alert.",
+      "title": "Trips non-terminal past stale threshold (now)",
+      "description": "In-flight envelope trips created > StaleThresholdHours ago — still polled by the reconciler every tick (late vendor transitions heal automatically), but wedged long enough that a human should decide: resume, cancel, or force-complete. Drives the AmrTripsStuckBeyondReconcileWindow alert.",
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "fieldConfig": {
         "defaults": {

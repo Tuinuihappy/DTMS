@@ -46,13 +46,14 @@ public interface ITripRepository
     Task<List<Trip>> GetActiveTripsByVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Lists envelope-dispatched trips still awaiting a terminal vendor
-    /// callback (Status ∈ {Created, InProgress, Paused}). Used by the
-    /// reconciliation poller to backfill missed webhooks. Trips older than
-    /// <paramref name="staleCutoffUtc"/> are excluded — past that age the
-    /// poller stops chasing them and ops takes over.
+    /// Lists ALL envelope-dispatched trips (UpperKey set) still awaiting a
+    /// terminal vendor callback (Status ∈ {Created, InProgress, Hang, Held}),
+    /// regardless of age. Used by the reconciliation poller to backfill
+    /// missed webhooks — a vendor-side terminal transition can land days
+    /// after dispatch, so no age cutoff gates the query. Staleness
+    /// classification (trips_stuck gauge) happens in the caller.
     /// </summary>
-    Task<List<Trip>> GetInFlightEnvelopeTripsAsync(DateTime staleCutoffUtc, CancellationToken cancellationToken = default);
+    Task<List<Trip>> GetInFlightEnvelopeTripsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Self-heal backstop for the reconciler. Lists terminal envelope trips

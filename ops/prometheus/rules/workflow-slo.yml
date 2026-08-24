@@ -11,11 +11,12 @@
 groups:
   - name: amr-reconciler
     rules:
-      # PRIMARY: the "order stuck" signal. An in-flight envelope trip that has
-      # aged past the reconcile window (created > StaleThresholdHours ago) is
-      # silently abandoned — the reconciler no longer polls RIOT3 for it, so it
-      # will never self-heal. > 0 for 10m means a real order is wedged and needs
-      # a human (admin force-complete / force-start endpoint).
+      # PRIMARY: the "order stuck" signal. An in-flight envelope trip older
+      # than StaleThresholdHours is STILL polled every tick (no age cutoff on
+      # reconciliation since 2026-08-24) — the gauge now means "non-terminal
+      # for suspiciously long", not "abandoned". > 0 for 10m means a real
+      # order has been wedged at the vendor (e.g. long HANG after a robot
+      # fault) and needs a human decision: resume, cancel, or force-complete.
       - alert: AmrTripsStuckBeyondReconcileWindow
         expr: dtms_workflow_trips_stuck_reconcile > 0
         for: 10m
@@ -23,12 +24,13 @@ groups:
           severity: P1
           service: dtms-api
         annotations:
-          summary: "{{ $value }} AMR trip(s) stuck past the reconcile window"
+          summary: "{{ $value }} AMR trip(s) non-terminal past the stale threshold"
           description: >
-            In-flight envelope trips older than the reconcile window are no
-            longer being reconciled against RIOT3 and will not self-heal.
-            Investigate via the admin workflow endpoints; a dropped webhook was
-            never caught in time. Value = current stuck count.
+            In-flight envelope trips older than the stale threshold are still
+            being reconciled against RIOT3 (a late vendor-side transition will
+            heal automatically), but they have sat non-terminal far longer
+            than any healthy order — decide whether to resume, cancel, or
+            force-complete them. Value = current stuck count.
 
       # LEADING INDICATOR: RIOT3 connectivity trouble. Sustained fetch errors
       # mean the reconciler can't reach RIOT3 — dropped webhooks won't be healed
@@ -44,8 +46,8 @@ groups:
           description: >
             The AMR reconciler is failing to fetch trip state from RIOT3
             (timeout / unreachable) across the last 10 minutes. Check RIOT3
-            connectivity (host, latency, VendorAdapter__Riot3__BaseUrl) before
-            trips age past the reconcile window.
+            connectivity (host, latency, VendorAdapter__Riot3__BaseUrl) —
+            dropped webhooks are not being healed while this persists.
 
       # INDIRECT RETRY CHECK (method A). Every trip the reconciler heals or
       # backfills is a webhook RIOT3 sent that DTMS never received — and that

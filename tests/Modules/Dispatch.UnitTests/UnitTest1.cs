@@ -1359,7 +1359,7 @@ internal sealed class FakeTripRepository : ITripRepository
     public Task<List<Trip>> GetActiveTripsByVehicleAsync(Guid vehicleId, CancellationToken ct = default)
         => Task.FromResult(new List<Trip>());
 
-    public Task<List<Trip>> GetInFlightEnvelopeTripsAsync(DateTime staleCutoffUtc, CancellationToken ct = default)
+    public Task<List<Trip>> GetInFlightEnvelopeTripsAsync(CancellationToken ct = default)
         => Task.FromResult(new List<Trip>());
 
     public Task<List<Trip>> GetTerminalTripsMissingVehicleAsync(DateTime completedSinceUtc, CancellationToken ct = default)
