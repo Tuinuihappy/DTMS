@@ -714,7 +714,12 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
               )
             )}
             {/* ── Auto-refresh (Phase S.9) ─────────────────────────── */}
-            {data.credential.callbackAuthScheme?.toLowerCase() === "bearer" && (
+            {/* Shown whenever a refresh config exists, even with the auth
+                scheme cleared — clearing the scheme is exactly how an operator
+                drops a bad stored token, and "Refresh now" is the way back:
+                a successful mint switches the scheme back to bearer. */}
+            {(data.credential.callbackAuthScheme?.toLowerCase() === "bearer" ||
+              data.credential.tokenRefreshUrl) && (
               <div className="mt-4 rounded-lg border border-[var(--color-ink-100)] bg-[var(--color-ink-50)]/40 p-3 dark:border-white/[0.06] dark:bg-white/[0.02]">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -751,6 +756,12 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
                     </button>
                   </div>
                 </div>
+                {data.credential.callbackAuthScheme?.toLowerCase() !== "bearer" && (
+                  <p className="mt-2 text-[11px] text-[var(--color-ink-500)]">
+                    No bearer token stored — &quot;Refresh now&quot; mints one from the mint URL and
+                    switches the auth scheme back to bearer.
+                  </p>
+                )}
                 {data.credential.tokenRefreshUrl && (
                   <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] text-[var(--color-ink-500)]">
                     <DefRow label="Mint URL" value={data.credential.tokenRefreshUrl} mono />

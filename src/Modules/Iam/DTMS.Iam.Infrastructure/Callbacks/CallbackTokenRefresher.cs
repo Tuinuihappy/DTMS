@@ -92,8 +92,15 @@ public sealed class CallbackTokenRefresher : ICallbackTokenRefresher
             return RefreshResult.Skipped($"No credential for '{systemKey}'.");
 
         var settings = TokenRefreshSettings.TryParse(cred.TokenRefreshConfig);
-        if (settings is null || !settings.Enabled)
-            return RefreshResult.Skipped("Auto-refresh not configured or disabled.");
+        if (settings is null)
+            return RefreshResult.Skipped("Auto-refresh not configured.");
+
+        // Enabled only switches the background loop off. A manual "Refresh now"
+        // (force:true) is the operator's explicit ask to mint — honour it even
+        // while auto-refresh is disabled, same as force already bypasses the
+        // due check.
+        if (!settings.Enabled && !force)
+            return RefreshResult.Skipped("Auto-refresh disabled.");
 
         var hasCurrentToken = CallbackTokenInspector.ReadStoredToken(cred.CallbackAuthConfig) is not null;
         var currentExp = CallbackTokenInspector.ReadExpiryFromConfig(cred.CallbackAuthConfig);
