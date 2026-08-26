@@ -1,6 +1,13 @@
 # ADR-001: Multi-Mode Transport Module Split
 
-- **Status**: Accepted
+- **Status**: Accepted (partial — `Transport.Fleet` cancelled 2026-08-20)
+
+> **Partial supersede notice (2026-08-20):** The Amr/Manual split shipped as
+> designed, but the `Transport.Fleet` peer module was **cancelled** with
+> Phase 5 — `TransportMode.Fleet` no longer exists in the enum. The config
+> flag `TransportModes:{Mode}:Enabled` referenced below was withdrawn
+> 2026-08-19 (see [ADR-006](adr-006-transport-mode-feature-flag.md)); mode
+> enablement is decided by `IDispatchStrategy` DI registration.
 - **Date**: 2026-06-22
 - **Deciders**: Architecture team
 - **Supersedes**: N/A
@@ -38,7 +45,7 @@ src/Modules/
 - มี Domain / Application / Infrastructure / Presentation layers (DDD standard)
 - Implement contracts จาก `Transport.Abstractions`
 - Register ตนเองผ่าน `services.AddTransportXxx(config)` extension method
-- Toggle ผ่าน config flag `TransportModes:{Mode}:Enabled`
+- ~~Toggle ผ่าน config flag `TransportModes:{Mode}:Enabled`~~ (withdrawn 2026-08-19 — enablement = strategy DI registration)
 
 ### Core Abstractions (in `Transport.Abstractions`)
 
@@ -242,9 +249,9 @@ Scenario: Trip exists with mode `X`, but no adapter registered for `X`
 public IVendorEnvelopeOperationService For(Trip trip)
 {
     if (!_registry.IsRegistered(trip.TransportMode))
-        throw new TransportModeNotEnabledException(
-            $"Cannot operate on trip {trip.Id}: mode {trip.TransportMode} not enabled. " +
-            "Check appsettings.json TransportModes:{Mode}:Enabled");
+        throw new TransportModeNotEnabledException(trip.TransportMode);
+        // message: "... is not enabled in this deployment (no IDispatchStrategy
+        // registered for it)" — enablement is DI registration, not config.
     return _adapters[trip.TransportMode];
 }
 ```

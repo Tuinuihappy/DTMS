@@ -1,5 +1,12 @@
 # Phase 5 — Implement Transport.Fleet
 
+> **❌ Cancelled (2026-08-20):** Fleet mode (3PL outsourcing) was cancelled
+> by product decision. `TransportMode.Fleet` was removed from the enum, the
+> UI, and this phase will not be implemented. The mode column is stored as a
+> string everywhere with no CHECK constraint, so a future revival would be a
+> purely additive re-introduction — but treat this document as historical
+> design, not a backlog.
+
 - **Sprint**: 9-10
 - **Risk**: Medium-High (depends on 3PL provider quality)
 - **Schema change**: Yes (additive — new tables)

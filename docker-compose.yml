@@ -432,7 +432,7 @@ services:
       # spamming the vendor cluster. Default true so prod is safe.
       - VendorAdapter__Riot3__Enabled=${VendorAdapter__Riot3__Enabled:-true}
       # WMS (Warehouse Management System) location catalogue integration.
-      # Manual/Fleet transport-mode order routing resolves PickupLocationCode
+      # Manual transport-mode order routing resolves PickupLocationCode
       # against the local snapshot populated by WmsLocationSyncService.
       # Auth token is a JWT issued by WMS admin — DO NOT commit; pass via .env.
       - Wms__Enabled=${Wms__Enabled:-false}
@@ -448,10 +448,10 @@ services:
       - CallbackTokenRefresh__AllowedMintHosts__0=${CallbackTokenRefresh__MintHost0:-10.204.212.28}
       - CallbackTokenRefresh__PollIntervalSeconds=${CallbackTokenRefresh__PollIntervalSeconds:-3600}
       # WMS PR-4's TransportModes__{mode}__Enabled flags were removed
-      # 2026-08-19 along with their sole reader, /api/v1/system/capabilities
-      # (never consumed by any UI component). Manual-mode dispatch is gated
-      # separately via TransportModes:Manual:Dispatch:EnableDispatch in
-      # appsettings.json.
+      # 2026-08-19 along with their sole reader, /api/v1/system/capabilities.
+      # Manual dispatch has its own kill switch — lets ops stop Manual
+      # dispatch during an incident without rebuilding the image.
+      - TransportModes__Manual__Dispatch__EnableDispatch=${TransportModes__Manual__Dispatch__EnableDispatch:-true}
       # Phase 4 — legacy UpstreamOms__* + Callbacks__ShipmentEventsEnabled env
       # removed. OMS callbacks run through the federated pipeline (config on the
       # 'oms' SystemCredential + its shipment.* subscriptions).

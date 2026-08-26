@@ -1,6 +1,13 @@
 # Multi-Mode Transport — Documentation Index
 
-DTMS refactor from AMR-only (RIOT3) to enterprise multi-mode (AMR + Manual + Fleet).
+DTMS refactor from AMR-only (RIOT3) to enterprise multi-mode (AMR + Manual).
+
+> **Scope change (2026-08-20):** Fleet mode (3PL — Kerry, Flash) was
+> **cancelled**; `TransportMode.Fleet` no longer exists and
+> [Phase 5](phases/phase-5-transport-fleet.md) will not be implemented.
+> [ADR-006](adr/adr-006-transport-mode-feature-flag.md)'s config flags were
+> withdrawn 2026-08-19 — mode enablement is `IDispatchStrategy` DI
+> registration, surfaced as 422 at order confirm time.
 
 ## Background
 
@@ -73,9 +80,9 @@ docs/multi-mode-transport/
 | Module structure | [001](adr/adr-001-multi-mode-transport-split.md) | Per-mode peer modules + Abstractions |
 | Domain modeling | [002](adr/adr-002-facility-station-hierarchy.md), [003](adr/adr-003-trip-extension-tables.md) | Warehouse promoted; Trip extension tables |
 | Quality | [004](adr/adr-004-testing-strategy.md), [008](adr/adr-008-migration-strategy.md) | 4-tier gates; manual EF migrations |
-| Operational toggle | [006](adr/adr-006-transport-mode-feature-flag.md) | Config-driven per mode |
+| Operational toggle | [006](adr/adr-006-transport-mode-feature-flag.md) | ~~Config-driven per mode~~ withdrawn 2026-08-19 — DI-registration decides |
 | Mobile platform | [005](adr/adr-005-push-notification-gateway.md), [007](adr/adr-007-mobile-api-authentication.md), [009](adr/adr-009-pod-object-storage.md), [010](adr/adr-010-geofence-implementation.md) | FCM + JWT + S3 + NTS |
-| Frontend | [011](adr/adr-011-frontend-architecture.md) | Per-mode folders + design tokens + useCapabilities |
+| Frontend | [011](adr/adr-011-frontend-architecture.md) | Per-mode folders + design tokens (~~useCapabilities~~ removed 2026-08-19) |
 
 ## ADRs Summary
 
@@ -86,7 +93,7 @@ docs/multi-mode-transport/
 | [003](adr/adr-003-trip-extension-tables.md) | Per-mode 1:0..1 extension tables instead of nullable columns on Trip | 8 min |
 | [004](adr/adr-004-testing-strategy.md) | 4-tier strict gates: unit + integration + architecture + manual smoke | 6 min |
 | [005](adr/adr-005-push-notification-gateway.md) | FCM via `IPushNotificationGateway` abstraction | 5 min |
-| [006](adr/adr-006-transport-mode-feature-flag.md) | Config-driven enable per mode; strongly-typed options + startup validation | 5 min |
+| [006](adr/adr-006-transport-mode-feature-flag.md) | ⚠️ Withdrawn — flags + capabilities endpoint removed; DI registration decides | 5 min |
 | [007](adr/adr-007-mobile-api-authentication.md) | JWT with audience separation + device-bound refresh tokens | 6 min |
 | [008](adr/adr-008-migration-strategy.md) | Manual EF migrations + MigrationId conventions + per-DbContext apply | 7 min |
 | [009](adr/adr-009-pod-object-storage.md) | S3-compatible storage (MinIO local, AWS S3 production); server-mediated upload | 6 min |
@@ -128,7 +135,7 @@ src/Modules/
 | 2 | Facility / Vehicle Split | 3-4 | High | Yes (breaking) |
 | 3 | Dispatch Plan Abstraction + Trip Extensions | 5-6 | High | Yes |
 | 4 | Implement Transport.Manual | 7-8 | High | Yes (additive) |
-| 5 | Implement Transport.Fleet | 9-10 | Medium-High | Yes (additive) |
+| 5 | ~~Implement Transport.Fleet~~ ❌ Cancelled 2026-08-20 | — | — | — |
 
 ## Status
 

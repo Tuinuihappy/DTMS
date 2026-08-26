@@ -497,7 +497,10 @@ CREATE INDEX ix_manual_trip_extensions_sla ON transport_manual.manual_trip_exten
 
 #### 10.1 New Hooks (foundation for all Manual UI)
 
-**`frontend/lib/hooks/use-capabilities.ts`** (NEW — also used by Phase 5):
+**`frontend/lib/hooks/use-capabilities.ts`** ~~(NEW — also used by Phase 5)~~
+**(withdrawn 2026-08-19 — `/api/system/capabilities` removed in `5cd901f`; the
+mode list is hard-coded `"Amr" | "Manual"` and the backend rejects an
+unregistered mode with 422 at confirm time. Do not build this hook.)**:
 
 ```tsx
 "use client";
@@ -641,7 +644,7 @@ export async function reassignOperator(tripId: string, newOperatorId: string, re
 export async function contactOperator(operatorId: string, message: string): Promise<void> { ... }
 ```
 
-**`frontend/lib/api/system.ts`** (NEW):
+**`frontend/lib/api/system.ts`** ~~(NEW)~~ **(withdrawn 2026-08-19 — see §10.1)**:
 ```typescript
 export async function getCapabilities(): Promise<SystemCapabilities> { ... }
 ```
@@ -1093,7 +1096,7 @@ export function ManualOperationsKpis() {
 □ Operator detail page: shift history paginated
 □ Geofence violation on test pickup (simulate GPS off-warehouse) → error in dispatcher console
 □ Navigation: Operator Board link only shows when Manual mode enabled
-□ Navigation: hidden when capabilities API returns Manual=disabled
+~~□ Navigation: hidden when capabilities API returns Manual=disabled~~ (capabilities API removed 2026-08-19 — not testable)
 □ Dashboard: Manual Operations KPI card renders
 □ Dark mode: all new components readable
 □ Mobile breakpoint: operator board collapses to single-column

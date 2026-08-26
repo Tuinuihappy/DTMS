@@ -231,6 +231,13 @@ function TripExtensionPanel({ trip }) {
 
 ### 4. Capability-Driven Rendering
 
+> **⚠️ Withdrawn (2026-08-19, updated 2026-08-20):** `/api/system/capabilities`
+> and the `useCapabilities()` hook were removed in commit `5cd901f` — the hook
+> was never imported by any component. The frontend now hard-codes the mode
+> list (`"Amr" | "Manual"` in `lib/api/delivery-orders.ts`); an unsupported
+> mode is rejected by the backend with 422 at order confirm time. Fleet was
+> removed entirely (Phase 5 cancelled). The pattern below is historical.
+
 `useCapabilities()` is the SINGLE source of truth for "is this mode enabled":
 
 ```tsx
@@ -547,7 +554,7 @@ Use Next.js Server Components heavily (per Next 16 default)
 ## Related ADRs
 
 - [ADR-001](adr-001-multi-mode-transport-split.md) — Per-mode module structure (backend)
-- [ADR-006](adr-006-transport-mode-feature-flag.md) — `/api/system/capabilities` powers `useCapabilities()`
+- [ADR-006](adr-006-transport-mode-feature-flag.md) — withdrawn 2026-08-19; capabilities endpoint + `useCapabilities()` removed (see §4 notice)
 - [ADR-004](adr-004-testing-strategy.md) — FE test deferral rationale
 - [UI Mockups](../diagrams/ui-mockups.md) — visual reference for components
 

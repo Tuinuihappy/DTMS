@@ -1,9 +1,20 @@
 # ADR-006: Transport Mode Feature Flag Mechanism
 
-- **Status**: Accepted
+- **Status**: ⚠️ **Withdrawn** (2026-08-19)
 - **Date**: 2026-06-22
 - **Deciders**: Architecture team
 - **Related**: [ADR-001](adr-001-multi-mode-transport-split.md), all phases
+
+> **Withdrawn notice (2026-08-19, updated 2026-08-20):** The Level-1
+> `TransportModes:{Mode}:Enabled` flags and the `/api/v1/system/capabilities`
+> endpoint this ADR mandates were removed in commit `5cd901f` — the endpoint
+> was the flags' sole reader and no UI component ever consumed it. Mode
+> enablement is decided by **`IDispatchStrategy` DI registration**
+> (`ModuleServiceRegistration.cs`): a mode with no registered strategy is
+> rejected at order confirm time with **422** (`TransportModeNotEnabledException`).
+> Manual dispatch keeps its own kill switch,
+> `TransportModes:Manual:Dispatch:EnableDispatch` (appsettings + compose env).
+> `TransportMode.Fleet` itself was removed 2026-08-20 — Phase 5 cancelled.
 
 ## Context
 
