@@ -11,7 +11,7 @@ namespace DTMS.Transport.Manual.Application.Consumers;
 /// WMS PR-4b (PR-I) — Web-push notification fan-out for pool dispatches.
 ///
 /// Subscribes to <see cref="TripDispatchedIntegrationEventV1"/> (fires
-/// when a Manual/Fleet trip enters the pool) and pushes to every
+/// when a Manual trip enters the pool) and pushes to every
 /// <see cref="OperatorStatus.Active"/> operator with an active
 /// Web-Push subscription. The operator PWA's service worker renders the
 /// notification even when the tab is closed — the pull-model pool is

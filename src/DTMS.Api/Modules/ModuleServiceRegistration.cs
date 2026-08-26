@@ -203,7 +203,7 @@ public static class ModuleServiceRegistration
 
         // ── WMS Module ────────────────────────────────────────────────
         // Snapshot cache of the external WMS (Warehouse Management System)
-        // location catalogue used by Manual/Fleet transport-mode order
+        // location catalogue used by Manual transport-mode order
         // routing. Sync-to-local pattern: background poller pulls every N
         // minutes, Order Submit reads from the local table so a WMS outage
         // doesn't block user-facing writes.
@@ -367,7 +367,7 @@ public static class ModuleServiceRegistration
         // contract → Facility module's read service). Not yet consumed by
         // order validation (MarkAsValidated still uses stations only);
         // Phase 4 Manual mode will inject this for operator scope checks.
-        // WMS PR-1/PR-3b — location lookup used by Manual/Fleet submit path
+        // WMS PR-1/PR-3b — location lookup used by the Manual submit path
         // to resolve PickupLocationCode → WmsLocation. Delegates to the WMS
         // module's repository so the DeliveryOrder Application layer stays
         // free of a direct WMS.Domain dependency.
@@ -485,7 +485,7 @@ public static class ModuleServiceRegistration
 
         // ── Phase 1 foundation: strategy registry + vendor operations router ──
         // Both auto-discover their adapters via IEnumerable<> injection. Adding
-        // Manual / Fleet later = register the new adapter + (optionally) its
+        // a new mode = register the new adapter + (optionally) its
         // IDispatchStrategy — registry + router pick them up without changes
         // here. The router is what Pause/Resume/Cancel handlers will use once
         // Phase 3 refactors them away from the static IVendorEnvelopeOperationService
@@ -497,7 +497,7 @@ public static class ModuleServiceRegistration
         // Phase 3c — AMR strategy wired into production. Routes through
         // IDispatchOrderTemplateService.DispatchByRouteAsync (the existing
         // OrderTemplate → RIOT3 envelope flow) but goes through the strategy
-        // contract so Manual / Fleet can plug their own implementations in.
+        // contract so other modes can plug their own implementations in.
         services.AddScoped<DTMS.Dispatch.Application.Services.IDispatchStrategy,
             DTMS.Api.Adapters.AmrDispatchStrategy>();
         // Phase 3c — Manual strategy stub. Returns Failure with a clear

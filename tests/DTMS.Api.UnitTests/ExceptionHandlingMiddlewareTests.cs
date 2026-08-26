@@ -69,6 +69,21 @@ public class ExceptionHandlingMiddlewareTests
         errors.GetArrayLength().Should().Be(1);
     }
 
+    [Fact]
+    public async Task TransportModeNotEnabled_Maps422_KeepsCallerMessage()
+    {
+        // Detail must track the exception's own message (it is written for
+        // the caller) — compare dynamically, never pin the string.
+        var ex = new DTMS.Dispatch.Application.Services.TransportModeNotEnabledException(
+            DTMS.DeliveryOrder.Domain.Enums.TransportMode.Manual);
+        var body = await RunWith(ex);
+
+        body.GetProperty("status").GetInt32().Should().Be(422);
+        body.GetProperty("title").GetString().Should().Be("Transport Mode Not Enabled");
+        body.GetProperty("detail").GetString().Should().Be(ex.Message);
+        body.TryGetProperty("traceId", out _).Should().BeTrue();
+    }
+
     // Drives the middleware with a pipeline that throws, then parses the JSON
     // body it wrote to the response.
     private static async Task<JsonElement> RunWith(Exception thrown)

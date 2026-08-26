@@ -9,7 +9,7 @@ namespace DTMS.DeliveryOrder.Application.Commands.MarkGroupItemsAsDispatchFailed
 /// (terminal) so the order can eventually reach PartiallyCompleted / Failed
 /// instead of being stuck on pending items.
 ///
-/// Accepts station Ids (AMR pairing) or WMS location Ids (Manual/Fleet
+/// Accepts station Ids (AMR pairing) or WMS location Ids (Manual
 /// pairing). Caller (Planning consumer) supplies whichever the order's
 /// mode uses; items match by either pair.
 /// </summary>

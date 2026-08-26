@@ -6,7 +6,7 @@ public record ItemHazmatSummaryDto(string ClassCode, string? PackingGroup);
 
 public record ItemTemperatureSummaryDto(double? MinC, double? MaxC);
 
-// WMS PR-2 — station Ids for AMR, WMS location Ids for Manual/Fleet.
+// WMS PR-2 — station Ids for AMR, WMS location Ids for Manual.
 // Both pairs nullable so Consumers (Planning) can dispatch on the
 // RequestedTransportMode to pick the right pair.
 public record ItemSummaryDto(

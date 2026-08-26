@@ -7,7 +7,7 @@ import { PoolTripsList } from "@/components/operator-pwa/pool-trips-list";
 export const metadata: Metadata = { title: "Pool — DTMS Operator" };
 
 // WMS PR-4b (PR-D) — Operator pool view. Universal visibility — any
-// active operator sees every dispatched, unclaimed Manual/Fleet trip and
+// active operator sees every dispatched, unclaimed Manual trip and
 // can tap to claim + start atomically. Realtime updates arrive via the
 // /hubs/operator-pool SignalR hub (see PoolTripsList).
 export default async function OperatorPoolPage() {

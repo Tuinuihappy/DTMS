@@ -123,7 +123,7 @@ public class TripItemsProjector :
         }
     }
 
-    // WMS PR-4b — Manual/Fleet pool dispatch. Same shape as TripStarted:
+    // WMS PR-4b — Manual pool dispatch. Same shape as TripStarted:
     // the DTO carries a TripItemSnapshot array we insert into the read
     // side. Firing at DISPATCH time (not claim time) means the operator
     // pool card can render pickup/drop/weight/item-count without waiting

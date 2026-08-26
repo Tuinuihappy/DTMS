@@ -57,7 +57,7 @@ public class DispatchDbContext : DbContext
             // Nullable for now; existing CreateForEnvelope callers don't pass
             // them yet. Phase 2.6 wires resolution at the command-handler
             // layer so every new Trip carries both Ids.
-            // WMS PR-2 — Manual/Fleet trips snapshot WMS location Ids.
+            // WMS PR-2 — Manual trips snapshot WMS location Ids.
             // AMR trips leave these NULL (station-based).
             builder.Property(t => t.PickupWmsLocationId);
             builder.Property(t => t.DropWmsLocationId);

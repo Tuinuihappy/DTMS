@@ -29,7 +29,7 @@ public record TripStartedIntegrationEvent(
     Guid? CorrelationId = null,
     IReadOnlyList<TripItemSnapshot>? Items = null) : IIntegrationEvent;
 
-// WMS PR-4b — Manual/Fleet pool dispatch. Fires when Trip enters the
+// WMS PR-4b — Manual pool dispatch. Fires when Trip enters the
 // available-pool state (Status → Dispatched). Consumed by:
 //   • TripPoolBroadcaster (SignalR) — pushes to operator PWAs so they
 //     can Acknowledge and start immediately without polling (PR-C).
@@ -67,7 +67,7 @@ public sealed record TripItemSnapshot(
     string? Description = null,
     double? QuantityValue = null,
     string? QuantityUom = null,
-    // Order-level routing mode (Amr/Manual/Fleet) captured at trip-start
+    // Order-level routing mode (Amr/Manual) captured at trip-start
     // so operators see the dispatched mode without a live join to the
     // DeliveryOrder side. Nullable because the source field is nullable
     // and pre-V1.4 snapshots carry NULL.

@@ -12,11 +12,11 @@ public class Item : Entity<Guid>
     public Guid? PickupStationId { get; private set; }
     public Guid? DropStationId { get; private set; }
 
-    // WMS PR-2 — Manual/Fleet orders resolve PickupLocationCode against the
+    // WMS PR-2 — Manual orders resolve PickupLocationCode against the
     // external WMS location catalogue (wms.Locations). Nullable because
     // AMR orders never populate these (they route via PickupStationId
     // above). Only one pair per item is populated: station for AMR, WMS
-    // location for Manual/Fleet.
+    // location for Manual.
     public Guid? PickupWmsLocationId { get; private set; }
     public Guid? DropWmsLocationId { get; private set; }
     public int ItemSeq { get; private set; }
@@ -110,7 +110,7 @@ public class Item : Entity<Guid>
     /// <summary>
     /// WMS PR-2 — Set the WMS location Ids resolved from
     /// PickupLocationCode / DropLocationCode. Called by MarkAsValidated for
-    /// Manual/Fleet orders. Internal because WMS resolution is an Application
+    /// Manual orders. Internal because WMS resolution is an Application
     /// concern; direct callers would bypass the codes-to-ids consistency
     /// check MarkAsValidated enforces.
     /// </summary>

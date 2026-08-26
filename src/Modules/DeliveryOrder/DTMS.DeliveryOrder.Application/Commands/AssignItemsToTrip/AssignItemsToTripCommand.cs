@@ -16,7 +16,7 @@ public record AssignItemsToTripCommand(
     int AttemptNumber,
     Guid PickupStationId,
     Guid DropStationId,
-    // WMS PR-3 — Manual/Fleet items have null station Ids and match on
+    // WMS PR-3 — Manual items have null station Ids and match on
     // the WMS location pair instead. AMR callers leave the WMS pair null
     // (station-based) and the station branch fires.
     Guid? PickupWmsLocationId = null,

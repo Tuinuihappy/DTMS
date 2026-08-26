@@ -31,7 +31,7 @@ public sealed record TripDetailsDto(
     // "Vehicle / Operator" cell when a manual / self-managed trip has no
     // vendor vehicle and no claiming operator.
     string? RequestedBy,
-    // Order transport mode ("Amr" | "Manual" | "Fleet"). Lets the UI interpret
+    // Order transport mode ("Amr" | "Manual"). Lets the UI interpret
     // the executor label per mode — AMR trips must NOT fall back to RequestedBy.
     string? TransportMode,
     string? TemplateNameAtDispatch,

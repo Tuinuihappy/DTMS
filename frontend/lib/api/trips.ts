@@ -46,7 +46,7 @@ export type TripDetailsDto = {
   // Order requester (DeliveryOrder.RequestedBy). Last-resort label for the
   // Vehicle/Operator cell on manual / self-managed trips.
   requestedBy: string | null;
-  // Order transport mode ("Amr" | "Manual" | "Fleet"). Gates the requester
+  // Order transport mode ("Amr" | "Manual"). Gates the requester
   // fallback so AMR trips never show a requester in the vehicle column.
   transportMode: string | null;
   templateNameAtDispatch: string | null;
@@ -174,7 +174,7 @@ export type TripQueueItemDto = {
   // Order requester (DeliveryOrder.RequestedBy). Last-resort label for the
   // Vehicle/Operator column on manual / self-managed trips.
   requestedBy: string | null;
-  // Order transport mode ("Amr" | "Manual" | "Fleet"). Gates the requester
+  // Order transport mode ("Amr" | "Manual"). Gates the requester
   // fallback so AMR trips never show a requester in the vehicle column.
   transportMode: string | null;
   status: TripStatus;

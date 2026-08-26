@@ -47,6 +47,11 @@ public class ExceptionHandlingMiddleware
             // the row between load and save. A retriable conflict, not a 500.
             Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException =>
                 (StatusCodes.Status409Conflict, "Concurrent Update"),
+            // Mode-disabled is a deployment-configuration outcome, not a
+            // server fault — 422 per the IDispatchStrategyRegistry contract,
+            // and the message is written for the caller.
+            DTMS.Dispatch.Application.Services.TransportModeNotEnabledException =>
+                (StatusCodes.Status422UnprocessableEntity, "Transport Mode Not Enabled"),
             _ => (StatusCodes.Status500InternalServerError, "Internal Server Error")
         };
 

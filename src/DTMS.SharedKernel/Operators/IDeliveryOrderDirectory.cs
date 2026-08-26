@@ -4,7 +4,7 @@ namespace DTMS.SharedKernel.Operators;
 /// Order-level context the Dispatch Trips list / detail needs to render the
 /// "Vehicle / Operator" column for trips that carry no vendor vehicle and no
 /// claiming operator. <see cref="TransportMode"/> is the order's requested
-/// mode (e.g. "Amr", "Manual", "Fleet") so the UI can interpret the executor
+/// mode (e.g. "Amr", "Manual") so the UI can interpret the executor
 /// label per mode — a robot-mode trip must NOT fall back to the requester.
 /// Both fields may be null (order missing, or no requester / mode recorded).
 /// </summary>

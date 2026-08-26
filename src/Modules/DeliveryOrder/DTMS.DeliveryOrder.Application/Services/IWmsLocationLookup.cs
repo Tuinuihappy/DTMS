@@ -2,7 +2,7 @@ namespace DTMS.DeliveryOrder.Application.Services;
 
 /// <summary>
 /// Outcome of a WMS location lookup. Mirrors <see cref="StationLookupResult"/>
-/// but for the WMS snapshot — Manual/Fleet transport modes resolve their
+/// but for the WMS snapshot — the Manual transport mode resolves its
 /// PickupLocationCode / DropLocationCode through this contract instead of
 /// against internal Warehouse rows.
 ///

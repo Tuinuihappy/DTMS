@@ -50,7 +50,7 @@ public class TripRepository : ITripRepository
 
         // IgnoreQueryFilters: same reasoning as GetByUpperKeyAsync — vendor
         // webhooks have no tenant context. Phase 3b — vendorOrderKey lives
-        // on AmrTripExtension; this is an AMR-only lookup (Manual / Fleet
+        // on AmrTripExtension; this is an AMR-only lookup (Manual
         // never produce a vendor order key).
         return await _context.Trips
             .IgnoreQueryFilters()
@@ -113,7 +113,7 @@ public class TripRepository : ITripRepository
         // note on GetByUpperKeyAsync). Without the Include, MarkVendorStarted /
         // ReconcileVehicleAssignment would Create() a fresh extension and
         // collide with the existing row's PK on save.
-        // UpperKey filter keeps this to AMR envelope trips (Manual/Fleet never
+        // UpperKey filter keeps this to AMR envelope trips (Manual never
         // set it and can't be queried against RIOT3) — previously the caller
         // skipped them per-row; filtering here keeps them out of the stale
         // count too. No age cutoff: a trip that goes terminal at the vendor
@@ -142,7 +142,7 @@ public class TripRepository : ITripRepository
         // Gate on VendorFinalSnapshot == null so a trip drops out for good
         // once the caller captures the snapshot — no per-tick re-fetch, even
         // when the vendor record has no vehicle. UpperKey filter keeps this to
-        // AMR envelope trips (Manual/Fleet never set it and can't be queried
+        // AMR envelope trips (Manual never sets it and can't be queried
         // against RIOT3).
         return await _context.Trips
             .IgnoreQueryFilters()

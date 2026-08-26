@@ -150,7 +150,7 @@ const STATUS_FILTER_VALUES: StatusFilter[] = [
 ];
 
 const PRIORITY_VALUES: Array<Priority | "All"> = ["All", "Low", "Normal", "High", "Critical"];
-const TRANSPORT_VALUES: Array<TransportMode | "All"> = ["All", "Amr", "Manual", "Fleet"];
+const TRANSPORT_VALUES: Array<TransportMode | "All"> = ["All", "Amr", "Manual"];
 const PAGE_SIZE_VALUES: PageSize[] = [10, 25, 50, 100];
 const SORT_COLUMNS: SortColumn[] = [
   "createdDate",
@@ -255,7 +255,9 @@ function ExperienceInner() {
     if (typeof snap.statusFilter === "string") setStatusFilter(snap.statusFilter as StatusFilter);
     if (typeof snap.priority === "string") setPriority(snap.priority as Priority | "All");
     if (typeof snap.transportMode === "string")
-      setTransportMode(snap.transportMode as TransportMode | "All");
+      // Guard against retired values in old saved filters (e.g. "Fleet").
+      setTransportMode(
+        (TRANSPORT_VALUES.find((m) => m === snap.transportMode) as TransportMode | "All") ?? "All");
     if (typeof snap.search === "string") setSearchInput(snap.search);
     if (typeof snap.hasFailedTrip === "boolean") setHasFailedTrip(snap.hasFailedTrip);
     if (typeof snap.hasActiveJob === "boolean") setHasActiveJob(snap.hasActiveJob);

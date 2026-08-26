@@ -6,6 +6,7 @@ using DTMS.DeliveryOrder.Application.Services;
 using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.DeliveryOrder.Domain.ValueObjects;
+using DTMS.Dispatch.Application.Services;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -28,6 +29,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
     private readonly IUomNormalizer _uomNormalizer;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IOrderOriginResolver _originResolver;
+    private readonly IDispatchStrategyRegistry _strategyRegistry;
     private readonly DeliveryOrderOptions _options;
     private readonly ILogger<CreateUpstreamDeliveryOrderCommandHandler> _logger;
 
@@ -39,6 +41,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         IUomNormalizer uomNormalizer,
         ICurrentUserAccessor currentUser,
         IOrderOriginResolver originResolver,
+        IDispatchStrategyRegistry strategyRegistry,
         IOptions<DeliveryOrderOptions> options,
         ILogger<CreateUpstreamDeliveryOrderCommandHandler> logger)
     {
@@ -49,6 +52,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         _uomNormalizer = uomNormalizer;
         _currentUser = currentUser;
         _originResolver = originResolver;
+        _strategyRegistry = strategyRegistry;
         _options = options.Value;
         _logger = logger;
     }
@@ -91,6 +95,15 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
             return Result<UpstreamOrderAckDto>.Success(
                 new UpstreamOrderAckDto(DeliveryOrderMapper.MapToDetailDto(full!), Array.Empty<OrderQualityIssue>()));
         }
+
+        // Confirm-time gate — this path creates + confirms in one call, so an
+        // unregistered mode would go straight to the Planning consumer and
+        // stall. Placed AFTER the idempotency lookup so replays of an order
+        // accepted while its mode was enabled still return the original ack.
+        // Surfaces as 422 via the ExceptionHandlingMiddleware mapping.
+        var requestedMode = request.RequestedTransportMode ?? Domain.Enums.TransportMode.Amr;
+        if (!_strategyRegistry.IsRegistered(requestedMode))
+            throw new TransportModeNotEnabledException(requestedMode);
 
         Domain.Entities.DeliveryOrder order;
         try
@@ -137,9 +150,9 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
 
         // WMS PR-2 — interpret location codes by mode. Upstream OMS still
         // treats AMR as the default when RequestedTransportMode isn't
-        // supplied; Manual / Fleet upstream payloads (when those modes go
-        // live) supply the mode and the same PickupLocationCode field is
-        // interpreted as a WMS location code (wms.Locations).
+        // supplied; Manual upstream payloads supply the mode and the same
+        // PickupLocationCode field is interpreted as a WMS location code
+        // (wms.Locations).
         var mode = order.RequestedTransportMode ?? DTMS.DeliveryOrder.Domain.Enums.TransportMode.Amr;
         IReadOnlyDictionary<string, Guid>? stationMap = null;
         IReadOnlyDictionary<string, Guid>? wmsLocationMap = null;

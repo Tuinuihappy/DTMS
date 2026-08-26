@@ -4,7 +4,7 @@ namespace DTMS.Transport.Manual.Application.Queries.GetPoolTrips;
 
 // WMS PR-4b (PR-D) — GET /api/operator/trips/pool
 //
-// Returns Manual/Fleet trips currently in the shared pool, FIFO-ordered
+// Returns Manual trips currently in the shared pool, FIFO-ordered
 // by DispatchedAt (oldest first). Universal visibility — no operator zone
 // or warehouse filter (per the P4b design decision "ทุกคนทำได้ทุกที่").
 //

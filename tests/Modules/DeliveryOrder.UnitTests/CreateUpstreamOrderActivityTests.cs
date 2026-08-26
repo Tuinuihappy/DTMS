@@ -38,10 +38,12 @@ public class CreateUpstreamOrderActivityTests
         var origins = Substitute.For<IOrderOriginResolver>();
         origins.GetByKeyAsync("oms", Arg.Any<CancellationToken>())
             .Returns(new OrderOrigin("oms", "OMS"));
+        var registry = Substitute.For<DTMS.Dispatch.Application.Services.IDispatchStrategyRegistry>();
+        registry.IsRegistered(Arg.Any<TransportMode>()).Returns(true);
 
         var handler = new CreateUpstreamDeliveryOrderCommandHandler(
             repo, audit, activity, stations, uom,
-            Substitute.For<ICurrentUserAccessor>(), origins,
+            Substitute.For<ICurrentUserAccessor>(), origins, registry,
             Options.Create(new DeliveryOrderOptions()),
             NullLogger<CreateUpstreamDeliveryOrderCommandHandler>.Instance);
         return (handler, repo, activity, stations);

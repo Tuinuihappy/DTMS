@@ -43,7 +43,6 @@ public class DispatchStrategyRegistryTests
 
         registry.IsRegistered(TransportMode.Amr).Should().BeTrue();
         registry.IsRegistered(TransportMode.Manual).Should().BeFalse();
-        registry.IsRegistered(TransportMode.Fleet).Should().BeFalse();
     }
 
     [Fact]

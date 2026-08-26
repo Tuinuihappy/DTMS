@@ -11,7 +11,7 @@ namespace DTMS.Wms.Domain.Entities;
 /// LocationCode is what user-facing systems (order Item.PickupLocationCode)
 /// reference; ExternalId is the WMS-internal integer key used only for
 /// diffing during sync. ParentLocationCode drives operator zone routing
-/// (Manual/Fleet transport modes).
+/// (Manual transport mode).
 ///
 /// Immutable from DTMS's side — no domain events emitted; DTMS never writes
 /// back to WMS. Kept as Entity, not AggregateRoot, for that reason.

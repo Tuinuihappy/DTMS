@@ -2,10 +2,10 @@ using DTMS.Dispatch.Domain.Enums;
 
 namespace DTMS.Dispatch.Domain.Entities;
 
-// Phase 3b — AMR-specific data lifted off the Trip core. Manual / Fleet
+// Phase 3b — AMR-specific data lifted off the Trip core. Manual
 // trips simply leave the navigation null; AMR trips persist one row per
 // trip in dispatch."AmrTripExtensions" (1:0..1). Pattern mirrors the
-// ManualTripExtension / FleetTripExtension entities planned for Phase 4-5.
+// ManualTripExtension entity (Phase 4).
 //
 // Phase 3d (vehicle reassignment fix) — the vehicle pointer fields
 // (VendorVehicleKey, VendorVehicleName) are now a CACHE of the most

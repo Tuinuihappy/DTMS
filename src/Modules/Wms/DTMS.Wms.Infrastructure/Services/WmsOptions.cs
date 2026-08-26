@@ -12,7 +12,7 @@ public sealed class WmsOptions
     /// <summary>
     /// Master switch for the WMS integration. When false: sync service
     /// skips its cycle, endpoint returns empty, downstream feature flag
-    /// gating hides Manual/Fleet in the UI. Default false so a fresh
+    /// gating hides Manual in the UI. Default false so a fresh
     /// deployment doesn't accidentally hammer an unconfigured endpoint.
     /// </summary>
     public bool Enabled { get; set; } = false;

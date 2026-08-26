@@ -1,6 +1,6 @@
 namespace DTMS.Dispatch.Domain.Enums;
 
-// Trip lifecycle states — unified across AMR and Manual/Fleet.
+// Trip lifecycle states — unified across AMR and Manual.
 //   Created    — trip persisted, awaiting acceptance. AMR: RIOT3 TASK_PROCESSING;
 //                Manual pool: an operator to Acknowledge from the pool.
 //   InProgress — vendor / operator has taken the trip and is executing it.
@@ -22,7 +22,7 @@ namespace DTMS.Dispatch.Domain.Enums;
 // serialized as a string everywhere, but pinning keeps every pre-existing
 // ordinal stable so the entire class of reorder bugs is off the table.
 //
-// The "in pool" signal for Manual/Fleet is NOT a distinct status — it is
+// The "in pool" signal for Manual is NOT a distinct status — it is
 // derived from (Status = Created ∧ DispatchedAt IS NOT NULL ∧
 // ClaimedByOperatorId IS NULL). See IX_Trips_Pool.
 public enum TripStatus

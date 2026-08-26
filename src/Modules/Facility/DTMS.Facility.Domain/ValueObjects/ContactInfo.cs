@@ -4,8 +4,7 @@ namespace DTMS.Facility.Domain.ValueObjects;
 
 /// <summary>
 /// Primary contact at a warehouse — used by Manual operators to call
-/// when arriving / when something's wrong, and by Fleet provider
-/// dispatchers to coordinate handover. Name is required because
+/// when arriving / when something's wrong. Name is required because
 /// "phone is +66..." with no name is useless when the receiver picks up.
 ///
 /// Phone format is intentionally permissive (no E.164 validation):

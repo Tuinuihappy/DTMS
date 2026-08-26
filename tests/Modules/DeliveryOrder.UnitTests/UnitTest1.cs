@@ -922,9 +922,9 @@ public class DeliveryOrderTests
     {
         var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "TM-002", Priority.Normal, serviceWindow: null,
-            requestedTransportMode: TransportMode.Fleet);
+            requestedTransportMode: TransportMode.Manual);
 
-        order.RequestedTransportMode.Should().Be(TransportMode.Fleet);
+        order.RequestedTransportMode.Should().Be(TransportMode.Manual);
     }
 
     [Fact]
@@ -966,14 +966,14 @@ public class DeliveryOrderTests
     {
         var order = DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder.Create(
             "TM-CONF", Priority.Normal, serviceWindow: null,
-            requestedTransportMode: TransportMode.Fleet);
+            requestedTransportMode: TransportMode.Manual);
         AddTestItem(order, itemSeq: 1, "WH-01", "STORE-05", "SKU-001");
         order.Submit();
         order.MarkAsValidated(StationMap("WH-01", "STORE-05"));
         order.Confirm(weightFallbackKg: 500);
 
         var confirmed = order.DomainEvents.OfType<DeliveryOrderConfirmedDomainEvent>().Single();
-        confirmed.RequestedTransportMode.Should().Be("Fleet");
+        confirmed.RequestedTransportMode.Should().Be("Manual");
     }
 
     // ── PartiallyCompleted finalize logic ─────────────────────────────────
@@ -1472,6 +1472,49 @@ public class DeliveryOrderTests
         order.Items.Count(i => i.Status == ItemStatus.Failed).Should().Be(2);
         order.Items.Single(i => i.PickupLocationCode == "WH-B").Status
              .Should().Be(ItemStatus.Pending);   // other group untouched
+    }
+
+    [Fact]
+    public void MarkAllPendingItemsAsDispatchFailed_FailsOnlyUnboundPendingItems()
+    {
+        var (order, groupA, _) = MultiGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);   // binds SKU-A1, SKU-A2
+
+        var marked = order.MarkAllPendingItemsAsDispatchFailed("mode has no strategy");
+
+        marked.Should().Be(1);   // only unbound SKU-B1
+        order.Items.Single(i => i.TripId is null).Status.Should().Be(ItemStatus.Failed);
+        order.Items.Where(i => i.TripId == tripA).Should()
+             .OnlyContain(i => i.Status == ItemStatus.Pending);   // bound items untouched
+        var evt = order.DomainEvents.OfType<TripItemsFailedDomainEvent>().Single();
+        evt.TripId.Should().Be(Guid.Empty);
+        evt.FailedCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void MarkAllPendingItemsAsDispatchFailed_ThenRecompute_MarksOrderFailed()
+    {
+        var (order, _, _) = MultiGroupOrder();
+
+        var marked = order.MarkAllPendingItemsAsDispatchFailed("mode has no strategy");
+        order.RecomputeStatusFromItems();
+
+        marked.Should().Be(3);
+        order.Status.Should().Be(OrderStatus.Failed);
+        order.DomainEvents.OfType<DeliveryOrderFailedDomainEvent>().Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void MarkAllPendingItemsAsDispatchFailed_SecondCall_NoOp()
+    {
+        var (order, _, _) = MultiGroupOrder();
+        order.MarkAllPendingItemsAsDispatchFailed("first");
+
+        var second = order.MarkAllPendingItemsAsDispatchFailed("second");
+
+        second.Should().Be(0);
+        order.DomainEvents.OfType<TripItemsFailedDomainEvent>().Should().HaveCount(1);
     }
 
     [Fact]

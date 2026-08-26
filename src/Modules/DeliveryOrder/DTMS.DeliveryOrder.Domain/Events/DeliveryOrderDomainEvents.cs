@@ -7,7 +7,7 @@ public record ItemHazmatDto(string ClassCode, string? PackingGroup);
 
 public record ItemTemperatureDto(double? MinC, double? MaxC);
 
-// WMS PR-2 — station Ids for AMR, WMS location Ids for Manual/Fleet.
+// WMS PR-2 — station Ids for AMR, WMS location Ids for Manual.
 // Both pairs nullable so the Created event can still fire pre-validation
 // (when neither resolution has run) and consumers pick whichever pair
 // matches the order's RequestedTransportMode.
@@ -19,7 +19,7 @@ public record ItemEventDto(
     ItemHazmatDto? Hazmat = null,
     ItemTemperatureDto? Temperature = null,
     IReadOnlyList<string>? HandlingInstructions = null,
-    // WMS PR-2 — Manual/Fleet orders populate these; AMR leaves them null.
+    // WMS PR-2 — Manual orders populate these; AMR leaves them null.
     Guid? PickupWmsLocationId = null,
     Guid? DropWmsLocationId = null);
 

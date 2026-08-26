@@ -12,7 +12,7 @@ namespace DTMS.Dispatch.Application.Services;
 /// Phase 1: only AMR is registered, so <see cref="For"/> returns the
 /// Riot3 adapter for <see cref="TransportMode.Amr"/> and throws
 /// <see cref="TransportModeNotEnabledException"/> for the others.
-/// Phase 4 + 5 add Manual + Fleet adapters by registering them in their
+/// New modes add their adapters by registering them in their
 /// module extensions — router picks them up automatically because the
 /// implementation walks all <c>IVendorEnvelopeOperationService</c>
 /// registrations and uses the <see cref="IVendorOperationsAdapter"/>
@@ -31,7 +31,7 @@ public interface IVendorOperationsRouter
     /// <summary>
     /// Robot-level operations (pass robot through checkpoint) are AMR-only.
     /// Returns null for modes that don't have a physical robot to nudge
-    /// (Manual, Fleet). Callers check before invoking — UI button is
+    /// (Manual). Callers check before invoking — UI button is
     /// hidden if this returns null.
     /// </summary>
     IVendorRobotOperationService? ForRobot(TransportMode mode);

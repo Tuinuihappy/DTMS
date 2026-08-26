@@ -5,6 +5,7 @@ using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Services;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.DeliveryOrder.Domain.ValueObjects;
+using DTMS.Dispatch.Application.Services;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Options;
 
@@ -17,6 +18,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
     private readonly IUomNormalizer _uomNormalizer;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IOrderOriginResolver _originResolver;
+    private readonly IDispatchStrategyRegistry _strategyRegistry;
     private readonly DeliveryOrderOptions _options;
 
     public BulkSubmitDeliveryOrdersCommandHandler(
@@ -25,6 +27,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         IUomNormalizer uomNormalizer,
         ICurrentUserAccessor currentUser,
         IOrderOriginResolver originResolver,
+        IDispatchStrategyRegistry strategyRegistry,
         IOptions<DeliveryOrderOptions> options)
     {
         _repo = repo;
@@ -32,6 +35,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         _uomNormalizer = uomNormalizer;
         _currentUser = currentUser;
         _originResolver = originResolver;
+        _strategyRegistry = strategyRegistry;
         _options = options.Value;
     }
 
@@ -115,10 +119,21 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         // IWmsLocationLookup back onto their respective DbContexts which
         // are not safe to use concurrently across orders. WMS PR-2 —
         // dispatch by RequestedTransportMode: AMR resolves station codes;
-        // Manual / Fleet resolve WMS location codes (wms.Locations).
+        // Manual resolves WMS location codes (wms.Locations).
         foreach (var order in pendingOrders)
         {
             var mode = order.RequestedTransportMode ?? DTMS.DeliveryOrder.Domain.Enums.TransportMode.Amr;
+
+            // Confirm-time gate (see SubmitDeliveryOrderCommandHandler) —
+            // collected per order instead of thrown so one bad mode doesn't
+            // abort the batch envelope (200/207/400).
+            if (!_strategyRegistry.IsRegistered(mode))
+            {
+                failures.Add(new BulkSubmitFailure(
+                    order.OrderRef, new TransportModeNotEnabledException(mode).Message));
+                continue;
+            }
+
             IReadOnlyDictionary<string, Guid>? stationMap = null;
             IReadOnlyDictionary<string, Guid>? wmsLocationMap = null;
 

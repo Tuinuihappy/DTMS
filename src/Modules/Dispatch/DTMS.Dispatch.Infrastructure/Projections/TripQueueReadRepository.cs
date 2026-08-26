@@ -21,7 +21,7 @@ public class TripQueueReadRepository : ITripQueueReadRepository
     {
         // Phase 3b — eagerly load AmrExtension so the row mapper below
         // can read VendorOrderKey / VendorVehicleKey / VendorVehicleName.
-        // Manual / Fleet trips materialise with AmrExtension = null,
+        // Manual trips materialise with AmrExtension = null,
         // which the delegating properties on Trip turn into null DTO fields.
         var query = _db.Trips.AsNoTracking().Include(t => t.AmrExtension).AsQueryable();
 
@@ -35,7 +35,7 @@ public class TripQueueReadRepository : ITripQueueReadRepository
         {
             var key = filter.VehicleKey;
             // Vendor vehicle key lives on the AMR extension (Phase 3b).
-            // Filtering by it is implicitly AMR-only — Manual / Fleet
+            // Filtering by it is implicitly AMR-only — Manual
             // trips with no extension never match.
             query = query.Where(t => t.AmrExtension != null && t.AmrExtension.VendorVehicleKey == key);
         }

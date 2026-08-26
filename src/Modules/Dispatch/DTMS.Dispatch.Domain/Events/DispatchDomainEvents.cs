@@ -17,7 +17,7 @@ public record TripStartedDomainEvent(
     Guid? VehicleId, string? VendorVehicleKey,
     IReadOnlyList<TripItemSnapshot>? Items = null) : IDomainEvent;
 
-// WMS PR-4b — fired when a Manual/Fleet trip enters the pool
+// WMS PR-4b — fired when a Manual trip enters the pool
 // (Created → Dispatched) at dispatch time, before any operator has
 // claimed it. Downstream OMS notification fires from this event
 // (with DeliveryBy = null) so the customer/system learns about the

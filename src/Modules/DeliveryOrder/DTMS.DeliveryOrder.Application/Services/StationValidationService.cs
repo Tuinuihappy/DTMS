@@ -54,7 +54,7 @@ public class StationValidationService : IStationValidationService
         return Result<IReadOnlyDictionary<string, Guid>>.Success(map);
     }
 
-    // Manual / Fleet path (Phase 2.5 Path A) — interpret location codes
+    // Manual path (Phase 2.5 Path A) — interpret location codes
     // as warehouse codes. Mirror of the station path: dedupe + batch
     // lookup + reject inactive entries with a clear "not found" /
     // "deactivated" message instead of letting the order land in a

@@ -5,6 +5,7 @@ using DTMS.DeliveryOrder.Application.Services;
 using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Domain.Repositories;
+using DTMS.Dispatch.Application.Services;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,7 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
     private readonly IDeliveryOrderRepository _repository;
     private readonly IOrderAuditEventRepository _auditRepo;
     private readonly IStationValidationService _stationValidation;
+    private readonly IDispatchStrategyRegistry _strategyRegistry;
     private readonly DeliveryOrderOptions _options;
     private readonly ILogger<SubmitDeliveryOrderCommandHandler> _logger;
 
@@ -24,12 +26,14 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
         IDeliveryOrderRepository repository,
         IOrderAuditEventRepository auditRepo,
         IStationValidationService stationValidation,
+        IDispatchStrategyRegistry strategyRegistry,
         IOptions<DeliveryOrderOptions> options,
         ILogger<SubmitDeliveryOrderCommandHandler> logger)
     {
         _repository = repository;
         _auditRepo = auditRepo;
         _stationValidation = stationValidation;
+        _strategyRegistry = strategyRegistry;
         _options = options.Value;
         _logger = logger;
     }
@@ -49,9 +53,16 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
 
         // WMS PR-2 — interpret location codes based on the order's
         // RequestedTransportMode. AMR keeps the existing station-code
-        // semantics; Manual / Fleet resolve against the WMS snapshot
+        // semantics; Manual resolves against the WMS snapshot
         // (wms.Locations) instead of internal Warehouse rows.
         var mode = order.RequestedTransportMode ?? TransportMode.Amr;
+
+        // Confirm-time gate: a mode with no registered strategy would sail
+        // through and stall at Planning (no consumer can group it). Surfaces
+        // as 422 via the ExceptionHandlingMiddleware mapping.
+        if (!_strategyRegistry.IsRegistered(mode))
+            throw new TransportModeNotEnabledException(mode);
+
         IReadOnlyDictionary<string, Guid>? stationMap = null;
         IReadOnlyDictionary<string, Guid>? wmsLocationMap = null;
 
@@ -63,7 +74,7 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
         }
         else
         {
-            // Manual / Fleet → WMS location-code interpretation.
+            // Manual → WMS location-code interpretation.
             var wmsResult = await _stationValidation.BuildWmsLocationMapAsync(order.Items, cancellationToken);
             if (wmsResult.IsFailure) return Result<SubmitDeliveryOrderResult>.Failure(wmsResult.Error);
             wmsLocationMap = wmsResult.Value;

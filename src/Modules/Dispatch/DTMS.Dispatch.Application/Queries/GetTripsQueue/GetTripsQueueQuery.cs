@@ -44,7 +44,7 @@ public sealed record TripQueueItemDto(
     // Vehicle/Operator column when a manual / self-managed trip carries no
     // vendor vehicle and was never claimed by a pool operator.
     string? RequestedBy,
-    // Order transport mode ("Amr" | "Manual" | "Fleet"). Lets the UI interpret
+    // Order transport mode ("Amr" | "Manual"). Lets the UI interpret
     // the executor label per mode — AMR trips must NOT fall back to RequestedBy.
     string? TransportMode,
     string Status,

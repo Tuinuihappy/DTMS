@@ -275,7 +275,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         var bound = 0;
         foreach (var item in _items)
         {
-            // Match by station pair (AMR) OR WMS location pair (Manual/Fleet).
+            // Match by station pair (AMR) OR WMS location pair (Manual).
             // Empty-Guid station sentinel from the Manual consumer doesn't
             // match items' null station Ids; the WMS branch picks them up.
             var matchesStation =
@@ -549,7 +549,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     /// Mode-aware validation. The order's <see cref="RequestedTransportMode"/>
     /// determines which map applies:
     ///   - AMR → stationMap only.
-    ///   - Manual/Fleet → wmsLocationMap only.
+    ///   - Manual → wmsLocationMap only.
     /// At least one map must be non-null.
     /// </summary>
     public void MarkAsValidated(
@@ -640,7 +640,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     private DeliveryOrderConfirmedDomainEvent BuildConfirmedEvent(double weightFallbackKg)
     {
         // Phase 3a — pass station + warehouse Ids through as nullable.
-        // AMR orders populate PickupStationId/DropStationId; Manual/Fleet
+        // AMR orders populate PickupStationId/DropStationId; Manual
         // populate the warehouse pair. Consumers pick by RequestedTransportMode.
         // BuildStation handler emits both as null for pre-Validated orders
         // (defensive — Confirm requires Validated so this shouldn't fire).
@@ -821,9 +821,9 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     /// keeps the failed group's items from blocking the order's eventual
     /// transition to terminal.
     ///
-    /// Accepts station Ids (AMR) or WMS location Ids (Manual/Fleet).
+    /// Accepts station Ids (AMR) or WMS location Ids (Manual).
     /// An item matches if EITHER pair matches: AMR items match by station,
-    /// Manual/Fleet by WMS location.
+    /// Manual by WMS location.
     /// </summary>
     public int MarkGroupItemsAsDispatchFailed(
         Guid? pickupStationId, Guid? dropStationId,
@@ -842,7 +842,7 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
                 && item.PickupStationId == pickupStationId
                 && item.DropStationId == dropStationId;
 
-            // WMS location match — Manual/Fleet items have WMS Ids populated.
+            // WMS location match — Manual items have WMS Ids populated.
             var matchesWms =
                 pickupWmsLocationId.HasValue && dropWmsLocationId.HasValue
                 && item.PickupWmsLocationId == pickupWmsLocationId
@@ -862,6 +862,34 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
             AddDomainEvent(new TripItemsFailedDomainEvent(
                 Guid.NewGuid(), DateTime.UtcNow, Id, Guid.Empty, changed,
                 $"Group dispatch failed: {reason}"));
+        return changed;
+    }
+
+    /// <summary>
+    /// Fails every unbound Pending item regardless of station / WMS pair.
+    /// For failures that precede grouping entirely — e.g. the order's
+    /// transport mode has no registered dispatch strategy, so no
+    /// DispatchGroup ever exists to key
+    /// <see cref="MarkGroupItemsAsDispatchFailed"/> on. Pair with a status
+    /// recompute so the order lands at Failed instead of stalling with
+    /// in-flight items.
+    /// </summary>
+    public int MarkAllPendingItemsAsDispatchFailed(string reason)
+    {
+        var changed = 0;
+        foreach (var item in _items)
+        {
+            // Same guard as the group variant: never override items the
+            // operator already finalised or items bound to a Trip.
+            if (item.Status is ItemStatus.Pending && item.TripId is null)
+            {
+                item.UpdateStatus(ItemStatus.Failed);
+                changed++;
+            }
+        }
+        if (changed > 0)
+            AddDomainEvent(new TripItemsFailedDomainEvent(
+                Guid.NewGuid(), DateTime.UtcNow, Id, Guid.Empty, changed, reason));
         return changed;
     }
 

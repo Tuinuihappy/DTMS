@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Hand, Truck } from "lucide-react";
+import { Bot, Hand } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { OrderStatus, Priority, TransportMode } from "@/lib/api/delivery-orders";
 
@@ -149,11 +149,6 @@ export function TransportModeBadge({ mode }: { mode: TransportMode | null }) {
       label: "Manual",
       icon: Hand,
       cls: "bg-[var(--color-ink-100)] text-[var(--color-ink-700)]",
-    },
-    Fleet: {
-      label: "Fleet",
-      icon: Truck,
-      cls: "bg-[var(--color-pastel-mint)] text-[var(--color-pastel-mint-ink)]",
     },
   }[mode];
   const Icon = config.icon;

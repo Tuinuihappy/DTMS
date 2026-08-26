@@ -23,16 +23,15 @@ public class Trip : AggregateRoot<Guid>
     public string? FailureReason { get; private set; }
 
     // UpperKey is the DTMS-side correlation key RIOT3 echoes back on every
-    // webhook. Lives on Trip core because Manual / Fleet trips will get
+    // webhook. Lives on Trip core because non-AMR trips may get
     // analogous correlation keys later (per Phase 3 plan); the field is
     // mode-agnostic at the type level even though only AMR populates it today.
     public string UpperKey { get; private set; } = string.Empty;
 
     // Phase 3b — AMR-specific vendor fields (VendorOrderKey, VendorVehicleKey,
     // VendorVehicleName, VendorPauseSource) moved off Trip core into a
-    // 1:0..1 navigation. AMR trips create the extension on demand; Manual /
-    // Fleet trips never touch it. Mirror entities (ManualTripExtension,
-    // FleetTripExtension) follow the same shape in Phase 4 / 5.
+    // 1:0..1 navigation. AMR trips create the extension on demand; Manual
+    // trips never touch it. ManualTripExtension follows the same shape.
     public AmrTripExtension? AmrExtension { get; private set; }
 
     // Read-only delegations so existing in-memory consumers (handlers
@@ -52,7 +51,7 @@ public class Trip : AggregateRoot<Guid>
     public Guid? PickupStationId { get; private set; }
     public Guid? DropStationId { get; private set; }
 
-    // WMS PR-2 — Manual/Fleet trips snapshot the WMS location Ids at create
+    // WMS PR-2 — Manual trips snapshot the WMS location Ids at create
     // time. Downstream operator geofence + POD checks read these. AMR
     // trips leave these NULL (station-based, see PickupStationId above).
     public Guid? PickupWmsLocationId { get; private set; }
@@ -70,7 +69,7 @@ public class Trip : AggregateRoot<Guid>
     public string? PickupLocationCode { get; private set; }
     public string? DropLocationCode { get; private set; }
 
-    // WMS PR-4b — pool-dispatch tracking. Manual/Fleet trips are born
+    // WMS PR-4b — pool-dispatch tracking. Manual trips are born
     // Dispatched (see TripStatus.Dispatched) and sit in the pool until an
     // operator clicks "Acknowledge and start" on their PWA.
     //
@@ -200,7 +199,7 @@ public class Trip : AggregateRoot<Guid>
             VendorRequestSnapshot = string.IsNullOrWhiteSpace(vendorRequestSnapshot) ? null : vendorRequestSnapshot
         };
         // Phase 3b — AMR vendor key lives on the extension entity now.
-        // Created on demand so Manual / Fleet callers (which pass
+        // Created on demand so Manual callers (which pass
         // vendorOrderKey=null) don't create an empty AmrTripExtension row.
         if (trimmedVendor is not null)
         {
@@ -238,7 +237,7 @@ public class Trip : AggregateRoot<Guid>
     }
 
     /// <summary>
-    /// WMS PR-4b — Manual/Fleet pool dispatch. Marks the trip as "available
+    /// WMS PR-4b — Manual pool dispatch. Marks the trip as "available
     /// in the pool" by stamping <see cref="DispatchedAt"/>. Status stays
     /// <see cref="TripStatus.Created"/> so the lifecycle is unified with
     /// AMR (which also sits in Created until vendor acceptance). The pool
@@ -530,7 +529,7 @@ public class Trip : AggregateRoot<Guid>
     // Trip.Status is intentionally unchanged — this is an interactive nudge at
     // robot level, not a state transition. Requires VendorVehicleKey because
     // RIOT3 routes PASS by deviceKey, not by orderKey. Phase 3b — key lives
-    // on the AMR extension; AMR-only call is a no-op for Manual/Fleet trips.
+    // on the AMR extension; AMR-only call is a no-op for Manual trips.
     //
     // actionBy/actedAt are optional: the operator PWA path leaves them null
     // (the ExecutionEvent's Actor stays blank, same as before), while the

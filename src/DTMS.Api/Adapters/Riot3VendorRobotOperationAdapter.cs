@@ -12,7 +12,7 @@ namespace DTMS.Api.Adapters;
 // the Riot3VendorEnvelopeOperationAdapter pattern.
 //
 // Implements IVendorOperationsAdapter (Mode=Amr) so VendorOperationsRouter
-// can auto-discover this adapter — Manual / Fleet won't have a robot
+// can auto-discover this adapter — Manual won't have a robot
 // adapter (ForRobot returns null), the marker is what differentiates.
 internal sealed class Riot3VendorRobotOperationAdapter : IVendorRobotOperationService, IVendorOperationsAdapter
 {

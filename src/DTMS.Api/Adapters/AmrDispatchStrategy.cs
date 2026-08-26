@@ -14,8 +14,7 @@ namespace DTMS.Api.Adapters;
 // Phase 3c — wired into the production flow. The DeliveryOrderValidatedConsumer
 // resolves a strategy by mode through IDispatchStrategyRegistry instead of
 // calling DispatchByRouteAsync directly; AMR routes here, Manual routes to
-// ManualDispatchStrategy (stub, Phase 4 fills it in), Fleet to FleetDispatchStrategy
-// (Phase 5).
+// ManualDispatchStrategy.
 //
 // AMR dispatch is vendor-first: the Trip Id is the OUTCOME of this call,
 // not its input. We pass through to DispatchByRouteAsync which:

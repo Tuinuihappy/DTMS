@@ -10,9 +10,9 @@ namespace DTMS.Dispatch.Application.Services;
 /// MyDispatchStrategy&gt;()</c> in its module extension to be picked up.
 ///
 /// Throws <see cref="TransportModeNotEnabledException"/> when a mode is
-/// requested that has no registered strategy — typically caught at the
-/// command handler / order creation layer with a clear "this deployment
-/// doesn't have mode X enabled" message (per ADR-006).
+/// requested that has no registered strategy. Enabling a mode means
+/// registering its <c>IDispatchStrategy</c> in the module's DI extension —
+/// there is no config flag for it.
 /// </summary>
 public interface IDispatchStrategyRegistry
 {
@@ -28,8 +28,9 @@ public interface IDispatchStrategyRegistry
 public sealed class TransportModeNotEnabledException : Exception
 {
     public TransportModeNotEnabledException(TransportMode mode)
-        : base($"Transport mode '{mode}' is not enabled in this deployment. " +
-               $"Check appsettings TransportModes:{mode}:Enabled.")
+        : base($"Transport mode '{mode}' is not enabled in this deployment " +
+               $"(no IDispatchStrategy registered for it). Manual mode can " +
+               $"additionally be disabled via TransportModes:Manual:Dispatch:EnableDispatch.")
     {
         Mode = mode;
     }

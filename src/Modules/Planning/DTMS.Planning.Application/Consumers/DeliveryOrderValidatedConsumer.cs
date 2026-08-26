@@ -1,3 +1,4 @@
+using DTMS.DeliveryOrder.Application.Commands.MarkAllItemsAsDispatchFailed;
 using DTMS.DeliveryOrder.Application.Commands.MarkGroupItemsAsDispatchFailed;
 using DTMS.DeliveryOrder.Application.Commands.MarkOrderDispatched;
 using DTMS.DeliveryOrder.Application.Commands.MarkOrderPlanned;
@@ -58,28 +59,29 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         var ct = context.CancellationToken;
 
         // Phase 3c — route through IDispatchStrategy by transport mode.
-        // AMR uses station Ids on the integration event; Manual / Fleet
-        // will eventually use warehouse Ids (the strategy contract carries
-        // both for forward compatibility). For now non-AMR stub strategies
-        // return Failure with a "not yet implemented" message, which lands
-        // the order at Failed with a clear reason — better than Confirmed-
-        // forever (the Phase 3a stopgap).
+        // AMR uses station Ids on the integration event; Manual uses WMS
+        // location Ids (the strategy contract carries both).
         var mode = ParseMode(evt.RequestedTransportMode);
         if (!_strategyRegistry.IsRegistered(mode))
         {
+            // No strategy → no groups ever exist, so the group-pair fail
+            // command can't apply. Fail every pending item, then recompute:
+            // Confirmed passes the recompute guards and delivered==0 lands
+            // the order at Failed. Redelivery is a no-op (0 items marked,
+            // recompute early-returns on Failed).
             _logger.LogWarning(
                 "[AutoPlan] Order {OrderId} mode '{Mode}' has no registered IDispatchStrategy. " +
-                "Marking order Failed so it doesn't stall at Confirmed.",
+                "Failing all pending items so the order recomputes to Failed instead of stalling at Confirmed.",
                 evt.DeliveryOrderId, mode);
-            await _sender.Send(new MarkOrderPlanningCommand(evt.DeliveryOrderId), ct);
+            var reason = new TransportModeNotEnabledException(mode).Message;
+            await _sender.Send(new MarkAllItemsAsDispatchFailedCommand(evt.DeliveryOrderId, reason), ct);
             await _sender.Send(new RecomputeOrderStatusCommand(evt.DeliveryOrderId), ct);
             return;
         }
         var strategy = _strategyRegistry.Get(mode);
 
         // Delegate grouping to the per-mode strategy — AMR groups by
-        // station pair, Manual by warehouse pair, Fleet (future) may
-        // split by carrier capacity. The consumer stays mode-agnostic;
+        // station pair, Manual by warehouse pair. The consumer stays mode-agnostic;
         // adding a new TransportMode means implementing GroupItems on
         // the new strategy, no changes here.
         var groupingInput = evt.Items

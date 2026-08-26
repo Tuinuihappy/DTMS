@@ -5,7 +5,7 @@ namespace DTMS.Transport.Abstractions.Services;
 /// <summary>
 /// Streams vehicle / operator position updates from a per-mode source.
 /// Each mode plugs in its own implementation — RIOT3 polling for AMR,
-/// mobile-app heartbeat for Manual, 3PL GPS for Fleet — and a single
+/// mobile-app heartbeat for Manual — and a single
 /// orchestrator background service consumes all registered providers
 /// into the shared position store (which feeds the SignalR map layer).
 ///
@@ -31,9 +31,9 @@ public interface IVehiclePositionProvider
 /// <summary>
 /// Single position observation. <see cref="X"/> / <see cref="Y"/> are
 /// factory-local for AMR (RIOT3 map coordinate frame) and lat/lng for
-/// Manual / Fleet — consumers know which frame by checking
+/// Manual — consumers know which frame by checking
 /// <see cref="Mode"/>. Optional <see cref="BatteryLevel"/> is AMR-only;
-/// Manual / Fleet leave null.
+/// Manual leaves null.
 /// </summary>
 public sealed record PositionUpdate(
     TransportMode Mode,

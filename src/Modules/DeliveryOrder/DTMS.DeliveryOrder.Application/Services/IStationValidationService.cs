@@ -13,7 +13,7 @@ namespace DTMS.DeliveryOrder.Application.Services;
 ///
 ///   - <see cref="BuildStationMapAsync"/> for AMR orders (location
 ///     code = station code; existing behaviour).
-///   - <see cref="BuildWarehouseMapAsync"/> for Manual / Fleet orders
+///   - <see cref="BuildWarehouseMapAsync"/> for Manual orders
 ///     (location code = warehouse code; Phase 2.5 Path A — wires
 ///     IWarehouseLookup into the validation pipeline).
 /// </summary>
@@ -23,7 +23,7 @@ public interface IStationValidationService
         BuildStationMapAsync(IEnumerable<Item> items, CancellationToken ct = default);
 
     /// <summary>
-    /// WMS PR-2 — Manual/Fleet transport-mode order path. Resolves each item's
+    /// WMS PR-2 — Manual transport-mode order path. Resolves each item's
     /// PickupLocationCode/DropLocationCode against the local WMS snapshot
     /// (populated by <c>WmsLocationSyncService</c>). Rejects unknown or
     /// upstream-inactive codes with a clear message so the order stays out

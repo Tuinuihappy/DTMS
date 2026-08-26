@@ -53,7 +53,7 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     // (caller populated via ITripItemSnapshotProvider).
                     Items: evt.Items)
             ],
-            // WMS PR-4b — Manual/Fleet pool dispatch. Consumed by the SignalR
+            // WMS PR-4b — Manual pool dispatch. Consumed by the SignalR
             // pool broadcaster + TripItems projector (no upstream callback —
             // shipment.started fires at operator claim via TripStarted).
             TripDispatchedDomainEvent evt =>

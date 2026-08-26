@@ -26,7 +26,7 @@ export type Priority = "Low" | "Normal" | "High" | "Critical";
 // deploy; the API stamps the lowercase iam.SystemClients.Key slug and
 // the UI renders it as-is (or via sourceSystemDisplayName when present).
 export type SourceSystem = string;
-export type TransportMode = "Amr" | "Manual" | "Fleet";
+export type TransportMode = "Amr" | "Manual";
 export type Uom = "KG" | "G" | "LB" | "EA" | "BOX" | "PALLET" | "CASE";
 export type HandlingInstruction =
   | "Fragile"

@@ -48,7 +48,7 @@ public sealed class PoolMetrics : IDisposable
         _depthGauge = _meter.CreateObservableGauge(
             "dtms.pool.depth",
             () => _depthSnapshot,
-            description: "Number of Manual/Fleet trips currently in the pool (Status=Created ∧ DispatchedAt≠null ∧ ClaimedByOperatorId IS NULL).");
+            description: "Number of Manual trips currently in the pool (Status=Created ∧ DispatchedAt≠null ∧ ClaimedByOperatorId IS NULL).");
 
         _claimTotal = _meter.CreateCounter<long>(
             "dtms.pool.claim.total",

@@ -260,8 +260,6 @@ function TransportModeChip({ mode }: { mode: string }) {
     switch (mode) {
       case "Amr":
         return "bg-[var(--color-pastel-sky)] text-[var(--color-pastel-sky-ink)]";
-      case "Fleet":
-        return "bg-[var(--color-pastel-lavender)] text-[var(--color-pastel-lavender-ink)]";
       case "Manual":
         return "bg-[var(--color-pastel-peach)] text-[var(--color-pastel-peach-ink)]";
       default:

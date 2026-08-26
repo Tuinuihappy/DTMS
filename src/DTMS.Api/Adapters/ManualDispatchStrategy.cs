@@ -15,7 +15,7 @@ using Microsoft.Extensions.Options;
 
 namespace DTMS.Api.Adapters;
 
-// WMS PR-4b — Manual/Fleet pool dispatch strategy (PR-E deleted the legacy
+// WMS PR-4b — Manual pool dispatch strategy (PR-E deleted the legacy
 // auto-assign branch after PoolMode ran stable in prod).
 //
 // Flow:

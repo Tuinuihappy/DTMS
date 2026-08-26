@@ -97,7 +97,7 @@ public class DeliveryOrderDbContext : DbContext
             // Phase 2.5 — warehouse Ids resolved by IWarehouseLookup (Phase 2.6).
             // Nullable until the lookup wiring lands; per ADR-002 every order
             // will reference a warehouse (the AMR station is optional inside it).
-            // WMS PR-2 — Manual/Fleet items populate these; AMR NULL.
+            // WMS PR-2 — Manual items populate these; AMR NULL.
             b.Property(p => p.PickupWmsLocationId);
             b.Property(p => p.DropWmsLocationId);
             // Trip binding (Option D — item-level state derivation). Null

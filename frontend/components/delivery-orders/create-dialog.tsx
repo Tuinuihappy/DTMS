@@ -250,7 +250,7 @@ export function CreateOrderDialog({
   const [stations, setStations] = useState<StationOption[]>([]);
   const [stationsLoading, setStationsLoading] = useState(false);
   const [stationsError, setStationsError] = useState<string | null>(null);
-  // WMS PR-4 — Manual/Fleet orders resolve pickup/drop against the WMS
+  // WMS PR-4 — Manual orders resolve pickup/drop against the WMS
   // location snapshot instead of internal Warehouse rows. The WMS
   // picker owns its own debounced server-side search (see
   // WmsLocationCombobox), so there's no shared list fetch to prop-drill.
@@ -518,7 +518,6 @@ export function CreateOrderDialog({
                           >
                             <option value="Amr">AMR</option>
                             <option value="Manual">Manual</option>
-                            <option value="Fleet">Fleet</option>
                           </select>
                         </Field>
                       </div>

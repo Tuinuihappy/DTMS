@@ -173,11 +173,11 @@ export function FilterBar({
           </FilterChip>
         ))}
         <div className="mx-1 self-center h-5 w-px bg-[var(--color-ink-200)]/60 dark:bg-white/10" />
-        {(["All", "Amr", "Manual", "Fleet"] as const).map((m) => (
+        {(["All", "Amr", "Manual"] as const).map((m) => (
           <FilterChip
             key={m}
             active={transportMode === m}
-            tone={m === "Amr" ? "sky" : m === "Fleet" ? "mint" : "ink"}
+            tone={m === "Amr" ? "sky" : "ink"}
             onClick={() => onTransportModeChange(m)}
           >
             {m === "All" ? "Any transport" : m === "Amr" ? "AMR" : m}
