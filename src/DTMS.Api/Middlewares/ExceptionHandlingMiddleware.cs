@@ -43,6 +43,12 @@ public class ExceptionHandlingMiddleware
             BusinessRuleViolationException => (StatusCodes.Status400BadRequest, "Business Rule Violation"),
             DomainException => (StatusCodes.Status400BadRequest, "Domain Exception"),
             FluentValidation.ValidationException => (StatusCodes.Status400BadRequest, "Validation Error"),
+            // Model-binding failure (malformed JSON body, unknown enum token,
+            // bad date …). The framework throws this with StatusCode=400;
+            // without this arm it fell to the 500 branch and the caller got
+            // a scrubbed "unexpected error" for what is a client-side typo.
+            Microsoft.AspNetCore.Http.BadHttpRequestException badReq =>
+                (badReq.StatusCode, "Malformed Request"),
             // Optimistic-concurrency clash (xmin token) — another writer changed
             // the row between load and save. A retriable conflict, not a 500.
             Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException =>

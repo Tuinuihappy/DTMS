@@ -70,6 +70,20 @@ public class ExceptionHandlingMiddlewareTests
     }
 
     [Fact]
+    public async Task BadHttpRequest_Maps400_KeepsBindingMessage()
+    {
+        // Model-binding failures (malformed JSON, unknown enum token) throw
+        // BadHttpRequestException with StatusCode=400 — must not be scrubbed
+        // into a 500 "unexpected error".
+        var body = await RunWith(new Microsoft.AspNetCore.Http.BadHttpRequestException(
+            "Failed to read parameter \"CreateSourceOrderRequest body\" from the request body as JSON."));
+
+        body.GetProperty("status").GetInt32().Should().Be(400);
+        body.GetProperty("title").GetString().Should().Be("Malformed Request");
+        body.GetProperty("detail").GetString().Should().Contain("request body as JSON");
+    }
+
+    [Fact]
     public async Task TransportModeNotEnabled_Maps422_KeepsCallerMessage()
     {
         // Detail must track the exception's own message (it is written for
