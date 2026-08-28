@@ -15,6 +15,8 @@ public class FleetDbContext : DbContext
     public DbSet<ChargingPolicy> ChargingPolicies { get; set; } = null!;
     public DbSet<MaintenanceRecord> MaintenanceRecords { get; set; } = null!;
     public DbSet<VehicleGroup> VehicleGroups { get; set; } = null!;
+    // ADR-019 — carrier catalogue, moved here from Facility in P0.2.
+    public DbSet<CarrierType> CarrierTypes { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     internal DbSet<VehicleGroupMember> VehicleGroupMembers { get; set; } = null!;
 
@@ -107,6 +109,21 @@ public class FleetDbContext : DbContext
              .WithMany()
              .HasForeignKey(m => m.VehicleId)
              .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ADR-019 — config carried over verbatim from FacilityDbContext apart
+        // from the AMRCapability → AmrCapability property rename, so the
+        // relocated table keeps the exact shape migration 20260506082818 built.
+        modelBuilder.Entity<CarrierType>(b =>
+        {
+            b.HasKey(c => c.Id);
+            b.Property(c => c.Code).HasMaxLength(50).IsRequired();
+            b.HasIndex(c => c.Code).IsUnique();
+            b.Property(c => c.DisplayName).HasMaxLength(200).IsRequired();
+            b.Property(c => c.AmrCapability).HasMaxLength(50).IsRequired();
+            b.Property(c => c.MaxWeightKg);
+            b.Property(c => c.MaxSlots);
+            b.Property(c => c.Description).HasMaxLength(500);
         });
 
         modelBuilder.Entity<OutboxMessage>(b =>

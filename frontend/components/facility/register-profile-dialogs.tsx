@@ -151,7 +151,7 @@ export function RegisterCarrierProfileDialog({
       await createCarrierTypeProfile({
         code: code.trim(),
         displayName: displayName.trim(),
-        aMRCapability: amr.trim(),
+        amrCapability: amr.trim(),
         maxWeightKg: maxWeight.trim() ? Number(maxWeight) : null,
         maxSlots: maxSlots.trim() ? Number(maxSlots) : null,
         description: description.trim() || null,

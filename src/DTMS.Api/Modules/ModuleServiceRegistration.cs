@@ -175,7 +175,6 @@ public static class ModuleServiceRegistration
         services.AddDbContext<FacilityDbContext>(o => o.UseNpgsql(npgsqlDataSource, ConfigureNpgsql));
         services.AddScoped<IMapRepository, MapRepository>();
         services.AddScoped<IStationRepository, StationRepository>();
-        services.AddScoped<ICarrierTypeProfileRepository, CarrierTypeProfileRepository>();
         services.AddScoped<IFacilityReadService, FacilityReadService>();
         var riot3BaseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
         var riot3ApiKey = configuration.GetValue<string>("VendorAdapter:Riot3:ApiKey");
@@ -246,6 +245,9 @@ public static class ModuleServiceRegistration
             .AddInterceptors(new DomainEventOutboxSaveChangesInterceptor(
                 sp.GetRequiredService<FleetDomainEventMapper>())));
         services.AddScoped<IVehicleRepository, VehicleRepository>();
+        // ADR-019 — carrier catalogue, relocated from Facility in P0.2.
+        services.AddScoped<DTMS.Fleet.Domain.Repositories.ICarrierTypeRepository,
+                           DTMS.Fleet.Infrastructure.Repositories.CarrierTypeRepository>();
         // Phase P3.2 — Fleet projections (vehicle state history + utilization snapshots).
         services.AddScoped<DTMS.Fleet.Application.Projections.IVehicleStateHistoryProjectionStore,
                            DTMS.Fleet.Infrastructure.Projections.VehicleStateHistoryProjectionStore>();

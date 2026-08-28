@@ -9,7 +9,6 @@ public class FacilityDbContext : DbContext
 
     public DbSet<Map> Maps { get; set; } = null!;
     public DbSet<Station> Stations { get; set; } = null!;
-    public DbSet<CarrierTypeProfile> CarrierTypeProfiles { get; set; } = null!;
 
     public FacilityDbContext(DbContextOptions<FacilityDbContext> options) : base(options) { }
 
@@ -76,18 +75,6 @@ public class FacilityDbContext : DbContext
                               v,
                               (System.Text.Json.JsonSerializerOptions?)null))
                 .HasColumnType("jsonb");
-        });
-
-        modelBuilder.Entity<CarrierTypeProfile>(b =>
-        {
-            b.HasKey(c => c.Id);
-            b.Property(c => c.Code).HasMaxLength(50).IsRequired();
-            b.HasIndex(c => c.Code).IsUnique();
-            b.Property(c => c.DisplayName).HasMaxLength(200).IsRequired();
-            b.Property(c => c.AMRCapability).HasMaxLength(50).IsRequired();
-            b.Property(c => c.MaxWeightKg);
-            b.Property(c => c.MaxSlots);
-            b.Property(c => c.Description).HasMaxLength(500);
         });
 
         base.OnModelCreating(modelBuilder);

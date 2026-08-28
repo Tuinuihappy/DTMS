@@ -4,9 +4,7 @@ using DTMS.Facility.Application.Commands.CreateMap;
 using DTMS.Facility.Application.Commands.ForceStationOffline;
 using DTMS.Facility.Application.Commands.ImportMapFromRiot3;
 using DTMS.Facility.Application.Commands.UpdateStation;
-using DTMS.Facility.Application.Commands.RegisterCarrierTypeProfile;
 using DTMS.Facility.Application.Commands.SyncMapStations;
-using DTMS.Facility.Application.Queries.GetCarrierTypeProfiles;
 using DTMS.Facility.Application.Queries.GetMapById;
 using DTMS.Facility.Application.Queries.GetStations;
 using DTMS.Facility.Application.Queries.ListMaps;
@@ -110,21 +108,6 @@ public static class MapEndpoints
                 var result = await sender.Send(new ClearStationOverrideCommand(stationId));
                 return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
             }).RequirePermission(Permissions.Facility.StationForceOffline);
-
-        // ── Carrier Type Profiles ─────────────────────────────────────────
-        group.MapPost("/carrier-type-profiles", async (RegisterCarrierTypeProfileCommand command, ISender sender) =>
-        {
-            var result = await sender.Send(command);
-            return result.IsSuccess
-                ? Results.Created($"/api/v1/facility/carrier-type-profiles/{result.Value}", result.Value)
-                : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Facility.ProfileWrite);
-
-        group.MapGet("/carrier-type-profiles", async (ISender sender) =>
-        {
-            var result = await sender.Send(new GetCarrierTypeProfilesQuery());
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Facility.ProfileRead);
 
     }
 }

@@ -124,7 +124,7 @@ function Inner() {
                       </TableTd>
                       <TableTd>
                         <span className="rounded-full bg-[var(--color-pastel-lavender)] px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--color-brand-900)]">
-                          {c.aMRCapability}
+                          {c.amrCapability}
                         </span>
                       </TableTd>
                       <TableTd align="right">

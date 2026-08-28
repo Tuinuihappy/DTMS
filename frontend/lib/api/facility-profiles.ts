@@ -5,13 +5,15 @@
 // had no consumer outside its own CRUD. Item.loadUnitProfileCode survives as
 // free text on the order payload; it was never validated against a catalogue.
 
-// NB: the backend property "AMRCapability" serializes to camelCase as
-// "aMRCapability" (System.Text.Json lowercases only the first character).
+// The backend property was renamed AMRCapability → AmrCapability when the
+// catalogue moved to Fleet (ADR-019), so the wire name is now a clean
+// "amrCapability" instead of the old "aMRCapability" that System.Text.Json
+// produced by lowercasing only the first character.
 export type CarrierTypeProfile = {
   id: string;
   code: string;
   displayName: string;
-  aMRCapability: string;
+  amrCapability: string;
   maxWeightKg: number | null;
   maxSlots: number | null;
   description: string | null;
@@ -58,9 +60,7 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 export type CreateCarrierTypeProfileInput = {
   code: string;
   displayName: string;
-  // Backend property AMRCapability; JSON binding is case-insensitive so
-  // either casing binds — we send the read-DTO casing for consistency.
-  aMRCapability: string;
+  amrCapability: string;
   maxWeightKg?: number | null;
   maxSlots?: number | null;
   description?: string | null;
