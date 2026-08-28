@@ -176,7 +176,6 @@ public static class ModuleServiceRegistration
         services.AddScoped<IMapRepository, MapRepository>();
         services.AddScoped<IStationRepository, StationRepository>();
         services.AddScoped<ICarrierTypeProfileRepository, CarrierTypeProfileRepository>();
-        services.AddScoped<ILoadUnitProfileRepository, LoadUnitProfileRepository>();
         services.AddScoped<IFacilityReadService, FacilityReadService>();
         var riot3BaseUrl = configuration.GetValue<string>("VendorAdapter:Riot3:BaseUrl") ?? "http://localhost:5100";
         var riot3ApiKey = configuration.GetValue<string>("VendorAdapter:Riot3:ApiKey");

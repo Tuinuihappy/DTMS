@@ -168,7 +168,7 @@ const actions: RailAction[] = [
         icon: <Layers className="h-3.5 w-3.5" strokeWidth={2.1} />,
         label: "Reference",
         href: "/facility/profiles",
-        hint: "Carrier & load-unit profiles · route cost",
+        hint: "Carrier type profiles",
         requires: Permissions.Facility.ProfileRead,
       },
     ],

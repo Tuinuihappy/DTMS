@@ -5,10 +5,8 @@ using DTMS.Facility.Application.Commands.ForceStationOffline;
 using DTMS.Facility.Application.Commands.ImportMapFromRiot3;
 using DTMS.Facility.Application.Commands.UpdateStation;
 using DTMS.Facility.Application.Commands.RegisterCarrierTypeProfile;
-using DTMS.Facility.Application.Commands.RegisterLoadUnitProfile;
 using DTMS.Facility.Application.Commands.SyncMapStations;
 using DTMS.Facility.Application.Queries.GetCarrierTypeProfiles;
-using DTMS.Facility.Application.Queries.GetLoadUnitProfiles;
 using DTMS.Facility.Application.Queries.GetMapById;
 using DTMS.Facility.Application.Queries.GetStations;
 using DTMS.Facility.Application.Queries.ListMaps;
@@ -128,20 +126,6 @@ public static class MapEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequirePermission(Permissions.Facility.ProfileRead);
 
-        // ── Load Unit Profiles ────────────────────────────────────────────
-        group.MapPost("/load-unit-profiles", async (RegisterLoadUnitProfileCommand command, ISender sender) =>
-        {
-            var result = await sender.Send(command);
-            return result.IsSuccess
-                ? Results.Created($"/api/v1/facility/load-unit-profiles/{result.Value}", result.Value)
-                : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Facility.ProfileWrite);
-
-        group.MapGet("/load-unit-profiles", async (string? carrierTypeCode, ISender sender) =>
-        {
-            var result = await sender.Send(new GetLoadUnitProfilesQuery(carrierTypeCode));
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Facility.ProfileRead);
     }
 }
 

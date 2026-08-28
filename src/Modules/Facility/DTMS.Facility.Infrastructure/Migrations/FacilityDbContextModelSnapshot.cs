@@ -62,49 +62,6 @@ namespace DTMS.Facility.Infrastructure.Migrations
                     b.ToTable("CarrierTypeProfiles", "facility");
                 });
 
-            modelBuilder.Entity("DTMS.Facility.Domain.Entities.LoadUnitProfile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CarrierTypeCode")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<double>("HeightMm")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("LengthMm")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("MaxGrossWeightKg")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("WidthMm")
-                        .HasColumnType("double precision");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CarrierTypeCode");
-
-                    b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.ToTable("LoadUnitProfiles", "facility");
-                });
-
             modelBuilder.Entity("DTMS.Facility.Domain.Entities.Map", b =>
                 {
                     b.Property<Guid>("Id")

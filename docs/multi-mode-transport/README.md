@@ -83,6 +83,7 @@ docs/multi-mode-transport/
 | Operational toggle | [006](adr/adr-006-transport-mode-feature-flag.md) | ~~Config-driven per mode~~ withdrawn 2026-08-19 — DI-registration decides |
 | Mobile platform | [005](adr/adr-005-push-notification-gateway.md), [007](adr/adr-007-mobile-api-authentication.md), [009](adr/adr-009-pod-object-storage.md), [010](adr/adr-010-geofence-implementation.md) | FCM + JWT + S3 + NTS |
 | Frontend | [011](adr/adr-011-frontend-architecture.md) | Per-mode folders + design tokens (~~useCapabilities~~ removed 2026-08-19) |
+| Carrier tracking | [019](adr/adr-019-carrier-tracking.md) | Fleet owns carrier type + instance + binding + manifest; per-mode binding strategy; intent vs actual |
 
 ## ADRs Summary
 
@@ -99,6 +100,7 @@ docs/multi-mode-transport/
 | [009](adr/adr-009-pod-object-storage.md) | S3-compatible storage (MinIO local, AWS S3 production); server-mediated upload | 6 min |
 | [010](adr/adr-010-geofence-implementation.md) | NetTopologySuite in-memory (no PostGIS); WKT polygon format; defer PostGIS | 6 min |
 | [011](adr/adr-011-frontend-architecture.md) | Per-mode folders; design tokens; capability-driven rendering; SWR + SignalR hybrid | 8 min |
+| [019](adr/adr-019-carrier-tracking.md) | Carrier type + instance + trip binding + load manifest all in Fleet; binding sourced via per-`TransportMode` strategy registry; `LoadUnitProfile` deleted | 12 min |
 
 ## Target Module Structure (After Refactor)
 

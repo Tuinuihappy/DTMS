@@ -15,16 +15,11 @@ import { TableEmptyState } from "@/components/primitives/data-table/table-empty-
 import { GlassCard } from "@/components/primitives/glass-card";
 import {
   getCarrierTypeProfiles,
-  getLoadUnitProfiles,
   type CarrierTypeProfile,
-  type LoadUnitProfile,
 } from "@/lib/api/facility-profiles";
 import { Permissions } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
-import {
-  RegisterCarrierProfileDialog,
-  RegisterLoadUnitProfileDialog,
-} from "./register-profile-dialogs";
+import { RegisterCarrierProfileDialog } from "./register-profile-dialogs";
 
 export function FacilityProfilesExperience() {
   return (
@@ -39,18 +34,9 @@ function Inner() {
   const canWrite = hasPermission(Permissions.Facility.ProfileWrite);
 
   const [carriers, setCarriers] = useState<CarrierTypeProfile[]>([]);
-  const [carrierFilter, setCarrierFilter] = useState("");
-  const [loadUnits, setLoadUnits] = useState<LoadUnitProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [carrierDialog, setCarrierDialog] = useState(false);
-  const [loadUnitDialog, setLoadUnitDialog] = useState(false);
-
-  const loadUnitsFor = useCallback((code: string) => {
-    getLoadUnitProfiles(code || undefined)
-      .then(setLoadUnits)
-      .catch((e: Error) => setError(e.message));
-  }, []);
 
   const reloadCarriers = useCallback(() => {
     getCarrierTypeProfiles()
@@ -62,11 +48,10 @@ function Inner() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    Promise.all([getCarrierTypeProfiles(), getLoadUnitProfiles()])
-      .then(([c, l]) => {
+    getCarrierTypeProfiles()
+      .then((c) => {
         if (cancelled) return;
         setCarriers(c);
-        setLoadUnits(l);
       })
       .catch((e: Error) => !cancelled && setError(e.message))
       .finally(() => !cancelled && setLoading(false));
@@ -86,7 +71,7 @@ function Inner() {
             Facility reference
           </h1>
           <p className="text-[12.5px] text-[var(--color-ink-500)]">
-            Carrier & load-unit profiles.
+            Carrier type profiles.
           </p>
         </div>
       </header>
@@ -158,79 +143,6 @@ function Inner() {
               </DataTableShell>
             )}
           </Section>
-
-          <Section
-            title="Load unit profiles"
-            icon={Boxes}
-            count={loadUnits.length}
-            aside={
-              <div className="flex items-center gap-2">
-                <select
-                value={carrierFilter}
-                onChange={(e) => {
-                  setCarrierFilter(e.target.value);
-                  loadUnitsFor(e.target.value);
-                }}
-                className={inputClass}
-              >
-                <option value="">All carrier types</option>
-                {carriers.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.code}
-                  </option>
-                ))}
-              </select>
-                {canWrite && (
-                  <button type="button" onClick={() => setLoadUnitDialog(true)} className={registerBtn}>
-                    <Plus className="h-3.5 w-3.5" strokeWidth={2.4} />
-                    Register
-                  </button>
-                )}
-              </div>
-            }
-          >
-            {loadUnits.length === 0 ? (
-              <TableEmptyState
-                variant={carrierFilter ? "no-filter-match" : "no-data"}
-                title="No load-unit profiles"
-                body={carrierFilter ? "None for this carrier type." : "Register load units to see them here."}
-                icon={Boxes}
-              />
-            ) : (
-              <DataTableShell>
-                <DataTableHead>
-                  <TableTh>Code</TableTh>
-                  <TableTh>Name</TableTh>
-                  <TableTh>Carrier</TableTh>
-                  <TableTh align="right">Dimensions (mm)</TableTh>
-                  <TableTh align="right">Max gross</TableTh>
-                </DataTableHead>
-                <DataTableBody>
-                  {loadUnits.map((l) => (
-                    <tr key={l.id} className="border-t border-white/40 dark:border-white/[0.05]">
-                      <TableTd>
-                        <span className="font-mono text-[12.5px] font-semibold text-[var(--color-ink-900)]">{l.code}</span>
-                      </TableTd>
-                      <TableTd>
-                        <span className="text-[12.5px] text-[var(--color-ink-800)]">{l.displayName}</span>
-                      </TableTd>
-                      <TableTd>
-                        <span className="font-mono text-[11.5px] text-[var(--color-ink-600)]">{l.carrierTypeCode}</span>
-                      </TableTd>
-                      <TableTd align="right">
-                        <span className="font-mono text-[12px] tabular-nums text-[var(--color-ink-700)]">
-                          {l.lengthMm}×{l.widthMm}×{l.heightMm}
-                        </span>
-                      </TableTd>
-                      <TableTd align="right">
-                        <span className="font-mono text-[12px] tabular-nums text-[var(--color-ink-700)]">{l.maxGrossWeightKg} kg</span>
-                      </TableTd>
-                    </tr>
-                  ))}
-                </DataTableBody>
-              </DataTableShell>
-            )}
-          </Section>
         </>
       )}
 
@@ -238,12 +150,6 @@ function Inner() {
         open={carrierDialog}
         onClose={() => setCarrierDialog(false)}
         onCreated={reloadCarriers}
-      />
-      <RegisterLoadUnitProfileDialog
-        open={loadUnitDialog}
-        carriers={carriers}
-        onClose={() => setLoadUnitDialog(false)}
-        onCreated={() => loadUnitsFor(carrierFilter)}
       />
     </div>
   );

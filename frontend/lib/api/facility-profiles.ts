@@ -1,6 +1,9 @@
 // Client for Facility read endpoints not covered by lib/api/facility.ts:
-//   GET /api/v1/facility/carrier-type-profiles          → CarrierTypeProfileDto[]
-//   GET /api/v1/facility/load-unit-profiles?carrierType → LoadUnitProfileDto[]
+//   GET /api/v1/facility/carrier-type-profiles → CarrierTypeProfileDto[]
+//
+// The load-unit-profile catalogue was removed in carrier-tracking P0.1 — it
+// had no consumer outside its own CRUD. Item.loadUnitProfileCode survives as
+// free text on the order payload; it was never validated against a catalogue.
 
 // NB: the backend property "AMRCapability" serializes to camelCase as
 // "aMRCapability" (System.Text.Json lowercases only the first character).
@@ -12,17 +15,6 @@ export type CarrierTypeProfile = {
   maxWeightKg: number | null;
   maxSlots: number | null;
   description: string | null;
-};
-
-export type LoadUnitProfile = {
-  id: string;
-  code: string;
-  displayName: string;
-  lengthMm: number;
-  widthMm: number;
-  heightMm: number;
-  maxGrossWeightKg: number;
-  carrierTypeCode: string;
 };
 
 async function getJson<T>(url: string): Promise<T> {
@@ -42,11 +34,6 @@ async function getJson<T>(url: string): Promise<T> {
 
 export function getCarrierTypeProfiles(): Promise<CarrierTypeProfile[]> {
   return getJson<CarrierTypeProfile[]>("/api/facility/carrier-type-profiles");
-}
-
-export function getLoadUnitProfiles(carrierTypeCode?: string): Promise<LoadUnitProfile[]> {
-  const qs = carrierTypeCode ? `?carrierTypeCode=${encodeURIComponent(carrierTypeCode)}` : "";
-  return getJson<LoadUnitProfile[]>(`/api/facility/load-unit-profiles${qs}`);
 }
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
@@ -85,18 +72,3 @@ export function createCarrierTypeProfile(
   return postJson<string>("/api/facility/carrier-type-profiles", input);
 }
 
-export type CreateLoadUnitProfileInput = {
-  code: string;
-  displayName: string;
-  lengthMm: number;
-  widthMm: number;
-  heightMm: number;
-  maxGrossWeightKg: number;
-  carrierTypeCode: string;
-};
-
-export function createLoadUnitProfile(
-  input: CreateLoadUnitProfileInput,
-): Promise<string> {
-  return postJson<string>("/api/facility/load-unit-profiles", input);
-}

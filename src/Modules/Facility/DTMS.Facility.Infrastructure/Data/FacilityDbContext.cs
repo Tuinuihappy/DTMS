@@ -10,7 +10,6 @@ public class FacilityDbContext : DbContext
     public DbSet<Map> Maps { get; set; } = null!;
     public DbSet<Station> Stations { get; set; } = null!;
     public DbSet<CarrierTypeProfile> CarrierTypeProfiles { get; set; } = null!;
-    public DbSet<LoadUnitProfile> LoadUnitProfiles { get; set; } = null!;
 
     public FacilityDbContext(DbContextOptions<FacilityDbContext> options) : base(options) { }
 
@@ -89,20 +88,6 @@ public class FacilityDbContext : DbContext
             b.Property(c => c.MaxWeightKg);
             b.Property(c => c.MaxSlots);
             b.Property(c => c.Description).HasMaxLength(500);
-        });
-
-        modelBuilder.Entity<LoadUnitProfile>(b =>
-        {
-            b.HasKey(p => p.Id);
-            b.Property(p => p.Code).HasMaxLength(50).IsRequired();
-            b.HasIndex(p => p.Code).IsUnique();
-            b.Property(p => p.DisplayName).HasMaxLength(200).IsRequired();
-            b.Property(p => p.LengthMm).IsRequired();
-            b.Property(p => p.WidthMm).IsRequired();
-            b.Property(p => p.HeightMm).IsRequired();
-            b.Property(p => p.MaxGrossWeightKg).IsRequired();
-            b.Property(p => p.CarrierTypeCode).HasMaxLength(50).IsRequired();
-            b.HasIndex(p => p.CarrierTypeCode);
         });
 
         base.OnModelCreating(modelBuilder);

@@ -141,12 +141,15 @@ function formFromOrder(o: DeliveryOrderDetailDto): FormState {
       // sees what they're about to overwrite. Closed by default for
       // items where it doesn't apply.
       advancedOpen: Boolean(
-        it.loadUnitProfileCode ||
-          it.dimensions ||
+        it.dimensions ||
           it.temperature ||
           it.hazmat ||
           (it.handlingInstructions && it.handlingInstructions.length > 0),
       ),
+      // Carrier-tracking P0.1 removed the load-unit catalogue and this
+      // field's input, but the value is still round-tripped so editing an
+      // existing draft doesn't silently NULL out a code someone already set.
+      // The column itself goes away in P6.
       loadUnitProfileCode: it.loadUnitProfileCode ?? "",
       lengthMm: it.dimensions ? String(it.dimensions.lengthMm) : "",
       widthMm: it.dimensions ? String(it.dimensions.widthMm) : "",
@@ -805,19 +808,6 @@ export function CreateOrderDialog({
                                 className="overflow-hidden"
                               >
                                 <div className="mt-3 space-y-3 border-t border-white/40 pt-3 dark:border-white/[0.06]">
-                                  <Field label="Load unit profile" compact>
-                                    <input
-                                      value={it.loadUnitProfileCode}
-                                      onChange={(e) =>
-                                        updateItem(idx, {
-                                          loadUnitProfileCode: e.target.value,
-                                        })
-                                      }
-                                      placeholder="EU-PALLET, AMR-TOTE-M…"
-                                      className={inputCls}
-                                    />
-                                  </Field>
-
                                   <div>
                                     <span className="block mb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-500)]">
                                       Dimensions (mm)

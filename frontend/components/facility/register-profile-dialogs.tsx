@@ -4,11 +4,7 @@ import { Boxes, Loader2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { useEffect, useState } from "react";
-import {
-  createCarrierTypeProfile,
-  createLoadUnitProfile,
-  type CarrierTypeProfile,
-} from "@/lib/api/facility-profiles";
+import { createCarrierTypeProfile } from "@/lib/api/facility-profiles";
 import { cn } from "@/lib/utils";
 
 // ── shared modal shell ─────────────────────────────────────────────────────
@@ -201,121 +197,6 @@ export function RegisterCarrierProfileDialog({
       </div>
       <Field label="Description">
         <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="optional" className={inputCls} />
-      </Field>
-    </ModalShell>
-  );
-}
-
-// ── Load unit profile ───────────────────────────────────────────────────────
-export function RegisterLoadUnitProfileDialog({
-  open,
-  carriers,
-  onClose,
-  onCreated,
-}: {
-  open: boolean;
-  carriers: CarrierTypeProfile[];
-  onClose: () => void;
-  onCreated: () => void;
-}) {
-  const [code, setCode] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [len, setLen] = useState("");
-  const [wid, setWid] = useState("");
-  const [hei, setHei] = useState("");
-  const [maxGross, setMaxGross] = useState("");
-  const [carrier, setCarrier] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open) {
-      setCode("");
-      setDisplayName("");
-      setLen("");
-      setWid("");
-      setHei("");
-      setMaxGross("");
-      setCarrier(carriers[0]?.code ?? "");
-      setBusy(false);
-      setError(null);
-    }
-  }, [open, carriers]);
-
-  const canSubmit =
-    code.trim() !== "" &&
-    displayName.trim() !== "" &&
-    carrier !== "" &&
-    len.trim() !== "" &&
-    wid.trim() !== "" &&
-    hei.trim() !== "" &&
-    maxGross.trim() !== "";
-
-  const submit = async () => {
-    if (!canSubmit) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await createLoadUnitProfile({
-        code: code.trim(),
-        displayName: displayName.trim(),
-        lengthMm: Number(len),
-        widthMm: Number(wid),
-        heightMm: Number(hei),
-        maxGrossWeightKg: Number(maxGross),
-        carrierTypeCode: carrier,
-      });
-      onCreated();
-      onClose();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <ModalShell
-      open={open}
-      title="Register load unit"
-      onClose={onClose}
-      busy={busy}
-      error={error}
-      onSubmit={() => void submit()}
-      submitLabel="Register"
-      canSubmit={canSubmit}
-    >
-      <div className="flex gap-3">
-        <Field label="Code" className="flex-1">
-          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="BOX-S" className={inputCls} />
-        </Field>
-        <Field label="Carrier type" className="flex-1">
-          <select value={carrier} onChange={(e) => setCarrier(e.target.value)} className={inputCls}>
-            {carriers.length === 0 && <option value="">No carriers</option>}
-            {carriers.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.code}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-      <Field label="Display name">
-        <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Small box" className={inputCls} />
-      </Field>
-      <div className="flex gap-3">
-        <Field label="Length (mm)" className="flex-1">
-          <input type="number" value={len} onChange={(e) => setLen(e.target.value)} className={inputCls} />
-        </Field>
-        <Field label="Width (mm)" className="flex-1">
-          <input type="number" value={wid} onChange={(e) => setWid(e.target.value)} className={inputCls} />
-        </Field>
-        <Field label="Height (mm)" className="flex-1">
-          <input type="number" value={hei} onChange={(e) => setHei(e.target.value)} className={inputCls} />
-        </Field>
-      </div>
-      <Field label="Max gross (kg)">
-        <input type="number" value={maxGross} onChange={(e) => setMaxGross(e.target.value)} className={inputCls} />
       </Field>
     </ModalShell>
   );
