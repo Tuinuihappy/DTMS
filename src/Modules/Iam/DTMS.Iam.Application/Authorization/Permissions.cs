@@ -73,6 +73,13 @@ public static class Permissions
         public static readonly PermissionDefinition VehicleMaintenance = new("dtms:fleet:vehicle:maintain", "Put a vehicle into / out of maintenance", "Fleet");
         public static readonly PermissionDefinition GroupWrite = new("dtms:fleet:group:write", "Manage fleet groups", "Fleet");
         public static readonly PermissionDefinition ChargingPolicyWrite = new("dtms:fleet:charging-policy:write", "Manage charging policy", "Fleet");
+        // ADR-019 — carrier catalogue. Renamed from dtms:facility:profile:*
+        // when the entity moved out of Facility; the codes are new, so grants
+        // must be re-issued on the external auth service (user permissions
+        // ride inline in the LDAP JWT — a rename only takes effect once the
+        // holder obtains a fresh token).
+        public static readonly PermissionDefinition CarrierTypeRead = new("dtms:fleet:carrier-type:read", "Read carrier types", "Fleet");
+        public static readonly PermissionDefinition CarrierTypeWrite = new("dtms:fleet:carrier-type:write", "Manage carrier types", "Fleet");
     }
 
     public static class Planning
@@ -107,8 +114,9 @@ public static class Permissions
         // together with topology-overlay:write / shelf:release /
         // resource:write when those Facility domains were deleted.
         public static readonly PermissionDefinition WarehouseWrite = new("dtms:facility:warehouse:write", "Manage warehouses", "Facility");
-        public static readonly PermissionDefinition ProfileRead = new("dtms:facility:profile:read", "Read facility profiles", "Facility");
-        public static readonly PermissionDefinition ProfileWrite = new("dtms:facility:profile:write", "Manage facility profiles", "Facility");
+        // ADR-019: profile:read / profile:write moved to Fleet as
+        // carrier-type:read / carrier-type:write when the carrier catalogue
+        // left this module (the LoadUnitProfile half was deleted outright).
     }
 
     public static class Iam

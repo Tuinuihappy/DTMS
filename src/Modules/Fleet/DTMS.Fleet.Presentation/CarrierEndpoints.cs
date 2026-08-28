@@ -12,13 +12,6 @@ namespace DTMS.Fleet.Presentation;
 /// Carrier endpoints (ADR-019). Separate from VehicleEndpoints because
 /// carriers are a distinct asset class that shares nothing with the vendor
 /// vehicle surface — no RIOT3 identity, no import, no state webhook.
-///
-/// <para>Permission note: these still carry <c>Permissions.Facility.Profile*</c>
-/// while the routes move. The rename to <c>dtms:fleet:carrier-type:*</c> is a
-/// separate commit (P0.2b), held back so the schema move can ship without
-/// waiting on grants being updated on the external auth service — user
-/// permissions ride inline in the LDAP JWT, so a rename only takes effect
-/// once affected users obtain a fresh token.</para>
 /// </summary>
 public static class CarrierEndpoints
 {
@@ -33,12 +26,12 @@ public static class CarrierEndpoints
             return result.IsSuccess
                 ? Results.Created($"/api/v1/fleet/carrier-types/{result.Value}", result.Value)
                 : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Facility.ProfileWrite);
+        }).RequirePermission(Permissions.Fleet.CarrierTypeWrite);
 
         group.MapGet("/carrier-types", async (ISender sender) =>
         {
             var result = await sender.Send(new GetCarrierTypesQuery());
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.Facility.ProfileRead);
+        }).RequirePermission(Permissions.Fleet.CarrierTypeRead);
     }
 }

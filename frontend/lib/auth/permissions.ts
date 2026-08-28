@@ -11,9 +11,13 @@ export const Permissions = {
     ItemRead: "dtms:deliveryorder:item:read",
   },
   Facility: {
-    ProfileRead: "dtms:facility:profile:read",
-    ProfileWrite: "dtms:facility:profile:write",
     MapRead: "dtms:facility:map:read",
+  },
+  Fleet: {
+    // ADR-019 — renamed from Facility.Profile* when the carrier catalogue
+    // moved to Fleet. New codes, so holders need a re-issued grant.
+    CarrierTypeRead: "dtms:fleet:carrier-type:read",
+    CarrierTypeWrite: "dtms:fleet:carrier-type:write",
   },
   Dispatch: {
     TripRead: "dtms:dispatch:trip:read",

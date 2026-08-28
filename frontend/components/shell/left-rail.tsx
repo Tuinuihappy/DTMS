@@ -169,7 +169,7 @@ const actions: RailAction[] = [
         label: "Reference",
         href: "/facility/profiles",
         hint: "Carrier type profiles",
-        requires: Permissions.Facility.ProfileRead,
+        requires: Permissions.Fleet.CarrierTypeRead,
       },
     ],
   },

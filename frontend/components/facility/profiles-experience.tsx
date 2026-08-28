@@ -23,7 +23,7 @@ import { RegisterCarrierProfileDialog } from "./register-profile-dialogs";
 
 export function FacilityProfilesExperience() {
   return (
-    <PermissionGuard requires={Permissions.Facility.ProfileRead}>
+    <PermissionGuard requires={Permissions.Fleet.CarrierTypeRead}>
       <Inner />
     </PermissionGuard>
   );
@@ -31,7 +31,7 @@ export function FacilityProfilesExperience() {
 
 function Inner() {
   const { hasPermission } = useAuth();
-  const canWrite = hasPermission(Permissions.Facility.ProfileWrite);
+  const canWrite = hasPermission(Permissions.Fleet.CarrierTypeWrite);
 
   const [carriers, setCarriers] = useState<CarrierTypeProfile[]>([]);
   const [loading, setLoading] = useState(true);
