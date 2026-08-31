@@ -187,11 +187,18 @@ fleet."CarrierTypes"          -- moved from facility."CarrierTypeProfiles"
   Id · Code · DisplayName · AmrCapability · MaxWeightKg · MaxSlots · Description
 
 fleet."Carriers"
-  Id · CarrierCode varchar(50) · CarrierTypeCode varchar(50) FK→CarrierTypes(Code)
+  Id · CarrierCode varchar(50) · CarrierTypeId uuid FK→CarrierTypes(Id) RESTRICT
   Barcode · DisplayName · Status varchar(20)  -- Available|InUse|Maintenance|Retired
-  CurrentTripId uuid · CurrentLocationCode · LastSeenAt
-  CommissionedAt · RetiredAt · xmin
-  UNIQUE(CarrierCode) · UNIQUE(Barcode) WHERE NOT NULL · IX(Status, CarrierTypeCode)
+  MaintenanceReason · MaintenanceSince
+  CurrentLocationCode · LastSeenAt · CurrentTripId uuid
+  CommissionedAt · RetiredAt · RetireReason
+  CreatedAt · CreatedBy · ModifiedAt · ModifiedBy · xmin
+  UNIQUE(CarrierCode) · UNIQUE(Barcode) WHERE NOT NULL · IX(Status, CarrierTypeId)
+
+fleet."CarrierMaintenanceLog"                 -- one row per repair episode
+  Id · CarrierId FK→Carriers(Id) CASCADE · Reason
+  StartedAt · StartedBy · EndedAt · EndedBy · Outcome
+  IX(CarrierId, StartedAt DESC) · UNIQUE(CarrierId) WHERE EndedAt IS NULL
 
 fleet."CarrierAssignments"
   Id · CarrierId FK→Carriers cascade · TripId uuid (no FK) · TripAttemptNumber
@@ -219,6 +226,14 @@ fleet."ActiveTrips"                          -- projection, not a source of trut
 ```
 
 The `❄` columns are snapshots frozen at write time, following `Trip.PickupLocationCode` and `Trip.TemplateNameAtDispatch`. They are what makes requirement 5 hold: retiring or renaming a carrier cannot rewrite history.
+
+> **Amended during P1 implementation (2026-08-31).** Three details of the sketch above changed once the code was written. None reverses a decision in this ADR; they correct how it is realised.
+>
+> 1. **The carrier's FK targets `CarrierTypes.Id`, not `.Code`.** `Code` carries only a unique *index*, and EF requires an FK's principal to be a *key*. Declaring `HasPrincipalKey(t => t.Code)` would add an alternate key, which EF materialises as a second UNIQUE constraint — and therefore a second index — beside `IX_CarrierTypes_Code`. No other table in this solution uses `HasAlternateKey`. Callers still speak in carrier-type codes; handlers resolve them to ids.
+> 2. **Maintenance keeps a `CarrierMaintenanceLog` rather than only a status + reason.** The operation is reactive — nothing is scheduled — so the full `MaintenanceRecord` shape Vehicle uses buys capability nobody needs. But history is the one thing that cannot be reconstructed later, so it is recorded from the first day at the cost of one table.
+> 3. **Removal is two operations, and `Retired` is reversible.** `retire` keeps the row, its history, and its code reservation forever; `delete` destroys the row and frees the code, and is permitted only when the carrier has no history at all. That guard is what lets both rules stand together: anything with history cannot be deleted, so no historical statement about a code can ever become ambiguous. `un-retire` exists because without it a mis-clicked retirement is unrecoverable — it can neither return to service (that path starts from `Maintenance`) nor be deleted (that path requires `Available`).
+>
+> Carriers also carry `CreatedAt`/`CreatedBy`/`ModifiedAt`/`ModifiedBy` like `ActionTemplate`, the closest existing admin-managed catalogue, and `CommissionedAt` is nullable and backdatable — the date the cart entered service, distinct from when its row was created.
 
 The two partial unique indexes carry the core invariants — a carrier belongs to at most one open trip, and an item sits on at most one carrier — enforced by Postgres rather than by application locking.
 

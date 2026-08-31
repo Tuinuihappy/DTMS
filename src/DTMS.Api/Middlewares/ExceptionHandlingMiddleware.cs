@@ -53,6 +53,15 @@ public class ExceptionHandlingMiddleware
             // the row between load and save. A retriable conflict, not a 500.
             Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException =>
                 (StatusCodes.Status409Conflict, "Concurrent Update"),
+            // Unique-constraint rejection (SQLSTATE 23505) — the sibling of the
+            // clash above: someone else took the value between the handler's
+            // pre-check and the INSERT. An application-level pre-check can never
+            // close that window, so without this arm every duplicate code / key
+            // fell to the 500 branch below and the caller got a scrubbed
+            // "unexpected error" for what is a plain conflict.
+            Microsoft.EntityFrameworkCore.DbUpdateException dbEx
+                when Infrastructure.Persistence.PostgresErrors.IsUniqueViolation(dbEx) =>
+                (StatusCodes.Status409Conflict, "Duplicate Value"),
             // Mode-disabled is a deployment-configuration outcome, not a
             // server fault — 422 per the IDispatchStrategyRegistry contract,
             // and the message is written for the caller.
@@ -70,11 +79,27 @@ public class ExceptionHandlingMiddleware
         var isServerError = statusCode == StatusCodes.Status500InternalServerError;
         var traceId = Activity.Current?.TraceId.ToString() ?? context.TraceIdentifier;
 
+        // DbUpdateException is the one modeled arm that doesn't author a
+        // caller-facing message — EF's own text is "An error occurred while
+        // saving the entity changes. See the inner exception for details.",
+        // and the inner Postgres message names the violated index, which is
+        // schema detail the caller has no use for. Supply a plain one instead;
+        // the field-specific wording comes from each handler's own pre-check on
+        // the normal path, and this arm only fires when someone won the race.
+        var detail = exception switch
+        {
+            _ when isServerError => "An unexpected error occurred.",
+            Microsoft.EntityFrameworkCore.DbUpdateException dbEx
+                when Infrastructure.Persistence.PostgresErrors.IsUniqueViolation(dbEx) =>
+                "A record with the same unique value already exists.",
+            _ => exception.Message
+        };
+
         var problemDetails = new ProblemDetails
         {
             Status = statusCode,
             Title = title,
-            Detail = isServerError ? "An unexpected error occurred." : exception.Message,
+            Detail = detail,
             Instance = context.Request.Path
         };
         // Opaque correlation id so support can find the real error in the logs.

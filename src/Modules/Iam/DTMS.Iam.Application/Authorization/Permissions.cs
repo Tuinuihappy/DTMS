@@ -80,6 +80,15 @@ public static class Permissions
         // holder obtains a fresh token).
         public static readonly PermissionDefinition CarrierTypeRead = new("dtms:fleet:carrier-type:read", "Read carrier types", "Fleet");
         public static readonly PermissionDefinition CarrierTypeWrite = new("dtms:fleet:carrier-type:write", "Manage carrier types", "Fleet");
+        // ADR-019 P1 — the physical carrier registry. Read/Write are the usual
+        // pair; Maintain is split out so a repair technician can take a cart out
+        // of service and bring it back without also being able to edit or retire
+        // the registry. Delete is its own code because it destroys the row
+        // outright (only ever permitted for carriers with no history at all).
+        public static readonly PermissionDefinition CarrierRead = new("dtms:fleet:carrier:read", "Read carriers", "Fleet");
+        public static readonly PermissionDefinition CarrierWrite = new("dtms:fleet:carrier:write", "Register / edit / retire carriers", "Fleet");
+        public static readonly PermissionDefinition CarrierMaintain = new("dtms:fleet:carrier:maintain", "Put a carrier into / out of maintenance", "Fleet");
+        public static readonly PermissionDefinition CarrierDelete = new("dtms:fleet:carrier:delete", "Permanently delete a carrier", "Fleet");
     }
 
     public static class Planning

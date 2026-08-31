@@ -35,12 +35,5 @@ internal static class CallbackFanout
     /// caught here as an idempotent no-op.
     /// </summary>
     public static bool IsUniqueViolation(DbUpdateException ex)
-    {
-        for (var cur = ex.InnerException; cur is not null; cur = cur.InnerException)
-        {
-            if (cur is Npgsql.PostgresException pg && pg.SqlState == "23505")
-                return true;
-        }
-        return false;
-    }
+        => Persistence.PostgresErrors.IsUniqueViolation(ex);
 }

@@ -3,6 +3,7 @@ using DTMS.Api.Middlewares;
 using DTMS.SharedKernel.Exceptions;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DTMS.Api.UnitTests;
@@ -97,6 +98,67 @@ public class ExceptionHandlingMiddlewareTests
         body.GetProperty("detail").GetString().Should().Be(ex.Message);
         body.TryGetProperty("traceId", out _).Should().BeTrue();
     }
+
+    [Fact]
+    public async Task UniqueViolation_Maps409_WithoutLeakingTheIndexName()
+    {
+        // Unique violations are the sibling of DbUpdateConcurrencyException:
+        // someone else took the value between a handler's pre-check and the
+        // INSERT. Before this arm existed they fell to the 500 branch, so the
+        // caller got a scrubbed "unexpected error" for a plain conflict.
+        var body = await RunWith(UniqueViolation(
+            "duplicate key value violates unique constraint \"IX_Carriers_CarrierCode\""));
+
+        body.GetProperty("status").GetInt32().Should().Be(409);
+        body.GetProperty("title").GetString().Should().Be("Duplicate Value");
+        body.GetProperty("detail").GetString().Should()
+            .Be("A record with the same unique value already exists.");
+        // EF's own message says nothing useful, and the Postgres one names the
+        // index — neither belongs in the response.
+        body.GetProperty("detail").GetString().Should().NotContain("IX_Carriers_CarrierCode");
+        body.GetProperty("detail").GetString().Should().NotContain("inner exception");
+        body.TryGetProperty("traceId", out _).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task UniqueViolation_IsFoundDeeperInTheInnerChain()
+    {
+        // EF wraps the provider exception at varying depth depending on whether
+        // the failure came from SaveChanges, a retrying execution strategy, or a
+        // batched update — so the check walks the whole chain.
+        var nested = new DbUpdateException(
+            "An error occurred while saving the entity changes.",
+            new InvalidOperationException("retry wrapper",
+                UniqueViolationInner("duplicate key value violates unique constraint \"IX_Carriers_Barcode\"")));
+
+        var body = await RunWith(nested);
+
+        body.GetProperty("status").GetInt32().Should().Be(409);
+    }
+
+    [Fact]
+    public async Task NonUniqueDbUpdateException_StillFallsTo500()
+    {
+        // The arm must stay narrow: widening every DbUpdateException to 409
+        // would tell callers a genuine write failure was their fault.
+        var fkViolation = new DbUpdateException(
+            "An error occurred while saving the entity changes.",
+            new Npgsql.PostgresException(
+                "insert or update violates foreign key constraint",
+                "ERROR", "ERROR", "23503"));
+
+        var body = await RunWith(fkViolation);
+
+        body.GetProperty("status").GetInt32().Should().Be(500);
+        body.GetProperty("detail").GetString().Should().Be("An unexpected error occurred.");
+    }
+
+    private static DbUpdateException UniqueViolation(string messageText)
+        => new("An error occurred while saving the entity changes. See the inner exception for details.",
+               UniqueViolationInner(messageText));
+
+    private static Npgsql.PostgresException UniqueViolationInner(string messageText)
+        => new(messageText, "ERROR", "ERROR", "23505");
 
     // Drives the middleware with a pipeline that throws, then parses the JSON
     // body it wrote to the response.

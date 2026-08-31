@@ -142,11 +142,9 @@ public sealed class DeadLetterStore : IDeadLetterStore
         return true;
     }
 
+    // Consolidated into PostgresErrors — the shared version also walks the whole
+    // inner-exception chain rather than only the immediate inner, which this copy
+    // did. EF nests the provider exception at varying depth.
     private static bool IsUniqueViolation(DbUpdateException ex)
-    {
-        // Npgsql exposes the SQLSTATE via PostgresException.SqlState.
-        // 23505 = unique_violation. Match on that specifically rather
-        // than string-sniffing the message.
-        return ex.InnerException is Npgsql.PostgresException pg && pg.SqlState == "23505";
-    }
+        => Persistence.PostgresErrors.IsUniqueViolation(ex);
 }

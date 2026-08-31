@@ -17,6 +17,9 @@ public class FleetDbContext : DbContext
     public DbSet<VehicleGroup> VehicleGroups { get; set; } = null!;
     // ADR-019 — carrier catalogue, moved here from Facility in P0.2.
     public DbSet<CarrierType> CarrierTypes { get; set; } = null!;
+    // ADR-019 P1 — the physical carriers themselves + their maintenance history.
+    public DbSet<Carrier> Carriers { get; set; } = null!;
+    public DbSet<CarrierMaintenanceLog> CarrierMaintenanceLogs { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     internal DbSet<VehicleGroupMember> VehicleGroupMembers { get; set; } = null!;
 
@@ -124,6 +127,66 @@ public class FleetDbContext : DbContext
             b.Property(c => c.MaxWeightKg);
             b.Property(c => c.MaxSlots);
             b.Property(c => c.Description).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<Carrier>(b =>
+        {
+            b.HasKey(c => c.Id);
+            b.Property(c => c.CarrierCode).HasMaxLength(50).IsRequired();
+            // Unconditional, not filtered on RetiredAt: a code identifies one
+            // physical carrier forever, so "CART-0001 ran 47 trips" can never
+            // become ambiguous. Deleting frees the code, but only carriers with
+            // no history at all can be deleted — see Carrier.CanDelete.
+            b.HasIndex(c => c.CarrierCode).IsUnique();
+
+            b.Property(c => c.Barcode).HasMaxLength(100);
+            b.HasIndex(c => c.Barcode).IsUnique().HasFilter("\"Barcode\" IS NOT NULL");
+
+            b.Property(c => c.DisplayName).HasMaxLength(200);
+            b.Property(c => c.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+            b.Property(c => c.MaintenanceReason).HasMaxLength(500);
+            b.Property(c => c.CurrentLocationCode).HasMaxLength(100);
+            b.Property(c => c.RetireReason).HasMaxLength(500);
+            b.Property(c => c.CreatedBy).HasMaxLength(200);
+            b.Property(c => c.ModifiedBy).HasMaxLength(200);
+
+            // Backs the list page's status/type filter.
+            b.HasIndex(c => new { c.Status, c.CarrierTypeId });
+
+            // Ordinary FK to the principal's PRIMARY key. Pointing it at
+            // CarrierTypes.Code instead would need an alternate key — EF models
+            // that as a second UNIQUE constraint, which PostgreSQL implements
+            // with a second index alongside IX_CarrierTypes_Code, and no other
+            // table in this solution uses HasAlternateKey at all.
+            b.HasOne<CarrierType>()
+             .WithMany()
+             .HasForeignKey(c => c.CarrierTypeId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            b.Ignore(c => c.DomainEvents);
+            // xmin — same optimistic-concurrency posture as VehicleGroup and Trip.
+            b.Property<uint>("xmin").IsRowVersion().HasColumnName("xmin");
+        });
+
+        modelBuilder.Entity<CarrierMaintenanceLog>(b =>
+        {
+            b.ToTable("CarrierMaintenanceLog");
+            b.HasKey(l => l.Id);
+            b.Property(l => l.Reason).HasMaxLength(500).IsRequired();
+            b.Property(l => l.StartedBy).HasMaxLength(200).IsRequired();
+            b.Property(l => l.EndedBy).HasMaxLength(200);
+            b.Property(l => l.Outcome).HasMaxLength(500);
+
+            b.HasOne<Carrier>()
+             .WithMany()
+             .HasForeignKey(l => l.CarrierId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            // Newest-first history for one carrier.
+            b.HasIndex(l => new { l.CarrierId, l.StartedAt }).IsDescending(false, true);
+            // At most one open episode per carrier — enforced here rather than
+            // by a read-then-write check that two callers could both pass.
+            b.HasIndex(l => l.CarrierId).IsUnique().HasFilter("\"EndedAt\" IS NULL");
         });
 
         modelBuilder.Entity<OutboxMessage>(b =>
