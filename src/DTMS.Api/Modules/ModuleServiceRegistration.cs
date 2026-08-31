@@ -248,9 +248,11 @@ public static class ModuleServiceRegistration
         // ADR-019 — carrier catalogue, relocated from Facility in P0.2.
         services.AddScoped<DTMS.Fleet.Domain.Repositories.ICarrierTypeRepository,
                            DTMS.Fleet.Infrastructure.Repositories.CarrierTypeRepository>();
-        // ADR-019 P1 — the physical carrier registry.
+        // ADR-019 P1 — the physical carrier registry + its maintenance history.
         services.AddScoped<DTMS.Fleet.Domain.Repositories.ICarrierRepository,
                            DTMS.Fleet.Infrastructure.Repositories.CarrierRepository>();
+        services.AddScoped<DTMS.Fleet.Domain.Repositories.ICarrierMaintenanceLogRepository,
+                           DTMS.Fleet.Infrastructure.Repositories.CarrierMaintenanceLogRepository>();
         // Phase P3.2 — Fleet projections (vehicle state history + utilization snapshots).
         services.AddScoped<DTMS.Fleet.Application.Projections.IVehicleStateHistoryProjectionStore,
                            DTMS.Fleet.Infrastructure.Projections.VehicleStateHistoryProjectionStore>();

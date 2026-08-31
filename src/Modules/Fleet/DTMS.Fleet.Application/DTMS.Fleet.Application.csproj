@@ -10,6 +10,13 @@
     <PackageReference Include="MassTransit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Command handlers are internal sealed (module convention); the unit tests
+         exercise them directly rather than through MediatR. Same arrangement as
+         DTMS.Facility.Application ↔ Facility.UnitTests. -->
+    <InternalsVisibleTo Include="Fleet.UnitTests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
