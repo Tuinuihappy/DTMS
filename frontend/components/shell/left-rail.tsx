@@ -152,6 +152,13 @@ const actions: RailAction[] = [
         href: "/fleet/drivers",
         hint: "Roster & credentials",
       },
+      {
+        icon: <Package className="h-3.5 w-3.5" strokeWidth={2.1} />,
+        label: "Carrier",
+        href: "/fleet/carriers",
+        hint: "Racks & carts",
+        requires: Permissions.Fleet.CarrierRead,
+      },
     ],
   },
   {

@@ -83,6 +83,7 @@ export const config = {
     "/profile/:path*",
     "/delivery-orders/:path*",
     "/facility/:path*",
+    "/fleet/:path*",
     "/home/:path*",
     "/reports/:path*",
     "/dispatch/:path*",
