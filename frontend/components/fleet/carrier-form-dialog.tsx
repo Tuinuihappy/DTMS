@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { createCarrier, updateCarrier, type Carrier } from "@/lib/api/fleet-carriers";
-import type { CarrierTypeProfile } from "@/lib/api/facility-profiles";
+import type { CarrierTypeProfile } from "@/lib/api/fleet-carrier-types";
 import { cn } from "@/lib/utils";
 
 const toDateInput = (iso: string | null) => (iso ? iso.slice(0, 10) : "");

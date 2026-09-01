@@ -4,7 +4,7 @@ import { Boxes, Loader2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { useEffect, useState } from "react";
-import { createCarrierTypeProfile } from "@/lib/api/facility-profiles";
+import { createCarrierTypeProfile } from "@/lib/api/fleet-carrier-types";
 import { cn } from "@/lib/utils";
 
 // ── shared modal shell ─────────────────────────────────────────────────────
@@ -109,8 +109,8 @@ function ModalShell({
   );
 }
 
-// ── Carrier type profile ────────────────────────────────────────────────────
-export function RegisterCarrierProfileDialog({
+// ── Carrier type ────────────────────────────────────────────────────────────
+export function RegisterCarrierTypeDialog({
   open,
   onClose,
   onCreated,

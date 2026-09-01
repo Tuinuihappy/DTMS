@@ -17,7 +17,7 @@ import {
 } from "@/components/primitives/data-table/table-shell";
 import { TableEmptyState } from "@/components/primitives/data-table/table-empty-state";
 import { GlassCard } from "@/components/primitives/glass-card";
-import { getCarrierTypeProfiles, type CarrierTypeProfile } from "@/lib/api/facility-profiles";
+import { getCarrierTypeProfiles, type CarrierTypeProfile } from "@/lib/api/fleet-carrier-types";
 import { getCarriers, type Carrier, type CarrierStatus } from "@/lib/api/fleet-carriers";
 import { Permissions } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";

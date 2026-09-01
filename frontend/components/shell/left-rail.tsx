@@ -159,6 +159,13 @@ const actions: RailAction[] = [
         hint: "Racks & carts",
         requires: Permissions.Fleet.CarrierRead,
       },
+      {
+        icon: <Layers className="h-3.5 w-3.5" strokeWidth={2.1} />,
+        label: "Carrier type",
+        href: "/fleet/carrier-types",
+        hint: "Kinds of rack & cart",
+        requires: Permissions.Fleet.CarrierTypeRead,
+      },
     ],
   },
   {
@@ -170,13 +177,6 @@ const actions: RailAction[] = [
         label: "Map",
         href: "/facility/maps",
         hint: "Site layouts & zones",
-      },
-      {
-        icon: <Layers className="h-3.5 w-3.5" strokeWidth={2.1} />,
-        label: "Reference",
-        href: "/facility/profiles",
-        hint: "Carrier type profiles",
-        requires: Permissions.Fleet.CarrierTypeRead,
       },
     ],
   },

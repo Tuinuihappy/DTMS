@@ -1,5 +1,7 @@
-// Client for Facility read endpoints not covered by lib/api/facility.ts:
-//   GET /api/v1/facility/carrier-type-profiles → CarrierTypeProfileDto[]
+// Client for the carrier-type catalogue, which describes *kinds* of carrier.
+// The individual physical racks and carts live in lib/api/fleet-carriers.ts.
+//   GET  /api/v1/fleet/carrier-types → CarrierTypeDto[]
+//   POST /api/v1/fleet/carrier-types
 //
 // The load-unit-profile catalogue was removed in carrier-tracking P0.1 — it
 // had no consumer outside its own CRUD. Item.loadUnitProfileCode survives as
@@ -35,7 +37,7 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 export function getCarrierTypeProfiles(): Promise<CarrierTypeProfile[]> {
-  return getJson<CarrierTypeProfile[]>("/api/facility/carrier-type-profiles");
+  return getJson<CarrierTypeProfile[]>("/api/fleet/carrier-types");
 }
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
@@ -69,6 +71,6 @@ export type CreateCarrierTypeProfileInput = {
 export function createCarrierTypeProfile(
   input: CreateCarrierTypeProfileInput,
 ): Promise<string> {
-  return postJson<string>("/api/facility/carrier-type-profiles", input);
+  return postJson<string>("/api/fleet/carrier-types", input);
 }
 

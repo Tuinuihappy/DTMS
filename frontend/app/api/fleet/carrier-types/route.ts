@@ -1,11 +1,7 @@
 import type { NextRequest } from "next/server";
 import { proxyToBackend } from "@/lib/api/proxy-helpers";
 
-// The backend route moved to Fleet in carrier-tracking P0.2 (ADR-019). This
-// Next route keeps its own path for now so the page above it is untouched;
-// it moves to app/api/fleet/carrier-types in P1.2 along with the page.
-
-// GET /api/facility/carrier-type-profiles → backend list
+// GET /api/fleet/carrier-types → backend list
 export async function GET() {
   return proxyToBackend({
     method: "GET",
@@ -13,7 +9,7 @@ export async function GET() {
   });
 }
 
-// POST /api/facility/carrier-type-profiles → register a carrier type
+// POST /api/fleet/carrier-types → register a carrier type
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   return proxyToBackend({

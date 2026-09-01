@@ -16,12 +16,12 @@ import { GlassCard } from "@/components/primitives/glass-card";
 import {
   getCarrierTypeProfiles,
   type CarrierTypeProfile,
-} from "@/lib/api/facility-profiles";
+} from "@/lib/api/fleet-carrier-types";
 import { Permissions } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
-import { RegisterCarrierProfileDialog } from "./register-profile-dialogs";
+import { RegisterCarrierTypeDialog } from "./register-carrier-type-dialog";
 
-export function FacilityProfilesExperience() {
+export function CarrierTypesExperience() {
   return (
     <PermissionGuard requires={Permissions.Fleet.CarrierTypeRead}>
       <Inner />
@@ -146,7 +146,7 @@ function Inner() {
         </>
       )}
 
-      <RegisterCarrierProfileDialog
+      <RegisterCarrierTypeDialog
         open={carrierDialog}
         onClose={() => setCarrierDialog(false)}
         onCreated={reloadCarriers}
