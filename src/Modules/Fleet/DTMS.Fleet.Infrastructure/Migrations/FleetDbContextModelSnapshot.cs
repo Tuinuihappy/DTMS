@@ -23,6 +23,79 @@ namespace DTMS.Fleet.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("DTMS.Fleet.Domain.Entities.Attachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Bucket")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)");
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("CarrierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CarrierTypeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("MaintenanceLogId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("OriginalFileName")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ThumbnailKey")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UploadedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CarrierId")
+                        .HasFilter("\"CarrierId\" IS NOT NULL");
+
+                    b.HasIndex("CarrierTypeId")
+                        .HasFilter("\"CarrierTypeId\" IS NOT NULL");
+
+                    b.HasIndex("MaintenanceLogId")
+                        .HasFilter("\"MaintenanceLogId\" IS NOT NULL");
+
+                    b.HasIndex("ObjectKey")
+                        .IsUnique();
+
+                    b.ToTable("Attachments", "fleet", t =>
+                        {
+                            t.HasCheckConstraint("CK_Attachments_ExactlyOneOwner", "num_nonnulls(\"CarrierId\", \"CarrierTypeId\", \"MaintenanceLogId\") = 1");
+                        });
+                });
+
             modelBuilder.Entity("DTMS.Fleet.Domain.Entities.Carrier", b =>
                 {
                     b.Property<Guid>("Id")
@@ -537,6 +610,24 @@ namespace DTMS.Fleet.Infrastructure.Migrations
                         .HasForeignKey("CarrierTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("DTMS.Fleet.Domain.Entities.Attachment", b =>
+                {
+                    b.HasOne("DTMS.Fleet.Domain.Entities.Carrier", null)
+                        .WithMany()
+                        .HasForeignKey("CarrierId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("DTMS.Fleet.Domain.Entities.CarrierType", null)
+                        .WithMany()
+                        .HasForeignKey("CarrierTypeId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("DTMS.Fleet.Domain.Entities.CarrierMaintenanceLog", null)
+                        .WithMany()
+                        .HasForeignKey("MaintenanceLogId")
+                        .OnDelete(DeleteBehavior.Cascade);
                 });
 
             modelBuilder.Entity("DTMS.Fleet.Domain.Entities.CarrierMaintenanceLog", b =>

@@ -32,6 +32,9 @@ public class CarrierMaintenanceLogRepository : ICarrierMaintenanceLogRepository
             .OrderByDescending(l => l.StartedAt)
             .ToListAsync(ct);
 
+    public Task<bool> ExistsAsync(Guid id, CancellationToken ct = default)
+        => _db.CarrierMaintenanceLogs.AnyAsync(l => l.Id == id, ct);
+
     public async Task AddAsync(CarrierMaintenanceLog log, CancellationToken ct = default)
         => await _db.CarrierMaintenanceLogs.AddAsync(log, ct);
 }

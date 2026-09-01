@@ -15,5 +15,9 @@ public interface ICarrierMaintenanceLogRepository
     /// <summary>Newest first.</summary>
     Task<List<CarrierMaintenanceLog>> GetHistoryAsync(Guid carrierId, CancellationToken ct = default);
 
+    /// <summary>Whether this episode exists — so an attachment cannot be hung
+    /// off an id that was never a maintenance record.</summary>
+    Task<bool> ExistsAsync(Guid id, CancellationToken ct = default);
+
     Task AddAsync(CarrierMaintenanceLog log, CancellationToken ct = default);
 }

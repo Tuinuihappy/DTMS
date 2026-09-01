@@ -253,6 +253,12 @@ public static class ModuleServiceRegistration
                            DTMS.Fleet.Infrastructure.Repositories.CarrierRepository>();
         services.AddScoped<DTMS.Fleet.Domain.Repositories.ICarrierMaintenanceLogRepository,
                            DTMS.Fleet.Infrastructure.Repositories.CarrierMaintenanceLogRepository>();
+        // ADR-019 — images attached to a carrier, a carrier type, or one
+        // maintenance episode.
+        services.AddScoped<DTMS.Fleet.Domain.Repositories.IAttachmentRepository,
+                           DTMS.Fleet.Infrastructure.Repositories.AttachmentRepository>();
+        services.AddScoped<DTMS.Fleet.Application.Services.IAttachmentOwnerLookup,
+                           DTMS.Fleet.Application.Services.AttachmentOwnerLookup>();
         // Phase P3.2 — Fleet projections (vehicle state history + utilization snapshots).
         services.AddScoped<DTMS.Fleet.Application.Projections.IVehicleStateHistoryProjectionStore,
                            DTMS.Fleet.Infrastructure.Projections.VehicleStateHistoryProjectionStore>();

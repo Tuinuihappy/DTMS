@@ -36,6 +36,14 @@ public class FleetDomainEventMapper : IDomainEventToIntegrationEventMapper
                     evt.OccurredOn,
                     evt.VehicleId)
             ],
+            AttachmentObjectsOrphanedDomainEvent evt =>
+            [
+                new AttachmentObjectsOrphanedIntegrationEvent(
+                    evt.EventId,
+                    evt.OccurredOn,
+                    evt.Bucket,
+                    evt.ObjectKeys)
+            ],
             _ => []
         };
     }

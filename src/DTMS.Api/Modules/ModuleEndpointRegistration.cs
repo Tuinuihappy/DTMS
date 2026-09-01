@@ -21,6 +21,7 @@ public static class ModuleEndpointRegistration
         app.MapWmsLocationEndpoints();   // WMS PR-1 — /api/v1/wms/locations (list + manual sync trigger)
         app.MapFleetEndpoints();
         app.MapCarrierEndpoints();       // ADR-019 — /api/v1/fleet/carrier-types
+        app.MapAttachmentEndpoints();    // ADR-019 — /api/v1/fleet/attachments
         app.MapDeliveryOrderEndpoints();
         // Phase S.2.2 — federated source-system endpoint group at
         // /api/v1/source/* (separate from the admin-side

@@ -20,6 +20,7 @@ public class FleetDbContext : DbContext
     // ADR-019 P1 — the physical carriers themselves + their maintenance history.
     public DbSet<Carrier> Carriers { get; set; } = null!;
     public DbSet<CarrierMaintenanceLog> CarrierMaintenanceLogs { get; set; } = null!;
+    public DbSet<Attachment> Attachments { get; set; } = null!;
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     internal DbSet<VehicleGroupMember> VehicleGroupMembers { get; set; } = null!;
 
@@ -187,6 +188,56 @@ public class FleetDbContext : DbContext
             // At most one open episode per carrier — enforced here rather than
             // by a read-then-write check that two callers could both pass.
             b.HasIndex(l => l.CarrierId).IsUnique().HasFilter("\"EndedAt\" IS NULL");
+        });
+
+        modelBuilder.Entity<Attachment>(b =>
+        {
+            b.ToTable("Attachments", t => t.HasCheckConstraint(
+                "CK_Attachments_ExactlyOneOwner",
+                "num_nonnulls(\"CarrierId\", \"CarrierTypeId\", \"MaintenanceLogId\") = 1"));
+
+            b.HasKey(a => a.Id);
+            b.Property(a => a.ObjectKey).HasMaxLength(300).IsRequired();
+            b.Property(a => a.ThumbnailKey).HasMaxLength(300);
+            b.Property(a => a.Bucket).HasMaxLength(63).IsRequired();
+            b.Property(a => a.ContentType).HasMaxLength(100).IsRequired();
+            b.Property(a => a.OriginalFileName).HasMaxLength(260);
+            b.Property(a => a.Caption).HasMaxLength(500);
+            b.Property(a => a.UploadedBy).HasMaxLength(200).IsRequired();
+
+            // One row per stored object. Also what turns a replayed confirm
+            // into a clean 409 instead of a duplicate row pointing at the
+            // same bytes.
+            b.HasIndex(a => a.ObjectKey).IsUnique();
+
+            // Cascade on every owner: an image is not history the way a
+            // maintenance episode is, so it must not block deleting the thing
+            // it describes. The bytes are removed separately — a database
+            // cascade cannot reach into object storage, which is why the
+            // delete handlers read the keys out before the row goes.
+            b.HasOne<Carrier>()
+             .WithMany()
+             .HasForeignKey(a => a.CarrierId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne<CarrierType>()
+             .WithMany()
+             .HasForeignKey(a => a.CarrierTypeId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne<CarrierMaintenanceLog>()
+             .WithMany()
+             .HasForeignKey(a => a.MaintenanceLogId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            // Filtered so the index holds only rows of that owner kind rather
+            // than a long tail of NULLs — every lookup is "images for one
+            // owner", never "all rows where this column is null".
+            b.HasIndex(a => a.CarrierId).HasFilter("\"CarrierId\" IS NOT NULL");
+            b.HasIndex(a => a.CarrierTypeId).HasFilter("\"CarrierTypeId\" IS NOT NULL");
+            b.HasIndex(a => a.MaintenanceLogId).HasFilter("\"MaintenanceLogId\" IS NOT NULL");
+
+            b.Ignore(a => a.DomainEvents);
         });
 
         modelBuilder.Entity<OutboxMessage>(b =>
