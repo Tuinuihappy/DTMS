@@ -58,6 +58,22 @@ public static class AdminManualOperatorEndpoints
         .WithSummary("List active Manual trips (not yet dropped).")
         .RequirePermission(Permissions.Operator.PoolRead);
 
+        // Gated on reading the trip, not on anything photo-specific: a
+        // dispatcher who can open a trip can see the evidence attached to it,
+        // and a separate permission would double the check without changing
+        // who gets in.
+        group.MapGet("/trips/{tripId:guid}/pod", async (
+            Guid tripId, ISender sender, CancellationToken ct) =>
+        {
+            var result = await sender.Send(new GetTripPodPhotosQuery(tripId), ct);
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.Problem(result.Error);
+        })
+        .WithName("AdminGetTripPodPhotos")
+        .WithSummary("Proof-of-delivery photos for a Manual trip, as time-limited URLs.")
+        .RequirePermission(Permissions.Dispatch.TripRead);
+
         group.MapGet("/geofence-overrides", async (ISender sender, CancellationToken ct) =>
         {
             var result = await sender.Send(new ListPendingOverridesQuery(), ct);

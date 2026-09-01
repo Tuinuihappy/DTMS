@@ -36,6 +36,7 @@ import { SnapshotInspector } from "./snapshot-inspector";
 import { TripActionBar } from "./trip-action-bar";
 import { DateTime } from "@/components/primitives/date-time";
 import { TripItemsSection } from "./trip-items-section";
+import { TripPodSection } from "./manual/trip-pod-section";
 import { OmsNotificationSection } from "@/components/delivery-orders/oms-notification-section";
 
 // Slide-in drawer over the order detail drawer. Mirrors the existing
@@ -366,6 +367,10 @@ export function TripDetailDrawer({
                       item's owning order context. Clicking an OrderRef
                       opens the Order drawer stacked on top. */}
                   <TripItemsSection tripId={data.id} onOpenOrder={onOpenOrder} />
+
+                  {/* Renders nothing unless the trip actually has operator
+                      photos, so AMR trips are unaffected. */}
+                  <TripPodSection tripId={data.id} />
 
                   {isTripInFlight(data.status) && (
                     <section>

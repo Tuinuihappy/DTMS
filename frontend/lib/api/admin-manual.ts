@@ -71,6 +71,24 @@ export const listActiveManualTrips = () =>
 export const listPendingOverrides = () =>
   getJson<OverrideQueueRow[]>("/api/admin/manual/geofence-overrides");
 
+export type TripPodPhoto = {
+  objectKey: string;
+  /** Time-limited. Regenerated on every call — the signature carries a
+   *  timestamp — so hold onto it rather than re-fetching per render. */
+  url: string;
+  expiresAt: string;
+};
+
+export type TripPodPhotos = {
+  tripId: string;
+  pickup: TripPodPhoto | null;
+  drop: TripPodPhoto | null;
+};
+
+/** Both legs are null for an AMR trip, which has no operator photos at all. */
+export const getTripPodPhotos = (tripId: string) =>
+  getJson<TripPodPhotos>(`/api/admin/manual/trips/${encodeURIComponent(tripId)}/pod`);
+
 export const approveOverride = (id: string, decidedByOperatorId: string, note: string | null) =>
   postJson(`/api/admin/manual/geofence-overrides/${id}/approve`, {
     decidedByOperatorId,
