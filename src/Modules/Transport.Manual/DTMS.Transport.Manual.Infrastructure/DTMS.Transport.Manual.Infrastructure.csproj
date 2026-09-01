@@ -16,8 +16,9 @@
     <PackageReference Include="Microsoft.Extensions.Options" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
-    <!-- Phase 4.3 — MinIO SDK + Web Push (VAPID). -->
-    <PackageReference Include="Minio" />
+    <!-- Phase 4.3 — Web Push (VAPID). The MinIO SDK moved to DTMS.Api when
+         object storage became shared (ADR-019); this project no longer talks
+         to MinIO at all. -->
     <PackageReference Include="WebPush" />
   </ItemGroup>
 

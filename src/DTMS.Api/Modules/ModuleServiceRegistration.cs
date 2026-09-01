@@ -315,18 +315,21 @@ public static class ModuleServiceRegistration
                            DTMS.Transport.Manual.Application.Services.OperatorSyncService>();
         services.AddScoped<DTMS.Api.Auth.OperatorSyncMiddleware>();
 
-        // Phase 4.3 — Object storage (MinIO) for POD photos (ADR-015).
-        services.Configure<DTMS.Transport.Manual.Infrastructure.Storage.ObjectStorageOptions>(
-            configuration.GetSection(DTMS.Transport.Manual.Infrastructure.Storage.ObjectStorageOptions.SectionName));
-        services.AddSingleton<DTMS.Transport.Manual.Application.Services.IObjectStorageService,
-                              DTMS.Transport.Manual.Infrastructure.Storage.MinioObjectStorageService>();
-        services.AddSingleton<DTMS.Transport.Manual.Application.Services.IPodBucketProvider>(sp =>
+        // Object storage (MinIO) — POD photos (ADR-015) and image attachments
+        // (ADR-019). The contract lives in SharedKernel and the MinIO
+        // implementation at this composition root, per ModuleBoundaryTests:
+        // a module must not reach into another module's infrastructure for it.
+        services.Configure<DTMS.Api.Infrastructure.Storage.ObjectStorageOptions>(
+            configuration.GetSection(DTMS.Api.Infrastructure.Storage.ObjectStorageOptions.SectionName));
+        services.AddSingleton<DTMS.SharedKernel.Storage.IObjectStorageService,
+                              DTMS.Api.Infrastructure.Storage.MinioObjectStorageService>();
+        services.AddSingleton<DTMS.SharedKernel.Storage.IStorageBuckets>(sp =>
         {
             var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<
-                DTMS.Transport.Manual.Infrastructure.Storage.ObjectStorageOptions>>().Value;
-            return new PodBucketProvider(opts.PodBucket);
+                DTMS.Api.Infrastructure.Storage.ObjectStorageOptions>>().Value;
+            return new StorageBuckets(opts.PodBucket, opts.AttachmentBucket);
         });
-        services.AddHostedService<DTMS.Transport.Manual.Infrastructure.Storage.ObjectStorageBucketInitializer>();
+        services.AddHostedService<DTMS.Api.Infrastructure.Storage.ObjectStorageBucketInitializer>();
 
         // Phase 4.3 — Web Push gateway (VAPID, ADR-013).
         services.Configure<DTMS.Transport.Manual.Infrastructure.Push.VapidOptions>(
@@ -914,10 +917,10 @@ public static class ModuleServiceRegistration
 
 // Phase 4.3 — tiny value-holders that let Application stay free of
 // Microsoft.Extensions.Options + Infrastructure-specific config types.
-// Registered as singletons against the IPodBucketProvider /
+// Registered as singletons against the IStorageBuckets /
 // IVapidPublicKeyProvider interfaces above.
-internal sealed record PodBucketProvider(string PodBucket)
-    : DTMS.Transport.Manual.Application.Services.IPodBucketProvider;
+internal sealed record StorageBuckets(string Pod, string Attachments)
+    : DTMS.SharedKernel.Storage.IStorageBuckets;
 
 internal sealed record VapidPublicKeyProvider(string PublicKey)
     : DTMS.Transport.Manual.Application.Services.IVapidPublicKeyProvider;

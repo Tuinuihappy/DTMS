@@ -520,6 +520,18 @@ services:
       - ObjectStorage__SecretKey=${ObjectStorage__SecretKey:-minioadmin}
       - ObjectStorage__UseSsl=${ObjectStorage__UseSsl:-false}
       - ObjectStorage__PodBucket=${ObjectStorage__PodBucket:-dtms-pod}
+      # Carrier / carrier-type / maintenance images (ADR-019). Separate
+      # bucket from POD, which already holds live objects and has nothing
+      # to gain from being moved. Both are created on startup.
+      - ObjectStorage__AttachmentBucket=${ObjectStorage__AttachmentBucket:-dtms-attachments}
+      # Upload ceiling, enforced by MinIO through the signed upload policy
+      # rather than by the API — the bytes never reach .NET. Client-side
+      # compression aims at ~600 KiB but passes the file through untouched
+      # when it cannot decode it, so a phone original can arrive unshrunk.
+      # This disk has filled and hung the docker daemon before; 10 MiB is
+      # the ceiling that keeps one mis-dragged file from repeating it.
+      - ObjectStorage__MaxUploadBytes=${ObjectStorage__MaxUploadBytes:-10485760}
+      - ObjectStorage__MaxAttachmentsPerOwner=${ObjectStorage__MaxAttachmentsPerOwner:-10}
       # Browser-facing URL the presigned URL embeds — different from the
       # internal endpoint when the PWA runs on the host or behind a
       # reverse proxy. Defaults to localhost:9000 for `npm run dev` flows;

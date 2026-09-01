@@ -1,8 +1,7 @@
 using DTMS.SharedKernel.Messaging;
-using DTMS.Transport.Manual.Application.Services;
+using DTMS.SharedKernel.Storage;
+using DTMS.Transport.Manual.Application.Services; // PodObjectKey
 using DTMS.Transport.Manual.Domain.Repositories;
-
-// Note: IPodBucketProvider lives in Services/IPodBucketProvider.cs.
 
 namespace DTMS.Transport.Manual.Application.Queries.GetPodPresignedUrl;
 
@@ -14,19 +13,17 @@ internal sealed class GetPodPresignedUrlQueryHandler
     // delivery genuinely takes longer the operator app re-presigns.
     public static readonly TimeSpan PresignTtl = TimeSpan.FromMinutes(10);
 
-    // Bucket name lives in config (ObjectStorage:PodBucket) — but Phase
-    // 4.3 keeps it injected as a string instead of pulling IOptions into
-    // Application (which would force a Microsoft.Extensions.Options
-    // dependency). Instead the Infrastructure-side wire-up resolves the
-    // bucket from config and registers a delegate factory.
+    // Bucket names live in config (ObjectStorage:*) but reach Application as
+    // plain strings through IStorageBuckets, so this layer stays free of a
+    // Microsoft.Extensions.Options dependency.
     private readonly IObjectStorageService _storage;
     private readonly IManualTripExtensionRepository _extensions;
-    private readonly IPodBucketProvider _bucket;
+    private readonly IStorageBuckets _bucket;
 
     public GetPodPresignedUrlQueryHandler(
         IObjectStorageService storage,
         IManualTripExtensionRepository extensions,
-        IPodBucketProvider bucket)
+        IStorageBuckets bucket)
     {
         _storage = storage;
         _extensions = extensions;
@@ -51,7 +48,7 @@ internal sealed class GetPodPresignedUrlQueryHandler
 
         var objectKey = PodObjectKey.Generate(request.TripId, kind!, request.FileExtension ?? "jpg");
         var url = await _storage.GeneratePresignedPutAsync(
-            bucket: _bucket.PodBucket,
+            bucket: _bucket.Pod,
             objectKey: objectKey,
             expiresIn: PresignTtl,
             contentType: "image/jpeg",

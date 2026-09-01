@@ -1,5 +1,5 @@
+using DTMS.SharedKernel.Storage;
 using DTMS.Transport.Manual.Application.Queries.GetPodPresignedUrl;
-using DTMS.Transport.Manual.Application.Services;
 using DTMS.Transport.Manual.Domain.Entities;
 using DTMS.Transport.Manual.Domain.Repositories;
 using FluentAssertions;
@@ -11,11 +11,11 @@ public class GetPodPresignedUrlHandlerTests
 {
     private readonly IObjectStorageService _storage = Substitute.For<IObjectStorageService>();
     private readonly IManualTripExtensionRepository _extensions = Substitute.For<IManualTripExtensionRepository>();
-    private readonly IPodBucketProvider _bucket = Substitute.For<IPodBucketProvider>();
+    private readonly IStorageBuckets _bucket = Substitute.For<IStorageBuckets>();
 
     private GetPodPresignedUrlQueryHandler CreateSut()
     {
-        _bucket.PodBucket.Returns("dtms-pod");
+        _bucket.Pod.Returns("dtms-pod");
         return new GetPodPresignedUrlQueryHandler(_storage, _extensions, _bucket);
     }
 
@@ -75,7 +75,7 @@ public class GetPodPresignedUrlHandlerTests
             Arg.Any<TimeSpan>(),
             Arg.Any<string?>(),
             Arg.Any<CancellationToken>())
-            .Returns(call => new PresignedUploadUrl(
+            .Returns(call => new PresignedPutUrl(
                 UploadUrl: "https://minio.example/dtms-pod/" + call.ArgAt<string>(1),
                 ObjectKey: call.ArgAt<string>(1),
                 ExpiresAt: DateTime.UtcNow.AddMinutes(10)));
