@@ -52,7 +52,20 @@ public sealed class MultiPartitionOutboxProcessor : BackgroundService
     private static readonly TimeSpan DiscoveryInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan IdleBackoff = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan CrashBackoff = TimeSpan.FromSeconds(5);
-    private const int BatchLimit = 50;
+
+    // How long a claimed row stays invisible to other workers while this
+    // one dispatches it. Must exceed the worst-case time to dispatch a
+    // whole batch: BatchLimit × the largest sane CallbackTimeoutMs (120s
+    // is the domain cap) is 40 min, but real timeouts default to 10s, so
+    // 5 min covers a 20-row batch with 15s/row of headroom. A pod that
+    // dies mid-batch costs at most this long before the rows retry.
+    private static readonly TimeSpan DispatchLease = TimeSpan.FromMinutes(5);
+
+    // Deliberately smaller than the pre-lease value of 50: the batch is
+    // now dispatched outside any transaction, so a big batch no longer
+    // holds locks — but it does hold the lease, and 20 × 10s keeps the
+    // worst case comfortably inside DispatchLease.
+    private const int BatchLimit = 20;
 
     private readonly IServiceProvider _sp;
     private readonly IConnectionMultiplexer _redis;
@@ -210,25 +223,76 @@ public sealed class MultiPartitionOutboxProcessor : BackgroundService
         _log.LogDebug("Outbox worker {Key} exited", systemKey);
     }
 
+    /// <summary>
+    /// One batch = claim (short tx) → dispatch (NO tx) → persist (short tx).
+    ///
+    /// <para><b>Why the HTTP call must not sit inside the transaction.</b>
+    /// The DbContext is registered with <c>EnableRetryOnFailure</c>, so a
+    /// transient Npgsql error on SaveChanges/Commit makes the execution
+    /// strategy re-run the whole delegate. When dispatch lived inside that
+    /// delegate, every callback already POSTed in the batch was POSTed
+    /// again — a duplicate the receiver has no way to distinguish. The
+    /// transaction also held <c>FOR UPDATE</c> locks (and a pooled
+    /// connection) for the entire network wait, which the reactive 401
+    /// token-refresh path could stretch into minutes.</para>
+    ///
+    /// <para><b>How a row stays owned across the gap.</b> There is no
+    /// transaction spanning the dispatch, so the claim writes a lease into
+    /// <see cref="OutboxMessage.NextRetryAtUtc"/> (= now + <see
+    /// cref="DispatchLease"/>) before committing. The claim query already
+    /// filters on that column, so a leased row is invisible to every other
+    /// worker and pod without needing a new column — adding one would mean
+    /// an <c>Ignore()</c> in all five per-module DbContexts for no
+    /// behavioural gain. Trade-off: an admin reading NextRetryAtUtc during
+    /// an in-flight dispatch sees a lease, not a real retry time.</para>
+    ///
+    /// <para><b>Crash semantics.</b> A pod that dies mid-dispatch leaves the
+    /// lease behind; it expires and the row is retried with RetryCount
+    /// unchanged. That is deliberate — a crash is not a receiver rejection
+    /// and should not consume a retry. Delivery stays at-least-once, as it
+    /// was before.</para>
+    /// </summary>
     private async Task<int> ProcessOneBatchAsync(string systemKey, CancellationToken ct)
     {
         using var scope = _sp.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
         var dispatcher = scope.ServiceProvider.GetRequiredService<ISourceCallbackDispatcher>();
 
+        var claimed = await ClaimBatchAsync(db, systemKey, ct);
+        if (claimed.Count == 0)
+            return 0;
+
+        var outcomes = await DispatchClaimedAsync(dispatcher, systemKey, claimed, ct);
+
+        // Intentionally NOT passed `ct`: by this point callbacks have already
+        // been POSTed. Abandoning the write on shutdown would leave those rows
+        // unmarked, and the lease would expire into a duplicate re-POST — the
+        // exact failure this restructure exists to remove.
+        await PersistOutcomesAsync(db, systemKey, claimed, outcomes);
+
+        return claimed.Count;
+    }
+
+    /// <summary>
+    /// Short transaction: take up to <see cref="BatchLimit"/> rows under
+    /// <c>FOR UPDATE SKIP LOCKED</c> and stamp a lease on them so they stay
+    /// ours after the transaction commits. Returns the rows detached — they
+    /// are read-only inputs to dispatch; the outcome pass reloads them.
+    /// </summary>
+    private static async Task<List<OutboxMessage>> ClaimBatchAsync(
+        OutboxDbContext db, string systemKey, CancellationToken ct)
+    {
         // Outer execution strategy because the DbContext was registered
         // with EnableRetryOnFailure — explicit BeginTransactionAsync
         // outside the strategy would throw "this operation is not
-        // supported by the configured execution strategy".
+        // supported by the configured execution strategy". Retrying THIS
+        // delegate is safe: it performs no side effect outside the DB.
         var strategy = db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
             await using IDbContextTransaction tx = await db.Database.BeginTransactionAsync(ct);
 
-            // Claim a batch under SKIP LOCKED so two pods don't both
-            // try to dispatch the same row. The PartitionKey index +
-            // tx scope keep contention bounded to one row at a time.
-            var nowParam = DateTime.UtcNow;
+            var now = DateTime.UtcNow;
             var batch = await db.OutboxMessages
                 .FromSqlRaw(@"
                     SELECT *
@@ -239,96 +303,190 @@ public sealed class MultiPartitionOutboxProcessor : BackgroundService
                     ORDER BY ""OccurredOnUtc""
                     LIMIT {2}
                     FOR UPDATE SKIP LOCKED",
-                    systemKey, nowParam, BatchLimit)
+                    systemKey, now, BatchLimit)
                 .ToListAsync(ct);
 
             if (batch.Count == 0)
             {
                 await tx.RollbackAsync(ct);
-                return 0;
+                return batch;
             }
 
-            foreach (var msg in batch)
+            var ids = batch.Select(m => m.Id).ToArray();
+            await db.Database.ExecuteSqlRawAsync(
+                @"UPDATE outbox.""OutboxMessages""
+                     SET ""NextRetryAtUtc"" = {0}
+                   WHERE ""Id"" = ANY({1})",
+                new object[] { now.Add(DispatchLease), ids },
+                ct);
+
+            await tx.CommitAsync(ct);
+
+            // The tracked copies now carry a stale NextRetryAtUtc (the raw
+            // UPDATE bypassed the change tracker). Drop them so the outcome
+            // pass reloads clean entities to mutate.
+            db.ChangeTracker.Clear();
+            return batch;
+        });
+    }
+
+    /// <summary>
+    /// Dispatch each claimed row with no transaction and no DB connection
+    /// held. Sequential, so ordering within the partition is preserved.
+    /// A row that is never reached (cancellation) simply gets no outcome
+    /// and has its lease cleared by the outcome pass.
+    /// </summary>
+    internal async Task<Dictionary<Guid, Exception?>> DispatchClaimedAsync(
+        ISourceCallbackDispatcher dispatcher,
+        string systemKey,
+        List<OutboxMessage> claimed,
+        CancellationToken ct)
+    {
+        var outcomes = new Dictionary<Guid, Exception?>(claimed.Count);
+
+        foreach (var msg in claimed)
+        {
+            if (ct.IsCancellationRequested)
+                break;
+
+            try
             {
-                bool success;
-                Exception? failure = null;
-                try
+                await dispatcher.DispatchAsync(systemKey, msg, ct);
+                outcomes[msg.Id] = null;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // Shutting down. Leave this row (and every row after it)
+                // without an outcome; the outcome pass releases their lease
+                // so the next worker iteration picks them straight back up.
+                break;
+            }
+            catch (Exception ex)
+            {
+                outcomes[msg.Id] = ex;
+            }
+        }
+
+        return outcomes;
+    }
+
+    /// <summary>
+    /// Short transaction: apply each dispatch result to a freshly-loaded
+    /// entity, emit the per-order audit event, and release the lease on any
+    /// row we never got to. Nothing here talks to the network, so the
+    /// execution strategy is free to retry the whole delegate.
+    ///
+    /// <para>Takes no CancellationToken by design — see the call site.</para>
+    /// </summary>
+    private async Task PersistOutcomesAsync(
+        OutboxDbContext db,
+        string systemKey,
+        List<OutboxMessage> claimed,
+        Dictionary<Guid, Exception?> outcomes)
+    {
+        var claimedIds = claimed.Select(m => m.Id).ToArray();
+
+        // Rows we leased but never dispatched (shutdown mid-batch). Clearing
+        // the lease to NULL is safe: the claim query treats NULL as "eligible
+        // now", which is exactly the state these rows were in when we took
+        // them, and it restores no retry time that we destroyed — the row's
+        // own backoff had already elapsed or it would not have been claimed.
+        var undispatchedIds = claimedIds.Where(id => !outcomes.ContainsKey(id)).ToArray();
+
+        var strategy = db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            db.ChangeTracker.Clear();
+            await using IDbContextTransaction tx = await db.Database.BeginTransactionAsync(CancellationToken.None);
+
+            if (undispatchedIds.Length > 0)
+            {
+                await db.Database.ExecuteSqlRawAsync(
+                    @"UPDATE outbox.""OutboxMessages""
+                         SET ""NextRetryAtUtc"" = NULL
+                       WHERE ""Id"" = ANY({0})",
+                    new object[] { undispatchedIds },
+                    CancellationToken.None);
+            }
+
+            if (outcomes.Count > 0)
+            {
+                var dispatchedIds = outcomes.Keys.ToArray();
+                var rows = await db.OutboxMessages
+                    .Where(m => dispatchedIds.Contains(m.Id))
+                    .ToListAsync(CancellationToken.None);
+
+                foreach (var msg in rows)
                 {
-                    await dispatcher.DispatchAsync(systemKey, msg, ct);
-                    msg.MarkAsProcessed(DateTime.UtcNow);
-                    success = true;
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    // Drop without saving — row stays locked until tx
-                    // commits/rollbacks. Rollback releases the row to
-                    // the next worker iteration.
-                    await tx.RollbackAsync(CancellationToken.None);
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    // Classify before marking: a deterministic receiver
-                    // rejection (e.g. 400 from OMS's create-once endpoint)
-                    // goes terminal-in-place immediately instead of burning
-                    // the full backoff (~2h45m) while head-blocking every
-                    // good callback behind it in this ordered partition.
-                    // Transient failures (401/403/404/408/429/5xx/timeouts/
-                    // connection-level/config errors) keep the exact
-                    // pre-classification MarkAsFailed behavior.
-                    var permanent = HttpCallbackFailureClassifier.ApplyFailure(msg, ex, DateTime.UtcNow);
-                    if (permanent)
+                    var failure = outcomes[msg.Id];
+                    var success = failure is null;
+
+                    if (success)
                     {
-                        // Warning, not Error: this is a recorded business
-                        // outcome (the audit block below emits it and the
-                        // order UI shows e.g. UpstreamOmsRejected), not
-                        // infra trouble needing a page.
-                        _log.LogWarning(ex,
-                            "Dispatch permanently rejected for outbox row {Id} (system={SystemKey}, status={Status}, attempt={Attempt}); marked terminal without retry",
-                            msg.Id, systemKey, (int?)(ex as HttpRequestException)?.StatusCode, msg.RetryCount);
+                        msg.MarkAsProcessed(DateTime.UtcNow);
                     }
                     else
                     {
-                        _log.LogWarning(ex,
-                            "Dispatch failed for outbox row {Id} (system={SystemKey}, attempt={Attempt})",
-                            msg.Id, systemKey, msg.RetryCount);
+                        // Classify before marking: a deterministic receiver
+                        // rejection (e.g. 400 from OMS's create-once endpoint)
+                        // goes terminal-in-place immediately instead of burning
+                        // the full backoff (~2h45m) while head-blocking every
+                        // good callback behind it in this ordered partition.
+                        // Transient failures (401/403/404/408/429/5xx/timeouts/
+                        // connection-level/config errors) keep the exact
+                        // pre-classification MarkAsFailed behavior.
+                        var permanent = HttpCallbackFailureClassifier.ApplyFailure(msg, failure!, DateTime.UtcNow);
+                        if (permanent)
+                        {
+                            // Warning, not Error: this is a recorded business
+                            // outcome (the audit block below emits it and the
+                            // order UI shows e.g. UpstreamOmsRejected), not
+                            // infra trouble needing a page.
+                            _log.LogWarning(failure,
+                                "Dispatch permanently rejected for outbox row {Id} (system={SystemKey}, status={Status}, attempt={Attempt}); marked terminal without retry",
+                                msg.Id, systemKey, (int?)(failure as HttpRequestException)?.StatusCode, msg.RetryCount);
+                        }
+                        else
+                        {
+                            _log.LogWarning(failure,
+                                "Dispatch failed for outbox row {Id} (system={SystemKey}, attempt={Attempt})",
+                                msg.Id, systemKey, msg.RetryCount);
+                        }
                     }
-                    success = false;
-                    failure = ex;
-                }
 
-                // Phase S.5 — emit a dispatch-outcome for callback rows tied to
-                // an order, so the owning module can write per-order audit. Fire
-                // on success (once) or on TERMINAL failure only (retries
-                // exhausted → MarkAsFailed set ProcessedOnUtc); a non-terminal
-                // failure will retry, so we stay quiet. The row is a NULL-
-                // partition outbox message written into this same `outbox`
-                // schema: OutboxProcessorService's central pass drains
-                // null-partition rows and publishes it through MassTransit (we
-                // own only the partitioned rows here). It is written in the same
-                // transaction as MarkAsProcessed — the callback result and its
-                // audit-emit commit atomically.
-                if (msg.RelatedOrderId is { } orderId && (success || msg.ProcessedOnUtc is not null))
-                {
-                    var statusCode = (failure as HttpRequestException)?.StatusCode;
-                    var outcome = new SourceCallbackOutcome(
-                        EventId: Guid.NewGuid(),
-                        OccurredOn: DateTime.UtcNow,
-                        SystemKey: systemKey,
-                        CallbackEventType: msg.Type,
-                        OrderId: orderId,
-                        TripId: msg.RelatedTripId,
-                        Success: success,
-                        StatusCode: statusCode.HasValue ? (int)statusCode.Value : null,
-                        Detail: success ? null : Truncate(failure?.Message),
-                        CorrelationId: msg.CorrelationId);
-                    db.OutboxMessages.Add(OutboxMessageFactory.FromIntegrationEvent(outcome));
+                    // Phase S.5 — emit a dispatch-outcome for callback rows tied to
+                    // an order, so the owning module can write per-order audit. Fire
+                    // on success (once) or on TERMINAL failure only (retries
+                    // exhausted → MarkAsFailed set ProcessedOnUtc); a non-terminal
+                    // failure will retry, so we stay quiet. The row is a NULL-
+                    // partition outbox message written into this same `outbox`
+                    // schema: OutboxProcessorService's central pass drains
+                    // null-partition rows and publishes it through MassTransit (we
+                    // own only the partitioned rows here). It is written in the same
+                    // transaction as MarkAsProcessed — the callback result and its
+                    // audit-emit commit atomically.
+                    if (msg.RelatedOrderId is { } orderId && (success || msg.ProcessedOnUtc is not null))
+                    {
+                        var statusCode = (failure as HttpRequestException)?.StatusCode;
+                        var outcome = new SourceCallbackOutcome(
+                            EventId: Guid.NewGuid(),
+                            OccurredOn: DateTime.UtcNow,
+                            SystemKey: systemKey,
+                            CallbackEventType: msg.Type,
+                            OrderId: orderId,
+                            TripId: msg.RelatedTripId,
+                            Success: success,
+                            StatusCode: statusCode.HasValue ? (int)statusCode.Value : null,
+                            Detail: success ? null : Truncate(failure?.Message),
+                            CorrelationId: msg.CorrelationId);
+                        db.OutboxMessages.Add(OutboxMessageFactory.FromIntegrationEvent(outcome));
+                    }
                 }
             }
 
-            await db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
-            return batch.Count;
+            await db.SaveChangesAsync(CancellationToken.None);
+            await tx.CommitAsync(CancellationToken.None);
+            return 0;
         });
     }
 

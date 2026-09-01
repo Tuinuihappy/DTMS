@@ -508,11 +508,26 @@ public class OutboxProcessorService : BackgroundService, IOutboxProcessor
                     }
 
                     var payload = JsonSerializer.Deserialize(message.Content, type);
-                    if (payload is IIntegrationEvent integrationEvent)
+                    if (payload is not IIntegrationEvent integrationEvent)
                     {
-                        // Per-publish timeout: fail fast when MassTransit bus is unavailable
-                        // (e.g., RabbitMQ not reachable) rather than blocking indefinitely.
-                        using var publishCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                        // A payload that deserializes to null or to something that
+                        // isn't an integration event must NOT fall through to the
+                        // success path below — doing so marks the row processed
+                        // without ever publishing, and the event disappears with
+                        // no log and no pending-age signal. Route it through the
+                        // normal failure ladder so it retries and lands in the DLQ.
+                        var shapeError = new InvalidOperationException(
+                            $"Outbox payload for {message.Type} deserialized to " +
+                            $"{payload?.GetType().FullName ?? "null"}, not IIntegrationEvent.");
+                        activity?.SetStatus(ActivityStatusCode.Error, shapeError.Message);
+                        results[i] = (null, shapeError);
+                        return;
+                    }
+
+                    // Per-publish timeout: fail fast when MassTransit bus is unavailable
+                    // (e.g., RabbitMQ not reachable) rather than blocking indefinitely.
+                    using (var publishCts = CancellationTokenSource.CreateLinkedTokenSource(ct))
+                    {
                         publishCts.CancelAfter(publishTimeout);
                         await publisher.Publish(integrationEvent, type, publishCts.Token);
                     }

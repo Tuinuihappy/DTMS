@@ -97,6 +97,41 @@ public class CentralOutboxDrainTests
             .ProcessedOnUtc.Should().BeNull("partitioned rows belong to MultiPartitionOutboxProcessor — publishing them here would double-deliver");
     }
 
+    // F3 — the publish block used to be `if (payload is IIntegrationEvent)`
+    // with no else, so a payload that deserialized to null fell straight
+    // through to the success path: row marked processed, nothing published,
+    // no log, and no pending-age signal for ops to notice. It has to fail
+    // into the retry ladder instead.
+    [Fact]
+    public async Task ProcessCentral_PayloadThatIsNotAnIntegrationEvent_FailsInsteadOfSilentlyVanishing()
+    {
+        await using var db = NewDb();
+        // Resolvable type, but the JSON deserializes to null — the shape a
+        // renamed/removed contract leaves behind after a rollback.
+        var brokenRow = new OutboxMessage(
+            id: Guid.NewGuid(),
+            type: typeof(SourceCallbackOutcome).AssemblyQualifiedName!,
+            content: "null",
+            occurredOnUtc: DateTime.UtcNow);
+        db.OutboxMessages.Add(brokenRow);
+        await db.SaveChangesAsync();
+
+        var publisher = Substitute.For<IPublishEndpoint>();
+
+        await NewService().ProcessCentralOutboxAsync(
+            db, publisher, Substitute.For<IDeadLetterStore>(),
+            new OutboxOptions { UseSkipLocked = false, BatchSize = 10, PublishConcurrency = 1 },
+            CancellationToken.None);
+
+        await publisher.DidNotReceiveWithAnyArgs().Publish(
+            Arg.Any<object>(), Arg.Any<Type>(), Arg.Any<CancellationToken>());
+
+        var stored = await db.OutboxMessages.SingleAsync(m => m.Id == brokenRow.Id);
+        stored.ProcessedOnUtc.Should().BeNull("a row that was never published must not be marked processed");
+        stored.RetryCount.Should().Be(1, "it belongs in the retry ladder, on its way to the DLQ");
+        stored.Error.Should().Contain("IIntegrationEvent");
+    }
+
     [Fact]
     public async Task ProcessCentral_EmptyBacklog_IsAQuietNoOp()
     {
