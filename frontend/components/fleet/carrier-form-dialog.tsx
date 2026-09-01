@@ -4,21 +4,34 @@ import { Loader2, PackagePlus, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
-import { createCarrier } from "@/lib/api/fleet-carriers";
+import { createCarrier, updateCarrier, type Carrier } from "@/lib/api/fleet-carriers";
 import type { CarrierTypeProfile } from "@/lib/api/facility-profiles";
 import { cn } from "@/lib/utils";
 
-export function RegisterCarrierDialog({
+const toDateInput = (iso: string | null) => (iso ? iso.slice(0, 10) : "");
+
+/**
+ * Register or edit. One form for both because the fields are identical apart
+ * from the code, which is immutable once assigned — carrier codes identify one
+ * physical cart forever (ADR-019), so a rename would make history ambiguous
+ * exactly the way reuse would.
+ */
+export function CarrierFormDialog({
   open,
+  carrier,
   carrierTypes,
   onClose,
-  onCreated,
+  onSaved,
 }: {
   open: boolean;
+  /** null → register mode; a carrier → edit mode with the code locked. */
+  carrier: Carrier | null;
   carrierTypes: CarrierTypeProfile[];
   onClose: () => void;
-  onCreated: () => void;
+  onSaved: () => void;
 }) {
+  const isEdit = carrier !== null;
+
   const [code, setCode] = useState("");
   const [carrierTypeCode, setCarrierTypeCode] = useState("");
   const [barcode, setBarcode] = useState("");
@@ -30,16 +43,16 @@ export function RegisterCarrierDialog({
 
   useEffect(() => {
     if (open) {
-      setCode("");
-      setCarrierTypeCode(carrierTypes[0]?.code ?? "");
-      setBarcode("");
-      setDisplayName("");
-      setLocation("");
-      setCommissionedAt("");
+      setCode(carrier?.carrierCode ?? "");
+      setCarrierTypeCode(carrier?.carrierTypeCode ?? carrierTypes[0]?.code ?? "");
+      setBarcode(carrier?.barcode ?? "");
+      setDisplayName(carrier?.displayName ?? "");
+      setLocation(carrier?.currentLocationCode ?? "");
+      setCommissionedAt(toDateInput(carrier?.commissionedAt ?? null));
       setBusy(false);
       setError(null);
     }
-  }, [open, carrierTypes]);
+  }, [open, carrier, carrierTypes]);
 
   // Mirrors the server-side rule. The code becomes a URL path segment, so a
   // space or slash would break the detail route — better to say so while the
@@ -51,16 +64,28 @@ export function RegisterCarrierDialog({
     if (!canSubmit) return;
     setBusy(true);
     setError(null);
+    const commissioned = commissionedAt ? new Date(commissionedAt).toISOString() : null;
     try {
-      await createCarrier({
-        carrierCode: code.trim(),
-        carrierTypeCode,
-        barcode: barcode.trim() || null,
-        displayName: displayName.trim() || null,
-        currentLocationCode: location.trim() || null,
-        commissionedAt: commissionedAt ? new Date(commissionedAt).toISOString() : null,
-      });
-      onCreated();
+      if (isEdit) {
+        // Location is not part of the edit payload — it has its own action so
+        // that moving a carrier always stamps LastSeenAt.
+        await updateCarrier(carrier.carrierCode, {
+          carrierTypeCode,
+          barcode: barcode.trim() || null,
+          displayName: displayName.trim() || null,
+          commissionedAt: commissioned,
+        });
+      } else {
+        await createCarrier({
+          carrierCode: code.trim(),
+          carrierTypeCode,
+          barcode: barcode.trim() || null,
+          displayName: displayName.trim() || null,
+          currentLocationCode: location.trim() || null,
+          commissionedAt: commissioned,
+        });
+      }
+      onSaved();
       onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -94,7 +119,7 @@ export function RegisterCarrierDialog({
                   <PackagePlus className="h-5 w-5" strokeWidth={2.2} />
                 </span>
                 <h2 className="font-display mt-1 flex-1 text-[1.2rem] font-semibold text-[var(--color-ink-900)]">
-                  Register carrier
+                  {isEdit ? `Edit ${carrier.carrierCode}` : "Register carrier"}
                 </h2>
                 <button
                   type="button"
@@ -113,12 +138,23 @@ export function RegisterCarrierDialog({
                       value={code}
                       onChange={(e) => setCode(e.target.value)}
                       placeholder="CART-0001"
-                      className={cn(inputCls, !codeOk && "border-[var(--color-coral)]")}
+                      disabled={isEdit}
+                      className={cn(
+                        inputCls,
+                        !codeOk && "border-[var(--color-coral)]",
+                        isEdit && "cursor-not-allowed opacity-60",
+                      )}
                     />
-                    {!codeOk && (
-                      <span className="mt-1 text-[10.5px] text-[var(--color-coral)]">
-                        Letters, digits, dot, underscore or hyphen only — it becomes part of the URL.
+                    {isEdit ? (
+                      <span className="mt-1 text-[10.5px] text-[var(--color-ink-500)]">
+                        Codes are permanent — they identify this carrier in every record.
                       </span>
+                    ) : (
+                      !codeOk && (
+                        <span className="mt-1 text-[10.5px] text-[var(--color-coral)]">
+                          Letters, digits, dot, underscore or hyphen only — it becomes part of the URL.
+                        </span>
+                      )
                     )}
                   </Field>
                   <Field label="Carrier type" className="flex-1">
@@ -155,14 +191,18 @@ export function RegisterCarrierDialog({
                       className={inputCls}
                     />
                   </Field>
-                  <Field label="Location" className="flex-1">
-                    <input
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      placeholder="optional"
-                      className={inputCls}
-                    />
-                  </Field>
+                  {/* Only on register. Editing a location goes through the
+                      move action so LastSeenAt is always stamped with it. */}
+                  {!isEdit && (
+                    <Field label="Location" className="flex-1">
+                      <input
+                        value={location}
+                        onChange={(e) => setLocation(e.target.value)}
+                        placeholder="optional"
+                        className={inputCls}
+                      />
+                    </Field>
+                  )}
                 </div>
 
                 <Field label="In service since">
@@ -206,7 +246,7 @@ export function RegisterCarrierDialog({
                   )}
                 >
                   {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2.4} />}
-                  {busy ? "Saving…" : "Register"}
+                  {busy ? "Saving…" : isEdit ? "Save" : "Register"}
                 </motion.button>
               </footer>
             </motion.div>

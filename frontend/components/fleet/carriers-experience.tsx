@@ -21,7 +21,10 @@ import { getCarrierTypeProfiles, type CarrierTypeProfile } from "@/lib/api/facil
 import { getCarriers, type Carrier, type CarrierStatus } from "@/lib/api/fleet-carriers";
 import { Permissions } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
-import { RegisterCarrierDialog } from "./register-carrier-dialog";
+import { CarrierActionDialog, type CarrierAction } from "./carrier-action-dialog";
+import { CarrierFormDialog } from "./carrier-form-dialog";
+import { CarrierMaintenancePanel } from "./carrier-maintenance-panel";
+import { CarrierRowMenu } from "./carrier-row-menu";
 
 const STATUSES: CarrierStatus[] = ["Available", "InUse", "Maintenance", "Retired"];
 
@@ -50,7 +53,14 @@ function Inner() {
   const [carrierTypes, setCarrierTypes] = useState<CarrierTypeProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [registerOpen, setRegisterOpen] = useState(false);
+
+  // Form dialog serves both register (formCarrier === null while open) and
+  // edit; the two share every field but the code.
+  const [formOpen, setFormOpen] = useState(false);
+  const [formCarrier, setFormCarrier] = useState<Carrier | null>(null);
+  const [action, setAction] = useState<CarrierAction | null>(null);
+  const [actionCarrier, setActionCarrier] = useState<Carrier | null>(null);
+  const [historyCode, setHistoryCode] = useState<string | null>(null);
 
   const refresh = useCallback(
     (signal?: AbortSignal) => {
@@ -115,7 +125,14 @@ function Inner() {
           </p>
         </div>
         {canWrite && (
-          <button type="button" onClick={() => setRegisterOpen(true)} className={registerBtn}>
+          <button
+            type="button"
+            onClick={() => {
+              setFormCarrier(null);
+              setFormOpen(true);
+            }}
+            className={registerBtn}
+          >
             <Plus className="h-3.5 w-3.5" strokeWidth={2.4} />
             Register
           </button>
@@ -196,6 +213,7 @@ function Inner() {
               <TableTh>Name</TableTh>
               <TableTh>Status</TableTh>
               <TableTh>Last seen</TableTh>
+              <TableTh align="right">{""}</TableTh>
             </DataTableHead>
             <DataTableBody>
               {rows.map((c) => (
@@ -245,6 +263,20 @@ function Inner() {
                       </div>
                     )}
                   </TableTd>
+                  <TableTd align="right">
+                    <CarrierRowMenu
+                      carrier={c}
+                      onAction={(a) => {
+                        setActionCarrier(c);
+                        setAction(a);
+                      }}
+                      onShowHistory={() => setHistoryCode(c.carrierCode)}
+                      onEdit={() => {
+                        setFormCarrier(c);
+                        setFormOpen(true);
+                      }}
+                    />
+                  </TableTd>
                 </tr>
               ))}
             </DataTableBody>
@@ -265,11 +297,24 @@ function Inner() {
         </>
       )}
 
-      <RegisterCarrierDialog
-        open={registerOpen}
+      <CarrierFormDialog
+        open={formOpen}
+        carrier={formCarrier}
         carrierTypes={carrierTypes}
-        onClose={() => setRegisterOpen(false)}
-        onCreated={() => refresh()}
+        onClose={() => setFormOpen(false)}
+        onSaved={() => refresh()}
+      />
+
+      <CarrierActionDialog
+        action={action}
+        carrier={actionCarrier}
+        onClose={() => setAction(null)}
+        onDone={() => refresh()}
+      />
+
+      <CarrierMaintenancePanel
+        carrierCode={historyCode}
+        onClose={() => setHistoryCode(null)}
       />
     </div>
   );
