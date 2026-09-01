@@ -29,22 +29,6 @@ public interface IObjectStorageService
         CancellationToken ct = default);
 
     /// <summary>
-    /// The older, weaker upload: a signed URL that authorises writing anything
-    /// of any size to one key.
-    ///
-    /// <para>Retained only so relocating this contract into SharedKernel is a
-    /// pure move with no behavioural change. The POD capture flow is switched
-    /// to <see cref="GeneratePresignedPostAsync"/> in the next step and this
-    /// member goes with it — do not build anything new on it.</para>
-    /// </summary>
-    Task<PresignedPutUrl> GeneratePresignedPutAsync(
-        string bucket,
-        string objectKey,
-        TimeSpan expiresIn,
-        string? contentType = null,
-        CancellationToken ct = default);
-
-    /// <summary>
     /// A time-limited URL for reading one object, for an <c>&lt;img src&gt;</c>.
     ///
     /// <para><paramref name="responseContentType"/> overrides the type the
@@ -118,12 +102,6 @@ public sealed record UploadConstraints(
 public sealed record PresignedUpload(
     string Url,
     IReadOnlyDictionary<string, string> Fields,
-    string ObjectKey,
-    DateTime ExpiresAt);
-
-/// <summary>Transitional — see <see cref="IObjectStorageService.GeneratePresignedPutAsync"/>.</summary>
-public sealed record PresignedPutUrl(
-    string UploadUrl,
     string ObjectKey,
     DateTime ExpiresAt);
 

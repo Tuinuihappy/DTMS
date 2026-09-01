@@ -92,38 +92,26 @@ public sealed class MinioObjectStorageService : IObjectStorageService
         // Signed against the PUBLIC endpoint so the browser's POST resolves.
         var (uri, formData) = await _publicClient.PresignedPostPolicyAsync(args);
 
+        var fields = new Dictionary<string, string>(formData)
+        {
+            // The SDK signs an ["eq","$Content-Type",...] condition into the
+            // policy but does not return Content-Type among the form fields.
+            // S3 evaluates conditions against form FIELDS, not the file part's
+            // header, so omitting it makes the condition impossible to satisfy
+            // and MinIO refuses every upload with 403 "Policy Condition failed".
+            //
+            // Sending it from here is also what makes the type trustworthy:
+            // the value is ours, and a client that edits it invalidates the
+            // signature. The stored content type is therefore pinned by the
+            // server, not asserted by the uploader.
+            ["Content-Type"] = constraints.ContentType
+        };
+
         return new PresignedUpload(
             Url: uri.ToString(),
-            Fields: new Dictionary<string, string>(formData),
+            Fields: fields,
             ObjectKey: objectKey,
             ExpiresAt: expiresAt);
-    }
-
-    // Transitional — removed together with the POD client migration. See the
-    // interface for why it still exists.
-    public async Task<PresignedPutUrl> GeneratePresignedPutAsync(
-        string bucket,
-        string objectKey,
-        TimeSpan expiresIn,
-        string? contentType = null,
-        CancellationToken ct = default)
-    {
-        if (expiresIn > MaxPresignTtl)
-            throw new ArgumentOutOfRangeException(nameof(expiresIn),
-                $"Presigned TTL must be <= 7 days (got {expiresIn}).");
-
-        var url = await _publicClient.PresignedPutObjectAsync(
-            new PresignedPutObjectArgs()
-                .WithBucket(bucket)
-                .WithObject(objectKey)
-                .WithExpiry((int)expiresIn.TotalSeconds));
-
-        // A presigned PUT signature cannot carry a content-type condition, so
-        // this argument has never been enforceable. That is precisely the gap
-        // GeneratePresignedPostAsync closes.
-        _ = contentType;
-
-        return new PresignedPutUrl(url, objectKey, DateTime.UtcNow.Add(expiresIn));
     }
 
     public async Task<string> GeneratePresignedGetAsync(

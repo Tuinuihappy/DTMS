@@ -8,9 +8,10 @@ import { compressImage } from "@/lib/operator-pwa/image-compress";
 //   1. Operator taps "Take photo" → file input opens camera (mobile)
 //      or file picker (desktop dev). `capture="environment"` hints
 //      back camera on phones.
-//   2. Onchange → component asks the backend for a presigned PUT URL
+//   2. Onchange → component asks the backend for a signed form post
 //      via /api/operator/pod/presign.
-//   3. PUTs the chosen file's bytes directly to MinIO.
+//   3. Posts the chosen file's bytes directly to MinIO, which checks the
+//      size and type conditions in the signature before storing anything.
 //   4. Calls onCaptured(objectKey) so the parent's action button can
 //      submit the pickup/drop with the key attached.
 //
@@ -37,7 +38,7 @@ export function PodCapture({ tripId, kind, podKey, onCaptured }: Props) {
     try {
       const compressed = await compressImage(file);
       const presigned = await presignPod(tripId, kind);
-      await uploadPodBytes(presigned.uploadUrl, compressed);
+      await uploadPodBytes(presigned, compressed);
       onCaptured(presigned.objectKey);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");

@@ -329,6 +329,13 @@ public static class ModuleServiceRegistration
                 DTMS.Api.Infrastructure.Storage.ObjectStorageOptions>>().Value;
             return new StorageBuckets(opts.PodBucket, opts.AttachmentBucket);
         });
+        services.AddSingleton<DTMS.SharedKernel.Storage.IUploadLimits>(sp =>
+        {
+            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<
+                DTMS.Api.Infrastructure.Storage.ObjectStorageOptions>>().Value;
+            return new UploadLimits(
+                opts.MaxUploadBytes, opts.AllowedContentTypes, opts.MaxAttachmentsPerOwner);
+        });
         services.AddHostedService<DTMS.Api.Infrastructure.Storage.ObjectStorageBucketInitializer>();
 
         // Phase 4.3 — Web Push gateway (VAPID, ADR-013).
@@ -921,6 +928,11 @@ public static class ModuleServiceRegistration
 // IVapidPublicKeyProvider interfaces above.
 internal sealed record StorageBuckets(string Pod, string Attachments)
     : DTMS.SharedKernel.Storage.IStorageBuckets;
+
+internal sealed record UploadLimits(
+    long MaxUploadBytes,
+    IReadOnlyList<string> AllowedContentTypes,
+    int MaxAttachmentsPerOwner) : DTMS.SharedKernel.Storage.IUploadLimits;
 
 internal sealed record VapidPublicKeyProvider(string PublicKey)
     : DTMS.Transport.Manual.Application.Services.IVapidPublicKeyProvider;

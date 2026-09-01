@@ -19,15 +19,23 @@ internal sealed class GetPodPresignedUrlQueryHandler
     private readonly IObjectStorageService _storage;
     private readonly IManualTripExtensionRepository _extensions;
     private readonly IStorageBuckets _bucket;
+    private readonly IUploadLimits _limits;
+
+    // The capture UI re-encodes every photo to JPEG before upload, so the
+    // policy can pin one exact type. Pinning it is the point: a presigned PUT
+    // could not express any content-type condition at all.
+    private const string PodContentType = "image/jpeg";
 
     public GetPodPresignedUrlQueryHandler(
         IObjectStorageService storage,
         IManualTripExtensionRepository extensions,
-        IStorageBuckets bucket)
+        IStorageBuckets bucket,
+        IUploadLimits limits)
     {
         _storage = storage;
         _extensions = extensions;
         _bucket = bucket;
+        _limits = limits;
     }
 
     public async Task<Result<PodPresignedUrlDto>> Handle(
@@ -47,17 +55,27 @@ internal sealed class GetPodPresignedUrlQueryHandler
             return Result<PodPresignedUrlDto>.Failure("Trip is assigned to a different operator.");
 
         var objectKey = PodObjectKey.Generate(request.TripId, kind!, request.FileExtension ?? "jpg");
-        var url = await _storage.GeneratePresignedPutAsync(
+
+        // Size and type are conditions inside the signature, so MinIO refuses a
+        // violating upload before writing anything. The old presigned PUT could
+        // authorise only "write to this key" — an oversized body was discovered
+        // after it had already landed on a disk that has filled and hung the
+        // docker daemon before.
+        var upload = await _storage.GeneratePresignedPostAsync(
             bucket: _bucket.Pod,
             objectKey: objectKey,
+            constraints: new UploadConstraints(
+                ContentType: PodContentType,
+                MinBytes: 1,
+                MaxBytes: _limits.MaxUploadBytes),
             expiresIn: PresignTtl,
-            contentType: "image/jpeg",
             ct: cancellationToken);
 
         return Result<PodPresignedUrlDto>.Success(new PodPresignedUrlDto(
-            UploadUrl: url.UploadUrl,
-            ObjectKey: url.ObjectKey,
-            ExpiresAt: url.ExpiresAt));
+            Url: upload.Url,
+            Fields: upload.Fields,
+            ObjectKey: upload.ObjectKey,
+            ExpiresAt: upload.ExpiresAt));
     }
 }
 

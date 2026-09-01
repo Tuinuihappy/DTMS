@@ -51,7 +51,11 @@ export type OperatorProfile = {
 };
 
 export type PresignResponse = {
-  uploadUrl: string;
+  url: string;
+  /** Signed policy fields. They must be appended to the form BEFORE the
+   *  file — S3-compatible servers read the policy from the leading fields
+   *  and reject a body that puts the file first. */
+  fields: Record<string, string>;
   objectKey: string;
   expiresAt: string;
 };
@@ -159,16 +163,41 @@ export const presignPod = async (
   return (await res.json()) as PresignResponse;
 };
 
-// Uploads the photo bytes to the presigned MinIO URL. Browser's PUT
-// hits MinIO directly — no DTMS round-trip for the photo itself.
-export const uploadPodBytes = async (uploadUrl: string, blob: Blob): Promise<void> => {
-  const res = await fetch(uploadUrl, {
-    method: "PUT",
-    body: blob,
-    headers: { "Content-Type": blob.type || "image/jpeg" },
-  });
+// Uploads the photo bytes straight to MinIO — no DTMS round-trip for the
+// photo itself. A signed form post rather than a PUT, because the policy
+// carries a size ceiling and an exact content type that MinIO enforces
+// before writing; a PUT URL could express neither.
+export const uploadPodBytes = async (
+  presigned: PresignResponse,
+  blob: Blob,
+): Promise<void> => {
+  // The policy pins Content-Type, and MinIO ignores the file part's own
+  // header. A blob that failed to re-encode would therefore be stored under
+  // a type its bytes do not match — an image nothing can render. Refuse it
+  // here rather than upload something broken.
+  if (blob.type && blob.type !== "image/jpeg") {
+    throw new Error("This photo format could not be processed. Try retaking it.");
+  }
+
+  const form = new FormData();
+  // Order matters — every policy field first, file last.
+  for (const [k, v] of Object.entries(presigned.fields)) form.append(k, v);
+  form.append("file", blob);
+
+  // Deliberately no Content-Type header on the request: the browser must set
+  // the multipart boundary itself, and setting it by hand produces a body
+  // MinIO cannot parse.
+  const res = await fetch(presigned.url, { method: "POST", body: form });
   if (!res.ok) {
-    throw new Error(`POD upload failed (${res.status}).`);
+    // MinIO checks the signed conditions before storing anything, so these
+    // are expected outcomes rather than faults.
+    throw new Error(
+      res.status === 400
+        ? "Photo is too large to upload. Try retaking it."
+        : res.status === 403
+          ? "Upload link expired. Take the photo again."
+          : `POD upload failed (${res.status}).`,
+    );
   }
 };
 
