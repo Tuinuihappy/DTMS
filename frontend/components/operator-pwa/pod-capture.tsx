@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { presignPod, uploadPodBytes } from "@/lib/api/operator";
-import { compressImage } from "@/lib/operator-pwa/image-compress";
+import { compressImage } from "@/lib/image-compress";
 
 // Phase 4.5 — POD capture flow:
 //   1. Operator taps "Take photo" → file input opens camera (mobile)

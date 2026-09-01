@@ -3,7 +3,10 @@
 import { Loader2, Wrench, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
+import { AttachmentGallery } from "@/components/attachments/attachment-gallery";
+import { useAuth } from "@/components/auth/auth-provider";
 import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { Permissions } from "@/lib/auth/permissions";
 import {
   getCarrierMaintenanceHistory,
   type CarrierMaintenanceEntry,
@@ -23,6 +26,8 @@ export function CarrierMaintenancePanel({
   onClose: () => void;
 }) {
   const open = carrierCode !== null;
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission(Permissions.Fleet.CarrierWrite);
   const [entries, setEntries] = useState<CarrierMaintenanceEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -131,6 +136,18 @@ export function CarrierMaintenancePanel({
                           {e.outcome}
                         </p>
                       )}
+
+                      {/* Damage photos belong to the episode, not the carrier:
+                          "what was broken that time" is a different question
+                          from "what does this cart look like". */}
+                      <div className="mt-3 border-t border-white/40 pt-3 dark:border-white/[0.06]">
+                        <AttachmentGallery
+                          owner="maintenance"
+                          ownerId={e.id}
+                          canEdit={canEdit}
+                          emptyHint="No photos for this repair."
+                        />
+                      </div>
                     </li>
                   ))}
                 </ol>

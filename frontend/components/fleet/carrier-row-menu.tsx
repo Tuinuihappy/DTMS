@@ -32,11 +32,13 @@ export function CarrierRowMenu({
   carrier,
   onAction,
   onShowHistory,
+  onShowPhotos,
   onEdit,
 }: {
   carrier: Carrier;
   onAction: (action: CarrierAction) => void;
   onShowHistory: () => void;
+  onShowPhotos: () => void;
   onEdit: () => void;
 }) {
   const { hasPermission } = useAuth();
@@ -77,6 +79,10 @@ export function CarrierRowMenu({
         ariaLabel={`Actions for ${carrier.carrierCode}`}
       >
         <MenuItem onClick={() => pick(onShowHistory)}>Maintenance history</MenuItem>
+
+        {/* Available in every status, like history — a retired carrier's
+            photos are still worth looking at. */}
+        <MenuItem onClick={() => pick(onShowPhotos)}>Photos</MenuItem>
 
         {can("edit") && canWrite && <MenuItem onClick={() => pick(onEdit)}>Edit details</MenuItem>}
 

@@ -23,6 +23,7 @@ import { Permissions } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
 import { CarrierActionDialog, type CarrierAction } from "./carrier-action-dialog";
 import { CarrierFormDialog } from "./carrier-form-dialog";
+import { PhotosDialog, type PhotosTarget } from "@/components/attachments/photos-dialog";
 import { CarrierMaintenancePanel } from "./carrier-maintenance-panel";
 import { CarrierRowMenu } from "./carrier-row-menu";
 
@@ -61,6 +62,7 @@ function Inner() {
   const [action, setAction] = useState<CarrierAction | null>(null);
   const [actionCarrier, setActionCarrier] = useState<Carrier | null>(null);
   const [historyCode, setHistoryCode] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<PhotosTarget | null>(null);
 
   const refresh = useCallback(
     (signal?: AbortSignal) => {
@@ -271,6 +273,9 @@ function Inner() {
                         setAction(a);
                       }}
                       onShowHistory={() => setHistoryCode(c.carrierCode)}
+                      onShowPhotos={() =>
+                        setPhotos({ owner: "carrier", ownerId: c.id, label: c.carrierCode })
+                      }
                       onEdit={() => {
                         setFormCarrier(c);
                         setFormOpen(true);
@@ -316,6 +321,8 @@ function Inner() {
         carrierCode={historyCode}
         onClose={() => setHistoryCode(null)}
       />
+
+      <PhotosDialog target={photos} canEdit={canWrite} onClose={() => setPhotos(null)} />
     </div>
   );
 }

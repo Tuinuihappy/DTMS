@@ -1,7 +1,8 @@
 "use client";
 
-import { Boxes, Loader2, Plus, Layers } from "lucide-react";
+import { Boxes, Images, Loader2, Plus, Layers } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { PhotosDialog, type PhotosTarget } from "@/components/attachments/photos-dialog";
 import { useAuth } from "@/components/auth/auth-provider";
 import { PermissionGuard } from "@/components/auth/permission-guard";
 import {
@@ -37,6 +38,7 @@ function Inner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [carrierDialog, setCarrierDialog] = useState(false);
+  const [photos, setPhotos] = useState<PhotosTarget | null>(null);
 
   const reloadCarriers = useCallback(() => {
     getCarrierTypeProfiles()
@@ -109,6 +111,7 @@ function Inner() {
                   <TableTh>AMR capability</TableTh>
                   <TableTh align="right">Max weight</TableTh>
                   <TableTh align="right">Slots</TableTh>
+                  <TableTh align="right">{""}</TableTh>
                 </DataTableHead>
                 <DataTableBody>
                   {carriers.map((c) => (
@@ -137,6 +140,18 @@ function Inner() {
                           {c.maxSlots ?? "—"}
                         </span>
                       </TableTd>
+                      <TableTd align="right">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPhotos({ owner: "carrier-type", ownerId: c.id, label: c.code })
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium text-[var(--color-ink-600)] transition-colors hover:bg-white/60 hover:text-[var(--color-ink-900)] dark:hover:bg-white/[0.08]"
+                        >
+                          <Images className="h-3.5 w-3.5" strokeWidth={2.1} />
+                          Photos
+                        </button>
+                      </TableTd>
                     </tr>
                   ))}
                 </DataTableBody>
@@ -151,6 +166,8 @@ function Inner() {
         onClose={() => setCarrierDialog(false)}
         onCreated={reloadCarriers}
       />
+
+      <PhotosDialog target={photos} canEdit={canWrite} onClose={() => setPhotos(null)} />
     </div>
   );
 }
