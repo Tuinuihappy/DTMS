@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  Check,
   ChevronDown,
+  Copy,
   Filter,
   RefreshCw,
   Route,
@@ -19,6 +21,7 @@ import {
   type TripStatus,
 } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
+import { copyText } from "@/lib/clipboard";
 import { fromDateTimeLocalInput } from "@/lib/datetime";
 import { DateTime } from "@/components/primitives/date-time";
 import {
@@ -508,6 +511,53 @@ function FiltersBar(props: {
   );
 }
 
+// Trip id is a raw GUID — far too long for a compact column, but operators
+// need the FULL value to grep logs / query the DB, so a bare truncation
+// would be useless. Show the leading segment; keep the whole id one click
+// (copy) or one hover (title) away. stopPropagation so copying doesn't
+// also open the detail drawer the row click owns.
+function TripIdCell({ id }: { id: string }) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 1200);
+    return () => clearTimeout(t);
+  }, [copied]);
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        void copyText(id).then((ok) => ok && setCopied(true));
+      }}
+      title={`${id}\nClick to copy`}
+      aria-label={`Copy trip id ${id}`}
+      className={cn(
+        "-mx-1.5 flex items-center gap-1.5 rounded-md px-1.5 py-0.5",
+        "font-mono text-[11px] tabular-nums text-[var(--color-ink-500)]",
+        "transition-colors hover:bg-[var(--color-ink-100)]/70 hover:text-[var(--color-ink-800)]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-500)]",
+        "dark:hover:bg-white/[0.06] dark:hover:text-white",
+      )}
+    >
+      <span>{id.slice(0, 8)}</span>
+      {copied ? (
+        <Check
+          className="h-3 w-3 shrink-0 text-[var(--color-mint-600,#16a34a)]"
+          strokeWidth={2.4}
+        />
+      ) : (
+        <Copy
+          className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-50"
+          strokeWidth={2.2}
+        />
+      )}
+    </button>
+  );
+}
+
 function TripsTable({
   trips,
   loading,
@@ -552,6 +602,7 @@ function TripsTable({
     <>
       <DataTableShell>
         <DataTableHead>
+          <TableTh density="compact">Trip ID</TableTh>
           <TableTh density="compact">Status</TableTh>
           <TableTh density="compact">Order ref</TableTh>
           <SortableTh
@@ -566,15 +617,6 @@ function TripsTable({
           <TableTh density="compact">Upper key</TableTh>
           <TableTh density="compact">Vehicle</TableTh>
           <TableTh density="compact">Template</TableTh>
-          <SortableTh
-            col="priority"
-            sortBy={sortBy}
-            sortDir={sortDir}
-            onSort={onSortHeader}
-            density="compact"
-          >
-            Priority
-          </SortableTh>
           <SortableTh
             col="createdAt"
             sortBy={sortBy}
@@ -606,6 +648,9 @@ function TripsTable({
         <DataTableBody>
           {trips.map((t, i) => (
             <DataRow key={t.id} delayIndex={i} onClick={() => onOpenTrip(t.id)}>
+              <TableTd density="compact">
+                <TripIdCell id={t.id} />
+              </TableTd>
               <TableTd density="compact">
                 <TripStatusBadge status={t.status} />
               </TableTd>
@@ -691,15 +736,6 @@ function TripsTable({
                 {t.templateNameAtDispatch ? (
                   <span title={t.templateNameAtDispatch}>
                     {t.templateNameAtDispatch}
-                  </span>
-                ) : (
-                  <span className="text-[var(--color-ink-300)]">—</span>
-                )}
-              </TableTd>
-              <TableTd density="compact">
-                {t.priorityAtDispatch != null ? (
-                  <span className="font-mono tabular-nums text-[11.5px] font-semibold text-[var(--color-ink-700)] dark:text-[var(--color-ink-500)]">
-                    {t.priorityAtDispatch}
                   </span>
                 ) : (
                   <span className="text-[var(--color-ink-300)]">—</span>
