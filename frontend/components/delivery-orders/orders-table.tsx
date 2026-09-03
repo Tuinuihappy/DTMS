@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowRight,
   ChevronRight,
   Copy,
   MoreHorizontal,
@@ -19,6 +18,7 @@ import type {
 import { PriorityBadge, StatusBadge, TransportModeBadge } from "./badges";
 import { Highlight } from "./highlight";
 import { DateTime } from "@/components/primitives/date-time";
+import { IdCell } from "@/components/primitives/id-cell";
 import { RowMenuPortal } from "@/components/primitives/row-menu-portal";
 import {
   DataRow,
@@ -150,10 +150,10 @@ export function OrdersTable({
               className="h-3.5 w-3.5 rounded border-[var(--color-ink-300)] accent-[var(--color-brand-500)]"
             />
           </TableTh>
+          <TableTh>Order ID</TableTh>
           <SortableTh col="orderRef" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
             Order
           </SortableTh>
-          <TableTh>Route</TableTh>
           <SortableTh col="status" sortBy={sortBy} sortDir={sortDir} onSort={onSortChange}>
             Status
           </SortableTh>
@@ -199,6 +199,9 @@ export function OrdersTable({
                   />
                 </TableTd>
                 <TableTd>
+                  <IdCell id={o.id} label="order id" />
+                </TableTd>
+                <TableTd>
                   <div className="font-mono text-[13px] font-semibold text-[var(--color-ink-900)]">
                     <Highlight text={shortRef(o.orderRef)} query={search} />
                   </div>
@@ -210,9 +213,6 @@ export function OrdersTable({
                       by <Highlight text={o.requestedBy} query={search} />
                     </div>
                   )}
-                </TableTd>
-                <TableTd>
-                  <RouteCell from={firstFrom(o)} to={firstTo(o)} />
                 </TableTd>
                 <TableTd>
                   <StatusBadge status={o.orderStatus} />
@@ -292,9 +292,6 @@ export function OrdersTable({
                     </div>
                     <PriorityBadge priority={o.priority} />
                   </div>
-                  <div className="mt-2">
-                    <RouteCell from={firstFrom(o)} to={firstTo(o)} />
-                  </div>
                 </div>
                 <ChevronRight className="h-4 w-4 shrink-0 text-[var(--color-ink-400)] mt-1" />
               </div>
@@ -316,33 +313,6 @@ export function OrdersTable({
       </div>
     </>
   );
-}
-
-function RouteCell({ from, to }: { from: string; to: string }) {
-  return (
-    <div className="flex items-center gap-2 max-w-[200px]">
-      <span className="font-mono text-[12px] text-[var(--color-ink-700)] truncate">
-        {from || "—"}
-      </span>
-      <ArrowRight
-        className="h-3 w-3 shrink-0 text-[var(--color-brand-500)]"
-        strokeWidth={2.4}
-      />
-      <span className="font-mono text-[12px] text-[var(--color-ink-700)] truncate">
-        {to || "—"}
-      </span>
-    </div>
-  );
-}
-
-// The list DTO doesn't include item routes (only the detail DTO does).
-// Show "{totalItems} stops" so the column still carries a signal at-a-
-// glance; the drawer reveals the actual pick→drop graph.
-function firstFrom(_o: DeliveryOrderListDto): string {
-  return "Pickup";
-}
-function firstTo(_o: DeliveryOrderListDto): string {
-  return "Drop";
 }
 
 function RowMenu({
