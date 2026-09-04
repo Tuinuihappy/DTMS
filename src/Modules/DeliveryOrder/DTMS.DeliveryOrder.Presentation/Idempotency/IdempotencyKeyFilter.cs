@@ -8,8 +8,10 @@ namespace DTMS.DeliveryOrder.Presentation.Idempotency;
 /// <summary>
 /// Best-effort endpoint filter for <c>Idempotency-Key</c> on mutation endpoints.
 /// <list type="bullet">
-///   <item>Missing header → pass through (no caching, no enforcement) — clients
-///         that opt out accept the risk of duplicate writes on network retries.</item>
+///   <item>Missing header → 400 on an endpoint tagged
+///         <see cref="IdempotencyKeyRequiredMetadata.Enforced"/>; otherwise pass
+///         through (no caching, no enforcement) — clients that opt out accept the
+///         risk of duplicate writes on network retries.</item>
 ///   <item>Same key + same request body → replay cached response, set
 ///         <c>Idempotency-Replayed: true</c>.</item>
 ///   <item>Same key + different body → 422 Unprocessable Entity.</item>
@@ -37,6 +39,26 @@ public sealed class IdempotencyKeyFilter : IEndpointFilter
 
         if (string.IsNullOrWhiteSpace(key))
         {
+            // Enforced endpoints treat the header as part of the contract: their
+            // create-semantics assume the caller can retry safely, so letting a
+            // request through without one would push the retry problem back into
+            // the handler.
+            var metadata = http.GetEndpoint()?.Metadata
+                .GetMetadata<IdempotencyKeyRequiredMetadata>();
+            if (metadata is { IsEnforced: true })
+            {
+                _logger.LogWarning(
+                    "Rejected {Method} {Path} — Idempotency-Key is required on this endpoint.",
+                    http.Request.Method, http.Request.Path);
+                return Results.Problem(
+                    title: "Idempotency-Key required",
+                    detail: "This endpoint requires an Idempotency-Key header — a unique value "
+                        + "(UUID recommended) per logical operation. Reuse the same key when "
+                        + "retrying so the original response is replayed instead of creating a "
+                        + "second order.",
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
             // Best-effort mode: client opted out of idempotency. Execute normally
             // with no replay protection — duplicates on retry are the caller's risk.
             return await next(context);

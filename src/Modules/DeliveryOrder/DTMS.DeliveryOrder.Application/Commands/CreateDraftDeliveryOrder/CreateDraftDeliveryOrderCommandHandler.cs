@@ -2,6 +2,7 @@ using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Services;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.DeliveryOrder.Domain.ValueObjects;
+using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
 
@@ -40,6 +41,21 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
         // carries either field.
         var origin = await _originResolver.GetInternalAsync(cancellationToken);
         var actor = _currentUser.GetCurrentUserName();
+
+        // Pre-check the (SourceSystemKey, OrderRef) uniqueness the database
+        // enforces anyway, so the operator gets a message naming the ref they
+        // typed instead of the index-agnostic "a record with the same unique
+        // value already exists" the 23505 arm produces. That arm stays as the
+        // safety net for a concurrent insert this lookup can't see.
+        var duplicate = await _repository.GetByRefAsync(origin.Key, request.OrderRef, cancellationToken);
+        if (duplicate is not null)
+        {
+            _logger.LogWarning("[CreateDraft] Order ref '{OrderRef}' already exists as {OrderId} — rejecting.",
+                request.OrderRef, duplicate.Id);
+            throw new DuplicateValueException(
+                $"Order ref '{request.OrderRef}' is already used by order {duplicate.Id} " +
+                $"({duplicate.Status}, created {duplicate.CreatedDate:yyyy-MM-dd}). Use a different reference.");
+        }
 
         var order = Domain.Entities.DeliveryOrder.Create(
             request.OrderRef,

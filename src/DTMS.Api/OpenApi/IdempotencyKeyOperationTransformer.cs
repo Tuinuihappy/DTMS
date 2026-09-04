@@ -17,11 +17,11 @@ internal sealed class IdempotencyKeyOperationTransformer : IOpenApiOperationTran
         OpenApiOperationTransformerContext context,
         CancellationToken cancellationToken)
     {
-        var hasMarker = context.Description.ActionDescriptor.EndpointMetadata
+        var marker = context.Description.ActionDescriptor.EndpointMetadata
             .OfType<IdempotencyKeyRequiredMetadata>()
-            .Any();
+            .FirstOrDefault();
 
-        if (!hasMarker) return Task.CompletedTask;
+        if (marker is null) return Task.CompletedTask;
 
         operation.Parameters ??= new List<IOpenApiParameter>();
 
@@ -36,12 +36,18 @@ internal sealed class IdempotencyKeyOperationTransformer : IOpenApiOperationTran
         {
             Name = "Idempotency-Key",
             In = ParameterLocation.Header,
-            Required = false,
-            Description = "Optional but **strongly recommended**. Unique value "
-                + "(UUID recommended) per logical operation. Retries with the same key "
-                + "replay the original response; the same key with a different body returns 422. "
-                + "If omitted, the request executes without replay protection — duplicates on "
-                + "network retries are the caller's risk.",
+            Required = marker.IsEnforced,
+            Description = marker.IsEnforced
+                ? "**Required.** Unique value (UUID recommended) per logical operation. "
+                    + "Retries with the same key replay the original response; the same key "
+                    + "with a different body returns 422. A request without this header is "
+                    + "rejected with 400 — it is the only safe way to retry on this route, "
+                    + "because reusing an existing orderRef returns 409 rather than replaying."
+                : "Optional but **strongly recommended**. Unique value "
+                    + "(UUID recommended) per logical operation. Retries with the same key "
+                    + "replay the original response; the same key with a different body returns 422. "
+                    + "If omitted, the request executes without replay protection — duplicates on "
+                    + "network retries are the caller's risk.",
             Schema = new OpenApiSchema { Type = JsonSchemaType.String, Format = "uuid", MaxLength = 200 }
         });
 

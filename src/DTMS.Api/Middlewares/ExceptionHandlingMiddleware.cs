@@ -27,51 +27,37 @@ public class ExceptionHandlingMiddleware
         {
             // Log the full detail with the same traceId the client receives, so
             // a support ticket carrying that id maps straight to this entry.
+            // Modeled 4xx arms are caller mistakes (duplicate ref, bad body,
+            // lost race), not server faults — logging them at Error made a
+            // user typo indistinguishable from an outage on the error-rate
+            // dashboard. Only the 500 branch stays at Error.
             var traceId = Activity.Current?.TraceId.ToString() ?? context.TraceIdentifier;
-            _logger.LogError(ex,
-                "An unhandled exception occurred (traceId {TraceId}): {Message}",
-                traceId, ex.Message);
+            var (status, _) = MapStatus(ex);
+            if (status >= StatusCodes.Status500InternalServerError)
+            {
+                _logger.LogError(ex,
+                    "An unhandled exception occurred (traceId {TraceId}): {Message}",
+                    traceId, ex.Message);
+            }
+            else
+            {
+                // Still pass the exception — the level says "not our fault",
+                // it must not also mean "no stack trace". A 400 arriving from
+                // somewhere unexpected is exactly when the trace is wanted.
+                _logger.LogWarning(ex,
+                    "Request rejected with {Status} (traceId {TraceId}): {Message}",
+                    status, traceId, ex.Message);
+            }
             await HandleExceptionAsync(context, ex);
         }
     }
 
     private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
-        var (statusCode, title) = exception switch
-        {
-            NotFoundException => (StatusCodes.Status404NotFound, "Not Found"),
-            BusinessRuleViolationException => (StatusCodes.Status400BadRequest, "Business Rule Violation"),
-            DomainException => (StatusCodes.Status400BadRequest, "Domain Exception"),
-            FluentValidation.ValidationException => (StatusCodes.Status400BadRequest, "Validation Error"),
-            // Model-binding failure (malformed JSON body, unknown enum token,
-            // bad date …). The framework throws this with StatusCode=400;
-            // without this arm it fell to the 500 branch and the caller got
-            // a scrubbed "unexpected error" for what is a client-side typo.
-            Microsoft.AspNetCore.Http.BadHttpRequestException badReq =>
-                (badReq.StatusCode, "Malformed Request"),
-            // Optimistic-concurrency clash (xmin token) — another writer changed
-            // the row between load and save. A retriable conflict, not a 500.
-            Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException =>
-                (StatusCodes.Status409Conflict, "Concurrent Update"),
-            // Unique-constraint rejection (SQLSTATE 23505) — the sibling of the
-            // clash above: someone else took the value between the handler's
-            // pre-check and the INSERT. An application-level pre-check can never
-            // close that window, so without this arm every duplicate code / key
-            // fell to the 500 branch below and the caller got a scrubbed
-            // "unexpected error" for what is a plain conflict.
-            Microsoft.EntityFrameworkCore.DbUpdateException dbEx
-                when Infrastructure.Persistence.PostgresErrors.IsUniqueViolation(dbEx) =>
-                (StatusCodes.Status409Conflict, "Duplicate Value"),
-            // Mode-disabled is a deployment-configuration outcome, not a
-            // server fault — 422 per the IDispatchStrategyRegistry contract,
-            // and the message is written for the caller.
-            DTMS.Dispatch.Application.Services.TransportModeNotEnabledException =>
-                (StatusCodes.Status422UnprocessableEntity, "Transport Mode Not Enabled"),
-            _ => (StatusCodes.Status500InternalServerError, "Internal Server Error")
-        };
+        var (statusCode, title) = MapStatus(exception);
 
-        // Only the modeled exceptions above carry a message written for the
-        // caller. Anything reaching the 500 branch is an unexpected internal
+        // Only the modeled exceptions in MapStatus carry a message written for
+        // the caller. Anything reaching the 500 branch is an unexpected internal
         // failure whose message (SQL text, host names, defensive-guard details)
         // must not leave the server — it is logged in InvokeAsync and correlated
         // to the client via traceId instead. This holds in every environment:
@@ -116,4 +102,48 @@ public class ExceptionHandlingMiddleware
 
         await context.Response.WriteAsJsonAsync(problemDetails);
     }
+
+    /// <summary>
+    /// Single source of truth for exception → (status, title). Called twice per
+    /// failure: once in <see cref="InvokeAsync"/> to pick the log level, once in
+    /// <see cref="HandleExceptionAsync"/> to write the response.
+    /// </summary>
+    private static (int StatusCode, string Title) MapStatus(Exception exception)
+        => exception switch
+        {
+            NotFoundException => (StatusCodes.Status404NotFound, "Not Found"),
+            BusinessRuleViolationException => (StatusCodes.Status400BadRequest, "Business Rule Violation"),
+            DomainException => (StatusCodes.Status400BadRequest, "Domain Exception"),
+            FluentValidation.ValidationException => (StatusCodes.Status400BadRequest, "Validation Error"),
+            // Model-binding failure (malformed JSON body, unknown enum token,
+            // bad date …). The framework throws this with StatusCode=400;
+            // without this arm it fell to the 500 branch and the caller got
+            // a scrubbed "unexpected error" for what is a client-side typo.
+            Microsoft.AspNetCore.Http.BadHttpRequestException badReq =>
+                (badReq.StatusCode, "Malformed Request"),
+            // Optimistic-concurrency clash (xmin token) — another writer changed
+            // the row between load and save. A retriable conflict, not a 500.
+            Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException =>
+                (StatusCodes.Status409Conflict, "Concurrent Update"),
+            // Handler-authored uniqueness rejection. Same status as the 23505
+            // arm below so one condition yields one status; the difference is
+            // that this message names the field and value that collided.
+            DuplicateValueException =>
+                (StatusCodes.Status409Conflict, "Duplicate Value"),
+            // Unique-constraint rejection (SQLSTATE 23505) — the sibling of the
+            // clash above: someone else took the value between the handler's
+            // pre-check and the INSERT. An application-level pre-check can never
+            // close that window, so without this arm every duplicate code / key
+            // fell to the 500 branch below and the caller got a scrubbed
+            // "unexpected error" for what is a plain conflict.
+            Microsoft.EntityFrameworkCore.DbUpdateException dbEx
+                when Infrastructure.Persistence.PostgresErrors.IsUniqueViolation(dbEx) =>
+                (StatusCodes.Status409Conflict, "Duplicate Value"),
+            // Mode-disabled is a deployment-configuration outcome, not a
+            // server fault — 422 per the IDispatchStrategyRegistry contract,
+            // and the message is written for the caller.
+            DTMS.Dispatch.Application.Services.TransportModeNotEnabledException =>
+                (StatusCodes.Status422UnprocessableEntity, "Transport Mode Not Enabled"),
+            _ => (StatusCodes.Status500InternalServerError, "Internal Server Error")
+        };
 }

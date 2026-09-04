@@ -7,6 +7,7 @@ using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.DeliveryOrder.Domain.ValueObjects;
 using DTMS.Dispatch.Application.Services;
+using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -84,23 +85,18 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
             return Result<UpstreamOrderAckDto>.Failure(
                 "requestedBy is required when selfManaged is true — it is the actor recorded on the auto acknowledge + pickup.");
 
-        // Idempotency check — if (SourceSystemKey, OrderRef) already exists, return existing ack
+        // OrderRef is a business reference, not an idempotency key — retries are
+        // the Idempotency-Key header's job (mandatory on this route), so reusing
+        // a ref that already exists is a conflict rather than a replay. The
+        // lookup is a courtesy: it names the ref that collided, where the
+        // unique-index arm can only report that some unique value did.
         var existing = await _repository.GetByRefAsync(request.SourceSystemKey, request.OrderRef, cancellationToken);
         if (existing is not null)
-        {
-            _logger.LogInformation("[Upstream] Order '{OrderRef}' from {SourceSystemKey} already exists with id {OrderId} — returning existing.",
-                request.OrderRef, request.SourceSystemKey, existing.Id);
-            // GetByRefAsync doesn't include Items — refetch the full graph for the DetailDto.
-            var full = await _repository.GetByIdAsNoTrackingAsync(existing.Id, cancellationToken);
-            return Result<UpstreamOrderAckDto>.Success(
-                new UpstreamOrderAckDto(DeliveryOrderMapper.MapToDetailDto(full!), Array.Empty<OrderQualityIssue>()));
-        }
+            throw ConflictingReuse(existing);
 
         // Confirm-time gate — this path creates + confirms in one call, so an
         // unregistered mode would go straight to the Planning consumer and
-        // stall. Placed AFTER the idempotency lookup so replays of an order
-        // accepted while its mode was enabled still return the original ack.
-        // Surfaces as 422 via the ExceptionHandlingMiddleware mapping.
+        // stall. Surfaces as 422 via the ExceptionHandlingMiddleware mapping.
         var requestedMode = request.RequestedTransportMode ?? Domain.Enums.TransportMode.Amr;
         if (!_strategyRegistry.IsRegistered(requestedMode))
             throw new TransportModeNotEnabledException(requestedMode);
@@ -243,16 +239,35 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         }
         catch (DbUpdateException)
         {
-            // Likely unique-index violation from a concurrent insert of the same (SourceSystemKey, OrderRef).
-            // Re-query: if the row now exists, treat as idempotent success; otherwise surface the original error.
+            // Unique-index violation from a concurrent insert of the same
+            // (SourceSystemKey, OrderRef) — the pre-check above read before the
+            // other writer committed. Re-query so the 409 can name the ref;
+            // if the row still isn't there the violation was something else and
+            // the original exception is the honest answer.
             var raced = await _repository.GetByRefAsync(request.SourceSystemKey, request.OrderRef, cancellationToken);
             if (raced is null) throw;
 
-            _logger.LogInformation("[Upstream] Order '{OrderRef}' raced with concurrent insert — returning existing id {OrderId}.",
-                request.OrderRef, raced.Id);
-            var racedFull = await _repository.GetByIdAsNoTrackingAsync(raced.Id, cancellationToken);
-            return Result<UpstreamOrderAckDto>.Success(
-                new UpstreamOrderAckDto(DeliveryOrderMapper.MapToDetailDto(racedFull!), Array.Empty<OrderQualityIssue>()));
+            throw ConflictingReuse(raced);
         }
+    }
+
+    /// <summary>
+    /// Builds the 409 for a reused OrderRef. Reaching this means the caller sent
+    /// a reference that already identifies an order — a duplicate shipment, not
+    /// a retry. A genuine retry never gets here: the same
+    /// <c>Idempotency-Key</c> replays the original response at the endpoint
+    /// filter, before the handler runs.
+    /// </summary>
+    private DuplicateValueException ConflictingReuse(Domain.Entities.DeliveryOrder existing)
+    {
+        _logger.LogWarning(
+            "[Upstream] Order ref '{OrderRef}' from {SourceSystemKey} already identifies order {OrderId} — rejecting as a conflict.",
+            existing.OrderRef, existing.SourceSystemKey, existing.Id);
+
+        return new DuplicateValueException(
+            $"Order ref '{existing.OrderRef}' already exists for source system " +
+            $"'{existing.SourceSystemKey}' (order {existing.Id}, {existing.Status}). " +
+            "Use a new order ref for a new shipment; to retry a request whose response " +
+            "you did not receive, resend it with the original Idempotency-Key.");
     }
 }

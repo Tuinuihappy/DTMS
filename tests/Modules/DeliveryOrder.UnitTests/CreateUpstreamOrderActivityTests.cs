@@ -7,6 +7,7 @@ using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.DeliveryOrder.Domain.ValueObjects;
+using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Messaging;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -20,8 +21,7 @@ namespace DeliveryOrder.UnitTests;
 // OrderUpstreamIngested row in the OrderActivity timeline. The projector
 // can't produce it (no integration event for ingest), so the create handler
 // mirrors it directly — these tests pin that write to exactly the success
-// path: never on the idempotent-duplicate return, never on validation
-// failure.
+// path: never on a rejected duplicate ref, never on validation failure.
 public class CreateUpstreamOrderActivityTests
 {
     private static (CreateUpstreamDeliveryOrderCommandHandler handler,
@@ -88,7 +88,7 @@ public class CreateUpstreamOrderActivityTests
     }
 
     [Fact]
-    public async Task Handle_DuplicateOrderRef_ReturnsExisting_WithoutActivityWrite()
+    public async Task Handle_DuplicateOrderRef_Rejects_WithoutActivityWrite()
     {
         var (handler, repo, activity, _) = Build();
         var existing = DomainOrder.CreateFromUpstream(
@@ -96,11 +96,10 @@ public class CreateUpstreamOrderActivityTests
             ServiceWindow.Create(DateTime.UtcNow.AddHours(1), DateTime.UtcNow.AddHours(4)),
             "oms", "OMS", "OMS", null, null, TransportMode.Amr, false);
         repo.GetByRefAsync("oms", "OD-TEST-01", Arg.Any<CancellationToken>()).Returns(existing);
-        repo.GetByIdAsNoTrackingAsync(existing.Id, Arg.Any<CancellationToken>()).Returns(existing);
 
-        var result = await handler.Handle(Command(), CancellationToken.None);
+        var act = () => handler.Handle(Command(), CancellationToken.None);
 
-        result.IsSuccess.Should().BeTrue();
+        await act.Should().ThrowAsync<DuplicateValueException>();
         await activity.DidNotReceiveWithAnyArgs().AppendAsync(
             default!, default, default, default!, default!, default, default,
             default, default, default, default, default, default, default);

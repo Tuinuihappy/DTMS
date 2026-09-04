@@ -7,6 +7,7 @@ using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.DeliveryOrder.Domain.ValueObjects;
 using DTMS.Dispatch.Application.Services;
+using DTMS.SharedKernel.Exceptions;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -40,8 +41,12 @@ public class UpstreamModeGateTests
     }
 
     [Fact]
-    public async Task DuplicateOrderRef_ReturnsExistingAck_EvenWhenModeNowUnregistered()
+    public async Task DuplicateOrderRef_ReportsTheConflict_NotTheDisabledMode()
     {
+        // Gate placement: the ref lookup runs first, so a caller reusing a ref
+        // is told that — not that a mode they didn't choose to disable is off.
+        // Both conditions hold here; only the one the caller can act on is
+        // reported.
         var (handler, repo, _) = Build(manualRegistered: false);
         var existing = DomainOrder.CreateFromUpstream(
             "OD-GATE-01", Priority.Normal,
@@ -50,10 +55,10 @@ public class UpstreamModeGateTests
         repo.GetByRefAsync("oms", "OD-GATE-01", Arg.Any<CancellationToken>()).Returns(existing);
         repo.GetByIdAsNoTrackingAsync(existing.Id, Arg.Any<CancellationToken>()).Returns(existing);
 
-        var result = await handler.Handle(
+        var act = () => handler.Handle(
             Command(orderRef: "OD-GATE-01", mode: TransportMode.Manual), CancellationToken.None);
 
-        result.IsSuccess.Should().BeTrue();   // gate placement: after idempotency lookup
+        await act.Should().ThrowAsync<DuplicateValueException>();
     }
 
     private static (CreateUpstreamDeliveryOrderCommandHandler handler,

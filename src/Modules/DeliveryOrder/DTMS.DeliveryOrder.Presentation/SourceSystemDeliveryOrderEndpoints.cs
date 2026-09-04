@@ -33,8 +33,12 @@ public static class SourceSystemDeliveryOrderEndpoints
     public static void MapSourceSystemDeliveryOrderEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/source").WithTags("SourceSystem");
+        // Idempotency-Key is mandatory here. It is the only retry mechanism on
+        // this route: OrderRef is a business reference, so reusing one is a
+        // conflict (409) rather than a replay, and a caller with no key would
+        // have no safe way to repeat a request whose response it never saw.
         group.MapPost("/delivery-orders", HandleCreateAsync)
-            .RequireIdempotencyKey()
+            .RequireIdempotencyKey(enforced: true)
             .RequirePermissionFromRouteKey(StandardSystemPermissions.OrderWriteTemplate);
     }
 
