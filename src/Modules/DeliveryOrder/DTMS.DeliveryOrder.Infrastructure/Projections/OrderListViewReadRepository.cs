@@ -114,14 +114,24 @@ public class OrderListViewReadRepository : IOrderListViewReadRepository
     /// have special meaning in the tsquery grammar (&amp;, |, !, parens)
     /// and turns whitespace-separated tokens into prefix-AND search
     /// (<c>foo &amp; bar:*</c>).
+    ///
+    /// A token that parses as a Guid is normalized to its dash-less "N"
+    /// form, because that is the shape
+    /// <c>OrderListViewProjectionStore.BuildSearchText</c> writes into
+    /// SearchText. Without this, the dashed GUID the operator copies out
+    /// of the Order ID column stays one hyphenated token and matches
+    /// nothing — the id is indexed, just in the other spelling.
     /// </summary>
-    private static string SanitizeQuery(string raw)
+    internal static string SanitizeQuery(string raw)
     {
         var cleaned = new string(raw.Where(ch => char.IsLetterOrDigit(ch) || char.IsWhiteSpace(ch) || ch == '-').ToArray());
         var tokens = cleaned.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         if (tokens.Length == 0) return string.Empty;
-        return string.Join(" & ", tokens.Select(t => $"{t}:*"));
+        return string.Join(" & ", tokens.Select(t => $"{NormalizeToken(t)}:*"));
     }
+
+    private static string NormalizeToken(string token)
+        => Guid.TryParse(token, out var guid) ? guid.ToString("N") : token;
 
     public async Task<DeliveryOrderStats> GetStatsAsync(CancellationToken cancellationToken = default)
     {

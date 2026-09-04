@@ -54,14 +54,28 @@ public class TripQueueReadRepository : ITripQueueReadRepository
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var s = filter.Search;
-            // Match UpperKey, VendorOrderKey, or any TripItems.OrderRef on
-            // this trip. OrderRef matches use EXISTS so the projection
-            // table is hit by its existing (TripId) index.
+
+            // A term that parses as a Guid gets two extra chances beyond the
+            // text columns below, because both ids an operator can copy out
+            // of the UI are dashed while neither is stored that way:
+            //
+            //   Trip.Id   is a uuid column — no ILIKE would ever hit it.
+            //   UpperKey  embeds the DeliveryOrder id in dash-less "N" form
+            //             ({orderId:N}-G{group}), so pasting a dashed order
+            //             id finds nothing until we strip the dashes.
+            //
+            // Both are exact/prefix matches on indexed columns, so this
+            // stays cheap: the Trip.Id arm is a PK probe.
+            var isGuid = Guid.TryParse(s, out var guid);
+            var guidN = isGuid ? guid.ToString("N") : string.Empty;
+
             query = query.Where(t =>
                 EF.Functions.ILike(t.UpperKey, $"%{s}%")
                 || (t.AmrExtension != null && t.AmrExtension.VendorOrderKey != null
                     && EF.Functions.ILike(t.AmrExtension.VendorOrderKey, $"%{s}%"))
-                || _db.TripItems.Any(i => i.TripId == t.Id && EF.Functions.ILike(i.OrderRef, $"%{s}%")));
+                || _db.TripItems.Any(i => i.TripId == t.Id && EF.Functions.ILike(i.OrderRef, $"%{s}%"))
+                || (isGuid && t.Id == guid)
+                || (isGuid && EF.Functions.ILike(t.UpperKey, $"%{guidN}%")));
         }
 
         // Total before paging — drives pagination UI.
