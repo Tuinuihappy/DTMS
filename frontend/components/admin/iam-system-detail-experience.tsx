@@ -9,6 +9,7 @@ import {
   Eye,
   EyeOff,
   KeyRound,
+  Link2,
   Lock,
   Pencil,
   Power,
@@ -28,12 +29,14 @@ import {
   issueToken,
   listIssuedTokens,
   listStandardSystemPermissions,
+  listSystems,
   patchSystem,
   revealCallbackToken,
   revokeSystemPermission,
   revokeToken,
   rotateCredential,
   setCallback,
+  setTokenSource,
   configureTokenRefresh,
   runTokenRefresh,
   getTokenRefreshPlatformSettings,
@@ -42,6 +45,7 @@ import {
   type IssuedTokenSummary,
   type IssueTokenRequest,
   type SystemDetailDto,
+  type SystemSummaryDto,
   type TokenRefreshConfigRequest,
   type TokenRefreshPlatformSettings,
 } from "@/lib/api/iam-systems";
@@ -98,6 +102,9 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
   const [editingRefresh, setEditingRefresh] = useState(false);
   const [refreshingNow, setRefreshingNow] = useState(false);
   const [refreshNote, setRefreshNote] = useState<string | null>(null);
+  // Which system's token this one uses. Separate modal from the mint config
+  // because the two are mutually exclusive — a borrower must not mint.
+  const [editingTokenSource, setEditingTokenSource] = useState(false);
   // Platform-managed (env/deploy) refresh knobs, shown read-only for transparency.
   const [platformSettings, setPlatformSettings] = useState<TokenRefreshPlatformSettings | null>(null);
 
@@ -719,7 +726,8 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
                 drops a bad stored token, and "Refresh now" is the way back:
                 a successful mint switches the scheme back to bearer. */}
             {(data.credential.callbackAuthScheme?.toLowerCase() === "bearer" ||
-              data.credential.tokenRefreshUrl) && (
+              data.credential.tokenRefreshUrl ||
+              data.credential.tokenSourceKey) && (
               <div className="mt-4 rounded-lg border border-[var(--color-ink-100)] bg-[var(--color-ink-50)]/40 p-3 dark:border-white/[0.06] dark:bg-white/[0.02]">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -748,14 +756,46 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
                     </button>
                     <button
                       type="button"
-                      onClick={() => setEditingRefresh(true)}
+                      onClick={() => setEditingTokenSource(true)}
                       className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
                     >
-                      <Settings2 className="h-3 w-3" strokeWidth={2.2} />
-                      Configure
+                      <Link2 className="h-3 w-3" strokeWidth={2.2} />
+                      Token source
                     </button>
+                    {/* A borrower has no mint config of its own to edit — the
+                        owner's is what governs it. */}
+                    {!data.credential.tokenSourceKey && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingRefresh(true)}
+                        className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+                      >
+                        <Settings2 className="h-3 w-3" strokeWidth={2.2} />
+                        Configure
+                      </button>
+                    )}
                   </div>
                 </div>
+                {data.credential.tokenSourceKey && (
+                  <p className="mt-2 text-[11px] text-[var(--color-ink-500)]">
+                    Borrowing its token from{" "}
+                    <span className="font-mono font-medium text-[var(--color-ink-700)]">
+                      {data.credential.tokenSourceKey}
+                    </span>
+                    . The settings below belong to that system — it does the minting, this one just
+                    presents the result. Only the token is shared; the callback URL and timeout above
+                    stay this system&apos;s own.
+                  </p>
+                )}
+                {data.credential.borrowedBy.length > 0 && (
+                  <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400">
+                    Lending this token to{" "}
+                    <span className="font-mono font-medium">
+                      {data.credential.borrowedBy.join(", ")}
+                    </span>
+                    . Changing its mint settings or deleting this system affects them too.
+                  </p>
+                )}
                 {data.credential.callbackAuthScheme?.toLowerCase() !== "bearer" && (
                   <p className="mt-2 text-[11px] text-[var(--color-ink-500)]">
                     No bearer token stored — &quot;Refresh now&quot; mints one from the mint URL and
@@ -897,6 +937,18 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
           onClose={() => setEditingRefresh(false)}
           onSaved={() => {
             setEditingRefresh(false);
+            void load();
+          }}
+        />
+      )}
+      {editingTokenSource && (
+        <ConfigureTokenSourceModal
+          systemKey={data.key}
+          current={data.credential?.tokenSourceKey ?? null}
+          mintsItsOwn={Boolean(data.credential?.tokenRefreshUrl) && !data.credential?.tokenSourceKey}
+          onClose={() => setEditingTokenSource(false)}
+          onSaved={() => {
+            setEditingTokenSource(false);
             void load();
           }}
         />
@@ -1311,6 +1363,132 @@ function ConfigureTokenRefreshModal({
       </div>
       {error && <ErrorBanner message={error} />}
       <ModalFooter onCancel={onClose} onSave={submit} saving={submitting} />
+    </ModalShell>
+  );
+}
+
+/**
+ * Chooses where a system's outbound token comes from: minted by itself, or
+ * borrowed from another system.
+ *
+ * The two are mutually exclusive on purpose. The auth service keeps one live
+ * token per account, so two systems minting with the same credentials each
+ * invalidate the other — and neither notices, because the stored expiry still
+ * reads as valid while every call comes back 401.
+ */
+function ConfigureTokenSourceModal({
+  systemKey,
+  current,
+  mintsItsOwn,
+  onClose,
+  onSaved,
+}: {
+  systemKey: string;
+  current: string | null;
+  mintsItsOwn: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [mode, setMode] = useState<"own" | "borrow">(current ? "borrow" : "own");
+  const [sourceKey, setSourceKey] = useState(current ?? "");
+  const [candidates, setCandidates] = useState<SystemSummaryDto[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const abort = new AbortController();
+    listSystems(abort.signal)
+      .then((rows) => setCandidates(rows.filter((r) => r.key !== systemKey)))
+      .catch((e) => {
+        if (!abort.signal.aborted) setError((e as Error).message);
+      });
+    return () => abort.abort();
+  }, [systemKey]);
+
+  const submit = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await setTokenSource(systemKey, mode === "borrow" ? sourceKey : null);
+      onSaved();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <ModalShell title="Token source" onClose={onClose}>
+      <p className="mb-3 text-[11.5px] text-[var(--color-ink-500)]">
+        Only the bearer token is shared. This system keeps its own callback URL, timeout and retry
+        settings either way.
+      </p>
+      <div className="space-y-3">
+        <label className="flex items-start gap-2 text-[12px] text-[var(--color-ink-700)]">
+          <input
+            type="radio"
+            className="mt-0.5"
+            checked={mode === "own"}
+            onChange={() => setMode("own")}
+          />
+          <span>
+            Mints its own
+            <span className="block text-[11px] text-[var(--color-ink-500)]">
+              Needs its own account on the auth service. Configure the mint URL and credentials
+              separately.
+            </span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-[12px] text-[var(--color-ink-700)]">
+          <input
+            type="radio"
+            className="mt-0.5"
+            checked={mode === "borrow"}
+            onChange={() => setMode("borrow")}
+          />
+          <span>
+            Borrows from another system
+            <span className="block text-[11px] text-[var(--color-ink-500)]">
+              Use this when both systems authenticate with the same account.
+            </span>
+          </span>
+        </label>
+        {mode === "borrow" && (
+          <Field label="Token owner">
+            <select
+              value={sourceKey}
+              onChange={(e) => setSourceKey(e.target.value)}
+              className="w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 text-[13px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
+            >
+              <option value="">— select a system —</option>
+              {candidates.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.key} — {c.displayName}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        {mode === "borrow" && mintsItsOwn && (
+          <p className="text-[11px] text-amber-700 dark:text-amber-400">
+            This system currently mints its own token. Clear its auto-refresh configuration first —
+            a system cannot both mint and borrow.
+          </p>
+        )}
+        {mode === "own" && current && (
+          <p className="text-[11px] text-amber-700 dark:text-amber-400">
+            It will stop borrowing from <span className="font-mono">{current}</span> and have no
+            token until you configure minting, so outbound calls will fail until then.
+          </p>
+        )}
+      </div>
+      {error && <ErrorBanner message={error} />}
+      <ModalFooter
+        onCancel={onClose}
+        onSave={submit}
+        saving={submitting || (mode === "borrow" && !sourceKey)}
+      />
     </ModalShell>
   );
 }

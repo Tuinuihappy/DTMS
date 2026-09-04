@@ -38,6 +38,25 @@ public sealed class SystemCredential
     /// </summary>
     public string? TokenRefreshConfig { get; private set; }
 
+    /// <summary>
+    /// Key of another system whose outbound token this one borrows. NULL means
+    /// this row owns its token and mints it via <see cref="TokenRefreshConfig"/>.
+    ///
+    /// <para>Exists because some auth servers keep only one live token per
+    /// account: two systems minting with the same credentials would each
+    /// invalidate the other's token, and neither would notice — the stored
+    /// <c>exp</c> still looks valid, so the refresh loop sees nothing to do
+    /// while every call fails 401. Pointing both at one owner means one minter
+    /// and no such race.</para>
+    ///
+    /// <para>Only the token is borrowed. <see cref="CallbackBaseUrl"/>, the
+    /// timeout and the resilience settings stay this row's own.</para>
+    ///
+    /// <para>Mutually exclusive with <see cref="TokenRefreshConfig"/>, and
+    /// chains are not allowed — an owner must own its token outright.</para>
+    /// </summary>
+    public string? TokenSourceKey { get; private set; }
+
     public DateTime UpdatedAt { get; private set; }
 
     /// <summary>
@@ -101,7 +120,36 @@ public sealed class SystemCredential
     /// EF value converter, same as <see cref="CallbackAuthConfig"/>.</summary>
     public void SetTokenRefreshConfig(string? config)
     {
+        // A borrower must not also mint: that is exactly the two-minters-one-
+        // account race TokenSourceKey exists to prevent.
+        if (config is not null && TokenSourceKey is not null)
+            throw new InvalidOperationException(
+                $"System '{SystemKey}' borrows its token from '{TokenSourceKey}'. " +
+                "Clear the token source before giving it a refresh config of its own.");
+
         TokenRefreshConfig = config;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Point this row at another system's token, or pass null to go back to
+    /// owning one. The caller is responsible for checking that the target
+    /// exists and is itself an owner — this entity can only see itself.
+    /// </summary>
+    public void SetTokenSource(string? sourceKey)
+    {
+        if (sourceKey is not null)
+        {
+            if (string.IsNullOrWhiteSpace(sourceKey))
+                throw new ArgumentException("Token source key cannot be blank.", nameof(sourceKey));
+            if (string.Equals(sourceKey, SystemKey, StringComparison.Ordinal))
+                throw new InvalidOperationException($"System '{SystemKey}' cannot borrow its token from itself.");
+            if (TokenRefreshConfig is not null)
+                throw new InvalidOperationException(
+                    $"System '{SystemKey}' mints its own token. Clear its refresh config before borrowing from '{sourceKey}'.");
+        }
+
+        TokenSourceKey = sourceKey;
         UpdatedAt = DateTime.UtcNow;
     }
 

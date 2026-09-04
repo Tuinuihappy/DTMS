@@ -32,7 +32,28 @@ public sealed class CachedCredentialReader
         _protector = protector;
     }
 
+    /// <summary>
+    /// The credential as outbound callers need it: when the system borrows its
+    /// token, <see cref="CachedCredential.CallbackAuthConfig"/> comes back
+    /// holding the owner's token, while every other field stays this system's
+    /// own. Administration that needs the row exactly as stored should read the
+    /// repository instead — the refresher does, so it always mints against the
+    /// owner's own token rather than a borrowed one.
+    /// </summary>
     public async Task<CachedCredential?> GetAsync(string systemKey, CancellationToken ct = default)
+    {
+        var cred = await GetStoredAsync(systemKey, ct);
+        if (cred?.TokenSourceKey is not { } ownerKey)
+            return cred;
+
+        // One hop only. Chains are rejected when the link is written; following
+        // just the one keeps a bad row from turning into a lookup loop here.
+        var owner = await GetStoredAsync(ownerKey, ct);
+        return cred.WithCallbackAuthConfig(owner?.CallbackAuthConfig);
+    }
+
+    /// <summary>The row as stored, with no link resolution.</summary>
+    private async Task<CachedCredential?> GetStoredAsync(string systemKey, CancellationToken ct)
     {
         var key = CacheKeyPrefix + systemKey;
 
@@ -79,6 +100,11 @@ public sealed class CachedCredential
     public int CircuitFailureThreshold { get; set; }
     public int CircuitDurationSeconds { get; set; }
 
+    /// <summary>Set when this system borrows its outbound token from another.
+    /// On an instance returned by <see cref="CachedCredentialReader.GetAsync"/>,
+    /// <see cref="CallbackAuthConfig"/> already holds the owner's token.</summary>
+    public string? TokenSourceKey { get; set; }
+
     public static CachedCredential FromEntity(SystemCredential e) => new()
     {
         SystemKey = e.SystemKey,
@@ -91,12 +117,13 @@ public sealed class CachedCredential
         RetryMaxAttempts = e.RetryMaxAttempts,
         CircuitFailureThreshold = e.CircuitFailureThreshold,
         CircuitDurationSeconds = e.CircuitDurationSeconds,
+        TokenSourceKey = e.TokenSourceKey,
     };
 
     /// <summary>
     /// Copy with a different <see cref="CallbackAuthConfig"/> — used by the
     /// reader to swap plaintext↔ciphertext without mutating the instance
-    /// the L1 cache holds.
+    /// the L1 cache holds, and to substitute a borrowed token.
     /// </summary>
     public CachedCredential WithCallbackAuthConfig(string? callbackAuthConfig) => new()
     {
@@ -110,5 +137,6 @@ public sealed class CachedCredential
         RetryMaxAttempts = RetryMaxAttempts,
         CircuitFailureThreshold = CircuitFailureThreshold,
         CircuitDurationSeconds = CircuitDurationSeconds,
+        TokenSourceKey = TokenSourceKey,
     };
 }

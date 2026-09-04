@@ -29,10 +29,17 @@ export type CredentialSummary = {
   callbackTokenExpiresAt: string | null;
   // Phase S.9 — outbound-token auto-refresh state (metadata only; the mint
   // password is never surfaced here).
+  // When tokenSourceKey is set these describe the OWNER's mint config, since
+  // that is what actually governs this system's token.
   tokenRefreshEnabled: boolean;
   tokenRefreshUrl: string | null;
   tokenRefreshUsername: string | null;
   tokenRefreshBeforeSeconds: number | null;
+  // Set when this system borrows another system's outbound token.
+  tokenSourceKey: string | null;
+  // Systems borrowing this one's token — non-empty means changing or deleting
+  // this system would leave them without credentials.
+  borrowedBy: string[];
 };
 
 export type SubscriptionSummary = {
@@ -475,6 +482,29 @@ export async function getTokenRefreshPlatformSettings(
   });
   if (!res.ok) throw new Error(await readError(res));
   return (await res.json()) as TokenRefreshPlatformSettings;
+}
+
+/**
+ * Point a system at another system's outbound token, or pass null to hand it
+ * back responsibility for minting its own.
+ *
+ * Exists because the auth service keeps one live token per account: two
+ * systems minting with the same credentials invalidate each other's tokens
+ * without either noticing, since the stored expiry still looks valid.
+ */
+export async function setTokenSource(
+  key: string,
+  tokenSourceKey: string | null,
+): Promise<void> {
+  const res = await fetch(
+    `/api/admin/iam/systems/${encodeURIComponent(key)}/token-source`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tokenSourceKey }),
+    },
+  );
+  if (!res.ok) throw new Error(await readError(res));
 }
 
 /** Save/enable/disable the outbound-token auto-refresh config for a system. */

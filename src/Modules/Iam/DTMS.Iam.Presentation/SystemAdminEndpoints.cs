@@ -129,6 +129,15 @@ public static class SystemAdminEndpoints
                 var permissions = await systems.GetPermissionCodesAsync(key, ct);
                 var subscriptions = await subs.ListBySystemAsync(key, ct);
 
+                // Both directions of the borrow link, so the page can say
+                // "borrowing from X" and warn before someone breaks a lender.
+                var owner = cred?.TokenSourceKey is { } src
+                    ? await creds.GetBySystemKeyAsync(src, ct)
+                    : null;
+                var borrowers = cred is null
+                    ? null
+                    : await creds.ListBorrowerKeysAsync(key, ct);
+
                 return Results.Ok(new SystemDetailDto(
                     Key: client.Key,
                     DisplayName: client.DisplayName,
@@ -140,7 +149,7 @@ public static class SystemAdminEndpoints
                     Subscriptions: subscriptions
                         .Select(s => new SubscriptionSummary(s.EventType, s.PayloadFormatKey, s.Enabled))
                         .ToList(),
-                    Credential: cred is null ? null : BuildCredentialSummary(cred)));
+                    Credential: cred is null ? null : BuildCredentialSummary(cred, owner, borrowers)));
             }).RequirePermission(Permissions.Iam.SystemRead);
 
         // ── Patch metadata ────────────────────────────────────────────
@@ -357,6 +366,13 @@ public static class SystemAdminEndpoints
                 if (cred is null)
                     return Results.Conflict(new { error = $"No credential row for '{key}'. POST to /api/v1/iam/systems first." });
 
+                if (cred.TokenSourceKey is { } borrowedFrom)
+                    return Results.Conflict(new
+                    {
+                        error = $"System '{key}' borrows its token from '{borrowedFrom}'. " +
+                                "Stop borrowing before giving it a mint configuration of its own.",
+                    });
+
                 var opts = refreshOptions.CurrentValue;
 
                 // SSRF guard — reject a mint URL whose host isn't allowlisted
@@ -383,6 +399,27 @@ public static class SystemAdminEndpoints
                     {
                         error = "password required when configuring auto-refresh for the first time — no existing password to preserve.",
                     });
+
+                // Two systems minting on one account is the failure this whole
+                // borrow mechanism exists to prevent: the auth service keeps one
+                // live token per account, so each refresh silently kills the
+                // other's token while its stored exp still reads as valid.
+                // Nothing downstream can detect that, so refuse it here.
+                foreach (var (otherKey, otherJson) in await creds.ListTokenRefreshConfigsAsync(ct))
+                {
+                    if (string.Equals(otherKey, key, StringComparison.Ordinal)) continue;
+                    var other = TokenRefreshSettings.TryParse(otherJson);
+                    if (other is null) continue;
+                    if (!string.Equals(other.TokenUrl, req.TokenUrl, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!string.Equals(other.Username, req.Username, StringComparison.OrdinalIgnoreCase)) continue;
+
+                    return Results.Conflict(new
+                    {
+                        error = $"System '{otherKey}' already mints from this URL as '{req.Username}'. " +
+                                $"Two systems minting on one account invalidate each other's tokens. " +
+                                $"Point '{key}' at '{otherKey}' with PUT /api/v1/iam/systems/{key}/token-source instead.",
+                    });
+                }
 
                 var settings = new TokenRefreshSettings
                 {
@@ -416,17 +453,97 @@ public static class SystemAdminEndpoints
                 return Results.NoContent();
             }).RequirePermission(Permissions.Iam.SystemWrite);
 
+        // ── Borrow another system's token ─────────────────────────────
+        // Set tokenSourceKey to borrow, or null to go back to owning one.
+        group.MapPut("/{key}/token-source",
+            async (string key, TokenSourceRequest req, HttpContext ctx,
+                   ISystemClientRepository systems,
+                   ISystemCredentialRepository creds,
+                   CachedCredentialReader reader,
+                   IAuditLogRepository audit,
+                   CancellationToken ct) =>
+            {
+                if (await systems.GetByKeyAsync(key, ct) is null) return Results.NotFound();
+
+                var cred = await creds.GetBySystemKeyAsync(key, ct);
+                if (cred is null)
+                    return Results.Conflict(new { error = $"No credential row for '{key}'. POST to /api/v1/iam/systems first." });
+
+                var source = string.IsNullOrWhiteSpace(req.TokenSourceKey) ? null : req.TokenSourceKey!.Trim();
+
+                if (source is not null)
+                {
+                    if (string.Equals(source, key, StringComparison.Ordinal))
+                        return Results.BadRequest(new { error = $"System '{key}' cannot borrow its token from itself." });
+
+                    var owner = await creds.GetBySystemKeyAsync(source, ct);
+                    if (owner is null)
+                        return Results.BadRequest(new { error = $"No credential row for token source '{source}'." });
+
+                    // No chains: an owner must hold its token outright, so the
+                    // resolver never has to walk more than one hop and there is
+                    // no way to build a cycle.
+                    if (owner.TokenSourceKey is { } ownersOwner)
+                        return Results.BadRequest(new
+                        {
+                            error = $"'{source}' itself borrows from '{ownersOwner}'. Borrow from '{ownersOwner}' directly.",
+                        });
+
+                    if (owner.TokenRefreshConfig is null)
+                        return Results.BadRequest(new
+                        {
+                            error = $"'{source}' has no mint configuration, so it has no token to lend. " +
+                                    $"Configure auto-refresh on '{source}' first.",
+                        });
+
+                    if (cred.TokenRefreshConfig is not null)
+                        return Results.Conflict(new
+                        {
+                            error = $"System '{key}' mints its own token. Clear its auto-refresh configuration " +
+                                    $"before borrowing from '{source}'.",
+                        });
+                }
+                else
+                {
+                    // Dropping the link leaves this system with no token at all
+                    // until someone configures minting, so say so rather than
+                    // letting its next callback fail with a bare 401.
+                    if (cred.TokenSourceKey is null)
+                        return Results.NoContent();
+                }
+
+                cred.SetTokenSource(source);
+                await creds.UpdateAsync(cred, ct);
+                await reader.InvalidateAsync(key, ct);
+
+                await audit.AppendAsync(new PermissionAuditEntry(
+                    actorEmployeeId: ActorOrUnknown(ctx),
+                    action: source is null ? "system-token-source-cleared" : "system-token-source-set",
+                    permissionCode: null,
+                    details: JsonSerializer.Serialize(new { systemKey = key, tokenSourceKey = source })), ct);
+
+                return Results.NoContent();
+            }).RequirePermission(Permissions.Iam.SystemWrite);
+
         // ── Manual "refresh now" ──────────────────────────────────────
         group.MapPost("/{key}/callback/token-refresh/run",
             async (string key, HttpContext ctx,
                    ISystemClientRepository systems,
+                   ISystemCredentialRepository creds,
                    ICallbackTokenRefresher refresher,
                    IAuditLogRepository audit,
                    CancellationToken ct) =>
             {
                 if (await systems.GetByKeyAsync(key, ct) is null) return Results.NotFound();
 
-                var result = await refresher.RefreshAsync(key, force: true, ct);
+                // A borrower has no token of its own to refresh — the operator
+                // pressing the button on its page means "get me a fresh token",
+                // so mint on the owner. Refreshing the borrower would report a
+                // truthful but useless "Auto-refresh not configured."
+                var cred = await creds.GetBySystemKeyAsync(key, ct);
+                var target = cred?.TokenSourceKey ?? key;
+
+                var result = await refresher.RefreshAsync(target, force: true, ct);
 
                 await audit.AppendAsync(new PermissionAuditEntry(
                     actorEmployeeId: ActorOrUnknown(ctx),
@@ -435,6 +552,7 @@ public static class SystemAdminEndpoints
                     details: JsonSerializer.Serialize(new
                     {
                         systemKey = key,
+                        mintedOn = target,
                         outcome = result.Outcome.ToString(),
                     })), ct);
 
@@ -483,6 +601,7 @@ public static class SystemAdminEndpoints
         group.MapDelete("/{key}",
             async (string key, HttpContext ctx,
                    ISystemClientRepository systems,
+                   ISystemCredentialRepository creds,
                    IAuditLogRepository audit,
                    CancellationToken ct) =>
             {
@@ -492,6 +611,17 @@ public static class SystemAdminEndpoints
                     return Results.Conflict(new
                     {
                         error = "Deactivate the system first. Hard delete is only allowed once the row is Inactive and no traffic is flowing.",
+                    });
+
+                // The self-referencing FK would refuse this anyway, but as a raw
+                // 23503 out of the cascade. Name the dependants instead so the
+                // operator knows what to re-point first.
+                var borrowers = await creds.ListBorrowerKeysAsync(key, ct);
+                if (borrowers.Count > 0)
+                    return Results.Conflict(new
+                    {
+                        error = $"Cannot delete '{key}': {string.Join(", ", borrowers)} borrow its outbound token. " +
+                                "Point them at another token source first.",
                     });
 
                 await systems.RemoveAsync(client, ct);
@@ -973,9 +1103,18 @@ public static class SystemAdminEndpoints
     // Maps a credential to its metadata summary. The mint password from
     // TokenRefreshConfig is deliberately dropped — only non-secret refresh
     // fields cross the wire on a routine detail load.
-    private static CredentialSummary BuildCredentialSummary(SystemCredential cred)
+    //
+    // When the system borrows its token, the refresh fields and the expiry are
+    // read off the owner: those are what actually govern this system's token,
+    // and showing its own empty values would read as "no auto-refresh" when
+    // refresh is in fact running one row over.
+    private static CredentialSummary BuildCredentialSummary(
+        SystemCredential cred,
+        SystemCredential? tokenOwner = null,
+        IReadOnlyList<string>? borrowedBy = null)
     {
-        var refresh = TokenRefreshSettings.TryParse(cred.TokenRefreshConfig);
+        var tokenHolder = tokenOwner ?? cred;
+        var refresh = TokenRefreshSettings.TryParse(tokenHolder.TokenRefreshConfig);
         return new CredentialSummary(
             AuthScheme: cred.AuthScheme,
             HasCallbackBaseUrl: !string.IsNullOrWhiteSpace(cred.CallbackBaseUrl),
@@ -983,11 +1122,13 @@ public static class SystemAdminEndpoints
             CallbackAuthScheme: cred.CallbackAuthScheme,
             CallbackTimeoutMs: cred.CallbackTimeoutMs,
             UpdatedAt: cred.UpdatedAt,
-            CallbackTokenExpiresAt: TryReadJwtExpiry(cred.CallbackAuthConfig),
+            CallbackTokenExpiresAt: TryReadJwtExpiry(tokenHolder.CallbackAuthConfig),
             TokenRefreshEnabled: refresh?.Enabled ?? false,
             TokenRefreshUrl: refresh?.TokenUrl,
             TokenRefreshUsername: refresh?.Username,
-            TokenRefreshBeforeSeconds: refresh?.RefreshBeforeSeconds);
+            TokenRefreshBeforeSeconds: refresh?.RefreshBeforeSeconds,
+            TokenSourceKey: cred.TokenSourceKey,
+            BorrowedBy: borrowedBy ?? Array.Empty<string>());
     }
 }
 
@@ -1059,10 +1200,18 @@ public sealed record CredentialSummary(
     DateTime? CallbackTokenExpiresAt,
     // Outbound-token auto-refresh state. Metadata only — the mint password is
     // NEVER surfaced here. Null/false when auto-refresh isn't configured.
+    // When TokenSourceKey is set these describe the OWNER's mint configuration,
+    // because that is what governs this system's token. Its own row carries
+    // none — a borrower is forbidden from minting.
     bool TokenRefreshEnabled,
     string? TokenRefreshUrl,
     string? TokenRefreshUsername,
-    int? TokenRefreshBeforeSeconds);
+    int? TokenRefreshBeforeSeconds,
+    // Set when this system borrows another's outbound token.
+    string? TokenSourceKey = null,
+    // Systems borrowing this one's token. Non-empty means un-owning or deleting
+    // this system would leave them with nothing to authenticate with.
+    IReadOnlyList<string>? BorrowedBy = null);
 
 public sealed record SubscriptionSummary(string EventType, string PayloadFormatKey, bool Enabled);
 
@@ -1103,6 +1252,10 @@ public sealed record TokenRefreshConfigRequest(
     string? TokenField,
     int? RefreshBeforeSeconds,
     bool Enabled);
+
+// Null / blank clears the link and hands the system back responsibility for
+// minting its own token.
+public sealed record TokenSourceRequest(string? TokenSourceKey);
 
 public sealed record TokenRefreshRunResponse(
     string Status,

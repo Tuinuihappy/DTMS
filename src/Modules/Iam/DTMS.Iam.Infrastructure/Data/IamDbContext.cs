@@ -110,6 +110,17 @@ public class IamDbContext : DbContext
                     v => protector.Protect(v)!,
                     v => protector.TryUnprotect(v)!);
             }
+            // Borrowed-token link. Self-referencing FK with Restrict so an
+            // owner can't be deleted out from under its borrowers — the delete
+            // endpoint pre-checks and returns a readable 409 before this fires.
+            b.Property(c => c.TokenSourceKey).HasMaxLength(50);
+            b.HasOne<SystemCredential>()
+                .WithMany()
+                .HasForeignKey(c => c.TokenSourceKey)
+                .HasPrincipalKey(c => c.SystemKey)
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(c => c.TokenSourceKey)
+                .HasFilter("\"TokenSourceKey\" IS NOT NULL");
             b.Property(c => c.CallbackTimeoutMs).HasDefaultValue(10_000);
             b.Property(c => c.RetryMaxAttempts).HasDefaultValue(3);
             b.Property(c => c.CircuitFailureThreshold).HasDefaultValue(5);

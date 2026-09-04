@@ -21,6 +21,27 @@ public sealed class SystemCredentialRepository : ISystemCredentialRepository
             .Select(c => c.SystemKey)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<string>> ListBorrowerKeysAsync(
+        string ownerKey, CancellationToken ct = default)
+        => await _db.SystemCredentials.AsNoTracking()
+            .Where(c => c.TokenSourceKey == ownerKey)
+            .Select(c => c.SystemKey)
+            .OrderBy(k => k)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<(string SystemKey, string TokenRefreshConfig)>>
+        ListTokenRefreshConfigsAsync(CancellationToken ct = default)
+    {
+        // Materialise before projecting to the tuple: the config goes through
+        // the decrypting value converter, which EF cannot translate into SQL.
+        var rows = await _db.SystemCredentials.AsNoTracking()
+            .Where(c => c.TokenRefreshConfig != null)
+            .Select(c => new { c.SystemKey, c.TokenRefreshConfig })
+            .ToListAsync(ct);
+
+        return rows.Select(r => (r.SystemKey, r.TokenRefreshConfig!)).ToList();
+    }
+
     // ── Phase S.4 admin CRUD ────────────────────────────────────────────
 
     public async Task AddAsync(SystemCredential credential, CancellationToken ct = default)
