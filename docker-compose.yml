@@ -524,6 +524,12 @@ services:
       # bucket from POD, which already holds live objects and has nothing
       # to gain from being moved. Both are created on startup.
       - ObjectStorage__AttachmentBucket=${ObjectStorage__AttachmentBucket:-dtms-attachments}
+      # Staging retention. The API installs this as a MinIO lifecycle rule
+      # ('dtms-incoming-expiry') on every boot, so uploads the operator
+      # abandoned under incoming/ are collected by the storage server —
+      # nothing in .NET needs delete rights over the bucket to do it.
+      # Set 0 to install the rule disabled instead of removing it.
+      - ObjectStorage__IncomingRetentionDays=${ObjectStorage__IncomingRetentionDays:-1}
       # Upload ceiling, enforced by MinIO through the signed upload policy
       # rather than by the API — the bytes never reach .NET. Client-side
       # compression aims at ~600 KiB but passes the file through untouched

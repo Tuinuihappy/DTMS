@@ -64,5 +64,9 @@ public sealed class ObjectStorageOptions
     // long was never confirmed, so it is garbage by definition — which
     // is what lets a MinIO lifecycle rule collect it instead of code
     // that would need the authority to delete real objects.
+    //
+    // Applied by ObjectStorageBucketInitializer on every boot. Zero or
+    // less installs the rule disabled rather than deleting it, so the
+    // intent stays visible in `mc ilm rule ls`.
     public int IncomingRetentionDays { get; set; } = 1;
 }

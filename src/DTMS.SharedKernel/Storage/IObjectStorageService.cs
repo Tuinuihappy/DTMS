@@ -86,6 +86,32 @@ public interface IObjectStorageService
 
     /// <summary>Idempotent; safe to call on every boot.</summary>
     Task EnsureBucketExistsAsync(string bucket, CancellationToken ct = default);
+
+    /// <summary>
+    /// Installs a server-side rule that expires everything under
+    /// <paramref name="prefix"/> after <paramref name="days"/> days.
+    ///
+    /// <para>The point of pushing this to the storage server rather than
+    /// sweeping the prefix ourselves is <b>authority</b>: a sweeper needs
+    /// delete rights over the whole bucket, so a bug in its "is this
+    /// orphaned?" predicate reaches real objects. A prefix rule cannot
+    /// touch anything outside the staging area no matter what.</para>
+    ///
+    /// <para><paramref name="days"/> of zero or less installs the rule
+    /// <em>disabled</em> rather than removing it — an off switch that still
+    /// shows up in <c>mc ilm rule ls</c>, so ops can see the intent instead
+    /// of finding nothing and wondering whether it was ever configured.</para>
+    ///
+    /// <para>Idempotent, and <b>must preserve rules it did not create</b>:
+    /// S3 lifecycle is written as a whole document, so an implementation
+    /// that PUTs only its own rule silently drops every other one.</para>
+    /// </summary>
+    Task EnsureExpiryRuleAsync(
+        string bucket,
+        string ruleId,
+        string prefix,
+        int days,
+        CancellationToken ct = default);
 }
 
 /// <summary>Conditions baked into an upload policy and enforced by the storage server.</summary>

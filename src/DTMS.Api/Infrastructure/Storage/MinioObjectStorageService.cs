@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Minio;
 using Minio.DataModel;
 using Minio.DataModel.Args;
+using Minio.DataModel.ILM;
 using Minio.Exceptions;
 
 namespace DTMS.Api.Infrastructure.Storage;
@@ -225,4 +226,106 @@ public sealed class MinioObjectStorageService : IObjectStorageService
         _logger.LogInformation("ObjectStorage: created bucket {Bucket} (Endpoint={Endpoint}).",
             bucket, _options.Endpoint);
     }
+
+    public async Task EnsureExpiryRuleAsync(
+        string bucket, string ruleId, string prefix, int days, CancellationToken ct = default)
+    {
+        // Measured against MinIO RELEASE.2025-01-20: a bucket with no lifecycle
+        // document returns null here rather than throwing. The catch below is
+        // for S3-compatible servers that surface the 404 as an exception
+        // instead — same meaning, different shape.
+        //
+        // What must NOT happen either way is falling through to the write on a
+        // read that failed for some other reason: the write replaces the whole
+        // document, so it would drop rules we never got to see. Hence the
+        // deliberately narrow filter.
+        LifecycleConfiguration? existing;
+        try
+        {
+            existing = await _internalClient.GetBucketLifecycleAsync(
+                new GetBucketLifecycleArgs().WithBucket(bucket), ct);
+        }
+        catch (Exception ex) when (IsMissingLifecycleConfiguration(ex))
+        {
+            existing = null;
+        }
+
+        var desired = PlanExpiryRule(existing, ruleId, prefix, days);
+        if (desired is null)
+        {
+            _logger.LogDebug(
+                "ObjectStorage: lifecycle rule '{RuleId}' on {Bucket} already current.", ruleId, bucket);
+            return;
+        }
+
+        await _internalClient.SetBucketLifecycleAsync(
+            new SetBucketLifecycleArgs().WithBucket(bucket).WithLifecycleConfiguration(desired), ct);
+
+        _logger.LogInformation(
+            "ObjectStorage: lifecycle rule '{RuleId}' on {Bucket} set to expire '{Prefix}' after {Days} day(s) ({Status}).",
+            ruleId, bucket, prefix, Math.Max(1, days),
+            days > 0 ? "enabled" : "disabled");
+    }
+
+    /// <summary>
+    /// The decision half of <see cref="EnsureExpiryRuleAsync"/>, split out so it
+    /// can be tested without a live MinIO — the interesting failure modes here
+    /// are dropping a foreign rule and rewriting an unchanged one on every boot,
+    /// neither of which a round trip against a real server would surface.
+    /// </summary>
+    /// <returns>
+    /// The configuration to write, or <c>null</c> when the bucket already
+    /// carries exactly this rule and nothing needs sending.
+    /// </returns>
+    public static LifecycleConfiguration? PlanExpiryRule(
+        LifecycleConfiguration? existing, string ruleId, string prefix, int days)
+    {
+        if (string.IsNullOrWhiteSpace(ruleId))
+            throw new ArgumentException("Rule id is required.", nameof(ruleId));
+
+        // MinIO rejects Expiration.Days below 1 even on a disabled rule, so a
+        // non-positive retention is expressed through Status, not through Days.
+        var desired = new LifecycleRule
+        {
+            ID = ruleId,
+            Status = days > 0
+                ? LifecycleRule.LifecycleRuleStatusEnabled
+                : LifecycleRule.LifecycleRuleStatusDisabled,
+            Filter = new RuleFilter { Prefix = prefix },
+            Expiration = new Expiration { Days = Math.Max(1, days) }
+        };
+
+        // Copy rather than mutate: on the "no change" path we return null and
+        // the caller must be left holding exactly what the server reported.
+        var rules = existing?.Rules is null
+            ? new List<LifecycleRule>()
+            : new List<LifecycleRule>(existing.Rules);
+
+        var index = rules.FindIndex(r => string.Equals(r?.ID, ruleId, StringComparison.Ordinal));
+        if (index >= 0)
+        {
+            if (Matches(rules[index], desired)) return null;
+            rules[index] = desired;
+        }
+        else
+        {
+            rules.Add(desired);
+        }
+
+        return new LifecycleConfiguration(rules);
+    }
+
+    private static bool Matches(LifecycleRule? actual, LifecycleRule desired) =>
+        actual is not null
+        && string.Equals(actual.Status, desired.Status, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(actual.Filter?.Prefix, desired.Filter?.Prefix, StringComparison.Ordinal)
+        && actual.Expiration?.Days == desired.Expiration?.Days;
+
+    // S3's NoSuchLifecycleConfiguration reaches us as a generic
+    // ErrorResponseException, so the code string in the message is the only
+    // thing to match on. Every other failure has to propagate — see the call
+    // site for why a failed read must never look like "no rules".
+    private static bool IsMissingLifecycleConfiguration(Exception ex) =>
+        ex.Message.Contains("NoSuchLifecycleConfiguration", StringComparison.OrdinalIgnoreCase)
+        || ex.Message.Contains("lifecycle configuration does not exist", StringComparison.OrdinalIgnoreCase);
 }

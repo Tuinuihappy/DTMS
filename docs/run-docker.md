@@ -219,8 +219,48 @@ Internal container DNS names (used in inter-service config): `postgres`,
 
 ---
 
+## MinIO housekeeping
+
+Two buckets hold bytes whose only reference is a Postgres column, so they
+drift apart over time. Two mechanisms keep that in check, split by whether
+age alone is enough to condemn an object.
+
+**Abandoned uploads — handled automatically.** Attachment uploads land under
+`incoming/` and are promoted to a final key on confirm, so anything left in
+that prefix is garbage by definition. The API installs a MinIO lifecycle rule
+(`dtms-incoming-expiry`) on every boot to expire it after
+`ObjectStorage__IncomingRetentionDays` days. Nothing to run:
+
+```bash
+docker exec dtms-minio mc ilm rule ls local/dtms-attachments
+```
+
+Set the env var to `0` to install the rule *disabled* rather than removing
+it — the intent stays visible in the listing above.
+
+**Everything else — a manual sweep.** A confirmed object whose row later
+vanished is not distinguishable by age, so it needs the database to judge:
+
+```powershell
+# report only; safe any time
+.\scripts\minio-orphan-sweep.ps1
+
+# show what -Delete would remove
+.\scripts\minio-orphan-sweep.ps1 -Delete -WhatIf
+
+# actually remove, prompting per object
+.\scripts\minio-orphan-sweep.ps1 -Delete
+```
+
+Run it from PowerShell, not Git Bash — MSYS rewrites the bucket/key argument
+into a Windows path and `mc` then reports the bucket as missing. Deletion is
+permanent: these buckets have no versioning and the volume is not backed up.
+
+---
+
 ## Related docs
 
 - [system-onboarding.md](system-onboarding.md) — partner onboarding, keypair rotation, troubleshooting auth flows
 - [scripts/setup-system-jwt-keypair.sh](../scripts/setup-system-jwt-keypair.sh) — one-shot keypair setup; run `--help` for options
+- [scripts/minio-orphan-sweep.ps1](../scripts/minio-orphan-sweep.ps1) — find storage objects no database row points at; `Get-Help` for options
 - `.env.example` — full list of supported env vars with inline docs
