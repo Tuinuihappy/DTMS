@@ -24,6 +24,14 @@ public class CreateUpstreamDeliveryOrderCommandValidator : AbstractValidator<Cre
             .Must(sw => sw.EarliestUtc.HasValue || sw.LatestUtc.HasValue)
             .When(x => x.ServiceWindow is not null)
             .WithMessage("ServiceWindow must have at least one bound (EarliestUtc or LatestUtc).");
+        // Mirrors the draft-path rule. Without it a reversed window reached
+        // ServiceWindow.Create, whose ArgumentException is not one of the
+        // handler's caught types nor a modeled arm in the exception
+        // middleware — so a caller typo surfaced as a 500 instead of a 400.
+        RuleFor(x => x.ServiceWindow)
+            .Must(sw => !(sw.EarliestUtc.HasValue && sw.LatestUtc.HasValue) || sw.EarliestUtc!.Value <= sw.LatestUtc!.Value)
+            .When(x => x.ServiceWindow is not null)
+            .WithMessage("ServiceWindow.EarliestUtc must be on or before LatestUtc.");
         RuleFor(x => x.RequestedBy!).MaximumLength(200).When(x => x.RequestedBy != null);
         RuleFor(x => x.Notes!).MaximumLength(1000).When(x => x.Notes != null);
 
