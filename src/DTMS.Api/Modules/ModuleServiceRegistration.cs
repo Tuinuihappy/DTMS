@@ -210,6 +210,13 @@ public static class ModuleServiceRegistration
         services.Configure<DTMS.Wms.Infrastructure.Services.WmsOptions>(
             configuration.GetSection(DTMS.Wms.Infrastructure.Services.WmsOptions.SectionName));
         services.AddTransient<DTMS.Wms.Infrastructure.Services.WmsBearerTokenHandler>();
+        // Outbound WMS token comes from the managed-credential store so the
+        // auto-refresh loop's rotation actually reaches the HTTP client;
+        // Wms:Auth:Token stays as the fallback (and the rollback path).
+        // Singleton + internal scope-per-call — the handler that consumes it is
+        // pooled by HttpClientFactory and must not capture a request scope.
+        services.AddSingleton<DTMS.Wms.Application.Services.IWmsTokenProvider,
+                              DTMS.Api.Adapters.SystemCredentialWmsTokenProvider>();
         services.AddScoped<DTMS.Wms.Domain.Repositories.IWmsLocationRepository,
                            DTMS.Wms.Infrastructure.Repositories.WmsLocationRepository>();
         // Sync config bridge — Application handler needs PageSize + MaxRows
