@@ -162,7 +162,8 @@ public sealed class MinioObjectStorageService : IObjectStorageService
             ct);
     }
 
-    public async Task DeleteAsync(string bucket, string objectKey, CancellationToken ct = default)
+    public async Task<ObjectDeleteOutcome> DeleteAsync(
+        string bucket, string objectKey, CancellationToken ct = default)
     {
         try
         {
@@ -172,14 +173,68 @@ public sealed class MinioObjectStorageService : IObjectStorageService
         catch (ObjectNotFoundException)
         {
             // Already gone is the desired end state. Callers are redelivered
-            // outbox instructions; throwing here would park the row in the DLQ
-            // on every retry after the first successful delete.
+            // outbox instructions; treating the second attempt as a failure
+            // would park the message in the DLQ after the first success.
             _logger.LogDebug("ObjectStorage: {Bucket}/{Key} already absent on delete.", bucket, objectKey);
+            return ObjectDeleteOutcome.AlreadyAbsent;
         }
         catch (BucketNotFoundException)
         {
-            _logger.LogWarning("ObjectStorage: bucket {Bucket} missing on delete of {Key}.", bucket, objectKey);
+            // NOT "already absent". A missing bucket means the client is
+            // looking somewhere wrong, and every key it is asked to remove will
+            // survive — the failure this method exists to stop being silent.
+            _logger.LogError(
+                "ObjectStorage: bucket {Bucket} not found while deleting {Key} (endpoint={Endpoint}). " +
+                "Nothing was removed.", bucket, objectKey, _options.Endpoint);
+            return ObjectDeleteOutcome.Failed;
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "ObjectStorage: delete of {Bucket}/{Key} failed (endpoint={Endpoint}).",
+                bucket, objectKey, _options.Endpoint);
+            return ObjectDeleteOutcome.Failed;
+        }
+
+        // The remove was accepted; confirm it took effect. This exists because
+        // an accepted-but-ineffective delete has already happened in this
+        // system, and nothing in the response distinguished it from a real one.
+        return await ConfirmGoneAsync(bucket, objectKey, ct);
+    }
+
+    /// <summary>
+    /// Re-reads the object after a delete that reported success.
+    ///
+    /// <para>Deliberately does not reuse <see cref="StatAsync"/>: that one
+    /// answers "is it there?" and folds every unexpected error into "no", which
+    /// is the safe reading for a lookup and exactly the wrong one here — it
+    /// would turn "could not check" into "confirmed gone" and re-hide the bug
+    /// this method was added to expose.</para>
+    /// </summary>
+    private async Task<ObjectDeleteOutcome> ConfirmGoneAsync(
+        string bucket, string objectKey, CancellationToken ct)
+    {
+        try
+        {
+            await _internalClient.StatObjectAsync(
+                new StatObjectArgs().WithBucket(bucket).WithObject(objectKey), ct);
+        }
+        catch (ObjectNotFoundException)
+        {
+            return ObjectDeleteOutcome.Deleted;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "ObjectStorage: could not verify that {Bucket}/{Key} was deleted (endpoint={Endpoint}). " +
+                "Treating it as still present.", bucket, objectKey, _options.Endpoint);
+            return ObjectDeleteOutcome.Failed;
+        }
+
+        _logger.LogError(
+            "ObjectStorage: delete of {Bucket}/{Key} was accepted but the object is still there " +
+            "(endpoint={Endpoint}).", bucket, objectKey, _options.Endpoint);
+        return ObjectDeleteOutcome.Failed;
     }
 
     public async Task<bool> ObjectExistsAsync(string bucket, string objectKey, CancellationToken ct = default)

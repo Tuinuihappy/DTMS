@@ -139,14 +139,24 @@ internal sealed class ConfirmAttachmentCommandHandler : ICommandHandler<ConfirmA
 
     private async Task TryDeleteStagingAsync(string bucket, string key, CancellationToken ct)
     {
+        // Debug, not warning, and genuinely best-effort: a staging object that
+        // survives is collected by the bucket's expiry rule, so failing here
+        // costs a day of disk and nothing else. This is the one delete in the
+        // system whose outcome does not matter — every other caller must check.
         try
         {
-            await _storage.DeleteAsync(bucket, key, ct);
+            var outcome = await _storage.DeleteAsync(bucket, key, ct);
+            if (outcome == ObjectDeleteOutcome.Failed)
+            {
+                _logger.LogDebug(
+                    "Staging object {Bucket}/{Key} was not cleared; the expiry rule will collect it.",
+                    bucket, key);
+            }
         }
         catch (Exception ex)
         {
             _logger.LogDebug(ex,
-                "Could not clear staging object {Bucket}/{Key}; the lifecycle rule will expire it.",
+                "Could not clear staging object {Bucket}/{Key}; the expiry rule will collect it.",
                 bucket, key);
         }
     }

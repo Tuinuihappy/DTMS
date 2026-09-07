@@ -31,6 +31,17 @@ public sealed class ObjectStorageBucketInitializer : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        // Stated on every boot of every process, because the two that share
+        // this image resolve it from different places: the api container gets
+        // an override, and for a while the worker did not — so it fell back to
+        // the appsettings default of localhost:9000, which is right on a
+        // developer's host and points at nothing inside a container. Its image
+        // deletions quietly did nothing for days. One line here makes a
+        // process talking to the wrong address obvious in its first breath.
+        _logger.LogInformation(
+            "ObjectStorage: endpoint={Endpoint}, publicEndpoint={PublicEndpoint}, buckets=[{Pod}, {Attachments}].",
+            _options.Endpoint, _options.PublicEndpoint, _options.PodBucket, _options.AttachmentBucket);
+
         foreach (var bucket in new[] { _options.PodBucket, _options.AttachmentBucket })
         {
             if (string.IsNullOrWhiteSpace(bucket)) continue;

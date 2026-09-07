@@ -656,6 +656,25 @@ services:
       # SELECT→Remove→Add upsert races against itself across processes
       # (23505 on the hour-bucket unique index every aligned tick).
       - Workers__FleetSnapshot__RunInThisProcess=false
+      # Object storage. This block MUST mirror the api service: both run from
+      # the same image, so the orphaned-object cleanup consumer is registered
+      # in BOTH and they compete for the same queue — whichever picks up a
+      # message is the one that has to be able to reach MinIO.
+      #
+      # It was missing here until 2026-09-03. appsettings.json defaults
+      # Endpoint to localhost:9000, which is correct for `dotnet run` on a
+      # host and points at nothing inside this container, so roughly half of
+      # all image deletions did nothing at all. Verified after the fix:
+      # curl from inside this container reaches minio:9000, not localhost:9000.
+      - ObjectStorage__Endpoint=${ObjectStorage__Endpoint:-minio:9000}
+      - ObjectStorage__AccessKey=${ObjectStorage__AccessKey:-minioadmin}
+      - ObjectStorage__SecretKey=${ObjectStorage__SecretKey:-minioadmin}
+      - ObjectStorage__UseSsl=${ObjectStorage__UseSsl:-false}
+      - ObjectStorage__PodBucket=${ObjectStorage__PodBucket:-dtms-pod}
+      - ObjectStorage__AttachmentBucket=${ObjectStorage__AttachmentBucket:-dtms-attachments}
+      - ObjectStorage__PublicEndpoint=${ObjectStorage__PublicEndpoint:-http://localhost:9000}
+      - ObjectStorage__MaxUploadBytes=${ObjectStorage__MaxUploadBytes:-10485760}
+      - ObjectStorage__MaxAttachmentsPerOwner=${ObjectStorage__MaxAttachmentsPerOwner:-10}
       # Outbound-token auto-refresh sweep runs HERE (single-replica worker), not
       # on the multi-replica api tier — see Program.cs runTokenRefresh gate. The
       # loop always runs here; each system's UI "Enable automatic refresh" tick

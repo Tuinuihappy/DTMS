@@ -59,12 +59,24 @@ public interface IObjectStorageService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Removes an object. <b>Deleting something that is already gone counts as
-    /// success</b> — callers are retried delete instructions from the outbox,
-    /// and treating the second attempt as a failure would park the row in the
-    /// dead-letter queue forever.
+    /// Removes an object and reports what actually happened.
+    ///
+    /// <para><b>Deleting something already gone is a success</b> — callers are
+    /// redelivered outbox instructions, so treating the second attempt as a
+    /// failure would park the message in the dead-letter queue forever.</para>
+    ///
+    /// <para><b>Why this returns an outcome instead of just not throwing.</b>
+    /// A delete that was accepted and changed nothing has happened here: a
+    /// process pointed at an unreachable endpoint reported success for every
+    /// key while the objects stayed in the bucket, and the only thing written
+    /// to the log was a cheerful count of keys it had walked past. An
+    /// implementation must therefore confirm the object is gone before saying
+    /// so, and must return <see cref="ObjectDeleteOutcome.Failed"/> — never
+    /// <see cref="ObjectDeleteOutcome.AlreadyAbsent"/> — when it could not
+    /// establish that.</para>
     /// </summary>
-    Task DeleteAsync(string bucket, string objectKey, CancellationToken ct = default);
+    Task<ObjectDeleteOutcome> DeleteAsync(
+        string bucket, string objectKey, CancellationToken ct = default);
 
     /// <summary>
     /// Existence check. Kept as its own method (rather than folded into
@@ -112,6 +124,22 @@ public interface IObjectStorageService
         string prefix,
         int days,
         CancellationToken ct = default);
+}
+
+public enum ObjectDeleteOutcome
+{
+    /// <summary>It was there; it is not any more, and that was confirmed.</summary>
+    Deleted,
+
+    /// <summary>It was already gone before we asked. Nothing to do, no problem.</summary>
+    AlreadyAbsent,
+
+    /// <summary>
+    /// It may still be there. Covers both a delete that threw and a delete that
+    /// returned quietly while the object survived — deliberately the same
+    /// outcome, because the caller's response is identical either way.
+    /// </summary>
+    Failed
 }
 
 /// <summary>Conditions baked into an upload policy and enforced by the storage server.</summary>
