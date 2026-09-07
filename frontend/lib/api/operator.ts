@@ -194,9 +194,11 @@ export const uploadPodBytes = async (
     throw new Error(
       res.status === 400
         ? "Photo is too large to upload. Try retaking it."
-        : res.status === 403
-          ? "Upload link expired. Take the photo again."
-          : `POD upload failed (${res.status}).`,
+        : res.status === 401
+          ? "You've been signed out. Sign in again and retake the photo."
+          : res.status === 403
+            ? "Upload link expired. Take the photo again."
+            : `POD upload failed (${res.status}).`,
     );
   }
 };

@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerToken } from "@/lib/auth/server-session";
+import { mayContainStorageUrl, rewriteStorageUrls } from "@/lib/api/rewrite-storage-urls";
 
 export type ProxyOptions = {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -160,5 +161,13 @@ export async function proxyToBackend({
   if (payload === null) {
     return new NextResponse(null, { status: upstream.status });
   }
-  return NextResponse.json(payload, { status: upstream.status });
+
+  // Storage URLs are rewritten here, on every successful response, rather than
+  // being opted into per route. Four routes carry them today; the fifth one
+  // somebody adds without remembering would hand a browser a hostname only the
+  // docker network can resolve, and the request would fail without reaching any
+  // server that could log it. The string check keeps the cost off every other
+  // payload — almost all of them.
+  const outbound = mayContainStorageUrl(text) ? rewriteStorageUrls(payload) : payload;
+  return NextResponse.json(outbound, { status: upstream.status });
 }

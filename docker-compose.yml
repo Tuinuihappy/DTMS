@@ -284,12 +284,15 @@ services:
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
-      # PWA at :3000 does presigned PUT directly to MinIO at :9000.
-      # Browsers send a CORS preflight + check Content-Type header on
-      # PUT — MinIO must echo the right headers or the upload aborts
-      # with "Failed to fetch". Comma-separated list; add prod hostnames
-      # via .env override when shipping beyond localhost.
-      MINIO_API_CORS_ALLOW_ORIGIN: "${MINIO_API_CORS_ALLOW_ORIGIN:-http://localhost:3000,http://localhost:5219}"
+      # No CORS allow-list any more (2026-09-07). Browsers used to upload here
+      # directly, which needed both this list and a "public endpoint" naming an
+      # address every device could reach. No such address exists — a LAN IP
+      # rotted on 2026-09-03 and every upload failed silently — so the frontend
+      # now relays storage traffic and nothing crosses an origin.
+      #
+      # Port 9000 stays published: no client needs it, but `mc` and any
+      # diagnosis from the host do, and closing it would remove a tool without
+      # removing any access (MinIO still requires a signature either way).
     volumes:
       - miniodata:/data
     command: server /data --console-address ":9001"
@@ -542,7 +545,6 @@ services:
       # internal endpoint when the PWA runs on the host or behind a
       # reverse proxy. Defaults to localhost:9000 for `npm run dev` flows;
       # set to a public hostname in production.
-      - ObjectStorage__PublicEndpoint=${ObjectStorage__PublicEndpoint:-http://localhost:9000}
       # Phase 4.3 — Web Push (VAPID) per ADR-013. Generate once via
       # `dotnet run --project src/DTMS.Api -- --generate-vapid-keys`
       # or any web-push-libs CLI; the keypair is non-secret on the public
@@ -672,7 +674,6 @@ services:
       - ObjectStorage__UseSsl=${ObjectStorage__UseSsl:-false}
       - ObjectStorage__PodBucket=${ObjectStorage__PodBucket:-dtms-pod}
       - ObjectStorage__AttachmentBucket=${ObjectStorage__AttachmentBucket:-dtms-attachments}
-      - ObjectStorage__PublicEndpoint=${ObjectStorage__PublicEndpoint:-http://localhost:9000}
       - ObjectStorage__MaxUploadBytes=${ObjectStorage__MaxUploadBytes:-10485760}
       - ObjectStorage__MaxAttachmentsPerOwner=${ObjectStorage__MaxAttachmentsPerOwner:-10}
       # Outbound-token auto-refresh sweep runs HERE (single-replica worker), not

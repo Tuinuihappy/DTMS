@@ -12,13 +12,19 @@ namespace DTMS.Api.Infrastructure.Storage;
 // than in a module because more than one module needs it and ModuleBoundaryTests
 // forbids a module reaching into another module's infrastructure to get it.
 //
-// Two-client design: one client targets the server-side endpoint (for
-// HEAD checks, copies, deletes, bucket creation — server-to-server traffic
-// that never leaves the docker network), and a SECOND client targets the
-// public endpoint just to sign URLs and policies (so the host the browser
-// is told to talk to is one it can actually reach). The SDK bakes the host
-// into whatever it signs and offers no "override host" knob, so the second
-// client is the idiomatic workaround.
+// ONE client, targeting the internal endpoint, and it signs browser-facing URLs
+// too. There used to be a second client pointed at a configured "public
+// endpoint" so the host a browser was told to talk to was one it could reach —
+// but no single such host exists: localhost is right for a desktop and wrong
+// for a tablet, and a LAN IP rots the next time DHCP hands out a different one.
+// It did rot, on 2026-09-03, and every upload failed with no server-side log at
+// all because the request never left the browser.
+//
+// Signed URLs now name minio:9000, which is a docker-network name that cannot
+// drift, and the frontend proxies browser traffic to it. Uploads survive the
+// hop because a POST policy signs the policy document, not the destination;
+// downloads survive because the proxy forwards to exactly the host that was
+// signed. Both verified against the running MinIO before this was written.
 //
 // Bucket policy is left at MinIO default (private). Signed URLs are the only
 // access path.
@@ -29,8 +35,7 @@ public sealed class MinioObjectStorageService : IObjectStorageService
     // of an opaque 400 from MinIO at signing time.
     public static readonly TimeSpan MaxPresignTtl = TimeSpan.FromDays(7);
 
-    private readonly IMinioClient _internalClient;
-    private readonly IMinioClient _publicClient;
+    private readonly IMinioClient _client;
     private readonly ObjectStorageOptions _options;
     private readonly ILogger<MinioObjectStorageService> _logger;
 
@@ -41,22 +46,10 @@ public sealed class MinioObjectStorageService : IObjectStorageService
         _options = options.Value;
         _logger = logger;
 
-        _internalClient = new MinioClient()
+        _client = new MinioClient()
             .WithEndpoint(_options.Endpoint)
             .WithCredentials(_options.AccessKey, _options.SecretKey)
             .WithSSL(_options.UseSsl)
-            .Build();
-
-        // PublicEndpoint is a full URL ("http://localhost:9000"); WithEndpoint
-        // wants host[:port] plus a separate SSL flag.
-        var publicUri = new Uri(_options.PublicEndpoint, UriKind.Absolute);
-        var publicHostPort = publicUri.IsDefaultPort
-            ? publicUri.Host
-            : $"{publicUri.Host}:{publicUri.Port}";
-        _publicClient = new MinioClient()
-            .WithEndpoint(publicHostPort)
-            .WithCredentials(_options.AccessKey, _options.SecretKey)
-            .WithSSL(string.Equals(publicUri.Scheme, "https", StringComparison.OrdinalIgnoreCase))
             .Build();
     }
 
@@ -90,8 +83,11 @@ public sealed class MinioObjectStorageService : IObjectStorageService
             .WithObject(objectKey)
             .WithPolicy(policy);
 
-        // Signed against the PUBLIC endpoint so the browser's POST resolves.
-        var (uri, formData) = await _publicClient.PresignedPostPolicyAsync(args);
+        // Signed for the internal host. A POST policy signs the policy document
+        // and nothing about where the form is posted, so the frontend can relay
+        // this to MinIO from wherever the browser reached it — verified by
+        // posting a policy signed for one host to a different one: 204.
+        var (uri, formData) = await _client.PresignedPostPolicyAsync(args);
 
         var fields = new Dictionary<string, string>(formData)
         {
@@ -144,7 +140,12 @@ public sealed class MinioObjectStorageService : IObjectStorageService
             });
         }
 
-        return await _publicClient.PresignedGetObjectAsync(args);
+        // Signed for the internal host, unlike the upload above this one is
+        // bound to it: SigV4 query auth covers the Host header, so the same URL
+        // aimed at a different host is refused with 403 (verified). The frontend
+        // must therefore forward it to minio:9000 unchanged rather than
+        // rewriting the host — which is exactly what it does.
+        return await _client.PresignedGetObjectAsync(args);
     }
 
     public async Task CopyAsync(
@@ -154,7 +155,7 @@ public sealed class MinioObjectStorageService : IObjectStorageService
             .WithBucket(bucket)
             .WithObject(sourceKey);
 
-        await _internalClient.CopyObjectAsync(
+        await _client.CopyObjectAsync(
             new CopyObjectArgs()
                 .WithBucket(bucket)
                 .WithObject(destinationKey)
@@ -167,7 +168,7 @@ public sealed class MinioObjectStorageService : IObjectStorageService
     {
         try
         {
-            await _internalClient.RemoveObjectAsync(
+            await _client.RemoveObjectAsync(
                 new RemoveObjectArgs().WithBucket(bucket).WithObject(objectKey), ct);
         }
         catch (ObjectNotFoundException)
@@ -216,7 +217,7 @@ public sealed class MinioObjectStorageService : IObjectStorageService
     {
         try
         {
-            await _internalClient.StatObjectAsync(
+            await _client.StatObjectAsync(
                 new StatObjectArgs().WithBucket(bucket).WithObject(objectKey), ct);
         }
         catch (ObjectNotFoundException)
@@ -244,7 +245,7 @@ public sealed class MinioObjectStorageService : IObjectStorageService
     {
         try
         {
-            var stat = await _internalClient.StatObjectAsync(
+            var stat = await _client.StatObjectAsync(
                 new StatObjectArgs().WithBucket(bucket).WithObject(objectKey), ct);
 
             // Size is measured by MinIO and can be trusted. ContentType is the
@@ -269,7 +270,7 @@ public sealed class MinioObjectStorageService : IObjectStorageService
 
     public async Task EnsureBucketExistsAsync(string bucket, CancellationToken ct = default)
     {
-        var exists = await _internalClient.BucketExistsAsync(
+        var exists = await _client.BucketExistsAsync(
             new BucketExistsArgs().WithBucket(bucket), ct);
         if (exists)
         {
@@ -277,7 +278,7 @@ public sealed class MinioObjectStorageService : IObjectStorageService
             return;
         }
 
-        await _internalClient.MakeBucketAsync(new MakeBucketArgs().WithBucket(bucket), ct);
+        await _client.MakeBucketAsync(new MakeBucketArgs().WithBucket(bucket), ct);
         _logger.LogInformation("ObjectStorage: created bucket {Bucket} (Endpoint={Endpoint}).",
             bucket, _options.Endpoint);
     }
@@ -297,7 +298,7 @@ public sealed class MinioObjectStorageService : IObjectStorageService
         LifecycleConfiguration? existing;
         try
         {
-            existing = await _internalClient.GetBucketLifecycleAsync(
+            existing = await _client.GetBucketLifecycleAsync(
                 new GetBucketLifecycleArgs().WithBucket(bucket), ct);
         }
         catch (Exception ex) when (IsMissingLifecycleConfiguration(ex))
@@ -313,7 +314,7 @@ public sealed class MinioObjectStorageService : IObjectStorageService
             return;
         }
 
-        await _internalClient.SetBucketLifecycleAsync(
+        await _client.SetBucketLifecycleAsync(
             new SetBucketLifecycleArgs().WithBucket(bucket).WithLifecycleConfiguration(desired), ct);
 
         _logger.LogInformation(

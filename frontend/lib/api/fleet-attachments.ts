@@ -117,16 +117,22 @@ async function postToStorage(target: PresignedTarget, blob: Blob): Promise<void>
 
   // No Content-Type header on the request: the browser has to set the
   // multipart boundary itself.
+  // target.url is same-origin — the API signs for MinIO's internal host and the
+  // response is rewritten to a path this app serves, so a relative URL resolves
+  // against whatever address the browser used to load the page.
   const res = await fetch(target.url, { method: "POST", body: form });
   if (!res.ok) {
     // Storage checks the signed size and type conditions before writing
-    // anything, so these are expected outcomes rather than faults.
+    // anything, so these are expected outcomes rather than faults. A 401 comes
+    // from our own relay rather than storage, which is why it reads differently.
     throw new Error(
       res.status === 400
         ? "That image is too large to upload."
-        : res.status === 403
-          ? "The upload link expired. Try again."
-          : `Upload failed (${res.status}).`,
+        : res.status === 401
+          ? "Your session ended. Sign in again and retry."
+          : res.status === 403
+            ? "The upload link expired. Try again."
+            : `Upload failed (${res.status}).`,
     );
   }
 }

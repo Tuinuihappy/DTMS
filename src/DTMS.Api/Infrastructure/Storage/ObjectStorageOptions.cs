@@ -13,10 +13,13 @@ public sealed class ObjectStorageOptions
     // the docker-network host or the internal LB in production).
     public string Endpoint { get; set; } = "minio:9000";
 
-    // URL the presigned upload embeds — what the browser sees. Differs
-    // from Endpoint when MinIO is behind a reverse proxy or when the
-    // PWA runs on a different host than the .NET app.
-    public string PublicEndpoint { get; set; } = "http://localhost:9000";
+    // There is deliberately no PublicEndpoint any more. It was the address a
+    // browser was told to upload to and download from, and no single value
+    // could be right: localhost suited a desktop and broke tablets, a LAN IP
+    // suited tablets until DHCP moved it — which it did, silently, taking POD
+    // uploads down for days. Signed URLs now name Endpoint, and the frontend
+    // relays browser traffic to it, so nothing here has to be reachable from a
+    // client network.
 
     public string AccessKey { get; set; } = string.Empty;
     public string SecretKey { get; set; } = string.Empty;

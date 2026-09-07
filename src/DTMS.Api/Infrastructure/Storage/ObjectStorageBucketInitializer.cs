@@ -39,8 +39,8 @@ public sealed class ObjectStorageBucketInitializer : IHostedService
         // deletions quietly did nothing for days. One line here makes a
         // process talking to the wrong address obvious in its first breath.
         _logger.LogInformation(
-            "ObjectStorage: endpoint={Endpoint}, publicEndpoint={PublicEndpoint}, buckets=[{Pod}, {Attachments}].",
-            _options.Endpoint, _options.PublicEndpoint, _options.PodBucket, _options.AttachmentBucket);
+            "ObjectStorage: endpoint={Endpoint}, buckets=[{Pod}, {Attachments}].",
+            _options.Endpoint, _options.PodBucket, _options.AttachmentBucket);
 
         foreach (var bucket in new[] { _options.PodBucket, _options.AttachmentBucket })
         {
