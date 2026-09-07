@@ -17,15 +17,19 @@ public interface IAttachmentRepository
     Task<Attachment?> GetByIdAsync(Guid id, CancellationToken ct = default);
 
     /// <summary>
-    /// Every object key belonging to one carrier, read <b>before</b> the carrier
+    /// One carrier's images, <b>tracked</b>, for the moment before the carrier
     /// is deleted.
     ///
-    /// <para>The database cascade removes these rows but cannot touch object
-    /// storage, and because it runs below EF it raises no domain event either —
-    /// so nothing downstream would ever learn the bytes were abandoned. The keys
-    /// have to be collected while the rows still exist.</para>
+    /// <para>Tracked and returning entities rather than keys, because each one
+    /// has to announce its own objects as orphaned and only a tracked aggregate
+    /// gets drained into the outbox. The database cascade would remove these
+    /// rows without any of that: it runs below EF, so no domain event fires and
+    /// nothing downstream ever learns the bytes were abandoned.</para>
+    ///
+    /// <para>Separate from <see cref="ListForOwnerAsync"/>, which is a read path
+    /// and deliberately untracked.</para>
     /// </summary>
-    Task<List<string>> ListObjectKeysForCarrierAsync(Guid carrierId, CancellationToken ct = default);
+    Task<List<Attachment>> ListForCarrierForDeleteAsync(Guid carrierId, CancellationToken ct = default);
 
     Task AddAsync(Attachment attachment, CancellationToken ct = default);
     void Remove(Attachment attachment);

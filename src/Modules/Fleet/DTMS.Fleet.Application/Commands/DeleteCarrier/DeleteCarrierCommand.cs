@@ -35,13 +35,16 @@ internal sealed class DeleteCarrierCommandHandler : ICommandHandler<DeleteCarrie
 {
     private readonly ICarrierRepository _carriers;
     private readonly ICarrierMaintenanceLogRepository _logs;
+    private readonly IAttachmentRepository _attachments;
 
     public DeleteCarrierCommandHandler(
         ICarrierRepository carriers,
-        ICarrierMaintenanceLogRepository logs)
+        ICarrierMaintenanceLogRepository logs,
+        IAttachmentRepository attachments)
     {
         _carriers = carriers;
         _logs = logs;
+        _attachments = attachments;
     }
 
     public async Task<Result<DeleteCarrierResult>> Handle(
@@ -62,8 +65,27 @@ internal sealed class DeleteCarrierCommandHandler : ICommandHandler<DeleteCarrie
 
         // The FK to CarrierMaintenanceLog cascades, but the guard above means
         // there is never anything for it to cascade to — history is exactly what
-        // makes a carrier undeletable.
+        // makes a carrier undeletable. That reasoning does NOT extend to images:
+        // a photo is not history in the sense CanDelete protects, so it never
+        // blocks a delete, so a deletable carrier can very much have some.
+        //
+        // Left to the database cascade they would vanish from the table while
+        // their bytes stayed in the bucket forever — the cascade runs below EF,
+        // so no aggregate is loaded, no domain event fires, and nothing
+        // downstream ever hears about it. Removing them here instead means each
+        // one announces its own objects while it still knows what they are.
+        var attachments = await _attachments.ListForCarrierForDeleteAsync(carrier.Id, cancellationToken);
+        foreach (var attachment in attachments)
+        {
+            attachment.MarkObjectsOrphaned();
+            _attachments.Remove(attachment);
+        }
+
         _carriers.Remove(carrier);
+
+        // One save for all of it. The repositories share the scoped
+        // FleetDbContext, so the carrier, its images, and the instructions to
+        // clear their bytes commit together or not at all.
         await _carriers.SaveChangesAsync(cancellationToken);
 
         return Result<DeleteCarrierResult>.Success(new DeleteCarrierResult(DeleteCarrierOutcome.Deleted));

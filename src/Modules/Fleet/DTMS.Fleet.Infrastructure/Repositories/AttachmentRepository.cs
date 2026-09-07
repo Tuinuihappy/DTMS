@@ -38,21 +38,13 @@ public class AttachmentRepository : IAttachmentRepository
     public Task<Attachment?> GetByIdAsync(Guid id, CancellationToken ct = default)
         => _db.Attachments.FirstOrDefaultAsync(a => a.Id == id, ct);
 
-    public async Task<List<string>> ListObjectKeysForCarrierAsync(
+    // No AsNoTracking, unlike every other read here: the caller raises a domain
+    // event on each row and the interceptor only drains tracked aggregates.
+    public Task<List<Attachment>> ListForCarrierForDeleteAsync(
         Guid carrierId, CancellationToken ct = default)
-    {
-        var rows = await _db.Attachments
-            .AsNoTracking()
+        => _db.Attachments
             .Where(a => a.CarrierId == carrierId)
-            .Select(a => new { a.ObjectKey, a.ThumbnailKey })
             .ToListAsync(ct);
-
-        return rows
-            .SelectMany(r => r.ThumbnailKey is null
-                ? new[] { r.ObjectKey }
-                : [r.ObjectKey, r.ThumbnailKey])
-            .ToList();
-    }
 
     public async Task AddAsync(Attachment attachment, CancellationToken ct = default)
         => await _db.Attachments.AddAsync(attachment, ct);

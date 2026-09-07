@@ -4,6 +4,7 @@ using DTMS.Fleet.Application.Commands.ReturnCarrierToService;
 using DTMS.Fleet.Application.Commands.SetCarrierMaintenance;
 using DTMS.Fleet.Domain.Entities;
 using DTMS.Fleet.Domain.Enums;
+using DTMS.Fleet.Domain.Events;
 using DTMS.Fleet.Domain.Repositories;
 using DTMS.SharedKernel.Auth;
 using FluentAssertions;
@@ -148,7 +149,7 @@ public class CarrierLifecycleHandlerTests
         carriers.GetByCodeAsync(Code, Arg.Any<CancellationToken>()).Returns(carrier);
         logs.CountForCarrierAsync(carrier.Id, Arg.Any<CancellationToken>()).Returns(0);
 
-        var result = await new DeleteCarrierCommandHandler(carriers, logs)
+        var result = await DeleteHandler(carriers, logs)
             .Handle(new DeleteCarrierCommand(Code), default);
 
         result.Value.Outcome.Should().Be(DeleteCarrierOutcome.Deleted);
@@ -163,7 +164,7 @@ public class CarrierLifecycleHandlerTests
         carriers.GetByCodeAsync(Code, Arg.Any<CancellationToken>()).Returns(carrier);
         logs.CountForCarrierAsync(carrier.Id, Arg.Any<CancellationToken>()).Returns(3);
 
-        var result = await new DeleteCarrierCommandHandler(carriers, logs)
+        var result = await DeleteHandler(carriers, logs)
             .Handle(new DeleteCarrierCommand(Code), default);
 
         result.Value.Outcome.Should().Be(DeleteCarrierOutcome.Blocked);
@@ -178,7 +179,7 @@ public class CarrierLifecycleHandlerTests
         var (carriers, logs, _) = Mocks();
         carriers.GetByCodeAsync(Code, Arg.Any<CancellationToken>()).Returns((Carrier?)null);
 
-        var result = await new DeleteCarrierCommandHandler(carriers, logs)
+        var result = await DeleteHandler(carriers, logs)
             .Handle(new DeleteCarrierCommand(Code), default);
 
         result.Value.Outcome.Should().Be(DeleteCarrierOutcome.NotFound);
@@ -193,6 +194,102 @@ public class CarrierLifecycleHandlerTests
         ICarrierRepository carriers, ICarrierMaintenanceLogRepository logs, ICurrentActorContext actor)
         => new(carriers, logs, actor,
                NullLogger<ReturnCarrierToServiceCommandHandler>.Instance);
+
+    // ── delete takes the carrier's images with it ───────────────────────────
+
+    [Fact]
+    public async Task Delete_TakesTheCarriersImagesWithIt()
+    {
+        var (carriers, logs, _) = Mocks();
+        var carrier = NewCarrier();
+        carriers.GetByCodeAsync(Code, Arg.Any<CancellationToken>()).Returns(carrier);
+        logs.CountForCarrierAsync(carrier.Id, Arg.Any<CancellationToken>()).Returns(0);
+
+        // A photo is not the kind of history CanDelete protects, so it never
+        // blocks a delete — which is exactly why a deletable carrier can have
+        // some, and why they cannot be left to the database cascade.
+        var photo = PhotoOf(carrier.Id);
+        var attachments = Substitute.For<IAttachmentRepository>();
+        attachments.ListForCarrierForDeleteAsync(carrier.Id, Arg.Any<CancellationToken>())
+                   .Returns([photo]);
+
+        var result = await DeleteHandler(carriers, logs, attachments)
+            .Handle(new DeleteCarrierCommand(Code), default);
+
+        result.Value.Outcome.Should().Be(DeleteCarrierOutcome.Deleted);
+
+        // Left on the aggregate for the interceptor to turn into an outbox row
+        // during SaveChanges. A cascade would have removed the row below EF,
+        // firing nothing and stranding the bytes.
+        photo.DomainEvents.OfType<AttachmentObjectsOrphanedDomainEvent>()
+             .Should().ContainSingle()
+             .Which.ObjectKeys.Should().BeEquivalentTo(photo.AllObjectKeys());
+
+        attachments.Received(1).Remove(photo);
+        carriers.Received(1).Remove(carrier);
+
+        // One save, so the carrier, its images and the delete instructions
+        // commit together or not at all.
+        await carriers.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await attachments.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Delete_OfACarrierWithNoImages_QueuesNothing()
+    {
+        var (carriers, logs, _) = Mocks();
+        var carrier = NewCarrier();
+        carriers.GetByCodeAsync(Code, Arg.Any<CancellationToken>()).Returns(carrier);
+        logs.CountForCarrierAsync(carrier.Id, Arg.Any<CancellationToken>()).Returns(0);
+
+        var attachments = Substitute.For<IAttachmentRepository>();
+        attachments.ListForCarrierForDeleteAsync(carrier.Id, Arg.Any<CancellationToken>())
+                   .Returns([]);
+
+        await DeleteHandler(carriers, logs, attachments)
+            .Handle(new DeleteCarrierCommand(Code), default);
+
+        attachments.DidNotReceive().Remove(Arg.Any<Attachment>());
+    }
+
+    [Fact]
+    public async Task Delete_BlockedByHistory_LeavesImagesAlone()
+    {
+        var (carriers, logs, _) = Mocks();
+        var carrier = NewCarrier();
+        carriers.GetByCodeAsync(Code, Arg.Any<CancellationToken>()).Returns(carrier);
+        logs.CountForCarrierAsync(carrier.Id, Arg.Any<CancellationToken>()).Returns(2);
+
+        var attachments = Substitute.For<IAttachmentRepository>();
+
+        await DeleteHandler(carriers, logs, attachments)
+            .Handle(new DeleteCarrierCommand(Code), default);
+
+        // A refused delete must not queue any bytes for removal — the carrier
+        // and its photos are both still in use.
+        await attachments.DidNotReceive()
+            .ListForCarrierForDeleteAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        attachments.DidNotReceive().Remove(Arg.Any<Attachment>());
+    }
+
+    private static Attachment PhotoOf(Guid carrierId) => Attachment.For(
+        AttachmentOwner.Carrier, carrierId, "dtms-attachments",
+        $"carrier/{carrierId}/a.jpg", $"carrier/{carrierId}/a.thumb.jpg",
+        "image/jpeg", 2048, "a.jpg", null, "Ada Ops");
+
+    private static DeleteCarrierCommandHandler DeleteHandler(
+        ICarrierRepository carriers,
+        ICarrierMaintenanceLogRepository logs,
+        IAttachmentRepository? attachments = null)
+    {
+        if (attachments is null)
+        {
+            attachments = Substitute.For<IAttachmentRepository>();
+            attachments.ListForCarrierForDeleteAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                       .Returns([]);
+        }
+        return new DeleteCarrierCommandHandler(carriers, logs, attachments);
+    }
 
     private static (ICarrierRepository, ICarrierMaintenanceLogRepository, ICurrentActorContext) Mocks()
     {
