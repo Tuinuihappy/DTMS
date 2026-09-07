@@ -86,7 +86,10 @@ const SORT_OPTIONS: { value: TripQueueSortKey; label: string }[] = [
   { value: "completedAt", label: "Completed" },
   { value: "attemptNumber", label: "Attempt" },
   { value: "status", label: "Status" },
-  { value: "priority", label: "Priority" },
+  // No Priority entry: the column came off the table, and offering a sort
+  // by a value the row no longer shows just reorders the list for reasons
+  // the operator can't see. The API still accepts sortBy=priority, and a
+  // stale bookmarked URL carrying it falls back to createdAt below.
 ];
 
 const PAGE_SIZE_VALUES: PageSize[] = [10, 25, 50, 100];

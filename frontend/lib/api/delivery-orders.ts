@@ -75,6 +75,12 @@ export type ItemDto = {
   description: string | null;
   pickupLocationCode: string;
   dropLocationCode: string;
+  // Resolved Facility station keys for the codes above. The codes are
+  // labels ("SHELF3"); these are what a link into the facility map needs.
+  // Null until the order is resolved, and on rows whose transport mode
+  // routes by warehouse location instead of station.
+  pickupStationId: string | null;
+  dropStationId: string | null;
   loadUnitProfileCode: string | null;
   dimensions: {
     lengthMm: number;
