@@ -563,7 +563,7 @@ public class DeliveryOrderTests
         confirmed.LatestUtc.Should().BeNull();
     }
 
-    // ── P1-9: Quantity VO + UnitOfMeasure enum ──────────────────────────
+    // ── P1-9: Quantity VO (uom is free-form text) ───────────────────────
 
     [Fact]
     public void Quantity_Create_RejectsZeroOrNegativeValue()
