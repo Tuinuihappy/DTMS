@@ -54,7 +54,12 @@ internal sealed class GetPodPresignedUrlQueryHandler
         if (ext.OperatorId != request.OperatorId)
             return Result<PodPresignedUrlDto>.Failure("Trip is assigned to a different operator.");
 
-        var objectKey = PodObjectKey.Generate(request.TripId, kind!, request.FileExtension ?? "jpg");
+        // Staged, not final. The bytes are not a proof of delivery until a leg
+        // references them, and until this change an upload that no leg ever
+        // referenced — a retaken photo, a leg abandoned mid-flow — was written
+        // straight to its final key and became permanent garbage that only a
+        // database comparison could identify.
+        var objectKey = PodObjectKey.GenerateStaging(request.TripId, kind!, request.FileExtension ?? "jpg");
 
         // Size and type are conditions inside the signature, so MinIO refuses a
         // violating upload before writing anything. The old presigned PUT could

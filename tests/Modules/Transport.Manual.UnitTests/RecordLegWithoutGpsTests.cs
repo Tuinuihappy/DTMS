@@ -1,5 +1,6 @@
 using DTMS.Dispatch.Domain.Entities;
 using DTMS.Dispatch.Domain.Repositories;
+using DTMS.SharedKernel.Storage;
 using DTMS.Transport.Manual.Application.Commands.RecordDrop;
 using DTMS.Transport.Manual.Application.Commands.RecordPickup;
 using DTMS.Transport.Manual.Application.Options;
@@ -7,6 +8,7 @@ using DTMS.Transport.Manual.Domain.Entities;
 using DTMS.Transport.Manual.Domain.Repositories;
 using DTMS.Wms.Domain.Repositories;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
@@ -26,6 +28,8 @@ public class RecordLegWithoutGpsTests
     private readonly ITripRepository _trips = Substitute.For<ITripRepository>();
     private readonly IWmsLocationRepository _wmsLocations = Substitute.For<IWmsLocationRepository>();
     private readonly IGeofenceOverrideRequestRepository _overrides = Substitute.For<IGeofenceOverrideRequestRepository>();
+    private readonly IObjectStorageService _storage = Substitute.For<IObjectStorageService>();
+    private readonly IStorageBuckets _buckets = Substitute.For<IStorageBuckets>();
 
     private readonly Guid _tripId = Guid.NewGuid();
     private readonly Guid _operatorId = Guid.NewGuid();
@@ -44,11 +48,13 @@ public class RecordLegWithoutGpsTests
 
     private RecordPickupCommandHandler Pickup(bool geofenceEnabled) =>
         new(_extensions, _trips, _wmsLocations, _overrides,
-            Options.Create(new RecordDropGeofenceOptions { Enabled = geofenceEnabled }));
+            Options.Create(new RecordDropGeofenceOptions { Enabled = geofenceEnabled }),
+            _storage, _buckets, NullLogger<RecordPickupCommandHandler>.Instance);
 
     private RecordDropCommandHandler Drop(bool geofenceEnabled) =>
         new(_extensions, _trips, _wmsLocations, _overrides,
-            Options.Create(new RecordDropGeofenceOptions { Enabled = geofenceEnabled }));
+            Options.Create(new RecordDropGeofenceOptions { Enabled = geofenceEnabled }),
+            _storage, _buckets, NullLogger<RecordDropCommandHandler>.Instance);
 
     [Fact]
     public async Task Pickup_FenceOff_AcceptsAMissingFix()
@@ -56,7 +62,7 @@ public class RecordLegWithoutGpsTests
         var ext = GivenAssignedTrip();
 
         var result = await Pickup(geofenceEnabled: false).Handle(
-            new RecordPickupCommand(_tripId, _operatorId, null, null, "pod/x/pickup/a.jpg"), default);
+            new RecordPickupCommand(_tripId, _operatorId, null, null, null), default);
 
         result.IsSuccess.Should().BeTrue();
         ext.PickedUpAt.Should().NotBeNull();

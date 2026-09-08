@@ -10,9 +10,9 @@ namespace DTMS.Fleet.Application.Services;
 /// closed tab, lost signal, changed mind — identifiable without consulting the
 /// database: anything left in the staging prefix is garbage by definition, so a
 /// storage lifecycle rule can expire it and no code needs the authority to
-/// delete real objects. Of the 13 POD objects that predate this scheme, exactly
-/// one is referenced by a row; the rest are the same abandonment this
-/// prevents.</para>
+/// delete real objects. POD went the other way at first — straight to a final
+/// key — and accumulated exactly the abandoned uploads this prevents, until it
+/// adopted the same scheme (see <c>PodObjectKey.IncomingPrefix</c>).</para>
 /// </summary>
 public static class AttachmentObjectKey
 {

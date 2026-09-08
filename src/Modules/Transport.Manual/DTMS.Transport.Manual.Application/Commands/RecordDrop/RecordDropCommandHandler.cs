@@ -1,9 +1,11 @@
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
+using DTMS.SharedKernel.Storage;
 using DTMS.Transport.Manual.Application.Options;
 using DTMS.Transport.Manual.Application.Services;
 using DTMS.Transport.Manual.Domain.Repositories;
 using DTMS.Wms.Domain.Repositories;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace DTMS.Transport.Manual.Application.Commands.RecordDrop;
@@ -15,19 +17,28 @@ internal sealed class RecordDropCommandHandler : ICommandHandler<RecordDropComma
     private readonly IWmsLocationRepository _wmsLocations;
     private readonly IGeofenceOverrideRequestRepository _overrides;
     private readonly RecordDropGeofenceOptions _geofenceOptions;
+    private readonly IObjectStorageService _storage;
+    private readonly IStorageBuckets _buckets;
+    private readonly ILogger<RecordDropCommandHandler> _logger;
 
     public RecordDropCommandHandler(
         IManualTripExtensionRepository extensions,
         ITripRepository trips,
         IWmsLocationRepository wmsLocations,
         IGeofenceOverrideRequestRepository overrides,
-        IOptions<RecordDropGeofenceOptions> geofenceOptions)
+        IOptions<RecordDropGeofenceOptions> geofenceOptions,
+        IObjectStorageService storage,
+        IStorageBuckets buckets,
+        ILogger<RecordDropCommandHandler> logger)
     {
         _extensions = extensions;
         _trips = trips;
         _wmsLocations = wmsLocations;
         _overrides = overrides;
         _geofenceOptions = geofenceOptions.Value;
+        _storage = storage;
+        _buckets = buckets;
+        _logger = logger;
     }
 
     public async Task<Result> Handle(RecordDropCommand request, CancellationToken cancellationToken)
@@ -84,7 +95,20 @@ internal sealed class RecordDropCommandHandler : ICommandHandler<RecordDropComma
         }
 
         var firstDrop = !ext.DroppedAt.HasValue;
-        ext.MarkDropped(podKey: request.PodKey, overrideId: overrideId);
+
+        // See RecordPickupCommandHandler — promotion belongs to the first record
+        // only, because MarkDropped ignores the key on a repeat.
+        string? podKey = null;
+        if (firstDrop)
+        {
+            var photo = await PodPhotoPromotion.ResolveAsync(
+                _storage, _buckets.Pod, request.PodKey, request.TripId,
+                PodObjectKey.KindDrop, _logger, cancellationToken);
+            if (photo.IsFailure) return Result.Failure(photo.Error!);
+            podKey = photo.Key;
+        }
+
+        ext.MarkDropped(podKey: podKey, overrideId: overrideId);
         await _extensions.SaveChangesAsync(cancellationToken);
 
         // Mirror the vendor-drop event so the DeliveryOrder-side

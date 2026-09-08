@@ -1,10 +1,9 @@
 namespace DTMS.Api.Infrastructure.Storage;
 
 // Bound from configuration section "ObjectStorage" (see appsettings +
-// docker-compose env). Two endpoints because MinIO inside the docker
-// network is reachable as "minio:9000" but the browser the PWA runs
-// in only sees the published port — we sign URLs against the public
-// endpoint so the operator's PUT actually resolves.
+// docker-compose env). One endpoint: the address MinIO answers on inside
+// the docker network. Browsers reach it through the frontend's storage
+// relay and are never told where it is — see the note on Endpoint below.
 public sealed class ObjectStorageOptions
 {
     public const string SectionName = "ObjectStorage";

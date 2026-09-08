@@ -22,6 +22,32 @@ public static class PodObjectKey
     public const string KindPickup = "pickup";
     public const string KindDrop = "drop";
 
+    /// <summary>
+    /// Where an upload lands before the leg that references it is recorded.
+    ///
+    /// <para>POD used to be written straight to its final key, which made an
+    /// abandoned capture — a retaken photo, a closed app, a leg never confirmed —
+    /// indistinguishable from a real one without consulting the database, so
+    /// every one of them stayed. Staging makes the difference readable from the
+    /// key alone, which is what lets a bucket lifecycle rule collect the garbage
+    /// and keeps the authority to delete a real proof of delivery out of our
+    /// code.</para>
+    /// </summary>
+    public const string IncomingPrefix = "incoming/";
+
+    /// <summary>The key an upload is presigned against. Same tail as the final
+    /// key, so promoting is removing a prefix and nothing else can drift.</summary>
+    public static string GenerateStaging(Guid tripId, string kind, string fileExtension = "jpg")
+        => IncomingPrefix + Generate(tripId, kind, fileExtension);
+
+    public static bool IsStaged(string objectKey) =>
+        objectKey.StartsWith(IncomingPrefix, StringComparison.Ordinal);
+
+    /// <summary>The resting place for a staged key. Returns null for a key that
+    /// was not staged, which the caller treats as "already final".</summary>
+    public static string? PromoteToFinal(string objectKey) =>
+        IsStaged(objectKey) ? objectKey[IncomingPrefix.Length..] : null;
+
     public static string Generate(Guid tripId, string kind, string fileExtension = "jpg")
     {
         if (string.IsNullOrWhiteSpace(kind))
@@ -36,10 +62,13 @@ public static class PodObjectKey
     // Cheap server-side guard against operator app passing a key for
     // someone else's trip. Real auth + ACL still belong on the bucket
     // policy; this is the defence-in-depth check on the .NET side.
+    //
+    // Accepts a key in either stage: the leg being recorded is the moment a
+    // staged upload is promoted, so both forms legitimately arrive here.
     public static bool BelongsToTripLeg(string objectKey, Guid tripId, string kind)
     {
         if (string.IsNullOrWhiteSpace(objectKey)) return false;
-        var prefix = $"pod/{tripId}/{kind}/";
-        return objectKey.StartsWith(prefix, StringComparison.Ordinal);
+        var tail = PromoteToFinal(objectKey) ?? objectKey;
+        return tail.StartsWith($"pod/{tripId}/{kind}/", StringComparison.Ordinal);
     }
 }

@@ -1,5 +1,6 @@
 using DTMS.Fleet.Application.Services;
 using DTMS.SharedKernel.Storage;
+using DTMS.Transport.Manual.Application.Services;
 using Microsoft.Extensions.Options;
 
 namespace DTMS.Api.Infrastructure.Storage;
@@ -61,19 +62,24 @@ public sealed class ObjectStorageBucketInitializer : IHostedService
                 continue;
             }
 
-            // Only the attachment bucket stages uploads under a prefix before
-            // promoting them. POD writes straight to its final key, so there is
-            // no staging garbage there for a rule to collect — its unreferenced
-            // objects are a cleanup job (scripts/minio-orphan-sweep.ps1), not an
-            // expiry policy, because age alone does not make a POD photo junk.
-            if (!string.Equals(bucket, _options.AttachmentBucket, StringComparison.Ordinal)) continue;
+            // Both buckets stage uploads under the same prefix now. POD used to
+            // write straight to its final key, so a retaken photo or an abandoned
+            // leg left bytes that only a database comparison could tell from a
+            // real proof of delivery — and every one of them survived, because
+            // nothing may delete an object it cannot prove is junk. Under a
+            // staging prefix that proof is the key itself, which is what lets a
+            // server-side rule collect them and keeps delete rights over real
+            // objects out of our code entirely.
+            var prefix = string.Equals(bucket, _options.AttachmentBucket, StringComparison.Ordinal)
+                ? AttachmentObjectKey.IncomingPrefix
+                : PodObjectKey.IncomingPrefix;
 
             try
             {
                 await _storage.EnsureExpiryRuleAsync(
                     bucket,
                     IncomingExpiryRuleId,
-                    AttachmentObjectKey.IncomingPrefix,
+                    prefix,
                     _options.IncomingRetentionDays,
                     cancellationToken);
             }
@@ -85,7 +91,7 @@ public sealed class ObjectStorageBucketInitializer : IHostedService
                 _logger.LogError(ex,
                     "ObjectStorage: failed to set lifecycle rule '{RuleId}' on '{Bucket}'. " +
                     "Abandoned uploads under '{Prefix}' will accumulate until it is set.",
-                    IncomingExpiryRuleId, bucket, AttachmentObjectKey.IncomingPrefix);
+                    IncomingExpiryRuleId, bucket, prefix);
             }
         }
     }

@@ -79,7 +79,9 @@ public class GetPodPresignedUrlHandlerTests
             default);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.ObjectKey.Should().StartWith($"pod/{tripId}/pickup/");
+        // Staged, not final: the bytes become a proof of delivery only when a
+        // leg references them, and RecordPickup is what promotes them.
+        result.Value.ObjectKey.Should().StartWith($"incoming/pod/{tripId}/pickup/");
         result.Value.Url.Should().StartWith("https://minio.example/dtms-pod");
         result.Value.Fields.Should().ContainKey("policy");
         result.Value.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
@@ -115,7 +117,7 @@ public class GetPodPresignedUrlHandlerTests
     private void StubPresign(Guid tripId) =>
         _storage.GeneratePresignedPostAsync(
             "dtms-pod",
-            Arg.Is<string>(k => k.StartsWith($"pod/{tripId}/")),
+            Arg.Is<string>(k => k.StartsWith($"incoming/pod/{tripId}/")),
             Arg.Any<UploadConstraints>(),
             Arg.Any<TimeSpan>(),
             Arg.Any<CancellationToken>())
