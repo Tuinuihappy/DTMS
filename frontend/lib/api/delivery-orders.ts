@@ -27,7 +27,19 @@ export type Priority = "Low" | "Normal" | "High" | "Critical";
 // the UI renders it as-is (or via sourceSystemDisplayName when present).
 export type SourceSystem = string;
 export type TransportMode = "Amr" | "Manual";
-export type Uom = "KG" | "G" | "LB" | "EA" | "BOX" | "PALLET" | "CASE";
+// The API stores whatever unit the order names — no whitelist, no aliasing.
+// These seven are only what the create form offers first; anything typed is
+// just as valid, so adding a unit needs no deploy on either side.
+export type Uom = string;
+export const UOM_SUGGESTIONS = [
+  "EA",
+  "BOX",
+  "PALLET",
+  "CASE",
+  "KG",
+  "G",
+  "LB",
+] as const;
 export type HandlingInstruction =
   | "Fragile"
   | "ThisSideUp"
@@ -196,10 +208,11 @@ function normalizeOrder<T extends Record<string, unknown>>(o: T): T {
       const nit = { ...it };
       if (typeof nit.status === "string")
         nit.status = pascalFromUpperSnake(nit.status as string);
-      if (nit.quantity && typeof nit.quantity === "object") {
-        const q = nit.quantity as Record<string, unknown>;
-        if (typeof q.uom === "string") q.uom = pascalFromUpperSnake(q.uom as string).toUpperCase();
-      }
+      // quantity.uom is deliberately NOT normalized. It is free text the
+      // caller chose, and pascalFromUpperSnake would destroy both case and
+      // underscores ("mL" -> "ML", "SQ_M" -> "SQM"). The write path already
+      // sends it verbatim, and /items and the dispatch drawer already render
+      // it raw — touching it here is what made the three screens disagree.
       if (Array.isArray(nit.handlingInstructions)) {
         nit.handlingInstructions = (nit.handlingInstructions as string[]).map((h) =>
           pascalFromUpperSnake(h),

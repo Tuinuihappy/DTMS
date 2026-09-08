@@ -144,7 +144,7 @@ export function TripItemsSection({
                       {it.quantity ? (
                         <span className="font-mono text-[11.5px] tabular-nums text-[var(--color-ink-800)] dark:text-[var(--color-ink-300)]">
                           {it.quantity.value}
-                          <span className="ml-1 text-[10px] uppercase tracking-[0.04em] text-[var(--color-ink-400)]">
+                          <span className="ml-1 text-[10px] tracking-[0.04em] text-[var(--color-ink-400)]">
                             {it.quantity.uom}
                           </span>
                         </span>
