@@ -29,6 +29,7 @@ import {
 } from "@/lib/api/delivery-orders";
 import { getStationOptions, type StationOption } from "@/lib/api/facility";
 import { StationCombobox } from "@/components/primitives/station-combobox";
+import { UomCombobox } from "@/components/primitives/uom-combobox";
 import { WmsLocationCombobox } from "@/components/primitives/wms-location-combobox";
 import { cn } from "@/lib/utils";
 import {
@@ -662,14 +663,6 @@ export function CreateOrderDialog({
                       transition={{ duration: 0.2 }}
                       className="space-y-3"
                     >
-                      {/* One shared suggestion list for every item row — the
-                          unit field is free text, so these are a shortcut,
-                          not a constraint. */}
-                      <datalist id="uom-suggestions">
-                        {UOM_SUGGESTIONS.map((u) => (
-                          <option key={u} value={u} />
-                        ))}
-                      </datalist>
                       {form.items.map((it, idx) => (
                         <div
                           key={idx}
@@ -746,7 +739,10 @@ export function CreateOrderDialog({
                               )}
                             </Field>
                             <Field label="Qty" compact>
-                              <div className="flex items-center gap-1.5">
+                              {/* items-start, not items-center: the unit field
+                                  grows a hint line under it for a custom unit,
+                                  which would otherwise nudge the qty box down. */}
+                              <div className="flex items-start gap-1.5">
                                 <input
                                   type="number"
                                   min={1}
@@ -758,21 +754,13 @@ export function CreateOrderDialog({
                                   }
                                   className={cn(inputCls, "w-20")}
                                 />
-                                <input
-                                  list="uom-suggestions"
+                                <UomCombobox
                                   value={it.uom}
-                                  onChange={(e) =>
-                                    updateItem(idx, { uom: e.target.value })
-                                  }
-                                  placeholder="EA"
-                                  className={cn(inputCls, "flex-1")}
+                                  onChange={(v) => updateItem(idx, { uom: v })}
+                                  suggestions={UOM_SUGGESTIONS}
+                                  className="flex-1"
                                 />
                               </div>
-                              {isCustomUom(it.uom) && (
-                                <p className="mt-1 text-[10.5px] text-[var(--color-amber)]">
-                                  “{it.uom}” isn’t one of the usual units
-                                </p>
-                              )}
                             </Field>
                             <Field label="Weight (kg)" compact>
                               <input
@@ -1078,11 +1066,6 @@ export function CreateOrderDialog({
     </>
   );
 }
-
-// A unit outside the shortcut list is perfectly valid — this only flags it so
-// a typo ("Bxo") is visible before submit.
-const isCustomUom = (uom: string) =>
-  uom.trim() !== "" && !(UOM_SUGGESTIONS as readonly string[]).includes(uom);
 
 const inputCls = cn(
   "w-full rounded-lg bg-white/70 px-3 py-2 text-[13px] font-medium",
