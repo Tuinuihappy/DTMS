@@ -44,6 +44,32 @@ function readMockFix(): GeoFix | null {
   return { lat, lng, accuracy: 10 };
 }
 
+/** A fix, or the reason there isn't one. Never throws. */
+export type GeoAttempt =
+  | { fix: GeoFix; reason: null }
+  | { fix: null; reason: string };
+
+/**
+ * For callers where a fix is wanted but not their decision to demand.
+ *
+ * Whether GPS is mandatory lives in Wms:Geofence:Enabled on the server, which
+ * the browser cannot see. A caller that throws on a failed fix therefore
+ * enforces a rule it has no way to know is in force — and when the fence is
+ * off, that rule is nobody's. Hand the reason back instead and let the server
+ * answer; if it does demand coordinates, the reason explains why there are
+ * none.
+ */
+export async function tryGetCurrentPosition(): Promise<GeoAttempt> {
+  try {
+    return { fix: await getCurrentPosition(), reason: null };
+  } catch (err) {
+    return {
+      fix: null,
+      reason: err instanceof Error ? err.message : "Couldn't read your location.",
+    };
+  }
+}
+
 export async function getCurrentPosition(): Promise<GeoFix> {
   const mock = readMockFix();
   if (mock) {

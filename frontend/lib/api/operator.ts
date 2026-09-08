@@ -97,8 +97,12 @@ export const acknowledgeTrip = (tripId: string) =>
   });
 
 export type RecordPickupBody = {
-  lat: number;
-  lng: number;
+  // Nullable because the geofence is opt-out server-side (Wms:Geofence:Enabled)
+  // and the browser cannot see that flag. With the fence off the backend takes
+  // the leg without coordinates; with it on it answers GEOFENCE_REQUIRED. Either
+  // way the decision belongs there, not here.
+  lat: number | null;
+  lng: number | null;
   podKey: string | null;
 };
 

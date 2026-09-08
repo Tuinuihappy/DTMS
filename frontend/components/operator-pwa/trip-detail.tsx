@@ -10,10 +10,26 @@ import {
   submitGeofenceOverride,
   type AssignedTrip,
 } from "@/lib/api/operator";
-import { getCurrentPosition } from "@/lib/operator-pwa/geolocation";
+import { getCurrentPosition, tryGetCurrentPosition } from "@/lib/operator-pwa/geolocation";
 import { PodCapture } from "./pod-capture";
 
 type Step = "acknowledge" | "pickup" | "drop" | "complete" | "done";
+
+/**
+ * GEOFENCE_REQUIRED means the server wanted coordinates and got none, which
+ * only happens when the fix failed — so the operator needs to hear what went
+ * wrong with their location, not a constant they cannot act on.
+ */
+function explainLegFailure(
+  err: unknown,
+  geoReason: string | null,
+  fallback: string,
+): string {
+  const message = err instanceof Error ? err.message : fallback;
+  return geoReason && message.includes("GEOFENCE_REQUIRED")
+    ? `${geoReason} This trip is fenced, so it can't be recorded without one.`
+    : message;
+}
 
 // Phase 4.5 — Trip action workflow. Drives the operator through the
 // FSM transitions one at a time:
@@ -89,21 +105,25 @@ export function TripDetail({ tripId }: { tripId: string }) {
     }
   };
 
+  // A failed fix no longer ends the leg here. It used to: a tablet on an HTTP
+  // LAN address gets PERMISSION_DENIED from Chromium whatever the permission
+  // says, which made pickup unreachable on the very devices this app is for —
+  // even though the geofence is off and the backend never wanted coordinates.
   const onPickup = async () => {
     setActionBusy("pickup");
     setActionError(null);
     setActionNote(null);
+    const { fix, reason } = await tryGetCurrentPosition();
     try {
-      const fix = await getCurrentPosition();
       const result = await recordPickup(tripId, {
-        lat: fix.lat,
-        lng: fix.lng,
+        lat: fix?.lat ?? null,
+        lng: fix?.lng ?? null,
         podKey: pickupPodKey,
       });
       setActionNote(result.delivered ? "Pickup recorded." : "Saved offline — will sync.");
       await refresh();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Pickup failed.");
+      setActionError(explainLegFailure(err, reason, "Pickup failed."));
     } finally {
       setActionBusy(null);
     }
@@ -113,17 +133,17 @@ export function TripDetail({ tripId }: { tripId: string }) {
     setActionBusy("drop");
     setActionError(null);
     setActionNote(null);
+    const { fix, reason } = await tryGetCurrentPosition();
     try {
-      const fix = await getCurrentPosition();
       const result = await recordDrop(tripId, {
-        lat: fix.lat,
-        lng: fix.lng,
+        lat: fix?.lat ?? null,
+        lng: fix?.lng ?? null,
         podKey: dropPodKey,
       });
       setActionNote(result.delivered ? "Drop recorded." : "Saved offline — will sync.");
       await refresh();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Drop failed.");
+      setActionError(explainLegFailure(err, reason, "Drop failed."));
     } finally {
       setActionBusy(null);
     }
