@@ -27,7 +27,6 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
     private readonly IOrderAuditEventRepository _auditRepo;
     private readonly IOrderActivityProjectionStore _activityStore;
     private readonly IStationValidationService _stationValidation;
-    private readonly IUomNormalizer _uomNormalizer;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IOrderOriginResolver _originResolver;
     private readonly IDispatchStrategyRegistry _strategyRegistry;
@@ -39,7 +38,6 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         IOrderAuditEventRepository auditRepo,
         IOrderActivityProjectionStore activityStore,
         IStationValidationService stationValidation,
-        IUomNormalizer uomNormalizer,
         ICurrentUserAccessor currentUser,
         IOrderOriginResolver originResolver,
         IDispatchStrategyRegistry strategyRegistry,
@@ -50,7 +48,6 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         _auditRepo = auditRepo;
         _activityStore = activityStore;
         _stationValidation = stationValidation;
-        _uomNormalizer = uomNormalizer;
         _currentUser = currentUser;
         _originResolver = originResolver;
         _strategyRegistry = strategyRegistry;
@@ -117,18 +114,13 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
 
             foreach (var (item, idx) in request.Items.Select((p, i) => (p, i + 1)))
             {
-                var uom = _uomNormalizer.Normalize(item.Quantity.Uom);
-                if (uom is null)
-                    return Result<UpstreamOrderAckDto>.Failure(
-                        $"Unknown UOM '{item.Quantity.Uom}' on item {idx} — accepted: KG, G, LB, EA, BOX, PALLET, CASE (or configured aliases).");
-
                 order.AddItem(
                     item.PickupLocationCode, item.DropLocationCode,
                     idx, item.ItemId, item.Description,
                     item.LoadUnitProfileCode,
                     item.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                     item.WeightKg,
-                    Quantity.Create(item.Quantity.Value, uom.Value),
+                    Quantity.Create(item.Quantity.Value, item.Quantity.Uom),
                     item.Hazmat is { } hz
                         ? HazmatInfo.Create(hz.ClassCode, hz.PackingGroup)
                         : null,

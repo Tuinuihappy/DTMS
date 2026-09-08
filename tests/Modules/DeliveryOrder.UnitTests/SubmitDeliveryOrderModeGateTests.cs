@@ -83,7 +83,7 @@ public class SubmitDeliveryOrderModeGateTests
         order.AddItem(
             "WH-A", "DOCK-1", 1, "SKU-1",
             description: null, loadUnitProfileCode: null,
-            dimensions: null, weightKg: 1.0, quantity: Quantity.Create(1, UnitOfMeasure.EA));
+            dimensions: null, weightKg: 1.0, quantity: Quantity.Create(1, "EA"));
         return order;
     }
 }

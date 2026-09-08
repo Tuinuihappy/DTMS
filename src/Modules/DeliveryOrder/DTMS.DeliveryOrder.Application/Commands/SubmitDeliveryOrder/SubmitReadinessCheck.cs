@@ -31,6 +31,8 @@ internal static class SubmitReadinessCheck
                 errors.Add($"{prefix}: Pickup and Drop locations must be different.");
             if (item.Quantity is null || item.Quantity.Value <= 0)
                 errors.Add($"{prefix}: Quantity must be > 0.");
+            if (item.Quantity is not null && string.IsNullOrWhiteSpace(item.Quantity.Uom))
+                errors.Add($"{prefix}: Quantity.Uom is required.");
         }
 
         return (errors.Count == 0, string.Join("; ", errors));

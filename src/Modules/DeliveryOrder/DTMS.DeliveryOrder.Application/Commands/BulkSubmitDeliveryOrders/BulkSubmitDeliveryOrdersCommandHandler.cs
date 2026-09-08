@@ -15,7 +15,6 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
 {
     private readonly IDeliveryOrderRepository _repo;
     private readonly IStationValidationService _stationValidation;
-    private readonly IUomNormalizer _uomNormalizer;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IOrderOriginResolver _originResolver;
     private readonly IDispatchStrategyRegistry _strategyRegistry;
@@ -24,7 +23,6 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
     public BulkSubmitDeliveryOrdersCommandHandler(
         IDeliveryOrderRepository repo,
         IStationValidationService stationValidation,
-        IUomNormalizer uomNormalizer,
         ICurrentUserAccessor currentUser,
         IOrderOriginResolver originResolver,
         IDispatchStrategyRegistry strategyRegistry,
@@ -32,7 +30,6 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
     {
         _repo = repo;
         _stationValidation = stationValidation;
-        _uomNormalizer = uomNormalizer;
         _currentUser = currentUser;
         _originResolver = originResolver;
         _strategyRegistry = strategyRegistry;
@@ -76,25 +73,15 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                     origin.Key, origin.DisplayName,
                     actor, actor, cmd.Notes, cmd.RequestedTransportMode);
 
-                var uomFailureForOrder = false;
                 foreach (var (pkg, idx) in cmd.Items.Select((p, i) => (p, i + 1)))
                 {
-                    var uom = _uomNormalizer.Normalize(pkg.Quantity.Uom);
-                    if (uom is null)
-                    {
-                        failures.Add(new BulkSubmitFailure(cmd.OrderRef,
-                            $"Unknown UOM '{pkg.Quantity.Uom}' on item {idx}."));
-                        uomFailureForOrder = true;
-                        break;
-                    }
-
                     order.AddItem(
                         pkg.PickupLocationCode, pkg.DropLocationCode,
                         idx, pkg.ItemId, pkg.Description,
                         pkg.LoadUnitProfileCode,
                         pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                         pkg.WeightKg,
-                        Quantity.Create(pkg.Quantity.Value, uom.Value),
+                        Quantity.Create(pkg.Quantity.Value, pkg.Quantity.Uom),
                         pkg.Hazmat is { } hz
                             ? HazmatInfo.Create(hz.ClassCode, hz.PackingGroup)
                             : null,
@@ -103,8 +90,6 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                             : null,
                         pkg.HandlingInstructions);
                 }
-
-                if (uomFailureForOrder) continue;
             }
             catch (InvalidOperationException ex)
             {

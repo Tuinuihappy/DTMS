@@ -34,7 +34,7 @@ public class GetOrderItemsQueryHandler : IQueryHandler<GetOrderItemsQuery, IRead
                 p.LoadUnitProfileCode,
                 p.Dimensions is { } d ? new DimensionsDto(d.LengthMm, d.WidthMm, d.HeightMm, d.VolumeCBM) : null,
                 p.WeightKg,
-                new QuantityDto(p.Quantity.Value, p.Quantity.Uom.ToString()),
+                new QuantityDto(p.Quantity.Value, p.Quantity.Uom),
                 p.Hazmat is { } hz ? new HazmatDto(hz.ClassCode, hz.PackingGroup) : null,
                 p.Temperature is { } tr ? new TemperatureRangeDto(tr.MinC, tr.MaxC) : null,
                 p.HandlingInstructions,

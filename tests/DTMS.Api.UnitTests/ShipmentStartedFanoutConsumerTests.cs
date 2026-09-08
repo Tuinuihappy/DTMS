@@ -107,7 +107,7 @@ public class ShipmentStartedFanoutConsumerTests
             "OD-TEST-" + Guid.NewGuid().ToString("N")[..6], Priority.Normal, serviceWindow: null,
             sourceSystemKey: "oms", sourceSystemDisplayName: "OMS");
         order.AddItem("WH-A", "DOCK-1", 1, "LOT-A", null, null, null, 5.0,
-            Quantity.Create(1, UnitOfMeasure.EA));
+            Quantity.Create(1, "EA"));
         // CreateFromUpstream already lands the order as Submitted — no Submit().
         order.MarkAsValidated(new Dictionary<string, Guid> { ["WH-A"] = Pickup, ["DOCK-1"] = Drop });
         order.Confirm(weightFallbackKg: 5.0);

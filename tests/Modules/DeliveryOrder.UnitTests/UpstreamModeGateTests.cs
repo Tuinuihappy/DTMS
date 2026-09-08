@@ -67,8 +67,6 @@ public class UpstreamModeGateTests
     {
         var repo = Substitute.For<IDeliveryOrderRepository>();
         var activity = Substitute.For<IOrderActivityProjectionStore>();
-        var uom = Substitute.For<IUomNormalizer>();
-        uom.Normalize(Arg.Any<string?>()).Returns(UnitOfMeasure.EA);
         var origins = Substitute.For<IOrderOriginResolver>();
         origins.GetByKeyAsync("oms", Arg.Any<CancellationToken>())
             .Returns(new OrderOrigin("oms", "OMS"));
@@ -78,7 +76,7 @@ public class UpstreamModeGateTests
 
         var handler = new CreateUpstreamDeliveryOrderCommandHandler(
             repo, Substitute.For<IOrderAuditEventRepository>(), activity,
-            Substitute.For<IStationValidationService>(), uom,
+            Substitute.For<IStationValidationService>(),
             Substitute.For<ICurrentUserAccessor>(), origins, registry,
             Options.Create(new DeliveryOrderOptions()),
             NullLogger<CreateUpstreamDeliveryOrderCommandHandler>.Instance);

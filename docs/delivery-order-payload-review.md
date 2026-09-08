@@ -30,7 +30,7 @@ Review นี้จัดเป็น **4 sections** (อ่านเข้า�
 | **P1-6** `:hold` / `:release` endpoints — expose existing entity `Hold()`/`Release()` via REST; idempotent; audit + warning surfaces | ✅ done | `826c4ea` |
 | **P1-1** ServiceWindow VO `{earliest, latest}` replaces `RequestedDeliveryDate`; entity, commands, query DTO, integration event additive (`Deadline` retained as alias for `Latest`, slated for removal in P1-8), AmendmentType rename `RequestedTimeChange`→`ServiceWindowChange`, migration | ✅ done | `d9c4e93` + `f210ce5` |
 | **Smoke test** P1-1/P1-2/P1-6/P1-7 end-to-end ผ่าน docker: 6 old paths→404, full create→submit→confirm→hold→release lifecycle, outbox payload carries `Earliest`/`Latest`/`Deadline`/`SlaTier`/`SubmittedAt` | ✅ verified | 2026-05-25 |
-| **P1-9** Quantity VO + closed `UnitOfMeasure` enum (KG/G/LB/EA/BOX/PALLET/CASE) + `UomNormalizer` + alias map in `appsettings.json` + migration backfill | ✅ done | `acf1fb5` |
+| **P1-9** Quantity VO + closed `UnitOfMeasure` enum (KG/G/LB/EA/BOX/PALLET/CASE) + `UomNormalizer` + alias map in `appsettings.json` + migration backfill | ✅ done → **whitelist reverted 2026-09-08** (Quantity VO คงไว้, `Uom` เป็น free-form string; enum/normalizer/alias map ลบทิ้ง — ดู Decision #4) | `acf1fb5` |
 | **P1-3** HazmatInfo VO (`ClassCode` regex `^[1-9](\.[1-6])?$` + optional `PackingGroup` I/II/III) on Item; nullable, additive integration event | ✅ done | `fddf8f3` |
 | **P1-4** TemperatureRange VO (`MinC`/`MaxC` independently nullable, invariant `MinC ≤ MaxC`) on Item; nullable, additive integration event | ✅ done | `7cebf96` |
 | **P1-5** HandlingInstructions — closed `HandlingInstruction` enum (Fragile / ThisSideUp / DoNotStack / HeavyLift / Sharp / KeepDry / KeepDark / PinchHazard); stored as Postgres `text[]`; duplicate-tolerant; additive integration event | ✅ done | `7b637a2` |
@@ -273,7 +273,7 @@ Review นี้จัดเป็น **4 sections** (อ่านเข้า�
 | ~~P1-6~~ | ~~**`:hold` / `:release`** (entity มีแล้ว แค่ขาด API)~~ ✅ done (this commit) — `POST /{id}/hold` (204 + reason/heldBy) + `POST /{id}/release` (200 + warnings); idempotent; audit | S | §1 line 106 |
 | ~~P1-7~~ | ~~**API versioning** — path-based~~ ✅ done (this commit) — prefix `/api/v1/` ทั้ง 6 business modules; Auth/Webhook/Health คงเดิม | M | §1 line 102 |
 | ~~P1-8~~ | ~~Integration event versioning — schemaVersion + V1 class rename~~ ✅ done (this commit) — 8 events renamed `…V1`, `SchemaVersion = "1.0"` field added, `Deadline` alias dropped, semver convention documented | M | §1 line 113-117 |
-| ~~P1-9~~ | ~~Quantity VO + UOM whitelist — Option C Hybrid~~ ✅ done (`acf1fb5`) — closed `UnitOfMeasure` enum + `UomNormalizer` alias map + migration backfill | M | — |
+| ~~P1-9~~ | ~~Quantity VO + UOM whitelist — Option C Hybrid~~ ✅ done (`acf1fb5`) — closed `UnitOfMeasure` enum + `UomNormalizer` alias map + migration backfill · **whitelist reverted 2026-09-08**, Quantity VO คงไว้ | M | — |
 | ~~P1-10~~ | ~~Amendment snapshot ขยาย scope + amendmentVersion~~ ✅ done (this commit) — `OrderSnapshotV1` full mutable state record; `AmendmentVersion` int column (0=legacy, 1=full); JSON round-trippable | M | §1 line 93 |
 
 ### 🟢 P2 — B2B-readiness / future patterns
@@ -332,7 +332,7 @@ Review นี้จัดเป็น **4 sections** (อ่านเข้า�
 | **1** | API versioning strategy | **Path-based** `/api/v1/delivery-orders` | Upstream enterprise (SAP/ERP/MES) friendly; discoverability ใน URL/log; design doc §1 line 102 ระบุไว้แล้ว | P1-7 |
 | **2** | `Confirmed` vs `ReadyToPlan` | **คง `Confirmed`** + update design doc | Code เป็น source of truth (commit `3fc95e07` sync แล้ว); rename มีต้นทุนสูง (event names, Planning consumer, migration); business semantic กว้างกว่า | Design doc only — no code change |
 | **3** | Multi-tenant reintroduction | **ไม่ดึงกลับ** ตอนนี้ + ปิด gap ใน design doc | No confirmed multi-subsidiary customer; `facilityId` ครอบคลุม multi-plant use case; complexity tax สูง | P2-7 placeholder คงไว้; design doc §7 resolved |
-| **4** | UOM whitelist scope | **Option C — Hybrid** (closed enum + alias map) | In-plant unit set แคบ; Planning solver ต้องการ closed set; upstream ส่ง variant ได้ผ่าน alias normalization | P1-9 |
+| **4** | UOM whitelist scope | ~~**Option C — Hybrid** (closed enum + alias map)~~ → **REVERSED 2026-09-08: free-form string** | เหตุผลเดิม *"Planning solver ต้องการ closed set"* **ไม่เป็นความจริง** — `grep [Uu]om` ทั้งโมดูล Planning ได้ 0 ผลลัพธ์ ไม่มี switch / การแปลงหน่วย / aggregation ตาม uom ที่ไหนเลย ทุก consumer แค่แสดงผล และ callback `shipment.*` ไม่มี uom ใน payload; whitelist จึงเป็นต้นทุนล้วน (เพิ่มหน่วยใหม่ต้อง deploy) โดยไม่มีผู้ใช้ประโยชน์ ตอนนี้ UI เป็นตัวเสนอลิสต์แทน backend | P1-9 (reverted) |
 | **5** | Hazmat scope | **Option C** — Class + Subdivision + PackingGroup (no UN number) | Solver ต้องการอย่างน้อย class+subdivision เพื่อทำ segregation matrix; full UN over-engineering สำหรับ Phase 1; schema extend-friendly ภายหลัง | P1-3 |
 
 ### Doc updates ที่ทำพร้อมกัน (2026-05-25)

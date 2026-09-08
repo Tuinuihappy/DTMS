@@ -71,7 +71,7 @@ public record OrderSnapshotV1(
                 ? new DimensionsSnapshotV1(d.LengthMm, d.WidthMm, d.HeightMm)
                 : null,
             WeightKg: p.WeightKg,
-            Quantity: new QuantitySnapshotV1(p.Quantity.Value, p.Quantity.Uom.ToString()),
+            Quantity: new QuantitySnapshotV1(p.Quantity.Value, p.Quantity.Uom),
             Hazmat: p.Hazmat is { } hz
                 ? new HazmatSnapshotV1(hz.ClassCode, hz.PackingGroup?.ToString())
                 : null,

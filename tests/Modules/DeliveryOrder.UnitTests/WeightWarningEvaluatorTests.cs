@@ -16,7 +16,7 @@ public class WeightWarningEvaluatorTests
                 "WH-01", "LINE-01",
                 seq, itemId,
                 description: null, loadUnitProfileCode: null,
-                dimensions: null, weightKg: weight, quantity: Quantity.Create(1, UnitOfMeasure.EA));
+                dimensions: null, weightKg: weight, quantity: Quantity.Create(1, "EA"));
         return order;
     }
 
@@ -85,7 +85,7 @@ public class DeliveryOrderFallbackWeightTests
             "WH-01", "LINE-01",
             itemSeq: 1, itemId: "ITEM-A",
             description: null, loadUnitProfileCode: null,
-            dimensions: null, weightKg: null, quantity: Quantity.Create(1, UnitOfMeasure.EA));
+            dimensions: null, weightKg: null, quantity: Quantity.Create(1, "EA"));
         order.Submit();
         order.MarkAsValidated(new Dictionary<string, Guid>
         {
@@ -109,7 +109,7 @@ public class DeliveryOrderFallbackWeightTests
             "WH-01", "LINE-01",
             itemSeq: 1, itemId: "ITEM-B",
             description: null, loadUnitProfileCode: null,
-            dimensions: null, weightKg: 42.0, quantity: Quantity.Create(1, UnitOfMeasure.EA));
+            dimensions: null, weightKg: 42.0, quantity: Quantity.Create(1, "EA"));
         order.Submit();
         order.MarkAsValidated(new Dictionary<string, Guid>
         {

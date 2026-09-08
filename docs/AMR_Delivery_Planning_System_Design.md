@@ -597,7 +597,7 @@ Predictive replanning, battery-aware dispatch, cost-model tuning per tenant, pla
 | SLA validation (window feasibility) | ❌ Not started | Solver-side check, not at payload tier |
 | Order Templates | ❌ Not started | Recurring order generation (Phase 5 / P2-4) |
 | HazmatInfo VO (class + packing group) | ⏳ planned (P1-3) | Option C per Decision #5 |
-| Quantity VO + UOM whitelist | ⏳ planned (P1-9) | Option C hybrid per Decision #4 |
+| Quantity VO (uom = free-form string) | ✅ Done | VO kept; UOM whitelist reversed 2026-09-08 — nothing branches on the unit, so the UI supplies suggestions and the API stores what it is given |
 | TemperatureRange VO | ⏳ planned (P1-4) | minC/maxC nullable bounds |
 | handlingInstructions | ⏳ planned (P1-5) | enum flags or string list |
 | Event schema versioning | ⏳ planned (P1-8) | `schemaVersion` field + drop `Deadline` alias |

@@ -50,7 +50,7 @@ public class GetItemQueryHandler : IQueryHandler<GetItemQuery, ItemDetailDto>
             item.LoadUnitProfileCode,
             item.Dimensions is { } d ? new DimensionsDto(d.LengthMm, d.WidthMm, d.HeightMm, d.VolumeCBM) : null,
             item.WeightKg,
-            new QuantityDto(item.Quantity.Value, item.Quantity.Uom.ToString()),
+            new QuantityDto(item.Quantity.Value, item.Quantity.Uom),
             item.Hazmat is { } hz ? new HazmatDto(hz.ClassCode, hz.PackingGroup) : null,
             item.Temperature is { } tr ? new TemperatureRangeDto(tr.MinC, tr.MaxC) : null,
             item.HandlingInstructions,

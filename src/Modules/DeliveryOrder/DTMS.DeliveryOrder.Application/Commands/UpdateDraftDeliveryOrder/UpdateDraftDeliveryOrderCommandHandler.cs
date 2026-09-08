@@ -1,6 +1,5 @@
 using DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
-using DTMS.DeliveryOrder.Application.Services;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.DeliveryOrder.Domain.ValueObjects;
 using DTMS.SharedKernel.Messaging;
@@ -12,16 +11,13 @@ namespace DTMS.DeliveryOrder.Application.Commands.UpdateDraftDeliveryOrder;
 public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraftDeliveryOrderCommand, DeliveryOrderDetailDto>
 {
     private readonly IDeliveryOrderRepository _repository;
-    private readonly IUomNormalizer _uomNormalizer;
     private readonly ILogger<UpdateDraftDeliveryOrderCommandHandler> _logger;
 
     public UpdateDraftDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
-        IUomNormalizer uomNormalizer,
         ILogger<UpdateDraftDeliveryOrderCommandHandler> logger)
     {
         _repository = repository;
-        _uomNormalizer = uomNormalizer;
         _logger = logger;
     }
 
@@ -47,10 +43,12 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
 
             foreach (var (item, idx) in request.Items.Select((p, i) => (p, i + 1)))
             {
-                var uom = _uomNormalizer.Normalize(item.Quantity.Uom);
-                if (uom is null)
+                // DraftItemDtoValidator guards the quantity fields behind
+                // `When(p => p.Quantity != null)`, so a null Quantity passes
+                // validation and used to NRE into a 500 here.
+                if (item.Quantity is null)
                     return Result<DeliveryOrderDetailDto>.Failure(
-                        $"Unknown UOM '{item.Quantity.Uom}' on item {idx} — accepted: KG, G, LB, EA, BOX, PALLET, CASE (or configured aliases).");
+                        $"Item {idx}: Quantity is required.");
 
                 order.AddItem(
                     item.PickupLocationCode, item.DropLocationCode,
@@ -58,7 +56,7 @@ public class UpdateDraftDeliveryOrderCommandHandler : ICommandHandler<UpdateDraf
                     item.LoadUnitProfileCode,
                     item.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                     item.WeightKg,
-                    Quantity.Create(item.Quantity.Value, uom.Value),
+                    Quantity.Create(item.Quantity.Value, item.Quantity.Uom),
                     item.Hazmat is { } hz
                         ? HazmatInfo.Create(hz.ClassCode, hz.PackingGroup)
                         : null,

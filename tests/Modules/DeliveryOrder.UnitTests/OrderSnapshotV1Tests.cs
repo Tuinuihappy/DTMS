@@ -28,7 +28,7 @@ public class OrderSnapshotV1Tests
             loadUnitProfileCode: "TRAY-A",
             dimensions: Dimensions.Create(300, 200, 100),
             weightKg: 2.5,
-            quantity: Quantity.Create(1, UnitOfMeasure.BOX),
+            quantity: Quantity.Create(1, "BOX"),
             hazmat: HazmatInfo.Create("6.2", PackingGroup.II),
             temperature: TemperatureRange.Create(2, 8),
             handlingInstructions: new[]

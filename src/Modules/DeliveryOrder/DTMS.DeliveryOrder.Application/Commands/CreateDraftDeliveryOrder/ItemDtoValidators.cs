@@ -32,7 +32,10 @@ public class DraftItemDtoValidator : AbstractValidator<ItemDto>
         When(p => p.Quantity != null, () =>
         {
             RuleFor(p => p.Quantity.Value).GreaterThan(0);
-            RuleFor(p => p.Quantity.Uom).MaximumLength(20);
+            // Uom is free text, but not blank text. This is the only guard on
+            // the draft path — the old UomNormalizer used to reject "" as an
+            // unknown unit, and nothing else here would catch it.
+            RuleFor(p => p.Quantity.Uom).NotEmpty().MaximumLength(20);
         });
 
         RuleFor(p => p.PickupLocationCode).NotEmpty().MaximumLength(50);

@@ -33,8 +33,6 @@ public class CreateUpstreamOrderActivityTests
         var audit = Substitute.For<IOrderAuditEventRepository>();
         var activity = Substitute.For<IOrderActivityProjectionStore>();
         var stations = Substitute.For<IStationValidationService>();
-        var uom = Substitute.For<IUomNormalizer>();
-        uom.Normalize(Arg.Any<string?>()).Returns(UnitOfMeasure.EA);
         var origins = Substitute.For<IOrderOriginResolver>();
         origins.GetByKeyAsync("oms", Arg.Any<CancellationToken>())
             .Returns(new OrderOrigin("oms", "OMS"));
@@ -42,7 +40,7 @@ public class CreateUpstreamOrderActivityTests
         registry.IsRegistered(Arg.Any<TransportMode>()).Returns(true);
 
         var handler = new CreateUpstreamDeliveryOrderCommandHandler(
-            repo, audit, activity, stations, uom,
+            repo, audit, activity, stations,
             Substitute.For<ICurrentUserAccessor>(), origins, registry,
             Options.Create(new DeliveryOrderOptions()),
             NullLogger<CreateUpstreamDeliveryOrderCommandHandler>.Instance);

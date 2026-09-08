@@ -27,6 +27,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Mirrors the Domain/Infrastructure projects: lets the unit tests reach
+         internal helpers such as SubmitReadinessCheck. -->
+    <InternalsVisibleTo Include="DeliveryOrder.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     <PackageReference Include="MassTransit" />

@@ -64,8 +64,6 @@ public class BulkSubmitModeGateTests
     {
         var repo = Substitute.For<IDeliveryOrderRepository>();
         var stations = Substitute.For<IStationValidationService>();
-        var uom = Substitute.For<IUomNormalizer>();
-        uom.Normalize(Arg.Any<string?>()).Returns(UnitOfMeasure.EA);
         var origins = Substitute.For<IOrderOriginResolver>();
         origins.GetInternalAsync(Arg.Any<CancellationToken>())
             .Returns(new OrderOrigin("manual", "Manual"));
@@ -74,7 +72,7 @@ public class BulkSubmitModeGateTests
         registry.IsRegistered(TransportMode.Manual).Returns(manualRegistered);
 
         var handler = new BulkSubmitDeliveryOrdersCommandHandler(
-            repo, stations, uom, Substitute.For<ICurrentUserAccessor>(),
+            repo, stations, Substitute.For<ICurrentUserAccessor>(),
             origins, registry, Options.Create(new DeliveryOrderOptions()));
         return (handler, repo, stations);
     }

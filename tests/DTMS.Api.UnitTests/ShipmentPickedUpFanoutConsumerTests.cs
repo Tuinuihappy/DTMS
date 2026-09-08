@@ -85,7 +85,7 @@ public class ShipmentPickedUpFanoutConsumerTests
             requestedTransportMode: selfManaged ? TransportMode.Manual : TransportMode.Amr,
             selfManaged: selfManaged);
         order.AddItem(pickupCode, "DOCK-1", 1, "LOT-A", null, null, null, 5.0,
-            Quantity.Create(1, UnitOfMeasure.EA));
+            Quantity.Create(1, "EA"));
         order.MarkAsValidated(new Dictionary<string, Guid> { [pickupCode] = Pickup, ["DOCK-1"] = Drop });
         order.Confirm(weightFallbackKg: 5.0);
         if (bindTripId is not null)

@@ -22,7 +22,7 @@ public class GetGroupLocationCodesQueryTests
             "OD-Q-" + Guid.NewGuid().ToString("N")[..6], Priority.Normal, serviceWindow: null,
             sourceSystemKey: "oms", sourceSystemDisplayName: "OMS");
         order.AddItem("SHELF1", "STF_09", 1, "LOT-A", null, null, null, 5.0,
-            Quantity.Create(1, UnitOfMeasure.EA));
+            Quantity.Create(1, "EA"));
         order.MarkAsValidated(new Dictionary<string, Guid> { ["SHELF1"] = PickupStation, ["STF_09"] = DropStation });
         order.Confirm(weightFallbackKg: 5.0);
         orderId = order.Id;
@@ -62,7 +62,7 @@ public class GetGroupLocationCodesQueryTests
             sourceSystemKey: "oms", sourceSystemDisplayName: "OMS",
             requestedTransportMode: TransportMode.Manual);
         order.AddItem("WH-A", "DOCK-1", 1, "LOT-A", null, null, null, 5.0,
-            Quantity.Create(1, UnitOfMeasure.EA));
+            Quantity.Create(1, "EA"));
         order.MarkAsValidated(stationMap: null,
             wmsLocationMap: new Dictionary<string, Guid> { ["WH-A"] = pickupWms, ["DOCK-1"] = dropWms });
         order.Confirm(weightFallbackKg: 5.0);

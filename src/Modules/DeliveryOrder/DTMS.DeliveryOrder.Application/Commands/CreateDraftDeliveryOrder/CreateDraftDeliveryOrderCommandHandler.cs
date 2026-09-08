@@ -11,20 +11,17 @@ namespace DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraftDeliveryOrderCommand, DeliveryOrderDetailDto>
 {
     private readonly IDeliveryOrderRepository _repository;
-    private readonly IUomNormalizer _uomNormalizer;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IOrderOriginResolver _originResolver;
     private readonly ILogger<CreateDraftDeliveryOrderCommandHandler> _logger;
 
     public CreateDraftDeliveryOrderCommandHandler(
         IDeliveryOrderRepository repository,
-        IUomNormalizer uomNormalizer,
         ICurrentUserAccessor currentUser,
         IOrderOriginResolver originResolver,
         ILogger<CreateDraftDeliveryOrderCommandHandler> logger)
     {
         _repository = repository;
-        _uomNormalizer = uomNormalizer;
         _currentUser = currentUser;
         _originResolver = originResolver;
         _logger = logger;
@@ -77,10 +74,12 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
 
         foreach (var (pkg, idx) in request.Items.Select((p, i) => (p, i + 1)))
         {
-            var uom = _uomNormalizer.Normalize(pkg.Quantity.Uom);
-            if (uom is null)
+            // DraftItemDtoValidator guards the quantity fields behind
+            // `When(p => p.Quantity != null)`, so a null Quantity passes
+            // validation and used to NRE into a 500 here.
+            if (pkg.Quantity is null)
                 return Result<DeliveryOrderDetailDto>.Failure(
-                    $"Unknown UOM '{pkg.Quantity.Uom}' on item {idx} — accepted: KG, G, LB, EA, BOX, PALLET, CASE (or configured aliases).");
+                    $"Item {idx}: Quantity is required.");
 
             order.AddItem(
                 pkg.PickupLocationCode, pkg.DropLocationCode,
@@ -88,7 +87,7 @@ public class CreateDraftDeliveryOrderCommandHandler : ICommandHandler<CreateDraf
                 pkg.LoadUnitProfileCode,
                 pkg.Dimensions is { } d ? Dimensions.Create(d.LengthMm, d.WidthMm, d.HeightMm) : null,
                 pkg.WeightKg,
-                Quantity.Create(pkg.Quantity.Value, uom.Value),
+                Quantity.Create(pkg.Quantity.Value, pkg.Quantity.Uom),
                 pkg.Hazmat is { } hz
                     ? HazmatInfo.Create(hz.ClassCode, hz.PackingGroup)
                     : null,

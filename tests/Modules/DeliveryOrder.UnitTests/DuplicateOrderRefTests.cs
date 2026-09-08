@@ -84,14 +84,12 @@ public class DuplicateOrderRefTests
             ServiceWindow.Create(DateTime.UtcNow.AddHours(1), DateTime.UtcNow.AddHours(4)));
         repo.GetByRefAsync("internal", "OD-DUP-01", Arg.Any<CancellationToken>()).Returns(existing);
 
-        var uom = Substitute.For<IUomNormalizer>();
-        uom.Normalize(Arg.Any<string?>()).Returns(UnitOfMeasure.EA);
         var origins = Substitute.For<IOrderOriginResolver>();
         origins.GetInternalAsync(Arg.Any<CancellationToken>())
             .Returns(new OrderOrigin("internal", "Internal"));
 
         var handler = new CreateDraftDeliveryOrderCommandHandler(
-            repo, uom, Substitute.For<ICurrentUserAccessor>(), origins,
+            repo, Substitute.For<ICurrentUserAccessor>(), origins,
             NullLogger<CreateDraftDeliveryOrderCommandHandler>.Instance);
 
         var act = () => handler.Handle(new CreateDraftDeliveryOrderCommand(
@@ -129,8 +127,6 @@ public class DuplicateOrderRefTests
     {
         var repo = Substitute.For<IDeliveryOrderRepository>();
         var stations = Substitute.For<IStationValidationService>();
-        var uom = Substitute.For<IUomNormalizer>();
-        uom.Normalize(Arg.Any<string?>()).Returns(UnitOfMeasure.EA);
         var origins = Substitute.For<IOrderOriginResolver>();
         origins.GetByKeyAsync("oms", Arg.Any<CancellationToken>())
             .Returns(new OrderOrigin("oms", "OMS"));
@@ -140,7 +136,7 @@ public class DuplicateOrderRefTests
         var handler = new CreateUpstreamDeliveryOrderCommandHandler(
             repo, Substitute.For<IOrderAuditEventRepository>(),
             Substitute.For<IOrderActivityProjectionStore>(),
-            stations, uom,
+            stations,
             Substitute.For<ICurrentUserAccessor>(), origins, registry,
             Options.Create(new DeliveryOrderOptions()),
             NullLogger<CreateUpstreamDeliveryOrderCommandHandler>.Instance);

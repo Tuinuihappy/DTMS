@@ -40,7 +40,7 @@ public class ResendShipmentDroppedOffTests
             requestedTransportMode: selfManaged ? TransportMode.Manual : TransportMode.Amr,
             selfManaged: selfManaged);
         order.AddItem("WH-A", "STF_09", 1, "LOT-A", null, null, null, 5.0,
-            Quantity.Create(1, UnitOfMeasure.EA));
+            Quantity.Create(1, "EA"));
         order.MarkAsValidated(new Dictionary<string, Guid> { ["WH-A"] = Pickup, ["STF_09"] = Drop });
         order.Confirm(weightFallbackKg: 5.0);
         if (bindItems)

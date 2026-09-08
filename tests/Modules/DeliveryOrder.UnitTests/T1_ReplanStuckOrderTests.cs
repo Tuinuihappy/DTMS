@@ -271,9 +271,9 @@ public class T1_ReplanStuckOrderTests
             "T1-" + Guid.NewGuid().ToString("N")[..6],
             Priority.Normal, serviceWindow: null);
         order.AddItem("WH-A", "DOCK-1", 1, "SKU-1", null, null, null, WeightFallbackKg,
-            Quantity.Create(1, UnitOfMeasure.EA));
+            Quantity.Create(1, "EA"));
         order.AddItem("WH-A", "DOCK-1", 2, "SKU-2", null, null, null, WeightFallbackKg,
-            Quantity.Create(1, UnitOfMeasure.EA));
+            Quantity.Create(1, "EA"));
         order.Submit();
         order.MarkAsValidated(new Dictionary<string, Guid>
         {
@@ -314,7 +314,7 @@ public class T1_ReplanStuckOrderTests
         var sub = DomainOrder.Create(
             "S-" + Guid.NewGuid().ToString("N")[..6], Priority.Normal, serviceWindow: null);
         sub.AddItem("WH-A", "DOCK-1", 1, "SKU-1", null, null, null,
-            WeightFallbackKg, Quantity.Create(1, UnitOfMeasure.EA));
+            WeightFallbackKg, Quantity.Create(1, "EA"));
         sub.Submit();
         return sub;
     }

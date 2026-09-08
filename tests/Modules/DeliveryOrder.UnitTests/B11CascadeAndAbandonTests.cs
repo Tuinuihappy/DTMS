@@ -200,9 +200,9 @@ public class B11CascadeAndAbandonTests
             "B11-" + Guid.NewGuid().ToString("N")[..6],
             Priority.Normal, serviceWindow: null);
         order.AddItem("WH-A", "DOCK-1", 1, "SKU-1", null, null, null, 5.0,
-            Quantity.Create(1, UnitOfMeasure.EA));
+            Quantity.Create(1, "EA"));
         order.AddItem("WH-A", "DOCK-1", 2, "SKU-2", null, null, null, 5.0,
-            Quantity.Create(1, UnitOfMeasure.EA));
+            Quantity.Create(1, "EA"));
         order.Submit();
         order.MarkAsValidated(new Dictionary<string, Guid>
         {

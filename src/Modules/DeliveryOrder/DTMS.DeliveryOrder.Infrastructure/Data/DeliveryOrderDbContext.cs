@@ -119,12 +119,12 @@ public class DeliveryOrderDbContext : DbContext
             b.Property(p => p.WeightKg);
             // Quantity is mapped as an owned value object. Column names are kept
             // as "Quantity" and "Uom" via HasColumnName so the existing schema
-            // doesn't need a rename — only the values inside Uom get backfilled
-            // to the canonical enum names by the migration.
+            // doesn't need a rename. Uom is free-form text stored verbatim; the
+            // 20-char cap is the only shape constraint the DB enforces.
             b.OwnsOne(p => p.Quantity, q =>
             {
                 q.Property(x => x.Value).HasColumnName("Quantity").IsRequired();
-                q.Property(x => x.Uom).HasConversion<string>().HasColumnName("Uom").HasMaxLength(20).IsRequired();
+                q.Property(x => x.Uom).HasColumnName("Uom").HasMaxLength(20).IsRequired();
             });
             b.Property(p => p.LoadUnitProfileCode).HasMaxLength(50);
             b.Property(p => p.Status).HasConversion<string>().HasMaxLength(20).IsRequired();

@@ -63,7 +63,7 @@ public sealed class DeliveryOrderTripItemSnapshotProvider : ITripItemSnapshotPro
                 OrderStatus: r.OrderStatus.ToString(),
                 Description: r.Description,
                 QuantityValue: r.QuantityValue,
-                QuantityUom: r.QuantityUom.ToString(),
+                QuantityUom: r.QuantityUom,
                 OrderTransportMode: r.OrderTransportMode?.ToString()))
             .ToList();
     }

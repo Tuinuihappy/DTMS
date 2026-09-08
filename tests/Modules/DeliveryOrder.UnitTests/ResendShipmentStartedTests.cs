@@ -41,7 +41,7 @@ public class ResendShipmentStartedTests
             "OD-R-" + Guid.NewGuid().ToString("N")[..6], Priority.Normal, serviceWindow: null,
             sourceSystemKey: source, sourceSystemDisplayName: source.ToUpperInvariant());
         order.AddItem("WH-A", "DOCK-1", 1, "LOT-A", null, null, null, 5.0,
-            Quantity.Create(1, UnitOfMeasure.EA));
+            Quantity.Create(1, "EA"));
         order.MarkAsValidated(new Dictionary<string, Guid> { ["WH-A"] = Pickup, ["DOCK-1"] = Drop });
         order.Confirm(weightFallbackKg: 5.0);
         if (bindItems)

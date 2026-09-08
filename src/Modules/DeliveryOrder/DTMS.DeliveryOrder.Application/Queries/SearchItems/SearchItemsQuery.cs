@@ -74,7 +74,7 @@ public class SearchItemsQueryHandler : IQueryHandler<SearchItemsQuery, PagedResu
                     i.LoadUnitProfileCode,
                     i.Dimensions is { } d ? new DimensionsDto(d.LengthMm, d.WidthMm, d.HeightMm, d.VolumeCBM) : null,
                     i.WeightKg,
-                    new QuantityDto(i.Quantity.Value, i.Quantity.Uom.ToString()),
+                    new QuantityDto(i.Quantity.Value, i.Quantity.Uom),
                     i.Hazmat is { } hz ? new HazmatDto(hz.ClassCode, hz.PackingGroup) : null,
                     i.Temperature is { } tr ? new TemperatureRangeDto(tr.MinC, tr.MaxC) : null,
                     i.HandlingInstructions,

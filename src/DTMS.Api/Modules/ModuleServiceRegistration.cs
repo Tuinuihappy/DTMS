@@ -459,8 +459,6 @@ public static class ModuleServiceRegistration
                            DTMS.DeliveryOrder.Infrastructure.Projections.OrderFactsProjectionStore>();
         services.Configure<DeliveryOrderOptions>(
             configuration.GetSection(DeliveryOrderOptions.SectionName));
-        services.Configure<UomOptions>(configuration.GetSection(UomOptions.SectionName));
-        services.AddSingleton<IUomNormalizer, UomNormalizer>();
 
         // ── Planning Module ───────────────────────────────────────────
         services.AddScoped<PlanningDomainEventMapper>();

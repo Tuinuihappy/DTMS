@@ -15,7 +15,7 @@ public class DeliveryOrderTests
     private static void AddTestItem(
         DTMS.DeliveryOrder.Domain.Entities.DeliveryOrder order,
         int itemSeq, string pickup, string drop, string sku,
-        double? weightKg = 10.0, double quantity = 5, UnitOfMeasure uom = UnitOfMeasure.EA) =>
+        double? weightKg = 10.0, double quantity = 5, string uom = "EA") =>
         order.AddItem(
             pickup, drop,
             itemSeq, sku,
@@ -236,10 +236,10 @@ public class DeliveryOrderTests
     public void UpdateDraft_ReplacesCoreFieldsAndItems()
     {
         var order = CreateOrder("Original Ref");
-        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-OLD", weightKg: 5.0, quantity: 10, uom: UnitOfMeasure.EA);
+        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-OLD", weightKg: 5.0, quantity: 10, uom: "EA");
 
         order.UpdateDraft("New Ref", Priority.High, serviceWindow: null);
-        AddTestItem(order, itemSeq: 1, "WH-02", "LINE-02", "SKU-NEW", weightKg: 3.0, quantity: 5, uom: UnitOfMeasure.BOX);
+        AddTestItem(order, itemSeq: 1, "WH-02", "LINE-02", "SKU-NEW", weightKg: 3.0, quantity: 5, uom: "BOX");
 
         order.OrderRef.Should().Be("New Ref");
         order.Priority.Should().Be(Priority.High);
@@ -264,7 +264,7 @@ public class DeliveryOrderTests
     public void UpdateDraft_WhenNotDraft_Throws()
     {
         var order = CreateOrder();
-        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-001", weightKg: 5.0, quantity: 10, uom: UnitOfMeasure.EA);
+        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-001", weightKg: 5.0, quantity: 10, uom: "EA");
         order.Submit();
 
         var act = () => order.UpdateDraft("New Ref", Priority.Low, serviceWindow: null);
@@ -276,8 +276,8 @@ public class DeliveryOrderTests
     public void UpdateDraft_ClearsTotals()
     {
         var order = CreateOrder();
-        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-A", weightKg: 10.0, quantity: 20, uom: UnitOfMeasure.EA);
-        AddTestItem(order, itemSeq: 2, "WH-01", "LINE-02", "SKU-B", weightKg: 5.0, quantity: 10, uom: UnitOfMeasure.EA);
+        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-A", weightKg: 10.0, quantity: 20, uom: "EA");
+        AddTestItem(order, itemSeq: 2, "WH-01", "LINE-02", "SKU-B", weightKg: 5.0, quantity: 10, uom: "EA");
 
         order.UpdateDraft(order.OrderRef, order.Priority, serviceWindow: null);
 
@@ -291,10 +291,10 @@ public class DeliveryOrderTests
     public void UpdateDraft_AllowsReAddingItemWithSameSeq()
     {
         var order = CreateOrder();
-        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-REUSE", weightKg: 5.0, quantity: 10, uom: UnitOfMeasure.EA);
+        AddTestItem(order, itemSeq: 1, "WH-01", "LINE-01", "SKU-REUSE", weightKg: 5.0, quantity: 10, uom: "EA");
 
         order.UpdateDraft(order.OrderRef, order.Priority, serviceWindow: null);
-        var act = () => AddTestItem(order, itemSeq: 1, "WH-02", "LINE-02", "SKU-REUSE", weightKg: 3.0, quantity: 5, uom: UnitOfMeasure.BOX);
+        var act = () => AddTestItem(order, itemSeq: 1, "WH-02", "LINE-02", "SKU-REUSE", weightKg: 3.0, quantity: 5, uom: "BOX");
 
         act.Should().NotThrow();
     }
@@ -568,8 +568,8 @@ public class DeliveryOrderTests
     [Fact]
     public void Quantity_Create_RejectsZeroOrNegativeValue()
     {
-        var actZero = () => Quantity.Create(0, UnitOfMeasure.EA);
-        var actNeg  = () => Quantity.Create(-5, UnitOfMeasure.KG);
+        var actZero = () => Quantity.Create(0, "EA");
+        var actNeg  = () => Quantity.Create(-5, "KG");
 
         actZero.Should().Throw<ArgumentException>().WithMessage("*greater than zero*");
         actNeg.Should().Throw<ArgumentException>().WithMessage("*greater than zero*");
@@ -578,10 +578,10 @@ public class DeliveryOrderTests
     [Fact]
     public void Quantity_Equality_IsStructural()
     {
-        var a = Quantity.Create(10, UnitOfMeasure.EA);
-        var b = Quantity.Create(10, UnitOfMeasure.EA);
-        var c = Quantity.Create(10, UnitOfMeasure.BOX);
-        var d = Quantity.Create(5, UnitOfMeasure.EA);
+        var a = Quantity.Create(10, "EA");
+        var b = Quantity.Create(10, "EA");
+        var c = Quantity.Create(10, "BOX");
+        var d = Quantity.Create(5, "EA");
 
         a.Should().Be(b);
         a.Should().NotBe(c);
@@ -645,14 +645,14 @@ public class DeliveryOrderTests
             itemSeq: 1, itemId: "PAPER",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(10, UnitOfMeasure.BOX));
+            quantity: Quantity.Create(10, "BOX"));
 
         order.AddItem(
             "WH-FLAM-01", "LINE-02",
             itemSeq: 2, itemId: "THINNER",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 25.0,
-            quantity: Quantity.Create(2, UnitOfMeasure.BOX),            hazmat: HazmatInfo.Create("3", PackingGroup.II));
+            quantity: Quantity.Create(2, "BOX"),            hazmat: HazmatInfo.Create("3", PackingGroup.II));
 
         var paper = order.Items.Single(i => i.ItemId == "PAPER");
         var thinner = order.Items.Single(i => i.ItemId == "THINNER");
@@ -672,13 +672,13 @@ public class DeliveryOrderTests
             itemSeq: 1, itemId: "SKU-CLEAN",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(1, UnitOfMeasure.BOX));
+            quantity: Quantity.Create(1, "BOX"));
         order.AddItem(
             "WH-FLAM-01", "STORE-05",
             itemSeq: 2, itemId: "SKU-ACID",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 10.0,
-            quantity: Quantity.Create(1, UnitOfMeasure.BOX),            hazmat: HazmatInfo.Create("8", PackingGroup.II));
+            quantity: Quantity.Create(1, "BOX"),            hazmat: HazmatInfo.Create("8", PackingGroup.II));
         order.Submit();
         order.MarkAsValidated(StationMap("WH-01", "WH-FLAM-01", "STORE-05"));
         order.Confirm(weightFallbackKg: 500);
@@ -739,14 +739,14 @@ public class DeliveryOrderTests
             itemSeq: 1, itemId: "PAPER",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(10, UnitOfMeasure.BOX));
+            quantity: Quantity.Create(10, "BOX"));
 
         order.AddItem(
             "WH-COLD-01", "LAB-FREEZER",
             itemSeq: 2, itemId: "VACCINE",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 2.0,
-            quantity: Quantity.Create(1, UnitOfMeasure.BOX),            hazmat: null,
+            quantity: Quantity.Create(1, "BOX"),            hazmat: null,
             temperature: TemperatureRange.Create(2.0, 8.0));
 
         var paper = order.Items.Single(i => i.ItemId == "PAPER");
@@ -767,13 +767,13 @@ public class DeliveryOrderTests
             itemSeq: 1, itemId: "SKU-AMBIENT",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(1, UnitOfMeasure.BOX));
+            quantity: Quantity.Create(1, "BOX"));
         order.AddItem(
             "WH-COLD-01", "STORE-05",
             itemSeq: 2, itemId: "SKU-COLD",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 3.0,
-            quantity: Quantity.Create(1, UnitOfMeasure.BOX),            hazmat: null,
+            quantity: Quantity.Create(1, "BOX"),            hazmat: null,
             temperature: TemperatureRange.Create(minC: null, maxC: 8.0));
         order.Submit();
         order.MarkAsValidated(StationMap("WH-01", "WH-COLD-01", "STORE-05"));
@@ -811,7 +811,7 @@ public class DeliveryOrderTests
             itemSeq: 1, itemId: "GLASS",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(10, UnitOfMeasure.BOX),            hazmat: null, temperature: null,
+            quantity: Quantity.Create(10, "BOX"),            hazmat: null, temperature: null,
             handlingInstructions: instructions);
 
         var item = order.Items.Single();
@@ -834,7 +834,7 @@ public class DeliveryOrderTests
             itemSeq: 1, itemId: "GLASS",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(10, UnitOfMeasure.BOX),            hazmat: null, temperature: null,
+            quantity: Quantity.Create(10, "BOX"),            hazmat: null, temperature: null,
             handlingInstructions: withDupes);
 
         var item = order.Items.Single();
@@ -853,7 +853,7 @@ public class DeliveryOrderTests
             itemSeq: 1, itemId: "PLAIN",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(10, UnitOfMeasure.BOX),            hazmat: null, temperature: null,
+            quantity: Quantity.Create(10, "BOX"),            hazmat: null, temperature: null,
             handlingInstructions: null);
 
         order.Items.Single().HandlingInstructions.Should().BeEmpty();
@@ -869,7 +869,7 @@ public class DeliveryOrderTests
             itemSeq: 2, itemId: "SKU-GLASS",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(10, UnitOfMeasure.BOX),            hazmat: null, temperature: null,
+            quantity: Quantity.Create(10, "BOX"),            hazmat: null, temperature: null,
             handlingInstructions: new[]
             {
                 HandlingInstruction.Fragile,
@@ -889,7 +889,7 @@ public class DeliveryOrderTests
     }
 
     [Fact]
-    public void AddItem_StoresQuantityVO_WithCanonicalUom()
+    public void AddItem_StoresQuantityVO_WithUomVerbatim()
     {
         var order = CreateOrder();
 
@@ -898,13 +898,13 @@ public class DeliveryOrderTests
             itemSeq: 1, itemId: "SKU-Q",
             description: null, loadUnitProfileCode: null,
             dimensions: null, weightKg: 5.0,
-            quantity: Quantity.Create(12, UnitOfMeasure.BOX));
+            quantity: Quantity.Create(12, "BOX"));
 
         var item = order.Items.Single();
         item.Quantity.Value.Should().Be(12);
-        item.Quantity.Uom.Should().Be(UnitOfMeasure.BOX);
-        // TotalQuantity continues to aggregate by raw value (Uom-mixed for now;
-        // capacity-aware aggregation by Uom is Planning-solver territory).
+        item.Quantity.Uom.Should().Be("BOX");
+        // TotalQuantity aggregates by raw value regardless of Uom — nothing in
+        // the system converts or compares units.
         order.TotalQuantity.Should().Be(12);
     }
 
