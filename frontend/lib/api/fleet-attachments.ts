@@ -7,6 +7,12 @@ import { compressImagePair } from "@/lib/image-compress";
 
 export type AttachmentOwner = "carrier" | "carrier-type" | "maintenance";
 
+/** Preparing happens before any request exists, so without this the UI would
+ *  claim it was uploading while the browser was still resizing a 12 MP photo —
+ *  the phase a user is most likely to be waiting on, and the one DevTools shows
+ *  as a gap with nothing in it. */
+export type UploadPhase = "preparing" | "uploading";
+
 export type Attachment = {
   id: string;
   /** Time-limited. Regenerated with a fresh timestamp on every list call, so a
@@ -69,7 +75,9 @@ export async function uploadAttachment(
   ownerId: string,
   file: File,
   caption?: string | null,
+  onPhase?: (phase: UploadPhase) => void,
 ): Promise<void> {
+  onPhase?.("preparing");
   const { full, thumbnail } = await compressImagePair(file);
 
   // The upload policy pins the content type, and storage ignores the file
@@ -79,6 +87,7 @@ export async function uploadAttachment(
     throw new Error("This image format could not be processed. Try another file.");
   }
 
+  onPhase?.("uploading");
   const presigned = await send<PresignResponse>("/api/fleet/attachments/presign", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -90,10 +99,16 @@ export async function uploadAttachment(
     }),
   });
 
-  await postToStorage(presigned.image, full);
-  if (thumbnail && presigned.thumbnail) {
-    await postToStorage(presigned.thumbnail, thumbnail);
-  }
+  // Together, not one after the other. These are two independent writes to two
+  // signed keys — the ordering constraint is between the pair and the confirm
+  // that follows, which the await below still enforces. The caller uploads one
+  // file at a time, so this adds one connection, not a flood.
+  await Promise.all([
+    postToStorage(presigned.image, full),
+    thumbnail && presigned.thumbnail
+      ? postToStorage(presigned.thumbnail, thumbnail)
+      : Promise.resolve(),
+  ]);
 
   await send<string>("/api/fleet/attachments/confirm", {
     method: "POST",

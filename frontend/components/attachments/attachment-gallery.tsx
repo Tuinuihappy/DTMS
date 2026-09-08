@@ -10,6 +10,7 @@ import {
   uploadAttachment,
   type Attachment,
   type AttachmentOwner,
+  type UploadPhase,
 } from "@/lib/api/fleet-attachments";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,7 @@ export function AttachmentGallery({
   const [items, setItems] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<UploadPhase | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [zoomed, setZoomed] = useState<Attachment | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -67,7 +69,7 @@ export function AttachmentGallery({
       // bytes, and the per-owner ceiling is checked server-side per call —
       // firing them at once would race that check and flood a phone's uplink.
       for (const file of files) {
-        await uploadAttachment(owner, ownerId, file);
+        await uploadAttachment(owner, ownerId, file, null, setPhase);
       }
       await refresh();
     } catch (err) {
@@ -76,6 +78,7 @@ export function AttachmentGallery({
       await refresh();
     } finally {
       setBusy(false);
+      setPhase(null);
       if (inputRef.current) inputRef.current.value = "";
     }
   };
@@ -126,7 +129,7 @@ export function AttachmentGallery({
               ) : (
                 <Upload className="h-3 w-3" strokeWidth={2.4} />
               )}
-              {busy ? "Uploading…" : "Add"}
+              {phase === "preparing" ? "Preparing…" : busy ? "Uploading…" : "Add"}
             </button>
           </>
         )}
