@@ -44,7 +44,7 @@ public class TripPoolTransitionTests
                 ItemPk: Guid.NewGuid(), ItemSeq: 1, LotNo: "L1", ItemStatus: "Pending",
                 PickupCode: "WH-A", DropCode: "WH-B", WeightKg: 12.5,
                 DeliveryOrderId: trip.DeliveryOrderId,
-                OrderRef: "OD-0001", OrderStatus: "Confirmed"),
+                OrderRef: "OD-0001"),
         };
 
         trip.MarkDispatched(items);

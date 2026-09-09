@@ -43,7 +43,6 @@ public class TripItemsProjectionStore : ITripItemsProjectionStore
                 eventId: eventId,
                 deliveryOrderId: snap.DeliveryOrderId,
                 orderRef: snap.OrderRef,
-                orderStatus: snap.OrderStatus,
                 lotNo: snap.LotNo,
                 itemSeq: snap.ItemSeq,
                 itemStatus: snap.ItemStatus,

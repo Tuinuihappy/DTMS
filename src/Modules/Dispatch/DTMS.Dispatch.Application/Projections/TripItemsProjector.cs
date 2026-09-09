@@ -29,9 +29,10 @@ namespace DTMS.Dispatch.Application.Projections;
 ///
 /// Idempotent (per-EventId inbox) + safe under webhook/reconciler race
 /// (InsertBindingsAsync skips ItemPks that already exist for the trip).
-/// OrderRef/OrderStatus are snapshotted at trip-start and intentionally
-/// not refreshed — operator can re-fetch via the order endpoint if they
-/// need live status.
+/// OrderRef is snapshotted at trip-start and intentionally not refreshed
+/// (it never changes). No order STATUS is stored — a snapshot nothing
+/// refreshes reads as current and isn't; operators re-fetch live order
+/// state from the order endpoint.
 /// </summary>
 public class TripItemsProjector :
     IConsumer<TripStartedIntegrationEvent>,

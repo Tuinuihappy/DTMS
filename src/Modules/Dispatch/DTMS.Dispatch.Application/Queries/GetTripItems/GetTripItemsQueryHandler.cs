@@ -46,7 +46,7 @@ public class GetTripItemsQueryHandler : IQueryHandler<GetTripItemsQuery, TripIte
                 Quantity: r.QuantityValue is { } qv && r.QuantityUom is { } qu
                     ? new TripItemQuantityDto(qv, qu)
                     : null,
-                Order: new OrderRefDto(r.DeliveryOrderId, r.OrderRef, r.OrderStatus, r.OrderTransportMode),
+                Order: new OrderRefDto(r.DeliveryOrderId, r.OrderRef, r.OrderTransportMode),
                 BoundAt: r.BoundAt,
                 LastEventAt: r.LastEventAt))
             .ToList();

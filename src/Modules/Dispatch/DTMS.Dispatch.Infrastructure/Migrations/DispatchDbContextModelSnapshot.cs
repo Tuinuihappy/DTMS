@@ -583,11 +583,6 @@ namespace DTMS.Dispatch.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<string>("OrderStatus")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
                     b.Property<string>("OrderTransportMode")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");

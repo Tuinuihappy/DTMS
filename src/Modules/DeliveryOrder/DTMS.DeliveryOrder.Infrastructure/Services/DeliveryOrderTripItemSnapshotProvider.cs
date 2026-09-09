@@ -23,8 +23,10 @@ public sealed class DeliveryOrderTripItemSnapshotProvider : ITripItemSnapshotPro
         Guid tripId, CancellationToken cancellationToken)
     {
         // One round-trip per call — projector reads denormalized columns
-        // we already have (Items.TripId + the owning order's OrderRef/Status).
-        // No Include + no tracking: this is a read-only enrichment.
+        // we already have (Items.TripId + the owning order's OrderRef and
+        // transport mode). No Include + no tracking: read-only enrichment.
+        // The order join stays for OrderRef/RequestedTransportMode; the
+        // order's Status is deliberately NOT snapshotted (see TripItemSnapshot).
         var rows = await (
             from item in _context.Items.AsNoTracking()
             join order in _context.DeliveryOrders.AsNoTracking() on item.DeliveryOrderId equals order.Id
@@ -44,7 +46,6 @@ public sealed class DeliveryOrderTripItemSnapshotProvider : ITripItemSnapshotPro
                 QuantityUom = item.Quantity.Uom,
                 DeliveryOrderId = order.Id,
                 order.OrderRef,
-                OrderStatus = order.Status,
                 OrderTransportMode = order.RequestedTransportMode
             }
         ).ToListAsync(cancellationToken);
@@ -60,7 +61,6 @@ public sealed class DeliveryOrderTripItemSnapshotProvider : ITripItemSnapshotPro
                 WeightKg: r.WeightKg,
                 DeliveryOrderId: r.DeliveryOrderId,
                 OrderRef: r.OrderRef,
-                OrderStatus: r.OrderStatus.ToString(),
                 Description: r.Description,
                 QuantityValue: r.QuantityValue,
                 QuantityUom: r.QuantityUom,

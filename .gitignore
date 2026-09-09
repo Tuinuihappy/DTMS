@@ -10,6 +10,10 @@ artifacts/obj/
 
 ## Local-only data
 backups/
+# One-off DB dumps taken before destructive migrations land next to the build
+# output, which only ignores bin/ and obj/ — so a `git add -A` would otherwise
+# commit rows of dev data. Keep the dumps, keep them out of the repo.
+artifacts/*.csv
 
 ## NuGet
 *.nupkg

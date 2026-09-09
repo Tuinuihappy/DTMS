@@ -5,10 +5,16 @@ namespace DTMS.Dispatch.Infrastructure.Projections;
 /// Written exclusively by <c>TripItemsProjector</c> from Dispatch Trip
 /// lifecycle events. Backs <c>GET /api/v1/dispatch/trips/{id}/items</c>.
 ///
-/// OrderRef/OrderStatus are snapshotted at trip-start and never refreshed
-/// (operator can re-fetch order state via <c>DeliveryOrderId</c> if they
-/// need live status). ItemStatus is updated on terminal Trip events
-/// (Completed → Delivered, Failed/Cancelled → Unbound).
+/// OrderRef is snapshotted at trip-start and never refreshed — safe,
+/// because an OrderRef never changes. ItemStatus is updated on terminal
+/// Trip events (Completed → Delivered, Failed/Cancelled → Unbound).
+///
+/// This row deliberately holds NO order status. It used to (dropped
+/// 2026-09-09), and nothing ever refreshed the stored copy, so the
+/// trip-items endpoint served the status the order had when its items
+/// were bound — wrong on every one of the 353 trips in dev. Don't add
+/// one back: order lifecycle is the DeliveryOrder module's to report,
+/// and callers already have <c>DeliveryOrderId</c> to ask it directly.
 /// </summary>
 public class TripItemsRow
 {
@@ -17,7 +23,6 @@ public class TripItemsRow
     public Guid EventId { get; private set; }
     public Guid DeliveryOrderId { get; private set; }
     public string OrderRef { get; private set; } = string.Empty;
-    public string OrderStatus { get; private set; } = string.Empty;
     public string LotNo { get; private set; } = string.Empty;
     public int ItemSeq { get; private set; }
     public string ItemStatus { get; private set; } = string.Empty;
@@ -35,7 +40,7 @@ public class TripItemsRow
 
     public TripItemsRow(
         Guid tripId, Guid itemPk, Guid eventId,
-        Guid deliveryOrderId, string orderRef, string orderStatus,
+        Guid deliveryOrderId, string orderRef,
         string lotNo, int itemSeq, string itemStatus,
         string? pickupCode, string? dropCode, double? weightKg,
         string? description, double? quantityValue, string? quantityUom,
@@ -56,7 +61,6 @@ public class TripItemsRow
         EventId = eventId;
         DeliveryOrderId = deliveryOrderId;
         OrderRef = orderRef;
-        OrderStatus = orderStatus;
         LotNo = lotNo;
         ItemSeq = itemSeq;
         ItemStatus = itemStatus;

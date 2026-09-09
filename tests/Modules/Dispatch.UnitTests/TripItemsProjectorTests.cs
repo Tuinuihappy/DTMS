@@ -319,8 +319,7 @@ public class TripItemsProjectorTests
             DropCode: "ST-B",
             WeightKg: 10,
             DeliveryOrderId: orderId,
-            OrderRef: "OD-001",
-            OrderStatus: "Dispatched");
+            OrderRef: "OD-001");
 
     private static ConsumeContext<T> Ctx<T>(T message) where T : class
     {

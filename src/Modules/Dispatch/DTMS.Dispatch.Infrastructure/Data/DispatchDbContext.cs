@@ -345,7 +345,6 @@ public class DispatchDbContext : DbContext
             b.Property(e => e.EventId).IsRequired();
             b.Property(e => e.DeliveryOrderId).IsRequired();
             b.Property(e => e.OrderRef).HasMaxLength(100).IsRequired();
-            b.Property(e => e.OrderStatus).HasMaxLength(30).IsRequired();
             b.Property(e => e.LotNo).HasMaxLength(200).IsRequired();
             b.Property(e => e.ItemSeq).IsRequired();
             b.Property(e => e.ItemStatus).HasMaxLength(30).IsRequired();

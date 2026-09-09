@@ -399,10 +399,13 @@ export function isTripInFlight(s: TripStatus): boolean {
 // binding with embedded order context — the drawer can render the
 // table without a second round-trip per item.
 
+// No order status here by design — the backend used to send one, but it
+// came from a trip-start snapshot that was never refreshed, so it showed
+// the wrong status on every finished trip. Open the order drawer (via id)
+// for live order state.
 export type TripItemOrderRefDto = {
   id: string;
   orderRef: string;
-  status: string;
   transportMode: string | null;
 };
 

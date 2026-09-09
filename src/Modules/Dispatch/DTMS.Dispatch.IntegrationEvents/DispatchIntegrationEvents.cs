@@ -45,9 +45,15 @@ public record TripDispatchedIntegrationEventV1(
 
 // Wire shape for a single Item-on-Trip binding. ItemPk is the
 // deliveryorder.Items.Id PK; LotNo is the operator-facing identifier
-// (Items.ItemId). OrderRef/OrderStatus are snapshotted at trip-start
-// and never refreshed (per P5.3 design — operator can re-fetch order
-// state via OrderId if they need live status).
+// (Items.ItemId). OrderRef is snapshotted at trip-start and never
+// refreshed — safe because an OrderRef never changes.
+//
+// Carried no order status since 2026-09-09. It used to, and the
+// projector stored it, but nothing ever refreshed the stored copy, so
+// consumers reading it as current state were wrong on every trip that
+// outlived its order's next transition. Consumers that need live order
+// state resolve it from DeliveryOrderId. Older messages still on the
+// bus carry an extra OrderStatus property; deserialization ignores it.
 //
 // Description / QuantityValue / QuantityUom (V1.3) — optional display
 // enrichment so the trip-items table can render fulfilment context
@@ -63,7 +69,6 @@ public sealed record TripItemSnapshot(
     double? WeightKg,
     Guid DeliveryOrderId,
     string OrderRef,
-    string OrderStatus,
     string? Description = null,
     double? QuantityValue = null,
     string? QuantityUom = null,

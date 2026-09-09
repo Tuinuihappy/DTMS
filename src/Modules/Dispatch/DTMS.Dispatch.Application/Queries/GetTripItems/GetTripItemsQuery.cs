@@ -57,8 +57,13 @@ public sealed record TripItemDto(
 // before V1.3 carry no value/uom (both NULL in the row).
 public sealed record TripItemQuantityDto(double Value, string Uom);
 
+// Deliberately carries NO order status. The read model used to snapshot one
+// at trip-start and never refresh it, so this DTO reported whatever status
+// the order held when its items were bound — stale on every trip measured
+// (2026-09-08: 1,742 rows, 353 trips, not one matching the live value). The
+// field went first, then the column (migration 20260909100000). Clients that
+// need live order state fetch it from the order endpoint via Id.
 public sealed record OrderRefDto(
     Guid Id,
     string OrderRef,
-    string Status,
     string? TransportMode);

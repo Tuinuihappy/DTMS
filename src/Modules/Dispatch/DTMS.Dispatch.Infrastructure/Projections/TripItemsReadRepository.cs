@@ -22,7 +22,6 @@ public class TripItemsReadRepository : ITripItemsReadRepository
                 r.ItemPk,
                 r.DeliveryOrderId,
                 r.OrderRef,
-                r.OrderStatus,
                 r.OrderTransportMode,
                 r.LotNo,
                 r.ItemSeq,

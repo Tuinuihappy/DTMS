@@ -181,7 +181,6 @@ export function TripItemsSection({
                           <span className="font-mono text-[11.5px] font-semibold text-[var(--color-brand-500)] underline-offset-2 group-hover:underline">
                             {it.order.orderRef}
                           </span>
-                          <OrderStatusChip status={it.order.status} />
                           {it.order.transportMode && (
                             <TransportModeChip mode={it.order.transportMode} />
                           )}
@@ -191,7 +190,6 @@ export function TripItemsSection({
                           <span className="font-mono text-[11.5px] font-semibold text-[var(--color-ink-900)]">
                             {it.order.orderRef}
                           </span>
-                          <OrderStatusChip status={it.order.status} />
                           {it.order.transportMode && (
                             <TransportModeChip mode={it.order.transportMode} />
                           )}
@@ -239,14 +237,6 @@ function ItemStatusBadge({ status }: { status: string }) {
         palette,
       )}
     >
-      {status}
-    </span>
-  );
-}
-
-function OrderStatusChip({ status }: { status: string }) {
-  return (
-    <span className="inline-flex items-center rounded bg-[var(--color-ink-100)] px-1.5 py-[1px] text-[9px] font-bold uppercase tracking-[0.06em] text-[var(--color-ink-500)] dark:bg-white/[0.06]">
       {status}
     </span>
   );
