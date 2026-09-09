@@ -20,9 +20,14 @@ public class GetTripItemsQueryHandler : IQueryHandler<GetTripItemsQuery, TripIte
     public async Task<Result<TripItemsResponse>> Handle(
         GetTripItemsQuery request, CancellationToken cancellationToken)
     {
-        if (request.TripId == Guid.Empty)
-            return Result<TripItemsResponse>.Failure("TripId is required.");
-
+        // No Guid.Empty guard on purpose — it was the only reason this
+        // handler could fail for two different causes ("malformed" vs
+        // "absent"), which forced the endpoint to answer 400 for both.
+        // An all-zero id simply matches no trip, so it takes the same
+        // not-found path as any other unknown id (and the {id:guid} route
+        // constraint already rejects non-guids at routing). Mirrors
+        // GetTripDetailsQueryHandler.
+        //
         // BFF — sequential reads on the shared DispatchDbContext (EF Core
         // forbids concurrent operations on the same context instance).
         // Both queries hit the same connection so wall-clock cost is one

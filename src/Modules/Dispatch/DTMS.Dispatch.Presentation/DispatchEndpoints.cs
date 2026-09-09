@@ -104,11 +104,14 @@ public static class DispatchEndpoints
         // Backed by dispatch.TripItems (TripItemsProjector materializes
         // it from TripStartedIntegrationEvent.Items). Empty list when the
         // projector hasn't seen the trip yet (vendor adapter hasn't bound
-        // items — operator should retry shortly).
+        // items — operator should retry shortly). An unknown trip is 404,
+        // matching /details and /orders/{id}/trips — it used to answer 400,
+        // which told callers they'd sent a bad request when the request was
+        // fine and the trip simply wasn't there.
         group.MapGet("/trips/{id:guid}/items", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new GetTripItemsQuery(id));
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         }).RequirePermission(Permissions.Dispatch.TripRead);
 
         // GET /api/v1/dispatch/orders/{orderId}/trips — list every Trip of an
