@@ -266,8 +266,8 @@ public class OrderListViewProjector :
         }
     }
 
-    private static bool IsTransient(Exception ex) => ex is
-        Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException or
-        TimeoutException or
-        TaskCanceledException;
+    // Shared policy — see ProjectionFaults. A unique-key violation here is
+    // two events racing to create the same order's first row, not a defect:
+    // retrying finds the winner's row and takes the update path.
+    private static bool IsTransient(Exception ex) => ProjectionFaults.IsTransient(ex);
 }

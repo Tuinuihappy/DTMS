@@ -118,14 +118,10 @@ public abstract class IdempotentProjector<TEvent> : IConsumer<TEvent>
 
     /// <summary>
     /// Distinguish transient (deserves retry) from permanent (skip + log)
-    /// failures. Default policy:
-    ///   - DbUpdateConcurrencyException → transient
-    ///   - TimeoutException / TaskCanceledException → transient
-    ///   - everything else → permanent
+    /// failures. Policy lives in <see cref="ProjectionFaults"/> so every
+    /// projector classifies the same way — it used to be copied per
+    /// projector, and each copy drifted into the same blind spot.
     /// Override for projector-specific classification.
     /// </summary>
-    protected virtual bool IsTransient(Exception ex) => ex is
-        Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException or
-        TimeoutException or
-        TaskCanceledException;
+    protected virtual bool IsTransient(Exception ex) => ProjectionFaults.IsTransient(ex);
 }

@@ -126,8 +126,5 @@ public class JobFactsProjector :
         }
     }
 
-    private static bool IsTransient(Exception ex) => ex is
-        Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException or
-        TimeoutException or
-        TaskCanceledException;
+    private static bool IsTransient(Exception ex) => ProjectionFaults.IsTransient(ex);
 }
