@@ -178,7 +178,12 @@ export function TripItemsSection({
                           aria-label={`Open order ${it.order.orderRef}`}
                           title={`Open order ${it.order.orderRef}`}
                         >
-                          <span className="font-mono text-[11.5px] font-semibold text-[var(--color-brand-500)] underline-offset-2 group-hover:underline">
+                          {/* nowrap: an OrderRef is full of hyphens and the
+                              browser treats every one as a break opportunity,
+                              so this column shredded OD-090926-0007-BUSRUN
+                              into four lines. The table scrolls sideways
+                              (overflow-x-auto above) if it ever needs to. */}
+                          <span className="whitespace-nowrap font-mono text-[11.5px] font-semibold text-[var(--color-brand-500)] underline-offset-2 group-hover:underline">
                             {it.order.orderRef}
                           </span>
                           {it.order.transportMode && (
@@ -187,7 +192,7 @@ export function TripItemsSection({
                         </button>
                       ) : (
                         <span className="inline-flex items-center gap-1.5">
-                          <span className="font-mono text-[11.5px] font-semibold text-[var(--color-ink-900)]">
+                          <span className="whitespace-nowrap font-mono text-[11.5px] font-semibold text-[var(--color-ink-900)]">
                             {it.order.orderRef}
                           </span>
                           {it.order.transportMode && (
