@@ -4,7 +4,6 @@ import { Trend, Rate, Counter } from 'k6/metrics';
 
 const API = __ENV.API_BASE || 'http://host.docker.internal:5219';
 
-const statsLatency = new Trend('latency_stats', true);
 const listLatency = new Trend('latency_list', true);
 const pageLatency = new Trend('latency_list_paged', true);
 const errorRate = new Rate('errors');
@@ -33,14 +32,6 @@ export const options = {
 };
 
 export default function () {
-  group('stats', () => {
-    const r = http.get(`${API}/api/v1/delivery-orders/stats`, { tags: { ep: 'stats' } });
-    statsLatency.add(r.timings.duration);
-    reqCount.add(1);
-    const ok = check(r, { 'stats 200': (x) => x.status === 200 });
-    errorRate.add(!ok);
-  });
-
   group('list', () => {
     const r = http.get(`${API}/api/v1/delivery-orders?pageSize=20&page=1`, { tags: { ep: 'list' } });
     listLatency.add(r.timings.duration);

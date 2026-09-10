@@ -312,11 +312,7 @@ function denormalizeCreate(payload: CreateOrderPayload): unknown {
   };
 }
 
-export type StatusBucketParam = "active" | "completed" | "terminal";
-
 export type ListOrdersParams = {
-  status?: OrderStatus;
-  bucket?: StatusBucketParam;
   priority?: Priority;
   transportMode?: TransportMode;
   search?: string;
@@ -342,8 +338,6 @@ export async function listOrders(
   signal?: AbortSignal,
 ): Promise<PagedResult<DeliveryOrderListDto>> {
   const qs = new URLSearchParams();
-  if (params.status) qs.set("status", upperSnakeFromPascal(params.status));
-  if (params.bucket) qs.set("statusBucket", params.bucket);
   if (params.priority) qs.set("priority", upperSnakeFromPascal(params.priority));
   if (params.transportMode)
     qs.set("transportMode", upperSnakeFromPascal(params.transportMode));
@@ -364,38 +358,6 @@ export async function listOrders(
     totalCount: raw.totalCount,
     page: raw.page,
     pageSize: raw.pageSize,
-  };
-}
-
-export type OrderStats = {
-  total: number;
-  active: number;
-  completed: number;
-  totalWeightKg: number;
-  byStatus: Record<OrderStatus, number>;
-};
-
-export async function getOrderStats(signal?: AbortSignal): Promise<OrderStats> {
-  const res = await fetch(`/api/delivery-orders/stats`, { cache: "no-store", signal });
-  const raw = await unwrap<{
-    total: number;
-    active: number;
-    completed: number;
-    totalWeightKg: number;
-    byStatus: Record<string, number>;
-  }>(res);
-  // Backend keys are SnakeCaseUpper enum names ("DRAFT", "IN_PROGRESS") —
-  // re-key into PascalCase to match the OrderStatus union the UI uses.
-  const byStatus: Partial<Record<OrderStatus, number>> = {};
-  for (const [k, v] of Object.entries(raw.byStatus)) {
-    byStatus[pascalFromUpperSnake(k) as OrderStatus] = v;
-  }
-  return {
-    total: raw.total,
-    active: raw.active,
-    completed: raw.completed,
-    totalWeightKg: raw.totalWeightKg,
-    byStatus: byStatus as Record<OrderStatus, number>,
   };
 }
 

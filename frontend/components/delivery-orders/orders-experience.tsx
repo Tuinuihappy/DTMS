@@ -9,7 +9,6 @@ import {
   abandonStuckOrder,
   deleteOrder,
   getOrder,
-  getOrderStats,
   holdOrder,
   idempotencyKey,
   listOrders,
@@ -18,7 +17,6 @@ import {
   submitOrder,
   type DeliveryOrderDetailDto,
   type DeliveryOrderListDto,
-  type OrderStats,
   type OrderStatus,
   type Priority,
   type TransportMode,
@@ -29,8 +27,7 @@ import { BulkActionBar } from "./bulk-bar";
 import { CancelOrderDialog } from "./cancel-dialog";
 import { CreateOrderDialog } from "./create-dialog";
 import { OrderDetailDrawer } from "./detail-drawer";
-import { FilterBar, type StatusFilter } from "./filter-bar";
-import { OrdersKpiStrip } from "./kpi-strip";
+import { FilterBar } from "./filter-bar";
 import { OrdersTable, type SortColumn, type SortDir } from "./orders-table";
 import { InfiniteFooter, Pagination, type PageSize } from "./pagination";
 import { PodScanDialog } from "./pod-scan-dialog";
@@ -42,31 +39,6 @@ import {
 } from "./state-action-dialog";
 import { ToastProvider, useToast } from "./toast";
 import { formatDate } from "@/lib/datetime";
-
-// Translate the UI's StatusFilter into backend query params. Virtual
-// buckets ("Active"/"Completed"/"Terminal") resolve to server-side
-// WHERE Status IN (...) via the statusBucket param; a concrete enum
-// goes through as `status`. "All" sends neither.
-function filterToServerParams(
-  f: StatusFilter,
-): { status?: OrderStatus; bucket?: "active" | "completed" | "terminal" } {
-  if (f === "All") return {};
-  if (f === "Active") return { bucket: "active" };
-  if (f === "Completed") return { bucket: "completed" };
-  if (f === "Terminal") return { bucket: "terminal" };
-  return { status: f };
-}
-
-// Mirror of OrderStatusBuckets.Terminal on the backend — used for the
-// chip count derived from the stats endpoint. If you ever add a status
-// to the terminal bucket on the server, add it here too.
-const TERMINAL_STATUSES: OrderStatus[] = [
-  "Held",
-  "Failed",
-  "Amended",
-  "Cancelled",
-  "Rejected",
-];
 
 function exportCsv(rows: DeliveryOrderListDto[]) {
   const headers = [
@@ -126,29 +98,6 @@ function useDebouncedValue<T>(value: T, delay = 350): T {
   return debounced;
 }
 
-// Whitelist of statuses we accept from the URL — guards against a hand-
-// crafted ?status=PUDDING crashing the chip renderer.
-const STATUS_FILTER_VALUES: StatusFilter[] = [
-  "All",
-  "Active",
-  "Completed",
-  "Terminal",
-  "Draft",
-  "Submitted",
-  "Validated",
-  "Confirmed",
-  "Planning",
-  "Planned",
-  "Dispatched",
-  "InProgress",
-  "PartiallyCompleted",
-  "Held",
-  "Failed",
-  "Amended",
-  "Cancelled",
-  "Rejected",
-];
-
 const PRIORITY_VALUES: Array<Priority | "All"> = ["All", "Low", "Normal", "High", "Critical"];
 const TRANSPORT_VALUES: Array<TransportMode | "All"> = ["All", "Amr", "Manual"];
 const PAGE_SIZE_VALUES: PageSize[] = [10, 25, 50, 100];
@@ -168,10 +117,6 @@ function ExperienceInner() {
   // Filter state — hydrated from the URL on first render so a deep
   // link (or refresh) lands on the same view. Each setter writes back
   // to the URL via the effect below.
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
-    const raw = searchParams.get("status");
-    return STATUS_FILTER_VALUES.find((s) => s === raw) ?? "All";
-  });
   const [priority, setPriority] = useState<Priority | "All">(() => {
     const raw = searchParams.get("priority");
     return (PRIORITY_VALUES.find((p) => p === raw) as Priority | "All") ?? "All";
@@ -239,7 +184,6 @@ function ExperienceInner() {
   // "Save" persists the exact view, and "Apply" restores it in one shot.
   const savedFilterSnapshot = useMemo(
     () => ({
-      statusFilter,
       priority,
       transportMode,
       search,
@@ -248,11 +192,10 @@ function ExperienceInner() {
       sortBy,
       sortDir,
     }),
-    [statusFilter, priority, transportMode, search, hasFailedTrip, hasActiveJob, sortBy, sortDir],
+    [priority, transportMode, search, hasFailedTrip, hasActiveJob, sortBy, sortDir],
   );
 
   const applySavedFilter = useCallback((snap: Record<string, unknown>) => {
-    if (typeof snap.statusFilter === "string") setStatusFilter(snap.statusFilter as StatusFilter);
     if (typeof snap.priority === "string") setPriority(snap.priority as Priority | "All");
     if (typeof snap.transportMode === "string")
       // Guard against retired values in old saved filters (e.g. "Fleet").
@@ -268,7 +211,6 @@ function ExperienceInner() {
   // Data state
   const [orders, setOrders] = useState<DeliveryOrderListDto[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [stats, setStats] = useState<OrderStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -358,14 +300,13 @@ function ExperienceInner() {
   // be stranded on page 7 of a 12-row result.
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, priority, transportMode, search, hasFailedTrip, hasActiveJob, pageSize]);
+  }, [priority, transportMode, search, hasFailedTrip, hasActiveJob, pageSize]);
 
   // Mirror state back to the URL so refresh/back/forward and share links
   // restore the view. router.replace (not push) keeps history clean.
   // Defaults are omitted from the URL so a "clean" view stays clean.
   useEffect(() => {
     const p = new URLSearchParams();
-    if (statusFilter !== "All") p.set("status", statusFilter);
     if (priority !== "All") p.set("priority", priority);
     if (transportMode !== "All") p.set("transport", transportMode);
     if (search) p.set("q", search);
@@ -377,7 +318,7 @@ function ExperienceInner() {
     if (sortDir !== "desc") p.set("sortDir", sortDir);
     const qs = p.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [statusFilter, priority, transportMode, search, hasFailedTrip, hasActiveJob, page, pageSize, sortBy, sortDir, router, pathname]);
+  }, [priority, transportMode, search, hasFailedTrip, hasActiveJob, page, pageSize, sortBy, sortDir, router, pathname]);
 
   // Persist pagination mode preference across visits.
   useEffect(() => {
@@ -396,11 +337,8 @@ function ExperienceInner() {
       if (!opts?.silent) setRefreshing(true);
       setError(null);
       try {
-        const { status, bucket } = filterToServerParams(statusFilter);
         const res = await listOrders(
           {
-            status,
-            bucket,
             priority: priority === "All" ? undefined : priority,
             transportMode: transportMode === "All" ? undefined : transportMode,
             search: search.trim() || undefined,
@@ -437,30 +375,14 @@ function ExperienceInner() {
         }
       }
     },
-    [statusFilter, priority, transportMode, search, hasFailedTrip, hasActiveJob, page, pageSize, sortBy, sortDir, paginationMode],
+    [priority, transportMode, search, hasFailedTrip, hasActiveJob, page, pageSize, sortBy, sortDir, paginationMode],
   );
-
-  // Stats refetch — runs less often than the table fetch and ignores
-  // the search/priority filters so the KPI strip stays a stable system
-  // overview, not a "narrowed view" reading.
-  const fetchStats = useCallback(async () => {
-    try {
-      const next = await getOrderStats();
-      setStats(next);
-    } catch {
-      // Stats failure shouldn't crash the page; the chips just lose their counts.
-    }
-  }, []);
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
 
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
-
-  // Soft polling — refresh data + stats every 15s while the user isn't
+  // Soft polling — refresh the list every 15s while the user isn't
   // in a modal/drawer AND the tab is visible. Backgrounded tabs would
   // otherwise keep hitting the API silently; visibilitychange lets us
   // pause and resume cleanly. When the user comes back we fire one
@@ -473,7 +395,6 @@ function ExperienceInner() {
       if (pollRef.current) return;
       pollRef.current = setInterval(() => {
         fetchOrders({ silent: true });
-        fetchStats();
       }, 15_000);
     };
     const stop = () => {
@@ -489,7 +410,6 @@ function ExperienceInner() {
       } else {
         start();
         fetchOrders({ silent: true });
-        fetchStats();
       }
     };
 
@@ -499,7 +419,7 @@ function ExperienceInner() {
       document.removeEventListener("visibilitychange", handleVisibility);
       stop();
     };
-  }, [createOpen, detailId, fetchOrders, fetchStats]);
+  }, [createOpen, detailId, fetchOrders]);
 
   // Phase P4 — SignalR live updates for the cross-order list. Backend
   // pushes ListItemUpdated hints to the "orders-list" group whenever any
@@ -513,9 +433,8 @@ function ExperienceInner() {
     listHintTimerRef.current = setTimeout(() => {
       listHintTimerRef.current = null;
       fetchOrders({ silent: true });
-      fetchStats();
     }, 500);
-  }, [fetchOrders, fetchStats]);
+  }, [fetchOrders]);
 
   useEffect(() => {
     return () => {
@@ -527,25 +446,6 @@ function ExperienceInner() {
     ListItemUpdated: scheduleListRefetch,
   });
 
-  // Counts for the chip row come from the unfiltered stats endpoint, with
-  // synthetic "All", "Active", "Completed" derived from stats.byStatus.
-  const counts = useMemo<Partial<Record<StatusFilter, number>>>(() => {
-    if (!stats) return {};
-    const c: Partial<Record<StatusFilter, number>> = {
-      All: stats.total,
-      Active: stats.active,
-      Completed: stats.completed,
-      Terminal: TERMINAL_STATUSES.reduce(
-        (sum, s) => sum + (stats.byStatus[s] ?? 0),
-        0,
-      ),
-    };
-    for (const [k, v] of Object.entries(stats.byStatus)) {
-      c[k as StatusFilter] = v;
-    }
-    return c;
-  }, [stats]);
-
   // Actually call the backend DELETE — runs after the 6-second undo
   // grace period unless the user clicks Undo (which clears the timer).
   const flushCancel = useCallback(
@@ -555,10 +455,8 @@ function ExperienceInner() {
       pendingCancelsRef.current.delete(id);
       try {
         await deleteOrder(id, pending.reason);
-        // Pull fresh server state — the order is now truly Cancelled,
-        // and stats should reflect the bucket move.
+        // Pull fresh server state — the order is now truly Cancelled.
         fetchOrders({ silent: true });
-        fetchStats();
       } catch (e) {
         // Restore the row if the upstream call ultimately failed.
         setOrders((prev) =>
@@ -571,7 +469,7 @@ function ExperienceInner() {
         });
       }
     },
-    [fetchOrders, fetchStats, toast],
+    [fetchOrders, toast],
   );
 
   const undoCancel = useCallback((id: string) => {
@@ -798,10 +696,7 @@ function ExperienceInner() {
           tone: "success",
           message: `Confirmed ${target.orderRef}`,
         });
-        setTimeout(() => {
-          fetchOrders({ silent: true });
-          fetchStats();
-        }, 600);
+        setTimeout(() => fetchOrders({ silent: true }), 600);
       } catch (e) {
         setOrders(previousOrders);
         setTotalCount(previousTotal);
@@ -822,7 +717,6 @@ function ExperienceInner() {
       flushCancel,
       undoCancel,
       fetchOrders,
-      fetchStats,
       toast,
     ],
   );
@@ -849,8 +743,7 @@ function ExperienceInner() {
     setSelected(new Set());
     setBusy(false);
     fetchOrders({ silent: true });
-    fetchStats();
-  }, [selected, toast, fetchOrders, fetchStats]);
+  }, [selected, toast, fetchOrders]);
 
   // Bulk cancel — shares the cancel dialog with the single-row path but
   // captures every selected order at once (snapshot taken from current
@@ -908,19 +801,13 @@ function ExperienceInner() {
               ? `Couldn't load orders · ${error}`
               : loading
                 ? "Loading active and historical orders…"
-                : `${stats?.total.toLocaleString("en-US") ?? totalCount.toLocaleString("en-US")} orders · live · refreshes every 15s`
+                : `${totalCount.toLocaleString("en-US")} orders · live · refreshes every 15s`
           }
         />
       </motion.div>
 
-      {/* KPI — driven by stats endpoint, system-wide */}
-      <OrdersKpiStrip stats={stats} loading={loading && !stats} />
-
       {/* Filter bar */}
       <FilterBar
-        status={statusFilter}
-        onStatusChange={setStatusFilter}
-        counts={counts}
         search={searchInput}
         onSearchChange={setSearchInput}
         priority={priority}
@@ -945,10 +832,7 @@ function ExperienceInner() {
             message: `Exported ${orders.length} order${orders.length === 1 ? "" : "s"} on this page.`,
           });
         }}
-        onRefresh={() => {
-          fetchOrders();
-          fetchStats();
-        }}
+        onRefresh={() => fetchOrders()}
         refreshing={refreshing}
       />
 
@@ -966,13 +850,11 @@ function ExperienceInner() {
           onSortChange={handleSortChange}
           search={search}
           hasFilters={
-            statusFilter !== "All" ||
             priority !== "All" ||
             transportMode !== "All" ||
             search.trim() !== ""
           }
           onClearFilters={() => {
-            setStatusFilter("All");
             setPriority("All");
             setTransportMode("All");
             setSearchInput("");
@@ -1081,7 +963,6 @@ function ExperienceInner() {
         onCreated={() => {
           toast.push({ tone: "success", message: "Order created" });
           fetchOrders({ silent: true });
-          fetchStats();
         }}
       />
 
@@ -1092,7 +973,6 @@ function ExperienceInner() {
         onCreated={() => {
           toast.push({ tone: "success", message: "Order updated" });
           fetchOrders({ silent: true });
-          fetchStats();
           // If the user had the detail drawer open on this order,
           // re-open it so they see the new values immediately.
           if (editingOrder && detailId === editingOrder.id) {
@@ -1112,7 +992,6 @@ function ExperienceInner() {
             message: `Reorder created from ${reorderingOrder?.orderRef ?? "source"}`,
           });
           fetchOrders({ silent: true });
-          fetchStats();
         }}
       />
 
@@ -1304,10 +1183,7 @@ function ExperienceInner() {
               });
             }
             setStateActionTarget(null);
-            setTimeout(() => {
-              fetchOrders({ silent: true });
-              fetchStats();
-            }, 600);
+            setTimeout(() => fetchOrders({ silent: true }), 600);
           } catch (err) {
             setStateActionError((err as Error).message);
           } finally {

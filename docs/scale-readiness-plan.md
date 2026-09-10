@@ -407,7 +407,7 @@ export const getOrderFunnel = cache(async (range: string) => {
 });
 ```
 
-Repeat for: `listOrders`, `getOrderStats`, `getStations`, `listMaps`, `getOrderFunnel`, `getFleetUtilization`.
+Repeat for: `listOrders`, `getStations`, `listMaps`, `getOrderFunnel`, `getFleetUtilization`.
 
 ### Step C2 — Page-level revalidate + ISR (0.5 day)
 

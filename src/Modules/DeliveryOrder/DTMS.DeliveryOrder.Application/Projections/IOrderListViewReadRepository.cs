@@ -1,5 +1,4 @@
 using DTMS.DeliveryOrder.Domain.Enums;
-using DTMS.DeliveryOrder.Domain.Repositories;
 
 namespace DTMS.DeliveryOrder.Application.Projections;
 
@@ -60,10 +59,4 @@ public interface IOrderListViewReadRepository
         int page,
         int pageSize,
         CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Group-by-status counts + total weight, sourced from the projection
-    /// so the stats endpoint and the list table agree numerically.
-    /// </summary>
-    Task<DeliveryOrderStats> GetStatsAsync(CancellationToken cancellationToken = default);
 }

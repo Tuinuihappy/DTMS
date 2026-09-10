@@ -2,47 +2,12 @@
 
 import { Download, Plus, RefreshCw, Search, X } from "lucide-react";
 import { motion } from "motion/react";
-import type { OrderStatus, Priority, TransportMode } from "@/lib/api/delivery-orders";
+import type { Priority, TransportMode } from "@/lib/api/delivery-orders";
 import { cn } from "@/lib/utils";
 import { FilterChip } from "./badges";
 import { SavedFiltersMenu, type FilterSnapshot } from "./saved-filters";
 
-export type StatusFilter = "All" | "Active" | "Completed" | "Terminal" | OrderStatus;
-
-// Ordered by lifecycle: overview → intake → planning → execution → terminal.
-// Tones mirror StatusBadge so the chip and the row badge agree at a glance.
-type ChipTone = "ink" | "sky" | "lavender" | "mint" | "peach" | "amber" | "success" | "coral";
-
-const QUICK_FILTERS: { key: StatusFilter; label: string; tone: ChipTone }[] = [
-  // Overview
-  { key: "All", label: "All", tone: "ink" },
-  { key: "Active", label: "Active", tone: "amber" },
-  { key: "Terminal", label: "Terminal", tone: "coral" },
-  // Intake
-  { key: "Draft", label: "Draft", tone: "ink" },
-  { key: "Submitted", label: "Submitted", tone: "sky" },
-  { key: "Validated", label: "Validated", tone: "sky" },
-  // Planning
-  { key: "Confirmed", label: "Confirmed", tone: "lavender" },
-  { key: "Planning", label: "Planning", tone: "lavender" },
-  { key: "Planned", label: "Planned", tone: "mint" },
-  // Execution
-  { key: "Dispatched", label: "Dispatched", tone: "peach" },
-  { key: "InProgress", label: "In progress", tone: "peach" },
-  // Outcomes
-  { key: "Completed", label: "Completed", tone: "success" },
-  { key: "PartiallyCompleted", label: "Partial", tone: "amber" },
-  { key: "Held", label: "Held", tone: "amber" },
-  { key: "Failed", label: "Failed", tone: "coral" },
-  { key: "Amended", label: "Amended", tone: "ink" },
-  { key: "Cancelled", label: "Cancelled", tone: "ink" },
-  { key: "Rejected", label: "Rejected", tone: "coral" },
-];
-
 export function FilterBar({
-  status,
-  onStatusChange,
-  counts,
   search,
   onSearchChange,
   priority,
@@ -60,9 +25,6 @@ export function FilterBar({
   onRefresh,
   refreshing,
 }: {
-  status: StatusFilter;
-  onStatusChange: (s: StatusFilter) => void;
-  counts: Partial<Record<StatusFilter, number>>;
   search: string;
   onSearchChange: (s: string) => void;
   priority: Priority | "All";
@@ -148,20 +110,8 @@ export function FilterBar({
         </div>
       </div>
 
-      {/* Status chips */}
+      {/* Filter chips */}
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [&::-webkit-scrollbar]:h-1">
-        {QUICK_FILTERS.map((f) => (
-          <FilterChip
-            key={f.key}
-            active={status === f.key}
-            tone={f.tone}
-            count={counts[f.key]}
-            onClick={() => onStatusChange(f.key)}
-          >
-            {f.label}
-          </FilterChip>
-        ))}
-        <div className="mx-1 self-center h-5 w-px bg-[var(--color-ink-200)]/60 dark:bg-white/10" />
         {(["All", "Critical", "High", "Normal", "Low"] as const).map((p) => (
           <FilterChip
             key={p}

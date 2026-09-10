@@ -8,7 +8,6 @@ const API = __ENV.API_BASE || 'http://host.docker.internal:5219';
 const createLat = new Trend('latency_create', true);
 const getLat = new Trend('latency_get', true);
 const listLat = new Trend('latency_list', true);
-const statsLat = new Trend('latency_stats', true);
 const errorRate = new Rate('errors');
 const e2eCount = new Counter('e2e_cycles');
 
@@ -28,7 +27,6 @@ export const options = {
   },
   thresholds: {
     'http_req_duration{ep:list}': ['p(95)<800'],
-    'http_req_duration{ep:stats}': ['p(95)<800'],
     'http_req_duration{ep:get}': ['p(95)<1000'],
     'http_req_duration{ep:create}': ['p(95)<2000'],
     http_req_failed: ['rate<0.05'],
@@ -86,12 +84,6 @@ export default function () {
     const r = http.get(`${API}/api/v1/delivery-orders?pageSize=20`, { tags: { ep: 'list' } });
     listLat.add(r.timings.duration);
     errorRate.add(!check(r, { 'list ok': (x) => x.status === 200 }));
-  });
-
-  group('stats', () => {
-    const r = http.get(`${API}/api/v1/delivery-orders/stats`, { tags: { ep: 'stats' } });
-    statsLat.add(r.timings.duration);
-    errorRate.add(!check(r, { 'stats ok': (x) => x.status === 200 }));
   });
 
   if (createdId) {

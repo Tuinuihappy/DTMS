@@ -1,9 +1,6 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
-using Microsoft.Extensions.Caching.Distributed;
 
 namespace DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
 
@@ -191,88 +188,6 @@ public class GetDeliveryOrdersQueryHandler : IQueryHandler<GetDeliveryOrdersQuer
             RequestedTransportMode: Enum.TryParse<TransportMode>(e.TransportMode, out var tm) ? tm : null,
             RequiresDropPod: e.RequiresDropPod,
             RequiresPickupPod: e.RequiresPickupPod);
-    }
-}
-
-public record DeliveryOrderStatsDto(
-    int Total,
-    int Active,
-    int Completed,
-    double TotalWeightKg,
-    Dictionary<OrderStatus, int> ByStatus);
-
-public record GetDeliveryOrderStatsQuery() : IQuery<DeliveryOrderStatsDto>;
-
-public class GetDeliveryOrderStatsQueryHandler : IQueryHandler<GetDeliveryOrderStatsQuery, DeliveryOrderStatsDto>
-{
-    // Short TTL — stale up to 5s is acceptable for an ops dashboard
-    // (humans don't perceive sub-5s lag) and one DB hit per 5s no
-    // matter how many users are polling crushes the load curve when
-    // there are 10+ tabs open in a control room.
-    private const string CacheKey = "stats:delivery-orders:v1";
-    private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(5);
-    private static readonly JsonSerializerOptions CacheJsonOptions = new()
-    {
-        // Enum keys in Dictionary<OrderStatus, int> need a string
-        // converter to roundtrip cleanly through the cache layer.
-        Converters = { new JsonStringEnumConverter() },
-    };
-
-    private readonly DTMS.DeliveryOrder.Application.Projections.IOrderListViewReadRepository _listRepo;
-    private readonly IDistributedCache _cache;
-
-    public GetDeliveryOrderStatsQueryHandler(
-        DTMS.DeliveryOrder.Application.Projections.IOrderListViewReadRepository listRepo,
-        IDistributedCache cache)
-    {
-        _listRepo = listRepo;
-        _cache = cache;
-    }
-
-    public async Task<Result<DeliveryOrderStatsDto>> Handle(GetDeliveryOrderStatsQuery request, CancellationToken cancellationToken)
-    {
-        // Cache lookup — best-effort. Any deserialization issue silently
-        // falls through to a fresh DB query rather than failing the call.
-        var cached = await _cache.GetStringAsync(CacheKey, cancellationToken);
-        if (!string.IsNullOrEmpty(cached))
-        {
-            try
-            {
-                var hit = JsonSerializer.Deserialize<DeliveryOrderStatsDto>(cached, CacheJsonOptions);
-                if (hit is not null)
-                    return Result<DeliveryOrderStatsDto>.Success(hit);
-            }
-            catch (JsonException)
-            {
-                // Schema drift across deployments — proceed to refill.
-            }
-        }
-
-        var stats = await _listRepo.GetStatsAsync(cancellationToken);
-
-        var active = OrderStatusBuckets.Active.Sum(s => stats.ByStatus.GetValueOrDefault(s));
-        var completed = OrderStatusBuckets.Completed.Sum(s => stats.ByStatus.GetValueOrDefault(s));
-
-        // Ensure every status appears in the response (with 0 if absent)
-        // so the frontend chip counts don't render "undefined".
-        var byStatus = Enum.GetValues<OrderStatus>().ToDictionary(s => s, s => stats.ByStatus.GetValueOrDefault(s));
-
-        var dto = new DeliveryOrderStatsDto(stats.Total, active, completed, stats.TotalWeightKg, byStatus);
-
-        try
-        {
-            await _cache.SetStringAsync(
-                CacheKey,
-                JsonSerializer.Serialize(dto, CacheJsonOptions),
-                new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = CacheTtl },
-                cancellationToken);
-        }
-        catch
-        {
-            // Cache write is best-effort — Redis blip shouldn't fail the API.
-        }
-
-        return Result<DeliveryOrderStatsDto>.Success(dto);
     }
 }
 

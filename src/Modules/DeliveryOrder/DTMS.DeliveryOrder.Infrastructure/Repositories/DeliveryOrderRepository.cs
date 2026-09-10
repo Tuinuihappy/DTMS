@@ -114,27 +114,6 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
         return (items, total);
     }
 
-    public async Task<DeliveryOrderStats> GetStatsAsync(CancellationToken cancellationToken = default)
-    {
-        // Two DB roundtrips (group-by + sum) instead of one fat aggregate —
-        // EF Core can't combine a GroupBy with a non-grouped Sum in a single
-        // SQL projection cleanly, and the two queries each hit the same
-        // small table so the overhead is negligible.
-        var byStatusRaw = await _context.DeliveryOrders
-            .AsNoTracking()
-            .GroupBy(o => o.Status)
-            .Select(g => new { Status = g.Key, Count = g.Count() })
-            .ToListAsync(cancellationToken);
-
-        var byStatus = byStatusRaw.ToDictionary(x => x.Status, x => x.Count);
-        var total = byStatus.Values.Sum();
-
-        var totalWeight = total == 0
-            ? 0d
-            : await _context.DeliveryOrders.AsNoTracking().SumAsync(o => o.TotalWeightKg, cancellationToken);
-
-        return new DeliveryOrderStats(total, byStatus, totalWeight);
-    }
 
     public async Task<List<Domain.Entities.DeliveryOrder>> GetOrdersByItemIdsAsync(
         IEnumerable<string> itemIds, CancellationToken cancellationToken = default)

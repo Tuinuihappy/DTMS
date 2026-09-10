@@ -19,7 +19,7 @@ export const options = {
 
 let logged = 0;
 export default function () {
-  const r = http.get(`${API}/api/v1/delivery-orders/stats`);
+  const r = http.get(`${API}/api/v1/delivery-orders?pageSize=1`);
   if (r.status === 0) status0.add(1);
   else if (r.status >= 200 && r.status < 300) status2xx.add(1);
   else if (r.status >= 400 && r.status < 500) {

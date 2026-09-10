@@ -189,9 +189,8 @@ public static class PlanningEndpoints
                 : RiotEnvelope.BadRequest(result.Error);
         }).RequirePermission(Permissions.Planning.ActionTemplateRead);
 
-        // GET /stats — unfiltered catalog counters for the KPI strip.
-        // Mirrors /api/v1/delivery-orders/stats: a fixed system overview
-        // that does not narrow with the list filter.
+        // GET /stats — unfiltered catalog counters for the KPI strip: a
+        // fixed system overview that does not narrow with the list filter.
         actionTemplates.MapGet("/stats", async (ISender sender) =>
         {
             var result = await sender.Send(new GetActionTemplateStatsQuery());

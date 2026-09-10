@@ -323,15 +323,6 @@ public static class DeliveryOrderEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequirePermission(Permissions.DeliveryOrder.OrderRead);
 
-        // GET /api/v1/delivery-orders/stats — aggregate counts for the KPI strip
-        // and filter chips. Unfiltered by design: the strip is a system-wide
-        // overview, not a "what's in your current view" readout.
-        group.MapGet("/stats", async (ISender sender) =>
-        {
-            var result = await sender.Send(new GetDeliveryOrderStatsQuery());
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        }).RequirePermission(Permissions.DeliveryOrder.OrderRead);
-
         // DELETE /api/v1/delivery-orders/{id}
         group.MapDelete("/{id:guid}", async (Guid id, [FromBody] CancelOrderRequest body, ISender sender) =>
         {

@@ -6,10 +6,9 @@ namespace DTMS.DeliveryOrder.Domain.Enums;
 /// currently moving through the pipeline" or "anything terminal" without
 /// having to spell out 5–7 enum values.
 ///
-/// Definitions live with the domain — the same membership feeds the stats
-/// aggregator, the orders list filter, and any future report — so a new
-/// status added to the system (e.g. Quarantined) only needs to be bucketed
-/// here once.
+/// Definitions live with the domain — the same membership feeds the orders
+/// list filter and any future report — so a new status added to the system
+/// (e.g. Quarantined) only needs to be bucketed here once.
 /// </summary>
 public enum StatusBucket
 {

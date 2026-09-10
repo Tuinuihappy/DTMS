@@ -241,7 +241,7 @@ export function ActionTemplatesExperience() {
         }
       />
 
-      {/* KPI strip — matches OrdersKpiStrip pattern */}
+      {/* KPI strip — glass tiles over the catalog stats endpoint */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <KpiTile
           icon={<Layers className="h-4 w-4" strokeWidth={2.2} />}
@@ -489,7 +489,7 @@ export function ActionTemplatesExperience() {
   );
 }
 
-// ── KPI tile (mirrors OrdersKpiStrip) ──────────────────────────────────
+// ── KPI tile ───────────────────────────────────────────────────────────
 
 function KpiTile({
   icon,
