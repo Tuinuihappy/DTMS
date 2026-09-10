@@ -43,27 +43,10 @@ public class OrderFunnelHourlyRow
         BucketHour = bucketHour;
     }
 
-    /// <summary>
-    /// Increment the counter matching the given status name. Unknown
-    /// statuses are silently ignored — projector logs a warning at the
-    /// boundary so production drift is observable without a runtime
-    /// exception that would block the projection queue.
-    /// </summary>
-    public void IncrementStatus(string status)
-    {
-        switch (status)
-        {
-            case "Confirmed":           Confirmed++; break;
-            case "Dispatched":          Dispatched++; break;
-            case "InProgress":          InProgress++; break;
-            case "Completed":           Completed++; break;
-            case "PartiallyCompleted":  PartiallyCompleted++; break;
-            case "Failed":              Failed++; break;
-            case "Cancelled":           Cancelled++; break;
-            case "Rejected":            Rejected++; break;
-            case "Held":                Held++; break;
-            case "Released":            Released++; break;
-            default: /* no-op */        break;
-        }
-    }
+    // Read-only from C#. Counters are incremented by OrderFunnelProjectionStore
+    // with SET x = x + 1 in the database, never by mutating a loaded instance:
+    // api and outbox-worker both consume these events, and a read-then-write
+    // increment let them both read the same value and both write value+1,
+    // dropping a count silently. There used to be an IncrementStatus() here
+    // that did exactly that — don't bring it back.
 }

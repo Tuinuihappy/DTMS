@@ -97,34 +97,31 @@ public class OrderFunnelProjectorTests
         await act.Should().ThrowAsync<TimeoutException>();
     }
 
-    [Fact]
-    public void IncrementStatus_MapsKnownStatuses()
-    {
-        var row = new OrderFunnelHourlyRow(
-            new DateTime(2026, 6, 13, 14, 0, 0, DateTimeKind.Utc));
+    // The status → counter-column mapping moved out of the entity when the
+    // increment moved into SQL. It is still the thing worth pinning: the
+    // column name is interpolated into the UPDATE, so only these literals
+    // may ever come back from it.
+    [Theory]
+    [InlineData("Confirmed", "Confirmed")]
+    [InlineData("Dispatched", "Dispatched")]
+    [InlineData("InProgress", "InProgress")]
+    [InlineData("Completed", "Completed")]
+    [InlineData("PartiallyCompleted", "PartiallyCompleted")]
+    [InlineData("Failed", "Failed")]
+    [InlineData("Cancelled", "Cancelled")]
+    [InlineData("Rejected", "Rejected")]
+    [InlineData("Held", "Held")]
+    [InlineData("Released", "Released")]
+    public void CounterColumn_MapsKnownStatuses(string status, string expected)
+        => OrderFunnelProjectionStore.CounterColumn(status).Should().Be(expected);
 
-        row.IncrementStatus("Confirmed");
-        row.IncrementStatus("Confirmed");
-        row.IncrementStatus("Failed");
-        row.IncrementStatus("PartiallyCompleted");
-
-        row.Confirmed.Should().Be(2);
-        row.Failed.Should().Be(1);
-        row.PartiallyCompleted.Should().Be(1);
-        row.Cancelled.Should().Be(0);
-    }
-
-    [Fact]
-    public void IncrementStatus_UnknownStatus_IsNoOp()
-    {
-        var row = new OrderFunnelHourlyRow(
-            new DateTime(2026, 6, 13, 14, 0, 0, DateTimeKind.Utc));
-
-        row.IncrementStatus("WhoKnows");
-
-        row.Confirmed.Should().Be(0);
-        row.Failed.Should().Be(0);
-    }
+    [Theory]
+    [InlineData("WhoKnows")]
+    [InlineData("confirmed")]          // case-sensitive by design
+    [InlineData("")]
+    [InlineData("Confirmed\"; DROP TABLE x --")]
+    public void CounterColumn_UnknownStatus_IsNull(string status)
+        => OrderFunnelProjectionStore.CounterColumn(status).Should().BeNull();
 
     private static (OrderFunnelProjector projector, IOrderFunnelProjectionStore store) Build()
     {
