@@ -116,6 +116,7 @@ export function TripItemsSection({
                 <TableTh density="compact">Status</TableTh>
                 <TableTh density="compact">Route</TableTh>
                 <TableTh density="compact">Order</TableTh>
+                <TableTh density="compact">Transport</TableTh>
               </DataTableHead>
               <DataTableBody>
                 {items.map((it, i) => (
@@ -186,19 +187,23 @@ export function TripItemsSection({
                           <span className="whitespace-nowrap font-mono text-[11.5px] font-semibold text-[var(--color-brand-500)] underline-offset-2 group-hover:underline">
                             {it.order.orderRef}
                           </span>
-                          {it.order.transportMode && (
-                            <TransportModeChip mode={it.order.transportMode} />
-                          )}
                         </button>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="whitespace-nowrap font-mono text-[11.5px] font-semibold text-[var(--color-ink-900)]">
-                            {it.order.orderRef}
-                          </span>
-                          {it.order.transportMode && (
-                            <TransportModeChip mode={it.order.transportMode} />
-                          )}
+                        <span className="whitespace-nowrap font-mono text-[11.5px] font-semibold text-[var(--color-ink-900)]">
+                          {it.order.orderRef}
                         </span>
+                      )}
+                    </TableTd>
+                    {/* Transport mode is the order's routing intent, not the
+                        item's — it repeats down the column for a single-order
+                        trip. Its own column anyway, so the header names it
+                        instead of leaving an unlabelled chip beside OrderRef,
+                        and it lines up with the orders list table. */}
+                    <TableTd density="compact">
+                      {it.order.transportMode ? (
+                        <TransportModeChip mode={it.order.transportMode} />
+                      ) : (
+                        <span className="text-[var(--color-ink-300)]">—</span>
                       )}
                     </TableTd>
                   </DataRow>
