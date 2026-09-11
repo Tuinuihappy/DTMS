@@ -10,6 +10,11 @@ public class DispatchDbContext : DbContext
 {
     public const string Schema = "dispatch";
 
+    /// <summary>Cross-cutting BI schema. TripFacts lives here but is owned
+    /// and written only by Dispatch — named so raw SQL in the projection
+    /// store doesn't hardcode it a second time.</summary>
+    public const string BiSchema = "bi";
+
     public DbSet<Trip> Trips { get; set; } = null!;
     public DbSet<ExecutionEvent> ExecutionEvents { get; set; } = null!;
     public DbSet<TripException> TripExceptions { get; set; } = null!;
@@ -299,7 +304,7 @@ public class DispatchDbContext : DbContext
         // in the migration as STORED columns; EF reads them only.
         modelBuilder.Entity<TripFactsRow>(b =>
         {
-            b.ToTable("TripFacts", "bi");
+            b.ToTable("TripFacts", BiSchema);
             b.HasKey(e => e.TripId);
             b.Property(e => e.VendorUpperKey).HasMaxLength(100);
             b.Property(e => e.VendorVehicleKey).HasMaxLength(100);

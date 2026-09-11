@@ -2,19 +2,66 @@ using DTMS.Dispatch.Application.Projections;
 using DTMS.Dispatch.Infrastructure.Data;
 using DTMS.SharedKernel.Projection;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using NpgsqlTypes;
 
 namespace DTMS.Dispatch.Infrastructure.Projections;
 
 public class TripFactsProjectionStore : ITripFactsProjectionStore
 {
+    private const string Table = $"{DispatchDbContext.BiSchema}.\"TripFacts\"";
+
+    private const string PauseSql = $"""
+        UPDATE {Table}
+           SET "PauseCount"    = "PauseCount" + 1,
+               "FirstPausedAt" = COALESCE("FirstPausedAt", @at),
+               "FinalStatus"   = @status,
+               "UpdatedAt"     = @at
+         WHERE "TripId" = @tripId;
+        """;
+
+    private const string ReflavourSql = $"""
+        UPDATE {Table}
+           SET "FinalStatus" = @status,
+               "UpdatedAt"   = @at
+         WHERE "TripId" = @tripId;
+        """;
+
     private readonly DispatchDbContext _db;
 
     public TripFactsProjectionStore(DispatchDbContext db) => _db = db;
+
+    private static NpgsqlParameter TripIdParam(Guid tripId) =>
+        new("tripId", NpgsqlDbType.Uuid) { Value = tripId };
+
+    private static NpgsqlParameter AtParam(DateTime at) =>
+        new("at", NpgsqlDbType.TimestampTz) { Value = at };
+
+    private static NpgsqlParameter StatusParam(string status) =>
+        new("status", NpgsqlDbType.Varchar) { Value = status };
 
     public Task<bool> HasProcessedEventAsync(string projectorName, Guid eventId, CancellationToken ct)
         => _db.ProjectionInbox
             .AsNoTracking()
             .AnyAsync(m => m.ProjectorName == projectorName && m.EventId == eventId, ct);
+
+    public async Task ExecuteInTransactionAsync(Func<Task> work, CancellationToken ct)
+    {
+        // DispatchDbContext has EnableRetryOnFailure, and EF refuses an
+        // explicit transaction outside the execution strategy.
+        var strategy = _db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            // The strategy re-runs this whole lambda after a rollback. Entities
+            // the failed attempt tracked are still queued, so without clearing
+            // them the retry would insert each one twice.
+            _db.ChangeTracker.Clear();
+
+            await using var tx = await _db.Database.BeginTransactionAsync(ct);
+            await work();
+            await tx.CommitAsync(ct);
+        });
+    }
 
     public async Task MarkProcessedAsync(string projectorName, Guid eventId, CancellationToken ct)
     {
@@ -46,12 +93,31 @@ public class TripFactsProjectionStore : ITripFactsProjectionStore
         row?.SetStartedAt(at, deliveryOrderId, jobId, vehicleId, vendorVehicleKey);
     }
 
-    public async Task RecordPausedAsync(Guid tripId, DateTime at, CancellationToken ct)
-        => (await Find(tripId, ct))?.RecordPaused(at);
+    public Task RecordPausedAsync(Guid tripId, DateTime at, CancellationToken ct)
+        => RecordPausedAsync(tripId, at, "Paused", reflavour: false, ct);
 
-    public async Task RecordPausedAsync(
+    /// <summary>
+    /// PauseCount is the one accumulating column in this table, so it is the
+    /// one that cannot be computed in memory: api and outbox-worker both
+    /// consume pause events, and `PauseCount += 1` on a loaded row let two of
+    /// them read the same count and both write count+1, losing one silently.
+    /// Postgres adds to the stored value under the row lock it holds for the
+    /// statement, so concurrent pauses serialize and both land.
+    ///
+    /// <para>A re-flavour (Hang↔Held drift on an already-paused trip) moves
+    /// the status label only — hence the second statement, which leaves the
+    /// counter and FirstPausedAt alone.</para>
+    ///
+    /// <para>No row match is a no-op, exactly as the previous
+    /// <c>Find(...)?.RecordPaused(...)</c> was: pause events arrive after the
+    /// row exists, and a missing one means the trip was never projected.</para>
+    /// </summary>
+    public Task RecordPausedAsync(
         Guid tripId, DateTime at, string finalStatus, bool reflavour, CancellationToken ct)
-        => (await Find(tripId, ct))?.RecordPaused(at, finalStatus, reflavour);
+        => _db.Database.ExecuteSqlRawAsync(
+            reflavour ? ReflavourSql : PauseSql,
+            [TripIdParam(tripId), AtParam(at), StatusParam(finalStatus)],
+            ct);
 
     public async Task RecordResumedAsync(Guid tripId, DateTime at, CancellationToken ct)
         => (await Find(tripId, ct))?.RecordResumed(at);

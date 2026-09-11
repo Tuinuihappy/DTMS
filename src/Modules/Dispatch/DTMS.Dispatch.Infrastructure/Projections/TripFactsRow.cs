@@ -11,19 +11,19 @@ namespace DTMS.Dispatch.Infrastructure.Projections;
 /// <c>VendorUpperKey</c> dimension lets the analyst slice
 /// AvgTimeToComplete by vendor, then export the slice as CSV.</para>
 ///
-/// <para><b>Assign, never accumulate — with one outstanding exception.</b>
-/// Every other column is overwritten from the event, which is what makes a
-/// lost projection race harmless: the loser would have written the same
-/// values. <see cref="PauseCount"/> is the exception — <c>MarkPaused</c>
-/// does <c>PauseCount += 1</c> on a loaded row, and api and outbox-worker
-/// both consume these events, so two pause events in flight for one trip
-/// can both read the same count and both write count+1, dropping one
-/// silently with no exception. Same defect OrderFunnelHourly had before it
-/// moved its increment into SQL; the exposure here is far smaller (only
-/// pause events, not every transition) and the column feeds reporting
-/// only. Fix it the same way — increment in SQL, see
-/// OrderFunnelProjectionStore — and do not add a second counter here in
-/// the meantime.</para>
+/// <para><b>Assign, never accumulate.</b> Every column here is overwritten
+/// from the event, which is what makes a lost projection race harmless: the
+/// loser would have written the same values anyway. api and outbox-worker
+/// both consume these events, so a column updated as <c>x = x + 1</c> on a
+/// loaded row can be read by two of them at once and lose a write with no
+/// exception raised.</para>
+///
+/// <para><see cref="PauseCount"/> is the one accumulating column, and for
+/// exactly that reason it has no setter method here — it is incremented in
+/// SQL by <c>TripFactsProjectionStore.RecordPausedAsync</c>, under the row
+/// lock Postgres holds for the statement. It used to do <c>+= 1</c> on a
+/// loaded row (fixed 2026-09-11, after the same defect cost OrderFunnelHourly
+/// real counts). Any future counter belongs in SQL the same way.</para>
 /// </summary>
 public class TripFactsRow
 {
@@ -102,19 +102,10 @@ public class TripFactsRow
         UpdatedAt = at;
     }
 
-    // finalStatus: "Paused" (legacy shim) or the flavour-split "Hang"/"Held".
-    // reflavour=true = Hang↔Held drift transition — the trip was already
-    // paused, so the pause metrics must not move; only the status label does.
-    public void RecordPaused(DateTime at, string finalStatus = "Paused", bool reflavour = false)
-    {
-        if (!reflavour)
-        {
-            FirstPausedAt ??= at;
-            PauseCount += 1;
-        }
-        FinalStatus = finalStatus;
-        UpdatedAt = at;
-    }
+    // Pausing is written by TripFactsProjectionStore.RecordPausedAsync in SQL,
+    // not here: PauseCount accumulates, and `PauseCount += 1` on a loaded row
+    // is a read-modify-write that two consumers can lose. There is deliberately
+    // no RecordPaused() to call — see the class summary.
 
     public void RecordResumed(DateTime at)
     {

@@ -254,6 +254,12 @@ public class TripFactsProjectorTests
         var store = Substitute.For<ITripFactsProjectionStore>();
         store.HasProcessedEventAsync(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(false);
+        // The projector now wraps its write + inbox marker in a store-owned
+        // transaction. A bare substitute would swallow the callback and every
+        // assertion below would pass against a projector that did nothing, so
+        // run the work the way the real store does.
+        store.ExecuteInTransactionAsync(Arg.Any<Func<Task>>(), Arg.Any<CancellationToken>())
+            .Returns(call => ((Func<Task>)call[0])());
         var metrics = new ProjectionMetrics();
         var projector = new TripFactsProjector(
             store, metrics, NullLogger<TripFactsProjector>.Instance);

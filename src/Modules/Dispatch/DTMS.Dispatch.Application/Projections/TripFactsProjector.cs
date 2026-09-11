@@ -115,8 +115,18 @@ public class TripFactsProjector :
 
         try
         {
-            await body();
-            await _store.MarkProcessedAsync(Name, evt.EventId, ctx.CancellationToken);
+            // One transaction for the projection write and its inbox marker.
+            // This was implicit while every write was a tracked mutation
+            // flushed by MarkProcessedAsync's SaveChanges; RecordPausedAsync
+            // now issues SQL that executes immediately, so the boundary has
+            // to be real or an increment could commit without its marker and
+            // be applied twice on redelivery.
+            await _store.ExecuteInTransactionAsync(async () =>
+            {
+                await body();
+                await _store.MarkProcessedAsync(Name, evt.EventId, ctx.CancellationToken);
+            }, ctx.CancellationToken);
+
             _metrics.RecordProjected(Name, typeof(TEvent).Name);
             _metrics.RecordLag(Name, evt.OccurredOn);
         }

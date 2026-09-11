@@ -12,6 +12,26 @@ public interface ITripFactsProjectionStore
     Task<bool> HasProcessedEventAsync(string projectorName, Guid eventId, CancellationToken ct);
     Task MarkProcessedAsync(string projectorName, Guid eventId, CancellationToken ct);
 
+    /// <summary>
+    /// Runs the projection write and its inbox row inside one database
+    /// transaction.
+    ///
+    /// <para>This boundary used to be implicit: every Set* method only
+    /// mutated tracked entities, so the single SaveChanges in
+    /// <see cref="MarkProcessedAsync"/> happened to commit the row and the
+    /// inbox marker together. That held only as long as nothing needed to
+    /// execute immediately — and an atomic counter must. Without an explicit
+    /// transaction, a SQL increment commits on its own, and if the inbox
+    /// insert then fails (a duplicate is transient and gets retried) the
+    /// redelivery increments a second time: over-counting, which is worse
+    /// than the lost update it was meant to fix.</para>
+    ///
+    /// <para>Making it explicit keeps both properties at once — the write
+    /// can be atomic, and it still lands with its inbox marker or not at
+    /// all.</para>
+    /// </summary>
+    Task ExecuteInTransactionAsync(Func<Task> work, CancellationToken ct);
+
     /// <summary>Ensures a row exists for the trip; no-op if already present.</summary>
     Task EnsureRowAsync(
         Guid tripId, DateTime occurredAt,
