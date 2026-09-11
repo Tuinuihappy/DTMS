@@ -20,6 +20,14 @@ namespace DTMS.DeliveryOrder.Infrastructure.Projections;
 /// EF Core only sees them as read-only properties. That way the math
 /// stays a single source of truth in the schema, never drifts from
 /// what the projector wrote, and is indexable.</para>
+///
+/// <para><b>Assign, never accumulate.</b> TotalItems / TotalQuantity /
+/// TotalWeightKg are order totals copied from the event, not running sums —
+/// each write replaces the value. Keep it that way: api and outbox-worker
+/// both consume these events, so an <c>x = x + 1</c> column can be read by
+/// two of them at once and lose a write with no exception (it happened on
+/// OrderFunnelHourly). A counter here belongs in SQL, the way
+/// OrderFunnelProjectionStore increments.</para>
 /// </summary>
 public class OrderFactsRow
 {

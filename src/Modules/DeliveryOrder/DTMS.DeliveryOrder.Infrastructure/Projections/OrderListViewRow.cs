@@ -25,6 +25,15 @@ namespace DTMS.DeliveryOrder.Infrastructure.Projections;
 /// <para>The projector owns every write — handlers MUST NOT touch this
 /// table. Deleting the table and replaying events (or running the
 /// backfill SQL) reconstructs every row deterministically.</para>
+///
+/// <para><b>Assign, never accumulate.</b> Every column here is overwritten
+/// from the aggregate on each event, which is what makes a lost projection
+/// race harmless: the loser would have written the winner's values anyway.
+/// A column updated as <c>x = x + 1</c> would break that — api and
+/// outbox-worker both consume these events, so two of them can read the
+/// same value and both write value+1, dropping one silently (this happened
+/// on OrderFunnelHourly). If you ever need a counter here, increment it in
+/// SQL the way OrderFunnelProjectionStore does, not on a loaded row.</para>
 /// </summary>
 public class OrderListViewRow
 {

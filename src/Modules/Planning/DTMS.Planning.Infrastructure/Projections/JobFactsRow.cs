@@ -7,6 +7,15 @@ namespace DTMS.Planning.Infrastructure.Projections;
 ///
 /// <para><b>Drives:</b> Job retry/queue health report — count + age
 /// distribution by FailureReason, AttemptNumber, FinalStatus.</para>
+///
+/// <para><b>Assign, never accumulate.</b> AttemptNumber looks like a
+/// counter but isn't one — it is copied from the event, which already
+/// carries the attempt it belongs to. Keep every column that way: api and
+/// outbox-worker both consume these events, so an <c>x = x + 1</c> column
+/// can be read by two of them at once and lose a write silently, with no
+/// exception raised (it happened on OrderFunnelHourly). If a real counter
+/// is ever needed, increment it in SQL the way
+/// OrderFunnelProjectionStore does, not on a loaded row.</para>
 /// </summary>
 public class JobFactsRow
 {

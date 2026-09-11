@@ -10,6 +10,20 @@ namespace DTMS.Dispatch.Infrastructure.Projections;
 /// <para><b>Vendor performance reports</b> live on this table — the
 /// <c>VendorUpperKey</c> dimension lets the analyst slice
 /// AvgTimeToComplete by vendor, then export the slice as CSV.</para>
+///
+/// <para><b>Assign, never accumulate — with one outstanding exception.</b>
+/// Every other column is overwritten from the event, which is what makes a
+/// lost projection race harmless: the loser would have written the same
+/// values. <see cref="PauseCount"/> is the exception — <c>MarkPaused</c>
+/// does <c>PauseCount += 1</c> on a loaded row, and api and outbox-worker
+/// both consume these events, so two pause events in flight for one trip
+/// can both read the same count and both write count+1, dropping one
+/// silently with no exception. Same defect OrderFunnelHourly had before it
+/// moved its increment into SQL; the exposure here is far smaller (only
+/// pause events, not every transition) and the column feeds reporting
+/// only. Fix it the same way — increment in SQL, see
+/// OrderFunnelProjectionStore — and do not add a second counter here in
+/// the meantime.</para>
 /// </summary>
 public class TripFactsRow
 {
