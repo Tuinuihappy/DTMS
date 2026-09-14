@@ -728,8 +728,32 @@ builder.Services.AddRateLimiter(options =>
             return RateLimitPartition.GetNoLimiter("bypass-infra");
         }
 
+        var remoteIp = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        // Attachment thumbnails get a bucket of their own. A table of photos
+        // costs one of these per image the first time it is seen, and every
+        // browser request reaches the API through the Next.js server — so all
+        // users arrive from one IP and share one per-IP bucket. Left in that
+        // bucket, a single page of thumbnails could spend the minute's budget and
+        // turn every ordinary API call for everyone into a 429. They are safe to
+        // allow far more of: authenticated, cheap (a key lookup and a local
+        // signature), and cached by the browser after the first view.
+        if (ctx.Request.Path.StartsWithSegments("/api/v1/fleet/attachments") &&
+            ctx.Request.Path.Value!.EndsWith("/thumbnail", StringComparison.Ordinal))
+        {
+            return RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: "thumbnails:" + remoteIp,
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = rlPermitLimit * 20,
+                    Window = TimeSpan.FromSeconds(rlWindowSeconds),
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    QueueLimit = 100
+                });
+        }
+
         return RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            partitionKey: remoteIp,
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = rlPermitLimit,

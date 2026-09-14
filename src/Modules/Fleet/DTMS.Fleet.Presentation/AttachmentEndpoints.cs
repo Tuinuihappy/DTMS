@@ -2,6 +2,7 @@ using DTMS.Fleet.Application.Commands.ConfirmAttachment;
 using DTMS.Fleet.Application.Commands.DeleteAttachment;
 using DTMS.Fleet.Application.Commands.PresignAttachment;
 using DTMS.Fleet.Application.Queries.GetAttachments;
+using DTMS.Fleet.Application.Queries.GetAttachmentThumbnail;
 using DTMS.Fleet.Domain.Entities;
 using DTMS.Iam.Application.Authorization;
 using MediatR;
@@ -51,6 +52,26 @@ public static class AttachmentEndpoints
                 return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
             })
             .WithName($"ListFleetAttachments_{slug}")
+            .RequirePermission(read);
+
+            // A thumbnail by owner and id, answered with a redirect to a signed
+            // URL. It is meant for the frontend relay, which fetches those bytes
+            // and serves them under a stable address a browser can cache —
+            // image bytes for an id never change. Registered per owner so the
+            // owner's read permission sits in the route table like the list's;
+            // the handler refuses an id that is not this owner's, so this route
+            // cannot hand out another owner kind's picture.
+            //
+            // no-store on the redirect itself: the Location carries a signature
+            // that expires in minutes, and a cached copy would outlive it.
+            group.MapGet($"/{slug}/{{ownerId:guid}}/{{id:guid}}/thumbnail", async (
+                Guid ownerId, Guid id, HttpContext http, ISender sender, CancellationToken ct) =>
+            {
+                http.Response.Headers.CacheControl = "no-store";
+                var result = await sender.Send(new GetAttachmentThumbnailQuery(owner, ownerId, id), ct);
+                return result.IsSuccess ? Results.Redirect(result.Value) : Results.NotFound(result.Error);
+            })
+            .WithName($"GetFleetAttachmentThumbnail_{slug}")
             .RequirePermission(read);
         }
 

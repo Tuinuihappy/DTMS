@@ -63,6 +63,21 @@ export const deleteAttachment = (id: string) =>
   send<void>(`/api/fleet/attachments/${encodeURIComponent(id)}`, { method: "DELETE" });
 
 /**
+ * A thumbnail's address for an `<img>`. Unlike `Attachment.thumbnailUrl` it is
+ * stable: it names the image rather than a signature, so it stays the same on
+ * every render and every list refresh, and the route behind it serves bytes
+ * the browser may cache for good — an attachment's image never changes, a new
+ * upload gets a new id. That is what lets a table of photos cost one download
+ * per image rather than one per page view.
+ *
+ * The owner rides along because the backend guards each owner kind with that
+ * owner's own read permission. It never changes for a given image either, so
+ * the address is still stable.
+ */
+export const attachmentThumbnailUrl = (owner: AttachmentOwner, ownerId: string, id: string) =>
+  `/api/fleet/attachments/${encodeURIComponent(id)}/thumbnail?owner=${owner}&ownerId=${encodeURIComponent(ownerId)}`;
+
+/**
  * Compress, upload, then record.
  *
  * The record is written last on purpose: a row created before the upload would

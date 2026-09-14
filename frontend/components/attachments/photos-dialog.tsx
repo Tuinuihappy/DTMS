@@ -4,30 +4,39 @@ import { Images, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { AttachmentGallery } from "@/components/attachments/attachment-gallery";
 import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
-import type { AttachmentOwner } from "@/lib/api/fleet-attachments";
+import type { Attachment, AttachmentOwner } from "@/lib/api/fleet-attachments";
 
 export type PhotosTarget = {
   owner: AttachmentOwner;
   ownerId: string;
   /** What the photos are of, e.g. a carrier code. */
   label: string;
+  /** Open straight onto this image full-size; closing it closes the dialog.
+   *  For a thumbnail in a table, where "show me this photo" is the whole ask. */
+  focusAttachmentId?: string | null;
 };
 
 /**
- * Photos for one thing, opened on demand.
+ * Photos for one thing, opened on demand — the place to browse them all, add
+ * and delete.
  *
- * Deliberately a dialog rather than a column of thumbnails in the table: a
- * gallery per row would fire one list request per row on every page load, and
- * both tables it serves are the hottest query on their page.
+ * A table may still show a thumbnail per row without paying a request per row:
+ * the list carries each row's cover id and count, and the image comes from a
+ * stable address the browser caches (see attachmentThumbnailUrl). What the table
+ * must not do is load a gallery per row, which is what this dialog is for.
  */
 export function PhotosDialog({
   target,
   canEdit,
   onClose,
+  onItemsChanged,
 }: {
   target: PhotosTarget | null;
   canEdit: boolean;
   onClose: () => void;
+  /** Passed through from the gallery; lets the caller keep a row's cover and
+   *  count in step without refetching its whole list. */
+  onItemsChanged?: (items: Attachment[]) => void;
 }) {
   return (
     <>
@@ -78,6 +87,13 @@ export function PhotosDialog({
                   ownerId={target.ownerId}
                   canEdit={canEdit}
                   emptyHint="No photos yet."
+                  initialZoomId={target.focusAttachmentId}
+                  // Opened for one photo, the user asked to see that photo — so
+                  // putting it away returns them to where they were, not to a
+                  // gallery they did not ask for. A delete does not count as
+                  // putting it away; the gallery stays to show what is left.
+                  onZoomClose={target.focusAttachmentId ? onClose : undefined}
+                  onItemsChanged={onItemsChanged}
                 />
               </div>
             </motion.div>

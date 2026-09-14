@@ -24,11 +24,23 @@ export function AttachmentGallery({
   ownerId,
   canEdit,
   emptyHint,
+  initialZoomId,
+  onZoomClose,
+  onItemsChanged,
 }: {
   owner: AttachmentOwner;
   ownerId: string;
   canEdit: boolean;
   emptyHint?: string;
+  /** Open straight onto this image once the list arrives. Ignored if it is no
+   *  longer there — someone may have deleted it since the caller last looked. */
+  initialZoomId?: string | null;
+  /** The user closed the full-size view themselves (not a delete). */
+  onZoomClose?: () => void;
+  /** The authoritative list after it loads, after an upload, and after a
+   *  delete — only ever on success, so a failed load can never tell the caller
+   *  there are no images. Lets a table show the right cover without refetching. */
+  onItemsChanged?: (items: Attachment[]) => void;
 }) {
   const [items, setItems] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,10 +50,27 @@ export function AttachmentGallery({
   const [zoomed, setZoomed] = useState<Attachment | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Held in refs so refresh keeps its identity — a new callback from the parent
+  // on every render must not re-run the load effect.
+  const onItemsChangedRef = useRef(onItemsChanged);
+  const initialZoomIdRef = useRef(initialZoomId);
+  const zoomedOnce = useRef(false);
+  useEffect(() => {
+    onItemsChangedRef.current = onItemsChanged;
+  });
+
   const refresh = useCallback(
     (signal?: AbortSignal) =>
       listAttachments(owner, ownerId, signal)
-        .then(setItems)
+        .then((list) => {
+          setItems(list);
+          onItemsChangedRef.current?.(list);
+          if (!zoomedOnce.current) {
+            zoomedOnce.current = true;
+            const target = initialZoomIdRef.current;
+            if (target) setZoomed(list.find((a) => a.id === target) ?? null);
+          }
+        })
         .catch((e: Error) => {
           if (e.name !== "AbortError") setError(e.message);
         })
@@ -88,7 +117,9 @@ export function AttachmentGallery({
     setError(null);
     try {
       await deleteAttachment(a.id);
-      setItems((prev) => prev.filter((x) => x.id !== a.id));
+      const next = items.filter((x) => x.id !== a.id);
+      setItems(next);
+      onItemsChangedRef.current?.(next);
       setZoomed(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete the image.");
@@ -164,7 +195,10 @@ export function AttachmentGallery({
         canEdit={canEdit}
         busy={busy}
         onDelete={onDelete}
-        onClose={() => setZoomed(null)}
+        onClose={() => {
+          setZoomed(null);
+          onZoomClose?.();
+        }}
       />
     </div>
   );

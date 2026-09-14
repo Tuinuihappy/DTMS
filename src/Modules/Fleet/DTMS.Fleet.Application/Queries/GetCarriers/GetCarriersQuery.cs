@@ -1,11 +1,19 @@
+using DTMS.Fleet.Domain.Entities;
 using DTMS.Fleet.Domain.Enums;
 using DTMS.Fleet.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
 namespace DTMS.Fleet.Application.Queries.GetCarriers;
 
-/// <summary>Row shape for the registry list. <c>CarrierTypeCode</c> is joined in —
-/// the table stores the id (ADR-019) but callers and the UI speak in codes.</summary>
+/// <summary>
+/// Row shape for the registry list. <c>CarrierTypeCode</c> is joined in — the
+/// table stores the id (ADR-019) but callers and the UI speak in codes.
+///
+/// <para><c>CoverAttachmentId</c> is an id, not a URL. A signed URL changes on
+/// every call and expires within the hour, so a browser would re-download every
+/// thumbnail each time the list is filtered. The id addresses an image whose
+/// bytes never change, which the client turns into a stable, cacheable URL.</para>
+/// </summary>
 public sealed record CarrierListDto(
     Guid Id,
     string CarrierCode,
@@ -18,7 +26,9 @@ public sealed record CarrierListDto(
     DateTime? LastSeenAt,
     DateTime? CommissionedAt,
     DateTime? RetiredAt,
-    string? RetireReason);
+    string? RetireReason,
+    Guid? CoverAttachmentId,
+    int PhotoCount);
 
 /// <summary>
 /// Paged, filtered registry list. Uses <see cref="PagedResult{T}"/> from
@@ -50,11 +60,16 @@ public class GetCarriersQueryHandler : IQueryHandler<GetCarriersQuery, PagedResu
 {
     private readonly ICarrierRepository _carriers;
     private readonly ICarrierTypeRepository _carrierTypes;
+    private readonly IAttachmentRepository _attachments;
 
-    public GetCarriersQueryHandler(ICarrierRepository carriers, ICarrierTypeRepository carrierTypes)
+    public GetCarriersQueryHandler(
+        ICarrierRepository carriers,
+        ICarrierTypeRepository carrierTypes,
+        IAttachmentRepository attachments)
     {
         _carriers = carriers;
         _carrierTypes = carrierTypes;
+        _attachments = attachments;
     }
 
     public async Task<Result<PagedResult<CarrierListDto>>> Handle(
@@ -93,19 +108,30 @@ public class GetCarriersQueryHandler : IQueryHandler<GetCarriersQuery, PagedResu
         var (rows, totalCount) = await _carriers.SearchAsync(
             status, carrierTypeId, request.Q, page, pageSize, cancellationToken);
 
-        var data = rows.Select(c => new CarrierListDto(
-            c.Id,
-            c.CarrierCode,
-            typeCodeById.TryGetValue(c.CarrierTypeId, out var code) ? code : string.Empty,
-            c.DisplayName,
-            c.Status.ToString(),
-            c.MaintenanceReason,
-            c.MaintenanceSince,
-            c.CurrentLocationCode,
-            c.LastSeenAt,
-            c.CommissionedAt,
-            c.RetiredAt,
-            c.RetireReason)).ToList();
+        // Same rule as the type lookup above: one query for the whole page, so a
+        // photo column never costs a request per row.
+        var photos = await _attachments.GetSummariesForOwnersAsync(
+            AttachmentOwner.Carrier, rows.Select(c => c.Id).ToArray(), cancellationToken);
+
+        var data = rows.Select(c =>
+        {
+            var hasPhotos = photos.TryGetValue(c.Id, out var photo);
+            return new CarrierListDto(
+                c.Id,
+                c.CarrierCode,
+                typeCodeById.TryGetValue(c.CarrierTypeId, out var code) ? code : string.Empty,
+                c.DisplayName,
+                c.Status.ToString(),
+                c.MaintenanceReason,
+                c.MaintenanceSince,
+                c.CurrentLocationCode,
+                c.LastSeenAt,
+                c.CommissionedAt,
+                c.RetiredAt,
+                c.RetireReason,
+                hasPhotos ? photo.CoverId : null,
+                hasPhotos ? photo.Count : 0);
+        }).ToList();
 
         return Result<PagedResult<CarrierListDto>>.Success(
             new PagedResult<CarrierListDto>(data, totalCount, page, pageSize));

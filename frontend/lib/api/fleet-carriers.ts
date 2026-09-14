@@ -21,6 +21,10 @@ export type Carrier = {
   commissionedAt: string | null;
   retiredAt: string | null;
   retireReason: string | null;
+  // The newest photo, as an id — see attachmentThumbnailUrl for why the list
+  // carries an id rather than a URL.
+  coverAttachmentId: string | null;
+  photoCount: number;
 };
 
 export type PagedCarriers = {
