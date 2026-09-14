@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useWedgeScanner } from "@/lib/hooks/use-wedge-scanner";
 import type { PodMethod, PodScanType } from "@/lib/api/delivery-orders";
 
 /**
@@ -44,14 +45,31 @@ export function PodScanDialog({
 }) {
   const [method, setMethod] = useState<PodMethod>("Confirm");
   const [scannedBy, setScannedBy] = useState(currentUser ?? "");
-  const [reference, setReference] = useState("");
   const sigRef = useRef<HTMLCanvasElement | null>(null);
+
+  // The reference box is shared by Manual and Barcode. Only Barcode reads the
+  // scanner's physical keys: Manual is a person typing, and a person must still
+  // be able to type whatever the active layout gives them. "Scanned by" never
+  // goes through this at all — names are typed in Thai.
+  //
+  // A finished scan only fills the box; recording the POD still takes the
+  // Confirm click. Nothing checks that the scanned code belongs to this item —
+  // Item.RecordDropPod stores whatever it is given and marks the item Delivered
+  // on the spot — so a scan of the wrong box would otherwise be recorded with
+  // no moment for anyone to notice. The hook also swallows the scanner's Enter,
+  // so scanners that send one wait for the click too.
+  const reference = useWedgeScanner({
+    enabled: method === "Barcode",
+    onScan: () => {},
+  });
 
   useEffect(() => {
     if (!open) return;
     setMethod("Confirm");
     setScannedBy(currentUser ?? "");
-    setReference("");
+    reference.setValue("");
+    // setValue is stable; listing `reference` would re-run this on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, currentUser]);
 
   useEffect(() => {
@@ -110,13 +128,13 @@ export function PodScanDialog({
       const dataUrl = c.toDataURL("image/png");
       return `sig:${simpleHash(dataUrl).toString(16)}`;
     }
-    return reference.trim() || null;
+    return reference.value.trim() || null;
   };
 
   const canSubmit =
     scannedBy.trim().length > 0 &&
     !busy &&
-    (method === "Confirm" || method === "Signature" || reference.trim().length > 0);
+    (method === "Confirm" || method === "Signature" || reference.value.trim().length > 0);
 
   return (
     <>
@@ -215,8 +233,11 @@ export function PodScanDialog({
                     <input
                       type="text"
                       autoFocus
-                      value={reference}
-                      onChange={(e) => setReference(e.target.value)}
+                      value={reference.value}
+                      onChange={reference.onChange}
+                      onKeyDown={reference.onKeyDown}
+                      spellCheck={false}
+                      autoComplete="off"
                       placeholder={method === "Barcode" ? "Focus here, scan with USB scanner / camera" : "Type SKU or reference code"}
                       className={cn(
                         "w-full rounded-lg border border-[var(--color-ink-100)] bg-[var(--color-surface)] py-2 pr-3 text-[13px] text-[var(--color-ink-900)] focus:border-[var(--color-brand-500)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/20",
@@ -227,7 +248,8 @@ export function PodScanDialog({
                   </div>
                   {method === "Barcode" && (
                     <p className="mt-1 text-[10.5px] text-[var(--color-ink-400)]">
-                      Compatible with USB barcode scanners (sends Enter on read).
+                      Works with any USB barcode scanner, whether the keyboard is
+                      set to Thai or English. Check the code, then Confirm POD.
                       Mobile: open camera in your browser&apos;s default scanner
                       app and copy into this field.
                     </p>

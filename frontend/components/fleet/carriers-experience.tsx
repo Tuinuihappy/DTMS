@@ -233,8 +233,8 @@ function Inner() {
           <DataTableShell>
             <DataTableHead>
               <TableTh>Code</TableTh>
-              <TableTh>Type</TableTh>
               <TableTh>Name</TableTh>
+              <TableTh>Type</TableTh>
               <TableTh>Status</TableTh>
               <TableTh>Last seen</TableTh>
               <TableTh align="right">{""}</TableTh>
@@ -248,13 +248,13 @@ function Inner() {
                     </span>
                   </TableTd>
                   <TableTd>
-                    <span className="font-mono text-[11.5px] text-[var(--color-ink-600)]">
-                      {c.carrierTypeCode}
+                    <span className="text-[12.5px] text-[var(--color-ink-800)]">
+                      {c.displayName ?? "—"}
                     </span>
                   </TableTd>
                   <TableTd>
-                    <span className="text-[12.5px] text-[var(--color-ink-800)]">
-                      {c.displayName ?? "—"}
+                    <span className="font-mono text-[11.5px] text-[var(--color-ink-600)]">
+                      {c.carrierTypeCode}
                     </span>
                   </TableTd>
                   <TableTd>

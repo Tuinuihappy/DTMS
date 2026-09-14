@@ -1,6 +1,7 @@
 "use client";
 
-import { Download, Loader2, Printer, QrCode } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Printer, QrCode } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PermissionGuard } from "@/components/auth/permission-guard";
 import { TableEmptyState } from "@/components/primitives/data-table/table-empty-state";
@@ -11,7 +12,7 @@ import {
 } from "@/lib/api/fleet-carrier-types";
 import { getCarriers, type Carrier, type CarrierStatus } from "@/lib/api/fleet-carriers";
 import { Permissions } from "@/lib/auth/permissions";
-import { carrierQrSvg, downloadSvg } from "@/lib/qr";
+import { carrierLabelSvg, carrierQrSvg, downloadSvg } from "@/lib/qr";
 import { cn } from "@/lib/utils";
 
 const STATUSES: CarrierStatus[] = ["Available", "InUse", "Maintenance", "Retired"];
@@ -83,36 +84,47 @@ function Inner() {
   return (
     <div className="space-y-5">
       {/* ── header + controls: excluded from print by the sheet-scoped rules ── */}
-      <div className="carrier-label-chrome flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--color-brand-500)] to-[var(--color-brand-600)] text-white">
-            <QrCode className="h-5 w-5" strokeWidth={2.2} />
-          </span>
-          <div>
-            <h1 className="font-display text-[22px] font-semibold text-[var(--color-ink-900)]">
-              Carrier labels
-            </h1>
-            <p className="text-[12.5px] text-[var(--color-ink-500)]">
-              Print QR stickers for the shelves themselves.
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => window.print()}
-          disabled={rows.length === 0}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.06em] transition-all",
-            rows.length === 0
-              ? "cursor-not-allowed bg-[var(--color-ink-100)] text-[var(--color-ink-400)] dark:bg-white/[0.04]"
-              : "bg-[var(--color-brand-500)] text-white hover:shadow-[0_14px_36px_-12px_rgba(59,130,246,0.5)]",
-          )}
+      <header className="carrier-label-chrome space-y-2">
+        {/* Same back-link idiom as the admin detail pages. The rail has no
+            entry for this page, so without it the only way back is the browser. */}
+        <Link
+          href="/fleet/carriers"
+          className="inline-flex items-center gap-1 text-[11.5px] text-[var(--color-ink-500)] hover:text-[var(--color-ink-700)]"
         >
-          <Printer className="h-3.5 w-3.5" strokeWidth={2.4} />
-          Print sheet
-        </button>
-      </div>
+          <ArrowLeft className="h-3 w-3" strokeWidth={2.2} />
+          All carriers
+        </Link>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--color-brand-500)] to-[var(--color-brand-600)] text-white">
+              <QrCode className="h-5 w-5" strokeWidth={2.2} />
+            </span>
+            <div>
+              <h1 className="font-display text-[22px] font-semibold text-[var(--color-ink-900)]">
+                Carrier labels
+              </h1>
+              <p className="text-[12.5px] text-[var(--color-ink-500)]">
+                Print QR stickers for the shelves themselves.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => window.print()}
+            disabled={rows.length === 0}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.06em] transition-all",
+              rows.length === 0
+                ? "cursor-not-allowed bg-[var(--color-ink-100)] text-[var(--color-ink-400)] dark:bg-white/[0.04]"
+                : "bg-[var(--color-brand-500)] text-white hover:shadow-[0_14px_36px_-12px_rgba(59,130,246,0.5)]",
+            )}
+          >
+            <Printer className="h-3.5 w-3.5" strokeWidth={2.4} />
+            Print sheet
+          </button>
+        </div>
+      </header>
 
       <GlassCard className="carrier-label-chrome flex flex-wrap items-center gap-2 px-4 py-3">
         <select
@@ -217,7 +229,15 @@ function LabelCard({ carrier }: { carrier: Carrier }) {
       <button
         type="button"
         disabled={!svg}
-        onClick={() => svg && downloadSvg(`${carrier.carrierCode}.svg`, svg)}
+        onClick={() =>
+          svg &&
+          downloadSvg(
+            `${carrier.carrierCode}.svg`,
+            // The whole card, not just the QR — a bare square with no code under
+            // it is no use once it has been printed and stuck to a shelf.
+            carrierLabelSvg(svg, carrier.carrierCode, carrier.displayName),
+          )
+        }
         title="Download SVG"
         aria-label={`Download label for ${carrier.carrierCode}`}
         className="carrier-label-chrome absolute right-2 top-2 rounded-full bg-[var(--color-ink-100)] p-1.5 text-[var(--color-ink-600)] opacity-0 transition-opacity hover:bg-[var(--color-ink-200)] focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed"

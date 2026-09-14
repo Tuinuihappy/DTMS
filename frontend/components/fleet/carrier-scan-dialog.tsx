@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { getCarrier, type Carrier } from "@/lib/api/fleet-carriers";
+import { useWedgeScanner } from "@/lib/hooks/use-wedge-scanner";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,8 +18,11 @@ import { cn } from "@/lib/utils";
  * taken while some other input has focus silently lands its code in that input.
  * A modal owns focus for as long as it is open, which removes both.
  *
- * The Enter handler still calls preventDefault/stopPropagation: the modal is
- * the reason those are enough, not a reason to skip them.
+ * Reading the scanner itself — a Thai keyboard layout turning the code into
+ * Thai, and handhelds that never send Enter — is handled by useWedgeScanner.
+ * A finished scan only looks the carrier up and shows it; picking it still
+ * takes the "Use this carrier" click, so a wrong sticker is caught before it
+ * is applied.
  */
 
 /** Mirrors Carrier.NormalizeAndValidateCode on the server. Checked here first so
@@ -52,17 +56,8 @@ export function CarrierScanDialog({
    *  the page loaded. */
   knownCarriers?: Carrier[];
 }) {
-  const [value, setValue] = useState("");
   const [state, setState] = useState<Resolution>({ kind: "idle" });
   const lastScan = useRef<{ code: string; at: number } | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setValue("");
-    setState({ kind: "idle" });
-    lastScan.current = null;
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -147,6 +142,25 @@ export function CarrierScanDialog({
     [knownCarriers],
   );
 
+  const scanner = useWedgeScanner({
+    enabled: true,
+    onScan: (code) => {
+      void resolve(code);
+      // Clear straight away so the next scan starts from an empty box rather
+      // than being appended to this one.
+      scanner.setValue("");
+    },
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    scanner.setValue("");
+    setState({ kind: "idle" });
+    lastScan.current = null;
+    // setValue is stable; listing `scanner` would re-run this on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   const found = state.kind === "found" ? state.carrier : null;
 
   return (
@@ -202,19 +216,10 @@ export function CarrierScanDialog({
                       strokeWidth={2.4}
                     />
                     <input
-                      ref={inputRef}
                       autoFocus
-                      value={value}
-                      onChange={(e) => setValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key !== "Enter") return;
-                        // The scanner's trailing Enter must never reach a form
-                        // behind this dialog.
-                        e.preventDefault();
-                        e.stopPropagation();
-                        void resolve(value);
-                        setValue("");
-                      }}
+                      value={scanner.value}
+                      onChange={scanner.onChange}
+                      onKeyDown={scanner.onKeyDown}
                       placeholder="Scan the sticker, or type the code"
                       spellCheck={false}
                       autoComplete="off"
@@ -222,7 +227,8 @@ export function CarrierScanDialog({
                     />
                   </div>
                   <span className="mt-1 block text-[10.5px] text-[var(--color-ink-400)]">
-                    Works with any USB barcode scanner that sends Enter on read.
+                    Works with any USB barcode scanner, with or without Enter, and
+                    whether the keyboard is set to Thai or English.
                   </span>
                 </label>
 
