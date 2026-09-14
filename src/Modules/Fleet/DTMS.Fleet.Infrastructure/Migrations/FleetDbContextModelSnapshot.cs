@@ -102,10 +102,6 @@ namespace DTMS.Fleet.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Barcode")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
                     b.Property<string>("CarrierCode")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -171,10 +167,6 @@ namespace DTMS.Fleet.Infrastructure.Migrations
                         .HasColumnName("xmin");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Barcode")
-                        .IsUnique()
-                        .HasFilter("\"Barcode\" IS NOT NULL");
 
                     b.HasIndex("CarrierCode")
                         .IsUnique();

@@ -14,7 +14,7 @@ namespace Fleet.UnitTests;
 public class CarrierTests
 {
     private static Carrier NewCarrier(string code = "cart-0001")
-        => new(code, Guid.NewGuid(), barcode: null, displayName: null,
+        => new(code, Guid.NewGuid(), displayName: null,
                currentLocationCode: null, commissionedAt: null, createdBy: "tester");
 
     // ── code normalization + charset ────────────────────────────────────────
@@ -64,7 +64,7 @@ public class CarrierTests
     [Fact]
     public void Register_WithLocation_StampsLastSeenSoTheLocationIsDatable()
     {
-        var carrier = new Carrier("CART-1", Guid.NewGuid(), null, null,
+        var carrier = new Carrier("CART-1", Guid.NewGuid(), displayName: null,
             currentLocationCode: "DOCK-A", commissionedAt: null, createdBy: "tester");
 
         carrier.CurrentLocationCode.Should().Be("DOCK-A");

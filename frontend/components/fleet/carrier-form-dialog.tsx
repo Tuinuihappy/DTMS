@@ -34,7 +34,6 @@ export function CarrierFormDialog({
 
   const [code, setCode] = useState("");
   const [carrierTypeCode, setCarrierTypeCode] = useState("");
-  const [barcode, setBarcode] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [location, setLocation] = useState("");
   const [commissionedAt, setCommissionedAt] = useState("");
@@ -45,7 +44,6 @@ export function CarrierFormDialog({
     if (open) {
       setCode(carrier?.carrierCode ?? "");
       setCarrierTypeCode(carrier?.carrierTypeCode ?? carrierTypes[0]?.code ?? "");
-      setBarcode(carrier?.barcode ?? "");
       setDisplayName(carrier?.displayName ?? "");
       setLocation(carrier?.currentLocationCode ?? "");
       setCommissionedAt(toDateInput(carrier?.commissionedAt ?? null));
@@ -71,7 +69,6 @@ export function CarrierFormDialog({
         // that moving a carrier always stamps LastSeenAt.
         await updateCarrier(carrier.carrierCode, {
           carrierTypeCode,
-          barcode: barcode.trim() || null,
           displayName: displayName.trim() || null,
           commissionedAt: commissioned,
         });
@@ -79,7 +76,6 @@ export function CarrierFormDialog({
         await createCarrier({
           carrierCode: code.trim(),
           carrierTypeCode,
-          barcode: barcode.trim() || null,
           displayName: displayName.trim() || null,
           currentLocationCode: location.trim() || null,
           commissionedAt: commissioned,
@@ -182,28 +178,18 @@ export function CarrierFormDialog({
                   />
                 </Field>
 
-                <div className="flex gap-3">
-                  <Field label="Barcode" className="flex-1">
+                {/* Only on register. Editing a location goes through the
+                    move action so LastSeenAt is always stamped with it. */}
+                {!isEdit && (
+                  <Field label="Location">
                     <input
-                      value={barcode}
-                      onChange={(e) => setBarcode(e.target.value)}
-                      placeholder="optional, if different from code"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="optional"
                       className={inputCls}
                     />
                   </Field>
-                  {/* Only on register. Editing a location goes through the
-                      move action so LastSeenAt is always stamped with it. */}
-                  {!isEdit && (
-                    <Field label="Location" className="flex-1">
-                      <input
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        placeholder="optional"
-                        className={inputCls}
-                      />
-                    </Field>
-                  )}
-                </div>
+                )}
 
                 <Field label="In service since">
                   <input

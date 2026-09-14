@@ -10,7 +10,6 @@ export type Carrier = {
   id: string;
   carrierCode: string;
   carrierTypeCode: string;
-  barcode: string | null;
   displayName: string | null;
   status: CarrierStatus;
   maintenanceReason: string | null;
@@ -74,11 +73,31 @@ export async function getCarriers(
 export type CreateCarrierInput = {
   carrierCode: string;
   carrierTypeCode: string;
-  barcode?: string | null;
   displayName?: string | null;
   currentLocationCode?: string | null;
   commissionedAt?: string | null;
 };
+
+/**
+ * One carrier by code. Exact match on a unique index, so this is the lookup a
+ * scan resolves through — `getCarriers({ q })` is a substring ILIKE and would
+ * happily return CART-10 and CART-100 for a scan of CART-1.
+ *
+ * Returns null on 404 rather than throwing: "no carrier with that code" is an
+ * ordinary outcome of scanning, not an error condition.
+ */
+export async function getCarrier(
+  code: string,
+  signal?: AbortSignal,
+): Promise<Carrier | null> {
+  const res = await fetch(`/api/fleet/carriers/${encodeURIComponent(code)}`, {
+    cache: "no-store",
+    signal,
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
 
 export async function createCarrier(input: CreateCarrierInput): Promise<string> {
   const res = await fetch("/api/fleet/carriers", {
@@ -109,7 +128,6 @@ async function send(path: string, method: "PUT" | "POST" | "DELETE", body?: unkn
 
 export type UpdateCarrierInput = {
   carrierTypeCode: string;
-  barcode?: string | null;
   displayName?: string | null;
   commissionedAt?: string | null;
 };

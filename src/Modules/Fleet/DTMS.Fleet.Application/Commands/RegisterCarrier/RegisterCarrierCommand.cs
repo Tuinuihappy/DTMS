@@ -15,7 +15,6 @@ namespace DTMS.Fleet.Application.Commands.RegisterCarrier;
 public record RegisterCarrierCommand(
     string CarrierCode,
     string CarrierTypeCode,
-    string? Barcode = null,
     string? DisplayName = null,
     string? CurrentLocationCode = null,
     DateTime? CommissionedAt = null) : ICommand<Guid>;
@@ -65,14 +64,9 @@ internal sealed class RegisterCarrierCommandHandler : ICommandHandler<RegisterCa
         if (await _carriers.CodeExistsAsync(code, cancellationToken))
             return Result<Guid>.Failure($"Carrier '{code}' already exists.");
 
-        if (!string.IsNullOrWhiteSpace(request.Barcode)
-            && await _carriers.BarcodeExistsAsync(request.Barcode, null, cancellationToken))
-            return Result<Guid>.Failure($"Barcode '{request.Barcode.Trim()}' is already assigned to another carrier.");
-
         var carrier = new Carrier(
             code,
             carrierType.Id,
-            request.Barcode,
             request.DisplayName,
             request.CurrentLocationCode,
             request.CommissionedAt,

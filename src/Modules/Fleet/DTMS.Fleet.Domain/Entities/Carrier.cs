@@ -34,9 +34,6 @@ public class Carrier : AggregateRoot<Guid>
     public string CarrierCode { get; private set; } = string.Empty;
     public Guid CarrierTypeId { get; private set; }
 
-    /// <summary>Scan tag when it differs from <see cref="CarrierCode"/>. Unique
-    /// when present; many carriers may have none.</summary>
-    public string? Barcode { get; private set; }
     public string? DisplayName { get; private set; }
 
     public CarrierStatus Status { get; private set; }
@@ -77,7 +74,6 @@ public class Carrier : AggregateRoot<Guid>
     public Carrier(
         string carrierCode,
         Guid carrierTypeId,
-        string? barcode,
         string? displayName,
         string? currentLocationCode,
         DateTime? commissionedAt,
@@ -89,7 +85,6 @@ public class Carrier : AggregateRoot<Guid>
             ? carrierTypeId
             : throw new ArgumentException("CarrierTypeId must not be empty.", nameof(carrierTypeId));
 
-        Barcode = Trimmed(barcode);
         DisplayName = Trimmed(displayName);
         CommissionedAt = commissionedAt;
 
@@ -127,7 +122,7 @@ public class Carrier : AggregateRoot<Guid>
     /// <summary>Editable metadata. The code itself is immutable — see ADR-019:
     /// codes are unique forever so history can never become ambiguous, which a
     /// rename would defeat just as surely as reuse would.</summary>
-    public void Update(Guid carrierTypeId, string? barcode, string? displayName,
+    public void Update(Guid carrierTypeId, string? displayName,
         DateTime? commissionedAt, string? modifiedBy)
     {
         if (Status == CarrierStatus.InUse)
@@ -136,7 +131,6 @@ public class Carrier : AggregateRoot<Guid>
             throw new ArgumentException("CarrierTypeId must not be empty.", nameof(carrierTypeId));
 
         CarrierTypeId = carrierTypeId;
-        Barcode = Trimmed(barcode);
         DisplayName = Trimmed(displayName);
         CommissionedAt = commissionedAt;
         Touch(modifiedBy);

@@ -129,7 +129,7 @@ public class ExceptionHandlingMiddlewareTests
         var nested = new DbUpdateException(
             "An error occurred while saving the entity changes.",
             new InvalidOperationException("retry wrapper",
-                UniqueViolationInner("duplicate key value violates unique constraint \"IX_Carriers_Barcode\"")));
+                UniqueViolationInner("duplicate key value violates unique constraint \"IX_Carriers_CarrierCode\"")));
 
         var body = await RunWith(nested);
 

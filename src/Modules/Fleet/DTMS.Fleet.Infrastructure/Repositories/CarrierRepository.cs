@@ -21,14 +21,6 @@ public class CarrierRepository : ICarrierRepository
     public Task<bool> CodeExistsAsync(string carrierCode, CancellationToken ct = default)
         => _db.Carriers.AnyAsync(c => c.CarrierCode == carrierCode.Trim().ToUpperInvariant(), ct);
 
-    public Task<bool> BarcodeExistsAsync(string barcode, Guid? excludeId = null, CancellationToken ct = default)
-    {
-        var trimmed = barcode.Trim();
-        var q = _db.Carriers.Where(c => c.Barcode == trimmed);
-        if (excludeId.HasValue) q = q.Where(c => c.Id != excludeId.Value);
-        return q.AnyAsync(ct);
-    }
-
     public async Task<(IReadOnlyList<Carrier> Rows, int TotalCount)> SearchAsync(
         CarrierStatus? status,
         Guid? carrierTypeId,
@@ -52,8 +44,7 @@ public class CarrierRepository : ICarrierRepository
             var pattern = $"%{query.Trim()}%";
             filtered = filtered.Where(c =>
                 EF.Functions.ILike(c.CarrierCode, pattern) ||
-                (c.DisplayName != null && EF.Functions.ILike(c.DisplayName, pattern)) ||
-                (c.Barcode != null && EF.Functions.ILike(c.Barcode, pattern)));
+                (c.DisplayName != null && EF.Functions.ILike(c.DisplayName, pattern)));
         }
 
         var totalCount = await filtered.CountAsync(ct);

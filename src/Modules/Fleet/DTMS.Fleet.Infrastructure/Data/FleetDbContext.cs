@@ -140,9 +140,6 @@ public class FleetDbContext : DbContext
             // no history at all can be deleted — see Carrier.CanDelete.
             b.HasIndex(c => c.CarrierCode).IsUnique();
 
-            b.Property(c => c.Barcode).HasMaxLength(100);
-            b.HasIndex(c => c.Barcode).IsUnique().HasFilter("\"Barcode\" IS NOT NULL");
-
             b.Property(c => c.DisplayName).HasMaxLength(200);
             b.Property(c => c.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.Property(c => c.MaintenanceReason).HasMaxLength(500);

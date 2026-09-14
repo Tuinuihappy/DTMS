@@ -1,6 +1,7 @@
 "use client";
 
-import { Loader2, Plus, Truck } from "lucide-react";
+import { Loader2, Plus, QrCode, ScanLine, Truck } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { PermissionGuard } from "@/components/auth/permission-guard";
@@ -26,6 +27,7 @@ import { CarrierFormDialog } from "./carrier-form-dialog";
 import { PhotosDialog, type PhotosTarget } from "@/components/attachments/photos-dialog";
 import { CarrierMaintenancePanel } from "./carrier-maintenance-panel";
 import { CarrierRowMenu } from "./carrier-row-menu";
+import { CarrierScanDialog } from "./carrier-scan-dialog";
 
 const STATUSES: CarrierStatus[] = ["Available", "InUse", "Maintenance", "Retired"];
 
@@ -63,6 +65,7 @@ function Inner() {
   const [actionCarrier, setActionCarrier] = useState<Carrier | null>(null);
   const [historyCode, setHistoryCode] = useState<string | null>(null);
   const [photos, setPhotos] = useState<PhotosTarget | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
 
   const refresh = useCallback(
     (signal?: AbortSignal) => {
@@ -126,6 +129,13 @@ function Inner() {
             Racks and carts — what exists, what state each is in, where it was last seen.
           </p>
         </div>
+        <Link
+          href="/fleet/carriers/labels"
+          className={cn(secondaryBtn, "h-8 gap-1.5 px-3 text-[11.5px]")}
+        >
+          <QrCode className="h-3.5 w-3.5" strokeWidth={2.4} />
+          Labels
+        </Link>
         {canWrite && (
           <button
             type="button"
@@ -178,11 +188,23 @@ function Inner() {
           <input
             value={searchDraft}
             onChange={(e) => setSearchDraft(e.target.value)}
-            placeholder="Search code, name or barcode…"
+            placeholder="Search code or name…"
             className={cn(inputCls, "min-w-[200px] flex-1")}
           />
           <button type="submit" className={secondaryBtn}>
             Search
+          </button>
+          {/* Scanning opens a modal rather than feeding this input directly: a
+              wedge scanner ends every read with Enter, which in here would
+              submit the filter form mid-scan. */}
+          <button
+            type="button"
+            onClick={() => setScanOpen(true)}
+            className={cn(secondaryBtn, "gap-1.5 px-3")}
+            title="Scan a carrier label"
+          >
+            <ScanLine className="h-3.5 w-3.5" strokeWidth={2.4} />
+            Scan
           </button>
         </form>
       </GlassCard>
@@ -224,11 +246,6 @@ function Inner() {
                     <span className="font-mono text-[12.5px] font-semibold text-[var(--color-ink-900)]">
                       {c.carrierCode}
                     </span>
-                    {c.barcode && (
-                      <div className="mt-0.5 font-mono text-[10.5px] text-[var(--color-ink-500)]">
-                        {c.barcode}
-                      </div>
-                    )}
                   </TableTd>
                   <TableTd>
                     <span className="font-mono text-[11.5px] text-[var(--color-ink-600)]">
@@ -323,6 +340,19 @@ function Inner() {
       />
 
       <PhotosDialog target={photos} canEdit={canWrite} onClose={() => setPhotos(null)} />
+
+      {/* A scan here narrows the registry to the carrier that was scanned —
+          the rows already on screen serve as the local resolve map, so a hit
+          costs no network at all. */}
+      <CarrierScanDialog
+        open={scanOpen}
+        onClose={() => setScanOpen(false)}
+        knownCarriers={rows}
+        onPicked={(c) => {
+          setSearchDraft(c.carrierCode);
+          applyFilter(() => setSearch(c.carrierCode));
+        }}
+      />
     </div>
   );
 }

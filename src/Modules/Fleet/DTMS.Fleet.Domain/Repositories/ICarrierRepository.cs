@@ -13,10 +13,6 @@ public interface ICarrierRepository
     /// guarantee (surfaced as 409 by ExceptionHandlingMiddleware).</summary>
     Task<bool> CodeExistsAsync(string carrierCode, CancellationToken ct = default);
 
-    /// <summary>Same caveat as <see cref="CodeExistsAsync"/>. <paramref name="excludeId"/>
-    /// lets an edit ignore the row being edited.</summary>
-    Task<bool> BarcodeExistsAsync(string barcode, Guid? excludeId = null, CancellationToken ct = default);
-
     /// <summary>
     /// Filtered page of carriers plus the total matching count.
     /// Ordered by <c>CarrierCode</c> — without a deterministic ORDER BY,

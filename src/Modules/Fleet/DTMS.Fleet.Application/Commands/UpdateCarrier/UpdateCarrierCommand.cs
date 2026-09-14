@@ -13,7 +13,6 @@ namespace DTMS.Fleet.Application.Commands.UpdateCarrier;
 public record UpdateCarrierCommand(
     string CarrierCode,
     string CarrierTypeCode,
-    string? Barcode = null,
     string? DisplayName = null,
     DateTime? CommissionedAt = null) : ICommand;
 
@@ -46,15 +45,9 @@ internal sealed class UpdateCarrierCommandHandler : ICommandHandler<UpdateCarrie
         if (carrierType is null)
             return Result.Failure($"CarrierType '{request.CarrierTypeCode.Trim().ToUpperInvariant()}' not found.");
 
-        // Names the offending field; the unique index is what actually
-        // guarantees it, surfaced as 409 if someone wins the race.
-        if (!string.IsNullOrWhiteSpace(request.Barcode)
-            && await _carriers.BarcodeExistsAsync(request.Barcode, carrier.Id, cancellationToken))
-            return Result.Failure($"Barcode '{request.Barcode.Trim()}' is already assigned to another carrier.");
-
         try
         {
-            carrier.Update(carrierType.Id, request.Barcode, request.DisplayName,
+            carrier.Update(carrierType.Id, request.DisplayName,
                 request.CommissionedAt, ActorName.Of(_actor));
         }
         catch (InvalidOperationException ex) { return Result.Failure(ex.Message); }

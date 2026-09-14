@@ -21,7 +21,7 @@ using Microsoft.AspNetCore.Routing;
 namespace DTMS.Fleet.Presentation;
 
 public record UpdateCarrierRequest(
-    string CarrierTypeCode, string? Barcode = null, string? DisplayName = null,
+    string CarrierTypeCode, string? DisplayName = null,
     DateTime? CommissionedAt = null);
 public record MoveCarrierRequest(string? CurrentLocationCode);
 public record SetCarrierMaintenanceRequest(string Reason);
@@ -86,7 +86,7 @@ public static class CarrierEndpoints
             string code, [FromBody] UpdateCarrierRequest body, ISender sender) =>
         {
             var result = await sender.Send(new UpdateCarrierCommand(
-                code, body.CarrierTypeCode, body.Barcode, body.DisplayName, body.CommissionedAt));
+                code, body.CarrierTypeCode, body.DisplayName, body.CommissionedAt));
             return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
         }).RequirePermission(Permissions.Fleet.CarrierWrite);
 

@@ -568,3 +568,61 @@ main,
     transition-duration: 0.001ms !important;
   }
 }
+
+/* =========================================================================
+   Print — carrier label sheet ONLY
+   =========================================================================
+   Every rule below is scoped to a page that contains .carrier-label-sheet.
+   globals.css loads on every route, so an unscoped @media print block would
+   silently restyle printing for the whole app — someone printing an order or a
+   trip would get a layout designed for stickers, and nobody would guess why.
+
+   If you add a rule here, it MUST start from `body:has(.carrier-label-sheet)`
+   or a `.carrier-label-*` class. No exceptions.
+   ========================================================================= */
+@media print {
+  /* Fixed chrome, page padding and the sheet's own controls: all off. */
+  body:has(.carrier-label-sheet) nav,
+  body:has(.carrier-label-sheet) aside,
+  body:has(.carrier-label-sheet) header,
+  body:has(.carrier-label-chrome) .carrier-label-chrome {
+    display: none !important;
+  }
+
+  body:has(.carrier-label-sheet) main {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* The app ships glass surfaces, blur and a dark theme. A printer renders all
+     three as grey mush, so the sheet forces plain black on white regardless of
+     which theme the operator happens to be using. */
+  body:has(.carrier-label-sheet),
+  body:has(.carrier-label-sheet) * {
+    background: #fff !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .carrier-label-sheet {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 6mm !important;
+  }
+
+  /* A label split across a page boundary is a wasted sticker. */
+  .carrier-label-card {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    border: 1px solid #d4d4d4 !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+}

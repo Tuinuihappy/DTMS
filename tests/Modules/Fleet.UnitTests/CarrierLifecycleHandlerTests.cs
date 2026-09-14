@@ -188,7 +188,7 @@ public class CarrierLifecycleHandlerTests
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private static Carrier NewCarrier()
-        => new(Code, Guid.NewGuid(), null, null, null, null, "tester");
+        => new(Code, Guid.NewGuid(), null, null, null, "tester");
 
     private static ReturnCarrierToServiceCommandHandler Handler(
         ICarrierRepository carriers, ICarrierMaintenanceLogRepository logs, ICurrentActorContext actor)

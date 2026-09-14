@@ -235,6 +235,16 @@ The `❄` columns are snapshots frozen at write time, following `Trip.PickupLoca
 >
 > Carriers also carry `CreatedAt`/`CreatedBy`/`ModifiedAt`/`ModifiedBy` like `ActionTemplate`, the closest existing admin-managed catalogue, and `CommissionedAt` is nullable and backdatable — the date the cart entered service, distinct from when its row was created.
 
+> **Amended again (2026-09-11) — `Carriers.Barcode` is gone.** The sketch above lists `Barcode` and `UNIQUE(Barcode) WHERE NOT NULL`; migration `20260911100000_DropCarrierBarcode` removes both.
+>
+> The column was specified as "the scan tag when it differs from `CarrierCode`". In the live database every carrier had it set to exactly its own `CarrierCode` — a field whose entire purpose was to hold a *different* value, holding the same one, every time. That is what a second identifier box on a form invites, and it would have kept happening.
+>
+> Nothing read it either: there was no `GetByBarcodeAsync`, and its only consumers were a uniqueness guard protecting the column from itself plus one `ILIKE` clause in the registry search.
+>
+> It was also about to cost something real. Printing QR labels means a scanned string has to resolve to exactly one carrier. Two identifier spaces with no constraint between them let one carrier's `Barcode` equal another's `CarrierCode`, so the lookup would have needed precedence rules and fresh validation to stay unambiguous. With the column gone, scan-resolve *is* the existing `GET /carriers/{code}`.
+>
+> If a carrier ever arrives wearing a supplier label that cannot be removed, adopt that label **as** its `CarrierCode` — the charset (`[A-Z0-9._-]`, up to 50) covers most asset tags, and `CarrierCode` is already immutable and unique forever, which is exactly what a printed label needs. A mapping column only becomes necessary if such a tag falls outside that charset or is not unique, and that is the point at which to reintroduce one — with a reader.
+
 The two partial unique indexes carry the core invariants — a carrier belongs to at most one open trip, and an item sits on at most one carrier — enforced by Postgres rather than by application locking.
 
 ### Per-mode policy defaults
