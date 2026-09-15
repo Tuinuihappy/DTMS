@@ -16,7 +16,7 @@
     "@microsoft/signalr-protocol-msgpack": "^10.0.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.460.0",
-    "motion": "^11.13.1",
+    "motion": "^12.43.0",
     "next": "16.2.6",
     "next-themes": "^0.4.6",
     "qrcode": "^1.5.4",

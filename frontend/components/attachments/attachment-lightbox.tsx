@@ -3,7 +3,7 @@
 import { ImageOff, Loader2, Trash2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
-import { animateInJs, OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import {
   attachmentImageUrl,
   attachmentThumbnailUrl,
@@ -34,8 +34,6 @@ const SPINNER_DELAY_MS = 700;
  * - It is always mounted, backdrop included, so the backdrop fades in every
  *   time. A backdrop created in the same render that opens it starts at its
  *   end state and the page goes dark in one jump.
- * - Every fade runs in JS (animateInJs). On the Web Animations API,
- *   framer-motion 11 shows the starting value for one frame as a fade ends.
  * - Nothing is drawn until the picture's shape is known, so the frame appears
  *   once, at its final size, and the buttons under it never move.
  * - The sharp image is usually ready by the click, since hovering its thumbnail
@@ -238,9 +236,6 @@ function LightboxBody({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
       transition={{ type: "spring", stiffness: 340, damping: 30 }}
-      // Without this the photo and buttons blinked once as the entrance
-      // finished, and once more after the exit — see animateInJs.
-      onUpdate={animateInJs}
       className="pointer-events-auto flex max-h-full flex-col items-center gap-3"
     >
       {ratio !== null ? (
@@ -278,7 +273,6 @@ function LightboxBody({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.2 }}
-                  onUpdate={animateInJs}
                   className="absolute inset-0 h-full w-full object-cover"
                 />
               )}

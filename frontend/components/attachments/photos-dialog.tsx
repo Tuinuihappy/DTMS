@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { AttachmentGallery } from "@/components/attachments/attachment-gallery";
 import { AttachmentLightbox } from "@/components/attachments/attachment-lightbox";
 import { useAttachments } from "@/components/attachments/use-attachments";
-import { animateInJs, OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import type { Attachment, AttachmentOwner } from "@/lib/api/fleet-attachments";
 
 export type PhotosTarget = {
@@ -73,7 +73,6 @@ export function PhotosDialog({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
               transition={{ type: "spring", stiffness: 360, damping: 30 }}
-              onUpdate={animateInJs}
               className="pointer-events-auto relative w-full max-w-lg overflow-hidden rounded-[var(--radius-xl)] glass-strong"
             >
               <header className="flex items-start gap-3 px-6 pt-5">

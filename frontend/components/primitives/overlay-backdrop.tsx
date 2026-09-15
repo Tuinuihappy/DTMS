@@ -3,10 +3,6 @@
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 
-/** See the onUpdate comment below. Exported for other motion elements that
- *  fade opacity or transform and must not blink when the fade ends. */
-export const animateInJs = () => {};
-
 /**
  * Full-screen dimming backdrop for drawers and modal dialogs.
  *
@@ -53,13 +49,6 @@ export function OverlayBackdrop({
       initial={false}
       animate={{ opacity: open ? 1 : 0 }}
       transition={{ duration: 0.25 }}
-      // Keeps the fade off the Web Animations API. framer-motion 11 ends a WAAPI
-      // animation by cancelling it one frame before it writes the final value,
-      // so the backdrop showed its starting opacity for a frame at the end of
-      // every fade — a full-screen dark flash just after an overlay closed
-      // (measured frame by frame in Edge, 2026-09-15). An onUpdate handler is
-      // the library's own condition for animating in JS instead.
-      onUpdate={animateInJs}
       onClick={open ? onClick : undefined}
       aria-hidden={!open}
       className={cn("fixed inset-0", !open && "pointer-events-none", className)}
