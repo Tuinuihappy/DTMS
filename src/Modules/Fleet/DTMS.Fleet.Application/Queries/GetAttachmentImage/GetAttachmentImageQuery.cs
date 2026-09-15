@@ -31,10 +31,10 @@ public record GetAttachmentImageQuery(
 internal sealed class GetAttachmentImageQueryHandler
     : IQueryHandler<GetAttachmentImageQuery, string>
 {
-    // Minutes, not the hour GetAttachmentsQuery uses. This URL never reaches a
-    // browser: the frontend relay fetches it the instant it is issued and serves
-    // the bytes under an address of its own. Nothing is gained by leaving a
-    // capability valid for longer than that one request needs.
+    // Minutes. This URL never reaches a browser: the frontend relay fetches it
+    // the instant it is issued and serves the bytes under an address of its
+    // own. Nothing is gained by leaving a capability valid for longer than that
+    // one request needs.
     public static readonly TimeSpan UrlTtl = TimeSpan.FromMinutes(5);
 
     private readonly IAttachmentRepository _attachments;

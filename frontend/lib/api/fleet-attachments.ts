@@ -14,20 +14,16 @@ export type { AttachmentOwner };
  *  as a gap with nothing in it. */
 export type UploadPhase = "preparing" | "uploading";
 
+/** An image's details. No addresses: build them from the id with
+ *  attachmentThumbnailUrl and attachmentImageUrl, which stay stable and cache. */
 export type Attachment = {
   id: string;
-  /** Time-limited. Regenerated with a fresh timestamp on every list call, so a
-   *  browser treats each one as a new resource — hold them rather than
-   *  re-fetching per render. */
-  url: string;
-  thumbnailUrl: string | null;
   contentType: string;
   sizeBytes: number;
   originalFileName: string | null;
   caption: string | null;
   uploadedAt: string;
   uploadedBy: string;
-  expiresAt: string;
 };
 
 type PresignedTarget = {
@@ -69,7 +65,7 @@ export const deleteAttachment = (owner: AttachmentOwner, ownerId: string, id: st
   );
 
 /**
- * A thumbnail's address for an `<img>`. Unlike `Attachment.thumbnailUrl` it is
+ * A thumbnail's address for an `<img>`. Unlike a signed storage URL it is
  * stable: it names the image rather than a signature, so it stays the same on
  * every render and every list refresh, and the route behind it serves bytes
  * the browser may cache for good — an attachment's image never changes, a new

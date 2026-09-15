@@ -13,8 +13,8 @@ import { STORAGE_INTERNAL_ORIGIN, STORAGE_PROXY_PREFIX } from "@/lib/api/storage
  * host the signature names.
  *
  * Deliberately walks the whole payload rather than knowing the shape of the
- * four DTOs that carry these URLs today. Shape-aware rewriting is the version
- * that quietly stops working when someone adds a fifth field or a fifth route,
+ * DTOs that carry these URLs today. Shape-aware rewriting is the version
+ * that quietly stops working when someone adds another field or route,
  * and the failure would be an internal hostname reaching a browser — silent,
  * because nothing on the server ever sees the request that fails.
  *

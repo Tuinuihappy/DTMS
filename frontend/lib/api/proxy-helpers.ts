@@ -163,8 +163,8 @@ export async function proxyToBackend({
   }
 
   // Storage URLs are rewritten here, on every successful response, rather than
-  // being opted into per route. Four routes carry them today; the fifth one
-  // somebody adds without remembering would hand a browser a hostname only the
+  // being opted into per route. The next route to carry them, added by someone
+  // who does not remember this, would otherwise hand a browser a hostname only the
   // docker network can resolve, and the request would fail without reaching any
   // server that could log it. The string check keeps the cost off every other
   // payload — almost all of them.
