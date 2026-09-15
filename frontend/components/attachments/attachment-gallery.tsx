@@ -116,7 +116,7 @@ export function AttachmentGallery({
     setBusy(true);
     setError(null);
     try {
-      await deleteAttachment(a.id);
+      await deleteAttachment(owner, ownerId, a.id);
       const next = items.filter((x) => x.id !== a.id);
       setItems(next);
       onItemsChangedRef.current?.(next);

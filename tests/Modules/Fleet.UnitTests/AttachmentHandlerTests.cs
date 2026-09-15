@@ -6,6 +6,7 @@ using DTMS.Fleet.Domain.Entities;
 using DTMS.Fleet.Domain.Events;
 using DTMS.Fleet.Domain.Repositories;
 using DTMS.SharedKernel.Auth;
+using DTMS.SharedKernel.Messaging;
 using DTMS.SharedKernel.Storage;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -231,7 +232,7 @@ public class DeleteAttachmentHandlerTests
         _attachments.GetByIdAsync(attachment.Id, Arg.Any<CancellationToken>()).Returns(attachment);
 
         var sut = new DeleteAttachmentCommandHandler(_attachments);
-        var result = await sut.Handle(new DeleteAttachmentCommand(attachment.Id), default);
+        var result = await sut.Handle(CommandFor(attachment), default);
 
         result.IsSuccess.Should().BeTrue();
 
@@ -260,7 +261,7 @@ public class DeleteAttachmentHandlerTests
                     .Do(_ => hadEventAtRemoval = attachment.DomainEvents.Count > 0);
 
         var sut = new DeleteAttachmentCommandHandler(_attachments);
-        await sut.Handle(new DeleteAttachmentCommand(attachment.Id), default);
+        await sut.Handle(CommandFor(attachment), default);
 
         hadEventAtRemoval.Should().BeTrue();
     }
@@ -272,9 +273,50 @@ public class DeleteAttachmentHandlerTests
                     .Returns((Attachment?)null);
 
         var sut = new DeleteAttachmentCommandHandler(_attachments);
-        var result = await sut.Handle(new DeleteAttachmentCommand(Guid.NewGuid()), default);
+        var result = await sut.Handle(
+            new DeleteAttachmentCommand(AttachmentOwner.Carrier, Guid.NewGuid(), Guid.NewGuid()), default);
 
         result.IsFailure.Should().BeTrue();
         await _attachments.DidNotReceiveWithAnyArgs().SaveChangesAsync(default);
+    }
+
+    // The route is guarded by the named owner's write permission, so an image
+    // that belongs elsewhere must be refused before anything is marked or saved.
+    // Otherwise CarrierWrite on the carrier route could delete any image by id.
+    [Fact]
+    public async Task ImageOfAnotherOwnerOfTheSameKind_IsNotFound_AndChangesNothing()
+    {
+        var attachment = Existing();
+        _attachments.GetByIdAsync(attachment.Id, Arg.Any<CancellationToken>()).Returns(attachment);
+
+        var sut = new DeleteAttachmentCommandHandler(_attachments);
+        var result = await sut.Handle(
+            new DeleteAttachmentCommand(attachment.Owner, Guid.NewGuid(), attachment.Id), default);
+
+        ShouldHaveChangedNothing(result, attachment);
+    }
+
+    [Fact]
+    public async Task ImageOfAnotherOwnerKind_IsNotFound_AndChangesNothing()
+    {
+        var attachment = Existing();
+        _attachments.GetByIdAsync(attachment.Id, Arg.Any<CancellationToken>()).Returns(attachment);
+
+        var sut = new DeleteAttachmentCommandHandler(_attachments);
+        var result = await sut.Handle(
+            new DeleteAttachmentCommand(AttachmentOwner.CarrierType, attachment.OwnerId, attachment.Id), default);
+
+        ShouldHaveChangedNothing(result, attachment);
+    }
+
+    private static DeleteAttachmentCommand CommandFor(Attachment attachment) =>
+        new(attachment.Owner, attachment.OwnerId, attachment.Id);
+
+    private void ShouldHaveChangedNothing(Result result, Attachment attachment)
+    {
+        result.IsFailure.Should().BeTrue();
+        attachment.DomainEvents.Should().BeEmpty();
+        _attachments.DidNotReceiveWithAnyArgs().Remove(default!);
+        _attachments.DidNotReceiveWithAnyArgs().SaveChangesAsync(default);
     }
 }

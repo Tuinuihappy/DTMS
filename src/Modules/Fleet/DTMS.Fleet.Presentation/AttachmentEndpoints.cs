@@ -13,11 +13,12 @@ using Microsoft.AspNetCore.Routing;
 
 namespace DTMS.Fleet.Presentation;
 
-public record PresignAttachmentRequest(
-    string Owner, Guid OwnerId, string ContentType, bool WithThumbnail = true);
+/// <summary>The owner comes from the route, so the body carries only the upload.</summary>
+public record PresignAttachmentBody(string ContentType, bool WithThumbnail = true);
 
-public record ConfirmAttachmentRequest(
-    string Owner, Guid OwnerId, Guid UploadId, bool WithThumbnail = true,
+/// <summary>The owner comes from the route, so the body carries only the upload.</summary>
+public record ConfirmAttachmentBody(
+    Guid UploadId, bool WithThumbnail = true,
     string? OriginalFileName = null, string? Caption = null);
 
 /// <summary>
@@ -38,9 +39,16 @@ public static class AttachmentEndpoints
             .RequireAuthorization();
 
         // Read and write permissions differ per owner, and minimal APIs attach
-        // them per route, so each verb is registered once per owner kind rather
+        // them per route, so every route is registered once per owner kind rather
         // than resolved at runtime. Verbose, but the permission for a route is
         // then visible in the route table instead of buried in a switch.
+        //
+        // Every route here names its owner in the path. Upload and delete used to
+        // take the owner from the body or not at all, under one fixed CarrierWrite
+        // check for every kind — so editing a carrier type's photos demanded
+        // CarrierWrite, and CarrierWrite alone could delete them. Handlers that
+        // receive an owner refuse an image that is not that owner's, which is what
+        // keeps one kind's route from reaching another kind's pictures.
         foreach (var (owner, read, write) in OwnerPermissions())
         {
             var slug = OwnerSlug(owner);
@@ -57,10 +65,7 @@ public static class AttachmentEndpoints
             // A thumbnail by owner and id, answered with a redirect to a signed
             // URL. It is meant for the frontend relay, which fetches those bytes
             // and serves them under a stable address a browser can cache —
-            // image bytes for an id never change. Registered per owner so the
-            // owner's read permission sits in the route table like the list's;
-            // the handler refuses an id that is not this owner's, so this route
-            // cannot hand out another owner kind's picture.
+            // image bytes for an id never change.
             //
             // no-store on the redirect itself: the Location carries a signature
             // that expires in minutes, and a cached copy would outlive it.
@@ -73,51 +78,47 @@ public static class AttachmentEndpoints
             })
             .WithName($"GetFleetAttachmentThumbnail_{slug}")
             .RequirePermission(read);
+
+            group.MapPost($"/{slug}/{{ownerId:guid}}/presign", async (
+                Guid ownerId, [FromBody] PresignAttachmentBody body, ISender sender, CancellationToken ct) =>
+            {
+                var result = await sender.Send(new PresignAttachmentCommand(
+                    owner, ownerId, body.ContentType, body.WithThumbnail), ct);
+                return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+            })
+            .WithName($"PresignFleetAttachment_{slug}")
+            .WithSummary("Authorise one upload. Writes nothing until confirmed.")
+            .RequirePermission(write);
+
+            // Guarded by the owner being confirmed onto, not the one presigned
+            // for. Staging keys are not tied to an owner, so this check is what
+            // decides where the image may land.
+            group.MapPost($"/{slug}/{{ownerId:guid}}/confirm", async (
+                Guid ownerId, [FromBody] ConfirmAttachmentBody body, ISender sender, CancellationToken ct) =>
+            {
+                var result = await sender.Send(new ConfirmAttachmentCommand(
+                    owner, ownerId, body.UploadId, body.WithThumbnail,
+                    body.OriginalFileName, body.Caption), ct);
+
+                // No single-image GET exists, so the location is the owner's list.
+                return result.IsSuccess
+                    ? Results.Created($"/api/v1/fleet/attachments/{slug}/{ownerId}", result.Value)
+                    : Results.BadRequest(result.Error);
+            })
+            .WithName($"ConfirmFleetAttachment_{slug}")
+            .WithSummary("Record a completed upload, taking its size and type from storage.")
+            .RequirePermission(write);
+
+            group.MapDelete($"/{slug}/{{ownerId:guid}}/{{id:guid}}", async (
+                Guid ownerId, Guid id, ISender sender, CancellationToken ct) =>
+            {
+                var result = await sender.Send(new DeleteAttachmentCommand(owner, ownerId, id), ct);
+                return result.IsSuccess ? Results.NoContent() : Results.NotFound(result.Error);
+            })
+            .WithName($"DeleteFleetAttachment_{slug}")
+            .WithSummary("Remove an image; its bytes are cleared through the outbox.")
+            .RequirePermission(write);
         }
-
-        // Presign and confirm name their owner in the body, so one route each
-        // serves all three kinds — but that means the permission cannot be
-        // attached per route. Both require write on the owner, checked inside.
-        group.MapPost("/presign", async (
-            [FromBody] PresignAttachmentRequest body, ISender sender, CancellationToken ct) =>
-        {
-            if (!TryParseOwner(body.Owner, out var owner))
-                return Results.BadRequest($"Unknown owner '{body.Owner}'.");
-
-            var result = await sender.Send(new PresignAttachmentCommand(
-                owner, body.OwnerId, body.ContentType, body.WithThumbnail), ct);
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-        })
-        .WithName("PresignFleetAttachment")
-        .WithSummary("Authorise one upload. Writes nothing until confirmed.")
-        .RequirePermission(Permissions.Fleet.CarrierWrite);
-
-        group.MapPost("/confirm", async (
-            [FromBody] ConfirmAttachmentRequest body, ISender sender, CancellationToken ct) =>
-        {
-            if (!TryParseOwner(body.Owner, out var owner))
-                return Results.BadRequest($"Unknown owner '{body.Owner}'.");
-
-            var result = await sender.Send(new ConfirmAttachmentCommand(
-                owner, body.OwnerId, body.UploadId, body.WithThumbnail,
-                body.OriginalFileName, body.Caption), ct);
-
-            return result.IsSuccess
-                ? Results.Created($"/api/v1/fleet/attachments/{result.Value}", result.Value)
-                : Results.BadRequest(result.Error);
-        })
-        .WithName("ConfirmFleetAttachment")
-        .WithSummary("Record a completed upload, taking its size and type from storage.")
-        .RequirePermission(Permissions.Fleet.CarrierWrite);
-
-        group.MapDelete("/{id:guid}", async (Guid id, ISender sender, CancellationToken ct) =>
-        {
-            var result = await sender.Send(new DeleteAttachmentCommand(id), ct);
-            return result.IsSuccess ? Results.NoContent() : Results.NotFound(result.Error);
-        })
-        .WithName("DeleteFleetAttachment")
-        .WithSummary("Remove an image; its bytes are cleared through the outbox.")
-        .RequirePermission(Permissions.Fleet.CarrierWrite);
     }
 
     private static IEnumerable<(AttachmentOwner Owner, PermissionDefinition Read, PermissionDefinition Write)>
@@ -137,21 +138,4 @@ public static class AttachmentEndpoints
         AttachmentOwner.MaintenanceLog => "maintenance",
         _ => throw new ArgumentOutOfRangeException(nameof(owner), owner, "Unknown attachment owner.")
     };
-
-    private static bool TryParseOwner(string? value, out AttachmentOwner owner)
-    {
-        owner = default;
-        if (string.IsNullOrWhiteSpace(value)) return false;
-
-        foreach (var candidate in Enum.GetValues<AttachmentOwner>())
-        {
-            if (string.Equals(OwnerSlug(candidate), value, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(candidate.ToString(), value, StringComparison.OrdinalIgnoreCase))
-            {
-                owner = candidate;
-                return true;
-            }
-        }
-        return false;
-    }
 }

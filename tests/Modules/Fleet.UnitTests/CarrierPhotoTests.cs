@@ -1,6 +1,7 @@
 using DTMS.Fleet.Application.Queries.GetAttachmentThumbnail;
 using DTMS.Fleet.Application.Queries.GetCarrierByCode;
 using DTMS.Fleet.Application.Queries.GetCarriers;
+using DTMS.Fleet.Application.Queries.GetCarrierTypes;
 using DTMS.Fleet.Domain.Entities;
 using DTMS.Fleet.Domain.Enums;
 using DTMS.Fleet.Domain.Repositories;
@@ -151,6 +152,40 @@ public class CarrierListPhotoTests
 
         result.Value.CoverAttachmentId.Should().Be(cover);
         result.Value.PhotoCount.Should().Be(2);
+    }
+}
+
+public class CarrierTypeListPhotoTests
+{
+    private readonly ICarrierTypeRepository _types = Substitute.For<ICarrierTypeRepository>();
+    private readonly IAttachmentRepository _attachments = Substitute.For<IAttachmentRepository>();
+
+    // Same rule as the carriers page: one query for every type, and asked under
+    // the carrier-type owner — a carrier sharing a type's id must not lend it a photo.
+    [Fact]
+    public async Task List_LooksUpPhotosOnce_AsCarrierTypes_AndPutsEachCoverOnItsOwnRow()
+    {
+        var shelf = new CarrierType("SHELF", "Shelf", "LIFT");
+        var truck = new CarrierType("TRUCK", "Truck", "TOW");
+        var cover = Guid.NewGuid();
+        _types.GetAllAsync(Arg.Any<CancellationToken>()).Returns([shelf, truck]);
+        _attachments.GetSummariesForOwnersAsync(
+                Arg.Any<AttachmentOwner>(), Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyDictionary<Guid, AttachmentSummary>)
+                new Dictionary<Guid, AttachmentSummary> { [shelf.Id] = new(cover, 2) });
+
+        var result = await new GetCarrierTypesQueryHandler(_types, _attachments)
+            .Handle(new GetCarrierTypesQuery(), default);
+
+        await _attachments.Received(1).GetSummariesForOwnersAsync(
+            AttachmentOwner.CarrierType,
+            Arg.Is<IReadOnlyCollection<Guid>>(ids => ids.SequenceEqual(new[] { shelf.Id, truck.Id })),
+            Arg.Any<CancellationToken>());
+
+        result.Value.Single(r => r.Id == shelf.Id).Should().Match<CarrierTypeDto>(r =>
+            r.CoverAttachmentId == cover && r.PhotoCount == 2);
+        result.Value.Single(r => r.Id == truck.Id).Should().Match<CarrierTypeDto>(r =>
+            r.CoverAttachmentId == null && r.PhotoCount == 0);
     }
 }
 

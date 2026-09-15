@@ -19,6 +19,10 @@ export type CarrierTypeProfile = {
   maxWeightKg: number | null;
   maxSlots: number | null;
   description: string | null;
+  /** The newest photo's id, for attachmentThumbnailUrl. An id rather than a
+   *  URL so the address stays stable and the browser can cache it. */
+  coverAttachmentId: string | null;
+  photoCount: number;
 };
 
 async function getJson<T>(url: string): Promise<T> {

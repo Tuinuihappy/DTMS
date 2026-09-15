@@ -4,8 +4,9 @@
 // the small JSON calls pass through DTMS.
 
 import { compressImagePair } from "@/lib/image-compress";
+import type { AttachmentOwner } from "@/lib/api/attachment-owners";
 
-export type AttachmentOwner = "carrier" | "carrier-type" | "maintenance";
+export type { AttachmentOwner };
 
 /** Preparing happens before any request exists, so without this the UI would
  *  claim it was uploading while the browser was still resizing a 12 MP photo —
@@ -59,8 +60,13 @@ export const listAttachments = (owner: AttachmentOwner, ownerId: string, signal?
     { signal },
   );
 
-export const deleteAttachment = (id: string) =>
-  send<void>(`/api/fleet/attachments/${encodeURIComponent(id)}`, { method: "DELETE" });
+/** The owner is required: the backend checks write permission on that owner,
+ *  and refuses an image that is not its own. */
+export const deleteAttachment = (owner: AttachmentOwner, ownerId: string, id: string) =>
+  send<void>(
+    `/api/fleet/attachments/${encodeURIComponent(id)}?owner=${owner}&ownerId=${encodeURIComponent(ownerId)}`,
+    { method: "DELETE" },
+  );
 
 /**
  * A thumbnail's address for an `<img>`. Unlike `Attachment.thumbnailUrl` it is

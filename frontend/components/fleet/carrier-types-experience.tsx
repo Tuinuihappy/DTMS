@@ -2,6 +2,7 @@
 
 import { Boxes, Images, Loader2, Plus, Layers } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { PhotoCell } from "@/components/attachments/photo-cell";
 import { PhotosDialog, type PhotosTarget } from "@/components/attachments/photos-dialog";
 import { useAuth } from "@/components/auth/auth-provider";
 import { PermissionGuard } from "@/components/auth/permission-guard";
@@ -107,6 +108,7 @@ function Inner() {
               <DataTableShell>
                 <DataTableHead>
                   <TableTh>Code</TableTh>
+                  <TableTh className="w-14">Photo</TableTh>
                   <TableTh>Name</TableTh>
                   <TableTh>AMR capability</TableTh>
                   <TableTh align="right">Max weight</TableTh>
@@ -118,6 +120,25 @@ function Inner() {
                     <tr key={c.id} className="border-t border-white/40 dark:border-white/[0.05]">
                       <TableTd>
                         <span className="font-mono text-[12.5px] font-semibold text-[var(--color-ink-900)]">{c.code}</span>
+                      </TableTd>
+                      <TableTd className="py-2">
+                        <PhotoCell
+                          key={`${c.id}:${c.coverAttachmentId}`}
+                          owner="carrier-type"
+                          ownerId={c.id}
+                          label={c.code}
+                          coverAttachmentId={c.coverAttachmentId}
+                          photoCount={c.photoCount}
+                          canEdit={canWrite}
+                          onOpen={(focusAttachmentId) =>
+                            setPhotos({
+                              owner: "carrier-type",
+                              ownerId: c.id,
+                              label: c.code,
+                              focusAttachmentId,
+                            })
+                          }
+                        />
                       </TableTd>
                       <TableTd>
                         <div className="text-[12.5px] text-[var(--color-ink-800)]">{c.displayName}</div>
@@ -141,6 +162,8 @@ function Inner() {
                         </span>
                       </TableTd>
                       <TableTd align="right">
+                        {/* Kept beside the cell: the cell opens straight onto the
+                            cover, this opens the gallery to browse and manage. */}
                         <button
                           type="button"
                           onClick={() =>
@@ -167,7 +190,24 @@ function Inner() {
         onCreated={reloadCarriers}
       />
 
-      <PhotosDialog target={photos} canEdit={canWrite} onClose={() => setPhotos(null)} />
+      <PhotosDialog
+        target={photos}
+        canEdit={canWrite}
+        onClose={() => setPhotos(null)}
+        // Patch the one row from the gallery's own list rather than refetching,
+        // the same as the carriers page.
+        onItemsChanged={(list) => {
+          const ownerId = photos?.ownerId;
+          if (!ownerId) return;
+          setCarriers((rows) =>
+            rows.map((r) =>
+              r.id === ownerId
+                ? { ...r, coverAttachmentId: list[0]?.id ?? null, photoCount: list.length }
+                : r,
+            ),
+          );
+        }}
+      />
     </div>
   );
 }

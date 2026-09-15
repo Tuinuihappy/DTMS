@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 import { proxyToBackend } from "@/lib/api/proxy-helpers";
-
-const OWNERS = ["carrier", "carrier-type", "maintenance"] as const;
+import { isAttachmentOwner, isGuid, ownerPath } from "@/lib/api/attachment-owners";
 
 // The backend addresses a list as /attachments/{owner}/{ownerId} so each owner
 // kind can carry its own permission in the route table. Next cannot mirror that
@@ -12,14 +11,12 @@ export async function GET(req: NextRequest) {
   const owner = req.nextUrl.searchParams.get("owner");
   const ownerId = req.nextUrl.searchParams.get("ownerId");
 
-  if (!owner || !OWNERS.includes(owner as (typeof OWNERS)[number])) {
+  if (!isAttachmentOwner(owner)) {
     return Response.json({ message: `Unknown owner '${owner}'.` }, { status: 400 });
   }
-  if (!ownerId) {
-    return Response.json({ message: "ownerId is required." }, { status: 400 });
+  if (!isGuid(ownerId)) {
+    return Response.json({ message: "ownerId must be a GUID." }, { status: 400 });
   }
 
-  return proxyToBackend({
-    path: `/api/v1/fleet/attachments/${owner}/${encodeURIComponent(ownerId)}`,
-  });
+  return proxyToBackend({ path: ownerPath(owner, ownerId) });
 }

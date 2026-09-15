@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerToken } from "@/lib/auth/server-session";
 import { STORAGE_INTERNAL_ORIGIN } from "@/lib/api/storage-origin";
+import { isAttachmentOwner, isGuid, ownerPath } from "@/lib/api/attachment-owners";
 
 // A thumbnail under an address that never changes, served with bytes the
 // browser may keep for good.
@@ -20,11 +21,6 @@ import { STORAGE_INTERNAL_ORIGIN } from "@/lib/api/storage-origin";
 //
 // Goes around proxyToBackend on purpose: that helper reads bodies as text and
 // follows redirects, which is exactly wrong for both halves of this.
-
-const OWNERS = ["carrier", "carrier-type", "maintenance"] as const;
-type Owner = (typeof OWNERS)[number];
-
-const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // A thumbnail is tens of KB. Anything slower than this is a stuck request, not
 // a slow one — the storage relay's two minutes exist for uploads.
@@ -45,7 +41,7 @@ export async function GET(
   const owner = req.nextUrl.searchParams.get("owner");
   const ownerId = req.nextUrl.searchParams.get("ownerId");
 
-  if (!GUID.test(id) || !ownerId || !GUID.test(ownerId) || !OWNERS.includes(owner as Owner)) {
+  if (!isGuid(id) || !isGuid(ownerId) || !isAttachmentOwner(owner)) {
     return fail(400, "Bad thumbnail request.");
   }
 
@@ -61,7 +57,7 @@ export async function GET(
 
   try {
     const api = await fetch(
-      `${base.replace(/\/$/, "")}/api/v1/fleet/attachments/${owner}/${ownerId}/${id}/thumbnail`,
+      `${base.replace(/\/$/, "")}${ownerPath(owner, ownerId)}/${id}/thumbnail`,
       {
         headers: { Authorization: `Bearer ${token}` },
         // Manual, so the 302 comes back as a response with a readable Location
