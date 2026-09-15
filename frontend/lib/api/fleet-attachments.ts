@@ -83,6 +83,10 @@ export const deleteAttachment = (owner: AttachmentOwner, ownerId: string, id: st
 export const attachmentThumbnailUrl = (owner: AttachmentOwner, ownerId: string, id: string) =>
   `/api/fleet/attachments/${encodeURIComponent(id)}/thumbnail?owner=${owner}&ownerId=${encodeURIComponent(ownerId)}`;
 
+/** The full-size image's address, stable and cacheable like attachmentThumbnailUrl. */
+export const attachmentImageUrl = (owner: AttachmentOwner, ownerId: string, id: string) =>
+  `/api/fleet/attachments/${encodeURIComponent(id)}/image?owner=${owner}&ownerId=${encodeURIComponent(ownerId)}`;
+
 /**
  * Compress, upload, then record.
  *

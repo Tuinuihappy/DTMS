@@ -1,18 +1,16 @@
 "use client";
 
-import { ImageIcon, ImageOff, Loader2, Trash2, Upload, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { ImageIcon, ImageOff, Loader2, Upload } from "lucide-react";
+import { useRef, useState } from "react";
+import { AttachmentLightbox } from "@/components/attachments/attachment-lightbox";
+import { useAttachments } from "@/components/attachments/use-attachments";
+import { usePrefetchIntent } from "@/components/attachments/use-prefetch-intent";
 import {
-  deleteAttachment,
-  listAttachments,
-  uploadAttachment,
+  attachmentImageUrl,
+  attachmentThumbnailUrl,
   type Attachment,
   type AttachmentOwner,
-  type UploadPhase,
 } from "@/lib/api/fleet-attachments";
-import { cn } from "@/lib/utils";
 
 // Mirrors the server's allow-list. Not "image/*": that admits SVG, which the
 // server refuses anyway — better to grey it out in the picker than to let
@@ -24,108 +22,27 @@ export function AttachmentGallery({
   ownerId,
   canEdit,
   emptyHint,
-  initialZoomId,
-  onZoomClose,
   onItemsChanged,
 }: {
   owner: AttachmentOwner;
   ownerId: string;
   canEdit: boolean;
   emptyHint?: string;
-  /** Open straight onto this image once the list arrives. Ignored if it is no
-   *  longer there — someone may have deleted it since the caller last looked. */
-  initialZoomId?: string | null;
-  /** The user closed the full-size view themselves (not a delete). */
-  onZoomClose?: () => void;
-  /** The authoritative list after it loads, after an upload, and after a
-   *  delete — only ever on success, so a failed load can never tell the caller
-   *  there are no images. Lets a table show the right cover without refetching. */
+  /** See useAttachments. */
   onItemsChanged?: (items: Attachment[]) => void;
 }) {
-  const [items, setItems] = useState<Attachment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [phase, setPhase] = useState<UploadPhase | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [zoomed, setZoomed] = useState<Attachment | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Held in refs so refresh keeps its identity — a new callback from the parent
-  // on every render must not re-run the load effect.
-  const onItemsChangedRef = useRef(onItemsChanged);
-  const initialZoomIdRef = useRef(initialZoomId);
-  const zoomedOnce = useRef(false);
-  useEffect(() => {
-    onItemsChangedRef.current = onItemsChanged;
-  });
-
-  const refresh = useCallback(
-    (signal?: AbortSignal) =>
-      listAttachments(owner, ownerId, signal)
-        .then((list) => {
-          setItems(list);
-          onItemsChangedRef.current?.(list);
-          if (!zoomedOnce.current) {
-            zoomedOnce.current = true;
-            const target = initialZoomIdRef.current;
-            if (target) setZoomed(list.find((a) => a.id === target) ?? null);
-          }
-        })
-        .catch((e: Error) => {
-          if (e.name !== "AbortError") setError(e.message);
-        })
-        .finally(() => {
-          if (!signal?.aborted) setLoading(false);
-        }),
-    [owner, ownerId],
+  const { items, loading, busy, phase, error, upload, remove } = useAttachments(
+    owner,
+    ownerId,
+    onItemsChanged,
   );
-
-  useEffect(() => {
-    const ac = new AbortController();
-    setLoading(true);
-    void refresh(ac.signal);
-    return () => ac.abort();
-  }, [refresh]);
+  const [zoomedId, setZoomedId] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
-    if (files.length === 0) return;
-
-    setBusy(true);
-    setError(null);
-    try {
-      // Sequential, not parallel. Each upload is three round trips plus the
-      // bytes, and the per-owner ceiling is checked server-side per call —
-      // firing them at once would race that check and flood a phone's uplink.
-      for (const file of files) {
-        await uploadAttachment(owner, ownerId, file, null, setPhase);
-      }
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
-      // Some may have succeeded before the failure; show what actually landed.
-      await refresh();
-    } finally {
-      setBusy(false);
-      setPhase(null);
-      if (inputRef.current) inputRef.current.value = "";
-    }
-  };
-
-  const onDelete = async (a: Attachment) => {
-    setBusy(true);
-    setError(null);
-    try {
-      await deleteAttachment(owner, ownerId, a.id);
-      const next = items.filter((x) => x.id !== a.id);
-      setItems(next);
-      onItemsChangedRef.current?.(next);
-      setZoomed(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete the image.");
-    } finally {
-      setBusy(false);
-    }
+    await upload(files);
+    if (inputRef.current) inputRef.current.value = "";
   };
 
   return (
@@ -166,7 +83,8 @@ export function AttachmentGallery({
         )}
       </div>
 
-      {error && (
+      {/* The lightbox shows its own errors while it is open. */}
+      {error && !zoomedId && (
         <div className="rounded-md bg-[var(--color-coral-soft)] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)]">
           {error}
         </div>
@@ -184,175 +102,80 @@ export function AttachmentGallery({
         <ul className="flex flex-wrap gap-2.5">
           {items.map((a) => (
             <li key={a.id}>
-              <Thumb attachment={a} onZoom={() => setZoomed(a)} />
+              <Thumb
+                src={attachmentThumbnailUrl(owner, ownerId, a.id)}
+                fullSrc={attachmentImageUrl(owner, ownerId, a.id)}
+                attachment={a}
+                onZoom={() => setZoomedId(a.id)}
+              />
             </li>
           ))}
         </ul>
       )}
 
-      <Lightbox
-        attachment={zoomed}
+      <AttachmentLightbox
+        owner={owner}
+        ownerId={ownerId}
+        attachmentId={zoomedId}
+        details={items.find((a) => a.id === zoomedId) ?? null}
+        notice={error}
         canEdit={canEdit}
         busy={busy}
-        onDelete={onDelete}
-        onClose={() => {
-          setZoomed(null);
-          onZoomClose?.();
+        onDelete={async (id) => {
+          if (await remove(id)) setZoomedId(null);
         }}
+        onClose={() => setZoomedId(null)}
       />
     </div>
   );
 }
 
-function Thumb({ attachment, onZoom }: { attachment: Attachment; onZoom: () => void }) {
+function Thumb({
+  src,
+  fullSrc,
+  attachment,
+  onZoom,
+}: {
+  src: string;
+  /** Fetched on hover, so the lightbox opens onto a sharp picture. */
+  fullSrc: string;
+  attachment: Attachment;
+  onZoom: () => void;
+}) {
   const [broken, setBroken] = useState(false);
+  const prefetch = usePrefetchIntent(broken ? null : fullSrc);
 
-  // Prefer the small copy — a grid of full-size photos is megabytes for
-  // pictures nobody has clicked yet. Falls back when a thumbnail could not be
-  // produced at upload time.
-  const src = attachment.thumbnailUrl ?? attachment.url;
-
+  // The stable thumbnail address rather than the list's signed URL: the signed
+  // one changes on every list call, so the browser could never reuse it, and a
+  // photo the table already showed would download again here.
   return (
     <button
       type="button"
+      {...prefetch}
       onClick={onZoom}
       disabled={broken}
       title={attachment.caption ?? attachment.originalFileName ?? undefined}
       className="group relative h-[84px] w-[84px] overflow-hidden rounded-[var(--radius-lg)] border border-white/50 bg-[var(--color-ink-100)] transition-shadow hover:shadow-[0_10px_24px_-14px_rgba(15,23,42,0.5)] disabled:cursor-default dark:border-white/10 dark:bg-white/[0.04]"
     >
       {broken ? (
-        // These URLs expire, and the object can be removed out from under one.
-        // Naming that beats a silently blank square.
+        // A stable address does not expire, so a failure means the image is
+        // gone or unreadable. Naming that beats a silently blank square.
         <span className="flex h-full w-full flex-col items-center justify-center gap-1 px-1.5 text-center text-[9.5px] font-medium text-[var(--color-ink-500)]">
           <ImageOff className="h-3.5 w-3.5" strokeWidth={2} />
-          Expired
+          Unavailable
         </span>
       ) : (
-        // eslint-disable-next-line @next/next/no-img-element -- signed storage
-        // URL, deliberately outside the Next image optimiser
+        // eslint-disable-next-line @next/next/no-img-element -- served by our own
+        // cache-controlled route; the Next optimiser would only add a hop
         <img
           src={src}
           alt={attachment.caption ?? "Attachment"}
           loading="lazy"
+          decoding="async"
           onError={() => setBroken(true)}
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.05]"
         />
       )}
     </button>
-  );
-}
-
-function Lightbox({
-  attachment,
-  canEdit,
-  busy,
-  onDelete,
-  onClose,
-}: {
-  attachment: Attachment | null;
-  canEdit: boolean;
-  busy: boolean;
-  onDelete: (a: Attachment) => void;
-  onClose: () => void;
-}) {
-  const [confirming, setConfirming] = useState(false);
-
-  useEffect(() => {
-    setConfirming(false);
-  }, [attachment]);
-
-  useEffect(() => {
-    if (!attachment) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [attachment, onClose]);
-
-  return (
-    <>
-      <OverlayBackdrop
-        open={attachment !== null}
-        onClick={onClose}
-        className="z-[60] bg-[var(--color-ink-900)]/80 backdrop-blur-md"
-      />
-      <AnimatePresence>
-        {attachment && (
-          <div
-            key="attachment-lightbox"
-            className="pointer-events-none fixed inset-0 z-[61] flex items-center justify-center p-6"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
-              transition={{ type: "spring", stiffness: 340, damping: 30 }}
-              className="pointer-events-auto flex max-h-full flex-col items-center gap-3"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URL */}
-              <img
-                src={attachment.url}
-                alt={attachment.caption ?? "Attachment"}
-                className="max-h-[74vh] max-w-full rounded-[var(--radius-lg)] object-contain shadow-2xl"
-              />
-
-              <div className="flex items-center gap-3 text-[11.5px] text-white/75">
-                <span>
-                  {new Date(attachment.uploadedAt).toLocaleString()} · {attachment.uploadedBy}
-                </span>
-                <span>{Math.round(attachment.sizeBytes / 1024).toLocaleString()} KB</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {canEdit &&
-                  (confirming ? (
-                    <>
-                      <span className="text-[11.5px] font-medium text-white/85">
-                        Delete permanently?
-                      </span>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => onDelete(attachment)}
-                        className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full bg-[var(--color-coral)] px-3.5 py-1.5 text-[11.5px] font-semibold text-white",
-                          busy && "opacity-60",
-                        )}
-                      >
-                        {busy && <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2.4} />}
-                        Delete
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirming(false)}
-                        className="rounded-full bg-white/15 px-3.5 py-1.5 text-[11.5px] font-semibold text-white/90 hover:bg-white/25"
-                      >
-                        Keep
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setConfirming(true)}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-1.5 text-[11.5px] font-semibold text-white/90 transition-colors hover:bg-white/25"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" strokeWidth={2.2} />
-                      Delete
-                    </button>
-                  ))}
-
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-1.5 text-[11.5px] font-semibold text-white/90 transition-colors hover:bg-white/25"
-                >
-                  <X className="h-3.5 w-3.5" strokeWidth={2.4} />
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </>
   );
 }

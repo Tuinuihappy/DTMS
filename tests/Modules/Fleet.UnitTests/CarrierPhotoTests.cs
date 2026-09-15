@@ -1,4 +1,4 @@
-using DTMS.Fleet.Application.Queries.GetAttachmentThumbnail;
+using DTMS.Fleet.Application.Queries.GetAttachmentImage;
 using DTMS.Fleet.Application.Queries.GetCarrierByCode;
 using DTMS.Fleet.Application.Queries.GetCarriers;
 using DTMS.Fleet.Application.Queries.GetCarrierTypes;
@@ -189,18 +189,18 @@ public class CarrierTypeListPhotoTests
     }
 }
 
-public class GetAttachmentThumbnailHandlerTests
+public class GetAttachmentImageHandlerTests
 {
     private readonly IAttachmentRepository _attachments = Substitute.For<IAttachmentRepository>();
     private readonly IObjectStorageService _storage = Substitute.For<IObjectStorageService>();
 
-    private GetAttachmentThumbnailQueryHandler Sut()
+    private GetAttachmentImageQueryHandler Sut()
     {
         _storage.GeneratePresignedGetAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<TimeSpan>(),
                 Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns("http://minio:9000/signed");
-        return new GetAttachmentThumbnailQueryHandler(_attachments, _storage);
+        return new GetAttachmentImageQueryHandler(_attachments, _storage);
     }
 
     private void GivenImage(Attachment image)
@@ -212,6 +212,9 @@ public class GetAttachmentThumbnailHandlerTests
         AttachmentOwner.Carrier, Guid.NewGuid(), "dtms-attachments",
         "carrier/x/abc.jpg", thumbnailKey, "image/webp", 100, null, null, "someone");
 
+    private static GetAttachmentImageQuery QueryFor(Attachment image, AttachmentImageSize size) =>
+        new(AttachmentOwner.Carrier, image.OwnerId, image.Id, size);
+
     [Fact]
     public async Task SignsTheThumbnail_ForMinutes_AsTheRecordedType()
     {
@@ -219,37 +222,53 @@ public class GetAttachmentThumbnailHandlerTests
         var image = Image("carrier/x/abc.thumb.jpg");
         GivenImage(image);
 
-        var result = await sut.Handle(
-            new GetAttachmentThumbnailQuery(AttachmentOwner.Carrier, image.OwnerId, image.Id), default);
+        var result = await sut.Handle(QueryFor(image, AttachmentImageSize.Thumbnail), default);
 
         result.Value.Should().Be("http://minio:9000/signed");
         await _storage.Received(1).GeneratePresignedGetAsync(
             "dtms-attachments", "carrier/x/abc.thumb.jpg",
-            GetAttachmentThumbnailQueryHandler.UrlTtl, "image/webp", Arg.Any<CancellationToken>());
-        GetAttachmentThumbnailQueryHandler.UrlTtl.Should().BeLessThanOrEqualTo(TimeSpan.FromMinutes(5),
+            GetAttachmentImageQueryHandler.UrlTtl, "image/webp", Arg.Any<CancellationToken>());
+        GetAttachmentImageQueryHandler.UrlTtl.Should().BeLessThanOrEqualTo(TimeSpan.FromMinutes(5),
             "the URL is used once, server-side, the moment it is issued");
     }
 
     // Some browsers cannot decode an input to make a thumbnail at upload time.
     [Fact]
-    public async Task FallsBackToTheFullImage_WhenThereIsNoThumbnail()
+    public async Task Thumbnail_FallsBackToTheFullImage_WhenThereIsNoThumbnail()
     {
         var sut = Sut();
         var image = Image(thumbnailKey: null);
         GivenImage(image);
 
-        await sut.Handle(
-            new GetAttachmentThumbnailQuery(AttachmentOwner.Carrier, image.OwnerId, image.Id), default);
+        await sut.Handle(QueryFor(image, AttachmentImageSize.Thumbnail), default);
 
         await _storage.Received(1).GeneratePresignedGetAsync(
             Arg.Any<string>(), "carrier/x/abc.jpg", Arg.Any<TimeSpan>(),
             Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
+    // The lightbox asks for the full picture. Handing it the thumbnail instead
+    // would look fine in a test and blurry on every screen.
+    [Fact]
+    public async Task Full_SignsTheStoredImage_EvenWhenAThumbnailExists()
+    {
+        var sut = Sut();
+        var image = Image("carrier/x/abc.thumb.jpg");
+        GivenImage(image);
+
+        await sut.Handle(QueryFor(image, AttachmentImageSize.Full), default);
+
+        await _storage.Received(1).GeneratePresignedGetAsync(
+            "dtms-attachments", "carrier/x/abc.jpg",
+            GetAttachmentImageQueryHandler.UrlTtl, "image/webp", Arg.Any<CancellationToken>());
+    }
+
     // The route is guarded by one owner kind's permission. An id that is not that
     // owner's — missing, or someone else's — must not be signed at all.
-    [Fact]
-    public async Task AnImageThatIsNotThisOwners_IsNotFound_AndNothingIsSigned()
+    [Theory]
+    [InlineData(AttachmentImageSize.Thumbnail)]
+    [InlineData(AttachmentImageSize.Full)]
+    public async Task AnImageThatIsNotThisOwners_IsNotFound_AndNothingIsSigned(AttachmentImageSize size)
     {
         var sut = Sut();
         _attachments.FindForOwnerAsync(
@@ -257,7 +276,7 @@ public class GetAttachmentThumbnailHandlerTests
             .Returns((Attachment?)null);
 
         var result = await sut.Handle(
-            new GetAttachmentThumbnailQuery(AttachmentOwner.Carrier, Guid.NewGuid(), Guid.NewGuid()), default);
+            new GetAttachmentImageQuery(AttachmentOwner.Carrier, Guid.NewGuid(), Guid.NewGuid(), size), default);
 
         result.IsFailure.Should().BeTrue();
         await _storage.DidNotReceiveWithAnyArgs().GeneratePresignedGetAsync(

@@ -2,7 +2,7 @@ using DTMS.Fleet.Application.Commands.ConfirmAttachment;
 using DTMS.Fleet.Application.Commands.DeleteAttachment;
 using DTMS.Fleet.Application.Commands.PresignAttachment;
 using DTMS.Fleet.Application.Queries.GetAttachments;
-using DTMS.Fleet.Application.Queries.GetAttachmentThumbnail;
+using DTMS.Fleet.Application.Queries.GetAttachmentImage;
 using DTMS.Fleet.Domain.Entities;
 using DTMS.Iam.Application.Authorization;
 using MediatR;
@@ -62,22 +62,26 @@ public static class AttachmentEndpoints
             .WithName($"ListFleetAttachments_{slug}")
             .RequirePermission(read);
 
-            // A thumbnail by owner and id, answered with a redirect to a signed
-            // URL. It is meant for the frontend relay, which fetches those bytes
-            // and serves them under a stable address a browser can cache —
-            // image bytes for an id never change.
+            // One image by owner and id — the thumbnail or the full picture —
+            // answered with a redirect to a signed URL. It is meant for the
+            // frontend relay, which fetches those bytes and serves them under a
+            // stable address a browser can cache — image bytes for an id never
+            // change.
             //
             // no-store on the redirect itself: the Location carries a signature
             // that expires in minutes, and a cached copy would outlive it.
-            group.MapGet($"/{slug}/{{ownerId:guid}}/{{id:guid}}/thumbnail", async (
-                Guid ownerId, Guid id, HttpContext http, ISender sender, CancellationToken ct) =>
+            foreach (var (suffix, size) in ImageRoutes)
             {
-                http.Response.Headers.CacheControl = "no-store";
-                var result = await sender.Send(new GetAttachmentThumbnailQuery(owner, ownerId, id), ct);
-                return result.IsSuccess ? Results.Redirect(result.Value) : Results.NotFound(result.Error);
-            })
-            .WithName($"GetFleetAttachmentThumbnail_{slug}")
-            .RequirePermission(read);
+                group.MapGet($"/{slug}/{{ownerId:guid}}/{{id:guid}}/{suffix}", async (
+                    Guid ownerId, Guid id, HttpContext http, ISender sender, CancellationToken ct) =>
+                {
+                    http.Response.Headers.CacheControl = "no-store";
+                    var result = await sender.Send(new GetAttachmentImageQuery(owner, ownerId, id, size), ct);
+                    return result.IsSuccess ? Results.Redirect(result.Value) : Results.NotFound(result.Error);
+                })
+                .WithName($"GetFleetAttachment_{size}_{slug}")
+                .RequirePermission(read);
+            }
 
             group.MapPost($"/{slug}/{{ownerId:guid}}/presign", async (
                 Guid ownerId, [FromBody] PresignAttachmentBody body, ISender sender, CancellationToken ct) =>
@@ -120,6 +124,14 @@ public static class AttachmentEndpoints
             .RequirePermission(write);
         }
     }
+
+    // The last path segment of each image route. Program.cs gives these paths a
+    // rate-limit bucket of their own by the same suffixes — keep the two in step.
+    private static readonly (string Suffix, AttachmentImageSize Size)[] ImageRoutes =
+    [
+        ("thumbnail", AttachmentImageSize.Thumbnail),
+        ("image", AttachmentImageSize.Full),
+    ];
 
     private static IEnumerable<(AttachmentOwner Owner, PermissionDefinition Read, PermissionDefinition Write)>
         OwnerPermissions() =>

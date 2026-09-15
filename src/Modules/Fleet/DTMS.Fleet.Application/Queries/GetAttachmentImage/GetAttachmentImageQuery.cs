@@ -3,11 +3,20 @@ using DTMS.Fleet.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using DTMS.SharedKernel.Storage;
 
-namespace DTMS.Fleet.Application.Queries.GetAttachmentThumbnail;
+namespace DTMS.Fleet.Application.Queries.GetAttachmentImage;
+
+public enum AttachmentImageSize
+{
+    /// <summary>The small copy made at upload, for tables and grids.</summary>
+    Thumbnail,
+
+    /// <summary>The stored image itself, for viewing one photo.</summary>
+    Full,
+}
 
 /// <summary>
-/// A short-lived signed URL for one image's thumbnail, for the server-side relay
-/// that turns it into a stable, cacheable address.
+/// A short-lived signed URL for one image, for the server-side relay that turns
+/// it into a stable, cacheable address.
 ///
 /// <para>The owner is part of the request, not looked up from the image. The
 /// endpoint that sends this is registered once per owner kind and guarded by that
@@ -15,11 +24,12 @@ namespace DTMS.Fleet.Application.Queries.GetAttachmentThumbnail;
 /// what stops the carrier route — guarded by CarrierRead — from serving a carrier
 /// type's picture to someone who may not read carrier types.</para>
 /// </summary>
-public record GetAttachmentThumbnailQuery(AttachmentOwner Owner, Guid OwnerId, Guid AttachmentId)
+public record GetAttachmentImageQuery(
+    AttachmentOwner Owner, Guid OwnerId, Guid AttachmentId, AttachmentImageSize Size)
     : IQuery<string>;
 
-internal sealed class GetAttachmentThumbnailQueryHandler
-    : IQueryHandler<GetAttachmentThumbnailQuery, string>
+internal sealed class GetAttachmentImageQueryHandler
+    : IQueryHandler<GetAttachmentImageQuery, string>
 {
     // Minutes, not the hour GetAttachmentsQuery uses. This URL never reaches a
     // browser: the frontend relay fetches it the instant it is issued and serves
@@ -30,7 +40,7 @@ internal sealed class GetAttachmentThumbnailQueryHandler
     private readonly IAttachmentRepository _attachments;
     private readonly IObjectStorageService _storage;
 
-    public GetAttachmentThumbnailQueryHandler(
+    public GetAttachmentImageQueryHandler(
         IAttachmentRepository attachments,
         IObjectStorageService storage)
     {
@@ -39,7 +49,7 @@ internal sealed class GetAttachmentThumbnailQueryHandler
     }
 
     public async Task<Result<string>> Handle(
-        GetAttachmentThumbnailQuery request, CancellationToken cancellationToken)
+        GetAttachmentImageQuery request, CancellationToken cancellationToken)
     {
         var attachment = await _attachments.FindForOwnerAsync(
             request.Owner, request.OwnerId, request.AttachmentId, cancellationToken);
@@ -51,9 +61,13 @@ internal sealed class GetAttachmentThumbnailQueryHandler
 
         // The full image stands in when no thumbnail could be made at upload —
         // heavier, but a picture beats an empty cell.
+        var key = request.Size == AttachmentImageSize.Full
+            ? attachment.ObjectKey
+            : attachment.ThumbnailKey ?? attachment.ObjectKey;
+
         var url = await _storage.GeneratePresignedGetAsync(
             attachment.Bucket,
-            attachment.ThumbnailKey ?? attachment.ObjectKey,
+            key,
             UrlTtl,
             // Served as the type recorded on the row, as GetAttachmentsQuery does,
             // so a stray object with a scriptable type could never be served as one.

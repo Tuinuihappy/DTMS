@@ -3,7 +3,9 @@
 import { Images, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { AttachmentGallery } from "@/components/attachments/attachment-gallery";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { AttachmentLightbox } from "@/components/attachments/attachment-lightbox";
+import { useAttachments } from "@/components/attachments/use-attachments";
+import { animateInJs, OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import type { Attachment, AttachmentOwner } from "@/lib/api/fleet-attachments";
 
 export type PhotosTarget = {
@@ -11,8 +13,9 @@ export type PhotosTarget = {
   ownerId: string;
   /** What the photos are of, e.g. a carrier code. */
   label: string;
-  /** Open straight onto this image full-size; closing it closes the dialog.
-   *  For a thumbnail in a table, where "show me this photo" is the whole ask. */
+  /** Open straight onto this image full-size, with no gallery behind it;
+   *  closing it closes everything. For a thumbnail in a table, where "show me
+   *  this photo" is the whole ask. */
   focusAttachmentId?: string | null;
 };
 
@@ -24,6 +27,10 @@ export type PhotosTarget = {
  * the list carries each row's cover id and count, and the image comes from a
  * stable address the browser caches (see attachmentThumbnailUrl). What the table
  * must not do is load a gallery per row, which is what this dialog is for.
+ *
+ * With a focus id it is only a lightbox: one layer, one backdrop, shown at once.
+ * Opening the gallery first and the photo over it meant two entrances, two
+ * darkening steps and a dialog glimpsed on the way in and out.
  */
 export function PhotosDialog({
   target,
@@ -34,19 +41,29 @@ export function PhotosDialog({
   target: PhotosTarget | null;
   canEdit: boolean;
   onClose: () => void;
-  /** Passed through from the gallery; lets the caller keep a row's cover and
-   *  count in step without refetching its whole list. */
+  /** Lets the caller keep a row's cover and count in step without refetching
+   *  its whole list. */
   onItemsChanged?: (items: Attachment[]) => void;
 }) {
+  const focus = target?.focusAttachmentId ? target : null;
+  const gallery = target && !focus ? target : null;
+
   return (
     <>
+      <FocusedPhoto
+        target={focus}
+        canEdit={canEdit}
+        onClose={onClose}
+        onItemsChanged={onItemsChanged}
+      />
+
       <OverlayBackdrop
-        open={target !== null}
+        open={gallery !== null}
         onClick={onClose}
         className="z-40 bg-[var(--color-ink-900)]/55 backdrop-blur-md"
       />
       <AnimatePresence>
-        {target && (
+        {gallery && (
           <div
             key="photos-dialog"
             className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -56,6 +73,7 @@ export function PhotosDialog({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
               transition={{ type: "spring", stiffness: 360, damping: 30 }}
+              onUpdate={animateInJs}
               className="pointer-events-auto relative w-full max-w-lg overflow-hidden rounded-[var(--radius-xl)] glass-strong"
             >
               <header className="flex items-start gap-3 px-6 pt-5">
@@ -67,7 +85,7 @@ export function PhotosDialog({
                     Photos
                   </h2>
                   <p className="font-mono text-[11.5px] text-[var(--color-ink-500)]">
-                    {target.label}
+                    {gallery.label}
                   </p>
                 </div>
                 <button
@@ -82,17 +100,11 @@ export function PhotosDialog({
 
               <div className="px-6 pb-6 pt-4">
                 <AttachmentGallery
-                  key={`${target.owner}:${target.ownerId}`}
-                  owner={target.owner}
-                  ownerId={target.ownerId}
+                  key={`${gallery.owner}:${gallery.ownerId}`}
+                  owner={gallery.owner}
+                  ownerId={gallery.ownerId}
                   canEdit={canEdit}
                   emptyHint="No photos yet."
-                  initialZoomId={target.focusAttachmentId}
-                  // Opened for one photo, the user asked to see that photo — so
-                  // putting it away returns them to where they were, not to a
-                  // gallery they did not ask for. A delete does not count as
-                  // putting it away; the gallery stays to show what is left.
-                  onZoomClose={target.focusAttachmentId ? onClose : undefined}
                   onItemsChanged={onItemsChanged}
                 />
               </div>
@@ -101,5 +113,51 @@ export function PhotosDialog({
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+/**
+ * The lightbox on its own. Always rendered, even with no target, so its
+ * backdrop exists before the first open and fades in rather than snapping
+ * dark; loads nothing while closed.
+ *
+ * The list still loads behind the picture: it supplies the details line, lets
+ * Delete know the image exists, and hands the table the current cover and count.
+ */
+function FocusedPhoto({
+  target,
+  canEdit,
+  onClose,
+  onItemsChanged,
+}: {
+  target: PhotosTarget | null;
+  canEdit: boolean;
+  onClose: () => void;
+  onItemsChanged?: (items: Attachment[]) => void;
+}) {
+  const { items, busy, error, remove } = useAttachments(
+    target?.owner ?? null,
+    target?.ownerId ?? null,
+    onItemsChanged,
+  );
+
+  const focusId = target?.focusAttachmentId ?? null;
+
+  return (
+    <AttachmentLightbox
+      owner={target?.owner ?? null}
+      ownerId={target?.ownerId ?? null}
+      attachmentId={focusId}
+      details={items.find((a) => a.id === focusId) ?? null}
+      notice={error}
+      canEdit={canEdit}
+      busy={busy}
+      // With no gallery behind it, what is left after a delete is shown by the
+      // table row, which onItemsChanged has already updated.
+      onDelete={async (id) => {
+        if (await remove(id)) onClose();
+      }}
+      onClose={onClose}
+    />
   );
 }

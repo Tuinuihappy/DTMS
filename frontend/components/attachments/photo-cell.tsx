@@ -2,7 +2,12 @@
 
 import { ImageIcon, ImageOff, ImagePlus } from "lucide-react";
 import { useState } from "react";
-import { attachmentThumbnailUrl, type AttachmentOwner } from "@/lib/api/fleet-attachments";
+import { usePrefetchIntent } from "@/components/attachments/use-prefetch-intent";
+import {
+  attachmentImageUrl,
+  attachmentThumbnailUrl,
+  type AttachmentOwner,
+} from "@/lib/api/fleet-attachments";
 
 /**
  * A table cell showing an owner's newest photo, small, with a count when there
@@ -38,6 +43,11 @@ export function PhotoCell({
 }) {
   const [broken, setBroken] = useState(false);
   const cover = coverAttachmentId;
+  // A click here opens the full picture; start fetching it while the pointer
+  // is on its way.
+  const prefetch = usePrefetchIntent(
+    cover && !broken ? attachmentImageUrl(owner, ownerId, cover) : null,
+  );
 
   if (!cover) {
     return canEdit ? (
@@ -60,6 +70,7 @@ export function PhotoCell({
   return (
     <button
       type="button"
+      {...prefetch}
       // A broken image still opens: the dialog shows what is actually there,
       // which the cell cannot.
       onClick={() => onOpen(broken ? null : cover)}
