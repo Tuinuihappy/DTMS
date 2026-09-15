@@ -2,7 +2,7 @@
 
 import { Loader2, Plus, QrCode, ScanLine, Truck } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { PermissionGuard } from "@/components/auth/permission-guard";
 import {
@@ -68,36 +68,49 @@ function Inner() {
   const [photos, setPhotos] = useState<PhotosTarget | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
 
-  const refresh = useCallback(
-    (signal?: AbortSignal) => {
-      setLoading(true);
-      setError(null);
-      getCarriers(
-        {
-          status: status || undefined,
-          carrierTypeCode: typeCode || undefined,
-          q: search || undefined,
-          page,
-          pageSize,
-        },
-        signal,
-      )
-        .then((res) => {
-          setRows(res.data);
-          setTotal(res.totalCount);
-        })
-        .catch((e: Error) => {
-          if (e.name !== "AbortError") setError(e.message || "Failed to load carriers");
-        })
-        .finally(() => setLoading(false));
-    },
-    [status, typeCode, search, page, pageSize],
-  );
+  // The one list request allowed to touch the table. Every refresh — a filter
+  // change or a reload after save — cancels the one before it, and a response
+  // that is no longer the latest is dropped whole. Otherwise a cancelled request
+  // still switched the spinner off while the new one was in flight, and a reload
+  // after save, which nothing could cancel, could land after a filter change
+  // and fill the table with rows for the filter no longer selected.
+  const inFlight = useRef<AbortController | null>(null);
+
+  const refresh = useCallback(() => {
+    inFlight.current?.abort();
+    const ac = new AbortController();
+    inFlight.current = ac;
+
+    setLoading(true);
+    setError(null);
+    getCarriers(
+      {
+        status: status || undefined,
+        carrierTypeCode: typeCode || undefined,
+        q: search || undefined,
+        page,
+        pageSize,
+      },
+      ac.signal,
+    )
+      .then((res) => {
+        // Checked here too: the body can finish parsing just after a newer
+        // request has already taken over.
+        if (ac.signal.aborted) return;
+        setRows(res.data);
+        setTotal(res.totalCount);
+      })
+      .catch((e: Error) => {
+        if (!ac.signal.aborted) setError(e.message || "Failed to load carriers");
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setLoading(false);
+      });
+  }, [status, typeCode, search, page, pageSize]);
 
   useEffect(() => {
-    const ac = new AbortController();
-    refresh(ac.signal);
-    return () => ac.abort();
+    refresh();
+    return () => inFlight.current?.abort();
   }, [refresh]);
 
   useEffect(() => {
