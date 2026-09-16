@@ -12,7 +12,13 @@ import {
 } from "@/lib/api/fleet-carrier-types";
 import { getCarriers, type Carrier, type CarrierStatus } from "@/lib/api/fleet-carriers";
 import { Permissions } from "@/lib/auth/permissions";
-import { carrierLabelSvg, carrierQrSvg, downloadSvg } from "@/lib/qr";
+import {
+  carrierLabelPng,
+  carrierLabelSvg,
+  carrierQrSvg,
+  downloadBlob,
+  downloadSvg,
+} from "@/lib/qr";
 import { cn } from "@/lib/utils";
 
 const STATUSES: CarrierStatus[] = ["Available", "InUse", "Maintenance", "Retired"];
@@ -187,6 +193,20 @@ function Inner() {
 
 function LabelCard({ carrier }: { carrier: Carrier }) {
   const [svg, setSvg] = useState<string | null>(null);
+  const [png, setPng] = useState<"idle" | "busy" | "failed">("idle");
+
+  const downloadPng = async () => {
+    setPng("busy");
+    try {
+      downloadBlob(
+        `${carrier.carrierCode}.png`,
+        await carrierLabelPng(carrier.carrierCode, carrier.displayName),
+      );
+      setPng("idle");
+    } catch {
+      setPng("failed");
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -226,27 +246,61 @@ function LabelCard({ carrier }: { carrier: Carrier }) {
         </div>
       )}
 
-      <button
-        type="button"
-        disabled={!svg}
-        onClick={() =>
-          svg &&
-          downloadSvg(
-            `${carrier.carrierCode}.svg`,
-            // The whole card, not just the QR — a bare square with no code under
-            // it is no use once it has been printed and stuck to a shelf.
-            carrierLabelSvg(svg, carrier.carrierCode, carrier.displayName),
-          )
-        }
-        title="Download SVG"
-        aria-label={`Download label for ${carrier.carrierCode}`}
-        className="carrier-label-chrome absolute right-2 top-2 rounded-full bg-[var(--color-ink-100)] p-1.5 text-[var(--color-ink-600)] opacity-0 transition-opacity hover:bg-[var(--color-ink-200)] focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed"
+      {png === "failed" && (
+        <div className="carrier-label-chrome text-center text-[10.5px] font-medium text-[var(--color-coral)]">
+          Couldn&apos;t create the PNG. Try again.
+        </div>
+      )}
+
+      {/* Both formats carry the whole card, not just the QR — a bare square
+          with no code under it is no use once it is stuck to a shelf. SVG for
+          anything that opens vectors; PNG for sticker printer software that
+          does not. Kept visible while a PNG is being drawn or has failed. */}
+      <div
+        className={cn(
+          "carrier-label-chrome absolute right-2 top-2 flex gap-1 transition-opacity group-hover:opacity-100 has-[:focus-visible]:opacity-100",
+          png === "idle" ? "opacity-0" : "opacity-100",
+        )}
       >
-        <Download className="h-3.5 w-3.5" strokeWidth={2.4} />
-      </button>
+        <button
+          type="button"
+          disabled={!svg}
+          onClick={() =>
+            svg &&
+            downloadSvg(
+              `${carrier.carrierCode}.svg`,
+              carrierLabelSvg(svg, carrier.carrierCode, carrier.displayName),
+            )
+          }
+          title="Download SVG"
+          aria-label={`Download ${carrier.carrierCode} label as SVG`}
+          className={formatBtn}
+        >
+          <Download className="h-3 w-3" strokeWidth={2.4} />
+          SVG
+        </button>
+        <button
+          type="button"
+          disabled={png === "busy"}
+          onClick={downloadPng}
+          title="Download PNG, 1200px wide"
+          aria-label={`Download ${carrier.carrierCode} label as PNG`}
+          className={formatBtn}
+        >
+          {png === "busy" ? (
+            <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2.4} />
+          ) : (
+            <Download className="h-3 w-3" strokeWidth={2.4} />
+          )}
+          PNG
+        </button>
+      </div>
     </div>
   );
 }
+
+const formatBtn =
+  "inline-flex items-center gap-1 rounded-full bg-[var(--color-ink-100)] px-2 py-1 text-[10px] font-semibold text-[var(--color-ink-600)] hover:bg-[var(--color-ink-200)] disabled:cursor-not-allowed disabled:opacity-60";
 
 const inputCls =
   "rounded-full border border-[var(--color-ink-100)] bg-[var(--color-surface)] px-3 py-1.5 text-[12px] text-[var(--color-ink-800)] focus:border-[var(--color-brand-500)] focus:outline-none";

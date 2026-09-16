@@ -115,12 +115,132 @@ function escapeXml(text: string): string {
     .replace(/'/g, "&apos;");
 }
 
+// ── PNG label ──────────────────────────────────────────────────────────────
+// For sticker printer software that cannot open SVG. The same card as
+// carrierLabelSvg, scaled 3×: 1200px wide prints sharp up to about 10 cm at
+// 300 DPI, and a printer dialog can scale it down from there.
+
+const PNG_WIDTH = 1200;
+const PNG_SCALE = PNG_WIDTH / LABEL_WIDTH;
+// The code may shrink to fit, but not past where a person can still read it.
+const PNG_MIN_CODE_FONT = 40;
+
 /**
- * Hands the browser one SVG file. Mirrors the CSV export idiom in
+ * The label as a PNG, drawn directly onto a canvas rather than by rasterising
+ * the SVG. Two reasons:
+ *
+ * - The QR is laid out in whole pixels per module. Scaling a vector QR to an
+ *   arbitrary width leaves anti-aliased grey edges between modules, and a
+ *   scanner has to guess where a grey seam belongs.
+ * - Text uses the page's own loaded fonts. An SVG drawn through an image
+ *   cannot reach web fonts, so the code would come out in whatever the
+ *   fallback happens to be.
+ */
+export async function carrierLabelPng(
+  carrierCode: string,
+  displayName?: string | null,
+): Promise<Blob> {
+  const { create } = await import("qrcode");
+  const { modules } = create(carrierCode, { errorCorrectionLevel: ERROR_CORRECTION });
+
+  const cells = modules.size + QUIET_ZONE_MODULES * 2;
+  const modulePx = Math.floor(PNG_WIDTH / cells);
+  const qrPx = modulePx * cells;
+  // Whatever width whole modules cannot fill becomes extra white either side.
+  const qrLeft = Math.floor((PNG_WIDTH - qrPx) / 2);
+
+  const usable = PNG_WIDTH - LABEL_SIDE_PADDING * PNG_SCALE * 2;
+  const codeBaseline = qrPx + 40 * PNG_SCALE;
+  const name = displayName?.trim() || null;
+  const nameBaseline = codeBaseline + 38 * PNG_SCALE;
+  const height = (name ? nameBaseline : codeBaseline) + 28 * PNG_SCALE;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = PNG_WIDTH;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("This browser cannot draw the label.");
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, PNG_WIDTH, height);
+
+  ctx.fillStyle = "#000000";
+  for (let row = 0; row < modules.size; row++) {
+    for (let col = 0; col < modules.size; col++) {
+      if (modules.get(row, col)) {
+        ctx.fillRect(
+          qrLeft + (col + QUIET_ZONE_MODULES) * modulePx,
+          (row + QUIET_ZONE_MODULES) * modulePx,
+          modulePx,
+          modulePx,
+        );
+      }
+    }
+  }
+
+  const codeFamily = withPageFont("--font-mono", CODE_FONT_STACK);
+  const nameFamily = withPageFont("--font-sans", NAME_FONT_STACK);
+  const codeFont = (size: number) => `700 ${size}px ${codeFamily}`;
+  const nameFont = `400 ${NAME_FONT_SIZE * PNG_SCALE}px ${nameFamily}`;
+
+  // A canvas draws with whatever is loaded at that instant. Ask for exactly
+  // these glyphs first, or the first label after a page load comes out in the
+  // fallback font.
+  await Promise.all([
+    document.fonts.load(codeFont(CODE_FONT_SIZE * PNG_SCALE), carrierCode),
+    name ? document.fonts.load(nameFont, name) : Promise.resolve(),
+  ]).catch(() => {
+    // Drawn with the fallback instead — still a usable label.
+  });
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+
+  // Never truncated, as in the SVG: shrink until it fits. Measured rather than
+  // estimated, since the canvas knows the real glyph widths.
+  let codeSize = CODE_FONT_SIZE * PNG_SCALE;
+  ctx.font = codeFont(codeSize);
+  while (codeSize > PNG_MIN_CODE_FONT && ctx.measureText(carrierCode).width > usable) {
+    codeSize -= 2;
+    ctx.font = codeFont(codeSize);
+  }
+  ctx.fillText(carrierCode, PNG_WIDTH / 2, codeBaseline);
+
+  if (name) {
+    ctx.font = nameFont;
+    ctx.fillStyle = "#525252";
+    ctx.fillText(fitWithEllipsis(ctx, name, usable), PNG_WIDTH / 2, nameBaseline);
+  }
+
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Could not encode the PNG."))),
+      "image/png",
+    ),
+  );
+}
+
+/** The page's font first, then the stack that also works outside the app. */
+function withPageFont(variable: string, fallback: string): string {
+  const page = getComputedStyle(document.body).getPropertyValue(variable).trim();
+  return page ? `${page}, ${fallback}` : fallback;
+}
+
+/** Cuts by measured width rather than a character count: Thai marks take no
+ *  width of their own, so a count would cut far too early or too late. */
+function fitWithEllipsis(ctx: CanvasRenderingContext2D, text: string, width: number): string {
+  if (ctx.measureText(text).width <= width) return text;
+  const chars = Array.from(text);
+  while (chars.length > 1 && ctx.measureText(`${chars.join("")}…`).width > width) chars.pop();
+  return `${chars.join("")}…`;
+}
+
+/**
+ * Hands the browser one file. Mirrors the CSV export idiom in
  * `orders-experience.tsx` — the only download pattern this project has.
  */
-export function downloadSvg(fileName: string, svg: string): void {
-  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+export function downloadBlob(fileName: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = fileName;
@@ -128,4 +248,8 @@ export function downloadSvg(fileName: string, svg: string): void {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+export function downloadSvg(fileName: string, svg: string): void {
+  downloadBlob(fileName, new Blob([svg], { type: "image/svg+xml" }));
 }
