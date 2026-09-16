@@ -2,8 +2,10 @@
 
 - **Status**: Accepted
 - **Date**: 2026-08-28
+- **Last amended**: 2026-09-15
 - **Deciders**: TUINUI
-- **Related**: [ADR-001](adr-001-multi-mode-transport-split.md), [ADR-002](adr-002-facility-station-hierarchy.md), [ADR-003](adr-003-trip-extension-tables.md), [ADR-017](adr-017-permission-naming-standard.md)
+- **Implementation**: type catalogue, carrier registry, QR labels and photos shipped; carrier plans designed but not built; trip binding (assignments, loads, `ActiveTrips`, strategies) not started — see [Acceptance Criteria](#acceptance-criteria)
+- **Related**: [ADR-001](adr-001-multi-mode-transport-split.md), [ADR-002](adr-002-facility-station-hierarchy.md), [ADR-003](adr-003-trip-extension-tables.md), [ADR-015](adr-015-pod-upload-presigned-urls.md), [ADR-017](adr-017-permission-naming-standard.md)
 
 ## Context
 
@@ -245,6 +247,16 @@ The `❄` columns are snapshots frozen at write time, following `Trip.PickupLoca
 >
 > If a carrier ever arrives wearing a supplier label that cannot be removed, adopt that label **as** its `CarrierCode` — the charset (`[A-Z0-9._-]`, up to 50) covers most asset tags, and `CarrierCode` is already immutable and unique forever, which is exactly what a printed label needs. A mapping column only becomes necessary if such a tag falls outside that charset or is not unique, and that is the point at which to reintroduce one — with a reader.
 
+> **Amended (2026-09-14) — how `CarrierPlans` is first written. Designed, not built.** The order-creation UI is the first writer: an operator scans a carrier while creating a delivery order. These rules were settled before any code, so the build does not reopen them:
+>
+> 1. **One order, one carrier.** The scan is offered only when every item shares one pickup/drop pair, because dispatch splits an order into one trip per route pair and a single plan could not say which trip it meant.
+> 2. **The delivery-order contract does not change.** `CreateDraftDeliveryOrderCommand` is shared with the public source API through `ItemDto`. The UI writes the plan with its own call *after* the order is created, and a failed plan write warns without undoing the order, which is already committed. This is Decision C working as intended.
+> 3. **Editing replaces.** The write is an upsert, and the sketch gains `UNIQUE("DeliveryOrderId") WHERE "ConsumedAt" IS NULL`. Without it a double submit leaves two open plans that the binding step has no way to choose between.
+> 4. **`Source = OrderRequested` is stamped by the server**, never read from the request. A client able to send `OperatorScan` would claim precedence rung 5 and outrank a real scan on the floor.
+> 5. **The same carrier planned on two open orders is a warning, not a refusal.** A plan is intent; the partial unique index on `CarrierAssignments` is what stops one carrier running two trips.
+>
+> Nothing consumes a plan until trip binding exists. Until then a plan is recorded data shown on the order, not automation.
+
 The two partial unique indexes carry the core invariants — a carrier belongs to at most one open trip, and an item sits on at most one carrier — enforced by Postgres rather than by application locking.
 
 ### Per-mode policy defaults
@@ -260,6 +272,25 @@ These are data, not code: adjusting them does not require a deployment, and a ne
 ### Vendor correlation for AMR
 
 DTMS puts `carrier:{code}` into `Riot3OrderRequest.Tags` at dispatch. RIOT3 echoes `task.tags` on every notify frame, giving a free vendor-side confirmation channel without any change on the vendor side. This confirms *what DTMS asked for*, so the assignment stays `Planned` until a human or source system confirms it.
+
+### Labels and scanning (added 2026-09-15)
+
+Every capture path that "scans a carrier" depends on a physical label, so labels shipped ahead of binding.
+
+- **The QR payload is the bare `CarrierCode`.** Not a URL, which would print this deployment's hostname onto every sticker in the building. Not the `Id`, which nobody can type when a label is scraped off. A scanned string that fails the `CarrierCode` charset is rejected as a foreign code before any lookup, and a valid one resolves through the existing `GET /api/v1/fleet/carriers/{code}`.
+- **Labels are generated in the browser**, at `/fleet/carriers/labels`, as a print sheet or a download per carrier. SVG suits anything that opens vectors. PNG, 1200 px wide, suits sticker printer software that does not. The PNG is drawn with whole pixels per QR module, since a scaled vector leaves grey seams a scanner has to guess at. Error correction is level Q with the full 4-module quiet zone, because shelf labels get scraped.
+- **Scanning is a USB 2D wedge scanner, not a camera.** Order creation is desk work on Windows, where the browser's `BarcodeDetector` is unavailable, and a desk webcam cannot be pointed at a shelf. The scan field always lives in its own dialog: a wedge scanner types into whatever has focus, so inside a form it would fill the wrong field or submit the form.
+- **A scan is read from the physical keys and ends on speed, not Enter.** Real handhelds send no Enter, and plant PCs often have the Thai keyboard layout on. The dialog maps `KeyboardEvent.code` to characters and treats a fast burst followed by a short pause as one finished scan.
+- **A scan never commits by itself.** It resolves and shows the carrier, and a person confirms. The same rule applies to POD barcodes, where nothing yet checks the scanned code against the item.
+
+### Photos (added 2026-09-15)
+
+Carriers, carrier types and repair episodes can hold photos, in `fleet."Attachments"` with one nullable owner column per kind and a check that exactly one is set. Bytes never pass through the API. The upload is presigned straight from browser to storage, following [ADR-015](adr-015-pod-upload-presigned-urls.md): it lands under a staging key, and `confirm` moves it to the owner and writes the row. Deleting a row hands its objects to the outbox for clean-up in the same transaction, so a photo cannot vanish from the screen while its bytes stay in the bucket forever.
+
+- **Permissions are the owner's own.** Every route names its owner in the path, as `/api/v1/fleet/attachments/{carrier|carrier-type|maintenance}/{ownerId}/…`, and is registered once per owner kind with that owner's read or write permission. Handlers refuse an image that does not belong to the named owner, so one kind's permission cannot reach another kind's photos. There is one accepted gap: staging keys are not bound to an owner, so someone with write on two owners can upload for one and confirm onto the other.
+- **Images are served from stable addresses.** A list returns ids and details, never signed URLs, because a signature changes on every call and a browser can never cache it. `…/{id}/thumbnail` and `…/{id}/image` answer with a 302 to a URL signed for five minutes. The frontend relay follows it and serves the bytes under its own address, marked `immutable`, since an id's image never changes. These paths get a rate-limit bucket of their own, because every browser request reaches the API from the Next server's single IP and a page of thumbnails would otherwise spend everyone's budget.
+- **Tables show a cover without a request per row.** The carrier and carrier-type list DTOs carry `CoverAttachmentId` (newest photo, ties broken by the larger id) and `PhotoCount`, filled by one summary query per page.
+
 
 ## Edge Cases & Failure Modes
 
@@ -347,9 +378,14 @@ Scenario: an AMR trip runs with no plan and no operator present.
 
 ## Acceptance Criteria
 
+Checked against the code on 2026-09-15.
+
 - [x] `LoadUnitProfile` catalogue removed; `Item.LoadUnitProfileCode` behaviour unchanged
-- [ ] `CarrierTypeProfile` relocated to `fleet.CarrierTypes` with data intact and constraints renamed
-- [ ] `Carrier` registry with CRUD, admin UI, and maintenance transitions
+- [x] `CarrierTypeProfile` relocated to `fleet.CarrierTypes` with data intact and constraints renamed — `20260827100001_AdoptCarrierTypes` moves the table with `SET SCHEMA` and renames its key and index; permissions are `dtms:fleet:carrier-type:*`
+- [x] `Carrier` registry with CRUD, admin UI, and maintenance transitions — `/fleet/carriers`, with retire, un-retire, maintenance and return-to-service, plus maintenance history per carrier
+- [x] QR labels (print sheet, SVG and PNG) and wedge-scanner lookup by `CarrierCode`
+- [x] Photos on carriers, carrier types and repair episodes, each guarded by its owner's permissions
+- [ ] `fleet.CarrierPlans` written from order creation, under the rules in the 2026-09-14 amendment
 - [ ] `fleet.ActiveTrips` proven to receive events from every active transport mode for at least two days
 - [ ] Attach / load / detach endpoints with both partial unique indexes enforced under concurrent test
 - [ ] Auto-release on terminal states, idempotent against replayed events

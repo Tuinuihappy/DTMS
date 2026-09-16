@@ -365,7 +365,7 @@ See [Configuration Reference](./docs/configuration.md) for:
 | `POST` | `/api/v1/resources/{id}:command` | Door/lift/charger commands |
 | `POST` | `/api/v1/topology-overlays` | Create temporary overlay |
 
-For the complete OpenAPI specification, see [./docs/openapi.yaml](./docs/openapi.yaml).
+For the complete API, run the API in Development: it serves the OpenAPI document at `/openapi/v1.json`, a browsable reference at `/scalar/v1`, and Swagger UI at `/swagger`. The spec is generated from the running code, so no copy is kept in the repository to go stale.
 
 ---
 
@@ -462,7 +462,7 @@ Full design documentation lives in the `docs/` folder:
 - **[Pattern Details](./docs/patterns.md)** — solver strategies per pattern
 - **[Vendor Integration Guide](./docs/vendor-integration.md)** — adding a new AMR vendor
 - **[Configuration Reference](./docs/configuration.md)** — all tunable parameters
-- **[OpenAPI Spec](./docs/openapi.yaml)** — machine-readable API reference
+- **OpenAPI Spec** — served by the API itself at `/openapi/v1.json` in Development
 - **[Event Schemas](./docs/events/)** — JSON schemas for all domain events
 - **[Deployment Guide](./docs/deployment.md)** — topology, scaling, observability
 
