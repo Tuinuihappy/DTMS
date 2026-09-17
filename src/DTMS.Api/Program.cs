@@ -365,24 +365,10 @@ builder.Services.AddActorContext(sp =>
         var ctx = http.HttpContext;
         if (ctx is null) return null;
 
-        var employeeId = ctx.User.FindFirst("EmployeeId")?.Value
-                      ?? ctx.User.FindFirst("employeeCode")?.Value
-                      ?? ctx.User.Identity?.Name;
-        // Real External Auth LDAP tokens carry NONE of the claims above —
-        // decoded live 2026-07-23: identity is in `sub` (employee id) and
-        // `unique_name` (username); only the dev-bypass JWT ships
-        // `EmployeeId`. Without this fallback every audit row since the
-        // bypass was disabled stamped TriggeredBy="http". System JWTs use
-        // sub = "system:{key}" and are branch-selected below via
-        // ctx.Items["principal"], but guard anyway so one never masquerades
-        // as a user id if that middleware is skipped.
-        if (string.IsNullOrWhiteSpace(employeeId))
-        {
-            var sub = ctx.User.FindFirst("sub")?.Value;
-            if (!string.IsNullOrWhiteSpace(sub)
-                && !sub.StartsWith("system:", StringComparison.Ordinal))
-                employeeId = sub;
-        }
+        // Shared with the rate limiter's per-user quota, so both agree on who
+        // someone is. System principals are branch-selected below via
+        // ctx.Items["principal"].
+        var employeeId = ctx.User.ResolveUserId();
         // DisplayName comes from the JWT's "displayName" claim — the IDP
         // mirrors it in the /auth/login response body too (same value).
         // OperatorSyncMiddleware uses the same claim key for the PWA scheme.
