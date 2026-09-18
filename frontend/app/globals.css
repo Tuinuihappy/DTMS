@@ -608,6 +608,25 @@ main,
     print-color-adjust: exact;
   }
 
+  /* The canvas auroras and the noise grain are body pseudo-elements, and `*`
+     matches elements only — so the white-out above never reached them and they
+     printed as a coloured wash wherever the sheet did not cover the page. Worse,
+     print-color-adjust inherits, so `exact` above forced them onto paper even
+     with the browser's "Background graphics" box unticked. */
+  body:has(.carrier-label-sheet)::before,
+  body:has(.carrier-label-sheet)::after {
+    display: none !important;
+  }
+
+  /* Same blind spot one level down: decorative ::before layers (.glass-edge and
+     friends). Strip the paint rather than the box, so anything that uses a
+     pseudo-element for real content still prints. */
+  body:has(.carrier-label-sheet) *::before,
+  body:has(.carrier-label-sheet) *::after {
+    background: none !important;
+    box-shadow: none !important;
+  }
+
   .carrier-label-sheet {
     display: grid !important;
     grid-template-columns: repeat(4, 1fr) !important;
