@@ -1,9 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.RateLimiting;
 using FluentValidation;
 using DTMS.Api.Auth;
 using DTMS.Api.Infrastructure.Outbox;
+using DTMS.Api.Infrastructure.RateLimiting;
 using DTMS.Api.Middlewares;
 using DTMS.Api.Modules;
 using DTMS.Api.RobotPositions;
@@ -15,7 +15,6 @@ using DTMS.SharedKernel.Projection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -307,6 +306,9 @@ builder.Services.AddOpenTelemetry()
         .AddMeter("DTMS.SignalR")
         .AddMeter("DTMS.Workflow")
         .AddMeter(DTMS.Api.Infrastructure.Metrics.PoolMetrics.MeterName)
+        // Rate limiting — requests, rejections and the busiest caller's window
+        // count per traffic class. Quotas are sized from partition_peak.
+        .AddMeter(DTMS.Api.Infrastructure.RateLimiting.RateLimitMetrics.MeterName)
         // T1.6 — MassTransit native meter emits messaging.* metrics
         // (consume_duration_seconds, receive_total, retry_total, fault_total)
         // so we don't need to write our own observer for consumer retries.
@@ -685,74 +687,12 @@ builder.Services.AddHealthChecks()
     }, tags: ["ready"])
     .AddCheck<RiotHealthCheckFromStore>("riot3", tags: ["vendors"]);
 
-// Rate limiting — fixed window per remote IP. Defaults to 100 req/min; override
-// via RateLimit__PermitLimit / RateLimit__WindowSeconds / RateLimit__QueueLimit
-// for load tests (e.g. PermitLimit=100000, WindowSeconds=1).
-var rlPermitLimit = builder.Configuration.GetValue<int?>("RateLimit:PermitLimit") ?? 100;
-var rlWindowSeconds = builder.Configuration.GetValue<int?>("RateLimit:WindowSeconds") ?? 60;
-var rlQueueLimit = builder.Configuration.GetValue<int?>("RateLimit:QueueLimit") ?? 5;
-builder.Services.AddRateLimiter(options =>
-{
-    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
-    {
-        // F3 — bypass infrastructure endpoints. These are probed at fixed
-        // intervals by K8s kubelet / service mesh / Prometheus, or carry
-        // many clients through a single egress IP (SignalR reconnect
-        // storms after a G1 drain). Either case would falsely trip the
-        // per-IP limit and break the exact reliability features rate
-        // limiting is supposed to protect — readiness flapping, drain
-        // reconnects landing on 429 instead of a healthy sibling pod,
-        // scrape gaps producing false alerts.
-        //
-        // Business API paths (/api/*) still rate-limit per IP as before;
-        // F3 only carves out infra.
-        var path = ctx.Request.Path;
-        if (path.StartsWithSegments("/health") ||
-            path.StartsWithSegments("/hubs") ||
-            path.StartsWithSegments("/metrics"))
-        {
-            return RateLimitPartition.GetNoLimiter("bypass-infra");
-        }
-
-        var remoteIp = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-
-        // Attachment images — thumbnails and full pictures — get a bucket of
-        // their own. A table of photos costs one of these per image the first
-        // time it is seen, and every browser request reaches the API through the
-        // Next.js server — so all users arrive from one IP and share one per-IP
-        // bucket. Left in that bucket, a single page of thumbnails could spend
-        // the minute's budget and turn every ordinary API call for everyone into
-        // a 429. They are safe to allow far more of: authenticated, cheap (a key
-        // lookup and a local signature — the bytes never pass through the API),
-        // and cached by the browser after the first view. The suffixes match
-        // ImageRoutes in AttachmentEndpoints.
-        if (ctx.Request.Path.StartsWithSegments("/api/v1/fleet/attachments") &&
-            (ctx.Request.Path.Value!.EndsWith("/thumbnail", StringComparison.Ordinal) ||
-             ctx.Request.Path.Value!.EndsWith("/image", StringComparison.Ordinal)))
-        {
-            return RateLimitPartition.GetFixedWindowLimiter(
-                partitionKey: "attachment-images:" + remoteIp,
-                factory: _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = rlPermitLimit * 20,
-                    Window = TimeSpan.FromSeconds(rlWindowSeconds),
-                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                    QueueLimit = 100
-                });
-        }
-
-        return RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: remoteIp,
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = rlPermitLimit,
-                Window = TimeSpan.FromSeconds(rlWindowSeconds),
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = rlQueueLimit
-            });
-    });
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-});
+// Rate limiting — see DTMS.Api.Infrastructure.RateLimiting. Quotas belong to
+// the caller (user, system client, vendor webhook) rather than to the TCP peer
+// address, which only ever names the Next.js server or the vendor's server.
+// Until RateLimit__Enforce is on, the original per-IP limit stays in force and
+// the per-class quotas are measured without refusing anything.
+builder.Services.AddDtmsRateLimiting(builder.Configuration);
 
 var app = builder.Build();
 
@@ -1016,8 +956,6 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseSerilogRequestLogging();
 app.UseHttpsRedirection();
 
-app.UseRateLimiter();
-
 // CORS must run BEFORE auth so the preflight OPTIONS request gets the
 // allow headers even on unauthenticated origins.
 app.UseCors(HubsCorsPolicy);
@@ -1047,6 +985,23 @@ app.UseWhen(
         branch.UseMiddleware<DTMS.Api.Middlewares.SystemClientAuthMiddleware>();
         branch.UseMiddleware<DTMS.Api.Middlewares.SystemRequestLoggingMiddleware>();
     });
+
+// Rate limiting runs here, and the position is the whole point of it: a quota
+// belongs to whoever is calling, and this is the first place that is known.
+// The user JWT scheme populates ctx.User above, and SystemClientAuthMiddleware
+// — the only thing that identifies a system client, since system JWTs are
+// signed with a different keypair — has just run in the branch above. Earlier
+// in the pipeline every caller looks anonymous and every browser user shares
+// one bucket keyed to the Next.js server's address.
+//
+// Two paths deliberately stay outside it, both short-circuiting above:
+// SystemClientAuthMiddleware's 401s and SystemPrincipalConfinementMiddleware's
+// 403s. Guessing system credentials is therefore not throttled here.
+//
+// After UseCors as well, so a preflight OPTIONS no longer spends quota — and
+// no longer risks a 429 without CORS headers, which a browser reports as an
+// opaque CORS failure rather than a rate limit.
+app.UseDtmsRateLimiting();
 
 app.UseAuthorization();
 
