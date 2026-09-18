@@ -78,10 +78,10 @@ function Inner() {
         </span>
         <div>
           <h1 className="font-display text-[1.35rem] font-semibold text-[var(--color-ink-900)]">
-            Facility reference
+            Carrier Types
           </h1>
           <p className="text-[12.5px] text-[var(--color-ink-500)]">
-            Carrier type profiles.
+            The kinds of rack and cart each carrier is registered against.
           </p>
         </div>
       </header>
