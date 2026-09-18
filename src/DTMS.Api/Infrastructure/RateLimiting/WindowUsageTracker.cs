@@ -23,6 +23,7 @@ public sealed class WindowUsageTracker : BackgroundService
     internal const int MaxTrackedCallers = 50_000;
 
     private readonly ConcurrentDictionary<string, SlidingCount> _counts = new();
+    private readonly ConcurrentDictionary<string, long> _lastLoggedWindow = new();
     private readonly RateLimitOptions _options;
     private readonly RateLimitMetrics _metrics;
     private readonly TimeProvider _time;
@@ -80,6 +81,29 @@ public sealed class WindowUsageTracker : BackgroundService
         return after;
     }
 
+    /// <summary>True the first time a caller is refused in the current window.
+    /// Rejections arrive in bursts — one line names who and where, a line per
+    /// refused request would bury it.</summary>
+    public bool ShouldLogRejection(RateLimitPartitionKey key)
+    {
+        var limit = _options.LimitFor(key.Class);
+        if (limit is null) return true;
+
+        var segment = SegmentOf(limit.Value.Window) / _options.SegmentsPerWindow;
+        var id = $"{key.Class}:{key.Key}";
+        var first = false;
+        _lastLoggedWindow.AddOrUpdate(
+            id,
+            _ => { first = true; return segment; },
+            (_, previous) =>
+            {
+                if (previous == segment) return previous;
+                first = true;
+                return segment;
+            });
+        return first;
+    }
+
     private long SegmentOf(TimeSpan window)
     {
         var segmentMs = Math.Max(1, (long)window.TotalMilliseconds / _options.SegmentsPerWindow);
@@ -114,7 +138,10 @@ public sealed class WindowUsageTracker : BackgroundService
             if (!Enum.TryParse<TrafficClass>(id[..separator], out var c)) continue;
             var limit = _options.LimitFor(c);
             if (limit is null || counter.IsIdle(SegmentOf(limit.Value.Window)))
+            {
                 _counts.TryRemove(id, out _);
+                _lastLoggedWindow.TryRemove(id, out _);
+            }
         }
         if (_counts.Count < MaxTrackedCallers) Interlocked.Exchange(ref _capWarned, 0);
     }

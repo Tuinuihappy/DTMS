@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -33,6 +34,7 @@ public static class RateLimitingSetup
                 return options.Enforce ? Enforced(key, options) : Legacy(key, ctx, options);
             });
             limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            limiter.OnRejected = (context, _) => Reject(context, options);
         });
 
         return services;
@@ -56,6 +58,56 @@ public static class RateLimitingSetup
             await next(ctx);
         });
         return app.UseRateLimiter();
+    }
+
+    /// <summary>
+    /// What a refused caller is told. Without this a 429 goes out empty: no
+    /// reason, and no <c>Retry-After</c>, so a polling client keeps asking at
+    /// the same rate and a user sees "Upstream error 429".
+    /// </summary>
+    private static ValueTask Reject(OnRejectedContext context, RateLimitOptions options)
+    {
+        var http = context.HttpContext;
+        var key = RateLimitPartitioner.For(http);
+        var services = http.RequestServices;
+
+        // The limiter knows when the window frees a permit; fall back to the
+        // class's own window so the header is always present, whatever limiter
+        // a future class uses.
+        var retryAfter = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var fromLease)
+            ? fromLease
+            : options.LimitFor(key.Class)?.Window ?? options.LegacyWindow;
+        var seconds = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds));
+
+        http.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        http.Response.Headers.RetryAfter = seconds.ToString();
+
+        services.GetRequiredService<RateLimitMetrics>().Rejected(key.Class);
+
+        var tracker = services.GetRequiredService<WindowUsageTracker>();
+        if (tracker.ShouldLogRejection(key))
+        {
+            // Metrics say a class is being refused; this says which caller and
+            // which endpoint, which is what a quota gets fixed from.
+            services.GetRequiredService<ILoggerFactory>()
+                .CreateLogger(typeof(RateLimitingSetup))
+                .LogWarning(
+                    "Rate limit reached by {Class} {Caller} on {Method} {Path}; refusing for {RetryAfterSeconds}s",
+                    key.Class, key.Key, http.Request.Method, http.Request.Path, seconds);
+        }
+
+        var traceId = Activity.Current?.TraceId.ToString() ?? http.TraceIdentifier;
+        return new ValueTask(http.Response.WriteAsJsonAsync(new
+        {
+            status = StatusCodes.Status429TooManyRequests,
+            title = "Too Many Requests",
+            detail = $"You have reached the request limit. Try again in {seconds} second{(seconds == 1 ? "" : "s")}.",
+            instance = http.Request.Path.Value,
+            traceId,
+            retryAfterSeconds = seconds,
+            // Same content type ExceptionHandlingMiddleware uses, so one
+            // client-side reader handles every modeled failure.
+        }, options: null, contentType: "application/problem+json"));
     }
 
     private static RateLimitPartition<string> Enforced(RateLimitPartitionKey key, RateLimitOptions options)
