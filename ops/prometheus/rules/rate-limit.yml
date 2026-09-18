@@ -1,0 +1,77 @@
+# Rate-limit alerts.
+#
+# Quotas belong to the caller — a user, a system client — rather than to the
+# TCP peer address, which only ever names the Next.js server or the vendor's
+# host. See src/DTMS.Api/Infrastructure/RateLimiting.
+#
+# The thing to understand when one of these fires: in this system a refused
+# user is almost always a quota set too low, not someone misbehaving. There is
+# one operator team, and the traffic is polling screens. So the first two rules
+# are sized to catch a wrong number rather than an attack, and the near-limit
+# rule exists to reach you BEFORE anyone is refused.
+#
+# Vendor webhooks are never refused (a lost frame is lost until the reconciler
+# notices), so their rule is informational only.
+#
+# Same delivery caveat as the other rule files: no Alertmanager — fires in the
+# Prometheus UI (/alerts) + Grafana only.
+groups:
+  - name: rate-limit
+    rules:
+      - alert: DtmsRateLimitRejectingUsers
+        # `or vector(0)` guards the freshly-deployed case where the counter has
+        # no samples yet — rate() over a missing series returns no data, which
+        # would silently disable the alert.
+        expr: >
+          (sum(rate(dtms_ratelimit_rejected_total{class="user"}[5m])) or vector(0)) > 0
+        for: 5m
+        labels:
+          severity: P2
+          service: dtms-api
+        annotations:
+          summary: "Users are being refused by the rate limiter"
+          description: >
+            A signed-in user has been over their request quota for 5 minutes.
+            Read the API log line "Rate limit reached by User …" — it names the
+            caller and the endpoint. Expect the cause to be a quota set too low
+            or a screen polling harder than expected, not abuse: raise
+            RateLimit__User__PermitLimit and size it from
+            max_over_time(dtms_ratelimit_partition_peak{class="user"}[1d]).
+
+      - alert: DtmsRateLimitNearCeiling
+        # The early warning. Crossing 80% of a quota costs nobody anything yet,
+        # which is exactly when a number is cheap to change.
+        expr: >
+          (sum by (class) (rate(dtms_ratelimit_near_limit_total[15m])) or vector(0)) > 0
+        for: 15m
+        labels:
+          severity: P3
+          service: dtms-api
+        annotations:
+          summary: "{{ $labels.class }} callers keep reaching 80% of their quota"
+          description: >
+            Some caller in this class has spent 80% of its window quota
+            repeatedly over 15 minutes. Nothing is refused yet. Compare
+            dtms_ratelimit_partition_peak{class="{{ $labels.class }}"} with the
+            configured limit and raise it before it starts refusing, or find
+            what is polling that hard.
+
+      - alert: DtmsWebhookRateAnomaly
+        # Informational: this class is deliberately never limited, so this can
+        # only tell you the vendor's frame rate has changed shape. The baseline
+        # is ~66/min peak measured 2026-09-14 under light dev load; 300/min
+        # sustained means something upstream changed.
+        expr: >
+          (sum(rate(dtms_ratelimit_requests_total{class="webhook"}[10m])) * 60 or vector(0)) > 300
+        for: 10m
+        labels:
+          severity: P4
+          service: dtms-api
+        annotations:
+          summary: "Vendor webhook rate far above its usual baseline"
+          description: >
+            Webhook traffic has exceeded 300 frames/min for 10 minutes against
+            a measured baseline of ~66. Webhooks are never rate limited by
+            design, so nothing is being dropped at the limiter — but check
+            whether RIOT3 is retrying, duplicating, or whether real load has
+            grown enough to resize the API.
