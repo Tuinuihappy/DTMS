@@ -91,10 +91,10 @@ public class AttachmentRepository : IAttachmentRepository
 
     // No AsNoTracking, unlike every other read here: the caller raises a domain
     // event on each row and the interceptor only drains tracked aggregates.
-    public Task<List<Attachment>> ListForCarrierForDeleteAsync(
-        Guid carrierId, CancellationToken ct = default)
+    public Task<List<Attachment>> ListForOwnerForDeleteAsync(
+        AttachmentOwner owner, Guid ownerId, CancellationToken ct = default)
         => _db.Attachments
-            .Where(a => a.CarrierId == carrierId)
+            .Where(OwnedBy(owner, ownerId))
             .ToListAsync(ct);
 
     public async Task AddAsync(Attachment attachment, CancellationToken ct = default)

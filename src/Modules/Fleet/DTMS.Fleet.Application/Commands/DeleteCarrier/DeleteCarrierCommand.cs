@@ -1,3 +1,4 @@
+using DTMS.Fleet.Domain.Entities;
 using DTMS.Fleet.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
@@ -74,7 +75,8 @@ internal sealed class DeleteCarrierCommandHandler : ICommandHandler<DeleteCarrie
         // so no aggregate is loaded, no domain event fires, and nothing
         // downstream ever hears about it. Removing them here instead means each
         // one announces its own objects while it still knows what they are.
-        var attachments = await _attachments.ListForCarrierForDeleteAsync(carrier.Id, cancellationToken);
+        var attachments = await _attachments.ListForOwnerForDeleteAsync(
+            AttachmentOwner.Carrier, carrier.Id, cancellationToken);
         foreach (var attachment in attachments)
         {
             attachment.MarkObjectsOrphaned();

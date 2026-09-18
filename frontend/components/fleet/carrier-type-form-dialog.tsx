@@ -4,7 +4,11 @@ import { Boxes, Loader2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { useEffect, useState } from "react";
-import { createCarrierTypeProfile } from "@/lib/api/fleet-carrier-types";
+import {
+  createCarrierTypeProfile,
+  updateCarrierTypeProfile,
+  type CarrierTypeProfile,
+} from "@/lib/api/fleet-carrier-types";
 import { cn } from "@/lib/utils";
 
 // ── shared modal shell ─────────────────────────────────────────────────────
@@ -42,7 +46,7 @@ function ModalShell({
       <AnimatePresence>
         {open && (
           <div
-            key="register-profile-dialog"
+            key="carrier-type-form-dialog"
             className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
           >
             <motion.div
@@ -110,15 +114,26 @@ function ModalShell({
 }
 
 // ── Carrier type ────────────────────────────────────────────────────────────
-export function RegisterCarrierTypeDialog({
+/**
+ * Register or edit. One form for both because the fields are identical apart
+ * from the code, which is locked once assigned: it addresses the row and is how
+ * every carrier payload names its type, so a rename would silently invalidate
+ * anything holding the old one.
+ */
+export function CarrierTypeFormDialog({
   open,
+  carrierType,
   onClose,
-  onCreated,
+  onSaved,
 }: {
   open: boolean;
+  /** null → register mode; a profile → edit mode with the code locked. */
+  carrierType: CarrierTypeProfile | null;
   onClose: () => void;
-  onCreated: () => void;
+  onSaved: () => void;
 }) {
+  const isEdit = carrierType !== null;
+
   const [code, setCode] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [amr, setAmr] = useState("");
@@ -130,33 +145,42 @@ export function RegisterCarrierTypeDialog({
 
   useEffect(() => {
     if (open) {
-      setCode("");
-      setDisplayName("");
-      setAmr("");
-      setMaxWeight("");
-      setMaxSlots("");
-      setDescription("");
+      setCode(carrierType?.code ?? "");
+      setDisplayName(carrierType?.displayName ?? "");
+      setAmr(carrierType?.amrCapability ?? "");
+      setMaxWeight(carrierType?.maxWeightKg != null ? String(carrierType.maxWeightKg) : "");
+      setMaxSlots(carrierType?.maxSlots != null ? String(carrierType.maxSlots) : "");
+      setDescription(carrierType?.description ?? "");
       setBusy(false);
       setError(null);
     }
-  }, [open]);
+  }, [open, carrierType]);
 
-  const canSubmit = code.trim() !== "" && displayName.trim() !== "" && amr.trim() !== "";
+  // Mirrors the server-side rule. The code becomes a URL path segment, so a
+  // space or slash would break the detail route — better to say so while the
+  // user is typing than to fail the request.
+  const codeOk = code.trim() === "" || /^[A-Za-z0-9][A-Za-z0-9._-]{0,49}$/.test(code.trim());
+  const canSubmit =
+    code.trim() !== "" && codeOk && displayName.trim() !== "" && amr.trim() !== "";
 
   const submit = async () => {
     if (!canSubmit) return;
     setBusy(true);
     setError(null);
+    const fields = {
+      displayName: displayName.trim(),
+      amrCapability: amr.trim(),
+      maxWeightKg: maxWeight.trim() ? Number(maxWeight) : null,
+      maxSlots: maxSlots.trim() ? Number(maxSlots) : null,
+      description: description.trim() || null,
+    };
     try {
-      await createCarrierTypeProfile({
-        code: code.trim(),
-        displayName: displayName.trim(),
-        amrCapability: amr.trim(),
-        maxWeightKg: maxWeight.trim() ? Number(maxWeight) : null,
-        maxSlots: maxSlots.trim() ? Number(maxSlots) : null,
-        description: description.trim() || null,
-      });
-      onCreated();
+      if (isEdit) {
+        await updateCarrierTypeProfile(carrierType.code, fields);
+      } else {
+        await createCarrierTypeProfile({ code: code.trim(), ...fields });
+      }
+      onSaved();
       onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -168,17 +192,38 @@ export function RegisterCarrierTypeDialog({
   return (
     <ModalShell
       open={open}
-      title="Register carrier type"
+      title={isEdit ? `Edit ${carrierType.code}` : "Register carrier type"}
       onClose={onClose}
       busy={busy}
       error={error}
       onSubmit={() => void submit()}
-      submitLabel="Register"
+      submitLabel={isEdit ? "Save" : "Register"}
       canSubmit={canSubmit}
     >
       <div className="flex gap-3">
         <Field label="Code" className="flex-1">
-          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="EUR-PALLET" className={inputCls} />
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="EUR-PALLET"
+            disabled={isEdit}
+            className={cn(
+              inputCls,
+              !codeOk && "border-[var(--color-coral)]",
+              isEdit && "cursor-not-allowed opacity-60",
+            )}
+          />
+          {isEdit ? (
+            <span className="mt-1 text-[10.5px] text-[var(--color-ink-500)]">
+              Codes are permanent — every carrier names its type by this.
+            </span>
+          ) : (
+            !codeOk && (
+              <span className="mt-1 text-[10.5px] text-[var(--color-coral)]">
+                Letters, digits, dot, underscore or hyphen only — it becomes part of the URL.
+              </span>
+            )
+          )}
         </Field>
         <Field label="AMR capability" className="flex-1">
           <input value={amr} onChange={(e) => setAmr(e.target.value)} placeholder="FORK" className={inputCls} />

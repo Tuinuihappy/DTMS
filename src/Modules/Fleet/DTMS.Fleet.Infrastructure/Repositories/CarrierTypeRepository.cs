@@ -29,6 +29,8 @@ public class CarrierTypeRepository : ICarrierTypeRepository
         return Task.CompletedTask;
     }
 
+    public void Remove(CarrierType carrierType) => _db.CarrierTypes.Remove(carrierType);
+
     public Task SaveChangesAsync(CancellationToken ct = default)
         => _db.SaveChangesAsync(ct);
 }

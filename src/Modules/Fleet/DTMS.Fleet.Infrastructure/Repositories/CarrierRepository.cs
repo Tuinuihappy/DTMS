@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using DTMS.Fleet.Domain.Entities;
 using DTMS.Fleet.Domain.Enums;
 using DTMS.Fleet.Domain.Repositories;
@@ -56,6 +57,29 @@ public class CarrierRepository : ICarrierRepository
             .ToListAsync(ct);
 
         return (rows, totalCount);
+    }
+
+    public Task<int> CountForCarrierTypeAsync(Guid carrierTypeId, CancellationToken ct = default)
+        => _db.Carriers.CountAsync(c => c.CarrierTypeId == carrierTypeId, ct);
+
+    public async Task<IReadOnlyDictionary<Guid, int>> CountsByCarrierTypeAsync(
+        IReadOnlyCollection<Guid> carrierTypeIds, CancellationToken ct = default)
+    {
+        if (carrierTypeIds.Count == 0)
+            return ReadOnlyDictionary<Guid, int>.Empty;
+
+        var ids = carrierTypeIds.Distinct().ToArray();
+
+        // GROUP BY in the database, not a count per row. IX(Status,
+        // CarrierTypeId) does not lead with the column grouped on, so this is a
+        // scan — fine at registry scale (single-digit thousands) and still one
+        // round trip instead of one per catalogue entry.
+        return await _db.Carriers
+            .AsNoTracking()
+            .Where(c => ids.Contains(c.CarrierTypeId))
+            .GroupBy(c => c.CarrierTypeId)
+            .Select(g => new { CarrierTypeId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.CarrierTypeId, x => x.Count, ct);
     }
 
     public async Task AddAsync(Carrier carrier, CancellationToken ct = default)

@@ -210,7 +210,8 @@ public class CarrierLifecycleHandlerTests
         // some, and why they cannot be left to the database cascade.
         var photo = PhotoOf(carrier.Id);
         var attachments = Substitute.For<IAttachmentRepository>();
-        attachments.ListForCarrierForDeleteAsync(carrier.Id, Arg.Any<CancellationToken>())
+        attachments.ListForOwnerForDeleteAsync(
+                       AttachmentOwner.Carrier, carrier.Id, Arg.Any<CancellationToken>())
                    .Returns([photo]);
 
         var result = await DeleteHandler(carriers, logs, attachments)
@@ -243,7 +244,8 @@ public class CarrierLifecycleHandlerTests
         logs.CountForCarrierAsync(carrier.Id, Arg.Any<CancellationToken>()).Returns(0);
 
         var attachments = Substitute.For<IAttachmentRepository>();
-        attachments.ListForCarrierForDeleteAsync(carrier.Id, Arg.Any<CancellationToken>())
+        attachments.ListForOwnerForDeleteAsync(
+                       AttachmentOwner.Carrier, carrier.Id, Arg.Any<CancellationToken>())
                    .Returns([]);
 
         await DeleteHandler(carriers, logs, attachments)
@@ -267,8 +269,8 @@ public class CarrierLifecycleHandlerTests
 
         // A refused delete must not queue any bytes for removal — the carrier
         // and its photos are both still in use.
-        await attachments.DidNotReceive()
-            .ListForCarrierForDeleteAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await attachments.DidNotReceive().ListForOwnerForDeleteAsync(
+            Arg.Any<AttachmentOwner>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
         attachments.DidNotReceive().Remove(Arg.Any<Attachment>());
     }
 
@@ -285,7 +287,8 @@ public class CarrierLifecycleHandlerTests
         if (attachments is null)
         {
             attachments = Substitute.For<IAttachmentRepository>();
-            attachments.ListForCarrierForDeleteAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            attachments.ListForOwnerForDeleteAsync(
+                           Arg.Any<AttachmentOwner>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
                        .Returns([]);
         }
         return new DeleteCarrierCommandHandler(carriers, logs, attachments);

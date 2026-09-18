@@ -1,4 +1,5 @@
 using DTMS.Fleet.Application.Commands.DeleteCarrier;
+using DTMS.Fleet.Application.Commands.DeleteCarrierType;
 using DTMS.Fleet.Application.Commands.MoveCarrier;
 using DTMS.Fleet.Application.Commands.RegisterCarrier;
 using DTMS.Fleet.Application.Commands.RegisterCarrierType;
@@ -7,9 +8,11 @@ using DTMS.Fleet.Application.Commands.ReturnCarrierToService;
 using DTMS.Fleet.Application.Commands.SetCarrierMaintenance;
 using DTMS.Fleet.Application.Commands.UnretireCarrier;
 using DTMS.Fleet.Application.Commands.UpdateCarrier;
+using DTMS.Fleet.Application.Commands.UpdateCarrierType;
 using DTMS.Fleet.Application.Queries.GetCarrierByCode;
 using DTMS.Fleet.Application.Queries.GetCarrierMaintenanceHistory;
 using DTMS.Fleet.Application.Queries.GetCarriers;
+using DTMS.Fleet.Application.Queries.GetCarrierTypeByCode;
 using DTMS.Fleet.Application.Queries.GetCarrierTypes;
 using DTMS.Iam.Application.Authorization;
 using MediatR;
@@ -20,6 +23,10 @@ using Microsoft.AspNetCore.Routing;
 
 namespace DTMS.Fleet.Presentation;
 
+/// <summary>Code is absent on purpose — it addresses the row and is immutable.</summary>
+public record UpdateCarrierTypeRequest(
+    string DisplayName, string AmrCapability,
+    double? MaxWeightKg = null, int? MaxSlots = null, string? Description = null);
 public record UpdateCarrierRequest(
     string CarrierTypeCode, string? DisplayName = null,
     DateTime? CommissionedAt = null);
@@ -53,6 +60,40 @@ public static class CarrierEndpoints
             var result = await sender.Send(new GetCarrierTypesQuery());
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequirePermission(Permissions.Fleet.CarrierTypeRead);
+
+        // {code}, not {id}, for the same reason as the carrier routes below: the
+        // code is what callers already speak (every carrier payload names its
+        // type by code) and CarrierType.NormalizeAndValidateCode keeps it
+        // URL-safe precisely because it lands in a path segment.
+        group.MapGet("/carrier-types/{code}", async (string code, ISender sender) =>
+        {
+            var result = await sender.Send(new GetCarrierTypeByCodeQuery(code));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
+        }).RequirePermission(Permissions.Fleet.CarrierTypeRead);
+
+        group.MapPut("/carrier-types/{code}", async (
+            string code, [FromBody] UpdateCarrierTypeRequest body, ISender sender) =>
+        {
+            var result = await sender.Send(new UpdateCarrierTypeCommand(
+                code, body.DisplayName, body.AmrCapability,
+                body.MaxWeightKg, body.MaxSlots, body.Description));
+            return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+        }).RequirePermission(Permissions.Fleet.CarrierTypeWrite);
+
+        // Refusal carries the domain's own reason so the caller is told how many
+        // carriers are holding the type rather than getting a bare 409.
+        group.MapDelete("/carrier-types/{code}", async (string code, ISender sender) =>
+        {
+            var result = await sender.Send(new DeleteCarrierTypeCommand(code));
+            if (!result.IsSuccess) return Results.BadRequest(result.Error);
+
+            return result.Value.Outcome switch
+            {
+                DeleteCarrierTypeOutcome.Deleted => Results.NoContent(),
+                DeleteCarrierTypeOutcome.NotFound => Results.NotFound(result.Value.Reason),
+                _ => Results.Conflict(result.Value.Reason)
+            };
+        }).RequirePermission(Permissions.Fleet.CarrierTypeDelete);
 
         // ── Carriers ───────────────────────────────────────────────────────
         // {code} is the natural key operators read off the cart, so it is what

@@ -34,8 +34,8 @@ public interface IAttachmentRepository
     Task<Attachment?> GetByIdAsync(Guid id, CancellationToken ct = default);
 
     /// <summary>
-    /// One carrier's images, <b>tracked</b>, for the moment before the carrier
-    /// is deleted.
+    /// One owner's images, <b>tracked</b>, for the moment before that owner is
+    /// deleted.
     ///
     /// <para>Tracked and returning entities rather than keys, because each one
     /// has to announce its own objects as orphaned and only a tracked aggregate
@@ -46,7 +46,8 @@ public interface IAttachmentRepository
     /// <para>Separate from <see cref="ListForOwnerAsync"/>, which is a read path
     /// and deliberately untracked.</para>
     /// </summary>
-    Task<List<Attachment>> ListForCarrierForDeleteAsync(Guid carrierId, CancellationToken ct = default);
+    Task<List<Attachment>> ListForOwnerForDeleteAsync(
+        AttachmentOwner owner, Guid ownerId, CancellationToken ct = default);
 
     Task AddAsync(Attachment attachment, CancellationToken ct = default);
     void Remove(Attachment attachment);

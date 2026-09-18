@@ -27,6 +27,26 @@ public interface ICarrierRepository
         int pageSize,
         CancellationToken ct = default);
 
+    /// <summary>How many carriers hold this type. Feeds the carrier-type delete
+    /// guard, which has to refuse before the FK does — Carriers.CarrierTypeId is
+    /// ON DELETE RESTRICT, and a 23503 reaching the caller says nothing useful.</summary>
+    Task<int> CountForCarrierTypeAsync(Guid carrierTypeId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The same count for every type in <paramref name="carrierTypeIds"/>, in one
+    /// query — what the catalogue list needs so no row counts its own carriers.
+    /// Types with none are absent from the result.
+    ///
+    /// <para>A second method rather than a loop over the singular one, the same
+    /// split <see cref="IAttachmentRepository.CountForOwnerAsync"/> and
+    /// <see cref="IAttachmentRepository.GetSummariesForOwnersAsync"/> already
+    /// make: one row asking about itself and a page asking about all its rows
+    /// are different queries, and expressing the page as N of the first is how
+    /// list endpoints quietly become N+1.</para>
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, int>> CountsByCarrierTypeAsync(
+        IReadOnlyCollection<Guid> carrierTypeIds, CancellationToken ct = default);
+
     Task AddAsync(Carrier carrier, CancellationToken ct = default);
     void Remove(Carrier carrier);
     Task SaveChangesAsync(CancellationToken ct = default);

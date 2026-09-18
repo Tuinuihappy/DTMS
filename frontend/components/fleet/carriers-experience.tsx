@@ -2,6 +2,7 @@
 
 import { Loader2, Plus, QrCode, ScanLine, Truck } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { PermissionGuard } from "@/components/auth/permission-guard";
@@ -43,9 +44,17 @@ export function CarriersExperience() {
 function Inner() {
   const { hasPermission } = useAuth();
   const canWrite = hasPermission(Permissions.Fleet.CarrierWrite);
+  const searchParams = useSearchParams();
 
   const [status, setStatus] = useState("");
-  const [typeCode, setTypeCode] = useState("");
+  // ?type=SHELF is how the carrier-type catalogue links into this page. Read
+  // once as the initial value rather than mirrored back on every change: the
+  // URL is an entry point here, not a saved view like the trips queue.
+  // Upper-cased because codes are stored canonically: a hand-typed ?type=shelf
+  // would otherwise filter correctly but leave the dropdown looking empty.
+  const [typeCode, setTypeCode] = useState(
+    () => searchParams.get("type")?.trim().toUpperCase() ?? "",
+  );
   const [searchDraft, setSearchDraft] = useState("");
   const [search, setSearch] = useState("");
 

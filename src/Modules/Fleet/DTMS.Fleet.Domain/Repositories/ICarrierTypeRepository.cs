@@ -9,5 +9,6 @@ public interface ICarrierTypeRepository
     Task<List<CarrierType>> GetAllAsync(CancellationToken ct = default);
     Task AddAsync(CarrierType carrierType, CancellationToken ct = default);
     Task UpdateAsync(CarrierType carrierType, CancellationToken ct = default);
+    void Remove(CarrierType carrierType);
     Task SaveChangesAsync(CancellationToken ct = default);
 }

@@ -159,6 +159,7 @@ public class CarrierTypeListPhotoTests
 {
     private readonly ICarrierTypeRepository _types = Substitute.For<ICarrierTypeRepository>();
     private readonly IAttachmentRepository _attachments = Substitute.For<IAttachmentRepository>();
+    private readonly ICarrierRepository _carriers = Substitute.For<ICarrierRepository>();
 
     // Same rule as the carriers page: one query for every type, and asked under
     // the carrier-type owner — a carrier sharing a type's id must not lend it a photo.
@@ -173,8 +174,11 @@ public class CarrierTypeListPhotoTests
                 Arg.Any<AttachmentOwner>(), Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
             .Returns((IReadOnlyDictionary<Guid, AttachmentSummary>)
                 new Dictionary<Guid, AttachmentSummary> { [shelf.Id] = new(cover, 2) });
+        _carriers.CountsByCarrierTypeAsync(
+                Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyDictionary<Guid, int>)new Dictionary<Guid, int>());
 
-        var result = await new GetCarrierTypesQueryHandler(_types, _attachments)
+        var result = await new GetCarrierTypesQueryHandler(_types, _attachments, _carriers)
             .Handle(new GetCarrierTypesQuery(), default);
 
         await _attachments.Received(1).GetSummariesForOwnersAsync(

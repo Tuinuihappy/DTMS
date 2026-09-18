@@ -18,6 +18,10 @@ export const Permissions = {
     // moved to Fleet. New codes, so holders need a re-issued grant.
     CarrierTypeRead: "dtms:fleet:carrier-type:read",
     CarrierTypeWrite: "dtms:fleet:carrier-type:write",
+    // Split from Write the way CarrierDelete is split from CarrierWrite —
+    // deleting a catalogue entry takes its photos with it and is refused while
+    // any carrier still holds the type.
+    CarrierTypeDelete: "dtms:fleet:carrier-type:delete",
     // ADR-019 P1 — the physical carrier registry. Maintain is separate so a
     // repair technician can service carts without editing the registry;
     // Delete is separate because it destroys the row.

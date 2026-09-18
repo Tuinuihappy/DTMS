@@ -1,6 +1,7 @@
 "use client";
 
-import { Boxes, Images, Loader2, Plus, Layers } from "lucide-react";
+import { Boxes, Images, Loader2, Pencil, Plus, Layers, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PhotoCell } from "@/components/attachments/photo-cell";
 import { PhotosDialog, type PhotosTarget } from "@/components/attachments/photos-dialog";
@@ -21,7 +22,8 @@ import {
 } from "@/lib/api/fleet-carrier-types";
 import { Permissions } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
-import { RegisterCarrierTypeDialog } from "./register-carrier-type-dialog";
+import { CarrierTypeDeleteDialog } from "./carrier-type-delete-dialog";
+import { CarrierTypeFormDialog } from "./carrier-type-form-dialog";
 
 export function CarrierTypesExperience() {
   return (
@@ -34,11 +36,16 @@ export function CarrierTypesExperience() {
 function Inner() {
   const { hasPermission } = useAuth();
   const canWrite = hasPermission(Permissions.Fleet.CarrierTypeWrite);
+  const canDelete = hasPermission(Permissions.Fleet.CarrierTypeDelete);
 
   const [carriers, setCarriers] = useState<CarrierTypeProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // null closes the form; a profile opens it in edit mode. Kept apart from the
+  // open flag so "register" and "edit CART type" cannot both be half-true.
   const [carrierDialog, setCarrierDialog] = useState(false);
+  const [editing, setEditing] = useState<CarrierTypeProfile | null>(null);
+  const [deleting, setDeleting] = useState<CarrierTypeProfile | null>(null);
   const [photos, setPhotos] = useState<PhotosTarget | null>(null);
 
   const reloadCarriers = useCallback(() => {
@@ -95,7 +102,14 @@ function Inner() {
             count={carriers.length}
             aside={
               canWrite ? (
-                <button type="button" onClick={() => setCarrierDialog(true)} className={registerBtn}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(null);
+                    setCarrierDialog(true);
+                  }}
+                  className={registerBtn}
+                >
                   <Plus className="h-3.5 w-3.5" strokeWidth={2.4} />
                   Register
                 </button>
@@ -113,13 +127,22 @@ function Inner() {
                   <TableTh>AMR capability</TableTh>
                   <TableTh align="right">Max weight</TableTh>
                   <TableTh align="right">Slots</TableTh>
+                  <TableTh align="right">Carriers</TableTh>
                   <TableTh align="right">{""}</TableTh>
                 </DataTableHead>
                 <DataTableBody>
                   {carriers.map((c) => (
                     <tr key={c.id} className="border-t border-white/40 dark:border-white/[0.05]">
                       <TableTd>
-                        <span className="font-mono text-[12.5px] font-semibold text-[var(--color-ink-900)]">{c.code}</span>
+                        {/* Straight to the carriers of this type — the registry
+                            page already filters by type, so the code is the
+                            natural way in rather than a second filter here. */}
+                        <Link
+                          href={`/fleet/carriers?type=${encodeURIComponent(c.code)}`}
+                          className="font-mono text-[12.5px] font-semibold text-[var(--color-ink-900)] underline-offset-2 hover:underline"
+                        >
+                          {c.code}
+                        </Link>
                       </TableTd>
                       <TableTd className="py-2">
                         <PhotoCell
@@ -162,18 +185,70 @@ function Inner() {
                         </span>
                       </TableTd>
                       <TableTd align="right">
-                        {/* Kept beside the cell: the cell opens straight onto the
-                            cover, this opens the gallery to browse and manage. */}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPhotos({ owner: "carrier-type", ownerId: c.id, label: c.code })
-                          }
-                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium text-[var(--color-ink-600)] transition-colors hover:bg-white/60 hover:text-[var(--color-ink-900)] dark:hover:bg-white/[0.08]"
-                        >
-                          <Images className="h-3.5 w-3.5" strokeWidth={2.1} />
-                          Photos
-                        </button>
+                        {c.carrierCount > 0 ? (
+                          <Link
+                            href={`/fleet/carriers?type=${encodeURIComponent(c.code)}`}
+                            className="font-mono text-[12px] tabular-nums text-[var(--color-ink-700)] underline-offset-2 hover:underline"
+                          >
+                            {c.carrierCount}
+                          </Link>
+                        ) : (
+                          <span className="font-mono text-[12px] tabular-nums text-[var(--color-ink-400)]">0</span>
+                        )}
+                      </TableTd>
+                      <TableTd align="right">
+                        <div className="flex items-center justify-end gap-0.5">
+                          {/* Kept beside the cell: the cell opens straight onto the
+                              cover, this opens the gallery to browse and manage. */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPhotos({ owner: "carrier-type", ownerId: c.id, label: c.code })
+                            }
+                            className={rowBtn}
+                          >
+                            <Images className="h-3.5 w-3.5" strokeWidth={2.1} />
+                            Photos
+                          </button>
+                          {canWrite && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditing(c);
+                                setCarrierDialog(true);
+                              }}
+                              className={rowBtn}
+                            >
+                              <Pencil className="h-3.5 w-3.5" strokeWidth={2.1} />
+                              Edit
+                            </button>
+                          )}
+                          {canDelete && (
+                            // Disabled rather than hidden while the type is in
+                            // use: the button is the only place that explains
+                            // why it cannot go, and the count beside it says
+                            // what to clear first.
+                            <button
+                              type="button"
+                              onClick={() => setDeleting(c)}
+                              disabled={c.carrierCount > 0}
+                              title={
+                                c.carrierCount > 0
+                                  ? `Used by ${c.carrierCount} carrier(s) — move or delete them first`
+                                  : `Delete ${c.code}`
+                              }
+                              className={cn(
+                                rowBtn,
+                                c.carrierCount > 0
+                                  ? "cursor-not-allowed text-[var(--color-ink-300)] hover:bg-transparent hover:text-[var(--color-ink-300)]"
+                                  : "text-[var(--color-ink-500)] hover:bg-[var(--color-coral-soft)] hover:text-[var(--color-coral)]",
+                              )}
+                              aria-label={`Delete ${c.code}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" strokeWidth={2.1} />
+                            </button>
+                          )}
+                        </div>
                       </TableTd>
                     </tr>
                   ))}
@@ -184,10 +259,17 @@ function Inner() {
         </>
       )}
 
-      <RegisterCarrierTypeDialog
+      <CarrierTypeFormDialog
         open={carrierDialog}
+        carrierType={editing}
         onClose={() => setCarrierDialog(false)}
-        onCreated={reloadCarriers}
+        onSaved={reloadCarriers}
+      />
+
+      <CarrierTypeDeleteDialog
+        carrierType={deleting}
+        onClose={() => setDeleting(null)}
+        onDeleted={reloadCarriers}
       />
 
       <PhotosDialog
@@ -242,8 +324,8 @@ function Section({
   );
 }
 
-const inputClass =
-  "h-9 rounded-md border border-white/70 bg-white/60 px-2.5 text-[12.5px] text-[var(--color-ink-900)] backdrop-blur-md focus:border-[var(--color-brand-500)]/30 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/40 dark:border-white/10 dark:bg-white/[0.05]";
+const rowBtn =
+  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium text-[var(--color-ink-600)] transition-colors hover:bg-white/60 hover:text-[var(--color-ink-900)] dark:hover:bg-white/[0.08]";
 
 const registerBtn =
   "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-3 text-[11.5px] font-semibold text-white transition-all hover:shadow-[0_10px_28px_-12px_rgba(15,23,42,0.5)] dark:bg-[var(--color-brand-500)]";
