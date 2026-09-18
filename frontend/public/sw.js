@@ -14,7 +14,7 @@
 // Versioning: bump CACHE_VERSION on every release so old shells get
 // purged. Today there's no cache layer; the constant exists so the
 // SW.update() event always fires when this file's bytes change.
-const CACHE_VERSION = 'dtms-operator-v0.4.3-skeleton';
+const CACHE_VERSION = 'dtms-operator-v0.4.4-skeleton';
 
 self.addEventListener('install', () => {
   // Skip the default "waiting" phase — the operator PWA is a single
@@ -116,12 +116,17 @@ async function drainQueue() {
         await deleteQueueRow(item.id);
         continue;
       }
-      // 4xx — permanent. Drop so the queue isn't stuck.
-      if (res.status >= 400 && res.status < 500) {
+      // A refusal retrying cannot fix. Drop so the queue isn't stuck.
+      // 429 and 408 are excluded: they mean "not now" — the caller is over
+      // their request quota or the request timed out — and dropping those
+      // would destroy an operator's confirmation because the app was busy.
+      // Same rule as isPermanentFailure in lib/operator-pwa/offline-queue.ts;
+      // this file cannot import it, so keep the two in step by hand.
+      if (res.status >= 400 && res.status < 500 && res.status !== 429 && res.status !== 408) {
         await deleteQueueRow(item.id);
         continue;
       }
-      // 5xx — leave + bail, retry next sync event.
+      // 5xx / 429 / 408 — leave + bail, retry next sync event.
       break;
     } catch (_) {
       // Network blip — leave the row, retry next sync.

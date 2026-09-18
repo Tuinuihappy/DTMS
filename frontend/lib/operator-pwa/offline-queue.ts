@@ -136,6 +136,21 @@ async function upsert(action: QueuedAction): Promise<void> {
   });
 }
 
+/**
+ * Whether a status means "this will never succeed", so the action can be
+ * dropped. Most 4xx are: the server rejected what the operator did and
+ * retrying sends the same thing again.
+ *
+ * 429 and 408 are the exceptions. They say "not now", not "not ever" — the
+ * caller has spent their request quota, or the request timed out. Dropping
+ * those would destroy an operator's pickup or drop confirmation, recorded
+ * offline, because the app happened to be busy. sw.js repeats this rule;
+ * keep the two in step.
+ */
+export function isPermanentFailure(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 429 && status !== 408;
+}
+
 async function sendOne(action: QueuedAction): Promise<{ ok: boolean; status: number; error: string | null }> {
   try {
     const res = await fetch(action.path, {
@@ -147,8 +162,9 @@ async function sendOne(action: QueuedAction): Promise<{ ok: boolean; status: num
     if (res.ok || res.status === 204) {
       return { ok: true, status: res.status, error: null };
     }
-    // 4xx is permanent — operator can't fix by retrying. Surface
-    // the error so drain() drops the action instead of looping.
+    // A refusal the operator cannot fix by retrying. Surfaced so drain()
+    // drops the action instead of looping — see isPermanentFailure for the
+    // two statuses that are held instead.
     if (res.status >= 400 && res.status < 500) {
       const body = (await res.json().catch(() => null)) as { message?: string; error?: string } | null;
       return {
@@ -198,13 +214,13 @@ export async function enqueueAction(args: EnqueueArgs): Promise<EnqueueResult> {
     await deleteById(action.id);
     return { delivered: true, queuedAt: null };
   }
-  // 4xx — drop and surface error to caller. The caller decides
-  // whether to surface the message as a toast.
-  if (outcome.status >= 400 && outcome.status < 500) {
+  // Permanently rejected — drop and surface the error to the caller, which
+  // decides whether to show it as a toast.
+  if (isPermanentFailure(outcome.status)) {
     await deleteById(action.id);
     throw new Error(outcome.error ?? "Action rejected.");
   }
-  // 5xx / network — keep queued, increment attempt counter.
+  // 5xx / 429 / 408 / network — keep queued, increment attempt counter.
   await upsert({ ...action, attempts: action.attempts + 1, lastError: outcome.error });
   await registerBackgroundSync();
   return { delivered: false, queuedAt: action.createdAt };
@@ -227,8 +243,8 @@ export async function drainQueue(): Promise<{ drained: number; remaining: number
       drained++;
       continue;
     }
-    if (outcome.status >= 400 && outcome.status < 500) {
-      // Permanent failure — drop so the queue doesn't keep looping.
+    if (isPermanentFailure(outcome.status)) {
+      // Never going to succeed — drop so the queue doesn't keep looping.
       await deleteById(action.id);
       lastError = outcome.error;
       drained++;
