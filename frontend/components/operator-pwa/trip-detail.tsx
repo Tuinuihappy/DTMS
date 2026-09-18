@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   acknowledgeTrip,
   completeTrip,
@@ -10,6 +10,7 @@ import {
   submitGeofenceOverride,
   type AssignedTrip,
 } from "@/lib/api/operator";
+import { usePollSchedule } from "@/lib/hooks/use-poll-schedule";
 import { getCurrentPosition, tryGetCurrentPosition } from "@/lib/operator-pwa/geolocation";
 import { PodCapture } from "./pod-capture";
 
@@ -59,19 +60,19 @@ export function TripDetail({ tripId }: { tripId: string }) {
       const all = await getAssignedTrips();
       const found = all.find((t) => t.tripId === tripId) ?? null;
       setTrip(found);
-    } catch {
-      // Network blip — keep stale state visible.
+    } catch (err) {
+      // Network blip — keep stale state visible, but let the schedule know so
+      // it slows down rather than asking again every 8 seconds.
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    refresh();
-    const tick = window.setInterval(refresh, 8_000);
-    return () => window.clearInterval(tick);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tripId]);
+  usePollSchedule(
+    useCallback(() => refresh(), [tripId]),
+    { intervalMs: 8_000 },
+  );
 
   if (loading) return <div className="p-6 text-sm text-zinc-500">Loading…</div>;
   if (!trip) {

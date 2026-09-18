@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   motion,
   useMotionValue,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { usePollSchedule } from "@/lib/hooks/use-poll-schedule";
 import {
   getMapRobotPositions,
   type RobotPositionDto,
@@ -25,9 +26,13 @@ const POLL_MS = 1000;
 
 /* -------------------------------------------------------------------------- */
 /* useRobotPositions — polls /maps/{id}/robot-positions on a 1 s interval.    */
-/* Skips when the tab is hidden (visibilityState !== "visible") so a parked   */
-/* tab doesn't burn API + battery. Cancels any in-flight fetch on tick or    */
-/* unmount via AbortController so we never race a stale response into state.  */
+/* The schedule skips hidden tabs, cancels the in-flight fetch each tick so a  */
+/* stale response never races into state, and backs off when the API refuses.  */
+/*                                                                            */
+/* This is by far the most expensive poll in the app — 60 requests a minute    */
+/* per open tab, and it is mounted by the facility map AND the home page's     */
+/* fleet strip. Moving it onto the /hubs/fleet channel, which the limiter does */
+/* not count at all, is tracked as separate work.                             */
 /* -------------------------------------------------------------------------- */
 export function useRobotPositions(mapId: string | null): {
   positions: RobotPositionDto[];
@@ -38,53 +43,34 @@ export function useRobotPositions(mapId: string | null): {
   const [lastTickMs, setLastTickMs] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Stash the latest abort controller so a new tick can cancel the in-flight one.
-  const abortRef = useRef<AbortController | null>(null);
-
   useEffect(() => {
     if (!mapId) {
       setPositions([]);
       setLastTickMs(null);
-      return;
     }
-
-    let cancelled = false;
-
-    async function tick() {
-      if (cancelled) return;
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
-        return;
-      }
-      abortRef.current?.abort();
-      const ctrl = new AbortController();
-      abortRef.current = ctrl;
-      try {
-        const data = await getMapRobotPositions(mapId!, ctrl.signal);
-        if (cancelled) return;
-        setPositions(data);
-        setLastTickMs(performance.now());
-        setError(null);
-      } catch (err) {
-        if (cancelled) return;
-        if ((err as { name?: string })?.name === "AbortError") return;
-        setError(err instanceof Error ? err.message : "Robot stream failed");
-      }
-    }
-
-    void tick();
-    const id = window.setInterval(() => void tick(), POLL_MS);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void tick();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-      document.removeEventListener("visibilitychange", onVisible);
-      abortRef.current?.abort();
-    };
   }, [mapId]);
+
+  usePollSchedule(
+    useCallback(
+      async (signal: AbortSignal) => {
+        if (!mapId) return;
+        try {
+          const data = await getMapRobotPositions(mapId, signal);
+          if (signal.aborted) return;
+          setPositions(data);
+          setLastTickMs(performance.now());
+          setError(null);
+        } catch (err) {
+          if (signal.aborted) return;
+          if ((err as { name?: string })?.name === "AbortError") return;
+          setError(err instanceof Error ? err.message : "Robot stream failed");
+          throw err;
+        }
+      },
+      [mapId],
+    ),
+    { intervalMs: POLL_MS, enabled: mapId !== null },
+  );
 
   return { positions, lastTickMs, error };
 }

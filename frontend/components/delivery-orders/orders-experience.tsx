@@ -39,6 +39,7 @@ import {
 } from "./state-action-dialog";
 import { ToastProvider, useToast } from "./toast";
 import { formatDate } from "@/lib/datetime";
+import { usePollSchedule } from "@/lib/hooks/use-poll-schedule";
 
 function exportCsv(rows: DeliveryOrderListDto[]) {
   const headers = [
@@ -259,7 +260,6 @@ function ExperienceInner() {
   const [cancelTripCount, setCancelTripCount] = useState(0);
 
   const toast = useToast();
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fetchAbortRef = useRef<AbortController | null>(null);
   // Holds the latest `runAction` closure. Bulk-cancel uses this ref
   // rather than including runAction in its deps, which would otherwise
@@ -326,13 +326,20 @@ function ExperienceInner() {
     window.localStorage.setItem("orders:pagination-mode", paginationMode);
   }, [paginationMode]);
 
+  // `signal` comes from the poll schedule when this runs on a timer, so a
+  // refused poll can back off; a manual refresh brings its own.
   const fetchOrders = useCallback(
-    async (opts?: { silent?: boolean }) => {
+    async (opts?: { silent?: boolean; signal?: AbortSignal }) => {
       // Cancel any in-flight request so a slow response can't overwrite
       // a newer one (race when the user types fast or pages quickly).
-      fetchAbortRef.current?.abort();
-      const controller = new AbortController();
-      fetchAbortRef.current = controller;
+      let controller: AbortController | null = null;
+      let signal = opts?.signal;
+      if (!signal) {
+        fetchAbortRef.current?.abort();
+        controller = new AbortController();
+        fetchAbortRef.current = controller;
+        signal = controller.signal;
+      }
 
       if (!opts?.silent) setRefreshing(true);
       setError(null);
@@ -349,7 +356,7 @@ function ExperienceInner() {
             sortBy,
             sortDir,
           },
-          controller.signal,
+          signal,
         );
         // Server now handles Active/Completed buckets via WHERE Status IN
         // (...). totalCount is authoritative for pagination — no more
@@ -366,10 +373,13 @@ function ExperienceInner() {
         }
         setTotalCount(res.totalCount);
       } catch (e) {
-        if ((e as Error).name === "AbortError") return;
+        if (signal.aborted || (e as Error).name === "AbortError") return;
         setError((e as Error).message || "Failed to load orders.");
+        // Rethrown so a poll on a timer slows down instead of asking again at
+        // the same rate — see usePollSchedule.
+        throw e;
       } finally {
-        if (fetchAbortRef.current === controller) {
+        if (!signal.aborted && (controller === null || fetchAbortRef.current === controller)) {
           setLoading(false);
           setRefreshing(false);
         }
@@ -379,47 +389,23 @@ function ExperienceInner() {
   );
 
   useEffect(() => {
-    fetchOrders();
+    void fetchOrders().catch(() => {
+      // Already shown in `error`; the poll schedule handles retrying.
+    });
   }, [fetchOrders]);
 
   // Soft polling — refresh the list every 15s while the user isn't
   // in a modal/drawer AND the tab is visible. Backgrounded tabs would
-  // otherwise keep hitting the API silently; visibilitychange lets us
-  // pause and resume cleanly. When the user comes back we fire one
-  // immediate fetch so they don't stare at stale numbers waiting for
-  // the next interval tick.
-  useEffect(() => {
-    if (createOpen || detailId) return;
-
-    const start = () => {
-      if (pollRef.current) return;
-      pollRef.current = setInterval(() => {
-        fetchOrders({ silent: true });
-      }, 15_000);
-    };
-    const stop = () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-
-    const handleVisibility = () => {
-      if (document.hidden) {
-        stop();
-      } else {
-        start();
-        fetchOrders({ silent: true });
-      }
-    };
-
-    if (!document.hidden) start();
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibility);
-      stop();
-    };
-  }, [createOpen, detailId, fetchOrders]);
+  // otherwise keep hitting the API silently. The schedule owns the timing,
+  // the pause while hidden, the immediate fetch when the tab comes back, and
+  // the back-off when the API refuses.
+  const { trigger } = usePollSchedule(
+    useCallback(
+      (signal: AbortSignal) => fetchOrders({ silent: true, signal }),
+      [fetchOrders],
+    ),
+    { intervalMs: 15_000, enabled: !createOpen && !detailId },
+  );
 
   // Phase P4 — SignalR live updates for the cross-order list. Backend
   // pushes ListItemUpdated hints to the "orders-list" group whenever any
@@ -427,14 +413,17 @@ function ExperienceInner() {
   // (500ms) so a burst of events (e.g. many JobCreated in quick
   // succession) collapses into one round-trip. Refetch — not delta
   // merge — keeps server-side search/facets authoritative.
+  //
+  // Through the schedule, so a burst of events while this caller is being
+  // rate limited cannot keep it pinned there.
   const listHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduleListRefetch = useCallback(() => {
     if (listHintTimerRef.current) clearTimeout(listHintTimerRef.current);
     listHintTimerRef.current = setTimeout(() => {
       listHintTimerRef.current = null;
-      fetchOrders({ silent: true });
+      trigger();
     }, 500);
-  }, [fetchOrders]);
+  }, [trigger]);
 
   useEffect(() => {
     return () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   listActiveManualTrips,
   listOperators,
@@ -10,6 +10,7 @@ import {
   type OverrideQueueRow,
 } from "@/lib/api/admin-manual";
 import { useHubSubscription } from "@/lib/hooks/use-hub-subscription";
+import { usePollSchedule } from "@/lib/hooks/use-poll-schedule";
 import { OperatorBoardSection } from "./operator-board-section";
 import { OverrideQueueSection } from "./override-queue-section";
 
@@ -33,6 +34,8 @@ export function ManualOperatorBoard() {
   const [overrides, setOverrides] = useState<OverrideQueueRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // Three requests per refresh, so this board is the heaviest poller per tick.
+  // Failures are rethrown for the schedule to back off on.
   const refreshAll = useCallback(async () => {
     try {
       const [ops, tr, ov] = await Promise.all([
@@ -46,14 +49,14 @@ export function ManualOperatorBoard() {
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load Manual board.");
+      throw err;
     }
   }, []);
 
-  useEffect(() => {
-    refreshAll();
-    const tick = window.setInterval(refreshAll, 12_000);
-    return () => window.clearInterval(tick);
-  }, [refreshAll]);
+  // Fallback polling, now paused while the tab is hidden and slowed when the
+  // API refuses — three endpoints every 12 seconds was the largest cost of
+  // leaving this board open in a background tab.
+  const { trigger } = usePollSchedule(refreshAll, { intervalMs: 12_000 });
 
   useHubSubscription({
     hubPath: "/hubs/manual-board",
@@ -61,12 +64,10 @@ export function ManualOperatorBoard() {
     unsubscribeMethod: "Unsubscribe",
     subscribeArgs: [],
     eventHandlers: {
-      OverrideDecided: () => {
-        void refreshAll();
-      },
-      TripReassigned: () => {
-        void refreshAll();
-      },
+      // Through the schedule: each hint costs three requests, and an
+      // undebounced burst used to fire all of them per event.
+      OverrideDecided: () => trigger(),
+      TripReassigned: () => trigger(),
     },
   });
 
@@ -81,7 +82,7 @@ export function ManualOperatorBoard() {
         </div>
         <button
           type="button"
-          onClick={() => void refreshAll()}
+          onClick={() => trigger()}
           className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
         >
           Refresh
@@ -98,12 +99,12 @@ export function ManualOperatorBoard() {
         <OperatorBoardSection
           operators={operators}
           trips={trips}
-          onChange={() => void refreshAll()}
+          onChange={() => trigger()}
         />
         <OverrideQueueSection
           overrides={overrides}
           operators={operators}
-          onChange={() => void refreshAll()}
+          onChange={() => trigger()}
         />
       </div>
     </div>

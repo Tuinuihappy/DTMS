@@ -34,6 +34,7 @@ import {
   TableTh,
 } from "@/components/primitives/data-table";
 import { useTripListSubscription } from "@/lib/realtime/hubs/trip-hub";
+import { usePollSchedule } from "@/lib/hooks/use-poll-schedule";
 import { Pagination, type PageSize } from "@/components/delivery-orders/pagination";
 import { TripStatusBadge, AttemptBadge } from "./badges";
 import { TripDetailDrawer } from "./trip-detail-drawer";
@@ -146,7 +147,6 @@ export function TripsExperience() {
   const [error, setError] = useState<string | null>(null);
   const [detailTripId, setDetailTripId] = useState<string | null>(null);
 
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fetchAbortRef = useRef<AbortController | null>(null);
 
   // Reset to page 1 when filters change.
@@ -170,11 +170,18 @@ export function TripsExperience() {
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }, [statusFilter, search, vehicleKey, fromDate, toDate, page, pageSize, sortBy, sortDir, router, pathname]);
 
+  // `signal` comes from the poll schedule when this runs on a timer, so a
+  // refused poll can back off; a manual refresh brings its own.
   const fetchTrips = useCallback(
-    async (opts?: { silent?: boolean }) => {
-      fetchAbortRef.current?.abort();
-      const controller = new AbortController();
-      fetchAbortRef.current = controller;
+    async (opts?: { silent?: boolean; signal?: AbortSignal }) => {
+      let controller: AbortController | null = null;
+      let signal = opts?.signal;
+      if (!signal) {
+        fetchAbortRef.current?.abort();
+        controller = new AbortController();
+        fetchAbortRef.current = controller;
+        signal = controller.signal;
+      }
       if (!opts?.silent) setRefreshing(true);
       setError(null);
       try {
@@ -192,15 +199,18 @@ export function TripsExperience() {
             page,
             pageSize,
           },
-          controller.signal,
+          signal,
         );
         setTrips(res.items);
         setTotalCount(res.totalCount);
       } catch (e) {
-        if ((e as Error).name === "AbortError") return;
+        if (signal.aborted || (e as Error).name === "AbortError") return;
         setError((e as Error).message || "Failed to load trips.");
+        // Rethrown so a poll on a timer slows down instead of asking again at
+        // the same rate — see usePollSchedule.
+        throw e;
       } finally {
-        if (fetchAbortRef.current === controller) {
+        if (!signal.aborted && (controller === null || fetchAbortRef.current === controller)) {
           setLoading(false);
           setRefreshing(false);
         }
@@ -210,23 +220,42 @@ export function TripsExperience() {
   );
 
   useEffect(() => {
-    fetchTrips();
+    void fetchTrips().catch(() => {
+      // Already shown in `error`; the poll schedule handles retrying.
+    });
   }, [fetchTrips]);
+
+  // Soft polling — 15s while the drawer is closed and the tab is visible.
+  // Kept as a safety net for environments where SignalR can't reach this
+  // client (proxy stripping WebSocket upgrade, browser tab throttling, etc.).
+  // The schedule owns the timing, the pause while hidden, and the back-off
+  // when the API refuses.
+  const { trigger } = usePollSchedule(
+    useCallback(
+      (signal: AbortSignal) => fetchTrips({ silent: true, signal }),
+      [fetchTrips],
+    ),
+    { intervalMs: 15_000, enabled: !detailTripId },
+  );
 
   // Backend Phase 2 (B3) — SignalR live updates for the cross-trip list.
   // TripStatusHistoryProjector pushes ListItemUpdated hints to the
   // "trips-list" group whenever any trip changes status. Debounce-refetch
   // (500ms) so a burst of events collapses into one round-trip. Refetch —
   // not delta merge — keeps server-side filter/sort authoritative. Polling
-  // below stays as the fallback when SignalR is briefly disconnected.
+  // above stays as the fallback when SignalR is briefly disconnected.
+  //
+  // Through the schedule, not straight to the fetch: while the API is
+  // refusing this caller, a burst of hub events would otherwise keep asking
+  // at full rate and hold the client in its own rate limit.
   const listHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduleListRefetch = useCallback(() => {
     if (listHintTimerRef.current) clearTimeout(listHintTimerRef.current);
     listHintTimerRef.current = setTimeout(() => {
       listHintTimerRef.current = null;
-      fetchTrips({ silent: true });
+      trigger();
     }, 500);
-  }, [fetchTrips]);
+  }, [trigger]);
 
   useEffect(() => {
     return () => {
@@ -237,37 +266,6 @@ export function TripsExperience() {
   useTripListSubscription({
     ListItemUpdated: scheduleListRefetch,
   });
-
-  // Soft polling — 15s while the drawer is closed and the tab is visible.
-  // Kept as a safety net for environments where SignalR can't reach this
-  // client (proxy stripping WebSocket upgrade, browser tab throttling, etc.).
-  useEffect(() => {
-    if (detailTripId) return;
-    const start = () => {
-      if (pollRef.current) return;
-      pollRef.current = setInterval(() => fetchTrips({ silent: true }), 15_000);
-    };
-    const stop = () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-    const handleVisibility = () => {
-      if (document.hidden) {
-        stop();
-      } else {
-        start();
-        fetchTrips({ silent: true });
-      }
-    };
-    if (!document.hidden) start();
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibility);
-      stop();
-    };
-  }, [detailTripId, fetchTrips]);
 
   const handleSortHeader = useCallback(
     (col: TripQueueSortKey) => {

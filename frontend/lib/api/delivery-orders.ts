@@ -3,6 +3,8 @@
 // Next.js route handlers under app/api/delivery-orders/* — these helpers
 // are what client components call.
 
+import { throwIfRateLimited } from "@/lib/api/errors";
+
 export type OrderStatus =
   | "Draft"
   | "Submitted"
@@ -271,6 +273,7 @@ function mutationHeaders(): Record<string, string> {
 }
 
 async function unwrap<T>(res: Response): Promise<T> {
+  await throwIfRateLimited(res);
   if (!res.ok) {
     let detail = "";
     try {

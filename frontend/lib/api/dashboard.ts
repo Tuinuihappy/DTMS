@@ -2,6 +2,8 @@
 // backend projection queries; the shapes mirror the C# DTOs so existing
 // chart components can consume them without a translation layer.
 
+import { throwIfRateLimited } from "@/lib/api/errors";
+
 export type OrderFunnelBucket = {
   bucketHour: string;
   confirmed: number;
@@ -44,6 +46,7 @@ async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<T> {
     headers: { Accept: "application/json" },
     signal,
   });
+  await throwIfRateLimited(res);
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
     try {

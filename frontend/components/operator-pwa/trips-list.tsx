@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { type AssignedTrip, getAssignedTrips } from "@/lib/api/operator";
+import { usePollSchedule } from "@/lib/hooks/use-poll-schedule";
 
 type LoadState =
   | { kind: "idle" }
@@ -17,28 +18,25 @@ type LoadState =
 export function TripsList() {
   const [state, setState] = useState<LoadState>({ kind: "idle" });
 
-  useEffect(() => {
-    let cancelled = false;
-    const fetchOnce = async () => {
+  // The schedule pauses while the phone's screen is off or the app is in the
+  // background, and slows down if the API refuses — an operator's quota is
+  // shared with everything else they have open.
+  usePollSchedule(
+    useCallback(async (signal: AbortSignal) => {
       try {
         const trips = await getAssignedTrips();
-        if (!cancelled) setState({ kind: "loaded", trips });
+        if (!signal.aborted) setState({ kind: "loaded", trips });
       } catch (err) {
-        if (!cancelled)
+        if (!signal.aborted)
           setState({
             kind: "error",
             message: err instanceof Error ? err.message : "Could not load trips.",
           });
+        throw err;
       }
-    };
-    setState({ kind: "loading" });
-    fetchOnce();
-    const tick = window.setInterval(fetchOnce, 10_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(tick);
-    };
-  }, []);
+    }, []),
+    { intervalMs: 10_000 },
+  );
 
   if (state.kind === "loading" || state.kind === "idle") {
     return <div className="p-6 text-sm text-zinc-500">Loading…</div>;

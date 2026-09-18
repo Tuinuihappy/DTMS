@@ -1,3 +1,5 @@
+import { throwIfRateLimited } from "@/lib/api/errors";
+
 export type StationDto = {
   id: string;
   mapId: string;
@@ -227,6 +229,7 @@ export async function getMapRobotPositions(
     cache: "no-store",
     signal,
   });
+  await throwIfRateLimited(res);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(text || `Failed to load robot positions (${res.status})`);

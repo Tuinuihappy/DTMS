@@ -7,6 +7,7 @@
 //   - read handles bypass the queue (always hit the network — operator
 //     needs fresh state)
 
+import { throwIfRateLimited } from "@/lib/api/errors";
 import { enqueueAction } from "@/lib/operator-pwa/offline-queue";
 
 export type AssignedTrip = {
@@ -63,6 +64,7 @@ export type PresignResponse = {
 // ── Reads ────────────────────────────────────────────────────────────
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: "include", cache: "no-store" });
+  await throwIfRateLimited(res);
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { message?: string } | null;
     throw new Error(body?.message ?? `Request to ${url} failed (${res.status}).`);

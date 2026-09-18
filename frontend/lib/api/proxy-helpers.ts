@@ -145,6 +145,10 @@ export async function proxyToBackend({
       fromField("message") ||
       fromField("Error") ||
       fromField("error") ||
+      // ProblemDetails writes its explanation to `detail` — every modeled 4xx
+      // the backend authors, and the 429 the rate limiter writes. Without this
+      // they all collapsed into "Upstream error 400" on the way through.
+      fromField("detail") ||
       rawString ||
       (upstream.status >= 500
         ? "Server error"
@@ -152,9 +156,16 @@ export async function proxyToBackend({
     // Preserve the backend correlation id (ProblemDetails.traceId) so a user
     // reporting a server error can quote it and support can find the log line.
     const traceId = fromField("traceId");
+
+    // A rate-limited caller is told how long to wait, so relay it: it is the
+    // one upstream header a client acts on, and everything else is dropped.
+    const headers = new Headers();
+    const retryAfter = upstream.headers.get("retry-after");
+    if (upstream.status === 429 && retryAfter) headers.set("Retry-After", retryAfter);
+
     return NextResponse.json(
       traceId ? { message, traceId } : { message },
-      { status: upstream.status },
+      { status: upstream.status, headers },
     );
   }
 

@@ -5,6 +5,8 @@
 // but keeps Admin reads + mutations separate so the bundle splits
 // cleanly between the operator PWA shell and the dispatcher app.
 
+import { throwIfRateLimited } from "@/lib/api/errors";
+
 export type OperatorBoardRow = {
   id: string;
   employeeCode: string;
@@ -44,6 +46,7 @@ export type OverrideQueueRow = {
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: "include", cache: "no-store" });
+  await throwIfRateLimited(res);
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { message?: string } | null;
     throw new Error(body?.message ?? `Request to ${url} failed (${res.status}).`);

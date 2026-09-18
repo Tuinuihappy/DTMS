@@ -3,6 +3,8 @@
 // operator view that bundles aggregate state, vendor snapshot fields,
 // per-mission timeline, and (optionally) the raw vendor JSON blobs.
 
+import { throwIfRateLimited } from "@/lib/api/errors";
+
 export type TripStatus =
   | "Created"
   | "InProgress"
@@ -87,6 +89,9 @@ async function api<T>(input: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { Accept: "application/json", ...(init?.headers ?? {}) },
   });
+  // A rate limit carries the wait the server asked for, so it is thrown as its
+  // own type and pollers slow down by exactly that much.
+  await throwIfRateLimited(res);
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
     try {
