@@ -1,0 +1,212 @@
+{
+  "annotations": { "list": [] },
+  "description": "Sizing the per-caller rate-limit quotas before RateLimit__Enforce is turned on. Measurement mode: nothing here is refused except by the legacy per-IP limiter.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "text",
+      "title": "How to read this",
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "**Measurement mode** (`RateLimit__Enforce=false`): every request is classified by caller and counted against its class quota, but only the legacy per-IP limiter refuses anything. Collection on podman started **2026-09-24**; earlier Docker Desktop history was not carried over.\n\n**To size a quota:** set the time range to the whole collection period (aim for ≥ 14 days, covering the busiest shift), read the class's *peak* tile, and set `RateLimit__<Class>__PermitLimit` comfortably above it. Then flip `RateLimit__Enforce=true` and watch *would-reject* → *rejected*.\n\nQuota lines below are the docker-compose defaults (user 600, system 1200, attachment images 3000, anonymous 300 per 60 s). If you change a quota in `.env`, update the thresholds here too — the API does not export its configured limits."
+      }
+    },
+    {
+      "type": "stat",
+      "title": "User — busiest caller, peak in range",
+      "description": "Highest request count any single signed-in user reached in one 60 s window over the selected range. Quota 600; amber from 80%.",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 5 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 480 },
+            { "color": "red", "value": 600 }
+          ] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "value", "graphMode": "none", "textMode": "value", "reduceOptions": { "calcs": ["max"], "fields": "", "values": false } },
+      "targets": [ { "expr": "max(max_over_time(dtms_ratelimit_partition_peak{class=\"user\"}[$__range]))", "instant": true, "refId": "A" } ]
+    },
+    {
+      "type": "stat",
+      "title": "System — busiest client, peak in range",
+      "description": "Highest request count any single system client (OMS, WMS…) reached in one 60 s window over the selected range. Quota 1200; amber from 80%.",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 5 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 960 },
+            { "color": "red", "value": 1200 }
+          ] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "value", "graphMode": "none", "textMode": "value", "reduceOptions": { "calcs": ["max"], "fields": "", "values": false } },
+      "targets": [ { "expr": "max(max_over_time(dtms_ratelimit_partition_peak{class=\"system\"}[$__range]))", "instant": true, "refId": "A" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Attachment images — busiest caller, peak in range",
+      "description": "Thumbnail/image requests by one caller in one 60 s window — a separate quota so a photo table does not spend the user's budget. Quota 3000; amber from 80%.",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 5 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 2400 },
+            { "color": "red", "value": 3000 }
+          ] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "value", "graphMode": "none", "textMode": "value", "reduceOptions": { "calcs": ["max"], "fields": "", "values": false } },
+      "targets": [ { "expr": "max(max_over_time(dtms_ratelimit_partition_peak{class=\"attachmentimage\"}[$__range]))", "instant": true, "refId": "A" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Anonymous — shared bucket, peak in range",
+      "description": "Requests without a token in one 60 s window. They all arrive from the Next server's one address, so this is ONE shared bucket, not per person (expired sessions reaching their 401). Quota 300; amber from 80%.",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 5 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 240 },
+            { "color": "red", "value": 300 }
+          ] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "value", "graphMode": "none", "textMode": "value", "reduceOptions": { "calcs": ["max"], "fields": "", "values": false } },
+      "targets": [ { "expr": "max(max_over_time(dtms_ratelimit_partition_peak{class=\"anonymous\"}[$__range]))", "instant": true, "refId": "A" } ]
+    },
+    {
+      "type": "timeseries",
+      "title": "User — busiest caller per 60 s window",
+      "description": "The dashed lines are 80% of quota (early warning) and the quota itself. A line that reaches the quota would have been refused had enforcement been on.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "custom": { "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "thresholdsStyle": { "mode": "dashed" } },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "transparent", "value": null },
+            { "color": "orange", "value": 480 },
+            { "color": "red", "value": 600 }
+          ] }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": false }, "tooltip": { "mode": "single" } },
+      "targets": [ { "expr": "max(dtms_ratelimit_partition_peak{class=\"user\"})", "legendFormat": "busiest user", "refId": "A" } ]
+    },
+    {
+      "type": "timeseries",
+      "title": "System — busiest client per 60 s window",
+      "description": "The dashed lines are 80% of quota (early warning) and the quota itself.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "custom": { "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "thresholdsStyle": { "mode": "dashed" } },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "transparent", "value": null },
+            { "color": "orange", "value": 960 },
+            { "color": "red", "value": 1200 }
+          ] }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": false }, "tooltip": { "mode": "single" } },
+      "targets": [ { "expr": "max(dtms_ratelimit_partition_peak{class=\"system\"})", "legendFormat": "busiest client", "refId": "A" } ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Daily peak by class",
+      "description": "The busiest single caller of each class, one bar per day. This is the number a quota is sized from: set it comfortably above the highest bar across the collection period.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 18 },
+      "interval": "1d",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "custom": { "drawStyle": "bars", "barAlignment": 0, "lineWidth": 1, "fillOpacity": 80, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [ { "expr": "max by (class) (max_over_time(dtms_ratelimit_partition_peak[1d]))", "legendFormat": "{{class}}", "interval": "1d", "refId": "A" } ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Requests / min by class",
+      "description": "All traffic the limiter sees, summed across callers. Webhooks are counted but never limited; infra (health, metrics, hubs) is not counted.",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 26 },
+      "fieldConfig": {
+        "defaults": { "unit": "none", "min": 0, "custom": { "lineWidth": 2, "fillOpacity": 0, "showPoints": "never" } },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [ { "expr": "sum by (class) (rate(dtms_ratelimit_requests_total[5m])) * 60", "legendFormat": "{{class}}", "refId": "A" } ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Would-reject / min by class",
+      "description": "Requests over their class quota that were let through only because enforcement is off. Anything here would be a 429 the day RateLimit__Enforce is turned on — raise that class's quota first.",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 26 },
+      "fieldConfig": {
+        "defaults": { "unit": "none", "min": 0, "noValue": "None so far", "custom": { "lineWidth": 2, "fillOpacity": 0, "showPoints": "never" } },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [ { "expr": "sum by (class) (rate(dtms_ratelimit_would_reject_total[5m])) * 60", "legendFormat": "{{class}}", "refId": "A" } ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Rejected (429) / min by class",
+      "description": "Requests actually refused. With enforcement off this stays at zero for the per-class quotas; after enforcement it drives the DtmsRateLimitRejectingUsers alert.",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 26 },
+      "fieldConfig": {
+        "defaults": { "unit": "none", "min": 0, "noValue": "None so far", "custom": { "lineWidth": 2, "fillOpacity": 0, "showPoints": "never" } },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [ { "expr": "sum by (class) (rate(dtms_ratelimit_rejected_total[5m])) * 60", "legendFormat": "{{class}}", "refId": "A" } ]
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["dtms", "rate-limit"],
+  "templating": { "list": [] },
+  "time": { "from": "now-7d", "to": "now" },
+  "timepicker": {},
+  "timezone": "Asia/Bangkok",
+  "title": "DTMS — Rate Limit Sizing",
+  "uid": "dtms-rate-limit",
+  "version": 1,
+  "weekStart": ""
+}
