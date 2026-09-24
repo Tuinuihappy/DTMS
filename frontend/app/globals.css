@@ -633,6 +633,15 @@ main,
     gap: 6mm !important;
   }
 
+  /* A single card's own print button marks that card, and every other one
+     drops out of the sheet. The grid is untouched on purpose: one label then
+     prints at exactly the size the full sheet gives it, and a sticker
+     re-printed at a different size does not fit the shelf it is replacing. */
+  .carrier-label-sheet:has(.carrier-label-card[data-print-solo])
+    .carrier-label-card:not([data-print-solo]) {
+    display: none !important;
+  }
+
   /* A label split across a page boundary is a wasted sticker. */
   .carrier-label-card {
     page-break-inside: avoid;
