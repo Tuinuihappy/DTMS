@@ -17,7 +17,12 @@
 #  The SSH port is re-read from podman on every attempt, so a machine restart
 #  that reassigns it is picked up on its own.
 #
-#  Delete this and its Startup shortcut once Docker Desktop is back.
+#  Started and kept alive by ops/podman-autostart.ps1 (the old Startup-folder
+#  shortcut is gone — it ran ~6 minutes after logon, and alongside the
+#  supervisor it would start a second copy). Run only one copy — two fight
+#  over the ports.
+#
+#  Delete this once Docker Desktop is back.
 # ---------------------------------------------------------------------------
 
 $ErrorActionPreference = 'SilentlyContinue'
