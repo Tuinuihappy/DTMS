@@ -1,0 +1,155 @@
+# Podman fallback overlay — NOT for normal Docker use.
+#
+# Why this exists: Docker Desktop was removed from this machine (2026-09-18) and
+# podman is the only container runtime left. Podman's own networking cannot
+# publish ports here — netavark 2.x fails applying its nftables ruleset on the
+# WSL kernel, and every workaround is closed (the iptables driver was deleted in
+# netavark 2.x; netavark 1.x cannot be driven by podman 6.0).
+#
+# So every service runs in the podman VM's own network namespace instead:
+# containers bind the VM's ports directly, no netavark involved, and WSL2's
+# localhost forwarding makes them reachable from Windows with no port mapping at
+# all. Verified: a host-network container listening on 18081 answered from
+# Windows at http://localhost:18081.
+#
+# Consequences, all of them deliberate:
+#
+#   * `ports:` is ignored in host mode, so services sit on their INTERNAL ports:
+#     api 8080 (not 5219), postgres 5432 (not 5434). pgbouncer would collide
+#     with postgres on 5432, so it is not started — and that is exactly why
+#     `pgbouncer` resolves to 127.0.0.1 below: the api's connection string keeps
+#     saying pgbouncer:5432 and lands on postgres directly. Pooling options in
+#     that string are client-side and stay honoured.
+#   * Service names no longer resolve, so each one is pinned to 127.0.0.1. This
+#     keeps every environment variable in docker-compose.yml untouched.
+#   * minio comes from quay.io: Docker Hub's minio/minio repo now 404s.
+#
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.podman.yml up -d
+#
+# Delete this file once Docker Desktop is reinstalled.
+
+x-hosts: &hosts
+  # The VM's hostname is the Windows machine name, and in host-network mode that
+  # is what each container reports as its own hostname with nothing resolving
+  # it. RabbitMQ is the one that cares: Erlang's epmd refuses to start without
+  # resolving its own node name ({epmd_error,"THWGR6NBH010662",address}).
+  - "THWGR6NBH010662:127.0.0.1"
+  - "postgres:127.0.0.1"
+  - "pgbouncer:127.0.0.1"
+  - "rabbitmq:127.0.0.1"
+  - "redis:127.0.0.1"
+  - "minio:127.0.0.1"
+  - "jaeger:127.0.0.1"
+  - "dtms-api:127.0.0.1"
+
+services:
+  postgres:
+    network_mode: host
+
+  postgres-backup:
+    network_mode: host
+    extra_hosts: *hosts
+    environment:
+      # The image serves its own healthcheck on this port, and 8080 is the
+      # api's in the shared host namespace (8081 is the outbox-worker's).
+      HEALTHCHECK_PORT: 8082
+
+  redis:
+    network_mode: host
+
+  rabbitmq:
+    network_mode: host
+    extra_hosts: *hosts
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z
+    network_mode: host
+
+  migrator:
+    network_mode: host
+    extra_hosts: *hosts
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    network_mode: host
+    extra_hosts: *hosts
+    environment:
+      # RIOT3 posts its notify webhooks to this PC, and two hops rewrite the
+      # source address before the API sees it: the Windows-side SSH forwarder
+      # that publishes 5219 on the LAN, and the socat container that maps 5219
+      # to 8080. Both re-originate the connection from inside the machine, so
+      # every webhook arrives as 127.0.0.1 and the allowlist — pinned in .env to
+      # 172.18.0.1, the old Docker bridge gateway — rejects all of them with a
+      # 403. The URL secret in the path (UrlSecrets) is still the real guard.
+      - VendorAdapter__Riot3__Webhook__AllowedIPs__1=127.0.0.1
+    # !override, not a plain map: compose merges depends_on by union, so without
+    # it pgbouncer stays on the wait list, gets pulled up as a dependency, and
+    # dies in netavark — the very thing this overlay exists to avoid.
+    depends_on: !override
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  outbox-worker:
+    network_mode: host
+    extra_hosts: *hosts
+    # Both this and the api run the full app, HTTP included, and in host mode
+    # they share one network namespace — so they fought over 8080 and whichever
+    # lost crash-looped on "address already in use". Worse, each one's
+    # healthcheck curls 127.0.0.1:8080, so the loser reported healthy while the
+    # winner answered for it. Only the OutboxProcessor matters here, so this one
+    # moves aside; its healthcheck follows it.
+    environment:
+      - ASPNETCORE_HTTP_PORTS=8081
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    depends_on: !override
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    network_mode: host
+    extra_hosts: *hosts
+
+  # ── port restoration ──────────────────────────────────────────────────────
+  # Host mode ignores `ports:`, so the api and postgres would sit on their
+  # internal 8080 and 5432 and every bookmark, tool and env default pointing at
+  # 5219 / 5434 would be wrong. Two socat forwarders put them back where they
+  # belong, which is cheaper and less error-prone than re-pointing the app
+  # config, its healthcheck, the frontend's backend URL and the browser's hub
+  # URL at new numbers.
+  portproxy-api:
+    image: docker.io/alpine/socat:latest
+    container_name: dtms-portproxy-api
+    network_mode: host
+    restart: unless-stopped
+    command: TCP-LISTEN:5219,fork,reuseaddr TCP:127.0.0.1:8080
+    depends_on:
+      api:
+        condition: service_healthy
+
+  portproxy-postgres:
+    image: docker.io/alpine/socat:latest
+    container_name: dtms-portproxy-postgres
+    network_mode: host
+    restart: unless-stopped
+    command: TCP-LISTEN:5434,fork,reuseaddr TCP:127.0.0.1:5432
+    depends_on:
+      postgres:
+        condition: service_healthy

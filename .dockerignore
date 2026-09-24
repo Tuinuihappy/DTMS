@@ -13,3 +13,11 @@
 **/*.md
 **/*.env
 **/tests
+# Not read by the api Dockerfile (it copies only Directory.*.props and src/).
+# BuildKit skips unused paths on its own, but `podman build` and the classic
+# builder tar the whole context — 1.2 GB of backups/ alone — before step one.
+backups
+frontend
+docs
+perf-tests
+.claude
