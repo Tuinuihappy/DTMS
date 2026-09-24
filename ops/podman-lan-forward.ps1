@@ -49,6 +49,14 @@ while ($true) {
     if (-not $ip -or -not $SshPort) { Start-Sleep -Seconds 20; continue }
 
     $forwards = $Ports | ForEach-Object { '-L', "${ip}:${_}:127.0.0.1:$_" }
+    # And the other way: windows_exporter (Windows :9182) into the VM's
+    # loopback, where prometheus finds it as host.docker.internal. The VM's
+    # own name for Windows is a stale DHCP address, and its gateway IP can
+    # change across reboots — the tunnel has neither problem.
+    # The Windows end is [::1], not 127.0.0.1: WSL mirrors the VM's loopback
+    # listeners onto Windows 127.0.0.1, so once this tunnel listens in the VM,
+    # Windows 127.0.0.1:9182 leads straight back into it — a loop.
+    $forwards += '-R', '127.0.0.1:9182:[::1]:9182'
     $sshArgs  = @(
         '-i', $Identity, '-p', $SshPort, '-N',
         '-o', 'StrictHostKeyChecking=no',
@@ -57,6 +65,12 @@ while ($true) {
         '-o', 'ServerAliveInterval=30',
         '-o', 'ServerAliveCountMax=3'
     ) + $forwards + 'user@127.0.0.1'
+
+    # A killed ssh.exe leaves its sshd-session in the VM still holding :9182
+    # until the server notices, and meanwhile every retry fails the -R — which
+    # ExitOnForwardFailure turns into dead LAN ports too. No tunnel of ours is
+    # alive at this point, so whatever holds the port is stale.
+    & $Podman machine ssh "sudo fuser -k 9182/tcp" 2>$null | Out-Null
 
     $ssh = Start-Process -FilePath $SshExe -ArgumentList $sshArgs -WindowStyle Hidden -PassThru
     if (-not $ssh) { Start-Sleep -Seconds 20; continue }

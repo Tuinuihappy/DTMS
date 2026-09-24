@@ -42,6 +42,8 @@ x-hosts: &hosts
   - "minio:127.0.0.1"
   - "jaeger:127.0.0.1"
   - "dtms-api:127.0.0.1"
+  - "api:127.0.0.1"          # prometheus scrapes api:8080
+  - "prometheus:127.0.0.1"   # grafana's datasource
 
 services:
   postgres:
@@ -126,6 +128,26 @@ services:
   frontend:
     network_mode: host
     extra_hosts: *hosts
+
+  jaeger:
+    network_mode: host
+
+  prometheus:
+    network_mode: host
+    # The windows-host job scrapes host.docker.internal:9182. podman resolves
+    # that to a stale address here, so it's pinned to the VM loopback, where
+    # ops/podman-lan-forward.ps1 tunnels windows_exporter in.
+    extra_hosts:
+      - "api:127.0.0.1"
+      - "host.docker.internal:127.0.0.1"
+
+  grafana:
+    network_mode: host
+    extra_hosts: *hosts
+    environment:
+      # Grafana listens on 3000 inside, which is the frontend's in the shared
+      # host namespace. 3001 is where the base file publishes it anyway.
+      - GF_SERVER_HTTP_PORT=3001
 
   # ── port restoration ──────────────────────────────────────────────────────
   # Host mode ignores `ports:`, so the api and postgres would sit on their
