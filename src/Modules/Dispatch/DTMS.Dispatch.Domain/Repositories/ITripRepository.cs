@@ -46,7 +46,8 @@ public interface ITripRepository
     Task<List<Trip>> GetActiveTripsByVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Lists ALL envelope-dispatched trips (UpperKey set) still awaiting a
+    /// Lists ALL trips sent to RIOT3 (VendorRequestSnapshot set — Manual and
+    /// self-managed trips never have one) still awaiting a
     /// terminal vendor callback (Status ∈ {Created, InProgress, Hang, Held}),
     /// regardless of age. Used by the reconciliation poller to backfill
     /// missed webhooks — a vendor-side terminal transition can land days

@@ -113,12 +113,17 @@ public class TripRepository : ITripRepository
         // note on GetByUpperKeyAsync). Without the Include, MarkVendorStarted /
         // ReconcileVehicleAssignment would Create() a fresh extension and
         // collide with the existing row's PK on save.
-        // UpperKey filter keeps this to AMR envelope trips (Manual never
-        // set it and can't be queried against RIOT3) — previously the caller
-        // skipped them per-row; filtering here keeps them out of the stale
-        // count too. No age cutoff: a trip that goes terminal at the vendor
-        // long after dispatch must still be reconcilable (a dropped cancel
-        // webhook past the old 24h window used to wedge the trip forever).
+        // VendorRequestSnapshot keeps this to trips actually sent to RIOT3 —
+        // only the AMR dispatch path records one; Manual and self-managed
+        // pass null. It used to filter on UpperKey != "", but every trip has
+        // an UpperKey (CreateForEnvelope throws without one), so Manual trips
+        // were polled against RIOT3 every tick and counted in the stale gauge:
+        // the "AMR trips stuck" P1 was really counting unclosed Manual jobs.
+        // Not AmrExtension — that only exists when RIOT3 echoed an orderKey,
+        // and an AMR trip without one is exactly what reconciling is for.
+        // No age cutoff: a trip that goes terminal at the vendor long after
+        // dispatch must still be reconcilable (a dropped cancel webhook past
+        // the old 24h window used to wedge the trip forever).
         return await _context.Trips
             .IgnoreQueryFilters()
             .Include(t => t.AmrExtension)
@@ -127,7 +132,7 @@ public class TripRepository : ITripRepository
                          || t.Status == TripStatus.InProgress
                          || t.Status == TripStatus.Hang
                          || t.Status == TripStatus.Held)
-                        && t.UpperKey != "")
+                        && t.VendorRequestSnapshot != null)
             .ToListAsync(cancellationToken);
     }
 
@@ -141,9 +146,9 @@ public class TripRepository : ITripRepository
         //
         // Gate on VendorFinalSnapshot == null so a trip drops out for good
         // once the caller captures the snapshot — no per-tick re-fetch, even
-        // when the vendor record has no vehicle. UpperKey filter keeps this to
-        // AMR envelope trips (Manual never sets it and can't be queried
-        // against RIOT3).
+        // when the vendor record has no vehicle. VendorRequestSnapshot keeps
+        // this to trips actually sent to RIOT3 (see GetInFlightEnvelopeTripsAsync
+        // for why UpperKey could not).
         return await _context.Trips
             .IgnoreQueryFilters()
             .Include(t => t.AmrExtension)
@@ -151,7 +156,7 @@ public class TripRepository : ITripRepository
             .Where(t => (t.Status == TripStatus.Completed || t.Status == TripStatus.Failed || t.Status == TripStatus.Rejected)
                         && t.VendorFinalSnapshot == null
                         && (t.AmrExtension == null || t.AmrExtension.VendorVehicleKey == null)
-                        && t.UpperKey != ""
+                        && t.VendorRequestSnapshot != null
                         && t.CompletedAt >= completedSinceUtc)
             .ToListAsync(cancellationToken);
     }
