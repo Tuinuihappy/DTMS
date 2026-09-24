@@ -22,7 +22,7 @@
 #  supervisor it would start a second copy). Run only one copy — two fight
 #  over the ports.
 #
-#  Delete this once Docker Desktop is back.
+#  Permanent: podman is this machine's runtime for good (decided 2026-09-24).
 # ---------------------------------------------------------------------------
 
 $ErrorActionPreference = 'SilentlyContinue'

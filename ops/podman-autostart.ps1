@@ -15,7 +15,7 @@
 #  one-shot migrator is not re-run every minute.
 #
 #  Log: %LOCALAPPDATA%\dtms-podman-autostart.log (trimmed to the last 2000 lines).
-#  Delete this, its installer and the task once Docker Desktop is back.
+#  Permanent: podman is this machine's runtime for good (decided 2026-09-24).
 # ---------------------------------------------------------------------------
 
 $ErrorActionPreference = 'Continue'
@@ -85,7 +85,19 @@ function Ensure-Machine {
     return Test-Engine
 }
 
+# ops/podman-rebuild.ps1 drops this file while it recreates containers, so the
+# supervisor does not see the api missing mid-recreate and race it with its own
+# `compose up`. Ignored once older than 30 minutes, so a crashed rebuild cannot
+# switch container supervision off for good.
+$PauseFile = "$env:LOCALAPPDATA\dtms-podman-autostart.pause"
+
+function Test-Paused {
+    $f = Get-Item $PauseFile -ErrorAction SilentlyContinue
+    return $f -and $f.LastWriteTime -gt (Get-Date).AddMinutes(-30)
+}
+
 function Ensure-Containers {
+    if (Test-Paused) { return }
     $running = & $Podman ps --format '{{.Names}}' 2>$null
     $missing = $LongRunning | Where-Object { $running -notcontains $_ }
     if (-not $missing) { return }

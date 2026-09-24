@@ -1,7 +1,8 @@
-# Podman fallback overlay — NOT for normal Docker use.
+# Podman overlay — how this stack runs on this machine.
 #
-# Why this exists: Docker Desktop was removed from this machine (2026-09-18) and
-# podman is the only container runtime left. Podman's own networking cannot
+# Podman is the container runtime here: Docker Desktop was removed (2026-09-18)
+# and, as decided on 2026-09-24, is not coming back. This overlay is permanent,
+# not a stopgap — don't delete it. Podman's own networking cannot
 # publish ports here — netavark 2.x fails applying its nftables ruleset on the
 # WSL kernel, and every workaround is closed (the iptables driver was deleted in
 # netavark 2.x; netavark 1.x cannot be driven by podman 6.0).
@@ -25,9 +26,12 @@
 #   * minio comes from quay.io: Docker Hub's minio/minio repo now 404s.
 #
 # Usage:
-#   docker-compose -f docker-compose.yml -f docker-compose.podman.yml up -d
-#
-# Delete this file once Docker Desktop is reinstalled.
+#   ops/podman-rebuild.ps1        rebuild images and restart (compose build does
+#                                 not work here — see that script)
+#   ops/podman-autostart.ps1      keeps it all running; installed as a task
+# or by hand:
+#   $env:DOCKER_HOST='npipe:////./pipe/docker_engine'
+#   docker-compose -f docker-compose.yml -f docker-compose.podman.yml --profile prod up -d --no-build
 
 x-hosts: &hosts
   # The VM's hostname is the Windows machine name, and in host-network mode that
