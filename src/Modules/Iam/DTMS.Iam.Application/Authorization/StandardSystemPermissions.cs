@@ -16,6 +16,14 @@ public static class StandardSystemPermissions
     public const string OrderWriteTemplate = "dtms:source:{key}:order:write";
     public const string OrderReadTemplate  = "dtms:source:{key}:order:read";
 
+    // Order cancel — a source system calls off one of its OWN orders via
+    // POST /api/v1/source/delivery-orders/{orderRef}/cancel. Held apart from
+    // order:write because write creates and this destroys, and a partner may
+    // reasonably hold one without the other. Reaches further than trip:cancel:
+    // an order in Confirmed / Planning / Planned has no trip yet, so this is
+    // the only way a source system can stop one before dispatch.
+    public const string OrderCancelTemplate = "dtms:source:{key}:order:cancel";
+
     // Trip lifecycle — a source system reports its trips' progress
     // (acknowledge → pickup → drop → complete) through /api/v1/source/trips/*.
     // Granular per-action so a partner can hold, say, drop+complete without
@@ -43,6 +51,7 @@ public static class StandardSystemPermissions
     {
         OrderWriteTemplate,
         OrderReadTemplate,
+        OrderCancelTemplate,
         TripAcknowledgeTemplate,
         TripPickupTemplate,
         TripDropTemplate,
