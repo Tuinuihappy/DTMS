@@ -75,18 +75,21 @@ public class SourceCancelTripCommandHandlerTests
     }
 
     [Fact]
-    public async Task BlankReason_FallsBackToALabelNamingTheSourceSystem()
+    public async Task BlankReason_FallsBackToALabel_AndLeavesTheSystemToOrigin()
     {
         // Reason is non-nullable downstream and lands in the order activity
-        // timeline, so it must never arrive empty.
+        // timeline, so it must never arrive empty. It also must not name the
+        // calling system: origin already does, and the audit row joins the two
+        // as "<reason> via=<origin>".
         var trip = NewTripInProgress();
         var cancellation = new StubCancellationService();
 
         await HandlerFor(trip, Owner, cancellation).Handle(
             new SourceCancelTripCommand(trip.Id, Owner, "oms-user-42", Reason: "   "), default);
 
-        cancellation.Calls.Should().ContainSingle()
-            .Which.Reason.Should().Contain(Owner);
+        var call = cancellation.Calls.Should().ContainSingle().Which;
+        call.Reason.Should().Be("Cancelled by source system");
+        call.Origin.Should().Be(Owner);
     }
 
     [Fact]

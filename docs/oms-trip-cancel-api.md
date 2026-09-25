@@ -108,8 +108,8 @@ useful field you can send us. It becomes:
 - the `cancelReason` we will send back to you on `shipment.cancelled.v1` once
   that callback is switched on.
 
-Leave it out and we record `"Cancelled via source system oms"`, which tells
-nobody anything. We log a warning every time that happens, so we will notice.
+Leave it out and we record `"Cancelled by source system"`, which tells nobody
+anything. We log a warning every time that happens, so we will notice.
 
 ---
 

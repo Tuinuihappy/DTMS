@@ -58,7 +58,10 @@ public sealed class SourceCancelTripCommandHandler
             _logger.LogWarning(
                 "[SourceTrip] Trip {TripId} cancel from {Key} carried no reason — falling back to a generic label",
                 trip.Id, request.SourceSystemKey);
-            reason = $"Cancelled via source system {request.SourceSystemKey}";
+            // Which system it was is carried by `origin` below, which the audit
+            // row renders as "via=oms" — naming it here too would read as
+            // "Cancelled by source system oms via=oms".
+            reason = "Cancelled by source system";
         }
 
         // Don't read `trip` past this point: the service's conflict-retry path
