@@ -3,8 +3,9 @@ using DTMS.SharedKernel.Messaging;
 namespace DTMS.Dispatch.Application.Commands.CancelTrip;
 
 /// <param name="ActionBy">
-/// Who cancelled, in the calling system's own terms. Null for callers with no
-/// human behind them (the order-cancelled cascade, bulk cancel).
+/// Who cancelled, in the calling system's own terms. Null when there is no human
+/// behind the call — bulk cancel, or the order-cancelled cascade forwarding a
+/// cancel that a source system rather than a person asked for.
 /// </param>
 /// <param name="ActedAt">When they cancelled it upstream, if known.</param>
 /// <param name="Origin">
