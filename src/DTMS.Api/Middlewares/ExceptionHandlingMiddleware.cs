@@ -91,6 +91,15 @@ public class ExceptionHandlingMiddleware
         // Opaque correlation id so support can find the real error in the logs.
         problemDetails.Extensions["traceId"] = traceId;
 
+        // Compatibility key. The /api/v1/source endpoints used to hand-roll
+        // `{"error": "..."}` instead of going through here; folding them in is
+        // what made their 404s and 403s distinguishable from plain rejections,
+        // but a partner already reading body.error should not have to redeploy
+        // for a shape change they never asked for. Extensions serialize as
+        // top-level members, same as traceId above. Drop this once every source
+        // system has moved to `detail`.
+        problemDetails.Extensions["error"] = detail;
+
         if (exception is FluentValidation.ValidationException validationException)
         {
             problemDetails.Extensions["errors"] = validationException.Errors
@@ -112,6 +121,9 @@ public class ExceptionHandlingMiddleware
         => exception switch
         {
             NotFoundException => (StatusCodes.Status404NotFound, "Not Found"),
+            // Authenticated, but the resource belongs to another principal.
+            // Only raised where saying so is safe — see ForbiddenException.
+            ForbiddenException => (StatusCodes.Status403Forbidden, "Forbidden"),
             BusinessRuleViolationException => (StatusCodes.Status400BadRequest, "Business Rule Violation"),
             DomainException => (StatusCodes.Status400BadRequest, "Domain Exception"),
             FluentValidation.ValidationException => (StatusCodes.Status400BadRequest, "Validation Error"),

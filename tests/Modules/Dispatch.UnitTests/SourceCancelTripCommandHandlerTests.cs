@@ -1,6 +1,7 @@
 using DTMS.Dispatch.Application.Commands.SourceSystemTrip;
 using DTMS.Dispatch.Application.Services;
 using DTMS.Dispatch.Domain.Entities;
+using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Messaging;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -19,17 +20,18 @@ public class SourceCancelTripCommandHandlerTests
     {
         // The security case. An already-cancelled trip is the one where the
         // idempotent shortcut is tempting to run first — do that and the
-        // 204-vs-400 answer becomes an oracle for probing another system's trip
+        // 204-vs-403 answer becomes an oracle for probing another system's trip
         // ids. Origin has to be settled before any state is revealed.
         var trip = NewTripInProgress();
         trip.Cancel("someone else stopped it");
         var cancellation = new StubCancellationService();
 
-        var result = await HandlerFor(trip, ownerKey: "sap", cancellation)
-            .Handle(Cmd(trip), default);
+        var act = () => HandlerFor(trip, ownerKey: "sap", cancellation).Handle(Cmd(trip), default);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().Contain("sap");
+        // 403 rather than 404: a trip id is an unguessable guid, so naming the
+        // owner costs nothing and saves a support round-trip.
+        (await act.Should().ThrowAsync<ForbiddenException>())
+            .WithMessage("*sap*");
         cancellation.Calls.Should().BeEmpty();
     }
 

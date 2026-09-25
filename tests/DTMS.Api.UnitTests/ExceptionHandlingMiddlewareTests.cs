@@ -50,6 +50,32 @@ public class ExceptionHandlingMiddlewareTests
     }
 
     [Fact]
+    public async Task Forbidden_Answers403_AndKeepsItsMessage()
+    {
+        var body = await RunWith(new ForbiddenException(
+            "Trip abc belongs to source system 'sap', not 'oms'."));
+
+        body.GetProperty("status").GetInt32().Should().Be(403);
+        body.GetProperty("detail").GetString().Should().Contain("sap");
+    }
+
+    [Fact]
+    public async Task EveryResponse_CarriesTheLegacyErrorKey()
+    {
+        // The /api/v1/source endpoints used to hand-roll {"error": "..."} and now
+        // route through here instead. Partners reading body.error must keep
+        // working until they move to `detail`. Holds for the scrubbed 500 too:
+        // error mirrors detail, so nobody gets the real message through a side
+        // door.
+        var modelled = await RunWith(new NotFoundException("no such order"));
+        modelled.GetProperty("error").GetString().Should().Be("no such order");
+
+        var scrubbed = await RunWith(new InvalidOperationException("SECRET internals"));
+        scrubbed.GetProperty("error").GetString().Should().Be("An unexpected error occurred.");
+        scrubbed.GetRawText().Should().NotContain("SECRET");
+    }
+
+    [Fact]
     public async Task BusinessRuleViolation_KeepsItsUserFacingMessage()
     {
         var body = await RunWith(new BusinessRuleViolationException("Priority must be 0-9."));

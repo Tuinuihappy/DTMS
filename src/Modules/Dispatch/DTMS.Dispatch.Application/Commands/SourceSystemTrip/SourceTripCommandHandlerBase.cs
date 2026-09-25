@@ -42,10 +42,12 @@ public abstract class SourceTripCommandHandlerBase<TCommand> : ICommandHandler<T
 
     public async Task<Result> Handle(TCommand request, CancellationToken cancellationToken)
     {
-        var resolved = await SourceTripOriginAuthorizer.ResolveAsync(
+        // Throws NotFound / Forbidden rather than returning a failure, so the
+        // caller gets 404 / 403 instead of the blanket 400 these used to share
+        // with "wrong status" rejections.
+        var trip = await SourceTripOriginAuthorizer.ResolveAsync(
             _trips, _orders, request.TripId, request.SourceSystemKey, cancellationToken);
-        if (!resolved.IsSuccess) return Result.Failure(resolved.Error);
-        return await HandleAuthorized(request, resolved.Value, cancellationToken);
+        return await HandleAuthorized(request, trip, cancellationToken);
     }
 
     /// <param name="trip">

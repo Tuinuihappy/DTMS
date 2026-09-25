@@ -1,7 +1,7 @@
 using DTMS.Dispatch.Application.Services;
 using DTMS.Dispatch.Domain.Entities;
 using DTMS.Dispatch.Domain.Repositories;
-using DTMS.SharedKernel.Messaging;
+using DTMS.SharedKernel.Exceptions;
 
 namespace DTMS.Dispatch.Application.Commands.SourceSystemTrip;
 
@@ -12,16 +12,26 @@ namespace DTMS.Dispatch.Application.Commands.SourceSystemTrip;
 /// <c>SourceSystemKey</c>. This mirrors how the outbound callback fan-out
 /// routes by <c>order.SourceSystem</c> and how the operator commands verify
 /// operator ownership — the origin match is the machine-caller equivalent.
+///
+/// <para>Throws rather than returning a failure so the three outcomes reach the
+/// caller as three different statuses. They used to collapse into one 400,
+/// which told a partner nothing about whether to fix the id, fix its token, or
+/// call us.</para>
 /// </summary>
 internal static class SourceTripOriginAuthorizer
 {
     /// <summary>
     /// Loads the trip and confirms <paramref name="callerSourceSystemKey"/>
     /// (pinned from the authenticated <c>SystemPrincipal</c>, never the wire
-    /// body) owns it. On success the trip is returned; on any mismatch a
-    /// <see cref="Result{Trip}"/> failure the handler can return verbatim.
+    /// body) owns it.
     /// </summary>
-    public static async Task<Result<Trip>> ResolveAsync(
+    /// <exception cref="NotFoundException">No such trip — 404.</exception>
+    /// <exception cref="ForbiddenException">Someone else's trip — 403.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The trip's parent order is missing — 500. That is our data being wrong,
+    /// not the caller's request.
+    /// </exception>
+    public static async Task<Trip> ResolveAsync(
         ITripRepository trips,
         IDeliveryOrderStatusReader orders,
         Guid tripId,
@@ -30,18 +40,26 @@ internal static class SourceTripOriginAuthorizer
     {
         var trip = await trips.GetByIdAsync(tripId, ct);
         if (trip is null)
-            return Result<Trip>.Failure($"Trip {tripId} not found.");
+            throw new NotFoundException($"Trip {tripId} not found.");
 
         var ownerKey = await orders.GetSourceSystemKeyAsync(trip.DeliveryOrderId, ct);
         if (ownerKey is null)
-            return Result<Trip>.Failure(
+            // A trip whose parent order has vanished is a data fault. Surfacing
+            // it as a scrubbed 500 with a traceId is honest; telling the caller
+            // they sent something wrong is not.
+            throw new InvalidOperationException(
                 $"Parent order {trip.DeliveryOrderId} for trip {tripId} not found.");
 
         if (!string.Equals(ownerKey, callerSourceSystemKey, StringComparison.OrdinalIgnoreCase))
-            return Result<Trip>.Failure(
+            // Naming the owner is safe here and saves a support round-trip: a
+            // trip id is an unguessable guid, so a caller able to ask this
+            // question already had the id. The source ORDER route deliberately
+            // does the opposite — an OrderRef can be enumerated, so there a
+            // foreign resource is simply "not found".
+            throw new ForbiddenException(
                 $"Trip {tripId} belongs to source system '{ownerKey}', " +
                 $"not '{callerSourceSystemKey}' — caller may only act on its own trips.");
 
-        return Result<Trip>.Success(trip);
+        return trip;
     }
 }

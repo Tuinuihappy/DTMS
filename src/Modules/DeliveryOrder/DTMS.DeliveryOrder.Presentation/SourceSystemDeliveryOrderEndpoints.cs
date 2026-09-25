@@ -3,6 +3,7 @@ using DTMS.DeliveryOrder.Application.Commands.CreateUpstreamDeliveryOrder;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.Presentation.Idempotency;
 using DTMS.Iam.Application.Authorization;
+using DTMS.SharedKernel.Exceptions;
 using System.ComponentModel;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
@@ -71,11 +72,15 @@ public static class SourceSystemDeliveryOrderEndpoints
             SelfManaged: body.SelfManaged);
 
         var result = await sender.Send(command);
-        return result.IsSuccess
-            ? Results.Created(
-                $"/api/v1/delivery-orders/{result.Value.Order.Id}",
-                result.Value)
-            : Results.BadRequest(new { error = result.Error });
+        if (result.IsFailure)
+            // Through the exception middleware rather than hand-rolled, so every
+            // rejection on /api/v1/source answers one shape (RFC 7807
+            // problem+json, with an `error` member kept for compatibility).
+            throw new BusinessRuleViolationException(result.Error);
+
+        return Results.Created(
+            $"/api/v1/delivery-orders/{result.Value.Order.Id}",
+            result.Value);
     }
 }
 

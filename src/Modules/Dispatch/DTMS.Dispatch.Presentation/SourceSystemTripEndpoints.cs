@@ -1,5 +1,6 @@
 using DTMS.Dispatch.Application.Commands.SourceSystemTrip;
 using DTMS.Iam.Application.Authorization;
+using DTMS.SharedKernel.Exceptions;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -125,13 +126,19 @@ public static class SourceSystemTripEndpoints
                 detail: "SystemClientAuthMiddleware did not run for this request",
                 statusCode: StatusCodes.Status500InternalServerError);
 
+        // Rejections go through the exception middleware rather than being
+        // hand-rolled here, so one route no longer answers two body shapes:
+        // the origin guard's 404 / 403 and this 400 all come out as RFC 7807
+        // problem+json. The middleware keeps an `error` member for partners
+        // still reading the old shape.
         if (string.IsNullOrWhiteSpace(actionBy))
-            return Results.BadRequest(new { error = "actionBy is required." });
+            throw new BusinessRuleViolationException("actionBy is required.");
 
         var result = await sender.Send(buildCommand(principal.Key));
-        return result.IsSuccess
-            ? Results.NoContent()
-            : Results.BadRequest(new { error = result.Error });
+        if (result.IsFailure)
+            throw new BusinessRuleViolationException(result.Error);
+
+        return Results.NoContent();
     }
 }
 
