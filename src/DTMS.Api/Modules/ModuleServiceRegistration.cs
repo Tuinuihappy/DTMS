@@ -510,6 +510,13 @@ public static class ModuleServiceRegistration
         services.AddScoped<DTMS.Dispatch.Application.Services.IVendorRobotOperationService,
             DTMS.Api.Adapters.Riot3VendorRobotOperationAdapter>();
 
+        // The single cancel implementation — local transition, vendor
+        // CMD_ORDER_CANCEL, xmin conflict retry. CancelTripCommandHandler and
+        // the federated source-system cancel both go through it, so there is
+        // one place that talks to the vendor about a cancel.
+        services.AddScoped<DTMS.Dispatch.Application.Services.ITripCancellationService,
+            DTMS.Dispatch.Application.Services.TripCancellationService>();
+
         // ── Phase 1 foundation: strategy registry + vendor operations router ──
         // Both auto-discover their adapters via IEnumerable<> injection. Adding
         // a new mode = register the new adapter + (optionally) its

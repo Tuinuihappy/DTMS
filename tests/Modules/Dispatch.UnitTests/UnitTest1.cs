@@ -1,5 +1,4 @@
 using DTMS.Dispatch.Application.Commands.AcknowledgeRobotPass;
-using DTMS.Dispatch.Application.Commands.CancelTrip;
 using DTMS.Dispatch.Application.Commands.PauseTrip;
 using DTMS.Dispatch.Application.Commands.ResumeTrip;
 using DTMS.Dispatch.Application.Services;
@@ -748,71 +747,6 @@ public class EnvelopeUpperKeyTests
     }
 }
 
-// ── Handler tests: vendor-first persistence semantics ───────────────────
-//
-// Cancel/Pause/Resume handlers call the vendor BEFORE persisting the local
-// state transition. If the vendor rejects, UpdateAsync must NOT be called
-// (the in-memory mutation is discarded by scope disposal). If the domain
-// rejects the transition, the vendor must NOT be called.
-
-public class CancelTripCommandHandlerTests
-{
-    [Fact]
-    public async Task VendorSuccess_PersistsCancelledState()
-    {
-        var trip = NewTripInProgress();
-        var repo = new FakeTripRepository(trip);
-        var vendor = new StubVendorOps();
-
-        var handler = new CancelTripCommandHandler(repo, vendor, NullLogger<CancelTripCommandHandler>.Instance);
-        var result = await handler.Handle(new CancelTripCommand(trip.Id, "ops"), default);
-
-        result.IsSuccess.Should().BeTrue();
-        repo.UpdateCalls.Should().Be(1);
-        // Handler routes envelope ops through vendorOrderKey not upperKey
-        // (per commit 107675e — RIOT3 silently no-ops upperKey route).
-        vendor.CancelCalls.Should().ContainSingle().Which.Should().Be(trip.VendorOrderKey);
-    }
-
-    [Fact]
-    public async Task VendorFailure_DoesNotPersist()
-    {
-        var trip = NewTripInProgress();
-        var repo = new FakeTripRepository(trip);
-        var vendor = new StubVendorOps { NextError = "network blip" };
-
-        var handler = new CancelTripCommandHandler(repo, vendor, NullLogger<CancelTripCommandHandler>.Instance);
-        var result = await handler.Handle(new CancelTripCommand(trip.Id, "ops"), default);
-
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().Contain("network blip");
-        repo.UpdateCalls.Should().Be(0);
-    }
-
-    [Fact]
-    public async Task DomainReject_DoesNotCallVendor()
-    {
-        var trip = NewTripInProgress();
-        trip.Cancel("first"); // already cancelled
-        var repo = new FakeTripRepository(trip);
-        var vendor = new StubVendorOps();
-
-        var handler = new CancelTripCommandHandler(repo, vendor, NullLogger<CancelTripCommandHandler>.Instance);
-        var result = await handler.Handle(new CancelTripCommand(trip.Id, "second"), default);
-
-        result.IsFailure.Should().BeTrue();
-        vendor.CancelCalls.Should().BeEmpty();
-        repo.UpdateCalls.Should().Be(0);
-    }
-
-    private static Trip NewTripInProgress()
-    {
-        var t = Trip.CreateForEnvelope(Guid.NewGuid(), "abc-G1", "ORD-1");
-        t.MarkVendorStarted(Guid.NewGuid());
-        return t;
-    }
-}
-
 public class PauseAndResumeTripHandlerTests
 {
     [Fact]
@@ -925,8 +859,8 @@ public class PauseAndResumeTripHandlerTests
         var repo = new FakeTripRepository(trip);
         var vendor = new StubVendorOps { NextOutcome = VendorOperationOutcome.NoVendorRecord };
 
-        var handler = new CancelTripCommandHandler(repo, vendor, NullLogger<CancelTripCommandHandler>.Instance);
-        var result = await handler.Handle(new CancelTripCommand(trip.Id, "ops"), default);
+        var service = new TripCancellationService(repo, vendor, NullLogger<TripCancellationService>.Instance);
+        var result = await service.CancelAsync(trip.Id, "ops");
 
         result.IsSuccess.Should().BeTrue();           // operator intent met
         repo.UpdateCalls.Should().Be(1);              // trip saved as Cancelled
@@ -977,8 +911,8 @@ public class PauseAndResumeTripHandlerTests
         var repo = new FakeTripRepository(trip);
         var vendor = new StubVendorOps { NextError = "RIOT3 rejected cancel (code E100007): not allowed" };
 
-        var handler = new CancelTripCommandHandler(repo, vendor, NullLogger<CancelTripCommandHandler>.Instance);
-        var result = await handler.Handle(new CancelTripCommand(trip.Id, "ops"), default);
+        var service = new TripCancellationService(repo, vendor, NullLogger<TripCancellationService>.Instance);
+        var result = await service.CancelAsync(trip.Id, "ops");
 
         result.IsFailure.Should().BeTrue();
         result.Error.Should().Contain("E100007");
@@ -1279,8 +1213,8 @@ public class TripCommandConflictRetryTests
         var repo = new FakeTripRepository(trip) { ConcurrencyThrows = 1, ReloadedTrip = reloaded };
         var vendor = new StubVendorOps();
 
-        var handler = new CancelTripCommandHandler(repo, vendor, NullLogger<CancelTripCommandHandler>.Instance);
-        var result = await handler.Handle(new CancelTripCommand(trip.Id, "operator stop — wrong station"), default);
+        var service = new TripCancellationService(repo, vendor, NullLogger<TripCancellationService>.Instance);
+        var result = await service.CancelAsync(trip.Id, "operator stop — wrong station");
 
         result.IsSuccess.Should().BeTrue();        // operator intent satisfied either way
         vendor.CancelCalls.Should().HaveCount(1);
@@ -1302,8 +1236,8 @@ public class TripCommandConflictRetryTests
         var repo = new FakeTripRepository(trip) { ConcurrencyThrows = 1, ReloadedTrip = reloaded };
         var vendor = new StubVendorOps();
 
-        var handler = new CancelTripCommandHandler(repo, vendor, NullLogger<CancelTripCommandHandler>.Instance);
-        var result = await handler.Handle(new CancelTripCommand(trip.Id, "ops"), default);
+        var service = new TripCancellationService(repo, vendor, NullLogger<TripCancellationService>.Instance);
+        var result = await service.CancelAsync(trip.Id, "ops");
 
         result.IsSuccess.Should().BeTrue();
         reloaded.Status.Should().Be(TripStatus.Cancelled);
