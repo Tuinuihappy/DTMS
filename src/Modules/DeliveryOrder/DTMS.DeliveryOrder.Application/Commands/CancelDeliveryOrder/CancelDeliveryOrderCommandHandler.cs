@@ -27,9 +27,25 @@ public class CancelDeliveryOrderCommandHandler : ICommandHandler<CancelDeliveryO
         try
         {
             order.Cancel(request.Reason);
+
+            // Items bound to a trip follow that trip: the cascade cancels the
+            // trip and TripCancelledConsumer then releases and sweeps them.
+            // Unbound items have nothing to follow — the order will never
+            // dispatch again, so leaving them Pending strands them forever.
+            // Bites hardest on a pre-dispatch cancel (Confirmed / Planning /
+            // Planned), where there is no trip at all and the trip-side sweep
+            // never runs.
+            //
+            // Safe and idempotent by construction: CancelUnboundItems skips
+            // anything with a TripId and anything already terminal, so a
+            // delivered item on a part-finished order is not reversed, and a
+            // repeat cancel self-heals an order cancelled before this existed.
+            var cancelledItems = order.CancelUnboundItems();
             await _repository.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("[Cancel] Order {OrderId} cancelled. Reason: {Reason}.", request.OrderId, request.Reason);
+            _logger.LogInformation(
+                "[Cancel] Order {OrderId} cancelled, {ItemCount} unbound item(s) cancelled with it. Reason: {Reason}.",
+                request.OrderId, cancelledItems, request.Reason);
             return Result.Success();
         }
         catch (InvalidOperationException ex)
