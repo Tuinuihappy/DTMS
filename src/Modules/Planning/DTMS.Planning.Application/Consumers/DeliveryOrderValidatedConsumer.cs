@@ -103,7 +103,32 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
 
         // Phase 1: Confirmed → Planning. Internal event (sub-second), but
         // surfaces in audit + lets RabbitMQ redeliveries be idempotent.
-        await _sender.Send(new MarkOrderPlanningCommand(evt.DeliveryOrderId), ct);
+        //
+        // Bail when the order can no longer enter Planning. A cancel landing
+        // while this event is in flight otherwise leaves the order Cancelled and
+        // this consumer about to dispatch trips for it — and nothing downstream
+        // would stop them, because the order-cancelled cascade already ran and
+        // found no trips. Same for a Held order, which until now was dispatched
+        // regardless, making the hold do nothing; releasing one re-raises the
+        // Confirmed event, so it plans then.
+        //
+        // Swallowing the event on failure is safe ONLY because
+        // MarkOrderPlanningCommandHandler catches InvalidOperationException and
+        // nothing else — a DbUpdateConcurrencyException propagates and
+        // MassTransit redelivers. So IsFailure always means "the domain said no",
+        // never "try again". If a transient catch is ever added there, this turns
+        // from a race guard into a silent order-dropper.
+        //
+        // Idempotent on redelivery: MarkPlanning is forward-only, returning
+        // success for Planning / Planned / Dispatched / InProgress.
+        var planningResult = await _sender.Send(new MarkOrderPlanningCommand(evt.DeliveryOrderId), ct);
+        if (planningResult.IsFailure)
+        {
+            _logger.LogWarning(
+                "[AutoPlan] Order {OrderId} cannot enter Planning ({Error}) — abandoning dispatch.",
+                evt.DeliveryOrderId, planningResult.Error);
+            return;
+        }
 
         // T2 Phase 2 step 1 — also publish OrderPlanRequested for the saga
         // shadow path. When Workflow:UseSaga=false (default) the event is
