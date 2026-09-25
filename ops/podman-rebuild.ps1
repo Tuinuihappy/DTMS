@@ -95,7 +95,7 @@ try {
     }
     if ($Only -in 'all', 'frontend') {
         $buildArgs = @()
-        foreach ($k in 'NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT', 'NEXT_PUBLIC_OPERATOR_MOCK_GPS_LNG') {
+        foreach ($k in 'NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT', 'NEXT_PUBLIC_OPERATOR_MOCK_GPS_LNG', 'NEXT_PUBLIC_DTMS_HUBS_URL') {
             $v = Read-DotEnv $k
             if ($v) { $buildArgs += '--build-arg', "$k=$v" }
         }

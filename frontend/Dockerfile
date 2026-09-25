@@ -44,6 +44,12 @@ ARG NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT
 ARG NEXT_PUBLIC_OPERATOR_MOCK_GPS_LNG
 ENV NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT=${NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT}
 ENV NEXT_PUBLIC_OPERATOR_MOCK_GPS_LNG=${NEXT_PUBLIC_OPERATOR_MOCK_GPS_LNG}
+# Where browsers open the SignalR WebSocket. Setting it on the running
+# container does nothing — the client bundle already holds whatever was here
+# at build time — so an image built for one host cannot serve another. The
+# default must stay non-empty: signalr-client.ts falls back only on undefined.
+ARG NEXT_PUBLIC_DTMS_HUBS_URL=http://localhost:5219
+ENV NEXT_PUBLIC_DTMS_HUBS_URL=${NEXT_PUBLIC_DTMS_HUBS_URL}
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

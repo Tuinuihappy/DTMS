@@ -743,6 +743,9 @@ services:
         # gate. Leave unset in production.
         NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT: ${NEXT_PUBLIC_OPERATOR_MOCK_GPS_LAT:-}
         NEXT_PUBLIC_OPERATOR_MOCK_GPS_LNG: ${NEXT_PUBLIC_OPERATOR_MOCK_GPS_LNG:-}
+        # Baked into the browser bundle — the runtime env entry below is too
+        # late to change it. Rebuild the image when the API's address changes.
+        NEXT_PUBLIC_DTMS_HUBS_URL: ${NEXT_PUBLIC_DTMS_HUBS_URL:-http://localhost:5219}
     image: tms-frontend:latest
     container_name: tms-frontend
     ports:
