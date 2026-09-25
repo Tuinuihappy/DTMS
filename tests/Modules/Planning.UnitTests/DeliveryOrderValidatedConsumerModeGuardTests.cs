@@ -6,6 +6,7 @@ using DTMS.DeliveryOrder.IntegrationEvents;
 using DTMS.Dispatch.Application.Services;
 using DTMS.Planning.Application.Consumers;
 using DTMS.SharedKernel.Diagnostics;
+using DTMS.SharedKernel.Messaging;
 using FluentAssertions;
 using MassTransit;
 using MediatR;
@@ -69,6 +70,11 @@ public class DeliveryOrderValidatedConsumerModeGuardTests
     {
         var registry = Substitute.For<IDispatchStrategyRegistry>();
         var sender = Substitute.For<ISender>();
+        // The consumer now reads this result and abandons dispatch on failure,
+        // so it has to be stubbed: Result has no public parameterless ctor, and
+        // an unstubbed Send hands back a Task<Result> of null.
+        sender.Send(Arg.Any<MarkOrderPlanningCommand>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success());
         var consumer = new DeliveryOrderValidatedConsumer(
             registry,
             Substitute.For<ISelfManagedDispatchService>(),
