@@ -1,0 +1,70 @@
+# Server overlay: how this stack runs under Docker Engine on the Linux server.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.server.yml --profile prod up -d --no-build
+#
+# The server has no internet, so it never builds or pulls: every image arrives
+# in the bundle made by ops/server-export.ps1 and is loaded by
+# ops/server-install.sh. Plain Docker publishes ports normally, so none of the
+# podman overlay's host-network workarounds apply here — don't combine the two.
+
+# Pinned so volume names (dtms_pgdata, dtms_dp-keys, ...) and the api image
+# name (dtms-api) do not depend on what the bundle's folder is called.
+name: dtms
+
+networks:
+  default:
+    ipam:
+      config:
+        # Pinned so the gateway below is a known address. Change it only if
+        # 172.30.0.0/24 is already routed on the server's LAN.
+        - subnet: 172.30.0.0/24
+
+services:
+  # Everything below is reachable only from the server itself. Their
+  # credentials are the compose defaults (postgres/postgres, guest/guest,
+  # minioadmin/minioadmin), fine on a dev PC and not on a LAN-facing server.
+  # Reach them from elsewhere through an SSH tunnel, e.g.
+  #   ssh -L 5434:127.0.0.1:5434 user@server
+  postgres:
+    ports: !override
+      - "127.0.0.1:5434:5432"
+
+  pgbouncer:
+    ports: !override
+      - "127.0.0.1:6432:5432"
+
+  rabbitmq:
+    ports: !override
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+
+  redis:
+    ports: !override
+      - "127.0.0.1:6379:6379"
+
+  minio:
+    # Docker Hub's minio/minio repository now 404s; the bundle carries this one.
+    image: quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z
+    ports: !override
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+
+  jaeger:
+    ports: !override
+      - "127.0.0.1:16686:16686"
+      - "127.0.0.1:4317:4317"
+
+  prometheus:
+    ports: !override
+      - "127.0.0.1:9090:9090"
+
+  api:
+    image: dtms-api
+    environment:
+      # Docker on Linux keeps the caller's real address on published ports,
+      # so RIOT3's webhooks arrive from RIOT3's own IP. .env's 172.18.0.1 was
+      # Docker Desktop's gateway and matches nothing here. The gateway entry
+      # covers calls made from the server itself (curl tests), which Docker's
+      # userland proxy re-originates from the network gateway.
+      - VendorAdapter__Riot3__Webhook__AllowedIPs__0=${RIOT3_WEBHOOK_IP:-10.204.212.28}
+      - VendorAdapter__Riot3__Webhook__AllowedIPs__1=172.30.0.1
