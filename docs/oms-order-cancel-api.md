@@ -78,7 +78,7 @@ it does not yet, you will get a 403 — one click on our side.
 | **404** | No order with that reference **for you**. |
 | **500** | Our fault. The body carries a `traceId` — send it to us. |
 
-Errors are RFC 7807 problem documents (`application/problem+json`). Read
+Errors are RFC 7807 problem documents (served as `application/json`). Read
 `detail`; the `error` member repeats it only so older clients keep working.
 
 ```

@@ -57,7 +57,7 @@ Your token already carries the permission (`dtms:source:oms:trip:cancel`,
 granted 2026-09-25). No new credential, no re-issue.
 
 You can only cancel shipments on your own orders. A trip belonging to another
-system is refused with a message naming the real owner.
+system answers 403, with a message naming the real owner.
 
 ---
 
@@ -73,7 +73,7 @@ system is refused with a message naming the real owner.
 | **404** | No shipment with that id. |
 | **500** | Our fault. The body carries a `traceId` — send it to us. |
 
-Errors are RFC 7807 problem documents (`application/problem+json`):
+Errors are RFC 7807 problem documents (served as `application/json`):
 
 ```json
 {
@@ -103,12 +103,12 @@ The vendor one means the robot controller refused. Nothing was changed on our
 side — the shipment is still running. Worth retrying or escalating rather than
 treating as cancelled.
 
-> **Changed 2026-09-25.** These used to be 400 for everything, with a
-> `{"error": "..."}` body. A missing shipment is now 404 and somebody else's
-> shipment is 403, so you can tell "fix the id" from "fix the token" from "the
-> shipment cannot be cancelled". The `error` key survived the move, so nothing
-> breaks if you are not ready to change — but if you match on `Content-Type`
-> rather than status, note it is now `application/problem+json`.
+> **Changed 2026-09-25.** These used to be 400 for everything. A missing
+> shipment is now 404 and somebody else's shipment is 403, so you can tell "fix
+> the id" from "fix the token" from "the shipment cannot be cancelled". The body
+> gained `status` / `title` / `instance` / `traceId`, kept `error`, and is still
+> served as `application/json` — so nothing breaks if you are not ready to
+> change.
 
 ---
 
@@ -143,10 +143,9 @@ anything. We log a warning every time that happens, so we will notice.
 
 **Cancel before the shipment starts.** The endpoint takes a trip id, and a trip
 only exists once we have dispatched. An order that is accepted but not yet
-dispatched has nothing to cancel this way — tell us and an operator will handle
-it. If you need to cancel in that window programmatically, say so: an
-order-level endpoint is designed but not built, and your demand is what would
-justify building it.
+dispatched has nothing to cancel this way — use
+[`POST /api/v1/source/delivery-orders/{orderRef}/cancel`](oms-order-cancel-api.md)
+instead, which is addressed by your own order reference and reaches that window.
 
 **Cancel a finished shipment.** Completed and rejected shipments are refused.
 
@@ -164,7 +163,7 @@ before we enable it.
 ## Notes for DTMS engineers
 
 - Endpoint: [`SourceSystemTripEndpoints`](../src/Modules/Dispatch/DTMS.Dispatch.Presentation/SourceSystemTripEndpoints.cs); handler: [`SourceCancelTripCommandHandler`](../src/Modules/Dispatch/DTMS.Dispatch.Application/Commands/SourceSystemTrip/SourceCancelTripCommandHandler.cs)
-- Origin check runs in `SourceTripCommandHandlerBase` before any state is read, so the 204/400 difference cannot be used to probe for another system's trip ids
+- Origin check runs in `SourceTripCommandHandlerBase` before any state is read, so the 204/403 difference cannot be used to probe for another system's trip ids
 - The already-cancelled shortcut is deliberately `Cancelled`-only; `Trip.Cancel` must keep throwing so `TripCancellationService`'s xmin retry can still detect the vendor echo winning the race
 - Cancel itself is [`TripCancellationService`](../src/Modules/Dispatch/DTMS.Dispatch.Application/Services/TripCancellationService.cs) — the same path the operator console uses, so there is one place that talks to the vendor about a cancel
 - Origin lands on `ExecutionEvent.Details` as `via=oms` and the actor on `ExecutionEvent.Actor`; the order activity row carries `ActorId = oms`. Vendor-echo cancels tag themselves `via=riot3` / `via=riot3-reconciler`, operator cancels carry the employee id and no origin
