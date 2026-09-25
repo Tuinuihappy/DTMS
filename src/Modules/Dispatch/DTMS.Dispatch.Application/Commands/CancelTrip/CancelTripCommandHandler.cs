@@ -16,5 +16,7 @@ public class CancelTripCommandHandler : ICommandHandler<CancelTripCommand>
         => _cancellation = cancellation;
 
     public Task<Result> Handle(CancelTripCommand request, CancellationToken cancellationToken)
-        => _cancellation.CancelAsync(request.TripId, request.Reason, cancellationToken);
+        => _cancellation.CancelAsync(
+            request.TripId, request.Reason, request.ActionBy, request.ActedAt,
+            request.Origin, cancellationToken);
 }

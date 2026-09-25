@@ -550,7 +550,22 @@ public class Trip : AggregateRoot<Guid>
             Guid.NewGuid(), DateTime.UtcNow, Id, vehicleKey));
     }
 
-    public void Cancel(string reason)
+    /// <param name="actionBy">
+    /// Who cancelled, in the calling system's own terms — an employee id for the
+    /// operator console, the upstream user for a federated source-system cancel.
+    /// Null for the vendor echo, which has no human behind it. Lands on the
+    /// ExecutionEvent, the same place every other lifecycle method records its
+    /// actor (see migration 20260706131000_AddExecutionEventActor).
+    /// </param>
+    /// <param name="origin">
+    /// Which system asked, recorded in the audit row's Details as
+    /// <c>via=&lt;origin&gt;</c> and deliberately kept OUT of
+    /// <paramref name="reason"/>: reason is the upstream-facing payload that
+    /// reaches OMS on shipment.cancelled.v1, Details is our internal trail.
+    /// Null for the operator console, whose origin is already implied.
+    /// </param>
+    public void Cancel(string reason, string? actionBy = null, DateTime? actedAt = null,
+        string? origin = null)
     {
         if (Status is TripStatus.Completed or TripStatus.Cancelled or TripStatus.Rejected)
             throw new InvalidOperationException($"Cannot cancel a trip in {Status} status.");
@@ -560,24 +575,41 @@ public class Trip : AggregateRoot<Guid>
         AddDomainEvent(new TripCancelledDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, JobId, DeliveryOrderId, reason,
             string.IsNullOrWhiteSpace(UpperKey) ? null : UpperKey));
-        RecordEvent("TripCancelled", reason);
+
+        var actor = string.IsNullOrWhiteSpace(actionBy) ? null : actionBy.Trim();
+        var details = string.IsNullOrWhiteSpace(origin) ? reason : $"{reason} via={origin}";
+        RecordEvent("TripCancelled", details, actor, ExecutionEvent.NormalizeToUtc(actedAt));
     }
 
     /// <summary>
-    /// Audit-only: preserves the operator's cancel reason when their cancel
+    /// Audit-only: preserves the caller's cancel reason when their cancel
     /// command lost the commit race to the vendor's TASK_CANCELED echo — the
     /// surviving (first) TripCancelled event then carries the vendor's
     /// placeholder reason ("vendor cancelled") and the true cause would
     /// otherwise be lost. Appends an ExecutionEvent; no status change, no
     /// domain event.
+    ///
+    /// <para>Takes the same actor/origin as <see cref="Cancel"/>. Losing them
+    /// here would be worse than losing them anywhere else: this is exactly the
+    /// row that explains who really wanted the trip stopped, and the race that
+    /// produces it is common (RIOT3 echoes TASK_CANCELED, and the reconciler
+    /// polls every 60s). Without the origin it reads as though an operator
+    /// acted when the request may well have come from a source system.</para>
     /// </summary>
-    public void RecordSupersededCancelIntent(string reason)
+    public void RecordSupersededCancelIntent(string reason, string? actionBy = null,
+        DateTime? actedAt = null, string? origin = null)
     {
         if (Status != TripStatus.Cancelled)
             throw new InvalidOperationException(
                 "Only cancelled trips can record a superseded cancel intent.");
+
+        // EventType stays "OperatorCancelSuperseded" for continuity with the
+        // rows already in the table; the wording below carries the real origin.
+        var who = string.IsNullOrWhiteSpace(origin) ? "Operator" : origin;
         RecordEvent("OperatorCancelSuperseded",
-            $"Operator cancel superseded by vendor echo; operator reason: {reason}");
+            $"{who} cancel superseded by vendor echo; {who} reason: {reason}",
+            string.IsNullOrWhiteSpace(actionBy) ? null : actionBy.Trim(),
+            ExecutionEvent.NormalizeToUtc(actedAt));
     }
 
     // Bind the trip to a vehicle the vendor (RIOT3) auto-selected after

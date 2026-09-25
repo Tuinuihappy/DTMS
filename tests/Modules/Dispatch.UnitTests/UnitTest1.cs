@@ -527,6 +527,40 @@ public class TripTests
     }
 
     [Fact]
+    public void Cancel_WithSourceActor_StampsActorNormalisesTimeAndTagsOrigin()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted(Guid.NewGuid());
+        // Unspecified Kind is what System.Text.Json hands us for a bare ISO
+        // string; Npgsql refuses to write that to a timestamptz column.
+        var upstream = new DateTime(2026, 9, 25, 3, 0, 0, DateTimeKind.Unspecified);
+
+        trip.Cancel("wrong station", "oms-user-42", upstream, "oms");
+
+        var ev = trip.Events.Last(e => e.EventType == "TripCancelled");
+        ev.Actor.Should().Be("oms-user-42");
+        ev.ActedAt!.Value.Kind.Should().Be(DateTimeKind.Utc);
+        ev.Details.Should().Be("wrong station via=oms");
+        // The upstream-facing reason stays clean — origin lives on the audit
+        // row only, because Reason is what reaches OMS on shipment.cancelled.v1.
+        trip.DomainEvents.OfType<TripCancelledDomainEvent>().Single()
+            .Reason.Should().Be("wrong station");
+    }
+
+    [Fact]
+    public void Cancel_WithoutOrigin_LeavesDetailsAsTheBareReason()
+    {
+        var trip = NewEnvelopeTrip();
+        trip.MarkVendorStarted(Guid.NewGuid());
+
+        trip.Cancel("ops");
+
+        var ev = trip.Events.Last(e => e.EventType == "TripCancelled");
+        ev.Details.Should().Be("ops");
+        ev.Actor.Should().BeNull();
+    }
+
+    [Fact]
     public void SetAssignedVehicle_FirstAssignment_Binds()
     {
         var trip = NewEnvelopeTrip();

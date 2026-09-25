@@ -338,7 +338,7 @@ public sealed class Riot3ReconciliationService : BackgroundService
                     // moves to Cancelled and DeliveryOrder is left alone so
                     // the order can be re-dispatched. (TASK_FAILED below
                     // remains the only path that fails the DeliveryOrder.)
-                    trip.Cancel(data.CancelReason ?? "vendor cancelled");
+                    trip.Cancel(data.CancelReason ?? "vendor cancelled", origin: "riot3-reconciler");
                     return Transition.Cancelled;
 
                 case "PROCESSING":

@@ -17,6 +17,7 @@ using DTMS.Dispatch.Application.Queries.GetTripsQueue;
 using DTMS.Dispatch.Application.Queries.GetTripStatusHistory;
 using DTMS.Dispatch.Domain.Enums;
 using DTMS.Iam.Application.Authorization;
+using DTMS.SharedKernel.Auth;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -164,10 +165,16 @@ public static class DispatchEndpoints
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         }).RequirePermission(Permissions.Dispatch.TripAcknowledge);
 
-        // POST /api/v1/dispatch/trips/{id}/cancel
-        group.MapPost("/trips/{id:guid}/cancel", async (Guid id, string reason, ISender sender) =>
+        // POST /api/v1/dispatch/trips/{id}/cancel — `reason` is a query string,
+        // not a body, which is how the frontend has always called it.
+        // ActionBy comes from the signed-in operator via ICurrentUserAccessor
+        // (bound from DI, not the query) so the cancel lands in the audit trail
+        // attributed to a person rather than to nobody.
+        group.MapPost("/trips/{id:guid}/cancel",
+            async (Guid id, string reason, ICurrentUserAccessor currentUser, ISender sender) =>
         {
-            var result = await sender.Send(new CancelTripCommand(id, reason));
+            var result = await sender.Send(
+                new CancelTripCommand(id, reason, ActionBy: currentUser.GetCurrentUserName()));
             return result.IsSuccess ? Results.Ok() : Results.BadRequest(result.Error);
         }).RequirePermission(Permissions.Dispatch.TripCancel);
 

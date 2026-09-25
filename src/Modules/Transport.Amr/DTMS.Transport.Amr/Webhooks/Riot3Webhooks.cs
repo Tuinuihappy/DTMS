@@ -231,7 +231,7 @@ public static class Riot3Webhooks
                     // Distinct from TASK_FAILED which propagates to mark the
                     // DeliveryOrder as Failed via TripFailedConsumer.
                     var cancelReason = payload.Task?.CancelReason ?? "vendor cancelled";
-                    trip.Cancel(cancelReason);
+                    trip.Cancel(cancelReason, origin: "riot3");
                     logger.LogInformation("[EnvelopeWebhook] Trip {TripId} cancelled by vendor (upperKey {UpperKey}): {Reason}",
                         trip.Id, upperKey, cancelReason);
                     break;

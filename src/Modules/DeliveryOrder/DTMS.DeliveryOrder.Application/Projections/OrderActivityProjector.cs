@@ -236,10 +236,15 @@ public class OrderActivityProjector :
             "TripRejected", ctx.Message.Reason,
             relatedTripId: ctx.Message.TripId);
 
+    // Unlike its neighbours this one carries the actor: "who stopped this trip"
+    // is the question the timeline gets asked about a cancel, and the answer is
+    // already on the event. The other trip-execution rows describe things the
+    // vendor did on its own, so they have no actor to show.
     public Task Consume(ConsumeContext<TripCancelledIntegrationEvent> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatTripExecution,
             "TripCancelled", ctx.Message.Reason,
-            relatedTripId: ctx.Message.TripId);
+            relatedTripId: ctx.Message.TripId,
+            actorId: ctx.Message.TriggeredBy);
 
     public async Task Consume(ConsumeContext<TripResumedIntegrationEventV1> ctx)
     {

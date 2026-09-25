@@ -22,8 +22,17 @@ public interface ITripCancellationService
     /// transition or the vendor rejects the cancel. A vendor that has no record
     /// of the order counts as success — the intent is met either way.
     /// </summary>
+    /// <param name="actionBy">Who cancelled, in the calling system's own terms.</param>
+    /// <param name="actedAt">When they cancelled it upstream, if known.</param>
+    /// <param name="origin">
+    /// Which system asked. Recorded in the audit trail and kept out of
+    /// <paramref name="reason"/>, because reason is what travels upstream.
+    /// </param>
     Task<Result> CancelAsync(
         Guid tripId,
         string reason,
+        string? actionBy = null,
+        DateTime? actedAt = null,
+        string? origin = null,
         CancellationToken cancellationToken = default);
 }

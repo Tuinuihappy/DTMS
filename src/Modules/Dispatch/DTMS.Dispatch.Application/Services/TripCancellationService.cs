@@ -29,12 +29,13 @@ public sealed class TripCancellationService : ITripCancellationService
     }
 
     public async Task<Result> CancelAsync(
-        Guid tripId, string reason, CancellationToken cancellationToken = default)
+        Guid tripId, string reason, string? actionBy = null, DateTime? actedAt = null,
+        string? origin = null, CancellationToken cancellationToken = default)
     {
         var trip = await _tripRepository.GetByIdAsync(tripId, cancellationToken);
         if (trip == null) return Result.Failure($"Trip {tripId} not found.");
 
-        try { trip.Cancel(reason); }
+        try { trip.Cancel(reason, actionBy, actedAt, origin); }
         catch (System.InvalidOperationException ex) { return Result.Failure(ex.Message); }
 
         // Skip the vendor call when there is no orderKey yet — the trip was
@@ -53,7 +54,8 @@ public sealed class TripCancellationService : ITripCancellationService
             }
             catch (DbUpdateConcurrencyException)
             {
-                return await RetryCancelAfterConflictAsync(tripId, reason, cancellationToken);
+                return await RetryCancelAfterConflictAsync(
+                    tripId, reason, actionBy, actedAt, origin, cancellationToken);
             }
         }
 
@@ -82,7 +84,8 @@ public sealed class TripCancellationService : ITripCancellationService
         }
         catch (DbUpdateConcurrencyException)
         {
-            return await RetryCancelAfterConflictAsync(tripId, reason, cancellationToken);
+            return await RetryCancelAfterConflictAsync(
+                tripId, reason, actionBy, actedAt, origin, cancellationToken);
         }
         return Result.Success();
     }
@@ -94,14 +97,15 @@ public sealed class TripCancellationService : ITripCancellationService
     // audit ExecutionEvent (no second integration event). Never repeats the
     // vendor call; a second consecutive conflict propagates (→ HTTP 409).
     private async Task<Result> RetryCancelAfterConflictAsync(
-        Guid tripId, string reason, CancellationToken cancellationToken)
+        Guid tripId, string reason, string? actionBy, DateTime? actedAt, string? origin,
+        CancellationToken cancellationToken)
     {
         _tripRepository.ResetTracking();
         var trip = await _tripRepository.GetByIdAsync(tripId, cancellationToken);
         if (trip == null) return Result.Failure($"Trip {tripId} not found.");
 
         var superseded = false;
-        try { trip.Cancel(reason); }
+        try { trip.Cancel(reason, actionBy, actedAt, origin); }
         catch (InvalidOperationException) { superseded = true; }
 
         if (trip.Status != TripStatus.Cancelled)
@@ -109,7 +113,7 @@ public sealed class TripCancellationService : ITripCancellationService
                 $"Cancel was superseded by a concurrent update — trip is now {trip.Status}.");
 
         if (superseded)
-            trip.RecordSupersededCancelIntent(reason);
+            trip.RecordSupersededCancelIntent(reason, actionBy, actedAt, origin);
 
         await _tripRepository.UpdateAsync(trip, cancellationToken);
         _logger.LogInformation(
