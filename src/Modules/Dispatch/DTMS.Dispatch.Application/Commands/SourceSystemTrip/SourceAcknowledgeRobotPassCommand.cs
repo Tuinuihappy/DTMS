@@ -20,4 +20,4 @@ public record SourceAcknowledgeRobotPassCommand(
     Guid TripId,
     string SourceSystemKey,
     string ActionBy,
-    DateTime? ActedAt = null) : ICommand;
+    DateTime? ActedAt = null) : ICommand, ISourceTripCommand;

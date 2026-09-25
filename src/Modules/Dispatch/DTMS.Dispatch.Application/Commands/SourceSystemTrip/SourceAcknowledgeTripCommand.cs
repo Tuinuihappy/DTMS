@@ -16,4 +16,4 @@ public record SourceAcknowledgeTripCommand(
     Guid TripId,
     string SourceSystemKey,
     string AcknowledgedBy,
-    DateTime? AcknowledgedAt = null) : ICommand;
+    DateTime? AcknowledgedAt = null) : ICommand, ISourceTripCommand;

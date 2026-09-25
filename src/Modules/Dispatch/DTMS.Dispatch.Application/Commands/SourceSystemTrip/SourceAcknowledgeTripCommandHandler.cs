@@ -1,4 +1,5 @@
 using DTMS.Dispatch.Application.Services;
+using DTMS.Dispatch.Domain.Entities;
 using DTMS.Dispatch.Domain.Enums;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
@@ -7,29 +8,21 @@ using Microsoft.Extensions.Logging;
 namespace DTMS.Dispatch.Application.Commands.SourceSystemTrip;
 
 public sealed class SourceAcknowledgeTripCommandHandler
-    : ICommandHandler<SourceAcknowledgeTripCommand>
+    : SourceTripCommandHandlerBase<SourceAcknowledgeTripCommand>
 {
-    private readonly ITripRepository _trips;
-    private readonly IDeliveryOrderStatusReader _orders;
     private readonly ILogger<SourceAcknowledgeTripCommandHandler> _logger;
 
     public SourceAcknowledgeTripCommandHandler(
         ITripRepository trips,
         IDeliveryOrderStatusReader orders,
-        ILogger<SourceAcknowledgeTripCommandHandler> logger)
+        ILogger<SourceAcknowledgeTripCommandHandler> logger) : base(trips, orders)
     {
-        _trips = trips;
-        _orders = orders;
         _logger = logger;
     }
 
-    public async Task<Result> Handle(SourceAcknowledgeTripCommand request, CancellationToken cancellationToken)
+    protected override async Task<Result> HandleAuthorized(
+        SourceAcknowledgeTripCommand request, Trip trip, CancellationToken cancellationToken)
     {
-        var resolved = await SourceTripOriginAuthorizer.ResolveAsync(
-            _trips, _orders, request.TripId, request.SourceSystemKey, cancellationToken);
-        if (!resolved.IsSuccess) return Result.Failure(resolved.Error);
-        var trip = resolved.Value;
-
         // Terminal trips can't be (re)started. Created → InProgress transitions;
         // an already-InProgress/Paused trip no-ops idempotently (safe for
         // at-least-once delivery from the source system).
@@ -38,7 +31,7 @@ public sealed class SourceAcknowledgeTripCommandHandler
                 $"Cannot acknowledge a trip in {trip.Status} status.");
 
         trip.AcknowledgeBySource(request.AcknowledgedBy, request.AcknowledgedAt);
-        await _trips.UpdateAsync(trip, cancellationToken);
+        await Trips.UpdateAsync(trip, cancellationToken);
         _logger.LogInformation(
             "[SourceTrip] Trip {TripId} acknowledged (started) by {AcknowledgedBy} via source system {Key}",
             trip.Id, request.AcknowledgedBy, request.SourceSystemKey);

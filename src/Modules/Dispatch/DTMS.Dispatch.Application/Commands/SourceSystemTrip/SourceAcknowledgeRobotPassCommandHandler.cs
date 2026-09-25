@@ -1,4 +1,5 @@
 using DTMS.Dispatch.Application.Services;
+using DTMS.Dispatch.Domain.Entities;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Logging;
@@ -6,10 +7,8 @@ using Microsoft.Extensions.Logging;
 namespace DTMS.Dispatch.Application.Commands.SourceSystemTrip;
 
 public sealed class SourceAcknowledgeRobotPassCommandHandler
-    : ICommandHandler<SourceAcknowledgeRobotPassCommand>
+    : SourceTripCommandHandlerBase<SourceAcknowledgeRobotPassCommand>
 {
-    private readonly ITripRepository _trips;
-    private readonly IDeliveryOrderStatusReader _orders;
     private readonly IVendorRobotOperationService _robotOps;
     private readonly ILogger<SourceAcknowledgeRobotPassCommandHandler> _logger;
 
@@ -17,21 +16,15 @@ public sealed class SourceAcknowledgeRobotPassCommandHandler
         ITripRepository trips,
         IDeliveryOrderStatusReader orders,
         IVendorRobotOperationService robotOps,
-        ILogger<SourceAcknowledgeRobotPassCommandHandler> logger)
+        ILogger<SourceAcknowledgeRobotPassCommandHandler> logger) : base(trips, orders)
     {
-        _trips = trips;
-        _orders = orders;
         _robotOps = robotOps;
         _logger = logger;
     }
 
-    public async Task<Result> Handle(SourceAcknowledgeRobotPassCommand request, CancellationToken cancellationToken)
+    protected override async Task<Result> HandleAuthorized(
+        SourceAcknowledgeRobotPassCommand request, Trip trip, CancellationToken cancellationToken)
     {
-        var resolved = await SourceTripOriginAuthorizer.ResolveAsync(
-            _trips, _orders, request.TripId, request.SourceSystemKey, cancellationToken);
-        if (!resolved.IsSuccess) return Result.Failure(resolved.Error);
-        var trip = resolved.Value;
-
         // Record the acknowledgment in-memory (audit + actor). PASS is AMR-only
         // and needs an in-flight robot; the domain guards on Status==InProgress
         // and a non-empty VendorVehicleKey — translate those to a clean 400.
@@ -69,7 +62,7 @@ public sealed class SourceAcknowledgeRobotPassCommandHandler
                 "Vendor has no record of this vehicle key — please verify robot state at the floor.");
         }
 
-        await _trips.UpdateAsync(trip, cancellationToken);
+        await Trips.UpdateAsync(trip, cancellationToken);
         _logger.LogInformation(
             "[SourceTrip] Trip {TripId} robot PASS acknowledged by {ActionBy} via source system {Key} (vehicleKey {VehicleKey})",
             trip.Id, request.ActionBy, request.SourceSystemKey, trip.VendorVehicleKey);

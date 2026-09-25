@@ -13,4 +13,4 @@ public record SourceCompleteTripCommand(
     Guid TripId,
     string SourceSystemKey,
     string ActionBy,
-    DateTime? ActedAt = null) : ICommand;
+    DateTime? ActedAt = null) : ICommand, ISourceTripCommand;
