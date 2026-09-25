@@ -67,22 +67,48 @@ system is refused with a message naming the real owner.
 |---|---|
 | **204** | Cancelled. No body. |
 | **204** | Also what you get if it was already cancelled — see "Retrying is safe". |
-| **400** | Refused. Body is `{"error": "..."}` with a sentence you can log or show. |
+| **400** | Refused: the shipment is in a state that cannot be cancelled, or the request was incomplete. |
 | **401** | Token missing, expired, or not ours. |
-| **403** | Token is fine but lacks the cancel permission. Tell us; it is a one-click fix on our side. |
+| **403** | Either the token lacks the cancel permission (tell us — one click on our side), or that shipment belongs to a different source system. The message says which. |
+| **404** | No shipment with that id. |
+| **500** | Our fault. The body carries a `traceId` — send it to us. |
 
-Real 400s you might see:
+Errors are RFC 7807 problem documents (`application/problem+json`):
 
 ```json
-{"error": "Cannot cancel a trip in Completed status."}
-{"error": "Trip 0000...0001 not found."}
-{"error": "actionBy is required."}
-{"error": "Vendor cancel failed: <reason from the robot controller>"}
+{
+  "status": 400,
+  "title": "Business Rule Violation",
+  "detail": "Cannot cancel a trip in Completed status.",
+  "instance": "/api/v1/source/trips/4f2a.../cancel",
+  "traceId": "0a91...",
+  "error": "Cannot cancel a trip in Completed status."
+}
 ```
 
-The last one means the robot controller refused. Nothing was changed on our
+`error` repeats `detail` so code written against our older shape keeps working.
+It is a compatibility shim and will go away — **read `detail`**.
+
+Messages you might see:
+
+```
+400  Cannot cancel a trip in Completed status.
+400  actionBy is required.
+400  Vendor cancel failed: <reason from the robot controller>
+403  Trip 4f2a... belongs to source system 'sap', not 'oms' — caller may only act on its own trips.
+404  Trip 0000...0001 not found.
+```
+
+The vendor one means the robot controller refused. Nothing was changed on our
 side — the shipment is still running. Worth retrying or escalating rather than
 treating as cancelled.
+
+> **Changed 2026-09-25.** These used to be 400 for everything, with a
+> `{"error": "..."}` body. A missing shipment is now 404 and somebody else's
+> shipment is 403, so you can tell "fix the id" from "fix the token" from "the
+> shipment cannot be cancelled". The `error` key survived the move, so nothing
+> breaks if you are not ready to change — but if you match on `Content-Type`
+> rather than status, note it is now `application/problem+json`.
 
 ---
 
