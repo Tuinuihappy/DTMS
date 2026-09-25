@@ -7,6 +7,7 @@ using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.DeliveryOrder.Domain.ValueObjects;
 using DTMS.Dispatch.Application.Services;
+using DTMS.SharedKernel.Auth;
 using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.EntityFrameworkCore;

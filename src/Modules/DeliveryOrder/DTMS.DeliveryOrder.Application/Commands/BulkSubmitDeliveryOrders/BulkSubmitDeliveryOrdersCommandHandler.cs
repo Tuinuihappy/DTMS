@@ -6,6 +6,7 @@ using DTMS.DeliveryOrder.Application.Services;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.DeliveryOrder.Domain.ValueObjects;
 using DTMS.Dispatch.Application.Services;
+using DTMS.SharedKernel.Auth;
 using DTMS.SharedKernel.Messaging;
 using Microsoft.Extensions.Options;
 

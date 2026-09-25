@@ -1,5 +1,6 @@
 using DTMS.Planning.Application.Services;
 using DTMS.Planning.Domain.Repositories;
+using DTMS.SharedKernel.Auth;
 using DTMS.SharedKernel.Exceptions;
 using DTMS.SharedKernel.Messaging;
 

@@ -18,12 +18,11 @@ namespace DTMS.Api.Auth;
 /// null CreatedBy/RequestedBy because Identity.Name resolves to null for
 /// real External Auth JWTs.</para>
 /// </summary>
-// Implements the per-module ICurrentUserAccessor interfaces. Each module
-// declares its own copy to avoid cross-module references; the API host
-// satisfies all of them with one implementation.
-public sealed class HttpContextCurrentUserAccessor :
-    DTMS.DeliveryOrder.Application.Services.ICurrentUserAccessor,
-    DTMS.Planning.Application.Services.ICurrentUserAccessor
+// Single implementation of the shared ICurrentUserAccessor. DeliveryOrder and
+// Planning used to declare an identical copy each, to avoid a cross-module
+// reference; the interface moved to SharedKernel when Dispatch became the third
+// module to need it, so there is now one interface and one registration.
+public sealed class HttpContextCurrentUserAccessor : DTMS.SharedKernel.Auth.ICurrentUserAccessor
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
 

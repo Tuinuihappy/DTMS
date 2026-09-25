@@ -2,6 +2,7 @@ using DTMS.Planning.Application.Queries.GetActionTemplates;
 using DTMS.Planning.Application.Services;
 using DTMS.Planning.Domain.Entities;
 using DTMS.Planning.Domain.Repositories;
+using DTMS.SharedKernel.Auth;
 using DTMS.SharedKernel.Messaging;
 
 namespace DTMS.Planning.Application.Commands.CreateActionTemplate;

@@ -384,9 +384,9 @@ public static class ModuleServiceRegistration
                 new DomainEventOutboxSaveChangesInterceptor(
                     sp.GetRequiredService<DeliveryOrderDomainEventMapper>())));
         services.AddHttpContextAccessor();
-        services.AddScoped<DTMS.DeliveryOrder.Application.Services.ICurrentUserAccessor,
-                           DTMS.Api.Auth.HttpContextCurrentUserAccessor>();
-        services.AddScoped<DTMS.Planning.Application.Services.ICurrentUserAccessor,
+        // One registration for every module — the interface lives in SharedKernel
+        // (it was a per-module copy until Dispatch became the third consumer).
+        services.AddScoped<DTMS.SharedKernel.Auth.ICurrentUserAccessor,
                            DTMS.Api.Auth.HttpContextCurrentUserAccessor>();
         services.AddScoped<IDeliveryOrderRepository, DeliveryOrderRepository>();
         services.AddScoped<FacilityStationLookup>();
