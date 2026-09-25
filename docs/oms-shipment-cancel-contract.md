@@ -99,11 +99,36 @@ If a retry ever does happen and the chain ultimately dies, `cancel(X)` goes out 
 
 Takes effect within one Redis round-trip. No deploy. Same toggle is the kill switch.
 
+### Do this first: suppress the echo
+
+Since `POST /api/v1/source/trips/{id}/cancel` shipped, OMS can cancel its own
+trips. The fan-out routes by `order.SourceSystemKey`, so flipping the toggle
+today would send OMS a cancel callback for the cancel OMS itself just requested.
+
+The existing `order.SelfManaged` gate that the pickedup/droppedoff fan-outs use
+is the wrong discriminator here — a plain AMR order is not self-managed and can
+still be source-cancelled.
+
+No schema change needed: `TripCancelledIntegrationEvent.TriggeredBy` already
+carries the bare system key for system callers (`ActorContext.PrincipalId` is
+`system:{key}`; `TriggeredBy` strips the prefix). One clause beside the existing
+`DispatchedAt`/`StartedAt` guards does it:
+
+```csharp
+// Don't echo a cancel back to the system that asked for it.
+if (string.Equals(evt.TriggeredBy, source, StringComparison.OrdinalIgnoreCase)) return;
+```
+
+Worth deciding with OMS rather than assuming: they may prefer the echo as a
+confirmation receipt. If so, this stays as-is and the note is just a heads-up
+that some cancels they receive will be their own.
+
 ## Notes for DTMS engineers
 
 - Fan-out: [`ShipmentCancelledCallbackFanoutConsumer`](../src/DTMS.Api/Infrastructure/Callbacks/ShipmentCancelledCallbackFanoutConsumer.cs) — the federated re-do of the deleted `TripCancelledOmsNotifyConsumer`, same event, same root-trip-id contract
 - Wire shape: [`OmsShipmentCancelledFormatter`](../src/Modules/Iam/DTMS.Iam.Infrastructure/Callbacks/OmsShipmentCancelledFormatter.cs) (`oms.shipment.cancelled.v1`), pinned byte-for-byte against the legacy DTO by `Cancelled_BodyMatchesLegacyContract_AndShipmentIdInPath`
 - Subscription seeded disabled by `20260716120000_SeedOmsShipmentCancelledSubscription`
+- Since the source-system cancel endpoint shipped, a cancel can now originate from OMS itself — see "Do this first: suppress the echo" above before enabling. `ExecutionEvent.Details` on the trip tells you which: `via=oms` for a source cancel, `via=riot3`/`via=riot3-reconciler` for the vendor echo, no suffix for the operator console
 - **Stricter than the old consumer**, which had no trip-state guards and cancelled unconditionally. We skip pool trips (`DispatchedAt` set) and never-started trips (`StartedAt` null): no `started` was sent for either, so a cancel would name a shipment OMS has never seen. If OMS would rather have those too, drop the two guards.
 - The cancel carries no lot list — neither did the old one. `TripCancelledConsumer` unbinds the trip's items while handling the same event on another queue, so any lot lookup here is a race.
 - The stuck list is derived, not hand-kept — re-run it rather than trusting the table above:
