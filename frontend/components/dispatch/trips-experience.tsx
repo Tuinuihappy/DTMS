@@ -608,9 +608,13 @@ function TripsTable({
               </TableTd>
               <TableTd density="compact">
                 {t.orderRef ? (
-                  <span className="font-mono text-[12px] font-semibold text-[var(--color-ink-900)] dark:text-white">
+                  <IdCell
+                    id={t.orderRef}
+                    label="order ref"
+                    className="text-left text-[12px] font-semibold text-[var(--color-ink-900)] dark:text-white"
+                  >
                     {t.orderRef}
-                  </span>
+                  </IdCell>
                 ) : (
                   <span className="text-[var(--color-ink-300)]">—</span>
                 )}

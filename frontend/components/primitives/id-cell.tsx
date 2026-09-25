@@ -31,6 +31,7 @@ export function IdCell({
   label = "id",
   chars = 8,
   className,
+  children,
 }: {
   id: string;
   /** Noun used in the aria-label, e.g. "trip id" / "order id". */
@@ -38,6 +39,8 @@ export function IdCell({
   /** Leading characters to show. */
   chars?: number;
   className?: string;
+  /** Custom visible content (e.g. a highlighted ref); `id` is still what gets copied. */
+  children?: React.ReactNode;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -65,7 +68,7 @@ export function IdCell({
         className,
       )}
     >
-      <span>{id.slice(0, chars)}</span>
+      <span className="min-w-0">{children ?? id.slice(0, chars)}</span>
       {copied ? (
         <Check
           className="h-3 w-3 shrink-0 text-[var(--color-mint-600,#16a34a)]"

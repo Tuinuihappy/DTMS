@@ -202,9 +202,13 @@ export function OrdersTable({
                   <IdCell id={o.id} label="order id" />
                 </TableTd>
                 <TableTd>
-                  <div className="font-mono text-[13px] font-semibold text-[var(--color-ink-900)]">
+                  <IdCell
+                    id={o.orderRef}
+                    label="order ref"
+                    className="text-[13px] font-semibold text-[var(--color-ink-900)]"
+                  >
                     <Highlight text={shortRef(o.orderRef)} query={search} />
-                  </div>
+                  </IdCell>
                   {o.requestedBy && (
                     <div
                       className="text-[11px] text-[var(--color-ink-400)] truncate max-w-[140px]"
