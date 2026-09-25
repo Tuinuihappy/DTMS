@@ -1100,13 +1100,23 @@ public class ReissueTripGuardTests
 internal sealed class StubOrderStatusReader : IDeliveryOrderStatusReader
 {
     private readonly string? _status;
-    public StubOrderStatusReader(string? status) => _status = status;
+    private readonly string? _sourceKey;
+
+    // sourceSystemKey is optional so the retry tests, which only care about order
+    // status, keep their single-argument construction. The source-system trip
+    // handlers need a real key for the origin guard to match against.
+    public StubOrderStatusReader(string? status, string? sourceSystemKey = null)
+    {
+        _status = status;
+        _sourceKey = sourceSystemKey;
+    }
+
     public Task<string?> GetStatusAsync(Guid orderId, CancellationToken ct = default)
         => Task.FromResult(_status);
     public Task<bool?> GetRequiresDropPodAsync(Guid orderId, CancellationToken ct = default)
         => Task.FromResult<bool?>(null);
     public Task<string?> GetSourceSystemKeyAsync(Guid orderId, CancellationToken ct = default)
-        => Task.FromResult<string?>(null);
+        => Task.FromResult(_sourceKey);
 }
 
 internal sealed class StubRetryEventRepository : ITripRetryEventRepository

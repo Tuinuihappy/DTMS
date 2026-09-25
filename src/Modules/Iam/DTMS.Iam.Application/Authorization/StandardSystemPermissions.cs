@@ -31,6 +31,14 @@ public static class StandardSystemPermissions
     // partner can PASS its own trips without any broad dispatch authority.
     public const string TripAcknowledgeRobotPassTemplate = "dtms:source:{key}:trip:acknowledge-robot-pass";
 
+    // Trip cancel — a source system calls off a trip on one of its OWN orders
+    // via POST /api/v1/source/trips/{id}/cancel. Held apart from the four
+    // progress actions because it is the destructive one: it reaches
+    // DTMS-executed AMR trips (issuing the RIOT3 CMD_ORDER_CANCEL), and on a
+    // single-trip order the b11 cascade will carry the parent order to
+    // Cancelled with it.
+    public const string TripCancelTemplate = "dtms:source:{key}:trip:cancel";
+
     public static readonly IReadOnlyList<string> All = new[]
     {
         OrderWriteTemplate,
@@ -40,6 +48,7 @@ public static class StandardSystemPermissions
         TripDropTemplate,
         TripCompleteTemplate,
         TripAcknowledgeRobotPassTemplate,
+        TripCancelTemplate,
     };
 
     /// <summary>
