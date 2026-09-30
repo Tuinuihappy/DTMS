@@ -43,9 +43,18 @@ function Get-LanAddress {
     # The adapter that actually carries traffic: up, and holding a default
     # gateway. Picking "the first IPv4" instead would sometimes return a
     # virtual-switch or VPN address that no other machine can reach.
-    (Get-NetIPConfiguration |
-        Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' } |
-        Select-Object -First 1).IPv4Address.IPAddress
+    #
+    # .NET, not Get-NetIPConfiguration: that CIM cmdlet leaks ~0.9 MB per call
+    # in Windows PowerShell 5.1, and at one call per 15 s this process reached
+    # 12.8 GB of commit in 6 days — the machine paged and every UI went slow.
+    [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() |
+        Where-Object { $_.OperationalStatus -eq 'Up' } |
+        ForEach-Object { $_.GetIPProperties() } |
+        Where-Object { $_.GatewayAddresses | Where-Object {
+            $_.Address.AddressFamily -eq 'InterNetwork' -and $_.Address.ToString() -ne '0.0.0.0' } } |
+        ForEach-Object { $_.UnicastAddresses } |
+        Where-Object { $_.Address.AddressFamily -eq 'InterNetwork' } |
+        Select-Object -First 1 | ForEach-Object { $_.Address.ToString() }
 }
 
 while ($true) {
