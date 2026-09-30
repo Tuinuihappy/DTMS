@@ -402,7 +402,7 @@ services:
       # CORS origins for SignalR hubs + cross-origin browser fetches.
       # Comma-separated, scheme://host:port only (no trailing slash).
       # Override via .env to add staging/prod UI hosts.
-      - Cors__HubsAllowedOrigins=${Cors__HubsAllowedOrigins:-http://localhost:3000,http://localhost:3001,http://10.204.37.65:5281,https://10.204.37.65:5281}
+      - Cors__HubsAllowedOrigins=${Cors__HubsAllowedOrigins:-http://localhost:3000,http://localhost:3001}
       # Phase F1 — Redis backplane for multi-replica SignalR. Default false
       # so single-host docker-compose stays in-memory (no Redis round-trip
       # cost). Flip to true via .env.test when running scale tests or in
