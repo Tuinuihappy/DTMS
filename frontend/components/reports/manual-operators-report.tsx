@@ -149,7 +149,7 @@ export function ManualOperatorsReport({ window }: { window: Window }) {
                     className={cn(
                       "font-mono tabular-nums",
                       r.successRate >= 0.95
-                        ? "text-[var(--color-mint, #4ade80)]"
+                        ? "text-[var(--color-success)]"
                         : r.successRate >= 0.8
                           ? "text-[var(--color-amber-600)]"
                           : "text-[var(--color-coral)]",

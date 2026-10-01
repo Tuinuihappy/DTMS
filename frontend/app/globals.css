@@ -49,6 +49,9 @@
 
   /* Functional */
   --color-amber: #f59e0b;
+  /* Text-weight amber: #f59e0b on white is ~2:1, too faint for numbers.
+     Ten report/admin cells already asked for this token before it existed. */
+  --color-amber-600: #d97706;
   --color-amber-soft: #fef0d4;
   --color-coral: #ff6b5b;
   --color-coral-soft: #fde0db;
@@ -135,6 +138,7 @@
 
   /* Functional — tuned to stay "alive" against deep navy */
   --color-amber: #fbb347;
+  --color-amber-600: #fbb347;
   --color-amber-soft: #2e2010;
   --color-coral: #ff7a6a;
   --color-coral-soft: #2e1410;
