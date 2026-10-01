@@ -32,6 +32,8 @@ import {
 } from "@/components/primitives/data-table";
 import { fmtDuration } from "./window-toggle";
 
+const BUCKET_KEYS = new Set(["(manual)", "(unassigned)"]);
+
 export function VehiclePerformanceReport({ window }: { window: Window }) {
   const fetcher = useCallback(
     (signal: AbortSignal) => getVehiclePerformanceReport(window, signal),
@@ -43,17 +45,18 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
 
   const csvHref = tripsExportCsvUrl(window);
   const chartData = (data?.rows ?? []).slice(0, 10).map((r) => ({
-    vehicle: r.vendorVehicleKey,
+    vehicle: r.vendorVehicleName ?? r.vendorVehicleKey,
     completed: r.completed,
     failed: r.failed,
     rejected: r.rejected,
     cancelled: r.cancelled,
+    inProgress: r.inProgress,
   }));
-  // "(unassigned)" rows come from trips that never started — surface
-  // them in the totals tile so ops notices, but pin the "best vehicle"
-  // tile to a vehicle that actually completed something.
+  // "(manual)" (human-carried trips) and "(unassigned)" (AMR trips no
+  // robot ever took) are buckets, not robots — keep them in the table
+  // but pin the "best vehicle" tile to a real robot.
   const bestVehicle = (data?.rows ?? [])
-    .filter((r) => r.vendorVehicleKey !== "(unassigned)" && r.completed + r.failed + r.cancelled > 0)
+    .filter((r) => !BUCKET_KEYS.has(r.vendorVehicleKey) && r.completed + r.failed + r.cancelled > 0)
     .reduce<typeof data extends infer T ? T extends { rows: infer R } ? R extends Array<infer Row> ? Row | null : null : null : null>(
       (best, r) => (best === null || r.successRate > best.successRate ? r : best),
       null,
@@ -68,7 +71,7 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
           label="Best success rate"
           value={
             bestVehicle
-              ? `${bestVehicle.vendorVehicleKey} (${(bestVehicle.successRate * 100).toFixed(1)}%)`
+              ? `${bestVehicle.vendorVehicleName ?? bestVehicle.vendorVehicleKey} (${(bestVehicle.successRate * 100).toFixed(1)}%)`
               : "—"
           }
         />
@@ -77,7 +80,7 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
       <GlassCard variant="default" className="p-5">
         <SectionLabel
           title="Trips by vehicle (top 10)"
-          subtitle="Group by VendorVehicleKey (RIOT3 deviceKey). Stacked by outcome — Completed / Failed / Cancelled. Sorted by trip volume."
+          subtitle="One bar per robot (RIOT3 vehicle name; grouped by deviceKey). Stacked by outcome — Completed / Failed / Rejected / Cancelled / In progress. (manual) = human-carried trips, no robot. Sorted by trip volume."
           action={
             <div className="flex items-center gap-1.5">
               <a
@@ -108,14 +111,12 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
         <div className="mt-4 h-72">
           <ChartMount>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 30 }}>
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-ink-100)" />
               <XAxis
                 dataKey="vehicle"
                 tick={{ fontSize: 10 }}
-                angle={-25}
-                textAnchor="end"
-                height={50}
+                height={30}
                 interval={0}
               />
               <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
@@ -125,6 +126,7 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
               <Bar dataKey="failed" stackId="a" name="Failed" fill="var(--color-coral, #f87171)" />
               <Bar dataKey="rejected" stackId="a" name="Rejected" fill="var(--color-wine, #991b1b)" />
               <Bar dataKey="cancelled" stackId="a" name="Cancelled" fill="var(--color-ink-400, #94a3b8)" />
+              <Bar dataKey="inProgress" stackId="a" name="In progress" fill="var(--color-amber, #f59e0b)" />
             </BarChart>
           </ResponsiveContainer>
           </ChartMount>
@@ -139,20 +141,21 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
               <TableTh density="compact" align="right">Failed</TableTh>
               <TableTh density="compact" align="right">Rejected</TableTh>
               <TableTh density="compact" align="right">Cancelled</TableTh>
+              <TableTh density="compact" align="right">In progress</TableTh>
               <TableTh density="compact" align="right">Success</TableTh>
-              <TableTh density="compact" align="right">Avg time</TableTh>
+              <TableTh density="compact" align="right">Median</TableTh>
               <TableTh density="compact" align="right">P95</TableTh>
               <TableTh density="compact" align="right">SLA breach</TableTh>
             </DataTableHead>
             <DataTableBody>
               {(data?.rows ?? []).length === 0 && loading && (
-                <TableSkeletonRows colSpan={10} rows={3} />
+                <TableSkeletonRows colSpan={11} rows={3} />
               )}
               {(data?.rows ?? []).length === 0 && !loading && (
                 <tr>
                   <TableTd
                     density="compact"
-                    colSpan={10}
+                    colSpan={11}
                     className="py-6 text-center text-[var(--color-ink-400)]"
                   >
                     No trips in this window.
@@ -161,8 +164,13 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
               )}
               {(data?.rows ?? []).map((r, i) => (
                 <DataRow key={r.vendorVehicleKey} delayIndex={i}>
-                  <TableTd density="compact" className="font-semibold">
-                    {r.vendorVehicleKey}
+                  <TableTd density="compact">
+                    <div className="font-semibold">{r.vendorVehicleName ?? r.vendorVehicleKey}</div>
+                    {r.vendorVehicleName && (
+                      <div className="mt-0.5 font-mono text-[10.5px] text-[var(--color-ink-400)]">
+                        {r.vendorVehicleKey}
+                      </div>
+                    )}
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
                     {r.totalTrips.toLocaleString("en-US")}
@@ -179,6 +187,9 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
                     {r.cancelled.toLocaleString("en-US")}
                   </TableTd>
+                  <TableTd density="compact" align="right" className="font-mono tabular-nums">
+                    {r.inProgress.toLocaleString("en-US")}
+                  </TableTd>
                   <TableTd
                     density="compact"
                     align="right"
@@ -194,7 +205,7 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
                     {(r.successRate * 100).toFixed(1)}%
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
-                    {fmtDuration(r.avgTimeToCompleteSec)}
+                    {fmtDuration(r.medianTimeToCompleteSec)}
                   </TableTd>
                   <TableTd density="compact" align="right" className="font-mono tabular-nums">
                     {fmtDuration(r.p95TimeToCompleteSec)}

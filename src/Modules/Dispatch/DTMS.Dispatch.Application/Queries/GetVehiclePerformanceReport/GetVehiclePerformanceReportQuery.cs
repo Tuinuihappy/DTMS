@@ -15,22 +15,28 @@ namespace DTMS.Dispatch.Application.Queries.GetVehiclePerformanceReport;
 /// ops actually thinks about fleet performance: "which robot is
 /// slow/fast/breaking down?"</para>
 ///
-/// <para>Rows whose <c>VendorVehicleKey</c> is missing (trips that
-/// never started, or pre-V1.1 events) collapse into "(unassigned)" so
-/// ops can still see them.</para>
+/// <para>Trips with no <c>VendorVehicleKey</c> collapse into one of two
+/// buckets: "(manual)" for Manual trips (no robot, so never a key — this
+/// is nearly all of them) and "(unassigned)" for AMR trips RIOT3 never
+/// put a robot on (e.g. cancelled before start).</para>
+///
+/// <para><c>InProgress</c> counts every non-terminal trip, so
+/// Completed + Failed + Rejected + Cancelled + InProgress = TotalTrips.</para>
 /// </summary>
 public record GetVehiclePerformanceReportQuery(
     DateTime FromUtc, DateTime ToUtc) : IQuery<VehiclePerformanceResponse>;
 
 public record VehiclePerformanceRow(
     string VendorVehicleKey,
+    string? VendorVehicleName,
     int TotalTrips,
     int Completed,
     int Failed,
     int Rejected,
     int Cancelled,
+    int InProgress,
     double SuccessRate,
-    double? AvgTimeToCompleteSec,
+    double? MedianTimeToCompleteSec,
     double? P95TimeToCompleteSec,
     int SlaBreached);
 
@@ -61,7 +67,8 @@ public class GetVehiclePerformanceReportQueryHandler
             new TripFactsFilters(request.FromUtc, request.ToUtc, null, null), ct);
 
         var rows = trips
-            .GroupBy(t => string.IsNullOrEmpty(t.VendorVehicleKey) ? "(unassigned)" : t.VendorVehicleKey)
+            .GroupBy(t => !string.IsNullOrEmpty(t.VendorVehicleKey) ? t.VendorVehicleKey
+                : t.IsManual ? "(manual)" : "(unassigned)")
             .Select(g =>
             {
                 var total = g.Count();
@@ -73,7 +80,7 @@ public class GetVehiclePerformanceReportQueryHandler
                                .Select(t => (double)t.TimeToCompleteSec!.Value)
                                .OrderBy(x => x)
                                .ToArray();
-                var avg = samples.Length > 0 ? (double?)samples.Average() : null;
+                var median = Percentile(samples, 0.5);
                 var p95 = Percentile(samples, 0.95);
                 var slaBreached = g.Count(t => t.SlaCompleteBreached == true);
                 // Success rate is over terminal trips only — pending/in-progress
@@ -82,15 +89,24 @@ public class GetVehiclePerformanceReportQueryHandler
                 var terminal = completed + failed + rejected + cancelled;
                 var successRate = terminal > 0 ? (double)completed / terminal : 0;
 
+                // Newest non-empty name wins, so a robot RIOT3 renames shows
+                // its current name. Null for the (manual)/(unassigned) buckets.
+                var name = g.Where(t => !string.IsNullOrWhiteSpace(t.VendorVehicleName))
+                            .OrderByDescending(t => t.CreatedAt)
+                            .Select(t => t.VendorVehicleName)
+                            .FirstOrDefault();
+
                 return new VehiclePerformanceRow(
                     VendorVehicleKey: g.Key,
+                    VendorVehicleName: name,
                     TotalTrips: total,
                     Completed: completed,
                     Failed: failed,
                     Rejected: rejected,
                     Cancelled: cancelled,
+                    InProgress: total - terminal,
                     SuccessRate: successRate,
-                    AvgTimeToCompleteSec: avg,
+                    MedianTimeToCompleteSec: median,
                     P95TimeToCompleteSec: p95,
                     SlaBreached: slaBreached);
             })

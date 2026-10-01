@@ -37,4 +37,10 @@ public record TripFactsEntry(
     int? TimeToStartSec,
     int? TimeToCompleteSec,
     bool? SlaCompleteBreached,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    // No AmrTripExtension row = a Manual trip (a human, not a robot,
+    // carried it), so it will never get a VendorVehicleKey.
+    bool IsManual = false,
+    // RIOT3's display name for the robot (e.g. FAN1_STANDARD_NO5), read
+    // live from AmrTripExtension — TripFacts only stores the deviceKey.
+    string? VendorVehicleName = null);

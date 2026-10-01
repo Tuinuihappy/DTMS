@@ -1,4 +1,5 @@
 using DTMS.Dispatch.Application.Projections;
+using DTMS.Dispatch.Domain.Entities;
 using DTMS.Dispatch.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,7 +25,12 @@ public class TripFactsReadRepository : ITripFactsReadRepository
                 r.CreatedAt, r.StartedAt, r.FirstPausedAt, r.LastResumedAt,
                 r.CompletedAt, r.FailedAt, r.CancelledAt, r.RejectedAt,
                 r.TimeToStartSec, r.TimeToCompleteSec, r.SlaCompleteBreached,
-                r.UpdatedAt))
+                r.UpdatedAt,
+                !_db.Set<AmrTripExtension>().Any(a => a.TripId == r.TripId),
+                _db.Set<AmrTripExtension>()
+                    .Where(a => a.TripId == r.TripId)
+                    .Select(a => a.VendorVehicleName)
+                    .FirstOrDefault()))
             .ToListAsync(ct);
     }
 

@@ -147,13 +147,15 @@ export async function getLeadTimeReport(w: Window, signal?: AbortSignal) {
 // ── Vehicle performance ── (renamed from vendor-performance in #10)
 export type VehiclePerformanceRow = {
   vendorVehicleKey: string;
+  vendorVehicleName: string | null;
   totalTrips: number;
   completed: number;
   failed: number;
   rejected: number;
   cancelled: number;
+  inProgress: number;
   successRate: number;
-  avgTimeToCompleteSec: number | null;
+  medianTimeToCompleteSec: number | null;
   p95TimeToCompleteSec: number | null;
   slaBreached: number;
 };
