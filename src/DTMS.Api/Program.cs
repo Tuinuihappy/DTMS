@@ -40,13 +40,14 @@ if (args.Contains("--generate-vapid-keys"))
     return;
 }
 
-// Startup thread-pool starvation. The pool starts at one worker per CPU (4 in
-// the container) and adds threads slowly, while startup blocks many of them at
-// once (MassTransit's 37 RabbitMQ endpoints + ~22 hosted services). Measured
-// 2026-10-01: the bus took 20-28 s to start, 2 s short of StartTimeout, and a
-// Redis GET timed out with its reply already in the socket, which turned into
-// a WMS 401. With 64 minimum worker threads the bus starts in ~1 s. Only the
-// floor is raised; idle threads still retire.
+// Insurance floor for the thread pool, which starts at one worker per CPU (4 in
+// the container) and grows slowly. On MassTransit 8.2 / RabbitMQ.Client 6 the
+// 37 receive endpoints blocked threads synchronously at startup: the bus took
+// 20-28 s, a Redis GET timed out with its reply already in the socket, and that
+// became a WMS 401. MassTransit 8.5 (RabbitMQ.Client 7, async) fixed the cause:
+// measured 2026-10-01 with this floor removed, the bus started in <= 1 s on a
+// fresh deploy and on two restarts. Kept because it costs nothing and covers
+// any future sync-over-async at startup. Idle threads still retire.
 ThreadPool.GetMinThreads(out var minWorkers, out var minIo);
 ThreadPool.SetMinThreads(Math.Max(minWorkers, 64), minIo);
 
@@ -676,7 +677,9 @@ builder.Services.AddHealthChecks()
             return HealthCheckResult.Degraded(ex.Message);
         }
     }, tags: ["ready"])
-    .AddCheck("rabbitmq", () =>
+    // RabbitMQ.Client 7 is async-only; the old sync CreateConnection also
+    // parked a thread-pool thread on every /health/ready probe.
+    .AddAsyncCheck("rabbitmq", async ct =>
     {
         try
         {
@@ -687,7 +690,7 @@ builder.Services.AddHealthChecks()
                 Password = rabbitPass,
                 RequestedConnectionTimeout = TimeSpan.FromSeconds(3)
             };
-            using var conn = factory.CreateConnection();
+            await using var conn = await factory.CreateConnectionAsync(ct);
             return HealthCheckResult.Healthy();
         }
         catch (Exception ex)
