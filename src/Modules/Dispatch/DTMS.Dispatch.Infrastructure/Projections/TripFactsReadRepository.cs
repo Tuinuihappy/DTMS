@@ -30,6 +30,10 @@ public class TripFactsReadRepository : ITripFactsReadRepository
                 _db.Set<AmrTripExtension>()
                     .Where(a => a.TripId == r.TripId)
                     .Select(a => a.VendorVehicleName)
+                    .FirstOrDefault(),
+                _db.Trips
+                    .Where(t => t.Id == r.TripId)
+                    .Select(t => t.AcknowledgedBy)
                     .FirstOrDefault()))
             .ToListAsync(ct);
     }

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using DTMS.Dispatch.Application.Projections;
+using DTMS.Dispatch.Application.Queries.GetManualOperatorsReport;
 using DTMS.Dispatch.Application.Queries.GetVehiclePerformanceReport;
 using DTMS.Iam.Application.Authorization;
 using MediatR;
@@ -32,6 +33,16 @@ public static class DispatchReportsEndpoints
         {
             var (from, to) = ResolveWindow(fromUtc, toUtc, defaultDays: 7);
             var result = await sender.Send(new GetVehiclePerformanceReportQuery(from, to));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        }).RequirePermission(Permissions.Reporting.ReportRead);
+
+        // Per-person breakdown of the vehicle report's "(manual)" row,
+        // grouped by the OMS user who acknowledged the trip.
+        group.MapGet("/manual-operators", async (
+            DateTime? fromUtc, DateTime? toUtc, ISender sender) =>
+        {
+            var (from, to) = ResolveWindow(fromUtc, toUtc, defaultDays: 7);
+            var result = await sender.Send(new GetManualOperatorsReportQuery(from, to));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequirePermission(Permissions.Reporting.ReportRead);
 

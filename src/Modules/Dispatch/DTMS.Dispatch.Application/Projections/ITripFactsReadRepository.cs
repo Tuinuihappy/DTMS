@@ -43,4 +43,8 @@ public record TripFactsEntry(
     bool IsManual = false,
     // RIOT3's display name for the robot (e.g. FAN1_STANDARD_NO5), read
     // live from AmrTripExtension — TripFacts only stores the deviceKey.
-    string? VendorVehicleName = null);
+    string? VendorVehicleName = null,
+    // OMS username of whoever first acknowledged the trip, read live from
+    // Trips. For Manual trips this is the closest thing to "who carried
+    // it" — not always the carrier, and some are shared accounts.
+    string? AcknowledgedBy = null);

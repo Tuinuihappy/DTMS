@@ -174,6 +174,35 @@ export async function getVehiclePerformanceReport(w: Window, signal?: AbortSigna
   return (await res.json()) as VehiclePerformanceResponse;
 }
 
+// ── Manual operators ── per-person breakdown of the "(manual)" row
+export type ManualOperatorRow = {
+  operator: string;
+  totalTrips: number;
+  completed: number;
+  failed: number;
+  rejected: number;
+  cancelled: number;
+  inProgress: number;
+  successRate: number;
+  medianTimeToCompleteSec: number | null;
+  p95TimeToCompleteSec: number | null;
+  slaBreached: number;
+};
+export type ManualOperatorsResponse = {
+  fromUtc: string;
+  toUtc: string;
+  totalTrips: number;
+  rows: ManualOperatorRow[];
+};
+export async function getManualOperatorsReport(w: Window, signal?: AbortSignal) {
+  const res = await fetch(`/api/reports/manual-operators?${windowQs(w)}`, {
+    signal,
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Failed: ${res.status}`);
+  return (await res.json()) as ManualOperatorsResponse;
+}
+
 // ── Job failures by category ── (Phase #9 — JobFacts.FailureCategory)
 export type JobFailureCategoryTotal = {
   category: string;
