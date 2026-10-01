@@ -22,6 +22,10 @@ export type CredentialSummary = {
   hasCallbackBaseUrl: boolean;
   callbackBaseUrl: string | null;
   callbackAuthScheme: string | null;
+  // A token is stored for calling this system (read off the owner when
+  // borrowed). Not the same as callbackAuthScheme being set: clearing the
+  // scheme is how a bad token gets dropped, so the two can disagree.
+  hasOutboundToken: boolean;
   callbackTimeoutMs: number;
   updatedAt: string;
   // Phase S.6 follow-up — when CallbackAuthScheme=bearer + token is a JWT
@@ -106,10 +110,13 @@ export type PatchSystemRequest = {
   ownerContact?: string | null;
 };
 
+// Where DTMS delivers callbacks. The two auth fields are legacy: the token is
+// set through setOutboundToken now, and omitting them here keeps whatever is
+// stored. They stay optional so an older caller still works.
 export type CallbackConfigRequest = {
   callbackBaseUrl: string | null;
-  callbackAuthScheme: string | null;
-  callbackBearerToken: string | null;
+  callbackAuthScheme?: string | null;
+  callbackBearerToken?: string | null;
   callbackTimeoutMs?: number | null;
   retryMaxAttempts?: number | null;
   circuitFailureThreshold?: number | null;
@@ -208,6 +215,33 @@ export async function setCallback(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (!res.ok) throw new Error(await readError(res));
+}
+
+// The credential DTMS presents when it CALLS this system — for callbacks and
+// for data it pulls itself. Its own route so that saving it cannot disturb the
+// callback URL or timeout, which setCallback rewrites wholesale.
+export type OutboundTokenRequest = {
+  // Blank/omitted = keep the stored token.
+  bearerToken?: string | null;
+  // Only "bearer" is supported; the server fills it in when omitted.
+  authScheme?: string | null;
+  // Drop the stored token. Cannot be combined with bearerToken.
+  clearToken?: boolean;
+};
+
+export async function setOutboundToken(
+  key: string,
+  body: OutboundTokenRequest,
+): Promise<void> {
+  const res = await fetch(
+    `/api/admin/iam/systems/${encodeURIComponent(key)}/outbound-token`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
   if (!res.ok) throw new Error(await readError(res));
 }
 
@@ -453,8 +487,6 @@ export type TokenRefreshConfigRequest = {
   username: string;
   // Blank/omitted = keep the currently stored password (metadata-only edit).
   password?: string | null;
-  // Dotted path to the token in the mint response, e.g. "token" / "data.token".
-  tokenField?: string | null;
   refreshBeforeSeconds?: number | null;
   enabled: boolean;
 };

@@ -22,11 +22,6 @@ public sealed record TokenRefreshSettings
     [JsonPropertyName("password")]
     public string? Password { get; init; }
 
-    /// <summary>Dotted path to the token in the mint response, e.g. <c>token</c>
-    /// or <c>data.token</c>. Default <c>token</c>.</summary>
-    [JsonPropertyName("tokenField")]
-    public string TokenField { get; init; } = "token";
-
     /// <summary>Refresh once the current token's remaining lifetime drops below
     /// this. Default 8h.</summary>
     [JsonPropertyName("refreshBeforeSeconds")]

@@ -122,6 +122,72 @@ public class BorrowedTokenTests
         cred.TokenRefreshConfig.Should().Be("{}");
     }
 
+    // ── Outbound token, set on its own ──────────────────────────────────
+    //
+    // The admin page used to carry one "Outbound callback" card that wrote
+    // every outbound field at once, so changing a callback URL dropped the
+    // token with it, and a system DTMS only ever pulls from (WMS) had no way
+    // to hold a token at all without a made-up callback URL. SetOutboundToken
+    // is what keeps the two settings apart.
+
+    [Fact]
+    public void SetOutboundToken_LeavesDeliveryConfigAlone()
+    {
+        var cred = Credential(OwnerKey, token: "old-jwt", baseUrl: "http://oms.test/api");
+        cred.UpdateResilience(retryMaxAttempts: 4, circuitFailureThreshold: 7, circuitDurationSeconds: 45);
+
+        cred.SetOutboundToken("bearer", "new-jwt");
+
+        cred.CallbackAuthConfig.Should().Be("new-jwt");
+        cred.CallbackBaseUrl.Should().Be("http://oms.test/api");
+        cred.CallbackTimeoutMs.Should().Be(10_000);
+        cred.RetryMaxAttempts.Should().Be(4);
+        cred.CircuitFailureThreshold.Should().Be(7);
+        cred.CircuitDurationSeconds.Should().Be(45);
+    }
+
+    [Fact]
+    public void SetOutboundToken_NullClearsBothAuthFields()
+    {
+        var cred = Credential(OwnerKey, token: "old-jwt", baseUrl: "http://oms.test/api");
+
+        cred.SetOutboundToken(null, null);
+
+        cred.CallbackAuthScheme.Should().BeNull();
+        cred.CallbackAuthConfig.Should().BeNull();
+        cred.CallbackBaseUrl.Should().Be("http://oms.test/api");
+        cred.CallbackTimeoutMs.Should().Be(10_000);
+    }
+
+    [Fact]
+    public void SetOutboundToken_DoesNotTouchTokenRefreshOrSource()
+    {
+        // Guards a later edit from turning this back into a full replace: the
+        // mint config and the borrow link are decided elsewhere and must
+        // survive a token write.
+        var cred = Credential(OwnerKey, token: "old-jwt", refreshConfig: """{"enabled":true}""");
+
+        cred.SetOutboundToken("bearer", "new-jwt");
+
+        cred.TokenRefreshConfig.Should().Be("""{"enabled":true}""");
+        cred.TokenSourceKey.Should().BeNull();
+    }
+
+    [Fact]
+    public void SetCallback_StillFullReplace()
+    {
+        // Pinned deliberately. SetCallback is the whole-outbound-block writer
+        // and PUT /callback still relies on it; the endpoint, not the entity,
+        // is what carries forward the fields a request omits.
+        var cred = Credential(OwnerKey, token: "old-jwt", baseUrl: "http://oms.test/api");
+
+        cred.SetCallback(baseUrl: "http://oms.test/v2", authScheme: null, authConfig: null);
+
+        cred.CallbackBaseUrl.Should().Be("http://oms.test/v2");
+        cred.CallbackAuthScheme.Should().BeNull();
+        cred.CallbackAuthConfig.Should().BeNull();
+    }
+
     // ── Fixtures ────────────────────────────────────────────────────────
 
     private static SystemCredential Credential(

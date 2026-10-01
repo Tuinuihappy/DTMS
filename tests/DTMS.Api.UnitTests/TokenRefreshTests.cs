@@ -155,8 +155,11 @@ public class HttpCallbackTokenMinterTests
         (await minter.MintAsync(settings, default)).Should().Be("abc.def.ghi");
     }
 
+    // Only a top-level "token" is read. The configurable field path that once
+    // allowed "data.token" is gone — no system ever set it — so a nested token
+    // must fail loudly rather than silently mint nothing usable.
     [Fact]
-    public async Task Mint_ExtractsDottedTokenPath()
+    public async Task Mint_NestedToken_ThrowsWithClearError()
     {
         var resp = new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -165,10 +168,12 @@ public class HttpCallbackTokenMinterTests
         var minter = Build(resp);
         var settings = new TokenRefreshSettings
         {
-            TokenUrl = "http://mint.internal/login", Username = "u", Password = "p", TokenField = "data.token",
+            TokenUrl = "http://mint.internal/login", Username = "u", Password = "p",
         };
 
-        (await minter.MintAsync(settings, default)).Should().Be("nested.jwt.sig");
+        await FluentActions.Awaiting(() => minter.MintAsync(settings, default))
+            .Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*top-level string 'token'*");
     }
 
     [Fact]

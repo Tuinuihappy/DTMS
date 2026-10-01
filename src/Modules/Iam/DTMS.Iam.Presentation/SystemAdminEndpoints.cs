@@ -239,32 +239,36 @@ public static class SystemAdminEndpoints
                 if (cred is null)
                     return Results.Conflict(new { error = $"No credential row for '{key}'. POST to /api/v1/iam/systems first." });
 
-                // For the bearer scheme we accept either a plaintext
-                // token (server JSON-encodes it), null to clear outbound
-                // auth entirely, OR blank-while-scheme-unchanged to keep
-                // the existing token — the frontend's "Leave blank to
-                // keep current value" hint relies on the third path so
-                // operators can rotate URL/timeout without re-pasting a
-                // 600-char JWT every time.
-                string? authConfigJson = null;
+                // This route edits where callbacks are delivered. The token
+                // comes along only because it used to live on the same card,
+                // and omitting it now KEEPS what is stored: SetCallback writes
+                // every outbound field, so defaulting these to null meant that
+                // saving a new base URL silently dropped the token with it, and
+                // the next callback — plus the WMS location pull, which uses
+                // the same token and no callback URL at all — started 401ing
+                // with nothing in the audit trail to explain it.
+                //
+                // PUT /{key}/outbound-token is the route for changing the
+                // token itself, including clearing it.
+                var authScheme = cred.CallbackAuthScheme;
+                var authConfigJson = cred.CallbackAuthConfig;
                 if (req.CallbackAuthScheme is { Length: > 0 } scheme)
                 {
                     if (scheme.ToLowerInvariant() != "bearer")
                         return Results.BadRequest(new { error = "Only 'bearer' callback auth scheme supported in MVP." });
+                    authScheme = scheme;
                     if (string.IsNullOrWhiteSpace(req.CallbackBearerToken))
                     {
-                        // Preserve the existing token when the request
-                        // leaves the field blank — but only if there IS
-                        // a token to preserve. Otherwise (first-time
-                        // configure with no token) reject with a clear
-                        // message rather than silently saving an empty
-                        // bearer config that would 401 on every call.
+                        // Blank token + bearer scheme = keep what is stored,
+                        // but only if there IS something to keep. Otherwise
+                        // (first-time configure) reject with a clear message
+                        // rather than silently saving an empty bearer config
+                        // that would 401 on every call.
                         if (string.IsNullOrWhiteSpace(cred.CallbackAuthConfig))
                             return Results.BadRequest(new
                             {
-                                error = "callbackBearerToken required when setting bearer scheme for the first time — no existing token to preserve.",
+                                error = "callbackBearerToken required when setting bearer scheme for the first time — no existing token to preserve. Configure auto-refresh and press \"Refresh now\" to mint one instead.",
                             });
-                        authConfigJson = cred.CallbackAuthConfig;
                     }
                     else
                     {
@@ -274,12 +278,12 @@ public static class SystemAdminEndpoints
 
                 cred.SetCallback(
                     baseUrl: req.CallbackBaseUrl,
-                    authScheme: req.CallbackAuthScheme,
+                    authScheme: authScheme,
                     authConfig: authConfigJson,
                     timeoutMs: req.CallbackTimeoutMs);
-                if (req.RetryMaxAttempts is int rma
-                    || req.CircuitFailureThreshold is int cft
-                    || req.CircuitDurationSeconds is int cds)
+                if (req.RetryMaxAttempts is not null
+                    || req.CircuitFailureThreshold is not null
+                    || req.CircuitDurationSeconds is not null)
                 {
                     cred.UpdateResilience(
                         retryMaxAttempts: req.RetryMaxAttempts ?? cred.RetryMaxAttempts,
@@ -303,10 +307,105 @@ public static class SystemAdminEndpoints
                     {
                         systemKey = key,
                         callbackBaseUrl = req.CallbackBaseUrl,
-                        callbackAuthScheme = req.CallbackAuthScheme,
+                        // The effective scheme, not the requested one — a
+                        // request that omits it keeps what was stored, and the
+                        // trail should say what the row ended up holding.
+                        callbackAuthScheme = authScheme,
                         // Never log token plaintext.
                         tokenSet = !string.IsNullOrWhiteSpace(req.CallbackBearerToken),
                     })), ct);
+
+                return Results.NoContent();
+            }).RequirePermission(Permissions.Iam.SystemWrite);
+
+        // ── Outbound token, on its own ─────────────────────────────────
+        //
+        // The credential DTMS presents when it calls this system. Separate
+        // from PUT /{key}/callback because the token is not a property of
+        // callback delivery: the WMS location pull authenticates with this
+        // same token and has no callback URL at all, and before this route
+        // existed the only way to set one was through the callback payload,
+        // which forced an operator to invent a callback URL first.
+        //
+        // Not under /credential — that prefix is the INBOUND half
+        // (/credential/rotate, /credential/scheme): the key this system uses
+        // to call us, which is a different secret in the other direction.
+        //
+        // No route test covers this group (DTMS.FunctionalTests is a stub),
+        // so the contract is spelled out here. Checked in order, first match
+        // answers:
+        //
+        //   1. unknown system                        → 404
+        //   2. no credential row                     → 409 (POST the system first)
+        //   3. TokenSourceKey set                    → 409 (edit the owner instead)
+        //   4. ClearToken together with BearerToken  → 400 (contradictory)
+        //   5. AuthScheme present and not "bearer"   → 400
+        //   6. no token given, none stored, no clear  → 400 (nothing to do)
+        //   7. ClearToken                            → scheme+token nulled, 204
+        //   8. BearerToken given                     → stored as bearer, 204
+        //   9. nothing given, token already stored   → scheme normalised, 204
+        group.MapPut("/{key}/outbound-token",
+            async (string key, OutboundTokenRequest req, HttpContext ctx,
+                   ISystemClientRepository systems,
+                   ISystemCredentialRepository creds,
+                   CachedCredentialReader reader,
+                   IAuditLogRepository audit,
+                   CancellationToken ct) =>
+            {
+                if (await systems.GetByKeyAsync(key, ct) is null) return Results.NotFound();
+
+                var cred = await creds.GetBySystemKeyAsync(key, ct);
+                if (cred is null)
+                    return Results.Conflict(new { error = $"No credential row for '{key}'. POST to /api/v1/iam/systems first." });
+
+                // A borrower holds no token of its own — the owner's row is
+                // what every call reads. Writing one here would be ignored at
+                // dispatch time and read back as if it had taken effect.
+                if (cred.TokenSourceKey is { } owner)
+                    return Results.Conflict(new
+                    {
+                        error = $"System '{key}' borrows its outbound token from '{owner}'. " +
+                                $"Set it on '{owner}', or clear the token source first with " +
+                                $"PUT /api/v1/iam/systems/{key}/token-source.",
+                    });
+
+                var hasToken = !string.IsNullOrWhiteSpace(req.BearerToken);
+                if (req.ClearToken && hasToken)
+                    return Results.BadRequest(new { error = "Pass either clearToken or bearerToken, not both." });
+
+                if (req.AuthScheme is { Length: > 0 } scheme && scheme.ToLowerInvariant() != "bearer")
+                    return Results.BadRequest(new { error = "Only 'bearer' outbound auth scheme supported in MVP." });
+
+                if (!req.ClearToken && !hasToken && string.IsNullOrWhiteSpace(cred.CallbackAuthConfig))
+                    return Results.BadRequest(new
+                    {
+                        error = "bearerToken required — no stored token to keep. Configure auto-refresh "
+                              + "and press \"Refresh now\" to mint one instead of pasting it by hand.",
+                    });
+
+                if (req.ClearToken)
+                    cred.SetOutboundToken(null, null);
+                else
+                    cred.SetOutboundToken(
+                        authScheme: "bearer",
+                        authConfig: hasToken
+                            ? JsonSerializer.Serialize(new { token = req.BearerToken })
+                            : cred.CallbackAuthConfig);
+
+                await creds.UpdateAsync(cred, ct);
+
+                // Same reason as PUT /callback: without eviction the previous
+                // token keeps being sent for up to the L2 TTL, so an operator
+                // fixing a 401 watches it continue and cannot tell whether the
+                // fix landed.
+                await reader.InvalidateAsync(key, ct);
+
+                await audit.AppendAsync(new PermissionAuditEntry(
+                    actorEmployeeId: ActorOrUnknown(ctx),
+                    action: req.ClearToken ? "system-outbound-token-cleared" : "system-outbound-token-updated",
+                    permissionCode: null,
+                    // Never log token plaintext, here or anywhere.
+                    details: JsonSerializer.Serialize(new { systemKey = key, tokenSet = hasToken })), ct);
 
                 return Results.NoContent();
             }).RequirePermission(Permissions.Iam.SystemWrite);
@@ -426,7 +525,6 @@ public static class SystemAdminEndpoints
                     TokenUrl = req.TokenUrl,
                     Username = req.Username,
                     Password = password,
-                    TokenField = string.IsNullOrWhiteSpace(req.TokenField) ? "token" : req.TokenField!,
                     RefreshBeforeSeconds = refreshBefore,
                     Enabled = req.Enabled,
                 };
@@ -1120,6 +1218,7 @@ public static class SystemAdminEndpoints
             HasCallbackBaseUrl: !string.IsNullOrWhiteSpace(cred.CallbackBaseUrl),
             CallbackBaseUrl: cred.CallbackBaseUrl,
             CallbackAuthScheme: cred.CallbackAuthScheme,
+            HasOutboundToken: !string.IsNullOrWhiteSpace(tokenHolder.CallbackAuthConfig),
             CallbackTimeoutMs: cred.CallbackTimeoutMs,
             UpdatedAt: cred.UpdatedAt,
             CallbackTokenExpiresAt: TryReadJwtExpiry(tokenHolder.CallbackAuthConfig),
@@ -1161,6 +1260,19 @@ public sealed record CallbackConfigRequest(
     int? CircuitFailureThreshold,
     int? CircuitDurationSeconds);
 
+// The credential DTMS presents when it calls this system — used for outbound
+// callbacks AND for data DTMS pulls itself. Deliberately holds nothing about
+// callback delivery, so saving one cannot disturb the other.
+public sealed record OutboundTokenRequest(
+    // Blank/omitted = keep the stored token (a scheme-only normalisation).
+    string? BearerToken,
+    // Only "bearer" is supported; omit to let the server fill it in.
+    string? AuthScheme = null,
+    // Drop the stored token and the scheme. Cannot be combined with
+    // BearerToken. Every outbound call to this system then goes unauthenticated
+    // until a token is set or minted again.
+    bool ClearToken = false);
+
 public sealed record CreatedSystemResponse(
     string Key,
     string DisplayName,
@@ -1191,6 +1303,13 @@ public sealed record CredentialSummary(
     bool HasCallbackBaseUrl,
     string? CallbackBaseUrl,
     string? CallbackAuthScheme,
+    // Whether a token is stored for calling this system — read off the owner
+    // when the token is borrowed, so a borrower reports true. The token itself
+    // never rides along; this is what lets the page say "Stored" and hide the
+    // reveal button when there is nothing to reveal. Not derivable from
+    // CallbackAuthScheme: clearing the scheme is how an operator drops a bad
+    // token, and a config can outlive its scheme.
+    bool HasOutboundToken,
     int CallbackTimeoutMs,
     DateTime UpdatedAt,
     // Phase S.6 follow-up — when CallbackAuthScheme=bearer and the stored
@@ -1248,8 +1367,6 @@ public sealed record TokenRefreshConfigRequest(
     // Blank = keep the currently stored password (metadata-only edit). Required
     // the first time auto-refresh is configured.
     string? Password,
-    // Dotted path to the token in the mint response, e.g. "token" or "data.token".
-    string? TokenField,
     int? RefreshBeforeSeconds,
     bool Enabled);
 

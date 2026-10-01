@@ -8,8 +8,13 @@ namespace DTMS.Iam.Infrastructure.Callbacks;
 
 /// <summary>
 /// HTTP implementation of <see cref="ICallbackTokenMinter"/>. POSTs
-/// <c>{username, password}</c> to the system's mint endpoint and pulls the JWT
-/// out of the JSON response at the (possibly dotted) <c>TokenField</c> path.
+/// <c>{username, password}</c> to the system's mint endpoint and reads the JWT
+/// from the response's top-level <c>token</c> property.
+///
+/// <para>Only that one shape is supported. A configurable field path used to
+/// exist and no system ever set it — every mint endpoint in use answers with
+/// <c>{"token": "…"}</c> — so it was removed rather than carried as an untested
+/// option. A system answering some other shape needs code here, not config.</para>
 ///
 /// <para>The typed <see cref="HttpClient"/> is registered with a hard-ceiling
 /// timeout and <c>AllowAutoRedirect=false</c> so a mint endpoint cannot bounce
@@ -54,25 +59,19 @@ public sealed class HttpCallbackTokenMinter : ICallbackTokenMinter
         await using var stream = await resp.Content.ReadAsStreamAsync(ct);
         using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
 
-        var token = ExtractByPath(doc.RootElement, settings.TokenField);
+        var token = ReadTopLevelToken(doc.RootElement);
         if (string.IsNullOrWhiteSpace(token))
             throw new InvalidOperationException(
-                $"Mint response had no string at field path '{settings.TokenField}'.");
+                "Mint response had no top-level string 'token' property. Only "
+                + "{\"token\": \"…\"} is supported — a nested token needs a code change here.");
 
         return token;
     }
 
-    /// <summary>Walk a dotted path (e.g. <c>data.token</c>) to a string leaf.
-    /// Null when any segment is missing or the leaf is not a string.</summary>
-    private static string? ExtractByPath(JsonElement root, string path)
-    {
-        var current = root;
-        foreach (var segment in path.Split('.', StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (current.ValueKind != JsonValueKind.Object) return null;
-            if (!current.TryGetProperty(segment, out var next)) return null;
-            current = next;
-        }
-        return current.ValueKind == JsonValueKind.String ? current.GetString() : null;
-    }
+    private static string? ReadTopLevelToken(JsonElement root)
+        => root.ValueKind == JsonValueKind.Object
+            && root.TryGetProperty("token", out var tok)
+            && tok.ValueKind == JsonValueKind.String
+                ? tok.GetString()
+                : null;
 }

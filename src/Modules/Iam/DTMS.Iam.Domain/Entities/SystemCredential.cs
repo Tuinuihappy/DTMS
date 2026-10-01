@@ -115,6 +115,30 @@ public sealed class SystemCredential
         UpdatedAt = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// Change only the credential this system presents when DTMS calls it —
+    /// the scheme and the token — leaving <see cref="CallbackBaseUrl"/>, the
+    /// timeout and the resilience settings untouched. Pass (null, null) to
+    /// clear it.
+    ///
+    /// <para>The outbound counterpart of <see cref="RotateInbound"/>, and the
+    /// reason it exists separately from <see cref="SetCallback"/>: that one
+    /// replaces every outbound field at once, so editing a callback URL through
+    /// it drops the token with it. The token is also used for calls DTMS
+    /// initiates itself (the WMS location pull), which have no callback URL at
+    /// all, so it has to be settable on its own.</para>
+    ///
+    /// <para>No guard here, matching <see cref="SetCallback"/> — scheme
+    /// validation and the refusal to overwrite a borrowed token belong to the
+    /// endpoint, which can answer with a status code.</para>
+    /// </summary>
+    public void SetOutboundToken(string? authScheme, string? authConfig)
+    {
+        CallbackAuthScheme = authScheme;
+        CallbackAuthConfig = authConfig;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     /// <summary>Set (or clear, with null) the outbound-token auto-refresh
     /// config. The value is a JSON object; encryption at rest is handled by the
     /// EF value converter, same as <see cref="CallbackAuthConfig"/>.</summary>

@@ -36,6 +36,7 @@ import {
   revokeToken,
   rotateCredential,
   setCallback,
+  setOutboundToken,
   setTokenSource,
   configureTokenRefresh,
   runTokenRefresh,
@@ -55,11 +56,14 @@ import { PermissionsChecklist } from "@/components/admin/permissions-checklist";
 import { cn } from "@/lib/utils";
 import { copyText } from "@/lib/clipboard";
 
-// Phase S.6 — single-system detail page. Three cards: metadata,
-// credential + rotate, callback config. Subscriptions live on a
-// separate page (drill-down nav) — link out from the bottom of this
-// page. Edit flows open inline modals styled like the create modal on
-// the list page.
+// Phase S.6 — single-system detail page. Four cards: metadata, inbound
+// credential + rotate, outbound credential (the token DTMS presents when it
+// calls this system, plus auto-refresh), and callback delivery. The last two
+// were one card until the token turned out to govern calls DTMS makes on its
+// own — the WMS location pull — which have no callback URL to hang it off.
+// Subscriptions live on a separate page (drill-down nav) — link out from the
+// bottom of this page. Edit flows open inline modals styled like the create
+// modal on the list page.
 
 export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) {
   const [data, setData] = useState<SystemDetailDto | null>(null);
@@ -99,6 +103,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
   const [revealedToken, setRevealedToken] = useState<string | null>(null);
   const [revealingToken, setRevealingToken] = useState(false);
   // Phase S.9 — outbound-token auto-refresh: config modal + manual "refresh now".
+  const [editingOutboundToken, setEditingOutboundToken] = useState(false);
   const [editingRefresh, setEditingRefresh] = useState(false);
   const [refreshingNow, setRefreshingNow] = useState(false);
   const [refreshNote, setRefreshNote] = useState<string | null>(null);
@@ -482,10 +487,10 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
         </dl>
       </section>
 
-      {/* ── Credential card ─────────────────────────────────────────── */}
+      {/* ── Inbound credential card ─────────────────────────────────── */}
       <section className="rounded-xl border border-[var(--color-ink-100)] bg-white/70 p-5 dark:border-white/[0.06] dark:bg-white/[0.03]">
         <div className="flex items-center justify-between">
-          <h2 className="text-[13px] font-semibold text-[var(--color-ink-800)]">Credential</h2>
+          <h2 className="text-[13px] font-semibold text-[var(--color-ink-800)]">Inbound credential</h2>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -516,6 +521,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
           </div>
         </div>
         <p className="mt-1 text-[11px] text-[var(--color-ink-500)]">
+          The key this system presents when it calls DTMS.
           The current key works forever. Rotate <em>only</em> when the key
           was leaked, someone who held it left, or a policy mandates it —
           rotating revokes the existing key immediately and you must
@@ -677,30 +683,41 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
         )}
       </section>
 
-      {/* ── Callback card ───────────────────────────────────────────── */}
+      {/* ── Outbound credential card ────────────────────────────────── */}
+      {/* Deliberately unconditional. This used to live inside the callback
+          card and only appeared once a callback URL was set, which made a
+          system DTMS merely PULLS from (the WMS location sync, which has no
+          callback at all) impossible to configure without inventing one. */}
       <section className="rounded-xl border border-[var(--color-ink-100)] bg-white/70 p-5 dark:border-white/[0.06] dark:bg-white/[0.03]">
         <div className="flex items-center justify-between">
-          <h2 className="text-[13px] font-semibold text-[var(--color-ink-800)]">Outbound callback</h2>
-          <button
-            type="button"
-            onClick={() => setEditingCallback(true)}
-            className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
-          >
-            <Settings2 className="h-3 w-3" strokeWidth={2.2} />
-            Configure
-          </button>
+          <h2 className="text-[13px] font-semibold text-[var(--color-ink-800)]">Outbound credential</h2>
+          {/* A borrower has no token of its own — the owner's row holds it,
+              and the endpoint answers 409. */}
+          {!data.credential?.tokenSourceKey && (
+            <button
+              type="button"
+              onClick={() => setEditingOutboundToken(true)}
+              className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+            >
+              <Settings2 className="h-3 w-3" strokeWidth={2.2} />
+              Edit token
+            </button>
+          )}
         </div>
-        {data.credential?.hasCallbackBaseUrl ? (
+        <p className="mt-1 text-[11px] text-[var(--color-ink-500)]">
+          The token DTMS presents when it calls this system — for callbacks and for data DTMS
+          pulls itself.
+        </p>
+        {data.credential && (
           <>
             <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
-              <DefRow label="Base URL" value={data.credential.callbackBaseUrl ?? "—"} mono />
-              <DefRow label="Auth scheme" value={data.credential.callbackAuthScheme ?? "—"} mono />
-              <DefRow label="Timeout (ms)" value={String(data.credential.callbackTimeoutMs)} />
+              <DefRow label="Token scheme" value={data.credential.callbackAuthScheme ?? "—"} mono />
+              <DefRow label="Token" value={data.credential.hasOutboundToken ? "Stored" : "None"} />
             </dl>
             {data.credential.callbackTokenExpiresAt && (
               <TokenExpiryBadge expiresAt={data.credential.callbackTokenExpiresAt} />
             )}
-            {data.credential.callbackAuthScheme?.toLowerCase() === "bearer" && (
+            {data.credential.hasOutboundToken && (
               revealedToken ? (
                 <RevealedTokenRow token={revealedToken} onHide={() => setRevealedToken(null)} />
               ) : (
@@ -721,132 +738,153 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
               )
             )}
             {/* ── Auto-refresh (Phase S.9) ─────────────────────────── */}
-            {/* Shown whenever a refresh config exists, even with the auth
-                scheme cleared — clearing the scheme is exactly how an operator
-                drops a bad stored token, and "Refresh now" is the way back:
-                a successful mint switches the scheme back to bearer. */}
-            {(data.credential.callbackAuthScheme?.toLowerCase() === "bearer" ||
-              data.credential.tokenRefreshUrl ||
-              data.credential.tokenSourceKey) && (
-              <div className="mt-4 rounded-lg border border-[var(--color-ink-100)] bg-[var(--color-ink-50)]/40 p-3 dark:border-white/[0.06] dark:bg-white/[0.02]">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <RefreshCw className="h-3.5 w-3.5 text-[var(--color-ink-500)]" strokeWidth={2.2} />
-                    <span className="text-[12px] font-semibold text-[var(--color-ink-700)]">Token auto-refresh</span>
-                    <span
-                      className={cn(
-                        "inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium",
-                        data.credential.tokenRefreshEnabled
-                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-                          : "bg-[var(--color-ink-100)] text-[var(--color-ink-500)]",
-                      )}
-                    >
-                      {data.credential.tokenRefreshEnabled ? "On" : "Off"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
+            {/* Also unconditional now. It was gated on a bearer scheme or an
+                existing refresh config, which left a brand-new system with
+                nowhere to enter its mint credentials. */}
+            <div className="mt-4 rounded-lg border border-[var(--color-ink-100)] bg-[var(--color-ink-50)]/40 p-3 dark:border-white/[0.06] dark:bg-white/[0.02]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="h-3.5 w-3.5 text-[var(--color-ink-500)]" strokeWidth={2.2} />
+                  <span className="text-[12px] font-semibold text-[var(--color-ink-700)]">Token auto-refresh</span>
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium",
+                      data.credential.tokenRefreshEnabled
+                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                        : "bg-[var(--color-ink-100)] text-[var(--color-ink-500)]",
+                    )}
+                  >
+                    {data.credential.tokenRefreshEnabled ? "On" : "Off"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void onRefreshNow()}
+                    disabled={refreshingNow || busy}
+                    className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)] disabled:opacity-50"
+                  >
+                    <RefreshCw className={cn("h-3 w-3", refreshingNow && "animate-spin")} strokeWidth={2.2} />
+                    {refreshingNow ? "Refreshing…" : "Refresh now"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTokenSource(true)}
+                    className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+                  >
+                    <Link2 className="h-3 w-3" strokeWidth={2.2} />
+                    Token source
+                  </button>
+                  {/* A borrower has no mint config of its own to edit — the
+                      owner's is what governs it. */}
+                  {!data.credential.tokenSourceKey && (
                     <button
                       type="button"
-                      onClick={() => void onRefreshNow()}
-                      disabled={refreshingNow || busy}
-                      className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)] disabled:opacity-50"
-                    >
-                      <RefreshCw className={cn("h-3 w-3", refreshingNow && "animate-spin")} strokeWidth={2.2} />
-                      {refreshingNow ? "Refreshing…" : "Refresh now"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingTokenSource(true)}
+                      onClick={() => setEditingRefresh(true)}
                       className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
                     >
-                      <Link2 className="h-3 w-3" strokeWidth={2.2} />
-                      Token source
+                      <Settings2 className="h-3 w-3" strokeWidth={2.2} />
+                      Configure
                     </button>
-                    {/* A borrower has no mint config of its own to edit — the
-                        owner's is what governs it. */}
-                    {!data.credential.tokenSourceKey && (
-                      <button
-                        type="button"
-                        onClick={() => setEditingRefresh(true)}
-                        className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
-                      >
-                        <Settings2 className="h-3 w-3" strokeWidth={2.2} />
-                        Configure
-                      </button>
-                    )}
-                  </div>
+                  )}
                 </div>
-                {data.credential.tokenSourceKey && (
-                  <p className="mt-2 text-[11px] text-[var(--color-ink-500)]">
-                    Borrowing its token from{" "}
-                    <span className="font-mono font-medium text-[var(--color-ink-700)]">
-                      {data.credential.tokenSourceKey}
-                    </span>
-                    . The settings below belong to that system — it does the minting, this one just
-                    presents the result. Only the token is shared; the callback URL and timeout above
-                    stay this system&apos;s own.
-                  </p>
-                )}
-                {data.credential.borrowedBy.length > 0 && (
-                  <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400">
-                    Lending this token to{" "}
-                    <span className="font-mono font-medium">
-                      {data.credential.borrowedBy.join(", ")}
-                    </span>
-                    . Changing its mint settings or deleting this system affects them too.
-                  </p>
-                )}
-                {data.credential.callbackAuthScheme?.toLowerCase() !== "bearer" && (
-                  <p className="mt-2 text-[11px] text-[var(--color-ink-500)]">
-                    No bearer token stored — &quot;Refresh now&quot; mints one from the mint URL and
-                    switches the auth scheme back to bearer.
-                  </p>
-                )}
-                {data.credential.tokenRefreshUrl && (
-                  <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] text-[var(--color-ink-500)]">
-                    <DefRow label="Mint URL" value={data.credential.tokenRefreshUrl} mono />
-                    <DefRow label="Username" value={data.credential.tokenRefreshUsername ?? "—"} mono />
-                    <DefRow
-                      label="Refresh before"
-                      value={
-                        data.credential.tokenRefreshBeforeSeconds
-                          ? `${Math.round(data.credential.tokenRefreshBeforeSeconds / 3600)}h before expiry`
-                          : "—"
-                      }
-                    />
-                  </dl>
-                )}
-                {refreshNote && (
-                  <p className="mt-2 text-[11px] text-[var(--color-ink-500)]">{refreshNote}</p>
-                )}
-                {platformSettings && (
-                  <div className="mt-3 border-t border-[var(--color-ink-100)] pt-2 dark:border-white/[0.06]">
-                    <div className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wide text-[var(--color-ink-400)]">
-                      <Lock className="h-3 w-3" strokeWidth={2.2} />
-                      Platform-managed (set via deployment)
-                    </div>
-                    <dl className="mt-1.5 grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] text-[var(--color-ink-500)]">
-                      <DefRow
-                        label="Allowed mint hosts"
-                        value={platformSettings.allowedMintHosts.join(", ") || "— none —"}
-                        mono
-                      />
-                      <DefRow
-                        label="Sweep interval"
-                        value={`${Math.round(platformSettings.pollIntervalSeconds / 60)} min`}
-                      />
-                      <DefRow label="Max parallel mints" value={String(platformSettings.maxParallelism)} />
-                      <DefRow label="Mint timeout" value={`${platformSettings.mintTimeoutSeconds}s`} />
-                    </dl>
-                    <p className="mt-1.5 text-[10px] text-[var(--color-ink-400)]">
-                      These are read-only. The mint-host allowlist is a security boundary — changing it
-                      requires a deployment update, not a UI edit.
-                    </p>
-                  </div>
-                )}
               </div>
-            )}
+              {data.credential.tokenSourceKey && (
+                <p className="mt-2 text-[11px] text-[var(--color-ink-500)]">
+                  Borrowing its token from{" "}
+                  <span className="font-mono font-medium text-[var(--color-ink-700)]">
+                    {data.credential.tokenSourceKey}
+                  </span>
+                  . The settings below belong to that system — it does the minting, this one just
+                  presents the result. Only the token is shared; the callback URL and timeout above
+                  stay this system&apos;s own.
+                </p>
+              )}
+              {data.credential.borrowedBy.length > 0 && (
+                <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400">
+                  Lending this token to{" "}
+                  <span className="font-mono font-medium">
+                    {data.credential.borrowedBy.join(", ")}
+                  </span>
+                  . Changing its mint settings or deleting this system affects them too.
+                </p>
+              )}
+              {!data.credential.hasOutboundToken && (
+                <p className="mt-2 text-[11px] text-[var(--color-ink-500)]">
+                  No bearer token stored — &quot;Refresh now&quot; mints one from the mint URL and
+                  switches the auth scheme back to bearer.
+                </p>
+              )}
+              {data.credential.tokenRefreshUrl && (
+                <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] text-[var(--color-ink-500)]">
+                  <DefRow label="Mint URL" value={data.credential.tokenRefreshUrl} mono />
+                  <DefRow label="Username" value={data.credential.tokenRefreshUsername ?? "—"} mono />
+                  <DefRow
+                    label="Refresh before"
+                    value={
+                      data.credential.tokenRefreshBeforeSeconds
+                        ? `${Math.round(data.credential.tokenRefreshBeforeSeconds / 3600)}h before expiry`
+                        : "—"
+                    }
+                  />
+                </dl>
+              )}
+              {refreshNote && (
+                <p className="mt-2 text-[11px] text-[var(--color-ink-500)]">{refreshNote}</p>
+              )}
+              {platformSettings && (
+                <div className="mt-3 border-t border-[var(--color-ink-100)] pt-2 dark:border-white/[0.06]">
+                  <div className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wide text-[var(--color-ink-400)]">
+                    <Lock className="h-3 w-3" strokeWidth={2.2} />
+                    Platform-managed (set via deployment)
+                  </div>
+                  <dl className="mt-1.5 grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] text-[var(--color-ink-500)]">
+                    <DefRow
+                      label="Allowed mint hosts"
+                      value={platformSettings.allowedMintHosts.join(", ") || "— none —"}
+                      mono
+                    />
+                    <DefRow
+                      label="Sweep interval"
+                      value={`${Math.round(platformSettings.pollIntervalSeconds / 60)} min`}
+                    />
+                    <DefRow label="Max parallel mints" value={String(platformSettings.maxParallelism)} />
+                    <DefRow label="Mint timeout" value={`${platformSettings.mintTimeoutSeconds}s`} />
+                  </dl>
+                  <p className="mt-1.5 text-[10px] text-[var(--color-ink-400)]">
+                    These are read-only. The mint-host allowlist is a security boundary — changing it
+                    requires a deployment update, not a UI edit.
+                  </p>
+                </div>
+              )}
+            </div>
           </>
+        )}
+      </section>
+
+      {/* ── Callback delivery card ──────────────────────────────────── */}
+      {/* Where results are POSTed back. Still hidden behind a configured base
+          URL: a system DTMS never calls back has nothing to show here. */}
+      <section className="rounded-xl border border-[var(--color-ink-100)] bg-white/70 p-5 dark:border-white/[0.06] dark:bg-white/[0.03]">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[13px] font-semibold text-[var(--color-ink-800)]">Callback delivery</h2>
+          <button
+            type="button"
+            onClick={() => setEditingCallback(true)}
+            className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+          >
+            <Settings2 className="h-3 w-3" strokeWidth={2.2} />
+            Configure
+          </button>
+        </div>
+        <p className="mt-1 text-[11px] text-[var(--color-ink-500)]">
+          Where DTMS posts order results back to this system.
+        </p>
+        {data.credential?.hasCallbackBaseUrl ? (
+          <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
+            <DefRow label="Base URL" value={data.credential.callbackBaseUrl ?? "—"} mono />
+            <DefRow label="Timeout (ms)" value={String(data.credential.callbackTimeoutMs)} />
+          </dl>
         ) : (
           <p className="mt-3 text-[12px] text-[var(--color-ink-400)]">
             No callback URL set. DTMS will not call this system back when its orders complete.
@@ -926,6 +964,18 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
           onClose={() => setEditingCallback(false)}
           onSaved={() => {
             setEditingCallback(false);
+            void load();
+          }}
+        />
+      )}
+      {editingOutboundToken && (
+        <ConfigureOutboundTokenModal
+          systemKey={data.key}
+          initial={data.credential}
+          onClose={() => setEditingOutboundToken(false)}
+          onSaved={() => {
+            setEditingOutboundToken(false);
+            setRevealedToken(null);
             void load();
           }}
         />
@@ -1194,10 +1244,6 @@ function ConfigureCallbackModal({
   onSaved: () => void;
 }) {
   const [callbackBaseUrl, setCallbackBaseUrl] = useState(initial?.callbackBaseUrl ?? "");
-  const [callbackAuthScheme, setCallbackAuthScheme] = useState<string>(
-    initial?.callbackAuthScheme ?? "",
-  );
-  const [callbackBearerToken, setCallbackBearerToken] = useState("");
   const [callbackTimeoutMs, setCallbackTimeoutMs] = useState(initial?.callbackTimeoutMs ?? 10000);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1208,8 +1254,15 @@ function ConfigureCallbackModal({
     try {
       const body: CallbackConfigRequest = {
         callbackBaseUrl: callbackBaseUrl || null,
-        callbackAuthScheme: callbackAuthScheme || null,
-        callbackBearerToken: callbackBearerToken || null,
+        // The scheme is echoed back rather than omitted on purpose. The server
+        // keeps what it has when this is absent, but belt-and-braces: an older
+        // API build replaces every outbound field from this payload, and a
+        // missing scheme there would null the stored token — taking OMS
+        // callbacks and the WMS pull down over a base-URL edit. The token
+        // itself lives behind PUT /outbound-token and is never sent here.
+        callbackAuthScheme: initial?.hasOutboundToken
+          ? initial.callbackAuthScheme ?? "bearer"
+          : null,
         callbackTimeoutMs,
       };
       await setCallback(systemKey, body);
@@ -1222,10 +1275,11 @@ function ConfigureCallbackModal({
   };
 
   return (
-    <ModalShell title="Configure outbound callback" onClose={onClose}>
+    <ModalShell title="Configure callback delivery" onClose={onClose}>
       <p className="mb-3 text-[11.5px] text-[var(--color-ink-500)]">
-        DTMS POSTs callback events to <code>&#123;baseUrl&#125;/events</code>. Bearer token is
-        stored once + reused; leave token blank to keep current value.
+        DTMS POSTs callback events to <code>&#123;baseUrl&#125;/events</code>. Clear the base URL
+        if this system never receives callbacks. The token used for those calls is set under{" "}
+        <strong>Outbound credential</strong> and is not touched here.
       </p>
       <div className="space-y-3">
         <Field label="Callback base URL">
@@ -1236,27 +1290,6 @@ function ConfigureCallbackModal({
             className="w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 font-mono text-[12px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
           />
         </Field>
-        <Field label="Auth scheme">
-          <select
-            value={callbackAuthScheme}
-            onChange={(e) => setCallbackAuthScheme(e.target.value)}
-            className="w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 text-[13px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
-          >
-            <option value="">— none —</option>
-            <option value="bearer">Bearer token</option>
-          </select>
-        </Field>
-        {callbackAuthScheme === "bearer" && (
-          <Field label="Bearer token (sent on every callback)">
-            <input
-              value={callbackBearerToken}
-              onChange={(e) => setCallbackBearerToken(e.target.value)}
-              placeholder="Leave blank to keep current"
-              className="w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 font-mono text-[12px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
-              type="password"
-            />
-          </Field>
-        )}
         <Field label="Timeout (ms)">
           <input
             type="number"
@@ -1270,6 +1303,155 @@ function ConfigureCallbackModal({
       </div>
       {error && <ErrorBanner message={error} />}
       <ModalFooter onCancel={onClose} onSave={submit} saving={submitting} />
+    </ModalShell>
+  );
+}
+
+type VerifyVerdict = { tone: "ok" | "bad" | "unsure"; text: string };
+
+/**
+ * Mints once and turns the outcome into something an operator can act on.
+ *
+ * Keyed off `status`, never the message text — the message is free-form and
+ * comes from whatever the mint endpoint said. `Failed` is the signal this whole
+ * flow exists to surface: a wrong password, an unreachable host, or a response
+ * DTMS could not read. It leaves the previously stored token alone.
+ */
+async function verifyMint(systemKey: string): Promise<VerifyVerdict> {
+  try {
+    const r = await runTokenRefresh(systemKey);
+    const detail = r.message ? ` — ${r.message}` : "";
+    switch (r.status) {
+      case "Refreshed":
+        return {
+          tone: "ok",
+          text: `Verified — token stored, expires ${
+            r.expiresAt ? new Date(r.expiresAt).toLocaleString() : "never (perpetual token)"
+          }.`,
+        };
+      case "Failed":
+        return {
+          tone: "bad",
+          text: `Saved, but minting failed${detail}. The stored token was unchanged.`,
+        };
+      case "Rejected":
+        // Not an error: the mint worked and the result was declined for being
+        // no better than what is already stored.
+        return { tone: "unsure", text: `Saved. Nothing to replace${detail}.` };
+      default:
+        return { tone: "unsure", text: `Saved, but the mint was inconclusive (${r.status})${detail}.` };
+    }
+  } catch (e) {
+    // A 409 (another refresh holds the lock) arrives here, as does a network
+    // failure. The config is saved regardless.
+    return { tone: "unsure", text: `Saved, but could not verify — ${(e as Error).message}` };
+  }
+}
+
+function VerdictBanner({ verdict }: { verdict: VerifyVerdict }) {
+  const Icon = verdict.tone === "ok" ? CheckCircle2 : verdict.tone === "bad" ? XCircle : AlertCircle;
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-2 rounded border px-3 py-2 text-[12px]",
+        verdict.tone === "ok" &&
+          "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300",
+        verdict.tone === "bad" &&
+          "border-red-300 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300",
+        verdict.tone === "unsure" &&
+          "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300",
+      )}
+    >
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2.2} />
+      <span>{verdict.text}</span>
+    </div>
+  );
+}
+
+/**
+ * Sets the token DTMS presents when calling this system, by itself.
+ *
+ * Pasting a token by hand is the fallback path — auto-refresh below mints one
+ * from a username and password instead, which is what most systems should use.
+ * This exists for a system with no mint endpoint, and for dropping a token that
+ * has gone bad.
+ */
+function ConfigureOutboundTokenModal({
+  systemKey,
+  initial,
+  onClose,
+  onSaved,
+}: {
+  systemKey: string;
+  initial: CredentialSummary | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [bearerToken, setBearerToken] = useState("");
+  const [clearToken, setClearToken] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const hasToken = initial?.hasOutboundToken ?? false;
+
+  const submit = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await setOutboundToken(
+        systemKey,
+        clearToken ? { clearToken: true } : { bearerToken: bearerToken || null },
+      );
+      onSaved();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <ModalShell title="Edit outbound token" onClose={onClose}>
+      <p className="mb-3 text-[11.5px] text-[var(--color-ink-500)]">
+        Sent as <code>Authorization: Bearer …</code> on every call DTMS makes to this system.
+        Leave blank to keep the stored token. The callback URL and timeout are not affected.
+      </p>
+      <div className="space-y-3">
+        <Field label="Bearer token">
+          <input
+            value={bearerToken}
+            onChange={(e) => setBearerToken(e.target.value)}
+            placeholder={hasToken ? "Leave blank to keep current" : "Paste the token"}
+            disabled={clearToken}
+            type="password"
+            className="w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 font-mono text-[12px] focus:border-[var(--color-brand-400)] focus:outline-none disabled:opacity-50 dark:border-white/[0.08] dark:bg-white/[0.04]"
+          />
+        </Field>
+        {hasToken && (
+          <>
+            <label className="flex items-center gap-2 text-[12px] text-[var(--color-ink-700)]">
+              <input
+                type="checkbox"
+                checked={clearToken}
+                onChange={(e) => setClearToken(e.target.checked)}
+              />
+              Clear the stored token
+            </label>
+            {clearToken && (
+              <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                Every outbound call to this system then goes unauthenticated — callbacks and any
+                data DTMS pulls from it will come back 401 until a token is set or minted again.
+              </p>
+            )}
+          </>
+        )}
+      </div>
+      {error && <ErrorBanner message={error} />}
+      <ModalFooter
+        onCancel={onClose}
+        onSave={submit}
+        saving={submitting}
+        saveLabel={clearToken ? "Clear token" : "Save"}
+      />
     </ModalShell>
   );
 }
@@ -1294,10 +1476,22 @@ function ConfigureTokenRefreshModal({
   const [enabled, setEnabled] = useState(initial?.tokenRefreshEnabled ?? true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set once the config is written and a mint has been attempted. Its presence
+  // means the save already happened, so the footer stops offering Cancel.
+  const [verdict, setVerdict] = useState<VerifyVerdict | null>(null);
 
+  // Save, then mint straight away and report what happened. Without the second
+  // half an operator who mistypes a password learns about it from the next
+  // sweep, up to an hour later, as an expiring token — which is what happened
+  // when the WMS account was first set up.
+  //
+  // Deliberately not transactional: a failed mint leaves the config saved so
+  // the password can be corrected and retried. Rolling it back would throw
+  // away the rest of a correct form over one wrong field.
   const submit = async () => {
     setSubmitting(true);
     setError(null);
+    setVerdict(null);
     try {
       const body: TokenRefreshConfigRequest = {
         tokenUrl,
@@ -1307,13 +1501,27 @@ function ConfigureTokenRefreshModal({
         enabled,
       };
       await configureTokenRefresh(systemKey, body);
-      onSaved();
+      setVerdict(await verifyMint(systemKey));
     } catch (e) {
+      // Thrown here means the config itself was rejected — nothing was saved.
       setError((e as Error).message);
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (verdict) {
+    return (
+      <ModalShell title="Configure token auto-refresh" onClose={onSaved}>
+        <VerdictBanner verdict={verdict} />
+        <p className="mt-3 text-[11px] text-[var(--color-ink-500)]">
+          The settings were saved either way. Re-open this dialog to correct them, or use
+          &quot;Refresh now&quot; on the card to try minting again.
+        </p>
+        <ModalFooter onCancel={onSaved} onSave={onSaved} saving={false} saveLabel="Done" hideCancel />
+      </ModalShell>
+    );
+  }
 
   return (
     <ModalShell title="Configure token auto-refresh" onClose={onClose}>
@@ -1322,6 +1530,16 @@ function ConfigureTokenRefreshModal({
         token expires, then stores the returned token automatically. The mint host must be
         allowlisted server-side. Leave password blank to keep the current one.
       </p>
+      <p className="mb-3 text-[11.5px] text-[var(--color-ink-500)]">
+        Saving mints a token immediately so you can see whether the credentials work.
+      </p>
+      {(initial?.borrowedBy.length ?? 0) > 0 && (
+        <p className="mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+          <strong>{initial?.borrowedBy.join(", ")}</strong> borrow this token. The mint on save is a
+          real one, and the auth service keeps a single live token per account — they switch to the
+          new token at the same moment this system does.
+        </p>
+      )}
       <div className="space-y-3">
         <Field label="Mint URL">
           <input
@@ -1362,7 +1580,13 @@ function ConfigureTokenRefreshModal({
         </label>
       </div>
       {error && <ErrorBanner message={error} />}
-      <ModalFooter onCancel={onClose} onSave={submit} saving={submitting} />
+      <ModalFooter
+        onCancel={onClose}
+        onSave={submit}
+        saving={submitting}
+        saveLabel="Save and verify"
+        savingLabel="Verifying…"
+      />
     </ModalShell>
   );
 }
@@ -1644,23 +1868,41 @@ function IssueTokenModal({
   );
 }
 
-function ModalFooter({ onCancel, onSave, saving }: { onCancel: () => void; onSave: () => void; saving: boolean }) {
+function ModalFooter({
+  onCancel,
+  onSave,
+  saving,
+  saveLabel = "Save",
+  savingLabel = "Saving…",
+  // For a modal that has already written something and is only showing the
+  // outcome: Cancel would read as "undo", which it cannot do.
+  hideCancel = false,
+}: {
+  onCancel: () => void;
+  onSave: () => void;
+  saving: boolean;
+  saveLabel?: string;
+  savingLabel?: string;
+  hideCancel?: boolean;
+}) {
   return (
     <div className="mt-5 flex items-center justify-end gap-2">
-      <button
-        type="button"
-        onClick={onCancel}
-        className="rounded border border-[var(--color-ink-200)] bg-white px-3 py-1.5 text-[12px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
-      >
-        Cancel
-      </button>
+      {!hideCancel && (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded border border-[var(--color-ink-200)] bg-white px-3 py-1.5 text-[12px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+        >
+          Cancel
+        </button>
+      )}
       <button
         type="button"
         disabled={saving}
         onClick={onSave}
         className="rounded bg-[var(--color-ink-900)] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[var(--color-ink-700)] disabled:opacity-50"
       >
-        {saving ? "Saving…" : "Save"}
+        {saving ? savingLabel : saveLabel}
       </button>
     </div>
   );
