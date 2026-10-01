@@ -965,8 +965,13 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseMiddleware<ExceptionHandlingMiddleware>();
+// Request logging wraps the exception handler, not the other way round: it has
+// to see the status the client actually got. Inside it, every modeled 4xx
+// (a 400 business-rule rejection, say) passed through as a thrown exception
+// and was logged "responded 500" at Error — the very noise
+// ExceptionHandlingMiddleware already downgrades to a Warning.
 app.UseSerilogRequestLogging();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseHttpsRedirection();
 
 // CORS must run BEFORE auth so the preflight OPTIONS request gets the
