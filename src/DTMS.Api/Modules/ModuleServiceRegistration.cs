@@ -664,7 +664,9 @@ public static class ModuleServiceRegistration
             .Configure(o =>
             {
                 o.WaitUntilStarted = true;
-                o.StartTimeout = TimeSpan.FromSeconds(30);
+                // 60 s, not 30: a cold start once took 28 s to bring the bus
+                // up (see the thread-pool note at the top of Program.cs).
+                o.StartTimeout = TimeSpan.FromSeconds(60);
                 o.StopTimeout = TimeSpan.FromSeconds(45);
             });
 

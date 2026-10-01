@@ -40,6 +40,16 @@ if (args.Contains("--generate-vapid-keys"))
     return;
 }
 
+// Startup thread-pool starvation. The pool starts at one worker per CPU (4 in
+// the container) and adds threads slowly, while startup blocks many of them at
+// once (MassTransit's 37 RabbitMQ endpoints + ~22 hosted services). Measured
+// 2026-10-01: the bus took 20-28 s to start, 2 s short of StartTimeout, and a
+// Redis GET timed out with its reply already in the socket, which turned into
+// a WMS 401. With 64 minimum worker threads the bus starts in ~1 s. Only the
+// floor is raised; idle threads still retire.
+ThreadPool.GetMinThreads(out var minWorkers, out var minIo);
+ThreadPool.SetMinThreads(Math.Max(minWorkers, 64), minIo);
+
 var builder = WebApplication.CreateBuilder(args);
 
 // T1.3 — extend shutdown window so MassTransit consumers and in-flight HTTP
