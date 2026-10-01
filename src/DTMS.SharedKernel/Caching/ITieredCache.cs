@@ -10,13 +10,24 @@ namespace DTMS.SharedKernel.Caching;
 /// </summary>
 public interface ITieredCache
 {
+    /// <summary>
+    /// Fail-open: a Redis failure (down, timeout) is reported as a miss
+    /// (<c>null</c>), never thrown, so read-through callers fall back to
+    /// their own store. Don't use this cache as a security control.
+    /// </summary>
     Task<T?> GetAsync<T>(string key, CancellationToken ct = default) where T : class;
 
+    /// <summary>
+    /// Writes L1 and returns; the L2 write and peer broadcast happen in the
+    /// background and are best-effort (a Redis failure is logged, not thrown).
+    /// </summary>
     Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken ct = default) where T : class;
 
     /// <summary>
     /// Remove from L1 + L2 and broadcast to peers via the invalidation
-    /// channel. Safe to call for keys that don't exist.
+    /// channel. Safe to call for keys that don't exist. Unlike Get/Set this
+    /// THROWS on a Redis failure — the caller changed the data and must know
+    /// peers may still hold the old value; the key is replayed on reconnect.
     /// </summary>
     Task InvalidateAsync(string key, CancellationToken ct = default);
 

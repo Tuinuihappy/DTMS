@@ -1,6 +1,6 @@
 # อัปเกรด MassTransit 8.5 + ให้ poller รอ ApplicationStarted — แผนการพัฒนา
 
-> **สถานะ**: 🟡 Phase 1 ✅ เสร็จ 2026-10-01 · Phase 2 ยังไม่เริ่ม
+> **สถานะ**: 🟡 Phase 1 ✅ เสร็จ 2026-10-01 · Phase 2 ⏭️ ถูกแทนด้วย [tiered-cache-fail-open.md](tiered-cache-fail-open.md)
 >
 > **ผล Phase 1**:
 > - build พังแค่จุดเดียวตามคาด (health check `CreateConnection`) ส่วน `IBusObserver` และ saga ไม่ต้องแก้
@@ -117,7 +117,9 @@ API คุยกับ RabbitMQ แบบ async ทั้งหมด จึง�
 
 ---
 
-## Phase 2 — poller รอ ApplicationStarted (~2–3 ชม.)
+## Phase 2 — poller รอ ApplicationStarted (~2–3 ชม.) — ⏭️ ไม่ทำแล้ว
+
+> **ถูกแทนด้วย [tiered-cache-fail-open.md](tiered-cache-fail-open.md) (2026-10-01)**: ความเสียหายเมื่อเช้า (WMS 401) เกิดเพราะ cache ไม่ยอมไปอ่าน DB เมื่อ Redis error ไม่ใช่เพราะ poller เริ่มเร็วเกินไป การแก้ cache ให้ไปอ่าน DB จึงครอบคลุมทุกช่วงเวลาและผู้ใช้ cache ทั้งหมด ไม่ใช่แค่ poller 8 ตัวตอนเปิดเครื่อง เนื้อหาด้านล่างเก็บไว้เป็นบันทึก
 
 ### 2.1 Helper (~30 นาที)
 - ไฟล์ใหม่ `src/DTMS.SharedKernel/Hosting/HostLifetimeExtensions.cs`

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using DTMS.SharedKernel.Caching;
 using Microsoft.Extensions.Caching.Memory;
@@ -19,6 +20,11 @@ public sealed class RedisBackedTieredCache : ITieredCache
     private readonly PodIdentity _pod;
     private readonly ILogger<RedisBackedTieredCache> _log;
 
+    // Keys whose invalidation could not reach Redis. Redis persists to disk,
+    // so the stale L2 value would otherwise outlive the outage by up to its
+    // TTL; they are deleted + re-broadcast as soon as the connection returns.
+    private readonly ConcurrentDictionary<string, byte> _pendingInvalidations = new();
+
     public RedisBackedTieredCache(
         IConnectionMultiplexer redis,
         IMemoryCache local,
@@ -29,15 +35,46 @@ public sealed class RedisBackedTieredCache : ITieredCache
         _local = local;
         _pod = pod;
         _log = log;
+
+        // One line per state change instead of one per cache miss. Only the
+        // interactive connection matters here; pub/sub has its own.
+        _redis.ConnectionFailed += (_, e) =>
+        {
+            if (e.ConnectionType == ConnectionType.Interactive)
+                _log.LogWarning("Redis connection failed ({FailureType}) — tiered cache now reads through to its stores", e.FailureType);
+        };
+        _redis.ConnectionRestored += (_, e) =>
+        {
+            if (e.ConnectionType != ConnectionType.Interactive) return;
+            _log.LogInformation("Redis connection restored — tiered cache back on L2");
+            _ = ReplayPendingInvalidationsAsync();
+        };
     }
 
+    // Fail-open read. Every caller is a read-through cache over its own store,
+    // so a Redis failure is a miss, never an error. When the multiplexer is
+    // already disconnected, skip L2 outright: with AbortOnConnectFail=false
+    // the command would otherwise sit in the backlog for the full 5 s timeout.
     public async Task<T?> GetAsync<T>(string key, CancellationToken ct = default) where T : class
     {
         if (_local.TryGetValue(key, out T? hit) && hit is not null)
             return hit;
 
-        var db = _redis.GetDatabase();
-        RedisValue raw = await db.StringGetAsync(key);
+        if (!_redis.IsConnected)
+            return null;
+
+        RedisValue raw;
+        try
+        {
+            raw = await _redis.GetDatabase().StringGetAsync(key);
+        }
+        catch (Exception ex) when (IsRedisFailure(ex))
+        {
+            _log.LogWarning("Redis read failed for cache key {Key} ({Error}: {Message}) — treating as a miss",
+                key, ex.GetType().Name, ex.Message);
+            return null;
+        }
+
         if (raw.IsNullOrEmpty)
             return null;
 
@@ -47,34 +84,89 @@ public sealed class RedisBackedTieredCache : ITieredCache
         return value;
     }
 
-    public async Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken ct = default) where T : class
+    // L1 first, then return: the caller never waits on Redis. The L2 write and
+    // the peer broadcast run in the background, still in that order.
+    public Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken ct = default) where T : class
     {
         var json = JsonSerializer.Serialize(value, JsonOpts);
-        var db = _redis.GetDatabase();
-        await db.StringSetAsync(key, json, ttl);
 
         var l1Ttl = ttl < L1Ttl ? ttl : L1Ttl;
         _local.Set(key, value, l1Ttl);
 
-        // Broadcast peer-side invalidation so other replicas drop their
-        // stale L1 copy of this key. We publish AFTER L2 is written so a
-        // peer that responds to the message and re-reads sees the new
-        // value, not the previous. Subscribers on this same pod filter
-        // out the echo via the sender pod id.
-        await PublishInvalidationAsync(key);
+        _ = WriteL2AndPublishAsync(key, json, ttl);
+        return Task.CompletedTask;
     }
 
+    private async Task WriteL2AndPublishAsync(string key, string json, TimeSpan ttl)
+    {
+        if (!_redis.IsConnected)
+            return;
+
+        try
+        {
+            await _redis.GetDatabase().StringSetAsync(key, json, ttl);
+
+            // Broadcast peer-side invalidation so other replicas drop their
+            // stale L1 copy of this key. We publish AFTER L2 is written so a
+            // peer that responds to the message and re-reads sees the new
+            // value, not the previous. Subscribers on this same pod filter
+            // out the echo via the sender pod id.
+            await PublishInvalidationAsync(key);
+        }
+        catch (Exception ex) when (IsRedisFailure(ex))
+        {
+            _log.LogWarning("Redis write failed for cache key {Key} ({Error}: {Message}) — kept in L1 only",
+                key, ex.GetType().Name, ex.Message);
+        }
+    }
+
+    // Deliberately NOT fail-open: callers invalidate after changing the
+    // underlying data (credential rotation, token refresh, admin edits), and
+    // an invalidation that silently missed L2 leaves peers on the old value.
+    // The caller must see the failure; the key is also queued and replayed
+    // when Redis comes back, so the stale L2 copy doesn't outlive the outage.
     public async Task InvalidateAsync(string key, CancellationToken ct = default)
     {
         _local.Remove(key);
 
+        try
+        {
+            await DeleteAndBroadcastAsync(key);
+        }
+        catch (Exception ex) when (IsRedisFailure(ex))
+        {
+            _pendingInvalidations.TryAdd(key, 0);
+            throw;
+        }
+    }
+
+    private async Task DeleteAndBroadcastAsync(string key)
+    {
         var db = _redis.GetDatabase();
         await db.KeyDeleteAsync(key);
 
         // Broadcast — peers drop their L1 copies. Our own L1 was already
-        // removed above; the subscriber on this pod filters the echo by
-        // sender id.
+        // removed by the caller; the subscriber on this pod filters the
+        // echo by sender id.
         await PublishInvalidationAsync(key);
+    }
+
+    private async Task ReplayPendingInvalidationsAsync()
+    {
+        foreach (var key in _pendingInvalidations.Keys)
+        {
+            try
+            {
+                await DeleteAndBroadcastAsync(key);
+                _pendingInvalidations.TryRemove(key, out _);
+                _log.LogInformation("Replayed cache invalidation for {Key} after Redis reconnect", key);
+            }
+            catch (Exception ex) when (IsRedisFailure(ex))
+            {
+                // Still down — the next ConnectionRestored retries it.
+                _log.LogWarning("Replaying cache invalidation for {Key} failed ({Message}); will retry on next reconnect", key, ex.Message);
+            }
+        }
     }
 
     public async Task<T> GetOrSetWithLockAsync<T>(
@@ -108,7 +200,11 @@ public sealed class RedisBackedTieredCache : ITieredCache
                     throw new InvalidOperationException(
                         $"Factory returned null for cache key '{key}'.");
 
-                await SetAsync(key, fresh, ttl, ct);
+                // Awaited L2 write, not SetAsync: waiters on other pods read
+                // "lock released" as "value is in Redis", so the write must
+                // land before the finally below drops the lock.
+                _local.Set(key, fresh, ttl < L1Ttl ? ttl : L1Ttl);
+                await WriteL2AndPublishAsync(key, JsonSerializer.Serialize(fresh, JsonOpts), ttl);
                 return fresh;
             }
             finally
@@ -153,6 +249,13 @@ public sealed class RedisBackedTieredCache : ITieredCache
         var sub = _redis.GetSubscriber();
         await sub.PublishAsync(RedisChannel.Literal(InvalidationChannel), payload);
     }
+
+    // RedisTimeoutException derives from TimeoutException, NOT RedisException
+    // — a plain `catch (RedisException)` misses the very timeout seen on
+    // 2026-10-01 (GET iam:cred:wms, 5008 ms). ObjectDisposedException covers
+    // a multiplexer torn down during shutdown.
+    private static bool IsRedisFailure(Exception ex) =>
+        ex is RedisException or RedisTimeoutException or ObjectDisposedException;
 
     private T? Deserialize<T>(string raw) where T : class
     {

@@ -242,6 +242,14 @@ Redis outage would defeat the point of having revocation. This does
 mean a Redis outage temporarily disables the `/api/v1/source/*` path
 for bearer-jwt systems — accepted for the security guarantee.
 
+The credential / system-client / callback-subscription **cache** is the
+opposite on purpose: it is **fail-open** (`RedisBackedTieredCache`). A
+Redis failure there is a cache miss, so readers fall back to the database
+and outbound callbacks and WMS sync keep running. Not everything survives
+a Redis outage, though: token refresh after an OMS 401 needs a Redis lock,
+and order intake's station lookup and the Idempotency-Key filter use
+`IDistributedCache` without a fallback.
+
 **Rotation vs revocation:**
 
 | Scenario | Use |
