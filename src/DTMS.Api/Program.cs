@@ -541,9 +541,8 @@ if (useRedisBackplane)
 // Phase S.0 — shared scale infrastructure. Single IConnectionMultiplexer
 // for the whole app (DTMS.Infrastructure tiered cache, distributed
 // circuit breaker, and the source-system pub/sub channels that S.2-S.3
-// add). The health check and SignalR backplane still create their own
-// transient connections — they predate this singleton and have their
-// own lifecycle requirements (health check needs to fail-fast on Connect).
+// add), and the Redis readiness check (RedisMultiplexerHealthCheck). The
+// SignalR backplane still creates its own connection.
 builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(_ =>
 {
     var cfg = StackExchange.Redis.ConfigurationOptions.Parse(redisConn);
@@ -662,21 +661,8 @@ builder.Services.AddHealthChecks()
     // stays Healthy so kubelet doesn't restart the draining pod.
     .AddCheck<DTMS.Api.Realtime.Drain.DrainHealthCheck>(
         "drain", tags: ["ready"])
-    .AddCheck("redis", () =>
-    {
-        try
-        {
-            var muxer = StackExchange.Redis.ConnectionMultiplexer.Connect(redisConn);
-            var db = muxer.GetDatabase();
-            db.Ping();
-            muxer.Close();
-            return HealthCheckResult.Healthy();
-        }
-        catch (Exception ex)
-        {
-            return HealthCheckResult.Degraded(ex.Message);
-        }
-    }, tags: ["ready"])
+    .AddCheck<DTMS.Api.Infrastructure.Health.RedisMultiplexerHealthCheck>(
+        "redis", tags: ["ready"])
     // RabbitMQ.Client 7 is async-only; the old sync CreateConnection also
     // parked a thread-pool thread on every /health/ready probe.
     .AddAsyncCheck("rabbitmq", async ct =>
@@ -1049,14 +1035,14 @@ app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks
 app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("ready"),
-    ResponseWriter = WriteJsonResponse
+    ResponseWriter = DTMS.Api.Infrastructure.Health.HealthResponse.WriteJsonAsync
 }).AllowAnonymous()
     .WithTags("Health").WithSummary("Readiness").WithDescription("Checks core dependencies: PostgreSQL, Redis, RabbitMQ.");
 // Vendor probe (checks external systems: RIOT3)
 app.MapHealthChecks("/health/vendors", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("vendors"),
-    ResponseWriter = WriteJsonResponse
+    ResponseWriter = DTMS.Api.Infrastructure.Health.HealthResponse.WriteJsonAsync
 }).AllowAnonymous()
     .WithTags("Health").WithSummary("Vendors").WithDescription("Checks external vendor connectivity: RIOT3.");
 
@@ -1170,7 +1156,8 @@ app.Run();
 
 static IResult WriteHealthResult(HealthReport report)
 {
-    var status = report.Status == HealthStatus.Healthy ? 200 : 503;
+    // Same mapping as /health/ready: only Unhealthy is a 503.
+    var status = DTMS.Api.Infrastructure.Health.HealthResponse.StatusCodeFor(report.Status);
     var body = new
     {
         status = report.Status.ToString(),
@@ -1183,22 +1170,4 @@ static IResult WriteHealthResult(HealthReport report)
         })
     };
     return status == 200 ? Results.Ok(body) : Results.Json(body, statusCode: 503);
-}
-
-static Task WriteJsonResponse(HttpContext ctx, HealthReport report)
-{
-    ctx.Response.ContentType = "application/json";
-    ctx.Response.StatusCode = report.Status == HealthStatus.Healthy ? 200 : 503;
-    var result = System.Text.Json.JsonSerializer.Serialize(new
-    {
-        status = report.Status.ToString(),
-        checks = report.Entries.Select(e => new
-        {
-            name   = e.Key,
-            status = e.Value.Status.ToString(),
-            description = e.Value.Description,
-            error  = e.Value.Exception?.Message
-        })
-    });
-    return ctx.Response.WriteAsync(result);
 }
