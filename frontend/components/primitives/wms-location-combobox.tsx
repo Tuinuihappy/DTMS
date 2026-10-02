@@ -3,18 +3,21 @@
 // WMS PR-4 — searchable WMS location picker for Manual/Fleet orders.
 // Mirrors WarehouseCombobox / StationCombobox shape (same keyboard nav,
 // click-outside, clear button, open-on-focus). Key differences:
-//   • Server-side debounced search via useWmsLocationSearch (WMS
-//     catalogue can hit thousands of rows; client-side filter of a
-//     pre-fetched full list would waste bandwidth + memory).
+//   • Filters a whole-catalogue `catalog` (useWmsLocationCatalog, loaded
+//     once by the host) in the browser — every location is listed and
+//     typing filters instantly. Without a complete catalog (none passed,
+//     load failed, or more rows than one page) it falls back to
+//     debounced server-side search via useWmsLocationSearch.
 //   • Shows the parent-zone display name as a subtle chip so operators
 //     see "STF_35 · WIP" at a glance.
 //   • Uses MapPin icon (physical location, matches WMS domain semantics).
 
 import { AlertTriangle, ChevronDown, Loader2, MapPin, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getWmsLocationByCode,
   useWmsLocationSearch,
+  type WmsLocationCatalog,
   type WmsLocationSummaryDto,
 } from "@/lib/api/wms-locations";
 import { ComboboxListPortal } from "@/components/primitives/combobox-list-portal";
@@ -23,6 +26,7 @@ import { cn } from "@/lib/utils";
 type Props = {
   value: string;                       // location code (e.g. "STF_35")
   onChange: (next: string) => void;
+  catalog?: WmsLocationCatalog;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -31,6 +35,7 @@ type Props = {
 export function WmsLocationCombobox({
   value,
   onChange,
+  catalog,
   placeholder = "Search WMS location…",
   disabled,
   className,
@@ -48,12 +53,35 @@ export function WmsLocationCombobox({
   const listRef = useRef<HTMLUListElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const { items, loading, error, resolvedQuery } = useWmsLocationSearch(query, {
+  // Local mode: the catalog holds every active location, so filter it here.
+  const localMode = !!catalog && catalog.complete && !catalog.error;
+  const catalogLoading = !!catalog && catalog.loading;
+  const server = useWmsLocationSearch(query, {
     pageSize: 20,
     debounceMs: 300,
+    enabled: open && !localMode && !catalogLoading,
   });
+  // Same match as the server search: code or display name contains the
+  // text, case-insensitive; the catalog is already ordered by code.
+  const localItems = useMemo(() => {
+    if (!localMode || !catalog) return [];
+    const q = query.trim().toLowerCase();
+    if (!q) return catalog.locations;
+    return catalog.locations.filter(
+      (loc) =>
+        loc.code.toLowerCase().includes(q) ||
+        loc.displayName.toLowerCase().includes(q),
+    );
+  }, [localMode, catalog, query]);
+  const items = localMode ? localItems : server.items;
+  const loading = catalogLoading || (!localMode && server.loading);
+  const error = localMode ? null : server.error;
   // Items answer the text in the box (not a previous keystroke's search).
-  const itemsFresh = !loading && resolvedQuery === query;
+  // Always true when filtering locally.
+  const itemsFresh =
+    localMode || (!catalogLoading && !server.loading && server.resolvedQuery === query);
+  // Server mode lists at most one page — say so when there's more.
+  const hiddenCount = localMode ? 0 : Math.max(server.total - server.items.length, 0);
   // Enter pressed before itemsFresh — resolved by the effect below once
   // the search for the current text lands.
   const [pendingEnter, setPendingEnter] = useState(false);
@@ -70,6 +98,15 @@ export function WmsLocationCombobox({
     // Only refetch when the external value changes AND we don't already
     // have that code loaded.
     if (selectedDetail?.code.toLowerCase() === value.toLowerCase()) return;
+    // The catalog usually has it — no request needed.
+    const known = catalog?.locations.find(
+      (loc) => loc.code.toLowerCase() === value.toLowerCase(),
+    );
+    if (known) {
+      setSelectedDetail(known);
+      return;
+    }
+    if (catalog?.loading) return; // re-runs when the catalog lands
     getWmsLocationByCode(value).then((loc) => {
       if (!cancelled) setSelectedDetail(loc);
     });
@@ -78,7 +115,7 @@ export function WmsLocationCombobox({
     };
     // selectedDetail is intentionally excluded — including it would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
+  }, [value, catalog?.locations, catalog?.loading]);
 
   // Click-outside to close.
   useEffect(() => {
@@ -268,7 +305,7 @@ export function WmsLocationCombobox({
             {loading && (
               <li className="flex items-center gap-1.5 px-2.5 py-2 text-xs text-gray-500">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                Searching…
+                {catalogLoading ? "Loading locations…" : "Searching…"}
               </li>
             )}
             {!loading && items.length === 0 && (
@@ -322,6 +359,11 @@ export function WmsLocationCombobox({
                 </li>
               );
             })}
+            {!loading && hiddenCount > 0 && (
+              <li className="px-2.5 py-1.5 text-[11px] text-gray-500">
+                Showing {items.length} of {server.total} — keep typing to narrow
+              </li>
+            )}
           </ul>
         </div>
       </ComboboxListPortal>

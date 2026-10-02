@@ -1,7 +1,8 @@
 // WMS PR-4 — client-side fetch helpers for the WMS location picker.
-// Server-side search + pagination because the WMS catalogue can grow
-// to thousands of locations; the create-order dialog picker fires
-// debounced queries as the user types.
+// The create-order dialog loads the whole active catalogue once
+// (useWmsLocationCatalog) and filters in the browser; if the catalogue
+// outgrows one page, the picker falls back to debounced server-side
+// search (useWmsLocationSearch).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -76,10 +77,11 @@ export type UseWmsLocationSearchResult = {
  */
 export function useWmsLocationSearch(
   query: string,
-  opts: { pageSize?: number; debounceMs?: number } = {},
+  opts: { pageSize?: number; debounceMs?: number; enabled?: boolean } = {},
 ): UseWmsLocationSearchResult {
   const pageSize = opts.pageSize ?? 20;
   const debounceMs = opts.debounceMs ?? 300;
+  const enabled = opts.enabled ?? true;
 
   const [items, setItems] = useState<WmsLocationSummaryDto[]>([]);
   const [total, setTotal] = useState(0);
@@ -92,6 +94,10 @@ export function useWmsLocationSearch(
   useEffect(() => {
     // Cancel any in-flight request before scheduling the next one.
     controllerRef.current?.abort();
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
     const controller = new AbortController();
     controllerRef.current = controller;
 
@@ -122,9 +128,68 @@ export function useWmsLocationSearch(
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query, pageSize, debounceMs]);
+  }, [query, pageSize, debounceMs, enabled]);
 
   return { items, total, loading, error, resolvedQuery };
+}
+
+// ── Whole-catalogue load for client-side filtering ───────────────────────
+
+// The backend's page-size ceiling (WmsLocationRepository clamps to 500).
+// A catalogue that fits in one page is filtered in the browser; a larger
+// one falls back to the server-side search above.
+export const WMS_CATALOG_MAX = 500;
+
+export type WmsLocationCatalog = {
+  locations: WmsLocationSummaryDto[];
+  // True when `locations` holds every active location, so filtering it
+  // in the browser is exact. False → the picker must search server-side.
+  complete: boolean;
+  loading: boolean;
+  error: string | null;
+};
+
+/**
+ * Loads every active WMS location once, each time `enabled` turns true
+ * (the create-order dialog passes "open and showing the WMS picker", so
+ * a reopen picks up newly synced locations). One request serves every
+ * pickup/drop picker in the dialog, and typing filters instantly with
+ * no per-keystroke fetch.
+ */
+export function useWmsLocationCatalog(enabled: boolean): WmsLocationCatalog {
+  const [state, setState] = useState<WmsLocationCatalog>({
+    locations: [],
+    complete: false,
+    loading: false,
+    error: null,
+  });
+
+  useEffect(() => {
+    if (!enabled) return;
+    const controller = new AbortController();
+    setState((s) => ({ ...s, loading: true, error: null }));
+    searchWmsLocations({ page: 1, pageSize: WMS_CATALOG_MAX, signal: controller.signal })
+      .then((page) => {
+        setState({
+          locations: page.data,
+          complete: page.data.length >= page.total,
+          loading: false,
+          error: null,
+        });
+      })
+      .catch((e: Error) => {
+        if (e.name === "AbortError") return;
+        setState({
+          locations: [],
+          complete: false,
+          loading: false,
+          error: e.message || "Failed to load WMS locations",
+        });
+      });
+    return () => controller.abort();
+  }, [enabled]);
+
+  return state;
 }
 
 // ── Detail lookup by code (for back-population in edit forms) ────────────
