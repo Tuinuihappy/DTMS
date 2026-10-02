@@ -6,6 +6,7 @@ import { cancelTrip, pauseTrip, resumeTrip, retryTrip, type TripStatus } from "@
 import { cn } from "@/lib/utils";
 import { PassRobotDialog } from "./pass-robot-dialog";
 import { RaiseExceptionDialog } from "./raise-exception-dialog";
+import { TripConfirmDialog } from "./trip-confirm-dialog";
 
 // Contextual action toolbar for a Trip. Buttons enable/disable based on
 // the current Trip status so operators can't fire commands the domain
@@ -64,6 +65,31 @@ export function TripActionBar({
       );
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // Cancel and Retry go through TripConfirmDialog first. Errors are
+  // rethrown so the dialog stays open and shows them.
+  // Open flag and kind kept apart so the kind survives the exit animation.
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmKind, setConfirmKind] = useState<"cancel" | "retry">("cancel");
+  const openConfirm = (kind: "cancel" | "retry") => {
+    setConfirmKind(kind);
+    setConfirmOpen(true);
+  };
+  const runConfirmed = async (kind: "cancel" | "retry", reason: string) => {
+    setBusy(kind);
+    setError(null);
+    try {
+      if (kind === "cancel") {
+        await cancelTrip(tripId, reason);
+        onAction?.("cancel");
+      } else {
+        const result = await retryTrip(tripId, { source: "Manual", reason: "operator retry from UI" });
+        onAction?.("retry", { newTripId: result.newTripId });
+      }
     } finally {
       setBusy(null);
     }
@@ -133,11 +159,7 @@ export function TripActionBar({
           tone="lavender"
           disabled={!canRetry || busy !== null}
           busy={busy === "retry"}
-          onClick={() =>
-            run("retry", () =>
-              retryTrip(tripId, { source: "Manual", reason: "operator retry from UI" }),
-            )
-          }
+          onClick={() => openConfirm("retry")}
         />
         <ActionButton
           icon={X}
@@ -145,7 +167,7 @@ export function TripActionBar({
           tone="coral"
           disabled={!canCancel || busy !== null}
           busy={busy === "cancel"}
-          onClick={() => run("cancel", () => cancelTrip(tripId, "Cancelled by operator"))}
+          onClick={() => openConfirm("cancel")}
         />
       </div>
       {error && (
@@ -162,6 +184,15 @@ export function TripActionBar({
           onPassed={() => onAction?.("pass")}
         />
       )}
+      <TripConfirmDialog
+        open={confirmOpen}
+        kind={confirmKind}
+        tripId={tripId}
+        status={status}
+        vendorVehicleKey={vendorVehicleKey}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={(reason) => runConfirmed(confirmKind, reason)}
+      />
       <RaiseExceptionDialog
         open={exceptionDialogOpen}
         tripId={tripId}
