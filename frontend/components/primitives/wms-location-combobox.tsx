@@ -48,10 +48,15 @@ export function WmsLocationCombobox({
   const listRef = useRef<HTMLUListElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const { items, loading, error } = useWmsLocationSearch(query, {
+  const { items, loading, error, resolvedQuery } = useWmsLocationSearch(query, {
     pageSize: 20,
     debounceMs: 300,
   });
+  // Items answer the text in the box (not a previous keystroke's search).
+  const itemsFresh = !loading && resolvedQuery === query;
+  // Enter pressed before itemsFresh — resolved by the effect below once
+  // the search for the current text lands.
+  const [pendingEnter, setPendingEnter] = useState(false);
 
   // Fetch detail for the initially-set value so the picker can render a
   // "STF_35 · WIP" chip immediately when opening an existing order for
@@ -110,6 +115,25 @@ export function WmsLocationCombobox({
     inputRef.current?.blur();
   };
 
+  // A pending Enter commits only an exact code match for what was typed.
+  // Anything else leaves the list open for the user to choose — never
+  // auto-pick a near miss (typing STF_3 must not land on STF_30).
+  useEffect(() => {
+    if (!pendingEnter) return;
+    if (!open || error) {
+      setPendingEnter(false);
+      return;
+    }
+    if (!itemsFresh) return;
+    setPendingEnter(false);
+    const typed = query.trim().toLowerCase();
+    const exact = items.find((loc) => loc.code.toLowerCase() === typed);
+    if (exact) commit(exact);
+    // commit is a fresh closure each render; the pendingEnter guard keeps
+    // this from re-running for it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingEnter, itemsFresh, items, query, open, error]);
+
   const clear = () => {
     onChange("");
     setSelectedDetail(null);
@@ -133,8 +157,14 @@ export function WmsLocationCombobox({
       setHighlight((h) => Math.max(h - 1, 0));
       e.preventDefault();
     } else if (e.key === "Enter") {
-      const pick = items[highlight];
-      if (pick) commit(pick);
+      // Before the search for the current text lands, items[highlight] is
+      // a row from the previous query — defer instead of picking it.
+      if (itemsFresh) {
+        const pick = items[highlight];
+        if (pick) commit(pick);
+      } else {
+        setPendingEnter(true);
+      }
       e.preventDefault();
     } else if (e.key === "Escape") {
       // Close only the list — keep the Esc from reaching a host dialog's
@@ -180,6 +210,8 @@ export function WmsLocationCombobox({
           value={open ? query : displayCode}
           onChange={(e) => {
             setQuery(e.target.value);
+            // Typing on after Enter means the user hasn't settled yet.
+            setPendingEnter(false);
             if (!open) setOpen(true);
           }}
           onFocus={(e) => {

@@ -63,6 +63,10 @@ export type UseWmsLocationSearchResult = {
   total: number;
   loading: boolean;
   error: string | null;
+  // The query `items` answer. Lags `query` during the debounce and the
+  // fetch — a caller acting on items (e.g. Enter to pick) must check it
+  // matches, or it acts on the previous query's rows.
+  resolvedQuery: string | null;
 };
 
 /**
@@ -81,6 +85,7 @@ export function useWmsLocationSearch(
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resolvedQuery, setResolvedQuery] = useState<string | null>(null);
 
   const controllerRef = useRef<AbortController | null>(null);
 
@@ -103,6 +108,7 @@ export function useWmsLocationSearch(
         if (!controller.signal.aborted) {
           setItems(page.data);
           setTotal(page.total);
+          setResolvedQuery(query);
         }
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
@@ -118,7 +124,7 @@ export function useWmsLocationSearch(
     };
   }, [query, pageSize, debounceMs]);
 
-  return { items, total, loading, error };
+  return { items, total, loading, error, resolvedQuery };
 }
 
 // ── Detail lookup by code (for back-population in edit forms) ────────────
