@@ -36,6 +36,7 @@ import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { useShell } from "@/components/shell/shell-context";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -342,31 +343,21 @@ export function LeftRail() {
     {/* Slides in from the left when the hamburger toggles it. Hidden  */}
     {/* on lg+ (the permanent rail takes over). Backdrop closes; ESC   */}
     {/* closes (see effect above).                                     */}
+    {/* Backdrop stays mounted outside AnimatePresence — see OverlayBackdrop. */}
+    <OverlayBackdrop
+      open={railDrawerOpen}
+      onClick={closeRailDrawer}
+      className="lg:hidden z-50 bg-[var(--color-ink-900)]/30 backdrop-blur-sm"
+    />
     <AnimatePresence>
       {railDrawerOpen && (
-        <motion.div
-          key="rail-drawer"
-          className="lg:hidden fixed inset-0 z-50"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          {/* Backdrop */}
-          <button
-            type="button"
-            aria-label="Close menu"
-            onClick={closeRailDrawer}
-            className="absolute inset-0 bg-[var(--color-ink-900)]/30 backdrop-blur-sm cursor-default"
-          />
-
-          {/* Panel */}
           <motion.aside
+            key="rail-drawer"
             initial={{ x: -320 }}
             animate={{ x: 0 }}
             exit={{ x: -320 }}
             transition={{ type: "spring", stiffness: 320, damping: 32, mass: 0.7 }}
-            className="absolute left-0 inset-y-0 w-[280px] bg-white/95 dark:bg-[var(--color-ink-950)]/95 backdrop-blur-xl shadow-[0_20px_60px_-20px_rgba(15,23,42,0.35)] border-r border-[var(--color-ink-100)]/70 dark:border-white/[0.06] flex flex-col"
+            className="lg:hidden fixed z-[51] left-0 inset-y-0 w-[280px] bg-white/95 dark:bg-[var(--color-ink-950)]/95 backdrop-blur-xl shadow-[0_20px_60px_-20px_rgba(15,23,42,0.35)] border-r border-[var(--color-ink-100)]/70 dark:border-white/[0.06] flex flex-col"
             aria-label="Quick actions"
           >
             {/* Drawer header — close button */}
@@ -400,7 +391,6 @@ export function LeftRail() {
             </ul>
 
           </motion.aside>
-        </motion.div>
       )}
     </AnimatePresence>
     </>

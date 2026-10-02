@@ -4,6 +4,7 @@ import { ArrowUpRight, Menu, Truck, X } from "lucide-react";
 import { AnimatePresence, motion, useScroll, useTransform } from "motion/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -145,22 +146,13 @@ export function LandingTopNav() {
         siblings (not wrapped in a shared motion.div). Wrapping them in a
         common ancestor with framer-motion opacity creates a stacking context
         that isolates the panel's `.glass` backdrop-filter, making the blur
-        fail to obscure the page behind it. */}
-    <AnimatePresence>
-      {mobileOpen && (
-        <motion.button
-          key="mobile-backdrop"
-          type="button"
-          aria-label="Close menu"
-          onClick={() => setMobileOpen(false)}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="lg:hidden fixed inset-0 z-40 bg-[var(--color-ink-900)]/30 backdrop-blur-2xl cursor-default"
-        />
-      )}
-    </AnimatePresence>
+        fail to obscure the page behind it. The backdrop stays mounted
+        outside AnimatePresence — see OverlayBackdrop. */}
+    <OverlayBackdrop
+      open={mobileOpen}
+      onClick={() => setMobileOpen(false)}
+      className="lg:hidden z-40 bg-[var(--color-ink-900)]/30 backdrop-blur-2xl"
+    />
 
     <AnimatePresence>
       {mobileOpen && (
