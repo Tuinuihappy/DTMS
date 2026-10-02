@@ -102,6 +102,16 @@ async function deleteQueueRow(id) {
   });
 }
 
+async function putQueueRow(row) {
+  const db = await openQueueDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(QUEUE_STORE, 'readwrite');
+    const req = tx.objectStore(QUEUE_STORE).put(row);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
 async function drainQueue() {
   const items = await listQueue();
   for (const item of items) {
@@ -117,16 +127,25 @@ async function drainQueue() {
         continue;
       }
       // A refusal retrying cannot fix. Drop so the queue isn't stuck.
-      // 429 and 408 are excluded: they mean "not now" — the caller is over
-      // their request quota or the request timed out — and dropping those
-      // would destroy an operator's confirmation because the app was busy.
-      // Same rule as isPermanentFailure in lib/operator-pwa/offline-queue.ts;
-      // this file cannot import it, so keep the two in step by hand.
-      if (res.status >= 400 && res.status < 500 && res.status !== 429 && res.status !== 408) {
+      // 429, 408 and 401 are excluded: they mean "not now" — the caller is
+      // over their request quota, the request timed out, or the session
+      // expired while offline — and dropping those would destroy an
+      // operator's confirmation. Same rule as isPermanentFailure in
+      // lib/operator-pwa/offline-queue.ts; this file cannot import it, so
+      // keep the two in step by hand.
+      if (
+        res.status >= 400 && res.status < 500 &&
+        res.status !== 429 && res.status !== 408 && res.status !== 401
+      ) {
         await deleteQueueRow(item.id);
         continue;
       }
-      // 5xx / 429 / 408 — leave + bail, retry next sync event.
+      // 401 — mark the row so the shell header asks the operator to sign
+      // in (getQueueState reads lastStatus).
+      if (res.status === 401) {
+        await putQueueRow({ ...item, lastStatus: 401 });
+      }
+      // 5xx / 429 / 408 / 401 — leave + bail, retry next sync event.
       break;
     } catch (_) {
       // Network blip — leave the row, retry next sync.

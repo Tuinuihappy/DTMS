@@ -2,21 +2,23 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { drainQueue, getQueueDepth } from "@/lib/operator-pwa/offline-queue";
+import { drainQueue, getQueueState } from "@/lib/operator-pwa/offline-queue";
 
 // Phase 4.5 — Sticky header on /m/* shell pages. Renders:
 //   - Page title
 //   - Online/offline pill
-//   - Queue depth pill (link to settings on tap → drain)
+//   - Queue depth pill (link to settings on tap → drain), or a
+//     "sign in" pill when the queue is held behind an expired session
 //   - Settings cog
 //
-// Polls navigator.onLine + queue depth every 4s so the operator gets
+// Polls navigator.onLine + queue state every 4s so the operator gets
 // near-real-time feedback that their offline writes are landing once
-// the network returns. Background drain is auto-triggered on the
-// 'online' window event below.
+// the network returns. Background drain is auto-triggered on mount
+// (catches up after signing in again) and on the 'online' window event.
 export function OperatorShellHeader({ title }: { title: string }) {
   const [online, setOnline] = useState(true);
   const [queueDepth, setQueueDepth] = useState(0);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
 
   useEffect(() => {
     const updateOnline = () => setOnline(navigator.onLine);
@@ -24,22 +26,36 @@ export function OperatorShellHeader({ title }: { title: string }) {
 
     const refreshDepth = async () => {
       try {
-        setQueueDepth(await getQueueDepth());
+        const state = await getQueueState();
+        setQueueDepth(state.depth);
+        setNeedsSignIn(state.needsSignIn);
       } catch {
         // IDB unavailable (private mode?) — ignore.
       }
     };
 
+    const drainAndRefresh = async () => {
+      try {
+        await drainQueue();
+      } catch {
+        // IDB unavailable — nothing queued to drain.
+      }
+      await refreshDepth();
+    };
+
     const onOnline = async () => {
       updateOnline();
-      const result = await drainQueue();
-      setQueueDepth(result.remaining);
+      await drainAndRefresh();
     };
     const onOffline = () => updateOnline();
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
 
-    refreshDepth();
+    if (navigator.onLine) {
+      void drainAndRefresh();
+    } else {
+      void refreshDepth();
+    }
     const tick = window.setInterval(refreshDepth, 4_000);
     return () => {
       window.removeEventListener("online", onOnline);
@@ -57,7 +73,15 @@ export function OperatorShellHeader({ title }: { title: string }) {
             Offline
           </span>
         )}
-        {queueDepth > 0 && (
+        {queueDepth > 0 && needsSignIn && (
+          <Link
+            href="/m/login"
+            className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-300"
+          >
+            {queueDepth} queued · Sign in to send
+          </Link>
+        )}
+        {queueDepth > 0 && !needsSignIn && (
           <Link
             href="/m/settings"
             className="rounded-full bg-zinc-100/10 px-2 py-0.5 text-xs text-zinc-200"

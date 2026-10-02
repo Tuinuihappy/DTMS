@@ -54,6 +54,10 @@ export type QueuedAction = {
   createdAt: number;
   attempts: number;
   lastError: string | null;
+  // HTTP status of the last failed send. Absent on rows written before
+  // this field existed. 401 here means "held until the operator signs
+  // in again" — see needsSignIn.
+  lastStatus?: number | null;
 };
 
 export type EnqueueArgs = {
@@ -141,14 +145,19 @@ async function upsert(action: QueuedAction): Promise<void> {
  * dropped. Most 4xx are: the server rejected what the operator did and
  * retrying sends the same thing again.
  *
- * 429 and 408 are the exceptions. They say "not now", not "not ever" — the
- * caller has spent their request quota, or the request timed out. Dropping
- * those would destroy an operator's pickup or drop confirmation, recorded
- * offline, because the app happened to be busy. sw.js repeats this rule;
- * keep the two in step.
+ * 429, 408 and 401 are the exceptions. They say "not now", not "not ever" —
+ * the caller has spent their request quota, the request timed out, or the
+ * session expired while the operator was offline. Dropping those would
+ * destroy an operator's pickup or drop confirmation, recorded offline,
+ * because the app happened to be busy or the shift outlasted the token.
+ * A 401 row is held until the operator signs in again (needsSignIn).
+ * 403 stays permanent: the operator really isn't allowed to do that.
+ * sw.js repeats this rule; keep the two in step.
  */
 export function isPermanentFailure(status: number): boolean {
-  return status >= 400 && status < 500 && status !== 429 && status !== 408;
+  return (
+    status >= 400 && status < 500 && status !== 429 && status !== 408 && status !== 401
+  );
 }
 
 async function sendOne(action: QueuedAction): Promise<{ ok: boolean; status: number; error: string | null }> {
@@ -200,6 +209,7 @@ export async function enqueueAction(args: EnqueueArgs): Promise<EnqueueResult> {
     createdAt: existing?.createdAt ?? Date.now(),
     attempts: existing?.attempts ?? 0,
     lastError: null,
+    lastStatus: null,
   };
   await upsert(action);
 
@@ -220,15 +230,35 @@ export async function enqueueAction(args: EnqueueArgs): Promise<EnqueueResult> {
     await deleteById(action.id);
     throw new Error(outcome.error ?? "Action rejected.");
   }
-  // 5xx / 429 / 408 / network — keep queued, increment attempt counter.
-  await upsert({ ...action, attempts: action.attempts + 1, lastError: outcome.error });
+  // 5xx / 429 / 408 / 401 / network — keep queued, increment attempt counter.
+  await upsert({
+    ...action,
+    attempts: action.attempts + 1,
+    lastError: outcome.error,
+    lastStatus: outcome.status,
+  });
   await registerBackgroundSync();
   return { delivered: false, queuedAt: action.createdAt };
 }
 
-// Drain the queue from the foreground (online event handler, "Sync
-// now" button). SW Background Sync handler does the same thing.
-export async function drainQueue(): Promise<{ drained: number; remaining: number; lastError: string | null }> {
+type DrainResult = { drained: number; remaining: number; lastError: string | null };
+
+// One drain at a time per tab: the shell header drains on mount and on
+// 'online', and "Sync now" can be pressed meanwhile. Two concurrent
+// drains would send the same row twice.
+let drainInFlight: Promise<DrainResult> | null = null;
+
+// Drain the queue from the foreground (shell mount, online event
+// handler, "Sync now" button). SW Background Sync handler does the
+// same thing.
+export function drainQueue(): Promise<DrainResult> {
+  drainInFlight ??= drainOnce().finally(() => {
+    drainInFlight = null;
+  });
+  return drainInFlight;
+}
+
+async function drainOnce(): Promise<DrainResult> {
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     const all = await listAll();
     return { drained: 0, remaining: all.length, lastError: "Offline." };
@@ -250,8 +280,14 @@ export async function drainQueue(): Promise<{ drained: number; remaining: number
       drained++;
       continue;
     }
-    // Transient — keep + stop draining for now (preserves order).
-    await upsert({ ...action, attempts: action.attempts + 1, lastError: outcome.error });
+    // Transient (or 401 — held until sign-in) — keep + stop draining for
+    // now (preserves order).
+    await upsert({
+      ...action,
+      attempts: action.attempts + 1,
+      lastError: outcome.error,
+      lastStatus: outcome.status,
+    });
     lastError = outcome.error;
     break;
   }
@@ -262,6 +298,12 @@ export async function drainQueue(): Promise<{ drained: number; remaining: number
 export async function getQueueDepth(): Promise<number> {
   const all = await listAll();
   return all.length;
+}
+
+// Depth plus whether any row is held behind an expired session.
+export async function getQueueState(): Promise<{ depth: number; needsSignIn: boolean }> {
+  const all = await listAll();
+  return { depth: all.length, needsSignIn: all.some((a) => a.lastStatus === 401) };
 }
 
 export async function clearQueue(): Promise<void> {
