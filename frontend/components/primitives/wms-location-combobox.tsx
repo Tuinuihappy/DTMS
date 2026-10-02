@@ -137,6 +137,12 @@ export function WmsLocationCombobox({
       if (pick) commit(pick);
       e.preventDefault();
     } else if (e.key === "Escape") {
+      // Close only the list — keep the Esc from reaching a host dialog's
+      // window listener, which would close the whole form. (The !open
+      // branch above already returned, so Esc on a closed list still
+      // reaches the dialog.)
+      e.preventDefault();
+      e.stopPropagation();
       setOpen(false);
       inputRef.current?.blur();
     }

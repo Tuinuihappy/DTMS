@@ -99,7 +99,11 @@ export function ActionTemplateCombobox({
         e.preventDefault();
         commit(filtered[highlight].name);
       }
-    } else if (e.key === "Escape") {
+    } else if (e.key === "Escape" && open) {
+      // Close only the list — keep the Esc from reaching a host dialog's
+      // window listener, which would close the whole form.
+      e.preventDefault();
+      e.stopPropagation();
       setOpen(false);
     }
   }
