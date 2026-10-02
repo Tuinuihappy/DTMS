@@ -3,6 +3,7 @@
 import { ImageOff, Loader2, Trash2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import {
   attachmentImageUrl,
@@ -77,7 +78,16 @@ export function AttachmentLightbox({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  return (
+  // Portalled to <body>: hosts like the Photos dialog and the carrier
+  // maintenance panel use backdrop-filter (glass-strong) + overflow-hidden,
+  // which makes them the containing block for `position: fixed` — the
+  // lightbox would be sized to and clipped by that box, not the viewport.
+  // Mounted-gated because document isn't there during SSR.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+
+  return createPortal(
     <>
       <OverlayBackdrop
         open={open}
@@ -107,7 +117,8 @@ export function AttachmentLightbox({
           </div>
         )}
       </AnimatePresence>
-    </>
+    </>,
+    document.body,
   );
 }
 
