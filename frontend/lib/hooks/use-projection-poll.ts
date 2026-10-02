@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePollSchedule } from "@/lib/hooks/use-poll-schedule";
 
 // Phase P3 — Reusable polling hook for projection-backed widgets that
@@ -26,10 +26,19 @@ export type ProjectionPollState<T> = {
 
 export function useProjectionPoll<T>(
   fetcher: (signal: AbortSignal) => Promise<T>,
-  opts: { intervalMs?: number; enabled?: boolean } = {},
+  opts: {
+    intervalMs?: number;
+    enabled?: boolean;
+    /** What the fetcher asks for (e.g. the report window). When it changes
+     *  the old data is dropped and a fetch runs now — otherwise the new
+     *  fetcher would only be picked up on the next interval tick. Must be
+     *  stable between renders (a primitive or a memoised object). */
+    resetKey?: unknown;
+  } = {},
 ): ProjectionPollState<T> {
   const intervalMs = opts.intervalMs ?? 10_000;
   const enabled = opts.enabled ?? true;
+  const resetKey = opts.resetKey;
 
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
@@ -63,6 +72,18 @@ export function useProjectionPoll<T>(
   const { trigger } = usePollSchedule(tick, { intervalMs, enabled });
 
   const refresh = useCallback(() => trigger(), [trigger]);
+
+  // Numbers for the previous window must not stay on screen labelled as
+  // the new one — clear to the loading skeleton, then fetch.
+  const lastResetKeyRef = useRef(resetKey);
+  useEffect(() => {
+    if (Object.is(lastResetKeyRef.current, resetKey)) return;
+    lastResetKeyRef.current = resetKey;
+    setData(null);
+    setLastUpdated(null);
+    setLoading(true);
+    trigger();
+  }, [resetKey, trigger]);
 
   return { data, loading, error, lastUpdated, refresh };
 }

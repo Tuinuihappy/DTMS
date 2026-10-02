@@ -38,6 +38,7 @@ export function ManualOperatorsReport({ window }: { window: Window }) {
   );
   const { data, loading, error, refresh } = useProjectionPoll(fetcher, {
     intervalMs: 5 * 60_000,
+    resetKey: window,
   });
 
   const rows = data?.rows ?? [];

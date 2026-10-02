@@ -42,6 +42,7 @@ export function JobFailuresReport({ window }: { window: Window }) {
   );
   const { data, loading, error, refresh } = useProjectionPoll(fetcher, {
     intervalMs: 5 * 60_000,
+    resetKey: window,
   });
 
   const csvHref = jobsExportCsvUrl(window);

@@ -45,6 +45,7 @@ export function RobotsAnalysisExperience() {
   );
   const { data, loading, error, refresh, lastUpdated } = useProjectionPoll(fetcher, {
     intervalMs: 30_000,
+    resetKey: window,
   });
 
   // Phase P3.x — DashboardHub live updates from FleetUtilizationSnapshotService.

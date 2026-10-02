@@ -41,6 +41,7 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
   );
   const { data, loading, error, refresh } = useProjectionPoll(fetcher, {
     intervalMs: 5 * 60_000,
+    resetKey: window,
   });
 
   const csvHref = tripsExportCsvUrl(window);

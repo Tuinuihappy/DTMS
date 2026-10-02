@@ -41,6 +41,7 @@ export function OrdersAnalysisExperience() {
   );
   const { data, loading, error, refresh, lastUpdated } = useProjectionPoll(fetcher, {
     intervalMs: 30_000,
+    resetKey: window,
   });
 
   // Phase P3 — DashboardHub live updates. OrderFunnelProjector pushes a
