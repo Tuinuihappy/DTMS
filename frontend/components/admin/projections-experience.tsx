@@ -144,7 +144,7 @@ function ProjectorRowCard({
   return (
     <div className="flex items-center justify-between py-2.5 gap-3">
       <div className="min-w-0 flex-1">
-        <div className="font-mono text-[12.5px] font-semibold text-[var(--color-ink-800)] dark:text-[var(--color-ink-100)] truncate" title={projector.name}>
+        <div className="font-mono text-[12.5px] font-semibold text-[var(--color-ink-800)] truncate" title={projector.name}>
           {projector.name}
         </div>
         <div className="mt-0.5 flex items-center gap-2 text-[11px] text-[var(--color-ink-500)]">

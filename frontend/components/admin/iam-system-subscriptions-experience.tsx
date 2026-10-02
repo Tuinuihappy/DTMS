@@ -119,7 +119,7 @@ export function IamSystemSubscriptionsExperience({ systemKey }: { systemKey: str
               type="button"
               onClick={() => setCreating(true)}
               disabled={availableEventTypes.length === 0}
-              className="inline-flex items-center gap-1 rounded-full bg-[var(--color-ink-900)] px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-[var(--color-ink-700)] disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-full bg-[var(--color-brand-900)] px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-[var(--color-brand-800)] dark:bg-[var(--color-brand-500)] dark:hover:bg-[var(--color-brand-400)] disabled:opacity-50"
               title={availableEventTypes.length === 0 ? "Already subscribed to every event type" : "Add subscription"}
             >
               <Plus className="h-3 w-3" strokeWidth={2.6} />
@@ -259,7 +259,7 @@ function AddSubscriptionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-xl border border-[var(--color-ink-100)] bg-white p-5 shadow-xl dark:border-white/[0.06] dark:bg-[var(--color-ink-900)]">
+      <div className="w-full max-w-md rounded-xl border border-[var(--color-ink-100)] bg-[var(--color-surface-raised)] p-5 shadow-xl dark:border-white/[0.06]">
         <div className="flex items-start justify-between">
           <h2 className="text-base font-semibold text-[var(--color-ink-900)] dark:text-white">Add subscription</h2>
           <button type="button" onClick={onClose} className="rounded p-1 text-[var(--color-ink-400)] hover:bg-[var(--color-ink-50)]">
@@ -321,7 +321,7 @@ function AddSubscriptionModal({
             type="button"
             disabled={!valid || submitting}
             onClick={submit}
-            className="rounded bg-[var(--color-ink-900)] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[var(--color-ink-700)] disabled:opacity-50"
+            className="rounded bg-[var(--color-brand-900)] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[var(--color-brand-800)] dark:bg-[var(--color-brand-500)] dark:hover:bg-[var(--color-brand-400)] disabled:opacity-50"
           >
             {submitting ? "Adding…" : "Add subscription"}
           </button>

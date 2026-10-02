@@ -214,7 +214,7 @@ function SummarySection() {
 function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <h2 className="text-[14px] font-semibold uppercase tracking-wider text-[var(--color-ink-700)] dark:text-[var(--color-ink-200)]">
+      <h2 className="text-[14px] font-semibold uppercase tracking-wider text-[var(--color-ink-700)]">
         {title}
       </h2>
       <span className="text-[11px] text-[var(--color-ink-400)]">{subtitle}</span>
@@ -343,7 +343,7 @@ function Field({ label, value, title }: FieldProps) {
       <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-400)]">
         {label}
       </div>
-      <div className="text-[12.5px] text-[var(--color-ink-800)] dark:text-[var(--color-ink-100)]" title={title}>
+      <div className="text-[12.5px] text-[var(--color-ink-800)]" title={title}>
         {value}
       </div>
     </div>
