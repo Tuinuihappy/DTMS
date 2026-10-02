@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   createOrderTemplate,
@@ -261,6 +261,16 @@ export function TemplateEditor({
   // Shared action-template catalog for ACT-reference rows.
   const actionTemplates = useActionTemplateOptions();
 
+  // Template id whose pickup/drop codes have been resolved into the form
+  // (see the effect below). State, not a ref, because Save is gated on it.
+  const [stationCodesFilledFor, setStationCodesFilledFor] = useState<string | null>(null);
+  // Saved station ids the catalog no longer has — the field stays empty
+  // and saving clears it, so the user is told.
+  const [missingStationIds, setMissingStationIds] = useState<{
+    pickup: string | null;
+    drop: string | null;
+  }>({ pickup: null, drop: null });
+
   useEffect(() => {
     if (existing) {
       setForm(formFromDto(existing));
@@ -268,6 +278,8 @@ export function TemplateEditor({
       const base = formFromDto(duplicating);
       setForm({ ...base, name: `${base.name} (Copy)` });
     }
+    // formFromDto blanks the station codes — resolve them again.
+    setStationCodesFilledFor(null);
   }, [existing, duplicating]);
 
   // Pickup/drop codes aren't in the read DTO (only the resolved
@@ -276,25 +288,36 @@ export function TemplateEditor({
   // a user clearing or retyping the field doesn't get clobbered when
   // stations re-fetch. Duplicate mode hits the same path — the codes
   // come from the source template's resolved ids.
-  const stationCodeAutoFilledForRef = useRef<string | null>(null);
   useEffect(() => {
     if (!sourceDto) return;
     if (stations.loading || stations.error) return;
-    if (stationCodeAutoFilledForRef.current === sourceDto.id) return;
-    stationCodeAutoFilledForRef.current = sourceDto.id;
+    if (stationCodesFilledFor === sourceDto.id) return;
     const pickup = sourceDto.pickupStationId
       ? (stations.byId.get(sourceDto.pickupStationId) ?? "")
       : "";
     const drop = sourceDto.dropStationId
       ? (stations.byId.get(sourceDto.dropStationId) ?? "")
       : "";
+    setMissingStationIds({
+      pickup: sourceDto.pickupStationId && !pickup ? sourceDto.pickupStationId : null,
+      drop: sourceDto.dropStationId && !drop ? sourceDto.dropStationId : null,
+    });
+    setStationCodesFilledFor(sourceDto.id);
     if (!pickup && !drop) return;
     setForm((f) => ({
       ...f,
       pickupStationCode: f.pickupStationCode || pickup,
       dropStationCode: f.dropStationCode || drop,
     }));
-  }, [sourceDto, stations.loading, stations.error, stations.byId]);
+  }, [sourceDto, stations.loading, stations.error, stations.byId, stationCodesFilledFor]);
+
+  // Saving before the codes are resolved would send null pickup/drop and
+  // wipe the template's stations, so Save waits — and stays blocked if
+  // the station list fails to load.
+  const stationCodesPending =
+    sourceDto != null &&
+    (sourceDto.pickupStationId != null || sourceDto.dropStationId != null) &&
+    stationCodesFilledFor !== sourceDto.id;
   const moveMissionCount = form.missions.filter((m) => m.type === "MOVE").length;
   const actMissionCount = form.missions.length - moveMissionCount;
 
@@ -326,6 +349,7 @@ export function TemplateEditor({
     e.preventDefault();
     setError(null);
     setValidationError(null);
+    if (stationCodesPending) return;
     const v = validate(form);
     if (v) {
       setValidationError(v);
@@ -412,11 +436,16 @@ export function TemplateEditor({
           >
             Cancel
           </Link>
+          {stationCodesPending && stations.error && (
+            <span className="text-[11.5px] font-medium text-[var(--color-coral)]">
+              Station list failed to load — reload to save.
+            </span>
+          )}
           <motion.button
             type="submit"
-            whileTap={!busy ? { scale: 0.96 } : undefined}
-            whileHover={!busy ? { y: -1 } : undefined}
-            disabled={busy}
+            whileTap={!busy && !stationCodesPending ? { scale: 0.96 } : undefined}
+            whileHover={!busy && !stationCodesPending ? { y: -1 } : undefined}
+            disabled={busy || stationCodesPending}
             className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-5 py-2 text-[12.5px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(15,23,42,0.55)] transition-shadow disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[var(--color-brand-500)]"
           >
             {busy ? (
@@ -429,7 +458,9 @@ export function TemplateEditor({
             ) : (
               <Save className="h-3.5 w-3.5" strokeWidth={2.3} />
             )}
-            {busy
+            {stationCodesPending && !busy
+              ? "Loading stations…"
+              : busy
               ? isEdit
                 ? "Saving…"
                 : isDuplicate
@@ -525,6 +556,7 @@ export function TemplateEditor({
                 stations={stations.stations}
                 loading={stations.loading}
                 error={stations.error}
+                missingStationId={form.pickupStationCode ? null : missingStationIds.pickup}
               />
               <FieldStation
                 label="Drop station code"
@@ -534,6 +566,7 @@ export function TemplateEditor({
                 stations={stations.stations}
                 loading={stations.loading}
                 error={stations.error}
+                missingStationId={form.dropStationCode ? null : missingStationIds.drop}
               />
             </div>
           </EditorCard>
@@ -1141,6 +1174,7 @@ function FieldStation({
   stations,
   loading,
   error,
+  missingStationId,
 }: {
   label: string;
   value: string;
@@ -1149,6 +1183,8 @@ function FieldStation({
   stations: StationOption[];
   loading: boolean;
   error: string | null;
+  // Saved station the catalog no longer has; shown while the field is empty.
+  missingStationId?: string | null;
 }) {
   return (
     <label className="block">
@@ -1165,6 +1201,12 @@ function FieldStation({
           error={error}
         />
       </div>
+      {missingStationId && (
+        <span className="mt-1 block text-[11px] font-medium text-[var(--color-amber-600)]">
+          The saved station ({missingStationId}) is no longer in the station list — saving
+          will clear it.
+        </span>
+      )}
     </label>
   );
 }
