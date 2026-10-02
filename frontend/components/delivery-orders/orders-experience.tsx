@@ -219,6 +219,9 @@ function ExperienceInner() {
   // UI state
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [detailId, setDetailId] = useState<string | null>(null);
+  // Bumped after an action on the open order succeeds, so the drawer
+  // reloads without closing (setDetailId(sameId) is a no-op).
+  const [detailRefreshKey, setDetailRefreshKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   // Edit mode reuses the create dialog with prefill. We hold the
   // fully-fetched detail (not the list dto) so advanced fields like
@@ -685,6 +688,7 @@ function ExperienceInner() {
           tone: "success",
           message: `Confirmed ${target.orderRef}`,
         });
+        setDetailRefreshKey((k) => k + 1);
         setTimeout(() => fetchOrders({ silent: true }), 600);
       } catch (e) {
         setOrders(previousOrders);
@@ -884,16 +888,10 @@ function ExperienceInner() {
         orderId={detailId}
         onClose={() => setDetailId(null)}
         onOpenOrder={(id) => setDetailId(id)}
-        onAction={async (a, id) => {
-          await runAction(a, id);
-          // Re-open the drawer after state-changing actions so the user
-          // sees the new status. Skip for delete (source is gone) and
-          // reorder (the create dialog opens on top — leaving the drawer
-          // underneath looks cluttered).
-          if (a !== "delete" && a !== "reorder") {
-            setTimeout(() => setDetailId(id), 50);
-          }
-        }}
+        refreshKey={detailRefreshKey}
+        // Most actions only open a confirm dialog here; the drawer
+        // reloads (refreshKey) once that dialog's action succeeds.
+        onAction={(a, id) => runAction(a, id)}
         onPodScan={(itemId, itemLabel) => {
           if (!detailId) return;
           const order = orders.find((o) => o.id === detailId);
@@ -932,12 +930,8 @@ function ExperienceInner() {
               message: `${podTarget.itemLabel} POD confirmed`,
             });
             setPodTarget(null);
-            // Refresh the drawer so the badge updates immediately
-            setTimeout(() => {
-              const id = podTarget.orderId;
-              setDetailId(null);
-              setTimeout(() => setDetailId(id), 30);
-            }, 80);
+            // Reload the drawer so the badge updates immediately.
+            setDetailRefreshKey((k) => k + 1);
           } catch (err) {
             setPodError((err as Error).message);
           } finally {
@@ -963,10 +957,9 @@ function ExperienceInner() {
           toast.push({ tone: "success", message: "Order updated" });
           fetchOrders({ silent: true });
           // If the user had the detail drawer open on this order,
-          // re-open it so they see the new values immediately.
+          // reload it so they see the new values immediately.
           if (editingOrder && detailId === editingOrder.id) {
-            setDetailId(null);
-            setTimeout(() => setDetailId(editingOrder.id), 60);
+            setDetailRefreshKey((k) => k + 1);
           }
         }}
       />
@@ -1060,6 +1053,7 @@ function ExperienceInner() {
               });
             }
             setReopenTarget(null);
+            setDetailRefreshKey((k) => k + 1);
           } catch (err) {
             setReopenError((err as Error).message);
           } finally {
@@ -1105,6 +1099,7 @@ function ExperienceInner() {
               message: `${redispatchTarget.orderRef} dispatch re-queued — Planning will run again.`,
             });
             setRedispatchTarget(null);
+            setDetailRefreshKey((k) => k + 1);
           } catch (err) {
             setRedispatchError((err as Error).message);
           } finally {
@@ -1172,6 +1167,7 @@ function ExperienceInner() {
               });
             }
             setStateActionTarget(null);
+            setDetailRefreshKey((k) => k + 1);
             setTimeout(() => fetchOrders({ silent: true }), 600);
           } catch (err) {
             setStateActionError((err as Error).message);

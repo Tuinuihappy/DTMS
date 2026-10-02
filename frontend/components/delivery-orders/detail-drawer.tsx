@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getOrder,
   getOrderTimeline,
@@ -67,8 +67,11 @@ export function OrderDetailDrawer({
   onAction,
   onPodScan,
   onOpenOrder,
+  refreshKey = 0,
 }: {
   orderId: string | null;
+  // Bump to reload the open order in place (after an action on it).
+  refreshKey?: number;
   onClose: () => void;
   onAction: (a: Action, id: string) => Promise<void> | void;
   onPodScan?: (itemId: string, itemLabel: string) => void;
@@ -103,8 +106,13 @@ export function OrderDetailDrawer({
     ActivityUpdated: (entry) => setLiveActivityEntry(entry as FullAuditEntryDto),
   });
 
+  // Which order the load effect last fetched — tells a refreshKey reload
+  // apart from switching to a different order.
+  const loadedOrderIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!orderId) {
+      loadedOrderIdRef.current = null;
       setData(null);
       setTimeline(null);
       setTrips(null);
@@ -113,11 +121,17 @@ export function OrderDetailDrawer({
       return;
     }
     let cancelled = false;
-    setLoading(true);
+    // A refreshKey reload of the same order keeps what's on screen until
+    // the new data lands, instead of blanking the drawer.
+    const reloadingSameOrder = loadedOrderIdRef.current === orderId;
+    loadedOrderIdRef.current = orderId;
+    if (!reloadingSameOrder) {
+      setLoading(true);
+      setTimeline(null);
+      setTrips(null);
+      setJobs(null);
+    }
     setError(null);
-    setTimeline(null);
-    setTrips(null);
-    setJobs(null);
 
     getOrder(orderId)
       .then((d) => {
@@ -158,7 +172,7 @@ export function OrderDetailDrawer({
     return () => {
       cancelled = true;
     };
-  }, [orderId]);
+  }, [orderId, refreshKey]);
 
   useEffect(() => {
     if (!orderId) return;
