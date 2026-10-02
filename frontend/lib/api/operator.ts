@@ -16,6 +16,9 @@ export type AssignedTrip = {
   acknowledgedAt: string | null;
   pickedUpAt: string | null;
   droppedAt: string | null;
+  // Set once the operator completes the trip; the list keeps finished
+  // trips as history, so this is what marks one as done.
+  completedAt: string | null;
   pickupDeadline: string | null;
   dropDeadline: string | null;
   pickupOverrideUsed: boolean;

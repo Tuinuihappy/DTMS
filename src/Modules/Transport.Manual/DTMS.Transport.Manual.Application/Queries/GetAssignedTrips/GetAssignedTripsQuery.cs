@@ -14,6 +14,7 @@ public record AssignedTripDto(
     DateTime? AcknowledgedAt,
     DateTime? PickedUpAt,
     DateTime? DroppedAt,
+    DateTime? CompletedAt,
     DateTime? PickupDeadline,
     DateTime? DropDeadline,
     bool PickupOverrideUsed,

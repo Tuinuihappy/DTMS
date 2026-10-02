@@ -29,6 +29,9 @@ internal sealed class CompleteTripCommandHandler : ICommandHandler<CompleteTripC
             return Result.Failure("Trip is assigned to a different operator.");
         if (ext.DroppedAt is null)
             return Result.Failure("Cannot complete — pickup/drop not recorded.");
+        // Already completed — a double tap or an offline-queue replay.
+        if (ext.CompletedAt is not null)
+            return Result.Success();
 
         var trip = await _trips.GetByIdAsync(request.TripId, cancellationToken);
         if (trip is null)
@@ -37,10 +40,13 @@ internal sealed class CompleteTripCommandHandler : ICommandHandler<CompleteTripC
         trip.MarkVendorCompleted();
         await _trips.UpdateAsync(trip, cancellationToken);
 
-        // Free the operator for the next assignment.
+        // Record completion on the extension (the operator app reads it) and
+        // free the operator for the next assignment. Both live in
+        // TransportManualDbContext, so one SaveChanges writes both.
+        ext.MarkCompleted();
         var op = await _operators.GetByIdAsync(request.OperatorId, cancellationToken);
         op?.ClearTripAssignment();
-        if (op is not null) await _operators.SaveChangesAsync(cancellationToken);
+        await _extensions.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

@@ -87,4 +87,43 @@ public class ManualTripExtensionTests
         ext.DropPodKey.Should().Be("drop/456");
         ext.DropGeofenceOverrideId.Should().BeNull();
     }
+
+    private static ManualTripExtension Dropped()
+    {
+        var ext = AssignFresh();
+        ext.MarkAcknowledged();
+        ext.MarkPickedUp(podKey: null, overrideId: null);
+        ext.MarkDropped(podKey: null, overrideId: null);
+        return ext;
+    }
+
+    [Fact]
+    public void MarkCompleted_BeforeDrop_Throws()
+    {
+        var ext = AssignFresh();
+        ext.MarkAcknowledged();
+        ext.MarkPickedUp(podKey: null, overrideId: null);
+        var act = () => ext.MarkCompleted();
+        act.Should().Throw<InvalidOperationException>().WithMessage("*drop*");
+        ext.CompletedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void MarkCompleted_AfterDrop_StampsTimestamp()
+    {
+        var ext = Dropped();
+        ext.MarkCompleted();
+        ext.CompletedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void MarkCompleted_Twice_IsIdempotent()
+    {
+        var ext = Dropped();
+        ext.MarkCompleted();
+        var first = ext.CompletedAt;
+        Thread.Sleep(2);
+        ext.MarkCompleted();
+        ext.CompletedAt.Should().Be(first);        // offline replay keeps the first stamp
+    }
 }

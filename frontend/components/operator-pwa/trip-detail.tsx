@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import {
   acknowledgeTrip,
@@ -47,6 +48,7 @@ function explainLegFailure(
 //   - Offline queue dedupe still prevents duplicate acks via the
 //     dedupeKey path in the queue helper.
 export function TripDetail({ tripId }: { tripId: string }) {
+  const router = useRouter();
   const [trip, setTrip] = useState<AssignedTrip | null>(null);
   const [loading, setLoading] = useState(true);
   const [pickupPodKey, setPickupPodKey] = useState<string | null>(null);
@@ -89,7 +91,9 @@ export function TripDetail({ tripId }: { tripId: string }) {
       ? "pickup"
       : !trip.droppedAt
         ? "drop"
-        : "complete";
+        : !trip.completedAt
+          ? "complete"
+          : "done";
 
   const onAcknowledge = async () => {
     setActionBusy("acknowledge");
@@ -156,7 +160,12 @@ export function TripDetail({ tripId }: { tripId: string }) {
     setActionNote(null);
     try {
       const result = await completeTrip(tripId);
-      setActionNote(result.delivered ? "Trip completed." : "Saved offline — will sync.");
+      if (result.delivered) {
+        // Nothing left to do on this trip — back to the list for the next.
+        router.push("/m/trips");
+        return;
+      }
+      setActionNote("Saved offline — will sync.");
       await refresh();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Complete failed.");
@@ -228,6 +237,7 @@ function ProgressTimeline({ trip }: { trip: AssignedTrip }) {
     { label: "Acknowledged", iso: trip.acknowledgedAt, done: !!trip.acknowledgedAt },
     { label: "Picked up", iso: trip.pickedUpAt, done: !!trip.pickedUpAt },
     { label: "Dropped", iso: trip.droppedAt, done: !!trip.droppedAt },
+    { label: "Completed", iso: trip.completedAt, done: !!trip.completedAt },
   ];
   return (
     <ol className="mt-4 flex flex-col gap-2 border-t border-zinc-800 pt-3 text-sm">

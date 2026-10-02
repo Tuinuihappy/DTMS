@@ -56,12 +56,12 @@ export function TripsList() {
     );
   }
 
-  // Sort: in-progress (acknowledged + not yet done) first, then new
-  // assignments waiting for ack, then finished (dropped). Within each
-  // bucket newest first by AssignedAt.
+  // Sort: in-progress (acknowledged, or dropped and waiting on Complete)
+  // first, then new assignments waiting for ack, then completed. Within
+  // each bucket newest first by AssignedAt.
   const sorted = [...state.trips].sort((a, b) => {
     const bucket = (t: AssignedTrip) =>
-      t.droppedAt ? 2 : t.acknowledgedAt ? 0 : 1;
+      t.completedAt ? 2 : t.acknowledgedAt ? 0 : 1;
     const diff = bucket(a) - bucket(b);
     if (diff !== 0) return diff;
     return new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime();
@@ -95,10 +95,16 @@ export function TripsList() {
 }
 
 function TripStatusBadge({ trip }: { trip: AssignedTrip }) {
-  if (trip.droppedAt)
+  if (trip.completedAt)
     return (
       <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-300">
-        Delivered
+        Completed
+      </span>
+    );
+  if (trip.droppedAt)
+    return (
+      <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-300">
+        Dropped · complete it
       </span>
     );
   if (trip.pickedUpAt)

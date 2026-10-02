@@ -30,6 +30,11 @@ public class ManualTripExtension
     public DateTime? PickedUpAt { get; private set; }
     public DateTime? DroppedAt { get; private set; }
 
+    // Set when the operator completes the trip. Without it the operator
+    // app could not tell a finished trip from one waiting on "Complete"
+    // (the extension row outlives the assignment as trip history).
+    public DateTime? CompletedAt { get; private set; }
+
     // Geofence override reference — null = operator was inside the
     // geofence (normal case); set = override was approved (audit pointer
     // to the GeofenceOverrideRequest row that authorized the action).
@@ -98,6 +103,14 @@ public class ManualTripExtension
         DroppedAt = DateTime.UtcNow;
         DropPodKey = podKey;
         DropGeofenceOverrideId = overrideId;
+    }
+
+    public void MarkCompleted()
+    {
+        if (!DroppedAt.HasValue)
+            throw new InvalidOperationException("Cannot complete before drop.");
+        if (CompletedAt.HasValue) return;          // idempotent — offline queue may replay
+        CompletedAt = DateTime.UtcNow;
     }
 
     // ReassignToOperator removed (2026-07-03) alongside the admin
