@@ -26,8 +26,10 @@
 | M23, M33, M34, M35, M40, M57, L41 (+ ส่วน dialog ของ M4, L28, L29) | layer stack กลาง: overlay ทั้ง 38 ตัวใช้ `ModalLayer` / `useDismissableLayer` (`lib/overlay`) — Esc ปิดทีละชั้น (ยกเว้นตอน busy), Tab วนใน dialog, คืน focus ให้ปุ่มที่เปิด, role/aria-modal/aria-labelledby, dialog ที่ย้อนกลับไม่ได้ (`intent="irreversible"`) เปิดมา focus ที่ปุ่มปลอดภัยและ Enter ใน input ไม่ส่งฟอร์ม, PASS ไม่รับ Enter ทั้งหน้าจออีก มี prebuild guard `check-overlay-keys.mjs` กันถอยกลับ ทดสอบในเบราว์เซอร์ครบ 3 checkpoint | `806fe858` … `8b2d57a6` (9 commits) |
 | ต่อจาก H11 | PWA: trip ที่ dispatcher/order cancel แสดงเป็น Cancelled ไม่มีปุ่มทำงาน (DTO ส่ง Trip.Status มาด้วย) | `ef6317b0` |
 
+**ไม่แก้ (ตัดสินใจ 2026-10-06)**
+- **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile: เจ้าของระบบเลือกข้าม คงไว้ตามเดิม
+
 **ยังเปิดอยู่**
-- **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile ต้องตัดสินใจก่อนว่าจะลบออก ต่อกับข้อมูลจริง หรือติดป้ายว่าเป็นตัวอย่าง
 - ส่วนที่ไม่ใช่ dialog ของ M4 (aria-label ปุ่ม X), L28 (race ตอนคลิกหลายแถว), L29 (aria-label ปุ่มลบ item)
 - MEDIUM/LOW ที่เหลือยังไม่ได้มีคนเปิดดูนอกจาก verifier
 
@@ -57,7 +59,7 @@
 - แก้: ใน `useProjectionPoll` เพิ่ม effect ที่เรียก `trigger()` เมื่อ `fetcher` เปลี่ยน (ข้าม mount แรก) แล้ว `setData(null)` เพื่อไม่ให้แสดงข้อมูลช่วงเก่า หรือที่ฝั่ง caller ใส่ `key={windowKey}` ให้ report component และ `key={window}` ให้ส่วนที่ใช้ poll ในหน้า analysis
 - Verifier: ยืนยันแล้ว: useProjectionPoll เก็บ fetcher ใน fetcherRef (บรรทัด 41-42) ส่วน tick เป็น useCallback ที่มี deps เป็น [] และ usePollSchedule รันใหม่เฉพาะเมื่อ [intervalMs, enabled] เปลี่ยน ฝั่ง ReportsExperience ไม่ได้ใส่ key ให้ report และ report ก็ไม่ได้เรียก refresh เมื่อ window เปลี่ยน orders/robots-analysis เป็นแบบเดียวกัน (มีแค่ hub CountersUpdated ที่อาจทำให้ refetch เร็วขึ้นบ้างในหน้า analysis) ส่วน csvHref คำนวณใหม่ทันที ตัวเลขบนจอจึงไม่ตรงกับไฟล์ที่ export
 
-### H4. หน้า /dashboard (Overview) เอาข้อมูล mock และตัวเลขที่ hard-code ไว้มาแสดงปนกับข้อมูลจริง — CONFIRMED
+### H4. หน้า /dashboard (Overview) เอาข้อมูล mock และตัวเลขที่ hard-code ไว้มาแสดงปนกับข้อมูลจริง — CONFIRMED · ⏭️ ไม่แก้ (ตัดสินใจ 2026-10-06)
 - กลุ่ม: analytics · uiux
 - ที่: `frontend/components/dashboard/live-activity-card.tsx:8`
 - ปัญหา: LiveActivityCard (`weekActivity` จาก lib/mock-data และค่า hard-code อย่าง +18%, $142.8k, On-time 96.4% ที่บรรทัด 163-179), PriorityShipments (priority-shipments.tsx:8, 40 "Three shipments need supervisor approval", 46 "See all 14" href="#"), DriverLeaderboard (driver-leaderboard.tsx:8, 25 href="#"), CommsCard (comms-card.tsx:45 "Truck 14 needs reroute", 102 ปุ่ม Reply ที่ไม่มี onClick) และ footer app/dashboard/page.tsx:33 "last refresh 07:42:18" กับ build 4aa1133 เป็นของปลอมทั้งหมด ปุ่ม "All routes" ที่ dispatch-funnel.tsx:114-120 ก็ไม่มี onClick เมนูใน left-rail.tsx:73 เรียกหน้านี้ว่า "Live operations cockpit"
@@ -121,7 +123,7 @@
 - แก้: เพิ่ม CompletedAt (หรือ status) ใน AssignedTripDto และ type AssignedTrip แล้วคำนวณ step "done" จากค่านั้น หรือถ้า complete คือการออกจาก assignment จริง ให้ filter ออกจาก GetByOperatorIdAsync แล้ว redirect ไป /m/trips หลังกด Complete สำเร็จ
 - Verifier: AssignedTripDto ไม่มี CompletedAt ส่วน CompleteTripCommandHandler เรียกแค่ trip.MarkVendorCompleted() กับ op.ClearTripAssignment() โดยไม่แตะ ManualTripExtension และ GetByOperatorIdAsync ก็ไม่ได้ filter trip ที่จบแล้วออก trip จึงยังกลับมาพร้อม droppedAt และ step ยังเป็น "complete" ตลอด ทำให้ step "done" ไม่มีวันเกิดขึ้น
 
-### H12. Security tab แสดงสถานะความปลอดภัยปลอม และปุ่ม 'Sign out everywhere' ไม่ทำอะไรเลย — CONFIRMED
+### H12. Security tab แสดงสถานะความปลอดภัยปลอม และปุ่ม 'Sign out everywhere' ไม่ทำอะไรเลย — CONFIRMED · ⏭️ ไม่แก้ (ตัดสินใจ 2026-10-06)
 - กลุ่ม: shell-pages · uiux
 - ที่: `frontend/components/profile/tab-security.tsx:77`
 - ปัญหา: ปุ่ม 'Sign out everywhere' (บรรทัด 77) และปุ่ม Change/Manage/Regenerate ใน SettingRow (บรรทัด 154) ไม่มี onClick แถวต่างๆ อ้างว่า 2FA enrolled, recovery codes 8 of 10 และเปลี่ยนรหัสผ่านไปแล้ว 41 วัน ส่วนรายการ session (บรรทัด 9-31) hardcode ไว้ทั้งหมดรวมถึง IP 192.168.4.18 แต่ผู้ใช้เปิดเจอได้จริงจากลิงก์ /profile ใน components/shell/top-nav.tsx:221
@@ -129,7 +131,7 @@
 - แก้: ซ่อนหรือลบ TabSecurity ออกจาก profile-tabs.tsx จนกว่า backend จะมี API สำหรับ session และ 2FA ถ้าจะเก็บไว้ก็แสดงเฉพาะข้อมูลจริง และลบปุ่มที่ไม่ได้ต่อกับระบบออก
 - Verifier: ปุ่ม 'Sign out everywhere' (tab-security.tsx:77) และปุ่มใน SettingRow (บรรทัด 154) ไม่มี onClick จริง TabSecurity ถูก render ใน profile-tabs.tsx:106 และ /profile ก็เปิดได้จากลิงก์ใน shell/top-nav.tsx:221 ผู้ใช้จึงกดปุ่มเพิกถอน session ปลอมได้จริง ถือเป็นการหลอกในเรื่องความปลอดภัย
 
-### H13. /home แสดง KPI ปฏิบัติการที่ hardcode ไว้ แต่ติดป้าย LIVE — CONFIRMED
+### H13. /home แสดง KPI ปฏิบัติการที่ hardcode ไว้ แต่ติดป้าย LIVE — CONFIRMED · ⏭️ ไม่แก้ (ตัดสินใจ 2026-10-06)
 - กลุ่ม: shell-pages · uiux
 - ที่: `frontend/components/home/home-overview.tsx:30`
 - ปัญหา: TILES (บรรทัด 30-63) เป็นตัวเลขคงที่ คือ Active fleet 142, On-time 96.4%, In transit 47 และ Distance 8,420 km คอมเมนต์ในโค้ดเองก็ยอมรับว่าเป็น mock แต่ tile 'In transit' แสดง StatusPulse กับคำว่า 'live' (บรรทัด 128-133) และมี trend badge สีเขียว หน้านี้คือปลายทางของลิงก์ 'Home' ใน left-rail
