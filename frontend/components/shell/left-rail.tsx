@@ -52,6 +52,9 @@ type RailChild = {
   // principal holds the permission (wildcard-matched). Items without
   // `requires` are visible to everyone.
   requires?: string;
+  // Page not built yet: shown dimmed with a "Soon" tag, not a link (the
+  // href would 404). Drop the flag once the route exists.
+  soon?: boolean;
 };
 
 type RailAction = {
@@ -59,6 +62,7 @@ type RailAction = {
   label: string;
   badge?: boolean;
   href?: string;
+  soon?: boolean;
   children?: RailChild[];
 };
 
@@ -146,12 +150,14 @@ const actions: RailAction[] = [
         label: "Robot",
         href: "/fleet/robots",
         hint: "Autonomous units",
+        soon: true,
       },
       {
         icon: <IdCard className="h-3.5 w-3.5" strokeWidth={2.1} />,
         label: "Driver",
         href: "/fleet/drivers",
         hint: "Roster & credentials",
+        soon: true,
       },
       {
         icon: <Package className="h-3.5 w-3.5" strokeWidth={2.1} />,
@@ -190,6 +196,7 @@ const actions: RailAction[] = [
         label: "Auto door",
         href: "/equipment/auto-doors",
         hint: "Door controllers & gates",
+        soon: true,
       },
     ],
   },
@@ -236,7 +243,7 @@ const actions: RailAction[] = [
     label: "System status",
     href: "/admin/system-status",
   },
-  { icon: <AlertTriangle className="h-4 w-4" strokeWidth={2} />, label: "Active alerts", badge: true },
+  { icon: <AlertTriangle className="h-4 w-4" strokeWidth={2} />, label: "Active alerts", soon: true },
 ];
 
 const COLLAPSED_PX = 56;
@@ -324,7 +331,7 @@ export function LeftRail() {
               {a.children ? (
                 <RailGroup action={a} expanded={expanded} />
               ) : (
-                <RailButton label={a.label} badge={a.badge} expanded={expanded} href={a.href}>
+                <RailButton label={a.label} badge={a.badge} soon={a.soon} expanded={expanded} href={a.href}>
                   {a.icon}
                 </RailButton>
               )}
@@ -375,11 +382,11 @@ export function LeftRail() {
             {/* Action list — always expanded in the drawer */}
             <ul className="flex-1 flex flex-col gap-1.5 px-3 py-4 overflow-y-auto">
               {actions.map((a) => (
-                <li key={a.label} onClick={a.children ? undefined : closeRailDrawer}>
+                <li key={a.label} onClick={a.children || a.soon ? undefined : closeRailDrawer}>
                   {a.children ? (
                     <RailGroup action={a} expanded onChildNavigate={closeRailDrawer} />
                   ) : (
-                    <RailButton label={a.label} badge={a.badge} expanded href={a.href}>
+                    <RailButton label={a.label} badge={a.badge} soon={a.soon} expanded href={a.href}>
                       {a.icon}
                     </RailButton>
                   )}
@@ -447,15 +454,51 @@ function RailButton({
   children,
   label,
   badge,
+  soon,
   expanded,
   href,
 }: {
   children: React.ReactNode;
   label: string;
   badge?: boolean;
+  soon?: boolean;
   expanded: boolean;
   href?: string;
 }) {
+  if (soon) {
+    // Not built yet — a dimmed, inert pill. aria-disabled (not disabled)
+    // so it stays focusable and the tooltip still says what it is.
+    return (
+      <span
+        role="button"
+        aria-disabled="true"
+        tabIndex={0}
+        aria-label={`${label} (coming soon)`}
+        className={cn(
+          "group relative flex h-10 items-center rounded-full border border-dashed border-[var(--color-ink-200)] text-[var(--color-ink-400)] cursor-not-allowed dark:border-white/[0.12]",
+          expanded ? "w-full justify-start gap-3 px-3" : "w-10 justify-center",
+        )}
+      >
+        <span className="flex h-4 w-4 items-center justify-center shrink-0 opacity-60">{children}</span>
+        {expanded ? (
+          <>
+            <span className="flex-1 min-w-0 text-left text-[12.5px] font-medium tracking-tight whitespace-nowrap truncate">
+              {label}
+            </span>
+            <SoonTag />
+          </>
+        ) : (
+          <span
+            role="tooltip"
+            className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-[var(--color-brand-900)] px-2 py-1 text-[11px] font-medium text-white opacity-0 translate-x-[-4px] transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0 group-focus-visible:opacity-100"
+          >
+            {label} · Soon
+          </span>
+        )}
+      </span>
+    );
+  }
+
   const className = cn(
     "group relative flex h-10 items-center rounded-full bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] transition-all duration-200 hover:-translate-y-px hover:bg-white hover:text-[var(--color-ink-900)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_6px_14px_-4px_rgba(15,23,42,0.14)] cursor-pointer dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_-2px_rgba(0,0,0,0.5)]",
     expanded ? "w-full justify-start gap-3 px-3" : "w-10 justify-center",
@@ -511,6 +554,14 @@ function RailButton({
     <button aria-label={label} className={className}>
       {inner}
     </button>
+  );
+}
+
+function SoonTag() {
+  return (
+    <span className="shrink-0 rounded-full bg-[var(--color-ink-100)] px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-[0.08em] text-[var(--color-ink-500)] dark:bg-white/[0.08]">
+      Soon
+    </span>
   );
 }
 
@@ -672,31 +723,48 @@ function RailGroup({
                     }}
                     className="py-0.5"
                   >
-                    <Link
-                      href={c.href}
-                      onClick={onChildNavigate}
-                      className={cn(
-                        "relative flex h-8 items-center gap-2.5 rounded-full pl-3 pr-3 text-[12px] font-medium transition-colors",
-                        active
-                          ? "bg-[var(--color-brand-900)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_6px_14px_-6px_rgba(14,21,48,0.5)] dark:bg-[var(--color-brand-500)] dark:text-white"
-                          : "text-[var(--color-ink-600)] hover:bg-white/80 hover:text-[var(--color-ink-900)] dark:hover:bg-white/[0.06]",
-                      )}
-                    >
-                      {/* Branch tick into the vertical thread */}
+                    {c.soon ? (
                       <span
-                        aria-hidden
-                        className={cn(
-                          "absolute left-[1px] top-1/2 h-px w-2 -translate-y-1/2",
-                          active
-                            ? "bg-[var(--color-brand-500)]"
-                            : "bg-[var(--color-ink-200)] dark:bg-white/[0.12]",
-                        )}
-                      />
-                      <span className="flex h-3.5 w-3.5 items-center justify-center shrink-0">
-                        {c.icon}
+                        aria-disabled="true"
+                        className="relative flex h-8 items-center gap-2.5 rounded-full pl-3 pr-3 text-[12px] font-medium text-[var(--color-ink-400)] cursor-not-allowed"
+                      >
+                        <span
+                          aria-hidden
+                          className="absolute left-[1px] top-1/2 h-px w-2 -translate-y-1/2 bg-[var(--color-ink-200)] dark:bg-white/[0.12]"
+                        />
+                        <span className="flex h-3.5 w-3.5 items-center justify-center shrink-0 opacity-60">
+                          {c.icon}
+                        </span>
+                        <span className="flex-1 truncate">{c.label}</span>
+                        <SoonTag />
                       </span>
-                      <span className="truncate">{c.label}</span>
-                    </Link>
+                    ) : (
+                      <Link
+                        href={c.href}
+                        onClick={onChildNavigate}
+                        className={cn(
+                          "relative flex h-8 items-center gap-2.5 rounded-full pl-3 pr-3 text-[12px] font-medium transition-colors",
+                          active
+                            ? "bg-[var(--color-brand-900)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_6px_14px_-6px_rgba(14,21,48,0.5)] dark:bg-[var(--color-brand-500)] dark:text-white"
+                            : "text-[var(--color-ink-600)] hover:bg-white/80 hover:text-[var(--color-ink-900)] dark:hover:bg-white/[0.06]",
+                        )}
+                      >
+                        {/* Branch tick into the vertical thread */}
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "absolute left-[1px] top-1/2 h-px w-2 -translate-y-1/2",
+                            active
+                              ? "bg-[var(--color-brand-500)]"
+                              : "bg-[var(--color-ink-200)] dark:bg-white/[0.12]",
+                          )}
+                        />
+                        <span className="flex h-3.5 w-3.5 items-center justify-center shrink-0">
+                          {c.icon}
+                        </span>
+                        <span className="truncate">{c.label}</span>
+                      </Link>
+                    )}
                   </motion.li>
                 );
               })}
@@ -774,54 +842,76 @@ function RailGroup({
                         ease: [0.22, 1, 0.36, 1],
                       }}
                     >
-                      <Link
-                        href={c.href}
-                        onClick={() => {
-                          setFlyoutOpen(false);
-                          onChildNavigate?.();
-                        }}
-                        className={cn(
-                          "group/flyitem relative flex items-center gap-2.5 rounded-[14px] px-2 py-2 transition-colors",
-                          active
-                            ? "bg-[var(--color-brand-900)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_8px_18px_-8px_rgba(14,21,48,0.6)] dark:bg-[var(--color-brand-500)]"
-                            : "text-[var(--color-ink-800)] hover:bg-white/80 dark:hover:bg-white/[0.08]",
-                        )}
-                      >
+                      {c.soon ? (
                         <span
+                          aria-disabled="true"
+                          className="relative flex items-center gap-2.5 rounded-[14px] px-2 py-2 text-[var(--color-ink-400)] cursor-not-allowed"
+                        >
+                          <span className="grid h-7 w-7 place-items-center rounded-lg shrink-0 bg-[var(--color-ink-50)] opacity-60 dark:bg-white/[0.04]">
+                            {c.icon}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[12.5px] font-semibold tracking-tight truncate">
+                              {c.label}
+                            </span>
+                            {c.hint && (
+                              <span className="block text-[10.5px] truncate text-[var(--color-ink-400)]">
+                                {c.hint}
+                              </span>
+                            )}
+                          </span>
+                          <SoonTag />
+                        </span>
+                      ) : (
+                        <Link
+                          href={c.href}
+                          onClick={() => {
+                            setFlyoutOpen(false);
+                            onChildNavigate?.();
+                          }}
                           className={cn(
-                            "grid h-7 w-7 place-items-center rounded-lg shrink-0 transition-colors",
+                            "group/flyitem relative flex items-center gap-2.5 rounded-[14px] px-2 py-2 transition-colors",
                             active
-                              ? "bg-white/15 text-white"
-                              : "bg-[var(--color-ink-50)] text-[var(--color-ink-700)] dark:bg-white/[0.06] dark:text-[var(--color-ink-700)]",
+                              ? "bg-[var(--color-brand-900)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_8px_18px_-8px_rgba(14,21,48,0.6)] dark:bg-[var(--color-brand-500)]"
+                              : "text-[var(--color-ink-800)] hover:bg-white/80 dark:hover:bg-white/[0.08]",
                           )}
                         >
-                          {c.icon}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[12.5px] font-semibold tracking-tight truncate">
-                            {c.label}
+                          <span
+                            className={cn(
+                              "grid h-7 w-7 place-items-center rounded-lg shrink-0 transition-colors",
+                              active
+                                ? "bg-white/15 text-white"
+                                : "bg-[var(--color-ink-50)] text-[var(--color-ink-700)] dark:bg-white/[0.06] dark:text-[var(--color-ink-700)]",
+                            )}
+                          >
+                            {c.icon}
                           </span>
-                          {c.hint && (
-                            <span
-                              className={cn(
-                                "block text-[10.5px] truncate transition-colors",
-                                active ? "text-white/70" : "text-[var(--color-ink-500)]",
-                              )}
-                            >
-                              {c.hint}
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[12.5px] font-semibold tracking-tight truncate">
+                              {c.label}
                             </span>
-                          )}
-                        </span>
-                        <ChevronRight
-                          className={cn(
-                            "h-3.5 w-3.5 shrink-0 transition-all",
-                            active
-                              ? "text-white"
-                              : "text-[var(--color-ink-300)] -translate-x-0.5 opacity-0 group-hover/flyitem:opacity-100 group-hover/flyitem:translate-x-0",
-                          )}
-                          strokeWidth={2.4}
-                        />
-                      </Link>
+                            {c.hint && (
+                              <span
+                                className={cn(
+                                  "block text-[10.5px] truncate transition-colors",
+                                  active ? "text-white/70" : "text-[var(--color-ink-500)]",
+                                )}
+                              >
+                                {c.hint}
+                              </span>
+                            )}
+                          </span>
+                          <ChevronRight
+                            className={cn(
+                              "h-3.5 w-3.5 shrink-0 transition-all",
+                              active
+                                ? "text-white"
+                                : "text-[var(--color-ink-300)] -translate-x-0.5 opacity-0 group-hover/flyitem:opacity-100 group-hover/flyitem:translate-x-0",
+                            )}
+                            strokeWidth={2.4}
+                          />
+                        </Link>
+                      )}
                     </motion.li>
                   );
                 })}
