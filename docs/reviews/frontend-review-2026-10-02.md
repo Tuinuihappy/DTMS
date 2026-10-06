@@ -8,7 +8,7 @@
 
 ## สถานะ (อัปเดต 2026-10-06)
 
-แก้แล้ว HIGH 12 จาก 15, MEDIUM 8 ข้อ (M5, M12, M23, M33, M34, M35, M40, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
+แก้แล้ว HIGH 12 จาก 15, MEDIUM 10 ข้อ (M5, M12, M18, M23, M33, M34, M35, M40, M49, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
 
 | ข้อ | เรื่อง | Commit |
 |---|---|---|
@@ -26,6 +26,8 @@
 | M23, M33, M34, M35, M40, M57, L41 (+ ส่วน dialog ของ M4, L28, L29) | layer stack กลาง: overlay ทั้ง 38 ตัวใช้ `ModalLayer` / `useDismissableLayer` (`lib/overlay`) — Esc ปิดทีละชั้น (ยกเว้นตอน busy), Tab วนใน dialog, คืน focus ให้ปุ่มที่เปิด, role/aria-modal/aria-labelledby, dialog ที่ย้อนกลับไม่ได้ (`intent="irreversible"`) เปิดมา focus ที่ปุ่มปลอดภัยและ Enter ใน input ไม่ส่งฟอร์ม, PASS ไม่รับ Enter ทั้งหน้าจออีก มี prebuild guard `check-overlay-keys.mjs` กันถอยกลับ ทดสอบในเบราว์เซอร์ครบ 3 checkpoint | `806fe858` … `8b2d57a6` (9 commits) |
 | ต่อจาก H11 | PWA: trip ที่ dispatcher/order cancel แสดงเป็น Cancelled ไม่มีปุ่มทำงาน (DTO ส่ง Trip.Status มาด้วย) | `ef6317b0` |
 | M5 | dark mode: ปุ่ม Cancel, ปุ่มรอง, filter, input, banner และป้ายสถานะทุกหน้า IAM มีสีของ dark mode | `c01e55a7`, `f6b256a0` |
+| M49 | ไอคอน PWA 192/512 (maskable) + badge ของ notification สร้างจากโลโก้รถบรรทุกบนหัวหน้าเว็บ | `6782f815` |
+| M18 | เมนู Robot, Driver, Auto door และ Active alerts แสดงเป็น "Soon" กดไม่ได้ (แทนลิงก์ 404 และจุดกะพริบ) | `8a6f4171` |
 
 **ไม่แก้ (ตัดสินใจ 2026-10-06)**
 - **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile: เจ้าของระบบเลือกข้าม คงไว้ตามเดิม
@@ -294,7 +296,7 @@
 - แก้: ใน onBlur ให้ setOpen(false) และ setQuery("") (คลิกที่ list ใช้ preventDefault ใน mousedown อยู่แล้วจึงไม่กระทบ) ใส่ role=combobox, aria-expanded, aria-controls={listId}, aria-activedescendant ลงใน input และ id ให้แต่ละ option ปุ่ม Clear ให้ใช้ onClick (คง onMouseDown preventDefault ไว้กัน blur) ควรรวมทั้ง 5 ตัวเป็น base combobox ตัวเดียว
 - Verifier: station-combobox onBlur (134) แค่ setAutofillGuard ไม่ปิด list ตัวปิดมีแค่ mousedown จึง Tab ออกแล้ว list ค้าง input ไม่มี role=combobox/aria-activedescendant ปุ่ม Clear ผูก onMouseDown อย่างเดียว (156) กด Enter/Space ที่ปุ่มจะยิงแค่ click จึงล้างค่าด้วยคีย์บอร์ดไม่ได้ (wms-location ใช้ onClick ซึ่งถูกต้อง)
 
-### M18. เมนู rail มีลิงก์ที่ไปหน้า 404 และปุ่ม 'Active alerts' ที่กดแล้วไม่ทำอะไร — CONFIRMED
+### M18. เมนู rail มีลิงก์ที่ไปหน้า 404 และปุ่ม 'Active alerts' ที่กดแล้วไม่ทำอะไร — CONFIRMED · ✅ แก้แล้ว `8a6f4171`
 - กลุ่ม: core · uiux
 - ที่: `frontend/components/shell/left-rail.tsx:189`
 - ปัญหา: href '/equipment/auto-doors' (บรรทัด 189), '/fleet/robots' (บรรทัด 145) และ '/fleet/drivers' (บรรทัด 152) ไม่มี app/<route>/page.tsx อยู่จริง (ตรวจด้วย ls แล้ว) ส่วน 'Active alerts' (บรรทัด 238) ไม่มี href แต่มี StatusPulse สี coral (สีของ failure) กระพริบอยู่ตลอด
@@ -542,7 +544,7 @@
 - แก้: เพิ่ม orderRef, pickupCode, dropCode ใน AssignedTripDto (Trip มี frozen location codes อยู่แล้ว) แล้วแสดงแบบเดียวกับ PoolCard/ConfirmClaimDrawer ส่วน tripId ให้เป็นข้อมูลรอง
 - Verifier: trip-detail.tsx:175 และ trips-list.tsx:84 แสดงแค่ tripId.slice(0,8) ส่วน AssignedTripDto ไม่มี orderRef/pickupCode/dropCode (คอมเมนต์ใน backend ระบุว่า Phase 4.4 จะ join ภายหลัง) operator จึงมองไม่เห็นจุดรับ/ส่งหลัง claim
 
-### M49. ไอคอนใน manifest และ notification ชี้ไปยังไฟล์ที่ไม่มีอยู่ — CONFIRMED
+### M49. ไอคอนใน manifest และ notification ชี้ไปยังไฟล์ที่ไม่มีอยู่ — CONFIRMED · ✅ แก้แล้ว `6782f815`
 - กลุ่ม: operator-pwa · uiux
 - ที่: `frontend/public/manifest.webmanifest:15`
 - ปัญหา: manifest อ้าง /icons/operator-192.png และ operator-512.png ส่วน sw.js:45-46 อ้าง operator-192.png และ operator-badge.png แต่ใน frontend/public มีแค่ manifest.webmanifest กับ sw.js ไม่มีโฟลเดอร์ icons
