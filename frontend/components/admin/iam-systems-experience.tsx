@@ -305,7 +305,7 @@ export function IamSystemsExperience() {
                             type="button"
                             disabled={busy}
                             onClick={() => handleDelete(s.key)}
-                            className="inline-flex items-center gap-1 rounded border border-rose-300 bg-white px-2 py-1 text-[11px] text-rose-600 hover:bg-rose-50 disabled:opacity-50 dark:bg-white/[0.04]"
+                            className="inline-flex items-center gap-1 rounded border border-rose-300 bg-white px-2 py-1 text-[11px] text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 disabled:opacity-50 dark:bg-white/[0.04]"
                             title="Hard delete system (irreversible)"
                           >
                             <Trash2 className="h-3 w-3" strokeWidth={2.2} />

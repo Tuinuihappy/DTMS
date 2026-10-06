@@ -67,7 +67,7 @@ export function IamPermissionsExperience() {
       </header>
 
       {error ? (
-        <GlassCard className="flex items-center gap-2 border-rose-200 bg-rose-50/60 px-4 py-3 text-[13px] text-rose-700">
+        <GlassCard className="flex items-center gap-2 border-rose-200 bg-rose-50/60 dark:border-rose-500/40 dark:bg-rose-950/30 dark:text-rose-300 px-4 py-3 text-[13px] text-rose-700">
           <AlertCircle className="h-4 w-4" />
           {error}
         </GlassCard>

@@ -131,7 +131,7 @@ export function IamSystemSubscriptionsExperience({ systemKey }: { systemKey: str
       </header>
 
       {error && (
-        <div className="flex items-start gap-2 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
+        <div className="flex items-start gap-2 rounded-md border border-rose-300 bg-rose-50 dark:border-rose-500/40 dark:bg-rose-950/30 dark:text-rose-300 px-3 py-2 text-[12px] text-rose-700">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={2.2} />
           <span>{error}</span>
           <button type="button" onClick={() => setError(null)} className="ml-auto" aria-label="Dismiss">
@@ -198,7 +198,7 @@ export function IamSystemSubscriptionsExperience({ systemKey }: { systemKey: str
                         type="button"
                         disabled={busy}
                         onClick={() => onDelete(s.eventType)}
-                        className="inline-flex items-center gap-1 rounded border border-rose-300 bg-white px-2 py-1 text-[11px] text-rose-600 hover:bg-rose-50 disabled:opacity-50 dark:bg-white/[0.04]"
+                        className="inline-flex items-center gap-1 rounded border border-rose-300 bg-white px-2 py-1 text-[11px] text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 disabled:opacity-50 dark:bg-white/[0.04]"
                       >
                         <Trash2 className="h-3 w-3" strokeWidth={2.2} />
                         Delete
@@ -319,7 +319,7 @@ function AddSubscriptionModal({
             </div>
 
             {error && (
-              <div className="mt-3 flex items-start gap-2 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
+              <div className="mt-3 flex items-start gap-2 rounded border border-rose-300 bg-rose-50 dark:border-rose-500/40 dark:bg-rose-950/30 dark:text-rose-300 px-3 py-2 text-[12px] text-rose-700">
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={2.2} />
                 <span>{error}</span>
               </div>

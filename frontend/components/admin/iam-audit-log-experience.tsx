@@ -84,7 +84,7 @@ export function IamAuditLogExperience() {
       </header>
 
       {error ? (
-        <GlassCard className="flex items-center gap-2 border-rose-200 bg-rose-50/60 px-4 py-3 text-[13px] text-rose-700">
+        <GlassCard className="flex items-center gap-2 border-rose-200 bg-rose-50/60 dark:border-rose-500/40 dark:bg-rose-950/30 dark:text-rose-300 px-4 py-3 text-[13px] text-rose-700">
           <AlertCircle className="h-4 w-4" />
           {error}
         </GlassCard>
@@ -248,11 +248,11 @@ function FilterInput({
 function toneClass(tone: "emerald" | "rose" | "ink" | "amber"): string {
   switch (tone) {
     case "emerald":
-      return "bg-emerald-100 text-emerald-800";
+      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300";
     case "rose":
-      return "bg-rose-100 text-rose-800";
+      return "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300";
     case "amber":
-      return "bg-amber-100 text-amber-800";
+      return "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300";
     case "ink":
     default:
       return "bg-[var(--color-ink-100)] text-[var(--color-ink-700)]";

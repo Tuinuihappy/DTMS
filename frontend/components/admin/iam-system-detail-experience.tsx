@@ -410,7 +410,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
                 type="button"
                 disabled={busy}
                 onClick={onActivate}
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-[11.5px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 dark:border-emerald-500/40 dark:bg-emerald-900/40 dark:text-emerald-300 px-3 py-1.5 text-[11.5px] font-medium text-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 disabled:opacity-50"
               >
                 <Power className="h-3 w-3" strokeWidth={2.2} />
                 Activate
@@ -421,7 +421,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
       </header>
 
       {error && (
-        <div className="flex items-start gap-2 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
+        <div className="flex items-start gap-2 rounded-md border border-rose-300 bg-rose-50 dark:border-rose-500/40 dark:bg-rose-950/30 dark:text-rose-300 px-3 py-2 text-[12px] text-rose-700">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={2.2} />
           <span>{error}</span>
           <button type="button" onClick={() => setError(null)} className="ml-auto" aria-label="Dismiss">
@@ -514,7 +514,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
               onClick={onRotate}
               disabled={busy || rotatedKey !== null}
               title={rotatedKey ? "Copy + test the visible key first before rotating again" : undefined}
-              className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-300 px-2 py-1 text-[11px] text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <KeyRound className="h-3 w-3" strokeWidth={2.2} />
               Rotate key
@@ -1782,7 +1782,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function ErrorBanner({ message }: { message: string }) {
   return (
-    <div className="mt-3 flex items-start gap-2 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
+    <div className="mt-3 flex items-start gap-2 rounded border border-rose-300 bg-rose-50 dark:border-rose-500/40 dark:bg-rose-950/30 dark:text-rose-300 px-3 py-2 text-[12px] text-rose-700">
       <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={2.2} />
       <span>{message}</span>
     </div>
@@ -1876,7 +1876,7 @@ function IssueTokenModal({
             bounded lifetime unless the partner genuinely cannot refresh.
           </div>
         ) : (
-          <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+          <div className="rounded border border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-300 px-3 py-2 text-[11px] text-amber-800">
             ⚠ Token will be valid for <strong>{days} days</strong>. If leaked,
             it's accepted until that date. Revoke it any time from the Issued
             tokens list (revoke takes effect immediately).
