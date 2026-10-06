@@ -6,9 +6,9 @@
 
 > หมายเหตุ: verifier หักล้างได้แค่ 1 จาก 132 ข้อ — เข้มน้อยกว่าที่ควร ให้ถือ MEDIUM/LOW เป็น "น่าจะจริง" จนกว่าจะเปิดดูเอง
 
-## สถานะ (อัปเดต 2026-10-05)
+## สถานะ (อัปเดต 2026-10-06)
 
-แก้แล้ว 13 ข้อ — HIGH 12 จาก 15 และ MEDIUM 1 ข้อ (M12) ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
+แก้แล้ว HIGH 12 จาก 15, MEDIUM 7 ข้อ (M12, M23, M33, M34, M35, M40, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
 
 | ข้อ | เรื่อง | Commit |
 |---|---|---|
@@ -23,11 +23,12 @@
 | H10 | lightbox render ผ่าน portal ไปที่ body | `7cba1082` |
 | H1, H2 | dark mode หน้า admin | `61e95e32` |
 | H11 | PWA: trip ที่ complete แล้วแสดงเป็น done (backend เพิ่ม CompletedAt + migration) | `94c39a4c` |
+| M23, M33, M34, M35, M40, M57, L41 (+ ส่วน dialog ของ M4, L28, L29) | layer stack กลาง: overlay ทั้ง 38 ตัวใช้ `ModalLayer` / `useDismissableLayer` (`lib/overlay`) — Esc ปิดทีละชั้น (ยกเว้นตอน busy), Tab วนใน dialog, คืน focus ให้ปุ่มที่เปิด, role/aria-modal/aria-labelledby, dialog ที่ย้อนกลับไม่ได้ (`intent="irreversible"`) เปิดมา focus ที่ปุ่มปลอดภัยและ Enter ใน input ไม่ส่งฟอร์ม, PASS ไม่รับ Enter ทั้งหน้าจออีก มี prebuild guard `check-overlay-keys.mjs` กันถอยกลับ ทดสอบในเบราว์เซอร์ครบ 3 checkpoint | `806fe858` … `8b2d57a6` (9 commits) |
+| ต่อจาก H11 | PWA: trip ที่ dispatcher/order cancel แสดงเป็น Cancelled ไม่มีปุ่มทำงาน (DTO ส่ง Trip.Status มาด้วย) | `ef6317b0` |
 
 **ยังเปิดอยู่**
 - **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile ต้องตัดสินใจก่อนว่าจะลบออก ต่อกับข้อมูลจริง หรือติดป้ายว่าเป็นตัวอย่าง
-- **ปัญหาที่เกิดซ้ำของ dialog** (Esc ปิดเกินหนึ่งชั้น, ไม่มี role="dialog"/focus trap) — กระจายอยู่ใน MEDIUM หลายข้อ แผนคือทำ hook กลางตัวเดียว
-- **trip ที่ dispatcher cancel** ยังค้างใน My trips ของ PWA (H11 ครอบคลุมเฉพาะตอน operator กด Complete เอง)
+- ส่วนที่ไม่ใช่ dialog ของ M4 (aria-label ปุ่ม X), L28 (race ตอนคลิกหลายแถว), L29 (aria-label ปุ่มลบ item)
 - MEDIUM/LOW ที่เหลือยังไม่ได้มีคนเปิดดูนอกจาก verifier
 
 ## HIGH
@@ -330,7 +331,7 @@
 - แก้: ข้ามรอบแรกด้วย ref (const first = useRef(true); if (first.current) { first.current = false; return; }) หรือย้ายการ reset page ไปไว้ใน setter ของ filter แต่ละตัวแทนการใช้ effect
 - Verifier: effect บรรทัด 299-303 ไม่มี guard สำหรับรอบแรก ตอน mount จึงเรียก setPage(1) เสมอ แม้ page จะ hydrate มาจาก ?page=N (บรรทัด 148-151) ผลคือ fetch ยิงด้วย page N หนึ่งครั้งแล้วยิงซ้ำด้วย page 1 และ effect ที่ mirror กลับ URL ก็ลบ page ออก deep link และการ refresh จึงกลับไปหน้า 1 ทุกครั้ง
 
-### M23. กด Escape ใน dialog หรือ trip drawer ที่ซ้อนอยู่ ทำให้ order drawer ปิดไปด้วย — CONFIRMED
+### M23. กด Escape ใน dialog หรือ trip drawer ที่ซ้อนอยู่ ทำให้ order drawer ปิดไปด้วย — CONFIRMED · ✅ แก้แล้ว (layer stack)
 - กลุ่ม: delivery-orders · code
 - ที่: `frontend/components/delivery-orders/detail-drawer.tsx:163`
 - ปัญหา: overlay ทุกตัวผูก keydown listener บน window เอง ได้แก่ detail-drawer:165, trip-detail-drawer:124, cancel-dialog:40, state-action-dialog:131, pod-scan-dialog:77, reopen-dialog:46 และ redispatch-dialog:45 โดยไม่มีตัวไหนเรียก stopPropagation หรือเช็กว่าตัวเองอยู่บนสุด ส่วน comment ที่บรรทัด 670-674 อ้างว่า Escape ปิดเฉพาะ trip drawer ซึ่งไม่จริง
@@ -410,7 +411,7 @@
 - แก้: ใน handler TimelineUpdated (หรือเพิ่ม StatusChanged) ให้เรียก refresh() แบบ debounce หรืออย่างน้อยเอา toStatus ใน entry มาอัปเดต data.status ด้วย setData(d => d && {...d, status})
 - Verifier: useTripSubscription ใน drawer ส่ง handler ไปแค่ TimelineUpdated กับ MissionUpdated ทั้งที่ trip-hub.ts ประกาศ StatusChanged ไว้ให้ แต่ไม่มีใครใช้ ส่วน refresh() ถูกเรียกเฉพาะหลังกด action ใน drawer เอง data.status ที่ใช้กับ TripStatusBadge, isTripInFlight และ TripActionBar จึงค้างเป็นค่าตอนเปิด drawer อีกทั้ง trips-experience ก็ปิด poll ไว้ตอน detailTripId มีค่า (enabled: !detailTripId)
 
-### M33. Pass dialog ยืนยันด้วย Enter แบบ global จนกด Enter ที่ปุ่ม Cancel แล้วหุ่นถูก PASS ไปด้วย — CONFIRMED
+### M33. Pass dialog ยืนยันด้วย Enter แบบ global จนกด Enter ที่ปุ่ม Cancel แล้วหุ่นถูก PASS ไปด้วย — CONFIRMED · ✅ แก้แล้ว (layer stack)
 - กลุ่ม: dispatch · uiux
 - ที่: `frontend/components/dispatch/pass-robot-dialog.tsx:41`
 - ปัญหา: keydown listener ผูกไว้ที่ window และเรียก handleConfirm() ทุกครั้งที่กด Enter โดยไม่ดูว่า focus อยู่ที่ไหน ถ้าผู้ใช้กด Tab ไปที่ปุ่ม "Cancel" (บรรทัด 136) แล้วกด Enter จะเกิดทั้ง acknowledgeRobotPass และ onClose พร้อมกัน dialog ไม่ย้าย focus เข้าไปข้างในด้วย การกด Enter ค้างหรือกดเร็วสองครั้งก่อน re-render ก็ยิง request ซ้ำได้ เพราะ busy ยังเป็น false ใน closure
@@ -418,7 +419,7 @@
 - แก้: เอา Enter handler ออกจาก window แล้วใช้ autoFocus ที่ปุ่ม PASS (หรือครอบด้วย <form onSubmit>) ให้ Enter ทำงานตามปุ่มที่ focus อยู่ และเพิ่ม guard ด้วย ref (inFlightRef) ใน handleConfirm กันการยิงซ้ำ
 - Verifier: pass-robot-dialog.tsx:41 ผูก Enter ไว้ที่ window แล้วเรียก handleConfirm() โดยไม่ดู e.target ถ้า Tab ไปที่ปุ่ม Cancel แล้วกด Enter, listener ที่ window จะยิง acknowledgeRobotPass ไปก่อน แล้ว browser จึง click ปุ่ม Cancel ตามมา คำขอ PASS ส่งออกไปแล้วไม่ว่าปุ่ม Cancel จะทำงานหรือไม่ ซึ่งหมายถึงหุ่นเคลื่อนที่จริง handleConfirm ไม่มี guard ด้วย ref, busy ใน closure จะเป็น true ก็ต่อเมื่อ re-render แล้ว และ dialog ไม่มี autoFocus ส่วนการยิงซ้ำจาก key repeat ทำได้แค่ในช่องเวลาสั้นมาก
 
-### M34. กด Esc ใน dialog หรือ lightbox แล้ว Trip drawer ข้างหลังปิดตามไปด้วย — CONFIRMED
+### M34. กด Esc ใน dialog หรือ lightbox แล้ว Trip drawer ข้างหลังปิดตามไปด้วย — CONFIRMED · ✅ แก้แล้ว (layer stack)
 - กลุ่ม: dispatch · uiux
 - ที่: `frontend/components/dispatch/trip-detail-drawer.tsx:124`
 - ปัญหา: drawer ผูก Escape → onClose ไว้ที่ window และ PassRobotDialog (pass-robot-dialog.tsx:40) กับ Lightbox (manual/trip-pod-section.tsx:127) ก็ผูกที่ window เช่นกันโดยไม่มี stopPropagation หรือเช็กว่าตัวเองเป็น overlay บนสุด ส่วน RaiseExceptionDialog ไม่มี Esc handler ของตัวเองเลย เลยไปเข้า handler ของ drawer แทน
@@ -426,7 +427,7 @@
 - แก้: ให้ drawer ข้าม Esc ตอนที่มี overlay ลูกเปิดอยู่ (ส่ง flag ลงไป หรือให้ลูกเรียก e.stopImmediatePropagation() ใน listener แบบ capture) และเพิ่ม Esc handler ให้ RaiseExceptionDialog ที่ไม่ปิดตอน busy ถ้าจะให้ดีควรทำเป็น hook กลางสำหรับ overlay stack
 - Verifier: drawer (trip-detail-drawer.tsx:124), PassRobotDialog และ Lightbox (trip-pod-section.tsx:127) ต่างผูก Escape ไว้ที่ window และไม่มีตัวไหน stopPropagation กด Esc ครั้งเดียวจึงปิดทุกชั้นพร้อมกัน RaiseExceptionDialog ไม่มี keydown handler เลย (grep ไม่เจอ) Esc จึงไปปิด drawer แทน แล้ว TripActionBar ที่มี dialog อยู่ข้างในก็ถูก unmount ทำให้ข้อความที่พิมพ์ไว้หาย
 
-### M35. Drawer และ dialog ไม่มี role=dialog, focus trap หรือการคืน focus — CONFIRMED
+### M35. Drawer และ dialog ไม่มี role=dialog, focus trap หรือการคืน focus — CONFIRMED · ✅ แก้แล้ว (layer stack)
 - กลุ่ม: dispatch · uiux
 - ที่: `frontend/components/dispatch/trip-detail-drawer.tsx:148`
 - ปัญหา: motion.aside ของ drawer, panel ของ PassRobotDialog (pass-robot-dialog.tsx:80), RaiseExceptionDialog (raise-exception-dialog.tsx:92), ReassignDialog (manual/operator-board-section.tsx:168) และ DenyDialog (manual/override-queue-section.tsx:177) ไม่มี role="dialog", aria-modal หรือ aria-labelledby ไม่ย้าย focus เข้าเมื่อเปิด ไม่ trap focus และไม่คืน focus เมื่อปิด
@@ -466,7 +467,7 @@
 - แก้: เก็บ `latestScan = useRef(0)` และเพิ่มค่าทุกครั้งที่ resolve ถูกเรียก หลัง await ให้เช็กว่ายังเป็นรอบล่าสุดก่อน setState หรือใช้ AbortController ยกเลิก getCarrier ตัวก่อน (getCarrier รับ signal อยู่แล้ว) และ abort ตอนปิด dialog ด้วย
 - Verifier: resolve() ใน carrier-scan-dialog.tsx:70-140 ไม่มี token หรือ AbortController จริง ถ้า A ไม่อยู่ใน knownCarriers จะ await getCarrier(A) ระหว่างนั้นถ้าสแกน B ที่อยู่ใน knownCarriers จะ settle(B) ทันที แล้วเมื่อ A ตอบกลับ settle(A) จะ setState ทับ ตัวกัน repeat (lastScan) กันได้แค่รหัสเดิมซ้ำ การสแกนต่อกันเร็วๆ ด้วย wedge เกิดขึ้นได้จริง แต่ผู้ใช้ยังต้องกดยืนยันเอง และกล่องแสดงรหัส carrier ที่ found ให้เห็น จึงคงไว้ที่ MEDIUM
 
-### M40. Dialog ในกลุ่ม fleet/attachments ไม่มี role=dialog, ไม่ปิดด้วย Esc และไม่ย้าย focus — CONFIRMED
+### M40. Dialog ในกลุ่ม fleet/attachments ไม่มี role=dialog, ไม่ปิดด้วย Esc และไม่ย้าย focus — CONFIRMED · ✅ แก้แล้ว (layer stack)
 - กลุ่ม: fleet · uiux
 - ที่: `frontend/components/fleet/carrier-action-dialog.tsx:183`
 - ปัญหา: panel ของ CarrierActionDialog (183), CarrierFormDialog (carrier-form-dialog.tsx:106), ModalShell (carrier-type-form-dialog.tsx:52), CarrierTypeDeleteDialog (carrier-type-delete-dialog.tsx:64), PhotosDialog (photos-dialog.tsx:71) และ CarrierMaintenancePanel (carrier-maintenance-panel.tsx:58) เป็น motion.div/aside ธรรมดา ไม่มี role="dialog"/aria-modal และไม่มีตัวจับ Escape ทั้งที่ CarrierScanDialog กับ AttachmentLightbox ในโฟลเดอร์เดียวกันมี นอกจากนี้ไม่มี autoFocus ที่ช่องแรกหรือปุ่ม confirm และไม่คืน focus ให้ปุ่มที่เปิด dialog ตอนปิด
@@ -602,7 +603,7 @@
 - แก้: ใน effect ให้สร้าง AbortController หรือ flag `cancelled` ส่ง signal เข้า getStations และไม่ setStations/setLoading เมื่อ request ถูกยกเลิก หรือเทียบ mapId กับ ref ของ map ที่เลือกล่าสุดก่อน set state
 - Verifier: refreshStations (maps-experience.tsx:257-268) เรียก setStations(all) โดยไม่เทียบ mapId กับ map ที่เลือกอยู่ ไม่มี abort และ effect บรรทัด 270-272 ไม่มี cleanup ถ้า response มาไม่ตรงลำดับ station ของ map เก่าจะมาทับได้จริง ทั้งนี้ต้องสลับ map เร็วและ response ต้องสลับลำดับกันด้วย
 
-### M57. Drawer/dialog หลายตัวกด Esc ปิดไม่ได้ และไม่มี role="dialog"/aria-modal — CONFIRMED
+### M57. Drawer/dialog หลายตัวกด Esc ปิดไม่ได้ และไม่มี role="dialog"/aria-modal — CONFIRMED · ✅ แก้แล้ว (layer stack)
 - กลุ่ม: templates · uiux
 - ที่: `frontend/components/order-templates/create-from-template-dialog.tsx:228`
 - ปัญหา: CreateFromTemplateDialog, OrderTemplateDrawer (order-templates/detail-drawer.tsx:62), ConfirmDeleteDialog ทั้งสองตัว (order-templates-experience.tsx:530, action-templates/templates-experience.tsx:581) และ StationEditDrawer (facility/station-edit-drawer.tsx:155) ไม่มี keydown handler สำหรับ Escape ไม่มี role="dialog" aria-modal และไม่ย้าย focus เข้า panel ตอนเปิด ขณะที่ ActionTemplateDialog กับ JobDetailDrawer ใน slice เดียวกันปิดด้วย Esc ได้ และ components/delivery-orders/reopen-dialog.tsx:46,74 ใส่ทั้ง Esc และ role/aria-modal ไว้แล้ว
@@ -940,7 +941,7 @@
 - แก้: ใน handleConfirmClaim ให้ setPreviewTripId(null) ก่อน await หรือใช้ ref 'claimingTripId' เพื่อข้าม toast ใน effect เมื่อแถวที่หายไปคือแถวที่ตัวเองกำลัง claim
 - Verifier: เส้นทางที่สำเร็จไม่ได้ clear previewTripId ถ้า PoolTripClaimed broadcast มาถึงก่อน router.push จะ unmount หน้า effect จะยิง toast ผิด แต่ขึ้นกับลำดับเวลาตอน runtime และเห็นแค่ชั่วครู่ก่อนเปลี่ยนหน้า จึงลดเป็น LOW
 
-### L41. Drawer ยืนยันการ claim ทำ backdrop เอง ไม่รองรับ Esc และไม่ย้าย focus — CONFIRMED
+### L41. Drawer ยืนยันการ claim ทำ backdrop เอง ไม่รองรับ Esc และไม่ย้าย focus — CONFIRMED · ✅ แก้แล้ว (layer stack)
 - กลุ่ม: operator-pwa · uiux
 - ที่: `frontend/components/operator-pwa/pool-trips-list.tsx:196`
 - ปัญหา: ConfirmClaimDrawer เขียน <button className="fixed inset-0 bg-black/60"> เองแทนการใช้ components/primitives/overlay-backdrop.tsx ไม่มี role="dialog"/aria-modal ไม่มี Esc ไม่ย้าย focus เข้า drawer และไม่ trap focus (ตอนนี้ไม่ได้อยู่ใน AnimatePresence จึงยังไม่เกิดปัญหา div ที่ค้างบังการคลิก)
