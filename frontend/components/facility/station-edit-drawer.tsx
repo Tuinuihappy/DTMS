@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import {
   AlertTriangle,
   BatteryCharging,
@@ -143,22 +143,22 @@ export function StationEditDrawer({
 
   return (
     <>
-      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
-          rationale. */}
-      <OverlayBackdrop
+      <ModalLayer
         open={open}
-        onClick={() => !busy && onClose()}
-        className="z-40 bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
-      />
-      <AnimatePresence>
-        {open && (
+        onClose={onClose}
+        dismissible={!busy}
+        backdropClassName="bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
+      >
+        {({ panelProps, titleId, panelStyle }) => (
           <motion.aside
+            {...panelProps}
+            style={panelStyle}
             key="station-edit-drawer-panel"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 320, damping: 34 }}
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-[var(--color-canvas)]/95 backdrop-blur-2xl shadow-[-20px_0_60px_-20px_rgba(15,23,42,0.35)] dark:bg-[var(--color-canvas)]/90"
+            className="fixed inset-y-0 right-0 flex w-full max-w-md flex-col bg-[var(--color-canvas)]/95 backdrop-blur-2xl shadow-[-20px_0_60px_-20px_rgba(15,23,42,0.35)] dark:bg-[var(--color-canvas)]/90 outline-none"
           >
             {/* Header */}
             <div className="relative shrink-0 overflow-hidden">
@@ -184,7 +184,7 @@ export function StationEditDrawer({
                       </span>
                       <StatusBadge active={station.isActive} forced={isOffline} />
                     </div>
-                    <h2 className="font-display mt-1 truncate text-[1.4rem] font-semibold text-[var(--color-ink-900)]">
+                    <h2 id={titleId} className="font-display mt-1 truncate text-[1.4rem] font-semibold text-[var(--color-ink-900)]">
                       {station.name}
                     </h2>
                     <div className="mt-1 flex items-center gap-2 font-mono text-[10.5px] tracking-tight text-[var(--color-ink-500)]">
@@ -434,7 +434,7 @@ export function StationEditDrawer({
             </div>
           </motion.aside>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }

@@ -7,6 +7,7 @@ import {
   type OperatorBoardRow,
   type OverrideQueueRow,
 } from "@/lib/api/admin-manual";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 
 // Phase 4.6 — Right column: pending geofence override requests.
 // Each row exposes Approve + Deny actions that hit the admin endpoints
@@ -170,49 +171,54 @@ function DenyDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl dark:bg-zinc-900"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-base font-semibold">Deny override</h3>
-        <p className="mt-1 text-xs text-zinc-500">
-          Override for trip <span className="font-mono">{row.tripId.slice(0, 8)}</span>.
-          Reason is shown to the operator.
-        </p>
-        <textarea
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          rows={4}
-          placeholder="e.g. Operator must approach the loading dock — current location is in the parking lot."
-          className="mt-3 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-950"
-        />
-        {error && (
-          <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
-            {error}
+    <ModalLayer open onClose={onClose} dismissible={!busy} backdropClassName="bg-black/60">
+      {({ panelProps, titleId, panelStyle }) => (
+        <div
+          key="modal"
+          style={panelStyle}
+          className="pointer-events-none fixed inset-0 flex items-center justify-center p-4"
+        >
+          <div
+            {...panelProps}
+            className="pointer-events-auto w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl outline-none dark:bg-zinc-900"
+          >
+            <h3 id={titleId} className="text-base font-semibold">Deny override</h3>
+            <p className="mt-1 text-xs text-zinc-500">
+              Override for trip <span className="font-mono">{row.tripId.slice(0, 8)}</span>.
+              Reason is shown to the operator.
+            </p>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={4}
+              placeholder="e.g. Operator must approach the loading dock — current location is in the parking lot."
+              className="mt-3 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+            />
+            {error && (
+              <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
+                {error}
+              </div>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submit}
+                disabled={busy || reason.trim().length < 3}
+                className="rounded-md bg-red-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              >
+                {busy ? "Denying…" : "Confirm deny"}
+              </button>
+            </div>
           </div>
-        )}
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={busy || reason.trim().length < 3}
-            className="rounded-md bg-red-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
-          >
-            {busy ? "Denying…" : "Confirm deny"}
-          </button>
         </div>
-      </div>
-    </div>
+      )}
+    </ModalLayer>
   );
 }

@@ -6,6 +6,7 @@ import {
   type ManualTripBoardRow,
   type OperatorBoardRow,
 } from "@/lib/api/admin-manual";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 
 // Phase 4.6 — Left column: operators with their current trip + status.
 // Each row gets a "Reassign" button that opens an inline dialog letting
@@ -161,74 +162,79 @@ function ReassignDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl dark:bg-zinc-900"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-base font-semibold">Reassign trip</h3>
-        <p className="mt-1 text-xs text-zinc-500">
-          Trip <span className="font-mono">{tripId.slice(0, 8)}</span> — pick a different active + idle operator.
-        </p>
-        <div className="mt-4 flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-zinc-500">New operator</span>
-            <select
-              value={newOperatorId}
-              onChange={(e) => setNewOperatorId(e.target.value)}
-              disabled={busy}
-              className="h-10 rounded-md border border-zinc-300 bg-white px-2 dark:border-zinc-700 dark:bg-zinc-950"
-            >
-              <option value="">— choose —</option>
-              {targets.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.employeeCode} · {o.displayName}
-                </option>
-              ))}
-            </select>
-            {targets.length === 0 && (
-              <span className="text-xs text-amber-700 dark:text-amber-300">
-                No idle Active operators available right now.
-              </span>
-            )}
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-zinc-500">Reason (optional)</span>
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              disabled={busy}
-              rows={3}
-              className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-950"
-            />
-          </label>
-          {error && (
-            <div className="rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
-              {error}
+    <ModalLayer open onClose={onClose} dismissible={!busy} backdropClassName="bg-black/60">
+      {({ panelProps, titleId, panelStyle }) => (
+        <div
+          key="modal"
+          style={panelStyle}
+          className="pointer-events-none fixed inset-0 flex items-center justify-center p-4"
+        >
+          <div
+            {...panelProps}
+            className="pointer-events-auto w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl outline-none dark:bg-zinc-900"
+          >
+            <h3 id={titleId} className="text-base font-semibold">Reassign trip</h3>
+            <p className="mt-1 text-xs text-zinc-500">
+              Trip <span className="font-mono">{tripId.slice(0, 8)}</span> — pick a different active + idle operator.
+            </p>
+            <div className="mt-4 flex flex-col gap-3">
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-zinc-500">New operator</span>
+                <select
+                  value={newOperatorId}
+                  onChange={(e) => setNewOperatorId(e.target.value)}
+                  disabled={busy}
+                  className="h-10 rounded-md border border-zinc-300 bg-white px-2 dark:border-zinc-700 dark:bg-zinc-950"
+                >
+                  <option value="">— choose —</option>
+                  {targets.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.employeeCode} · {o.displayName}
+                    </option>
+                  ))}
+                </select>
+                {targets.length === 0 && (
+                  <span className="text-xs text-amber-700 dark:text-amber-300">
+                    No idle Active operators available right now.
+                  </span>
+                )}
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-zinc-500">Reason (optional)</span>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  disabled={busy}
+                  rows={3}
+                  className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-950"
+                />
+              </label>
+              {error && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
+                  {error}
+                </div>
+              )}
             </div>
-          )}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submit}
+                disabled={busy || !newOperatorId}
+                className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+              >
+                {busy ? "Reassigning…" : "Confirm reassign"}
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={busy || !newOperatorId}
-            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
-          >
-            {busy ? "Reassigning…" : "Confirm reassign"}
-          </button>
-        </div>
-      </div>
-    </div>
+      )}
+    </ModalLayer>
   );
 }

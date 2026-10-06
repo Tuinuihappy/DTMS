@@ -7,8 +7,8 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import { useCallback, useEffect, useState } from "react";
 import { PermissionGuard } from "@/components/auth/permission-guard";
 import { Pagination, type PageSize } from "@/components/delivery-orders/pagination";
@@ -338,22 +338,24 @@ function ItemDetailDrawer({
 
   return (
     <>
-      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
-          rationale. */}
-      <OverlayBackdrop
+      <ModalLayer
         open={!!itemId}
-        onClick={onClose}
-        className="z-40 bg-[var(--color-ink-900)]/45 backdrop-blur-sm"
-      />
-      <AnimatePresence>
-        {itemId && (
+        onClose={onClose}
+        initialFocus="panel"
+        label="Item details"
+        backdropClassName="bg-[var(--color-ink-900)]/45 backdrop-blur-sm"
+      >
+        {({ panelProps, titleId, panelStyle }) =>
+          itemId && (
           <motion.aside
+            {...panelProps}
+            style={panelStyle}
             key="item-drawer-panel"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 320, damping: 34 }}
-            className="fixed right-0 top-0 z-50 h-full w-full max-w-md overflow-y-auto glass-strong"
+            className="fixed right-0 top-0 h-full w-full max-w-md overflow-y-auto glass-strong outline-none"
           >
             <header className="flex items-center justify-between border-b border-white/40 px-5 py-4 dark:border-white/[0.06]">
               <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--color-ink-400)]">
@@ -439,7 +441,7 @@ function ItemDetailDrawer({
             </div>
           </motion.aside>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }

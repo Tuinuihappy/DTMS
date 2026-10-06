@@ -1,8 +1,8 @@
 "use client";
 
 import { ChevronRight, RotateCcw, Search, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -511,31 +511,25 @@ function JobDetailDrawer({
     };
   }, [jobId]);
 
-  useEffect(() => {
-    if (!jobId) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [jobId, onClose]);
-
   return (
     <>
-      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
-          rationale. */}
-      <OverlayBackdrop
+      <ModalLayer
         open={!!jobId}
-        onClick={onClose}
-        className="z-40 bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
-      />
-      <AnimatePresence>
-        {jobId && (
+        onClose={onClose}
+        initialFocus="panel"
+        backdropClassName="bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
+      >
+        {({ panelProps, titleId, panelStyle }) =>
+          jobId && (
           <motion.aside
+            {...panelProps}
+            style={panelStyle}
             key="job-drawer-panel"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 340, damping: 38 }}
-            className="fixed right-0 top-0 z-50 flex h-full w-full flex-col bg-[var(--color-surface)] shadow-[0_30px_80px_-20px_rgba(15,23,42,0.5)] sm:w-[min(520px,100vw)]"
+            className="fixed right-0 top-0 flex h-full w-full flex-col bg-[var(--color-surface)] shadow-[0_30px_80px_-20px_rgba(15,23,42,0.5)] sm:w-[min(520px,100vw)] outline-none"
           >
             <header className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--color-ink-100)] px-6 py-5 dark:border-white/[0.06]">
               <div className="min-w-0 flex-1">
@@ -546,7 +540,7 @@ function JobDetailDrawer({
                   <div className="mt-2 h-7 w-48 animate-pulse rounded-md bg-[var(--color-ink-100)]" />
                 ) : (
                   <>
-                    <h2 className="font-mono mt-1 truncate text-[1.2rem] font-semibold text-[var(--color-ink-900)]">
+                    <h2 id={titleId} className="font-mono mt-1 truncate text-[1.2rem] font-semibold text-[var(--color-ink-900)]">
                       {data.id.slice(0, 8)}…
                     </h2>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -662,7 +656,7 @@ function JobDetailDrawer({
             )}
           </motion.aside>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import { usePoolTrips } from "@/lib/hooks/use-pool-trips";
 import { acknowledgeTrip } from "@/lib/api/operator";
 import type { PoolTrip } from "@/lib/api/operator-pool";
@@ -190,19 +191,28 @@ function ConfirmClaimDrawer({
   onConfirm: () => void;
 }) {
   const waited = formatWaited(trip.dispatchedAt);
+  // Claiming binds the trip to this operator: focus opens on Cancel.
+  // Tapping the backdrop still counts as Cancel.
+  const cancelRef = useRef<HTMLButtonElement>(null);
   return (
-    <>
-      {/* Backdrop — tapping it counts as Cancel */}
-      <button
-        type="button"
-        aria-label="Cancel"
-        onClick={onCancel}
-        className="fixed inset-0 z-40 bg-black/60"
-      />
-      <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border-t border-zinc-800 bg-zinc-950 shadow-2xl">
+    <ModalLayer
+      open
+      onClose={onCancel}
+      dismissible={!busy}
+      intent="irreversible"
+      safeRef={cancelRef}
+      backdropClassName="bg-black/60"
+    >
+      {({ panelProps, titleId, panelStyle }) => (
+      <div
+        {...panelProps}
+        key="confirm-claim"
+        style={panelStyle}
+        className="fixed inset-x-0 bottom-0 rounded-t-3xl border-t border-zinc-800 bg-zinc-950 shadow-2xl outline-none"
+      >
         <div className="mx-auto w-full max-w-2xl px-6 pb-6 pt-4">
           <div className="mx-auto h-1 w-10 rounded-full bg-zinc-700" />
-          <h2 className="mt-4 text-lg font-semibold text-zinc-100">
+          <h2 id={titleId} className="mt-4 text-lg font-semibold text-zinc-100">
             Confirm to accept this trip
           </h2>
           <p className="mt-1 text-xs text-zinc-500">
@@ -228,6 +238,7 @@ function ConfirmClaimDrawer({
 
           <div className="mt-5 grid grid-cols-2 gap-3">
             <button
+              ref={cancelRef}
               type="button"
               onClick={onCancel}
               disabled={busy}
@@ -246,7 +257,8 @@ function ConfirmClaimDrawer({
           </div>
         </div>
       </div>
-    </>
+      )}
+    </ModalLayer>
   );
 }
 
