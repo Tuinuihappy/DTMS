@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "prebuild": "node scripts/check-route-protection.mjs",
+    "prebuild": "node scripts/check-route-protection.mjs && node scripts/check-overlay-keys.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
