@@ -1,9 +1,9 @@
 "use client";
 
 import { AlertTriangle, Loader2, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
+import { useEffect, useRef, useState } from "react";
 import {
   deleteCarrier,
   moveCarrier,
@@ -108,6 +108,8 @@ export function CarrierActionDialog({
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Retire and delete open on Cancel (intent="irreversible").
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -117,15 +119,7 @@ export function CarrierActionDialog({
     }
   }, [open, action, carrier]);
 
-  if (!spec || !carrier || !action) {
-    return (
-      <OverlayBackdrop
-        open={false}
-        onClick={onClose}
-        className="z-40 bg-[var(--color-ink-900)]/55 backdrop-blur-md"
-      />
-    );
-  }
+  if (!spec || !carrier || !action) return null;
 
   const canConfirm = !spec.inputRequired || value.trim() !== "";
 
@@ -169,23 +163,28 @@ export function CarrierActionDialog({
 
   return (
     <>
-      <OverlayBackdrop
+      <ModalLayer
         open={open}
-        onClick={() => !busy && onClose()}
-        className="z-40 bg-[var(--color-ink-900)]/55 backdrop-blur-md"
-      />
-      <AnimatePresence>
-        {open && (
+        onClose={onClose}
+        dismissible={!busy}
+        {...(action === "retire" || action === "delete"
+          ? { intent: "irreversible" as const, safeRef: cancelRef }
+          : { intent: "default" as const })}
+        backdropClassName="bg-[var(--color-ink-900)]/55 backdrop-blur-md"
+      >
+        {({ panelProps, titleId, panelStyle }) => (
           <div
+            style={panelStyle}
             key="carrier-action-dialog"
-            className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="pointer-events-none fixed inset-0 flex items-center justify-center p-4"
           >
             <motion.div
+              {...panelProps}
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
               transition={{ type: "spring", stiffness: 360, damping: 30 }}
-              className="pointer-events-auto relative w-full max-w-md overflow-hidden rounded-[var(--radius-xl)] glass-strong"
+              className="pointer-events-auto relative w-full max-w-md overflow-hidden rounded-[var(--radius-xl)] glass-strong outline-none"
             >
               <header className="flex items-start gap-3 px-6 pt-5">
                 <span
@@ -200,7 +199,7 @@ export function CarrierActionDialog({
                 >
                   <AlertTriangle className="h-5 w-5" strokeWidth={2.2} />
                 </span>
-                <h2 className="font-display mt-1 flex-1 text-[1.2rem] font-semibold text-[var(--color-ink-900)]">
+                <h2 id={titleId} className="font-display mt-1 flex-1 text-[1.2rem] font-semibold text-[var(--color-ink-900)]">
                   {spec.title}
                 </h2>
                 <button
@@ -243,6 +242,7 @@ export function CarrierActionDialog({
 
               <footer className="flex items-center justify-end gap-2 border-t border-white/40 px-6 py-4 dark:border-white/[0.06]">
                 <button
+                  ref={cancelRef}
                   type="button"
                   onClick={() => !busy && onClose()}
                   className="rounded-full bg-white/40 px-4 py-2 text-[12px] font-semibold text-[var(--color-ink-700)] transition-colors hover:bg-white/70 dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
@@ -271,7 +271,7 @@ export function CarrierActionDialog({
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }

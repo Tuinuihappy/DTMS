@@ -1,9 +1,9 @@
 "use client";
 
 import { Loader2, PackagePlus, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import { useEffect, useState } from "react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { createCarrier, updateCarrier, type Carrier } from "@/lib/api/fleet-carriers";
 import type { CarrierTypeProfile } from "@/lib/api/fleet-carrier-types";
 import { cn } from "@/lib/utils";
@@ -92,29 +92,31 @@ export function CarrierFormDialog({
 
   return (
     <>
-      <OverlayBackdrop
+      <ModalLayer
         open={open}
-        onClick={() => !busy && onClose()}
-        className="z-40 bg-[var(--color-ink-900)]/55 backdrop-blur-md"
-      />
-      <AnimatePresence>
-        {open && (
+        onClose={onClose}
+        dismissible={!busy}
+        backdropClassName="bg-[var(--color-ink-900)]/55 backdrop-blur-md"
+      >
+        {({ panelProps, titleId, panelStyle }) => (
           <div
+            style={panelStyle}
             key="register-carrier-dialog"
-            className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="pointer-events-none fixed inset-0 flex items-center justify-center p-4"
           >
             <motion.div
+              {...panelProps}
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
               transition={{ type: "spring", stiffness: 360, damping: 30 }}
-              className="pointer-events-auto relative w-full max-w-md overflow-hidden rounded-[var(--radius-xl)] glass-strong"
+              className="pointer-events-auto relative w-full max-w-md overflow-hidden rounded-[var(--radius-xl)] glass-strong outline-none"
             >
               <header className="flex items-start gap-3 px-6 pt-5">
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--color-pastel-mint)] text-[var(--color-brand-900)]">
                   <PackagePlus className="h-5 w-5" strokeWidth={2.2} />
                 </span>
-                <h2 className="font-display mt-1 flex-1 text-[1.2rem] font-semibold text-[var(--color-ink-900)]">
+                <h2 id={titleId} className="font-display mt-1 flex-1 text-[1.2rem] font-semibold text-[var(--color-ink-900)]">
                   {isEdit ? `Edit ${carrier.carrierCode}` : "Register carrier"}
                 </h2>
                 <button
@@ -238,7 +240,7 @@ export function CarrierFormDialog({
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }
