@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { useDismissableLayer } from "@/lib/overlay/use-layer";
 
 // Row-level dropdown menus get clipped by `overflow-hidden` on
 // DataTableShell + `overflow-x-auto` on its inner scroll container —
@@ -79,9 +80,13 @@ export function RowMenuPortal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Close on outside click + Escape. The trigger button has its own
-  // toggle handler, so we ignore clicks that hit the trigger itself —
-  // otherwise opening would immediately close.
+  // Esc goes through the layer stack (a non-modal layer), so a menu open
+  // over a dialog closes before the dialog does; z-index comes from there.
+  const { z } = useDismissableLayer({ open, onDismiss: onClose });
+
+  // Close on outside click. The trigger button has its own toggle
+  // handler, so we ignore clicks that hit the trigger itself — otherwise
+  // opening would immediately close.
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
@@ -90,19 +95,36 @@ export function RowMenuPortal({
       if (triggerRef.current?.contains(target)) return;
       onClose();
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
     const timer = setTimeout(() => {
       window.addEventListener("click", onClick);
-      window.addEventListener("keydown", onKey);
     }, 0);
     return () => {
       clearTimeout(timer);
       window.removeEventListener("click", onClick);
-      window.removeEventListener("keydown", onKey);
     };
   }, [open, onClose, triggerRef]);
+
+  // When the menu closes with focus inside it (Esc, or an item was chosen),
+  // put focus back on the trigger. Layout effect on purpose: it runs before
+  // the passive effect of a dialog that the item just opened, so that
+  // dialog records the trigger as where to return focus when it closes —
+  // the item itself is about to be removed.
+  const wasOpen = useRef(false);
+  useLayoutEffect(() => {
+    if (open) {
+      wasOpen.current = true;
+      return;
+    }
+    if (!wasOpen.current) return;
+    wasOpen.current = false;
+    const active = document.activeElement;
+    const focusWasInMenu =
+      !active ||
+      active === document.body ||
+      !active.isConnected ||
+      (menuRef.current?.contains(active) ?? false);
+    if (focusWasInMenu) triggerRef.current?.focus({ preventScroll: true });
+  }, [open, triggerRef]);
 
   if (!mounted) return null;
 
@@ -123,7 +145,7 @@ export function RowMenuPortal({
             top: anchor.bottom + 4,
             left: anchor.right - width,
             width,
-            zIndex: 60,
+            zIndex: z ?? 60,
           }}
           className="origin-top-right overflow-hidden rounded-xl glass-strong shadow-[0_20px_50px_-15px_rgba(15,23,42,0.35)]"
         >

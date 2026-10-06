@@ -4,7 +4,9 @@
 //   - a keydown listener added by hand that handles Escape — overlays use
 //     ModalLayer / useDialog, lists and menus use useDismissableLayer, so
 //     the stack can send Esc to the topmost layer only;
-//   - hand-written role="dialog" / aria-modal — ModalLayer sets them.
+//   - hand-written aria-modal — ModalLayer sets it. (A plain role="dialog"
+//     without aria-modal is fine: that's a non-modal popover, e.g. the map
+//     instructions panel, which uses useDismissableLayer.)
 //
 // No eslint in this repo, so without this a new overlay would quietly go
 // back to a window listener and one Esc would close every layer again.
@@ -45,8 +47,8 @@ for (const file of walk(SCAN)) {
         findings.push(`${rel}:${i + 1}  hand-rolled Escape keydown listener — use ModalLayer / useDialog / useDismissableLayer`);
       }
     }
-    if (/role=["']dialog["']|role=["']alertdialog["']|aria-modal/.test(line)) {
-      findings.push(`${rel}:${i + 1}  hand-written dialog role/aria-modal — use ModalLayer (it sets them)`);
+    if (/aria-modal/.test(line)) {
+      findings.push(`${rel}:${i + 1}  hand-written aria-modal — use ModalLayer (it sets it)`);
     }
   });
 }

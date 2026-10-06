@@ -1,10 +1,10 @@
 "use client";
 
 import { ArrowUpRight, Menu, Truck, X } from "lucide-react";
-import { AnimatePresence, motion, useScroll, useTransform } from "motion/react";
+import { motion, useScroll, useTransform } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -27,19 +27,14 @@ export function LandingTopNav() {
   const driftY = useTransform(scrollY, [60, 100], [0, -24], { clamp: true });
   const pointerEvents = useTransform(scrollY, (v) => (v >= 100 ? "none" : "auto"));
 
-  // Close the mobile menu on ESC + lock body scroll so the background
-  // doesn't scroll behind the overlay (and so layout shifts don't push
-  // content around when the menu opens).
+  // Lock body scroll so the background doesn't scroll behind the overlay
+  // (and so layout shifts don't push content around when the menu opens).
+  // Esc is ModalLayer's.
   useEffect(() => {
     if (!mobileOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMobileOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
     };
   }, [mobileOpen]);
@@ -142,28 +137,23 @@ export function LandingTopNav() {
       </motion.div>
     </motion.header>
 
-    {/* Mobile menu — backdrop + floating card panel, rendered as TOP-LEVEL
-        siblings (not wrapped in a shared motion.div). Wrapping them in a
-        common ancestor with framer-motion opacity creates a stacking context
-        that isolates the panel's `.glass` backdrop-filter, making the blur
-        fail to obscure the page behind it. The backdrop stays mounted
-        outside AnimatePresence — see OverlayBackdrop. */}
-    <OverlayBackdrop
+    <ModalLayer
       open={mobileOpen}
-      onClick={() => setMobileOpen(false)}
-      className="lg:hidden z-40 bg-[var(--color-ink-900)]/30 backdrop-blur-2xl"
-    />
-
-    <AnimatePresence>
-      {mobileOpen && (
+      onClose={() => setMobileOpen(false)}
+      initialFocus="panel"
+      label="Mobile navigation"
+      backdropClassName="lg:hidden bg-[var(--color-ink-900)]/30 backdrop-blur-2xl"
+    >
+      {({ panelProps, titleId, panelStyle }) => (
         <motion.nav
+          {...panelProps}
+          style={panelStyle}
           key="mobile-menu"
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          className="lg:hidden fixed top-[68px] left-1/2 -translate-x-1/2 z-50 w-[calc(100vw-4rem)] rounded-[var(--radius-xl)] bg-white dark:bg-[var(--color-ink-950)] border border-[var(--color-ink-100)] dark:border-white/[0.06] p-2 flex flex-col gap-0.5 shadow-[0_18px_50px_-18px_rgba(15,23,42,0.45)]"
-          aria-label="Mobile navigation"
+          className="lg:hidden fixed top-[68px] left-1/2 -translate-x-1/2 w-[calc(100vw-4rem)] rounded-[var(--radius-xl)] bg-white dark:bg-[var(--color-ink-950)] border border-[var(--color-ink-100)] dark:border-white/[0.06] p-2 flex flex-col gap-0.5 shadow-[0_18px_50px_-18px_rgba(15,23,42,0.45)] outline-none"
         >
           {items.map((it) => {
             const isActive = active === it.label;
@@ -197,7 +187,7 @@ export function LandingTopNav() {
           </div>
         </motion.nav>
       )}
-    </AnimatePresence>
+    </ModalLayer>
     </>
   );
 }

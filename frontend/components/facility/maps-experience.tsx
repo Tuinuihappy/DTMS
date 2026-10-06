@@ -40,6 +40,7 @@ import { NumberTicker } from "@/components/primitives/number-ticker";
 import { SectionLabel } from "@/components/primitives/section-label";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { DateTime } from "@/components/primitives/date-time";
+import { useDismissableLayer } from "@/lib/overlay/use-layer";
 import { cn } from "@/lib/utils";
 import {
   clearStationOverride,
@@ -763,6 +764,8 @@ export function CanvasCard({
   // clicks that originated inside either of them.
   const [showInstructions, setShowInstructions] = useState(false);
   const helpRef = useRef<HTMLDivElement>(null);
+  // Non-modal popover: Esc via the layer stack, outside click closes too.
+  useDismissableLayer({ open: showInstructions, onDismiss: () => setShowInstructions(false) });
   useEffect(() => {
     if (!showInstructions) return;
     const onClick = (e: MouseEvent) => {
@@ -770,14 +773,9 @@ export function CanvasCard({
         setShowInstructions(false);
       }
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setShowInstructions(false);
-    };
     document.addEventListener("mousedown", onClick);
-    document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("mousedown", onClick);
-      document.removeEventListener("keydown", onKey);
     };
   }, [showInstructions]);
 

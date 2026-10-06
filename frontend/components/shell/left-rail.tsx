@@ -33,10 +33,10 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { useShell } from "@/components/shell/shell-context";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -278,19 +278,15 @@ export function LeftRail() {
     );
   }, [expanded, hydrated]);
 
+  // Lock body scroll while the drawer is open. Esc is ModalLayer's.
   useEffect(() => {
     if (!railDrawerOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeRailDrawer();
-    };
-    window.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [railDrawerOpen, closeRailDrawer]);
+  }, [railDrawerOpen]);
 
   return (
     <>
@@ -341,24 +337,25 @@ export function LeftRail() {
 
     {/* ── Tablet-portrait drawer ──────────────────────────────────── */}
     {/* Slides in from the left when the hamburger toggles it. Hidden  */}
-    {/* on lg+ (the permanent rail takes over). Backdrop closes; ESC   */}
-    {/* closes (see effect above).                                     */}
-    {/* Backdrop stays mounted outside AnimatePresence — see OverlayBackdrop. */}
-    <OverlayBackdrop
+    {/* on lg+ (the permanent rail takes over). Backdrop and Esc close */}
+    {/* it (ModalLayer); the effect above locks body scroll.          */}
+    <ModalLayer
       open={railDrawerOpen}
-      onClick={closeRailDrawer}
-      className="lg:hidden z-50 bg-[var(--color-ink-900)]/30 backdrop-blur-sm"
-    />
-    <AnimatePresence>
-      {railDrawerOpen && (
+      onClose={closeRailDrawer}
+      initialFocus="panel"
+      label="Quick actions"
+      backdropClassName="lg:hidden bg-[var(--color-ink-900)]/30 backdrop-blur-sm"
+    >
+      {({ panelProps, titleId, panelStyle }) => (
           <motion.aside
+            {...panelProps}
+            style={panelStyle}
             key="rail-drawer"
             initial={{ x: -320 }}
             animate={{ x: 0 }}
             exit={{ x: -320 }}
             transition={{ type: "spring", stiffness: 320, damping: 32, mass: 0.7 }}
-            className="lg:hidden fixed z-[51] left-0 inset-y-0 w-[280px] bg-white/95 dark:bg-[var(--color-ink-950)]/95 backdrop-blur-xl shadow-[0_20px_60px_-20px_rgba(15,23,42,0.35)] border-r border-[var(--color-ink-100)]/70 dark:border-white/[0.06] flex flex-col"
-            aria-label="Quick actions"
+            className="lg:hidden fixed left-0 inset-y-0 w-[280px] bg-white/95 dark:bg-[var(--color-ink-950)]/95 backdrop-blur-xl shadow-[0_20px_60px_-20px_rgba(15,23,42,0.35)] border-r border-[var(--color-ink-100)]/70 dark:border-white/[0.06] flex flex-col outline-none"
           >
             {/* Drawer header — close button */}
             <div className="flex items-center justify-between px-4 py-4 border-b border-[var(--color-ink-100)]/70 dark:border-white/[0.06]">
@@ -392,7 +389,7 @@ export function LeftRail() {
 
           </motion.aside>
       )}
-    </AnimatePresence>
+    </ModalLayer>
     </>
   );
 }

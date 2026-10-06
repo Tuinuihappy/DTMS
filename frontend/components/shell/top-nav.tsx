@@ -8,6 +8,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { Avatar } from "@/components/primitives/avatar";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { useShell } from "@/components/shell/shell-context";
+import { useDismissableLayer } from "@/lib/overlay/use-layer";
 import { cn } from "@/lib/utils";
 
 const navItems = ["Home", "Messages", "Discover", "Wallet", "Projects"] as const;
@@ -129,19 +130,16 @@ function AccountMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
 
+  // Esc via the layer stack (non-modal layer); outside click closes too.
+  useDismissableLayer({ open, onDismiss: () => setOpen(false) });
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
     window.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey);
     };
   }, [open]);
 
