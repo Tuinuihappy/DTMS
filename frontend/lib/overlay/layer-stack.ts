@@ -58,6 +58,14 @@ const FOCUSABLE = [
   "[contenteditable=true]",
 ].join(",");
 
+/** Marks the focus guards ModalLayer renders before and after a panel. */
+export const FOCUS_GUARD_ATTR = "data-focus-guard";
+
+function isFocusGuard(el: unknown): boolean {
+  const g = el as { hasAttribute?: (name: string) => boolean } | null;
+  return typeof g?.hasAttribute === "function" && g.hasAttribute(FOCUS_GUARD_ATTR);
+}
+
 // Inputs whose own picker uses Esc — let the browser close the picker
 // first instead of closing the dialog under it.
 const PICKER_INPUT_TYPES = new Set(["date", "time", "datetime-local", "month", "week"]);
@@ -69,6 +77,30 @@ function isVisible(el: unknown): boolean {
 
 export function focusablesIn(node: LayerNode): FocusTarget[] {
   return Array.from(node.querySelectorAll(FOCUSABLE)).filter(isVisible) as FocusTarget[];
+}
+
+// The selector can't know everything the browser skips (it listed a
+// disabled-looking motion.button the browser wouldn't Tab to), so "first"
+// and "last" are decided by actually focusing: try candidates in order and
+// keep the first one that really took focus.
+function tryFocusIn(node: LayerNode, fromEnd: boolean): boolean {
+  const items = focusablesIn(node);
+  if (fromEnd) items.reverse();
+  const doc = (globalThis as { document?: { activeElement: unknown } }).document;
+  for (const el of items) {
+    el.focus({ preventScroll: true });
+    if (!doc || doc.activeElement === el) return true;
+  }
+  node.focus({ preventScroll: true });
+  return false;
+}
+
+export function focusFirstIn(node: LayerNode): boolean {
+  return tryFocusIn(node, false);
+}
+
+export function focusLastIn(node: LayerNode): boolean {
+  return tryFocusIn(node, true);
 }
 
 export type LayerStack = ReturnType<typeof createLayerStack>;
@@ -134,25 +166,19 @@ export function createLayerStack(target: EventTarget | null) {
     }
 
     if (e.key === "Tab") {
+      // Wrapping at the panel's edges is done by focus guards around the
+      // panel (ModalLayer): the browser itself decides what is tabbable and
+      // lands on a guard, which sends focus back in. Here we only pull focus
+      // in when it is somewhere else entirely (the page behind, <body>).
       const layer = topModal();
       const node = layer ? nodes.get(layer.id) : undefined;
       if (!node) return;
-      const items = focusablesIn(node);
       const active = (globalThis as { document?: { activeElement: unknown } }).document
         ?.activeElement;
-      if (items.length === 0 || !node.contains(active)) {
+      if (!node.contains(active) && !isFocusGuard(active)) {
         e.preventDefault();
-        (items[0] ?? node).focus({ preventScroll: true });
-        return;
-      }
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (e.shiftKey && active === first) {
-        e.preventDefault();
-        last.focus({ preventScroll: true });
-      } else if (!e.shiftKey && active === last) {
-        e.preventDefault();
-        first.focus({ preventScroll: true });
+        if (e.shiftKey) focusLastIn(node);
+        else focusFirstIn(node);
       }
     }
   }

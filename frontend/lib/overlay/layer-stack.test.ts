@@ -145,26 +145,59 @@ test("a stale unregister does not remove a re-registered layer (StrictMode)", ()
   assert.equal(stack.isOpen("dialog"), true);
 });
 
-test("Tab wraps inside the topmost modal panel", () => {
-  const { add, stack, key } = setup();
-  const focused: string[] = [];
-  const mk = (name: string) => ({ name, focus: () => focused.push(name) });
-  const first = mk("first");
-  const last = mk("last");
+// A fake DOM: `focusable` elements accept focus (document.activeElement
+// follows), the rest silently refuse — like a button the browser treats as
+// disabled even though the selector matched it.
+function fakePanel(names: string[], refuse: string[] = []) {
+  const doc = { activeElement: null as unknown };
+  (globalThis as Record<string, unknown>).document = doc;
+  const els = names.map((name) => ({
+    name,
+    focus: () => {
+      if (!refuse.includes(name)) doc.activeElement = els.find((e) => e.name === name);
+    },
+  }));
   const node = {
-    focus: () => focused.push("panel"),
-    contains: (x: unknown) => x === first || x === last,
-    querySelectorAll: () => [first, last],
+    name: "panel",
+    focus: () => (doc.activeElement = node),
+    contains: (x: unknown) => x === node || els.includes(x as (typeof els)[number]),
+    querySelectorAll: () => els,
   };
+  return { doc, els, node };
+}
+
+test("Tab from outside the panel pulls focus in (Shift+Tab: from the end)", () => {
+  const { add, stack, key } = setup();
+  const { doc, node } = fakePanel(["close", "field", "cancel"]);
   add("dialog");
   stack.setNode("dialog", node);
-  (globalThis as Record<string, unknown>).document = { activeElement: last };
-  const e1 = key("Tab");
-  assert.equal(e1.defaultPrevented, true);
-  (globalThis as Record<string, unknown>).document = { activeElement: first };
+  doc.activeElement = { outside: true };
+  const e = key("Tab");
+  assert.equal(e.defaultPrevented, true);
+  assert.equal((doc.activeElement as { name: string }).name, "close");
+  doc.activeElement = { outside: true };
   key("Tab", { shiftKey: true });
-  (globalThis as Record<string, unknown>).document = { activeElement: { outside: true } };
-  key("Tab");
-  assert.deepEqual(focused, ["first", "last", "first"]);
+  assert.equal((doc.activeElement as { name: string }).name, "cancel");
+  delete (globalThis as Record<string, unknown>).document;
+});
+
+test("Tab inside the panel is left to the browser (guards wrap at the edges)", () => {
+  const { add, stack, key } = setup();
+  const { doc, els, node } = fakePanel(["close", "field", "cancel"]);
+  add("dialog");
+  stack.setNode("dialog", node);
+  doc.activeElement = els[2];
+  const e = key("Tab");
+  assert.equal(e.defaultPrevented, false);
+  delete (globalThis as Record<string, unknown>).document;
+});
+
+test("focusLastIn skips a control that refuses focus (the escaped-Tab bug)", async () => {
+  const { focusLastIn, focusFirstIn } = await import("./layer-stack.ts");
+  const { doc, node } = fakePanel(["close", "field", "cancel", "continue"], ["continue"]);
+  focusLastIn(node);
+  assert.equal((doc.activeElement as { name: string }).name, "cancel");
+  focusFirstIn(node);
+  assert.equal((doc.activeElement as { name: string }).name, "close");
   delete (globalThis as Record<string, unknown>).document;
 });

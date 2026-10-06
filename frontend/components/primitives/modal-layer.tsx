@@ -6,6 +6,12 @@ import { createPortal } from "react-dom";
 import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { usePortalTarget } from "@/components/primitives/overlay-root";
 import {
+  FOCUS_GUARD_ATTR,
+  focusFirstIn,
+  focusLastIn,
+  layerStack,
+} from "@/lib/overlay/layer-stack";
+import {
   LayerContext,
   useDialog,
   type DialogInitialFocus,
@@ -105,6 +111,27 @@ export function ModalLayer(props: ModalLayerProps) {
     panelStyle: z != null ? { zIndex: z + 1 } : undefined,
   };
 
+  // Focus guards: the browser Tabs onto these at the panel's edges (they
+  // sit right before and after it in DOM order) and they send focus back
+  // in — Tab past the last control wraps to the first, Shift+Tab past the
+  // first wraps to the last. The browser decides what's tabbable, so a
+  // control it skips can't let focus out of the dialog.
+  const guard = (edge: "start" | "end") =>
+    open ? (
+      <span
+        {...{ [FOCUS_GUARD_ATTR]: edge }}
+        tabIndex={0}
+        aria-hidden
+        style={GUARD_STYLE}
+        onFocus={() => {
+          const node = layerStack.nodeOf(id);
+          if (!node) return;
+          if (edge === "start") focusLastIn(node);
+          else focusFirstIn(node);
+        }}
+      />
+    ) : null;
+
   return createPortal(
     <LayerContext.Provider value={id}>
       <OverlayBackdrop
@@ -113,8 +140,19 @@ export function ModalLayer(props: ModalLayerProps) {
         className={backdropClassName}
         zIndex={z}
       />
+      {guard("start")}
       <AnimatePresence>{open ? children(render) : null}</AnimatePresence>
+      {guard("end")}
     </LayerContext.Provider>,
     target,
   );
 }
+
+const GUARD_STYLE: CSSProperties = {
+  position: "fixed",
+  width: 1,
+  height: 1,
+  opacity: 0,
+  overflow: "hidden",
+  pointerEvents: "none",
+};
