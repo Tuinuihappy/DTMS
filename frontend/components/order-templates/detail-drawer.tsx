@@ -1,7 +1,7 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import {
   Activity,
   Anchor,
@@ -50,22 +50,24 @@ export function OrderTemplateDrawer({
 }) {
   return (
     <>
-      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
-          rationale. */}
-      <OverlayBackdrop
+      <ModalLayer
         open={open && !!template}
-        onClick={() => !busy && onClose()}
-        className="z-40 bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
-      />
-      <AnimatePresence>
-        {open && template && (
+        onClose={onClose}
+        dismissible={!busy}
+        initialFocus="panel"
+        backdropClassName="bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
+      >
+        {({ panelProps, titleId, panelStyle }) =>
+          open && template && (
           <motion.aside
+            {...panelProps}
+            style={panelStyle}
             key="order-template-drawer-panel"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 320, damping: 34 }}
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-[var(--color-canvas)]/95 backdrop-blur-2xl shadow-[-20px_0_60px_-20px_rgba(15,23,42,0.35)] dark:bg-[var(--color-canvas)]/90"
+            className="fixed inset-y-0 right-0 flex w-full max-w-lg flex-col bg-[var(--color-canvas)]/95 backdrop-blur-2xl shadow-[-20px_0_60px_-20px_rgba(15,23,42,0.35)] dark:bg-[var(--color-canvas)]/90 outline-none"
           >
             {/* Header */}
             <div className="relative overflow-hidden">
@@ -82,7 +84,7 @@ export function OrderTemplateDrawer({
                       </span>
                       <ActiveDot active={template.isActive} />
                     </div>
-                    <h2 className="font-display mt-1 truncate text-[1.45rem] font-semibold text-[var(--color-ink-900)]">
+                    <h2 id={titleId} className="font-display mt-1 truncate text-[1.45rem] font-semibold text-[var(--color-ink-900)]">
                       {template.name}
                     </h2>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -264,7 +266,7 @@ export function OrderTemplateDrawer({
             </div>
           </motion.aside>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }

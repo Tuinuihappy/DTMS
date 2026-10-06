@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -215,26 +215,26 @@ export function CreateFromTemplateDialog({
 
   return (
     <>
-      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
-          rationale. Wrapper is pointer-events-none (panel re-enables)
-          so a stranded exit can never swallow page clicks. */}
-      <OverlayBackdrop
+      <ModalLayer
         open={open && !!template}
-        onClick={() => !busy && onClose()}
-        className="z-50 bg-[var(--color-ink-900)]/55 backdrop-blur-md"
-      />
-      <AnimatePresence>
-        {open && template && (
+        onClose={onClose}
+        dismissible={!busy}
+        backdropClassName="bg-[var(--color-ink-900)]/55 backdrop-blur-md"
+      >
+        {({ panelProps, titleId, panelStyle }) =>
+          open && template && (
           <div
+            style={panelStyle}
             key="create-from-template-dialog"
-            className="pointer-events-none fixed inset-0 z-[55] flex items-center justify-center p-4"
+            className="pointer-events-none fixed inset-0 flex items-center justify-center p-4"
           >
             <motion.div
+              {...panelProps}
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.18 } }}
               transition={{ type: "spring", stiffness: 320, damping: 30 }}
-              className="pointer-events-auto glass-strong relative flex w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-xl)]"
+              className="pointer-events-auto glass-strong relative flex w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-xl)] outline-none"
               style={{ maxHeight: "min(90vh, 760px)" }}
             >
               {/* Decorative header gradient. shrink-0 keeps the title and step
@@ -252,7 +252,7 @@ export function CreateFromTemplateDialog({
                       <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[var(--color-ink-400)]">
                         Create order from template
                       </div>
-                      <h2 className="font-display mt-1 truncate text-[1.3rem] font-semibold text-[var(--color-ink-900)]">
+                      <h2 id={titleId} className="font-display mt-1 truncate text-[1.3rem] font-semibold text-[var(--color-ink-900)]">
                         {template.name}
                       </h2>
                       <div className="mt-1 flex items-center gap-2 text-[11.5px] text-[var(--color-ink-500)]">
@@ -458,7 +458,7 @@ export function CreateFromTemplateDialog({
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }
