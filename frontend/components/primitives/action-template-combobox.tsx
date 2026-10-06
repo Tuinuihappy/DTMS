@@ -99,13 +99,8 @@ export function ActionTemplateCombobox({
         e.preventDefault();
         commit(filtered[highlight].name);
       }
-    } else if (e.key === "Escape" && open) {
-      // Close only the list — keep the Esc from reaching a host dialog's
-      // window listener, which would close the whole form.
-      e.preventDefault();
-      e.stopPropagation();
-      setOpen(false);
     }
+    // Esc is handled by the layer stack (ComboboxListPortal's onDismiss).
   }
 
   const displayValue = open ? query : value;
@@ -177,7 +172,7 @@ export function ActionTemplateCombobox({
         )}
       </div>
 
-      <ComboboxListPortal open={open && !loading && !error} anchorRef={wrapperRef}>
+      <ComboboxListPortal open={open && !loading && !error} anchorRef={wrapperRef} onDismiss={() => setOpen(false)}>
         <ul
           ref={listRef}
           role="listbox"

@@ -118,13 +118,8 @@ export function IntIdCombobox({
         e.preventDefault();
         commit(String(filtered[highlight].vendorId));
       }
-    } else if (e.key === "Escape" && open) {
-      // Close only the list — keep the Esc from reaching a host dialog's
-      // window listener, which would close the whole form.
-      e.preventDefault();
-      e.stopPropagation();
-      setOpen(false);
     }
+    // Esc is handled by the layer stack (ComboboxListPortal's onDismiss).
   }
 
   // Resolve the currently-selected option (if any) — drives the
@@ -203,7 +198,7 @@ export function IntIdCombobox({
         )}
       </div>
 
-      <ComboboxListPortal open={open && !loading && !error} anchorRef={wrapperRef}>
+      <ComboboxListPortal open={open && !loading && !error} anchorRef={wrapperRef} onDismiss={() => setOpen(false)}>
         <ul
           ref={listRef}
           role="listbox"

@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { useDismissableLayer } from "@/lib/overlay/use-layer";
 
 // Combobox dropdown lists rendered in-tree lose to sibling stacking
 // contexts: every mission-row / section card carries backdrop-filter (and
@@ -20,16 +21,23 @@ import { createPortal } from "react-dom";
 
 type Rect = { top: number; left: number; width: number };
 
+// The open list is a non-modal layer: Esc closes the list (not the dialog
+// it sits in — the list is that dialog's child layer) and its z-index
+// comes from the stack, so it is always above the dialog that hosts it.
 export function ComboboxListPortal({
   open,
   anchorRef,
+  onDismiss,
   children,
 }: {
   open: boolean;
   // The combobox wrapper — the list matches its width and opens under it.
   anchorRef: React.RefObject<HTMLElement | null>;
+  /** Close the list (Esc). */
+  onDismiss: () => void;
   children: ReactNode;
 }) {
+  const { z } = useDismissableLayer({ open, onDismiss });
   const [rect, setRect] = useState<Rect | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -64,7 +72,7 @@ export function ComboboxListPortal({
         top: rect.top,
         left: rect.left,
         width: rect.width,
-        zIndex: 60,
+        zIndex: z ?? 60,
       }}
     >
       {children}

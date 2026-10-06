@@ -1,9 +1,9 @@
 "use client";
 
 import { Camera, ImageOff, Loader2 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import { useEffect, useState } from "react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { getTripPodPhotos, type TripPodPhoto } from "@/lib/api/admin-manual";
 
 /**
@@ -122,32 +122,29 @@ function Lightbox({
   zoomed: { url: string; label: string } | null;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    if (!zoomed) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [zoomed, onClose]);
-
   return (
     <>
-      <OverlayBackdrop
+      <ModalLayer
         open={zoomed !== null}
-        onClick={onClose}
-        className="z-[60] bg-[var(--color-ink-900)]/80 backdrop-blur-md"
-      />
-      <AnimatePresence>
-        {zoomed && (
+        onClose={onClose}
+        initialFocus="panel"
+        label={zoomed ? `${zoomed.label} proof of delivery` : "Proof of delivery"}
+        backdropClassName="bg-[var(--color-ink-900)]/80 backdrop-blur-md"
+      >
+        {({ panelProps, titleId, panelStyle }) =>
+          zoomed && (
           <div
+            style={panelStyle}
             key="pod-lightbox"
-            className="pointer-events-none fixed inset-0 z-[61] flex items-center justify-center p-6"
+            className="pointer-events-none fixed inset-0 flex items-center justify-center p-6"
           >
             <motion.figure
+              {...panelProps}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
               transition={{ type: "spring", stiffness: 340, damping: 30 }}
-              className="pointer-events-auto flex max-h-full flex-col items-center gap-2"
+              className="pointer-events-auto flex max-h-full flex-col items-center gap-2 outline-none"
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URL */}
               <img
@@ -161,7 +158,7 @@ function Lightbox({
             </motion.figure>
           </div>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }

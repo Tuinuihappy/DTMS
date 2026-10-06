@@ -1,9 +1,9 @@
 "use client";
 
 import { AlertTriangle, Bot, Loader2, Trash2, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
-import { useEffect, useState } from "react";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export function CancelOrderDialog({
@@ -35,37 +35,33 @@ export function CancelOrderDialog({
     if (open) setReason("");
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !busy && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose, busy]);
-
   const canSubmit = reason.trim().length >= 3 && !busy;
+  // Focus opens on Back (intent="irreversible").
+  const backRef = useRef<HTMLButtonElement>(null);
 
   return (
     <>
-      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
-          rationale. Wrapper is pointer-events-none (panel re-enables)
-          so a stranded exit can never swallow page clicks. */}
-      <OverlayBackdrop
+      <ModalLayer
         open={open}
-        onClick={() => !busy && onClose()}
-        className="z-40 bg-[var(--color-ink-900)]/55 backdrop-blur-md"
-      />
-      <AnimatePresence>
-        {open && (
+        onClose={onClose}
+        dismissible={!busy}
+        intent="irreversible"
+        safeRef={backRef}
+        backdropClassName="bg-[var(--color-ink-900)]/55 backdrop-blur-md"
+      >
+        {({ panelProps, titleId, panelStyle }) => (
           <div
+            style={panelStyle}
             key="cancel-order-dialog"
-            className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="pointer-events-none fixed inset-0 flex items-center justify-center p-4"
           >
             <motion.div
+              {...panelProps}
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
               transition={{ type: "spring", stiffness: 360, damping: 30 }}
-              className="pointer-events-auto relative w-full max-w-md overflow-hidden rounded-[var(--radius-xl)] glass-strong"
+              className="pointer-events-auto relative w-full max-w-md overflow-hidden rounded-[var(--radius-xl)] glass-strong outline-none"
             >
               <header className="flex items-start gap-3 px-6 pt-5">
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--color-coral-soft)] text-[var(--color-coral)]">
@@ -75,7 +71,7 @@ export function CancelOrderDialog({
                   <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--color-ink-400)]">
                     {count > 1 ? `Cancel ${count} orders` : "Cancel order"}
                   </div>
-                  <h2 className="font-display mt-1 text-[1.2rem] font-semibold text-[var(--color-ink-900)] truncate">
+                  <h2 id={titleId} className="font-display mt-1 text-[1.2rem] font-semibold text-[var(--color-ink-900)] truncate">
                     {count > 1 ? `${count} selected` : (orderRef ?? "—")}
                   </h2>
                 </div>
@@ -127,7 +123,6 @@ export function CancelOrderDialog({
                     onChange={(e) => setReason(e.target.value)}
                     rows={3}
                     placeholder="e.g. duplicate request, requester withdrew, route blocked…"
-                    autoFocus
                     className={cn(
                       "w-full rounded-lg bg-white/70 px-3 py-2 text-[13px] font-medium resize-none",
                       "border border-white/80 backdrop-blur-md transition-all",
@@ -144,6 +139,7 @@ export function CancelOrderDialog({
 
               <footer className="flex items-center justify-end gap-2 border-t border-white/40 px-6 py-4 dark:border-white/[0.06]">
                 <button
+                  ref={backRef}
                   type="button"
                   onClick={() => !busy && onClose()}
                   className="rounded-full bg-white/40 px-4 py-2 text-[12px] font-semibold text-[var(--color-ink-700)] transition-colors hover:bg-white/70 dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
@@ -174,7 +170,7 @@ export function CancelOrderDialog({
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }

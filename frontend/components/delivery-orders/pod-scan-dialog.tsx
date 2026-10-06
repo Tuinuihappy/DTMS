@@ -1,8 +1,8 @@
 "use client";
 
 import { Barcode, CheckCircle2, Keyboard, PenLine, ScanLine, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useWedgeScanner } from "@/lib/hooks/use-wedge-scanner";
@@ -64,20 +64,16 @@ export function PodScanDialog({
   });
 
   useEffect(() => {
-    if (!open) return;
+    // Reset the tab on close too: reopening on a stale "Barcode" tab would
+    // mount (and autoFocus) the reference input for one render, then this
+    // effect switches tabs and focus falls to <body>.
     setMethod("Confirm");
+    if (!open) return;
     setScannedBy(currentUser ?? "");
     reference.setValue("");
     // setValue is stable; listing `reference` would re-run this on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, currentUser]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
 
   // Signature pad: minimal mouse/touch drawing. Hash on submit.
   useEffect(() => {
@@ -138,27 +134,26 @@ export function PodScanDialog({
 
   return (
     <>
-      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
-          rationale. */}
-      <OverlayBackdrop
+      <ModalLayer
         open={open && !!itemId}
-        onClick={onClose}
-        className="z-[80] bg-[var(--color-ink-900)]/50 backdrop-blur-sm"
-      />
-      <AnimatePresence>
-        {open && itemId && (
+        onClose={onClose}
+        dismissible={!busy}
+        backdropClassName="bg-[var(--color-ink-900)]/50 backdrop-blur-sm"
+      >
+        {({ panelProps, titleId, panelStyle }) =>
+          open && itemId && (
           <motion.div
+            {...panelProps}
+            style={panelStyle}
             key="pod-scan-dialog-panel"
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.22 }}
             className={cn(
-              "fixed left-1/2 top-1/2 z-[90] w-[min(520px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2",
+              "fixed left-1/2 top-1/2 w-[min(520px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 outline-none",
               "rounded-2xl bg-[var(--color-surface)] shadow-[0_30px_80px_-20px_rgba(15,23,42,0.5)]",
             )}
-            role="dialog"
-            aria-modal="true"
           >
             <header className="flex items-start justify-between gap-3 border-b border-[var(--color-ink-100)] px-5 py-4 dark:border-white/[0.06]">
               <div className="flex items-center gap-2.5">
@@ -166,7 +161,7 @@ export function PodScanDialog({
                   <CheckCircle2 className="h-4 w-4" strokeWidth={2.4} />
                 </span>
                 <div>
-                  <h2 className="text-[15px] font-semibold text-[var(--color-ink-900)]">
+                  <h2 id={titleId} className="text-[15px] font-semibold text-[var(--color-ink-900)]">
                     Confirm POD
                   </h2>
                   {itemLabel && (
@@ -315,7 +310,7 @@ export function PodScanDialog({
             </form>
           </motion.div>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }

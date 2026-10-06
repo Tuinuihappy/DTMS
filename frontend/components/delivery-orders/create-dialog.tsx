@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import { useEffect, useState } from "react";
 import {
   createOrder,
@@ -306,13 +306,6 @@ export function CreateOrderDialog({
     };
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !submitting && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose, submitting]);
-
   const canAdvance =
     step === 0
       ? form.orderRef.trim().length > 0 &&
@@ -374,28 +367,26 @@ export function CreateOrderDialog({
 
   return (
     <>
-      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
-          rationale. The centering wrapper below is pointer-events-none
-          (panel re-enables) for the same reason: a stranded exiting
-          wrapper must never be able to swallow page clicks. */}
-      <OverlayBackdrop
+      <ModalLayer
         open={open}
-        onClick={() => !submitting && onClose()}
-        className="z-40 bg-[var(--color-ink-900)]/50 backdrop-blur-md"
-      />
-      <AnimatePresence>
-        {open && (
+        onClose={onClose}
+        dismissible={!submitting}
+        backdropClassName="bg-[var(--color-ink-900)]/50 backdrop-blur-md"
+      >
+        {({ panelProps, titleId, panelStyle }) => (
           <div
+            style={panelStyle}
             key="create-order-dialog"
-            className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="pointer-events-none fixed inset-0 flex items-center justify-center p-4"
           >
             <motion.div
+              {...panelProps}
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
               transition={{ type: "spring", stiffness: 360, damping: 30 }}
               className={cn(
-                "pointer-events-auto relative w-full max-w-2xl overflow-hidden rounded-[var(--radius-xl)]",
+                "pointer-events-auto relative w-full max-w-2xl overflow-hidden rounded-[var(--radius-xl)] outline-none",
                 "glass-strong",
               )}
             >
@@ -409,7 +400,7 @@ export function CreateOrderDialog({
                         ? `Reorder of ${duplicating!.orderRef} · Step ${step + 1} / 2`
                         : `New delivery order · Step ${step + 1} / 2`}
                   </div>
-                  <h2 className="font-display mt-1 text-[1.4rem] font-semibold text-[var(--color-ink-900)]">
+                  <h2 id={titleId} className="font-display mt-1 text-[1.4rem] font-semibold text-[var(--color-ink-900)]">
                     {step === 0 ? "Order details" : "Pick & drop"}
                   </h2>
                 </div>
@@ -1067,7 +1058,7 @@ export function CreateOrderDialog({
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }

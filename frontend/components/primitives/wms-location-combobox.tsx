@@ -171,6 +171,12 @@ export function WmsLocationCombobox({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingEnter, itemsFresh, items, query, open, error]);
 
+  // Esc on the open list (via the layer stack): close it and leave the field.
+  const dismissList = () => {
+    setOpen(false);
+    inputRef.current?.blur();
+  };
+
   const clear = () => {
     onChange("");
     setSelectedDetail(null);
@@ -203,16 +209,8 @@ export function WmsLocationCombobox({
         setPendingEnter(true);
       }
       e.preventDefault();
-    } else if (e.key === "Escape") {
-      // Close only the list — keep the Esc from reaching a host dialog's
-      // window listener, which would close the whole form. (The !open
-      // branch above already returned, so Esc on a closed list still
-      // reaches the dialog.)
-      e.preventDefault();
-      e.stopPropagation();
-      setOpen(false);
-      inputRef.current?.blur();
     }
+    // Esc is handled by the layer stack (ComboboxListPortal's onDismiss).
   };
 
   // What to show in the collapsed input: either the current selection
@@ -286,7 +284,7 @@ export function WmsLocationCombobox({
         />
       </div>
 
-      <ComboboxListPortal open={open} anchorRef={wrapperRef}>
+      <ComboboxListPortal open={open} anchorRef={wrapperRef} onDismiss={dismissList}>
         <div
           ref={panelRef}
           className="max-h-64 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"

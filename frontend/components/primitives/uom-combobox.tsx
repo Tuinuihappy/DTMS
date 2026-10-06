@@ -95,13 +95,8 @@ export function UomCombobox({
       e.preventDefault();
       if (open && filtered[highlight]) pick(filtered[highlight]);
       else setOpen(false);
-    } else if (e.key === "Escape" && open) {
-      // Close only the list — keep the Esc from reaching a host dialog's
-      // window listener, which would close the whole form.
-      e.preventDefault();
-      e.stopPropagation();
-      setOpen(false);
     }
+    // Esc is handled by the layer stack (ComboboxListPortal's onDismiss).
   }
 
   const trimmed = value.trim();
@@ -147,7 +142,7 @@ export function UomCombobox({
         />
       </div>
 
-      <ComboboxListPortal open={open} anchorRef={wrapperRef}>
+      <ComboboxListPortal open={open} anchorRef={wrapperRef} onDismiss={() => setOpen(false)}>
         <ul
           ref={listRef}
           role="listbox"

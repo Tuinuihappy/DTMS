@@ -1,9 +1,9 @@
 "use client";
 
 import { Ban, PauseCircle, PlayCircle, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
-import { useEffect, useState } from "react";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 // Captures the actor + (optional) reason for hold / release / reject —
@@ -126,42 +126,42 @@ export function StateActionDialog({
     }
   }, [open, currentUser, variant]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
   const canSubmit =
     !!cfg &&
     !busy &&
     (!cfg.actorRequired || actor.trim().length > 0) &&
     (!cfg.reasonRequired || reason.trim().length > 0);
 
+  // Reject and abandon can't be undone: focus opens on Cancel and Enter in
+  // the actor field won't submit. Hold/release start on the first field.
+  const irreversible = variant === "reject" || variant === "abandon";
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
   return (
     <>
-      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
-          rationale. */}
-      <OverlayBackdrop
+      <ModalLayer
         open={open && !!cfg}
-        onClick={onClose}
-        className="z-[80] bg-[var(--color-ink-900)]/50 backdrop-blur-sm"
-      />
-      <AnimatePresence>
-        {open && cfg && (
+        onClose={onClose}
+        dismissible={!busy}
+        {...(irreversible
+          ? { intent: "irreversible" as const, safeRef: cancelRef }
+          : { intent: "default" as const })}
+        backdropClassName="bg-[var(--color-ink-900)]/50 backdrop-blur-sm"
+      >
+        {({ panelProps, titleId, panelStyle }) =>
+          open && cfg && (
           <motion.div
+            {...panelProps}
+            style={panelStyle}
             key="state-action-dialog-panel"
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.22 }}
             className={cn(
-              "fixed left-1/2 top-1/2 z-[90] w-[min(480px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2",
+              "fixed left-1/2 top-1/2 w-[min(480px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 outline-none",
               "rounded-2xl bg-[var(--color-surface)] shadow-[0_30px_80px_-20px_rgba(15,23,42,0.5)] dark:bg-[var(--color-surface)]",
             )}
-            role="dialog"
-            aria-modal="true"
           >
             <header className="flex items-start justify-between gap-3 border-b border-[var(--color-ink-100)] px-5 py-4 dark:border-white/[0.06]">
               <div className="flex items-center gap-2.5">
@@ -174,7 +174,7 @@ export function StateActionDialog({
                   {cfg.icon}
                 </span>
                 <div>
-                  <h2 className="text-[15px] font-semibold text-[var(--color-ink-900)]">
+                  <h2 id={titleId} className="text-[15px] font-semibold text-[var(--color-ink-900)]">
                     {cfg.title}
                   </h2>
                   {orderRef && (
@@ -257,6 +257,7 @@ export function StateActionDialog({
 
               <div className="flex items-center justify-end gap-2 pt-1">
                 <button
+                  ref={cancelRef}
                   type="button"
                   onClick={onClose}
                   className="rounded-full px-4 py-2 text-[12px] font-semibold text-[var(--color-ink-700)] transition-colors hover:bg-[var(--color-ink-100)] dark:text-[var(--color-ink-500)] dark:hover:bg-white/10"
@@ -280,7 +281,7 @@ export function StateActionDialog({
             </form>
           </motion.div>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }

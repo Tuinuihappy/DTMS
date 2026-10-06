@@ -10,7 +10,8 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import { useEffect, useState } from "react";
 import {
   getTripDetails,
@@ -23,7 +24,6 @@ import { StatusTimelineSection } from "@/components/projection/status-timeline-s
 import type { StatusHistoryEntry } from "@/lib/api/status-history";
 import { getTripStatusHistory } from "@/lib/api/status-history";
 import { useTripSubscription } from "@/lib/realtime/hubs/trip-hub";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { AttemptBadge, RetryChainNav, TripStatusBadge } from "./badges";
 import {
   MissionFailureAlert,
@@ -119,13 +119,6 @@ export function TripDetailDrawer({
     };
   }, [tripId, includeRaw]);
 
-  useEffect(() => {
-    if (!tripId) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [tripId, onClose]);
-
   const refresh = () => {
     if (!tripId) return;
     getTripDetails(tripId, { includeRaw }).then(setData).catch(() => undefined);
@@ -133,26 +126,24 @@ export function TripDetailDrawer({
 
   return (
     <>
-      {/* State-driven backdrop (see OverlayBackdrop for the stuck-exit
-          rationale). data-trip-drawer-backdrop doubles as a deploy
-          marker — its presence in the DOM while closed proves this
-          build is live. */}
-      <OverlayBackdrop
+      <ModalLayer
         open={!!tripId}
-        onClick={onClose}
-        data-trip-drawer-backdrop={tripId ? "open" : "closed"}
-        className="z-[60] bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
-      />
-      <AnimatePresence>
-        {tripId && (
+        onClose={onClose}
+        initialFocus="panel"
+        backdropClassName="bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
+      >
+        {({ panelProps, titleId, panelStyle }) =>
+          tripId && (
           <motion.aside
+            {...panelProps}
+            style={panelStyle}
             key="trip-drawer-panel"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 340, damping: 38 }}
             className={cn(
-              "fixed right-0 top-0 z-[70] flex h-full w-full flex-col overflow-hidden",
+              "fixed right-0 top-0 flex h-full w-full flex-col overflow-hidden outline-none",
               "sm:w-[min(640px,100vw)]",
               "bg-[var(--color-surface)] dark:bg-[var(--color-surface)]",
               "shadow-[0_30px_80px_-20px_rgba(15,23,42,0.5)]",
@@ -166,7 +157,7 @@ export function TripDetailDrawer({
                 {loading && !data ? (
                   <div className="mt-2 h-7 w-40 animate-pulse rounded-md bg-[var(--color-ink-100)]" />
                 ) : (
-                  <h2 className="mt-1 font-mono text-[1.3rem] font-semibold text-[var(--color-ink-900)] truncate">
+                  <h2 id={titleId} className="mt-1 font-mono text-[1.3rem] font-semibold text-[var(--color-ink-900)] truncate">
                     {data?.vendorOrderKey ?? data?.upperKey?.slice(0, 18) ?? tripId.slice(0, 8)}
                   </h2>
                 )}
@@ -451,7 +442,7 @@ export function TripDetailDrawer({
             </div>
           </motion.aside>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }

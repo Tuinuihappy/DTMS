@@ -1,9 +1,9 @@
 "use client";
 
 import { Loader2, Repeat2, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
-import { useEffect, useState } from "react";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
+import { useEffect, useRef, useState } from "react";
 import type { TripStatus } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
 
@@ -11,9 +11,8 @@ export const DEFAULT_CANCEL_REASON = "Cancelled by operator";
 
 // Confirmation for the two lifecycle actions that can't be taken back
 // from the action bar: Cancel stops the vendor mission, Retry dispatches
-// a new trip. Same shell as PassRobotDialog, but confirm is a button
-// press only — no global Enter, so Enter in the reason box or on the
-// "Keep" button can't fire the action.
+// a new trip. Same shell as PassRobotDialog: confirm is a button press
+// only (intent="irreversible" — focus on Keep, no Enter-to-submit).
 export function TripConfirmDialog({
   open,
   kind,
@@ -45,18 +44,9 @@ export function TripConfirmDialog({
     }
   }, [open]);
 
-  // Capture phase + stopPropagation: Esc closes only this dialog, not the
-  // trip drawer underneath (its listener is on window too, bubble phase).
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.stopPropagation();
-      if (!busy) onClose();
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [open, busy, onClose]);
+  // Focus opens on Keep (intent="irreversible"); Esc closes only this
+  // dialog, not the trip drawer underneath (layer stack).
+  const keepRef = useRef<HTMLButtonElement>(null);
 
   const handleConfirm = async () => {
     setBusy(true);
@@ -75,27 +65,27 @@ export function TripConfirmDialog({
   const shortTrip = tripId.slice(0, 8).toUpperCase();
 
   return (
-    <>
-      <OverlayBackdrop
-        open={open}
-        onClick={() => !busy && onClose()}
-        className="z-40 bg-[var(--color-ink-900)]/55 backdrop-blur-md"
-      />
-      <AnimatePresence>
-        {open && (
+    <ModalLayer
+      open={open}
+      onClose={onClose}
+      dismissible={!busy}
+      intent="irreversible"
+      safeRef={keepRef}
+      backdropClassName="bg-[var(--color-ink-900)]/55 backdrop-blur-md"
+    >
+      {({ panelProps, titleId, panelStyle }) => (
           <div
             key={`trip-${kind}-dialog`}
-            className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={panelStyle}
+            className="pointer-events-none fixed inset-0 flex items-center justify-center p-4"
           >
             <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="trip-confirm-title"
+              {...panelProps}
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
               transition={{ type: "spring", stiffness: 360, damping: 30 }}
-              className="pointer-events-auto relative w-full max-w-md overflow-hidden rounded-[var(--radius-xl)] glass-strong"
+              className="pointer-events-auto relative w-full max-w-md overflow-hidden rounded-[var(--radius-xl)] glass-strong outline-none"
             >
               <header className="flex items-start gap-3 px-6 pt-5">
                 <span
@@ -117,7 +107,7 @@ export function TripConfirmDialog({
                     {isCancel ? "Cancel trip" : "Retry trip"}
                   </div>
                   <h2
-                    id="trip-confirm-title"
+                    id={titleId}
                     className="font-display mt-1 text-[1.2rem] font-semibold text-[var(--color-ink-900)] truncate"
                   >
                     {isCancel ? "Cancel this trip?" : "Dispatch this trip again?"}
@@ -190,6 +180,7 @@ export function TripConfirmDialog({
 
               <footer className="flex items-center justify-end gap-2 border-t border-white/40 px-6 py-4 dark:border-white/[0.06]">
                 <button
+                  ref={keepRef}
                   type="button"
                   onClick={() => !busy && onClose()}
                   className="rounded-full bg-white/40 px-4 py-2 text-[12px] font-semibold text-[var(--color-ink-700)] transition-colors hover:bg-white/70 dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
@@ -229,8 +220,7 @@ export function TripConfirmDialog({
               </footer>
             </motion.div>
           </div>
-        )}
-      </AnimatePresence>
-    </>
+      )}
+    </ModalLayer>
   );
 }

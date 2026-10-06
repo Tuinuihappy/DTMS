@@ -35,6 +35,7 @@ export function OverlayBackdrop({
   open,
   onClick,
   className,
+  zIndex,
   ...rest
 }: {
   open: boolean;
@@ -43,6 +44,8 @@ export function OverlayBackdrop({
   onClick?: () => void;
   /** z-index, tint and blur — keep whatever the overlay used before. */
   className?: string;
+  /** From the layer stack (ModalLayer passes it); overrides a z- class. */
+  zIndex?: number | null;
 } & Record<`data-${string}`, string>) {
   return (
     <motion.div
@@ -52,6 +55,7 @@ export function OverlayBackdrop({
       onClick={open ? onClick : undefined}
       aria-hidden={!open}
       className={cn("fixed inset-0", !open && "pointer-events-none", className)}
+      style={zIndex != null ? { zIndex } : undefined}
       {...rest}
     />
   );

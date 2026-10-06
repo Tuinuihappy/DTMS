@@ -19,8 +19,8 @@ import {
   User,
   X,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import { useEffect, useRef, useState } from "react";
 import {
   getOrder,
@@ -174,35 +174,28 @@ export function OrderDetailDrawer({
     };
   }, [orderId, refreshKey]);
 
-  useEffect(() => {
-    if (!orderId) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [orderId, onClose]);
-
   const can = (s: string, list: string[]) => list.includes(s);
 
   return (
     <>
-      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
-          rationale (an AnimatePresence-managed backdrop can strand an
-          invisible click-blocking layer when exits are interrupted). */}
-      <OverlayBackdrop
+      <ModalLayer
         open={!!orderId}
-        onClick={onClose}
-        className="z-40 bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
-      />
-      <AnimatePresence>
-        {orderId && (
+        onClose={onClose}
+        initialFocus="panel"
+        backdropClassName="bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
+      >
+        {({ panelProps, titleId, panelStyle }) =>
+          orderId && (
           <motion.aside
+            {...panelProps}
+            style={panelStyle}
             key="order-drawer-panel"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 340, damping: 38 }}
             className={cn(
-              "fixed right-0 top-0 z-50 flex h-full w-full flex-col overflow-hidden",
+              "fixed right-0 top-0 flex h-full w-full flex-col overflow-hidden outline-none",
               "sm:w-[min(560px,100vw)]",
               "bg-[var(--color-surface)] dark:bg-[var(--color-surface)]",
               "shadow-[0_30px_80px_-20px_rgba(15,23,42,0.5)]",
@@ -216,7 +209,7 @@ export function OrderDetailDrawer({
                 {loading ? (
                   <div className="mt-2 h-7 w-40 animate-pulse rounded-md bg-[var(--color-ink-100)]" />
                 ) : (
-                  <h2 className="font-mono mt-1 text-[1.4rem] font-semibold text-[var(--color-ink-900)] truncate">
+                  <h2 id={titleId} className="font-mono mt-1 text-[1.4rem] font-semibold text-[var(--color-ink-900)] truncate">
                     {data?.orderRef ?? "—"}
                   </h2>
                 )}
@@ -442,7 +435,6 @@ export function OrderDetailDrawer({
                       />
                     </div>
                   </section>
-
 
                   {/* Items list with pickup → drop visual */}
                   <section>
@@ -680,7 +672,7 @@ export function OrderDetailDrawer({
             )}
           </motion.aside>
         )}
-      </AnimatePresence>
+      </ModalLayer>
       {/* Stacked Trip drawer — sits above the order drawer, escape and
           backdrop close it without dismissing the order drawer. Lives
           outside the AnimatePresence above because it manages its own
