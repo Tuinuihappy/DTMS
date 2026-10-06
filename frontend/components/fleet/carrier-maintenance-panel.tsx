@@ -1,11 +1,11 @@
 "use client";
 
 import { Loader2, Wrench, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import { useEffect, useState } from "react";
 import { AttachmentGallery } from "@/components/attachments/attachment-gallery";
 import { useAuth } from "@/components/auth/auth-provider";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import { Permissions } from "@/lib/auth/permissions";
 import {
   getCarrierMaintenanceHistory,
@@ -48,27 +48,29 @@ export function CarrierMaintenancePanel({
 
   return (
     <>
-      <OverlayBackdrop
+      <ModalLayer
         open={open}
-        onClick={onClose}
-        className="z-40 bg-[var(--color-ink-900)]/55 backdrop-blur-md"
-      />
-      <AnimatePresence>
-        {open && (
+        onClose={onClose}
+        initialFocus="panel"
+        backdropClassName="bg-[var(--color-ink-900)]/55 backdrop-blur-md"
+      >
+        {({ panelProps, titleId, panelStyle }) => (
           <motion.aside
+            {...panelProps}
+            style={panelStyle}
             key="carrier-maintenance-panel"
             initial={{ opacity: 0, x: 32 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 32, transition: { duration: 0.16 } }}
             transition={{ type: "spring", stiffness: 340, damping: 32 }}
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col overflow-hidden glass-strong"
+            className="fixed inset-y-0 right-0 flex w-full max-w-md flex-col overflow-hidden glass-strong outline-none"
           >
             <header className="flex items-start gap-3 border-b border-white/40 px-6 py-5 dark:border-white/[0.06]">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--color-pastel-butter)] text-[var(--color-ink-800)]">
                 <Wrench className="h-5 w-5" strokeWidth={2.2} />
               </span>
               <div className="flex-1">
-                <h2 className="font-display text-[1.1rem] font-semibold text-[var(--color-ink-900)]">
+                <h2 id={titleId} className="font-display text-[1.1rem] font-semibold text-[var(--color-ink-900)]">
                   Maintenance history
                 </h2>
                 <p className="font-mono text-[11.5px] text-[var(--color-ink-500)]">{carrierCode}</p>
@@ -155,7 +157,7 @@ export function CarrierMaintenancePanel({
             </div>
           </motion.aside>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }

@@ -1,10 +1,9 @@
 "use client";
 
 import { ImageOff, Loader2, Trash2, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import {
   attachmentImageUrl,
   attachmentThumbnailUrl,
@@ -71,34 +70,26 @@ export function AttachmentLightbox({
 }) {
   const open = owner !== null && ownerId !== null && attachmentId !== null;
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  // Portalled to <body>: hosts like the Photos dialog and the carrier
-  // maintenance panel use backdrop-filter (glass-strong) + overflow-hidden,
-  // which makes them the containing block for `position: fixed` — the
-  // lightbox would be sized to and clipped by that box, not the viewport.
-  // Mounted-gated because document isn't there during SSR.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
-
-  return createPortal(
-    <>
-      <OverlayBackdrop
-        open={open}
-        onClick={onClose}
-        className="z-[60] bg-[var(--color-ink-900)]/80 backdrop-blur-md"
-      />
-      <AnimatePresence>
-        {owner && ownerId && attachmentId && (
+  // ModalLayer portals out of the host: the Photos dialog and the carrier
+  // maintenance panel are glass-strong (backdrop-filter) + overflow-hidden,
+  // which would make them the containing block for `position: fixed` and
+  // clip the lightbox to their box. Opened from inside them it is their
+  // child layer, so Esc closes the lightbox first.
+  return (
+    <ModalLayer
+      open={open}
+      onClose={onClose}
+      initialFocus="panel"
+      label="Photo"
+      backdropClassName="bg-[var(--color-ink-900)]/80 backdrop-blur-md"
+    >
+      {({ panelProps, panelStyle }) =>
+        owner && ownerId && attachmentId && (
           <div
+            {...panelProps}
+            style={panelStyle}
             key="attachment-lightbox"
-            className="pointer-events-none fixed inset-0 z-[61] flex items-center justify-center p-6"
+            className="pointer-events-none fixed inset-0 flex items-center justify-center p-6 outline-none"
           >
             {/* On close this element is kept, props frozen, while it animates
                 out — which is why the owner may already be null by then. */}
@@ -115,10 +106,9 @@ export function AttachmentLightbox({
               onClose={onClose}
             />
           </div>
-        )}
-      </AnimatePresence>
-    </>,
-    document.body,
+        )
+      }
+    </ModalLayer>
   );
 }
 

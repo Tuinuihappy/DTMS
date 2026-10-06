@@ -1,11 +1,11 @@
 "use client";
 
 import { Images, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import { AttachmentGallery } from "@/components/attachments/attachment-gallery";
 import { AttachmentLightbox } from "@/components/attachments/attachment-lightbox";
 import { useAttachments } from "@/components/attachments/use-attachments";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
 import type { Attachment, AttachmentOwner } from "@/lib/api/fleet-attachments";
 
 export type PhotosTarget = {
@@ -57,30 +57,33 @@ export function PhotosDialog({
         onItemsChanged={onItemsChanged}
       />
 
-      <OverlayBackdrop
+      <ModalLayer
         open={gallery !== null}
-        onClick={onClose}
-        className="z-40 bg-[var(--color-ink-900)]/55 backdrop-blur-md"
-      />
-      <AnimatePresence>
-        {gallery && (
+        onClose={onClose}
+        initialFocus="panel"
+        backdropClassName="bg-[var(--color-ink-900)]/55 backdrop-blur-md"
+      >
+        {({ panelProps, titleId, panelStyle }) =>
+          gallery && (
           <div
+            style={panelStyle}
             key="photos-dialog"
-            className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="pointer-events-none fixed inset-0 flex items-center justify-center p-4"
           >
             <motion.div
+              {...panelProps}
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
               transition={{ type: "spring", stiffness: 360, damping: 30 }}
-              className="pointer-events-auto relative w-full max-w-lg overflow-hidden rounded-[var(--radius-xl)] glass-strong"
+              className="pointer-events-auto relative w-full max-w-lg overflow-hidden rounded-[var(--radius-xl)] glass-strong outline-none"
             >
               <header className="flex items-start gap-3 px-6 pt-5">
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--color-pastel-sky)] text-[var(--color-brand-900)]">
                   <Images className="h-5 w-5" strokeWidth={2.2} />
                 </span>
                 <div className="flex-1">
-                  <h2 className="font-display text-[1.15rem] font-semibold text-[var(--color-ink-900)]">
+                  <h2 id={titleId} className="font-display text-[1.15rem] font-semibold text-[var(--color-ink-900)]">
                     Photos
                   </h2>
                   <p className="font-mono text-[11.5px] text-[var(--color-ink-500)]">
@@ -110,7 +113,7 @@ export function PhotosDialog({
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }
