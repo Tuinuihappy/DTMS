@@ -96,7 +96,7 @@ export function IamPermissionsExperience() {
                 {perms.map((p) => (
                   <tr
                     key={p.code}
-                    className="border-b border-[var(--color-ink-100)]/60 last:border-b-0 hover:bg-white/40"
+                    className="border-b border-[var(--color-ink-100)]/60 last:border-b-0 hover:bg-white/40 dark:hover:bg-white/[0.03]"
                   >
                     <td className="px-4 py-2.5 font-mono text-[12px] text-[var(--color-ink-900)]">
                       {p.code}

@@ -111,7 +111,7 @@ export function IamAuditLogExperience() {
           <select
             value={action}
             onChange={(e) => changeFilter(setAction, e.target.value)}
-            className="mt-1 rounded-lg border border-[var(--color-ink-100)] bg-white px-3 py-1.5 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-[var(--color-ink-900)]/20"
+            className="mt-1 rounded-lg border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-3 py-1.5 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-[var(--color-ink-900)]/20"
           >
             <option value="">All actions</option>
             {Object.entries(ACTION_LABELS).map(([key, { label }]) => (
@@ -130,7 +130,7 @@ export function IamAuditLogExperience() {
               setAction("");
               setPage(1);
             }}
-            className="inline-flex h-[34px] items-center gap-1 rounded-full border border-[var(--color-ink-100)] bg-white px-3 text-[11.5px] font-medium text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+            className="inline-flex h-[34px] items-center gap-1 rounded-full border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-3 text-[11.5px] font-medium text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
           >
             <X className="h-3 w-3" />
             Clear filters
@@ -176,7 +176,7 @@ export function IamAuditLogExperience() {
               type="button"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="rounded-full border border-[var(--color-ink-100)] bg-white px-3 py-1 text-[12px] hover:bg-[var(--color-ink-50)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-full border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-3 py-1 text-[12px] hover:bg-[var(--color-ink-50)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Previous
             </button>
@@ -184,7 +184,7 @@ export function IamAuditLogExperience() {
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="rounded-full border border-[var(--color-ink-100)] bg-white px-3 py-1 text-[12px] hover:bg-[var(--color-ink-50)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-full border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-3 py-1 text-[12px] hover:bg-[var(--color-ink-50)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Next
             </button>
@@ -198,7 +198,7 @@ export function IamAuditLogExperience() {
 function AuditRow({ entry }: { entry: AuditLogEntryDto }) {
   const meta = ACTION_LABELS[entry.action] ?? { label: entry.action, tone: "ink" as const };
   return (
-    <tr className="border-b border-[var(--color-ink-100)]/60 last:border-b-0 hover:bg-white/40">
+    <tr className="border-b border-[var(--color-ink-100)]/60 last:border-b-0 hover:bg-white/40 dark:hover:bg-white/[0.03]">
       <td className="px-4 py-2 text-[12px] text-[var(--color-ink-700)]">
         <DateTime value={entry.occurredAt} />
       </td>
@@ -239,7 +239,7 @@ function FilterInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1 rounded-lg border border-[var(--color-ink-100)] bg-white px-3 py-1.5 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-[var(--color-ink-900)]/20"
+        className="mt-1 rounded-lg border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-3 py-1.5 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-[var(--color-ink-900)]/20"
       />
     </div>
   );

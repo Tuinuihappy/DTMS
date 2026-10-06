@@ -400,7 +400,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
                 type="button"
                 disabled={busy}
                 onClick={onDeactivate}
-                className="inline-flex items-center gap-1 rounded-full border border-[var(--color-ink-100)] bg-white px-3 py-1.5 text-[11.5px] font-medium text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)] disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-full border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-3 py-1.5 text-[11.5px] font-medium text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)] disabled:opacity-50"
               >
                 <PowerOff className="h-3 w-3" strokeWidth={2.2} />
                 Deactivate
@@ -476,7 +476,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
           <button
             type="button"
             onClick={() => setEditingMetadata(true)}
-            className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+            className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
           >
             <Pencil className="h-3 w-3" strokeWidth={2.2} />
             Edit
@@ -698,7 +698,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
             <button
               type="button"
               onClick={() => setEditingOutboundToken(true)}
-              className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+              className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
             >
               <Settings2 className="h-3 w-3" strokeWidth={2.2} />
               Edit token
@@ -727,7 +727,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
                     type="button"
                     onClick={() => void onRevealToken()}
                     disabled={revealingToken || busy}
-                    className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)] disabled:opacity-50"
+                    className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)] disabled:opacity-50"
                   >
                     <Eye className="h-3 w-3" strokeWidth={2.2} />
                     {revealingToken ? "Revealing…" : "Reveal token"}
@@ -763,7 +763,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
                     type="button"
                     onClick={() => void onRefreshNow()}
                     disabled={refreshingNow || busy}
-                    className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)] disabled:opacity-50"
+                    className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)] disabled:opacity-50"
                   >
                     <RefreshCw className={cn("h-3 w-3", refreshingNow && "animate-spin")} strokeWidth={2.2} />
                     {refreshingNow ? "Refreshing…" : "Refresh now"}
@@ -771,7 +771,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
                   <button
                     type="button"
                     onClick={() => setEditingTokenSource(true)}
-                    className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+                    className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
                   >
                     <Link2 className="h-3 w-3" strokeWidth={2.2} />
                     Token source
@@ -782,7 +782,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
                     <button
                       type="button"
                       onClick={() => setEditingRefresh(true)}
-                      className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+                      className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
                     >
                       <Settings2 className="h-3 w-3" strokeWidth={2.2} />
                       Configure
@@ -872,7 +872,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
           <button
             type="button"
             onClick={() => setEditingCallback(true)}
-            className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+            className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
           >
             <Settings2 className="h-3 w-3" strokeWidth={2.2} />
             Configure
@@ -899,7 +899,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
           <h2 className="text-[13px] font-semibold text-[var(--color-ink-800)]">Event subscriptions</h2>
           <Link
             href={`/admin/systems/${encodeURIComponent(data.key)}/subscriptions`}
-            className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+            className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-2 py-1 text-[11px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
           >
             Manage subscriptions →
           </Link>
@@ -1124,7 +1124,7 @@ function RevealedTokenRow({ token, onHide }: { token: string; onHide: () => void
         <button
           type="button"
           onClick={() => setVisible((v) => !v)}
-          className="rounded border border-[var(--color-ink-100)] bg-white px-3 text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+          className="rounded border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-3 text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
           aria-label={visible ? "Hide token" : "Show token"}
         >
           {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -1132,7 +1132,7 @@ function RevealedTokenRow({ token, onHide }: { token: string; onHide: () => void
         <button
           type="button"
           onClick={onCopy}
-          className="rounded border border-[var(--color-ink-100)] bg-white px-3 text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+          className="rounded border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-3 text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
           aria-label="Copy token to clipboard"
         >
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -1142,7 +1142,7 @@ function RevealedTokenRow({ token, onHide }: { token: string; onHide: () => void
         <button
           type="button"
           onClick={onCopyAsHeader}
-          className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2.5 py-1 text-[11px] font-medium text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+          className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
         >
           {copiedHeader ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
           Copy as header
@@ -1150,7 +1150,7 @@ function RevealedTokenRow({ token, onHide }: { token: string; onHide: () => void
         <button
           type="button"
           onClick={onHide}
-          className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white px-2.5 py-1 text-[11px] text-[var(--color-ink-500)] hover:bg-[var(--color-ink-50)]"
+          className="inline-flex items-center gap-1 rounded border border-[var(--color-ink-100)] bg-white dark:bg-white/[0.04] px-2.5 py-1 text-[11px] text-[var(--color-ink-500)] hover:bg-[var(--color-ink-50)]"
         >
           <EyeOff className="h-3 w-3" />
           Hide
@@ -1833,7 +1833,7 @@ function IssueTokenModal({
                   "rounded border px-2.5 py-1 text-[12px]",
                   days === d
                     ? "border-sky-400 bg-sky-50 text-sky-700"
-                    : "border-[var(--color-ink-200)] bg-white text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]",
+                    : "border-[var(--color-ink-200)] bg-white dark:bg-white/[0.04] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]",
                 )}
               >
                 {d} {d === 1 ? "day" : "days"}
@@ -1848,13 +1848,13 @@ function IssueTokenModal({
               value={days}
               disabled={neverExpires}
               onChange={(e) => setDays(Number(e.target.value) || 0)}
-              className="w-20 rounded border border-[var(--color-ink-200)] bg-white px-2 py-1 text-[13px]"
+              className="w-20 rounded border border-[var(--color-ink-200)] bg-white dark:bg-white/[0.04] px-2 py-1 text-[13px]"
             />
             <span className="text-[11px] text-[var(--color-ink-500)]">days (1-365)</span>
           </div>
         </Field>
         {/* Phase S.8d — perpetual token toggle. */}
-        <label className="flex items-start gap-2 rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 text-[12px] text-[var(--color-ink-700)]">
+        <label className="flex items-start gap-2 rounded border border-[var(--color-ink-200)] bg-white dark:bg-white/[0.04] px-3 py-2 text-[12px] text-[var(--color-ink-700)]">
           <input
             type="checkbox"
             checked={neverExpires}
@@ -1887,7 +1887,7 @@ function IssueTokenModal({
         <button
           type="button"
           onClick={onCancel}
-          className="rounded border border-[var(--color-ink-200)] bg-white px-3 py-1.5 text-[12px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+          className="rounded border border-[var(--color-ink-200)] bg-white dark:bg-white/[0.04] px-3 py-1.5 text-[12px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
         >
           Cancel
         </button>
@@ -1927,7 +1927,7 @@ function ModalFooter({
         <button
           type="button"
           onClick={onCancel}
-          className="rounded border border-[var(--color-ink-200)] bg-white px-3 py-1.5 text-[12px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+          className="rounded border border-[var(--color-ink-200)] bg-white dark:bg-white/[0.04] px-3 py-1.5 text-[12px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
         >
           Cancel
         </button>

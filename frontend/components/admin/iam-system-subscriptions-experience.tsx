@@ -329,7 +329,7 @@ function AddSubscriptionModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded border border-[var(--color-ink-200)] bg-white px-3 py-1.5 text-[12px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+                className="rounded border border-[var(--color-ink-200)] bg-white dark:bg-white/[0.04] px-3 py-1.5 text-[12px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
               >
                 Cancel
               </button>
