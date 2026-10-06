@@ -15,6 +15,7 @@ import {
   type SystemSummaryDto,
 } from "@/lib/api/iam-systems";
 import { OneTimeSecretBanner } from "@/components/admin/one-time-secret-banner";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import { cn } from "@/lib/utils";
 
 // Phase S.6 — federated source-system admin (SystemClient list + CRUD).
@@ -375,106 +376,123 @@ function CreateSystemModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-xl border border-[var(--color-ink-100)] bg-[var(--color-surface-raised)] p-5 shadow-xl dark:border-white/[0.06]">
-        <div className="flex items-start justify-between">
-          <h2 className="text-base font-semibold text-[var(--color-ink-900)] dark:text-white">New source system</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded p-1 text-[var(--color-ink-400)] hover:bg-[var(--color-ink-50)]"
-            aria-label="Close"
+    <ModalLayer
+      open
+      onClose={onClose}
+      dismissible={!submitting}
+      closeOnBackdrop={false}
+      backdropClassName="bg-black/40 backdrop-blur-sm"
+    >
+      {({ panelProps, titleId, panelStyle }) => (
+        <div
+          key="modal"
+          style={panelStyle}
+          className="pointer-events-none fixed inset-0 flex items-center justify-center p-4"
+        >
+          <div
+            {...panelProps}
+            className="pointer-events-auto w-full max-w-md rounded-xl border border-[var(--color-ink-100)] bg-[var(--color-surface-raised)] p-5 shadow-xl outline-none dark:border-white/[0.06]"
           >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <p className="mt-1 text-[12px] text-[var(--color-ink-500)]">
-          The credential will be shown once after create — copy it before closing the banner.
-        </p>
-
-        <div className="mt-4 space-y-3">
-          <div>
-            <label className="block text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--color-ink-500)]">
-              Key (slug)
-            </label>
-            <input
-              value={key}
-              onChange={(e) => setKey(e.target.value.toLowerCase())}
-              placeholder="e.g. oms, sap, wms-acme"
-              className="mt-1 w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 font-mono text-[13px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
-            />
-            <p className="mt-1 text-[10.5px] text-[var(--color-ink-400)]">
-              Lowercase letters, digits, and <code>-</code> only. Becomes part of URL +
-              permission codes (<code>dtms:source:&#123;key&#125;:*</code>).
+            <div className="flex items-start justify-between">
+              <h2 id={titleId} className="text-base font-semibold text-[var(--color-ink-900)] dark:text-white">New source system</h2>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded p-1 text-[var(--color-ink-400)] hover:bg-[var(--color-ink-50)]"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-1 text-[12px] text-[var(--color-ink-500)]">
+              The credential will be shown once after create — copy it before closing the banner.
             </p>
-          </div>
-          <div>
-            <label className="block text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--color-ink-500)]">
-              Display name
-            </label>
-            <input
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="e.g. Delta OMS"
-              className="mt-1 w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 text-[13px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--color-ink-500)]">
-              Description (optional)
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              className="mt-1 w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 text-[13px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--color-ink-500)]">
-              Owner contact (optional)
-            </label>
-            <input
-              value={ownerContact}
-              onChange={(e) => setOwnerContact(e.target.value)}
-              placeholder="e.g. ops@delta.com"
-              className="mt-1 w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 text-[13px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
-            />
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="block text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--color-ink-500)]">
+                  Key (slug)
+                </label>
+                <input
+                  value={key}
+                  onChange={(e) => setKey(e.target.value.toLowerCase())}
+                  placeholder="e.g. oms, sap, wms-acme"
+                  className="mt-1 w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 font-mono text-[13px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
+                />
+                <p className="mt-1 text-[10.5px] text-[var(--color-ink-400)]">
+                  Lowercase letters, digits, and <code>-</code> only. Becomes part of URL +
+                  permission codes (<code>dtms:source:&#123;key&#125;:*</code>).
+                </p>
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--color-ink-500)]">
+                  Display name
+                </label>
+                <input
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="e.g. Delta OMS"
+                  className="mt-1 w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 text-[13px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--color-ink-500)]">
+                  Description (optional)
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  className="mt-1 w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 text-[13px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--color-ink-500)]">
+                  Owner contact (optional)
+                </label>
+                <input
+                  value={ownerContact}
+                  onChange={(e) => setOwnerContact(e.target.value)}
+                  placeholder="e.g. ops@delta.com"
+                  className="mt-1 w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 text-[13px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
+                />
+              </div>
+            </div>
+            <p className="mt-3 text-[10.5px] text-[var(--color-ink-400)]">
+              Auth is OAuth 2.0 client_credentials (RFC 6749 §4.4). The partner
+              POSTs the issued <code>client_secret</code> to <code>/oauth/token</code>{" "}
+              with <code>client_id=&lt;key&gt;</code> to receive a short-lived JWT
+              (1 hour default), then sends <code>Authorization: Bearer &lt;jwt&gt;</code>{" "}
+              on inbound API calls.
+            </p>
+
+            {error && (
+              <div className="mt-3 flex items-start gap-2 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-[12px] text-rose-700 dark:border-rose-500/30 dark:bg-rose-950/40">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={2.2} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded border border-[var(--color-ink-200)] bg-white px-3 py-1.5 text-[12px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)] dark:border-white/[0.08] dark:bg-white/[0.04]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!valid || submitting}
+                onClick={submit}
+                className="rounded bg-[var(--color-brand-900)] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[var(--color-brand-800)] dark:bg-[var(--color-brand-500)] dark:hover:bg-[var(--color-brand-400)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {submitting ? "Creating…" : "Create system"}
+              </button>
+            </div>
           </div>
         </div>
-        <p className="mt-3 text-[10.5px] text-[var(--color-ink-400)]">
-          Auth is OAuth 2.0 client_credentials (RFC 6749 §4.4). The partner
-          POSTs the issued <code>client_secret</code> to <code>/oauth/token</code>{" "}
-          with <code>client_id=&lt;key&gt;</code> to receive a short-lived JWT
-          (1 hour default), then sends <code>Authorization: Bearer &lt;jwt&gt;</code>{" "}
-          on inbound API calls.
-        </p>
-
-        {error && (
-          <div className="mt-3 flex items-start gap-2 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-[12px] text-rose-700 dark:border-rose-500/30 dark:bg-rose-950/40">
-            <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={2.2} />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded border border-[var(--color-ink-200)] bg-white px-3 py-1.5 text-[12px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)] dark:border-white/[0.08] dark:bg-white/[0.04]"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={!valid || submitting}
-            onClick={submit}
-            className="rounded bg-[var(--color-brand-900)] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[var(--color-brand-800)] dark:bg-[var(--color-brand-500)] dark:hover:bg-[var(--color-brand-400)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {submitting ? "Creating…" : "Create system"}
-          </button>
-        </div>
-      </div>
-    </div>
+      )}
+    </ModalLayer>
   );
 }

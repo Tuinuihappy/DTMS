@@ -1,8 +1,8 @@
 "use client";
 
 import { AlertTriangle, Loader2, RotateCcw, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import { OverlayBackdrop } from "@/components/primitives/overlay-backdrop";
+import { motion } from "motion/react";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import { useEffect, useState } from "react";
 import {
   replayProjector,
@@ -53,13 +53,6 @@ export function ReplayDialog({
     setConfirmStage("form");
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !submitting && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose, submitting]);
-
   const submit = async () => {
     if (!projectorName) return;
     const fromIso = fromDateTimeLocalInput(fromUtc);
@@ -93,25 +86,24 @@ export function ReplayDialog({
 
   return (
     <>
-      {/* State-driven backdrop — see OverlayBackdrop for the stuck-exit
-          rationale. */}
-      <OverlayBackdrop
+      <ModalLayer
         open={open && !!projectorName}
-        onClick={!submitting ? onClose : undefined}
-        className="z-[80] bg-[var(--color-ink-900)]/50 backdrop-blur-sm"
-      />
-      <AnimatePresence>
-        {open && projectorName && (
+        onClose={onClose}
+        dismissible={!submitting}
+        backdropClassName="bg-[var(--color-ink-900)]/50 backdrop-blur-sm"
+      >
+        {({ panelProps, titleId, panelStyle }) =>
+          open && projectorName && (
           <motion.div
+            {...panelProps}
+            style={panelStyle}
             key="replay-dialog-panel"
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.22 }}
-            role="dialog"
-            aria-modal="true"
             className={cn(
-              "fixed left-1/2 top-1/2 z-[90] w-[min(500px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2",
+              "fixed left-1/2 top-1/2 w-[min(500px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 outline-none",
               "rounded-2xl bg-[var(--color-surface)] shadow-[0_30px_80px_-20px_rgba(15,23,42,0.5)] dark:bg-[var(--color-surface)]",
             )}
           >
@@ -121,7 +113,7 @@ export function ReplayDialog({
                   <RotateCcw className="h-4 w-4" strokeWidth={2.4} />
                 </span>
                 <div>
-                  <h2 className="text-[15px] font-semibold text-[var(--color-ink-900)]">
+                  <h2 id={titleId} className="text-[15px] font-semibold text-[var(--color-ink-900)]">
                     Replay projector
                   </h2>
                   <p className="mt-0.5 font-mono text-[11px] text-[var(--color-ink-500)]">
@@ -284,7 +276,7 @@ export function ReplayDialog({
             )}
           </motion.div>
         )}
-      </AnimatePresence>
+      </ModalLayer>
     </>
   );
 }

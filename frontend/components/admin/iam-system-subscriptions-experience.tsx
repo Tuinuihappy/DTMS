@@ -11,6 +11,7 @@ import {
   patchSubscription,
   type SubscriptionDto,
 } from "@/lib/api/iam-systems";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import { cn } from "@/lib/utils";
 
 // Phase S.6 — per-system subscription list with full CRUD. Drill-down
@@ -258,75 +259,92 @@ function AddSubscriptionModal({
   const valid = eventType.length > 0 && payloadFormatKey.length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-xl border border-[var(--color-ink-100)] bg-[var(--color-surface-raised)] p-5 shadow-xl dark:border-white/[0.06]">
-        <div className="flex items-start justify-between">
-          <h2 className="text-base font-semibold text-[var(--color-ink-900)] dark:text-white">Add subscription</h2>
-          <button type="button" onClick={onClose} className="rounded p-1 text-[var(--color-ink-400)] hover:bg-[var(--color-ink-50)]">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <p className="mt-1 text-[12px] text-[var(--color-ink-500)]">
-          The payload formatter key must match a DI-registered formatter on the backend
-          (e.g. <code>oms.shipment.v1</code>). Add a new formatter class in
-          Iam.Infrastructure if the system needs a custom wire shape.
-        </p>
-
-        <div className="mt-4 space-y-3">
-          <div>
-            <label className="block text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--color-ink-500)]">
-              Event type
-            </label>
-            <select
-              value={eventType}
-              onChange={(e) => setEventType(e.target.value)}
-              className="mt-1 w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 font-mono text-[12.5px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
-            >
-              {availableEventTypes.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--color-ink-500)]">
-              Payload format key
-            </label>
-            <input
-              value={payloadFormatKey}
-              onChange={(e) => setPayloadFormatKey(e.target.value)}
-              placeholder="e.g. oms.shipment.v1"
-              className="mt-1 w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 font-mono text-[12.5px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
-            />
-          </div>
-        </div>
-
-        {error && (
-          <div className="mt-3 flex items-start gap-2 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
-            <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={2.2} />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded border border-[var(--color-ink-200)] bg-white px-3 py-1.5 text-[12px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+    <ModalLayer
+      open
+      onClose={onClose}
+      dismissible={!submitting}
+      closeOnBackdrop={false}
+      backdropClassName="bg-black/40 backdrop-blur-sm"
+    >
+      {({ panelProps, titleId, panelStyle }) => (
+        <div
+          key="modal"
+          style={panelStyle}
+          className="pointer-events-none fixed inset-0 flex items-center justify-center p-4"
+        >
+          <div
+            {...panelProps}
+            className="pointer-events-auto w-full max-w-md rounded-xl border border-[var(--color-ink-100)] bg-[var(--color-surface-raised)] p-5 shadow-xl outline-none dark:border-white/[0.06]"
           >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={!valid || submitting}
-            onClick={submit}
-            className="rounded bg-[var(--color-brand-900)] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[var(--color-brand-800)] dark:bg-[var(--color-brand-500)] dark:hover:bg-[var(--color-brand-400)] disabled:opacity-50"
-          >
-            {submitting ? "Adding…" : "Add subscription"}
-          </button>
+            <div className="flex items-start justify-between">
+              <h2 id={titleId} className="text-base font-semibold text-[var(--color-ink-900)] dark:text-white">Add subscription</h2>
+              <button type="button" onClick={onClose} className="rounded p-1 text-[var(--color-ink-400)] hover:bg-[var(--color-ink-50)]">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-1 text-[12px] text-[var(--color-ink-500)]">
+              The payload formatter key must match a DI-registered formatter on the backend
+              (e.g. <code>oms.shipment.v1</code>). Add a new formatter class in
+              Iam.Infrastructure if the system needs a custom wire shape.
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="block text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--color-ink-500)]">
+                  Event type
+                </label>
+                <select
+                  value={eventType}
+                  onChange={(e) => setEventType(e.target.value)}
+                  className="mt-1 w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 font-mono text-[12.5px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
+                >
+                  {availableEventTypes.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--color-ink-500)]">
+                  Payload format key
+                </label>
+                <input
+                  value={payloadFormatKey}
+                  onChange={(e) => setPayloadFormatKey(e.target.value)}
+                  placeholder="e.g. oms.shipment.v1"
+                  className="mt-1 w-full rounded border border-[var(--color-ink-200)] bg-white px-3 py-2 font-mono text-[12.5px] focus:border-[var(--color-brand-400)] focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04]"
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="mt-3 flex items-start gap-2 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={2.2} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded border border-[var(--color-ink-200)] bg-white px-3 py-1.5 text-[12px] text-[var(--color-ink-600)] hover:bg-[var(--color-ink-50)]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!valid || submitting}
+                onClick={submit}
+                className="rounded bg-[var(--color-brand-900)] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[var(--color-brand-800)] dark:bg-[var(--color-brand-500)] dark:hover:bg-[var(--color-brand-400)] disabled:opacity-50"
+              >
+                {submitting ? "Adding…" : "Add subscription"}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </ModalLayer>
   );
 }

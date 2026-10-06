@@ -53,6 +53,7 @@ import {
 import { listPermissions, type PermissionDto } from "@/lib/api/iam";
 import { OneTimeSecretBanner } from "@/components/admin/one-time-secret-banner";
 import { PermissionsChecklist } from "@/components/admin/permissions-checklist";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import { cn } from "@/lib/utils";
 import { copyText } from "@/lib/clipboard";
 
@@ -1201,7 +1202,7 @@ function EditMetadataModal({
   };
 
   return (
-    <ModalShell title="Edit metadata" onClose={onClose}>
+    <ModalShell title="Edit metadata" onClose={onClose} busy={submitting}>
       <div className="space-y-3">
         <Field label="Display name">
           <input
@@ -1275,7 +1276,7 @@ function ConfigureCallbackModal({
   };
 
   return (
-    <ModalShell title="Configure callback delivery" onClose={onClose}>
+    <ModalShell title="Configure callback delivery" onClose={onClose} busy={submitting}>
       <p className="mb-3 text-[11.5px] text-[var(--color-ink-500)]">
         DTMS POSTs callback events to <code>&#123;baseUrl&#125;/events</code>. Clear the base URL
         if this system never receives callbacks. The token used for those calls is set under{" "}
@@ -1410,7 +1411,7 @@ function ConfigureOutboundTokenModal({
   };
 
   return (
-    <ModalShell title="Edit outbound token" onClose={onClose}>
+    <ModalShell title="Edit outbound token" onClose={onClose} busy={submitting}>
       <p className="mb-3 text-[11.5px] text-[var(--color-ink-500)]">
         Sent as <code>Authorization: Bearer …</code> on every call DTMS makes to this system.
         Leave blank to keep the stored token. The callback URL and timeout are not affected.
@@ -1512,7 +1513,7 @@ function ConfigureTokenRefreshModal({
 
   if (verdict) {
     return (
-      <ModalShell title="Configure token auto-refresh" onClose={onSaved}>
+      <ModalShell title="Configure token auto-refresh" onClose={onSaved} busy={submitting}>
         <VerdictBanner verdict={verdict} />
         <p className="mt-3 text-[11px] text-[var(--color-ink-500)]">
           The settings were saved either way. Re-open this dialog to correct them, or use
@@ -1524,7 +1525,7 @@ function ConfigureTokenRefreshModal({
   }
 
   return (
-    <ModalShell title="Configure token auto-refresh" onClose={onClose}>
+    <ModalShell title="Configure token auto-refresh" onClose={onClose} busy={submitting}>
       <p className="mb-3 text-[11.5px] text-[var(--color-ink-500)]">
         DTMS POSTs <code>&#123;username, password&#125;</code> to the mint URL before the outbound
         token expires, then stores the returned token automatically. The mint host must be
@@ -1643,7 +1644,7 @@ function ConfigureTokenSourceModal({
   };
 
   return (
-    <ModalShell title="Token source" onClose={onClose}>
+    <ModalShell title="Token source" onClose={onClose} busy={submitting}>
       <p className="mb-3 text-[11.5px] text-[var(--color-ink-500)]">
         Only the bearer token is shared. This system keeps its own callback URL, timeout and retry
         settings either way.
@@ -1717,19 +1718,54 @@ function ConfigureTokenSourceModal({
   );
 }
 
-function ModalShell({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+// Mounted only while its modal is open, hence open={true}. Clicking outside
+// never closed these (they hold half-typed credentials), so the backdrop
+// still doesn't; Esc does, except while the modal is saving.
+function ModalShell({
+  title,
+  children,
+  onClose,
+  busy = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+  busy?: boolean;
+}) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-xl border border-[var(--color-ink-100)] bg-[var(--color-surface-raised)] p-5 shadow-xl dark:border-white/[0.06]">
-        <div className="flex items-start justify-between">
-          <h2 className="text-base font-semibold text-[var(--color-ink-900)] dark:text-white">{title}</h2>
-          <button type="button" onClick={onClose} className="rounded p-1 text-[var(--color-ink-400)] hover:bg-[var(--color-ink-50)]">
-            <X className="h-4 w-4" />
-          </button>
+    <ModalLayer
+      open
+      onClose={onClose}
+      dismissible={!busy}
+      closeOnBackdrop={false}
+      backdropClassName="bg-black/40 backdrop-blur-sm"
+    >
+      {({ panelProps, titleId, panelStyle }) => (
+        <div
+          key="iam-modal"
+          style={panelStyle}
+          className="pointer-events-none fixed inset-0 flex items-center justify-center p-4"
+        >
+          <div
+            {...panelProps}
+            className="pointer-events-auto w-full max-w-md rounded-xl border border-[var(--color-ink-100)] bg-[var(--color-surface-raised)] p-5 shadow-xl outline-none dark:border-white/[0.06]"
+          >
+            <div className="flex items-start justify-between">
+              <h2 id={titleId} className="text-base font-semibold text-[var(--color-ink-900)] dark:text-white">{title}</h2>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="rounded p-1 text-[var(--color-ink-400)] hover:bg-[var(--color-ink-50)]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4">{children}</div>
+          </div>
         </div>
-        <div className="mt-4">{children}</div>
-      </div>
-    </div>
+      )}
+    </ModalLayer>
   );
 }
 
@@ -1778,7 +1814,7 @@ function IssueTokenModal({
   const valid = neverExpires || (days >= 1 && days <= 365);
 
   return (
-    <ModalShell title={`Issue JWT for "${systemKey}"`} onClose={onCancel}>
+    <ModalShell title={`Issue JWT for "${systemKey}"`} onClose={onCancel} busy={submitting}>
       <p className="text-[12px] text-[var(--color-ink-500)]">
         Generates a JWT signed by DTMS that the partner sends directly as
         {" "}<code>Authorization: Bearer &lt;token&gt;</code>{" "}— no OAuth
