@@ -25,7 +25,7 @@
 | H11 | PWA: trip ที่ complete แล้วแสดงเป็น done (backend เพิ่ม CompletedAt + migration) | `94c39a4c` |
 | M23, M33, M34, M35, M40, M57, L41 (+ ส่วน dialog ของ M4, L28, L29) | layer stack กลาง: overlay ทั้ง 38 ตัวใช้ `ModalLayer` / `useDismissableLayer` (`lib/overlay`) — Esc ปิดทีละชั้น (ยกเว้นตอน busy), Tab วนใน dialog, คืน focus ให้ปุ่มที่เปิด, role/aria-modal/aria-labelledby, dialog ที่ย้อนกลับไม่ได้ (`intent="irreversible"`) เปิดมา focus ที่ปุ่มปลอดภัยและ Enter ใน input ไม่ส่งฟอร์ม, PASS ไม่รับ Enter ทั้งหน้าจออีก มี prebuild guard `check-overlay-keys.mjs` กันถอยกลับ ทดสอบในเบราว์เซอร์ครบ 3 checkpoint | `806fe858` … `8b2d57a6` (9 commits) |
 | ต่อจาก H11 | PWA: trip ที่ dispatcher/order cancel แสดงเป็น Cancelled ไม่มีปุ่มทำงาน (DTO ส่ง Trip.Status มาด้วย) | `ef6317b0` |
-| M5 | dark mode: ปุ่ม Cancel, ปุ่มรอง, filter และ input ทุกหน้า IAM มีสีพื้นของ dark mode | `c01e55a7` |
+| M5 | dark mode: ปุ่ม Cancel, ปุ่มรอง, filter, input, banner และป้ายสถานะทุกหน้า IAM มีสีของ dark mode | `c01e55a7`, `f6b256a0` |
 
 **ไม่แก้ (ตัดสินใจ 2026-10-06)**
 - **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile: เจ้าของระบบเลือกข้าม คงไว้ตามเดิม
@@ -190,7 +190,7 @@
 - แก้: รวมเป็น dialog shell ตัวเดียวตาม pattern ของ replay-dialog.tsx:98-117 คือ OverlayBackdrop + motion panel, role=dialog, aria-modal, Esc handler (ปิดไม่ได้ขณะ submitting) และ autoFocus ที่ input แรก จากนั้นใส่ aria-label="Close" ให้ปุ่ม X
 - Verifier: ยืนยันแล้ว: ModalShell (:1720-1735) และ modal อีก 2 ตัวเป็น div fixed ธรรมดา ไม่มี role=dialog/aria-modal ไม่มี Esc handler ไม่มี focus management คลิก backdrop ไม่ปิด และปุ่ม X ไม่มี aria-label ซึ่งขัดกับ house rule ข้อ Dialogs (review-frontend.md:81) ส่วนการที่ไม่ได้อยู่ใน AnimatePresence ก็ทำให้ไม่เข้าข่ายปัญหา stranded backdrop ระดับ HIGH ตามที่ reviewer ระบุไว้ถูกต้อง
 
-### M5. dark mode: ปุ่มรอง, input และ banner ใน IAM ใช้ bg-white หรือ rose-50 โดยไม่มี dark variant — CONFIRMED · ✅ แก้แล้ว `c01e55a7`
+### M5. dark mode: ปุ่มรอง, input และ banner ใน IAM ใช้ bg-white หรือ rose-50 โดยไม่มี dark variant — CONFIRMED · ✅ แก้แล้ว `c01e55a7`, `f6b256a0`
 - กลุ่ม: admin · uiux
 - ที่: `frontend/components/admin/iam-system-detail-experience.tsx:478`
 - ปัญหา: ปุ่ม `bg-white ... text-[var(--color-ink-600)]` ไม่มี `dark:bg-*` ใน dark จึงเป็นตัวอักษร #a6b0cb บนพื้นขาว (ประมาณ 2:1) จุดที่เกิด: :402, 478, 700, 729, 765, 773, 783, 874, 901 นอกจากนี้ error banner ที่ :423 และ :1749, iam-system-subscriptions-experience.tsx:133 ก็ไม่มี dark variant รวมทั้ง input/select และ toneClass ใน iam-audit-log-experience.tsx:114, 242, 248 และป้าย amber ใน IssueTokenModal :1843 (globals.css:16 ระบุชัดว่าคลาส literal เหล่านี้ต้องมี `dark:` เอง)
