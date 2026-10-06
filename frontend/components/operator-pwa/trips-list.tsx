@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useState } from "react";
-import { type AssignedTrip, getAssignedTrips } from "@/lib/api/operator";
+import { type AssignedTrip, getAssignedTrips, tripEndedLabel } from "@/lib/api/operator";
 import { usePollSchedule } from "@/lib/hooks/use-poll-schedule";
 
 type LoadState =
@@ -57,11 +57,12 @@ export function TripsList() {
   }
 
   // Sort: in-progress (acknowledged, or dropped and waiting on Complete)
-  // first, then new assignments waiting for ack, then completed. Within
-  // each bucket newest first by AssignedAt.
+  // first, then new assignments waiting for ack, then finished (completed,
+  // or cancelled/failed by dispatch). Within each bucket newest first by
+  // AssignedAt.
   const sorted = [...state.trips].sort((a, b) => {
     const bucket = (t: AssignedTrip) =>
-      t.completedAt ? 2 : t.acknowledgedAt ? 0 : 1;
+      t.completedAt || tripEndedLabel(t) ? 2 : t.acknowledgedAt ? 0 : 1;
     const diff = bucket(a) - bucket(b);
     if (diff !== 0) return diff;
     return new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime();
@@ -95,6 +96,13 @@ export function TripsList() {
 }
 
 function TripStatusBadge({ trip }: { trip: AssignedTrip }) {
+  const ended = tripEndedLabel(trip);
+  if (ended)
+    return (
+      <span className="rounded-full bg-red-500/15 px-2.5 py-1 text-xs font-medium text-red-300">
+        {ended}
+      </span>
+    );
   if (trip.completedAt)
     return (
       <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-300">
@@ -129,7 +137,9 @@ function TripStatusBadge({ trip }: { trip: AssignedTrip }) {
 function DeadlineFooter({ trip }: { trip: AssignedTrip }) {
   // Show the nearest unfulfilled deadline. Skip past deadlines on a
   // step the operator has already completed. Pool claim + ack happen
-  // atomically so there is no separate AckDeadline anymore.
+  // atomically so there is no separate AckDeadline anymore. A trip
+  // dispatch already ended has no deadline left to meet.
+  if (tripEndedLabel(trip)) return null;
   const next = !trip.pickedUpAt
     ? trip.pickupDeadline && { label: "Pickup by", iso: trip.pickupDeadline }
     : !trip.droppedAt

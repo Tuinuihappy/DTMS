@@ -1334,6 +1334,13 @@ internal sealed class FakeTripRepository : ITripRepository
     public Task<Guid> GetRootTripIdAsync(Guid tripId, CancellationToken ct = default)
         => Task.FromResult(tripId);
 
+    public Task<IReadOnlyDictionary<Guid, TripStatus>> GetStatusesAsync(
+        IReadOnlyCollection<Guid> ids, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyDictionary<Guid, TripStatus>>(
+            ids.Contains(_trip.Id)
+                ? new Dictionary<Guid, TripStatus> { [_trip.Id] = _trip.Status }
+                : new Dictionary<Guid, TripStatus>());
+
     public Task<List<Trip>> GetActiveTripsByVehicleAsync(Guid vehicleId, CancellationToken ct = default)
         => Task.FromResult(new List<Trip>());
 

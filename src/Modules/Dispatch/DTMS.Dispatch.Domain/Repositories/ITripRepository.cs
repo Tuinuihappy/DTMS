@@ -1,4 +1,5 @@
 using DTMS.Dispatch.Domain.Entities;
+using DTMS.Dispatch.Domain.Enums;
 
 namespace DTMS.Dispatch.Domain.Repositories;
 
@@ -42,6 +43,15 @@ public interface ITripRepository
     /// </summary>
     Task<TripSubTaskLookup?> GetSubTaskLookupAsync(
         string? upperKey, string? vendorOrderKey, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// No-tracking batch lookup of Trip.Status for the given ids, in one
+    /// SELECT. For read paths that only need to know whether a trip is
+    /// still live (the operator app's trip list) — not worth loading the
+    /// aggregates. Ids with no matching trip are absent from the result.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, TripStatus>> GetStatusesAsync(
+        IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default);
 
     Task<List<Trip>> GetActiveTripsByVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default);
 

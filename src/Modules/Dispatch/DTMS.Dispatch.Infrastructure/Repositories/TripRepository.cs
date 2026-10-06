@@ -188,6 +188,17 @@ public class TripRepository : ITripRepository
         return rootIds.Count > 0 ? rootIds[0] : tripId;
     }
 
+    public async Task<IReadOnlyDictionary<Guid, TripStatus>> GetStatusesAsync(
+        IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0) return new Dictionary<Guid, TripStatus>();
+        return await _context.Trips
+            .AsNoTracking()
+            .Where(t => ids.Contains(t.Id))
+            .Select(t => new { t.Id, t.Status })
+            .ToDictionaryAsync(t => t.Id, t => t.Status, cancellationToken);
+    }
+
     public async Task<List<Trip>> GetByDeliveryOrderIdAsync(Guid deliveryOrderId, CancellationToken cancellationToken = default)
     {
         // Include Events so the order-level full-audit query (Phase 4.2)

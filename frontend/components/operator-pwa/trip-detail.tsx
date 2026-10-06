@@ -9,13 +9,14 @@ import {
   recordDrop,
   recordPickup,
   submitGeofenceOverride,
+  tripEndedLabel,
   type AssignedTrip,
 } from "@/lib/api/operator";
 import { usePollSchedule } from "@/lib/hooks/use-poll-schedule";
 import { getCurrentPosition, tryGetCurrentPosition } from "@/lib/operator-pwa/geolocation";
 import { PodCapture } from "./pod-capture";
 
-type Step = "acknowledge" | "pickup" | "drop" | "complete" | "done";
+type Step = "acknowledge" | "pickup" | "drop" | "complete" | "done" | "closed";
 
 /**
  * GEOFENCE_REQUIRED means the server wanted coordinates and got none, which
@@ -85,15 +86,20 @@ export function TripDetail({ tripId }: { tripId: string }) {
     );
   }
 
-  const step: Step = !trip.acknowledgedAt
-    ? "acknowledge"
-    : !trip.pickedUpAt
-      ? "pickup"
-      : !trip.droppedAt
-        ? "drop"
-        : !trip.completedAt
-          ? "complete"
-          : "done";
+  // Ended on the dispatch side (cancelled, failed) — nothing left for the
+  // operator, whatever their own timestamps say.
+  const ended = tripEndedLabel(trip);
+  const step: Step = ended
+    ? "closed"
+    : !trip.acknowledgedAt
+      ? "acknowledge"
+      : !trip.pickedUpAt
+        ? "pickup"
+        : !trip.droppedAt
+          ? "drop"
+          : !trip.completedAt
+            ? "complete"
+            : "done";
 
   const onAcknowledge = async () => {
     setActionBusy("acknowledge");
@@ -184,7 +190,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
               {trip.tripId.slice(0, 8)}
             </div>
           </div>
-          <StepBadge step={step} />
+          <StepBadge step={step} label={ended} />
         </div>
         <ProgressTimeline trip={trip} />
       </header>
@@ -219,16 +225,19 @@ export function TripDetail({ tripId }: { tripId: string }) {
   );
 }
 
-function StepBadge({ step }: { step: Step }) {
+function StepBadge({ step, label }: { step: Step; label: string | null }) {
   const map: Record<Step, { text: string; cls: string }> = {
     acknowledge: { text: "New", cls: "bg-zinc-100/15 text-zinc-100" },
     pickup: { text: "En route", cls: "bg-amber-500/15 text-amber-300" },
     drop: { text: "In transit", cls: "bg-cyan-500/15 text-cyan-300" },
     complete: { text: "Ready to close", cls: "bg-blue-500/15 text-blue-300" },
     done: { text: "Done", cls: "bg-emerald-500/15 text-emerald-300" },
+    closed: { text: "Closed", cls: "bg-red-500/15 text-red-300" },
   };
   const { text, cls } = map[step];
-  return <span className={`rounded-full px-3 py-1 text-xs font-medium ${cls}`}>{text}</span>;
+  return (
+    <span className={`rounded-full px-3 py-1 text-xs font-medium ${cls}`}>{label ?? text}</span>
+  );
 }
 
 function ProgressTimeline({ trip }: { trip: AssignedTrip }) {
@@ -344,6 +353,17 @@ function ActionPanel(props: {
       >
         {actionBusy === "complete" ? "Completing…" : "Complete trip"}
       </button>
+    );
+  }
+  if (step === "closed") {
+    return (
+      <div className="rounded-2xl border border-red-900/60 bg-red-950/40 p-4 text-sm text-red-200">
+        {tripEndedLabel(trip) === "Cancelled"
+          ? "This trip was cancelled by dispatch."
+          : "This trip was ended by dispatch."}{" "}
+        Nothing more to do here — check with your supervisor about any cargo
+        you already picked up.
+      </div>
     );
   }
   return null;

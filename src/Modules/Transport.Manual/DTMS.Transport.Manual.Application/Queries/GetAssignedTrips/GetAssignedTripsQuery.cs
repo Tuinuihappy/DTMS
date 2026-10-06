@@ -10,6 +10,9 @@ public record GetAssignedTripsQuery(Guid OperatorId) : IQuery<IReadOnlyList<Assi
 
 public record AssignedTripDto(
     Guid TripId,
+    // Dispatch Trip.Status name (InProgress, Completed, Cancelled, …);
+    // null when the Trip row is missing.
+    string? TripStatus,
     DateTime AssignedAt,
     DateTime? AcknowledgedAt,
     DateTime? PickedUpAt,

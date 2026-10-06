@@ -12,6 +12,10 @@ import { enqueueAction } from "@/lib/operator-pwa/offline-queue";
 
 export type AssignedTrip = {
   tripId: string;
+  // Dispatch Trip.Status ("InProgress", "Cancelled", …). The timestamps
+  // below only record what the operator did; a dispatcher or order cancel
+  // shows up here alone. Null if the trip row is gone.
+  tripStatus: string | null;
   assignedAt: string;
   acknowledgedAt: string | null;
   pickedUpAt: string | null;
@@ -24,6 +28,24 @@ export type AssignedTrip = {
   pickupOverrideUsed: boolean;
   dropOverrideUsed: boolean;
 };
+
+/**
+ * The trip ended on the dispatch side before the operator completed it
+ * (cancelled by a dispatcher, by its order, or failed). Returns the label to
+ * show, or null while the trip is still the operator's to work.
+ */
+export function tripEndedLabel(trip: AssignedTrip): string | null {
+  if (trip.completedAt) return null;
+  switch (trip.tripStatus) {
+    case "Cancelled":
+      return "Cancelled";
+    case "Failed":
+    case "Rejected":
+      return "Failed";
+    default:
+      return null;
+  }
+}
 
 export type OperatorProfile = {
   id: string;
