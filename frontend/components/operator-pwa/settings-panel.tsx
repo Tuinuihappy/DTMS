@@ -63,8 +63,14 @@ export function SettingsPanel() {
     setBusy(true);
     setNote(null);
     const label = navigator.userAgent.split(") ")[0]?.split(" (").pop() ?? "Unknown device";
-    const result = await subscribeToPush(label);
-    setBusy(false);
+    let result: Awaited<ReturnType<typeof subscribeToPush>>;
+    try {
+      result = await subscribeToPush(label);
+    } catch (err) {
+      result = { ok: false, reason: err instanceof Error ? err.message : "Enabling push failed." };
+    } finally {
+      setBusy(false);
+    }
     if (result.ok) {
       setNote("Notifications enabled.");
       await refreshAll();

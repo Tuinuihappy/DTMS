@@ -84,25 +84,51 @@ export async function subscribeToPush(deviceLabel: string | null): Promise<{
     };
   }
 
-  const reg = await navigator.serviceWorker.ready;
-  const existing = await reg.pushManager.getSubscription();
+  // `ready` never settles when no service worker controls the scope, so
+  // bound it — otherwise the button just spins forever.
+  const reg = await Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000)),
+  ]);
+  if (!reg)
+    return {
+      ok: false,
+      reason: "The app's service worker isn't running yet. Reload the page and try again.",
+    };
+
   let sub: PushSubscription;
-  if (existing) {
-    sub = existing;
-  } else {
-    sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey),
-    });
+  try {
+    sub =
+      (await reg.pushManager.getSubscription()) ??
+      (await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      }));
+  } catch (err) {
+    // Typically AbortError "push service error": the browser couldn't reach
+    // its push service (Google FCM for Chrome) — blocked network, or no
+    // Google Play services on the device.
+    const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    return {
+      ok: false,
+      reason: `The browser's push service refused the subscription (${detail}). This device may not be able to reach Google's push servers from this network.`,
+    };
   }
 
-  await registerPushSubscription({
-    platform: "WebPush",
-    endpoint: sub.endpoint,
-    publicKey: arrayBufferToBase64(sub.getKey("p256dh")),
-    authSecret: arrayBufferToBase64(sub.getKey("auth")),
-    deviceLabel,
-  });
+  try {
+    await registerPushSubscription({
+      platform: "WebPush",
+      endpoint: sub.endpoint,
+      publicKey: arrayBufferToBase64(sub.getKey("p256dh")),
+      authSecret: arrayBufferToBase64(sub.getKey("auth")),
+      deviceLabel,
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      reason: `Subscribed, but the server didn't save it: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
 
   return { ok: true, endpoint: sub.endpoint };
 }
