@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { OperatorPoolProvider } from "@/components/operator-pwa/operator-pool-provider";
 import { ServiceWorkerRegistrar } from "@/components/operator-pwa/service-worker-registrar";
 import { OverlayRoot } from "@/components/primitives/overlay-root";
 
@@ -40,7 +41,7 @@ export default function OperatorLayout({
           text colour set on this div. */}
       <OverlayRoot>
         <ServiceWorkerRegistrar />
-        {children}
+        <OperatorPoolProvider>{children}</OperatorPoolProvider>
       </OverlayRoot>
     </div>
   );
