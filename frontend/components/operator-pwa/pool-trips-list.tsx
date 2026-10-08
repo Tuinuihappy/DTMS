@@ -26,6 +26,14 @@ export function PoolTripsList() {
 
   const previewTrip = trips.find((t) => t.tripId === previewTripId) ?? null;
 
+  // Re-read the pool each time this page opens. The provider's live feed
+  // can't be trusted alone: trips are dispatched in the outbox worker, and
+  // its PoolTripAdded only reaches operators connected to the API when the
+  // SignalR Redis backplane is on (SignalR__UseRedisBackplane).
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
   // Auto-close the drawer if the trip disappears from the pool while
   // it was open (someone else claimed it, or an admin cancelled it).
   // The reducer already removed the row; we surface a toast so the
