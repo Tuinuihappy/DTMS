@@ -8,6 +8,7 @@ import {
   LogLevel,
 } from "@microsoft/signalr";
 import { MessagePackHubProtocol } from "@microsoft/signalr-protocol-msgpack";
+import { type HubLinkState, startWithRetry } from "@/lib/realtime/start-with-retry";
 
 // Phase P0 Day 5 — singleton HubConnection manager. One connection per
 // hub path is shared across components that subscribe to the same hub
@@ -30,11 +31,53 @@ const HUB_BASE_URL =
 
 type ConnectionEntry = {
   connection: HubConnection;
-  /** Resolves once the underlying connection finishes its first start(). */
+  /** Resolves once the connection is first up — retrying a failed start
+   *  for as long as it takes. Never rejects. */
   ready: Promise<void>;
+  /** A drain cycle is stopping/starting the connection on purpose; the
+   *  onclose its stop() fires must not kick off a second start. */
+  cycling: boolean;
+  /** The startWithRetry loop running for this connection, if any. */
+  retrying: Promise<void> | null;
 };
 
 const connections = new Map<string, ConnectionEntry>();
+
+function linkState(connection: HubConnection): HubLinkState {
+  if (connection.state === HubConnectionState.Connected) return "connected";
+  if (connection.state === HubConnectionState.Disconnected) return "disconnected";
+  return "busy";
+}
+
+/** Start (or restart) the entry's connection, retrying until it is up.
+ *  Only one loop per connection: a second caller just waits on the first. */
+function retryStart(hubPath: string, entry: ConnectionEntry): Promise<void> {
+  if (entry.retrying) return entry.retrying;
+  entry.retrying = startWithRetry({
+    start: () => entry.connection.start(),
+    state: () => linkState(entry.connection),
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    random: Math.random,
+    onError: (err, attempt) => {
+      // Once per outage, not on every retry — the loop can run for hours
+      // while the API is down.
+      if (attempt === 0) {
+        console.warn(`[signalr] Failed to start hub ${hubPath} — retrying until it's back:`, err);
+      }
+    },
+  }).finally(() => {
+    entry.retrying = null;
+  });
+  return entry.retrying;
+}
+
+/** Tell use-hub-subscription the connection came back through a path
+ *  SignalR's onreconnected doesn't cover, so it rejoins its group. */
+function announceRestarted(hubPath: string) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(DRAIN_CYCLE_EVENT, { detail: { hubPath } }));
+  }
+}
 
 export function getHub(hubPath: string): HubConnection {
   const existing = connections.get(hubPath);
@@ -99,15 +142,29 @@ export function getHub(hubPath: string): HubConnection {
     void cycleConnectionForDrain(hubPath, connection);
   });
 
-  const ready = connection.start().catch((err) => {
-    // Surface a clear error in console so the failing hook can show its
-    // disconnected state. The HubConnection itself stays in the map so
-    // the next subscriber's call to .invoke() short-circuits with the
-    // same "Cannot send data..." error rather than racing another start.
-    console.warn(`[signalr] Failed to start hub at ${url}:`, err);
+  const entry: ConnectionEntry = {
+    connection,
+    ready: Promise.resolve(),
+    cycling: false,
+    retrying: null,
+  };
+  connections.set(hubPath, entry);
+
+  // A failed first start used to strand the connection Disconnected for
+  // good (review M15). Now `ready` resolves only once it is actually up,
+  // so subscribers waiting in ensureStarted attach and Subscribe then.
+  entry.ready = retryStart(hubPath, entry);
+
+  // onclose fires when the connection ends without SignalR reconnecting
+  // it: a server-side close that doesn't allow reconnect, or a stop() of
+  // ours. Bring it back unless a drain cycle or retry loop owns it.
+  connection.onclose(() => {
+    if (entry.cycling || entry.retrying) return;
+    void retryStart(hubPath, entry).then(() => {
+      if (connection.state === HubConnectionState.Connected) announceRestarted(hubPath);
+    });
   });
 
-  connections.set(hubPath, { connection, ready });
   return connection;
 }
 
@@ -116,25 +173,29 @@ async function cycleConnectionForDrain(
   connection: HubConnection,
 ): Promise<void> {
   console.info(`[signalr] received __drain for ${hubPath} — cycling connection`);
+  const entry = connections.get(hubPath);
+  if (!entry || entry.cycling) return;
+  entry.cycling = true;
   try {
-    await connection.stop();
-  } catch (err) {
-    console.warn(`[signalr] stop during drain cycle failed for ${hubPath}:`, err);
+    try {
+      await connection.stop();
+    } catch (err) {
+      console.warn(`[signalr] stop during drain cycle failed for ${hubPath}:`, err);
+    }
+    try {
+      await connection.start();
+    } catch (err) {
+      // Server might still be inside its drain settle window and rejecting
+      // new connections via DrainAwareHubFilter. Automatic reconnect does
+      // NOT cover this (it only follows a dropped live connection), so
+      // retry here until the server takes us back.
+      console.warn(`[signalr] restart during drain cycle failed for ${hubPath}:`, err);
+      await retryStart(hubPath, entry);
+    }
+  } finally {
+    entry.cycling = false;
   }
-  try {
-    await connection.start();
-  } catch (err) {
-    // Server might still be inside its drain settle window and rejecting
-    // new connections via DrainAwareHubFilter. SignalR's automatic
-    // reconnect will pick up from here — it watches for state changes.
-    console.warn(`[signalr] restart during drain cycle failed for ${hubPath}:`, err);
-    return;
-  }
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(
-      new CustomEvent(DRAIN_CYCLE_EVENT, { detail: { hubPath } }),
-    );
-  }
+  if (connection.state === HubConnectionState.Connected) announceRestarted(hubPath);
 }
 
 /** CustomEvent name fired after a successful drain-driven reconnect.
@@ -144,7 +205,9 @@ export const DRAIN_CYCLE_EVENT = "dtms:signalr-drain-cycled";
 
 export type DrainCycleDetail = { hubPath: string };
 
-/** Returns the cached start() promise — useful for awaiting before invoke(). */
+/** Resolves once the hub's connection is first up (a failed start is
+ *  retried, so this can take as long as the API is down). Await it before
+ *  invoke(). Never rejects. */
 export function ensureStarted(hubPath: string): Promise<void> {
   const entry = connections.get(hubPath);
   if (!entry) {
