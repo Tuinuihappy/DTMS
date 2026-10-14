@@ -98,8 +98,9 @@
          version rather than suppressed, so the vulnerable assembly is actually
          gone instead of merely unreported. -->
     <!-- Via Microsoft.EntityFrameworkCore.Design → Microsoft.Build.Tasks.Core.
-         9.0.0 carries six High advisories. -->
-    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.10" />
+         9.0.0 carries six High advisories. 10.0.13: GHSA-r955-8q5j-3h83
+         (CVE-2026-96958, DoS, High) covers 10.0.0–10.0.12, filed 2026-10-13. -->
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.13" />
     <!-- Via the SignalR MessagePack protocol. GHSA-hv8m-jj95-wg3x: LZ4
          decompression can fault or over-read on hostile input. Patched in the
          2.x line at 2.5.301, so no jump to 3.x (which changes the wire format)
