@@ -4,7 +4,14 @@
 // that gate them. Browser-only; every call is safe to make anywhere (no-ops
 // when an API is missing) because tablets differ in what they support.
 
-import { PREF_KEYS, TONE_GAIN, TONES, VIBRATION, CHIME_COALESCE_MS } from "./alert-config";
+import {
+  CHIME_COALESCE_MS,
+  DEFERRED_SOUND_MAX_MS,
+  PREF_KEYS,
+  TONE_GAIN,
+  TONES,
+  VIBRATION,
+} from "./alert-config";
 
 export type AlertKind = keyof typeof TONES;
 
@@ -49,10 +56,24 @@ export function isAudioUnlocked(): boolean {
   return ctx?.state === "running";
 }
 
-/** Plays the alert tone for `kind`. Returns false when it couldn't play. */
-export function playTone(kind: AlertKind): boolean {
+/**
+ * Plays the alert tone for `kind`. Returns false when it couldn't play.
+ * Chrome on Android suspends the AudioContext while the screen is off and
+ * doesn't always resume it, so wake it first — allowed without a fresh tap
+ * once the page has been interacted with.
+ */
+export async function playTone(kind: AlertKind): Promise<boolean> {
   const c = ctx;
-  if (!c || c.state !== "running") return false;
+  if (!c) return false;
+  if (c.state !== "running") {
+    try {
+      await c.resume();
+    } catch {
+      return false;
+    }
+    // Re-read after the await (TS keeps the pre-await narrowing).
+    if ((c.state as AudioContextState) !== "running") return false;
+  }
   try {
     let t = c.currentTime;
     for (const step of TONES[kind]) {
@@ -113,6 +134,23 @@ export const keepAwakePref = {
   set: (on: boolean) => writePref(PREF_KEYS.keepAwake, on),
 };
 
+let deferred: { kind: AlertKind; at: number } | null = null;
+let deferListening = false;
+
+function deferUntilVisible(kind: AlertKind): void {
+  // "Your trip was cancelled" outranks "new pool trip" if both are waiting.
+  if (!deferred || kind === "trip-ended") deferred = { kind, at: Date.now() };
+  if (deferListening) return;
+  deferListening = true;
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || !deferred) return;
+    const held = deferred;
+    deferred = null;
+    // Older than this, the banner on screen says it all.
+    if (Date.now() - held.at <= DEFERRED_SOUND_MAX_MS) void soundAlert(held.kind);
+  });
+}
+
 /**
  * Plays one alert across all open tabs: only a visible tab sounds, and a
  * Web Lock (atomic across tabs) plus a shared timestamp stops two tabs that
@@ -120,8 +158,15 @@ export const keepAwakePref = {
  * where Web Locks are missing (insecure origin without the flag).
  */
 export async function soundAlert(kind: AlertKind): Promise<void> {
-  if (typeof document === "undefined" || document.visibilityState !== "visible") return;
+  if (typeof document === "undefined") return;
   if (!soundPref.get()) return;
+  if (document.visibilityState !== "visible") {
+    // Screen off / app in the background: Chrome may still deliver the
+    // event, and by screen-on the trip is no longer "new". Hold the sound
+    // and play it the moment the page is visible again.
+    deferUntilVisible(kind);
+    return;
+  }
 
   const claimAndPlay = () => {
     const now = Date.now();
@@ -132,7 +177,7 @@ export async function soundAlert(kind: AlertKind): Promise<void> {
     } catch {
       // No storage: this tab decides alone.
     }
-    playTone(kind);
+    void playTone(kind);
     vibrate(kind);
   };
 

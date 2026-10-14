@@ -10,6 +10,12 @@ export const POOL_FALLBACK_POLL_MS = 30_000;
 /** Don't refetch on every quick app switch. */
 export const VISIBILITY_REFETCH_MIN_MS = 5_000;
 
+/**
+ * An alert that fired while the screen was off plays when it comes back on —
+ * unless it is older than this; then the banner already on screen says it.
+ */
+export const DEFERRED_SOUND_MAX_MS = 10 * 60_000;
+
 export type ToneStep = { hz: number; ms: number };
 
 /** Loud enough for a shop floor: square wave, three alternating steps. */
