@@ -114,12 +114,22 @@ function readPref(key: string): boolean {
   }
 }
 
+/** Fired in this tab when a preference changes (other tabs get `storage`). */
+export const PREFS_CHANGED_EVENT = "dtms:operator-prefs-changed";
+
 function writePref(key: string, on: boolean): void {
   try {
     window.localStorage.setItem(key, on ? "on" : "off");
   } catch {
     // Private mode / storage blocked: the default (on) applies.
   }
+  window.dispatchEvent(new Event(PREFS_CHANGED_EVENT));
+}
+
+/** Screen Wake Lock needs a secure origin — https, or the insecure-origin
+ *  flag the tablets are set up with. */
+export function isWakeLockSupported(): boolean {
+  return typeof navigator !== "undefined" && "wakeLock" in navigator && window.isSecureContext;
 }
 
 /** Sound + vibration for alerts. Default on. Read in effects only. */

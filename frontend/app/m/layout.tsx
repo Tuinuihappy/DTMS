@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { AlertBanner } from "@/components/operator-pwa/alert-banner";
+import { KeepAwake } from "@/components/operator-pwa/keep-awake";
 import { OperatorAlertsProvider } from "@/components/operator-pwa/operator-alerts";
 import { OperatorPoolProvider } from "@/components/operator-pwa/operator-pool-provider";
 import { ServiceWorkerRegistrar } from "@/components/operator-pwa/service-worker-registrar";
@@ -47,6 +48,7 @@ export default function OperatorLayout({
         <OperatorAlertsProvider>
           <OperatorPoolProvider>
             <AlertBanner />
+            <KeepAwake />
             {children}
           </OperatorPoolProvider>
         </OperatorAlertsProvider>

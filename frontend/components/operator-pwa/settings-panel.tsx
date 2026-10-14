@@ -15,9 +15,18 @@ import {
   drainQueue,
   getQueueDepth,
 } from "@/lib/operator-pwa/offline-queue";
+import {
+  isWakeLockSupported,
+  keepAwakePref,
+  playTone,
+  soundPref,
+  unlockAudio,
+  vibrate,
+} from "@/lib/operator-pwa/alert-output";
 
 // Phase 4.5 — Operator settings:
 //   - Profile summary (employeeCode, role, warehouse)
+//   - New-trip alert sound on/off + test, keep-screen-awake
 //   - Push enable/disable + test push
 //   - Offline queue depth + sync now / clear
 //   - Logout
@@ -150,6 +159,8 @@ export function SettingsPanel() {
         </Card>
       )}
 
+      <AlertSettings />
+
       <Card title="Notifications">
         {pushState.kind === "loading" && (
           <div className="text-sm text-zinc-500">Checking support…</div>
@@ -219,6 +230,99 @@ export function SettingsPanel() {
         Log out
       </button>
     </div>
+  );
+}
+
+// Per-device switches for the in-app alerts (OperatorAlertsProvider) and
+// the screen wake lock (KeepAwake). Prefs live in localStorage, so they're
+// read after mount only — reading during render would mismatch the server.
+function AlertSettings() {
+  const [ready, setReady] = useState(false);
+  const [sound, setSound] = useState(true);
+  const [awake, setAwake] = useState(true);
+  const [awakeSupported, setAwakeSupported] = useState(true);
+
+  useEffect(() => {
+    setSound(soundPref.get());
+    setAwake(keepAwakePref.get());
+    setAwakeSupported(isWakeLockSupported());
+    setReady(true);
+  }, []);
+
+  const onTest = async () => {
+    // This tap is itself the user gesture that unlocks audio.
+    await unlockAudio();
+    void playTone("pool-new");
+    vibrate("pool-new");
+  };
+
+  return (
+    <Card title="การเตือนงานใหม่">
+      <Toggle
+        label="เสียงเตือนงานใหม่"
+        hint="ปิดแล้วยังมีแถบเตือน แต่ไม่ดังและไม่สั่น"
+        checked={sound}
+        disabled={!ready}
+        onChange={(on) => {
+          soundPref.set(on);
+          setSound(on);
+        }}
+      />
+      <button
+        onClick={onTest}
+        className="h-11 rounded-xl border border-zinc-700 text-sm font-medium text-zinc-100 active:bg-zinc-800"
+      >
+        ทดสอบเสียง
+      </button>
+      <Toggle
+        label="กันจอดับระหว่างเปิดแอป"
+        hint={
+          awakeSupported
+            ? "จอไม่ดับเองระหว่างเปิดแอป · ใช้แบตมากขึ้น และเครื่องจะไม่ล็อกหน้าจอเอง"
+            : "เครื่องนี้ไม่รองรับ (ต้องเปิดผ่าน https หรือตั้ง flag ของ Chrome)"
+        }
+        checked={awakeSupported && awake}
+        disabled={!ready || !awakeSupported}
+        onChange={(on) => {
+          keepAwakePref.set(on);
+          setAwake(on);
+        }}
+      />
+      <p className="text-xs text-zinc-500">
+        เตือนได้เมื่อเปิดแอปและจออยู่ · ไม่ต้องใช้อินเทอร์เน็ต · ถ้าเงียบ ให้เช็กเสียงสื่อ (media) ของเครื่อง
+      </p>
+    </Card>
+  );
+}
+
+function Toggle({
+  label,
+  hint,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  return (
+    <label className={"flex items-start justify-between gap-3 " + (disabled ? "opacity-50" : "")}>
+      <span className="flex flex-col gap-0.5">
+        <span className="text-sm text-zinc-100">{label}</span>
+        <span className="text-xs text-zinc-500">{hint}</span>
+      </span>
+      <input
+        type="checkbox"
+        role="switch"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-zinc-700 transition-colors before:block before:size-5 before:translate-x-0.5 before:translate-y-0.5 before:rounded-full before:bg-white before:transition-transform checked:bg-emerald-500 checked:before:translate-x-[22px] disabled:cursor-not-allowed"
+      />
+    </label>
   );
 }
 
