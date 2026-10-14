@@ -26,9 +26,20 @@ public sealed class OperatorPoolHub : Hub<IOperatorPoolClient>
 {
     public const string PoolGroup = "operator-pool";
 
+    /// <summary>
+    /// Per-operator group, keyed by the same employee code OperatorSyncMiddleware
+    /// stores as Operator.EmployeeCode — for messages meant for one operator
+    /// only (e.g. "your trip was cancelled"). Joined on connect and never left
+    /// by Unsubscribe, which is about the shared pool feed.
+    /// </summary>
+    public static string OperatorGroup(string employeeCode) => $"operator:{employeeCode}";
+
     public override async Task OnConnectedAsync()
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, PoolGroup);
+        var employeeCode = OperatorClaims.EmployeeCode(Context.User);
+        if (employeeCode is not null)
+            await Groups.AddToGroupAsync(Context.ConnectionId, OperatorGroup(employeeCode));
         await base.OnConnectedAsync();
     }
 

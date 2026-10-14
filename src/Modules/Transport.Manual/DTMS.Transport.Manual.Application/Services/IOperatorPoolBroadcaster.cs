@@ -63,4 +63,14 @@ public interface IOperatorPoolBroadcaster
     /// operator claimed it. Clients drop the card silently.
     /// </summary>
     Task BroadcastRemovedAsync(Guid tripId, string reason, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// A trip <paramref name="employeeCode"/> had claimed was ended by
+    /// dispatch. Goes to that operator's connections only, so their tablet
+    /// can alert wherever in the app they are. <paramref name="outcome"/> is
+    /// "cancelled" | "failed" | "rejected"; <paramref name="reason"/> the
+    /// trip's free-text reason.
+    /// </summary>
+    Task BroadcastAssignedTripEndedAsync(string employeeCode, Guid tripId, string outcome, string reason,
+        CancellationToken cancellationToken = default);
 }

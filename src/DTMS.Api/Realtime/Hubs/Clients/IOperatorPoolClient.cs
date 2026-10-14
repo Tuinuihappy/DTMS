@@ -33,4 +33,13 @@ public interface IOperatorPoolClient
     /// remove the trip from the list; no navigation happens.
     /// </summary>
     Task PoolTripRemoved(object removal);
+
+    /// <summary>
+    /// A trip this operator had claimed was ended by dispatch (cancelled,
+    /// failed or rejected). Sent only to that operator's connections (group
+    /// <c>operator:{EmployeeCode}</c>). Payload:
+    /// <c>{ tripId, outcome, reason }</c> — outcome is "cancelled" | "failed" |
+    /// "rejected"; reason is the free text the trip ended with.
+    /// </summary>
+    Task AssignedTripEnded(object ended);
 }

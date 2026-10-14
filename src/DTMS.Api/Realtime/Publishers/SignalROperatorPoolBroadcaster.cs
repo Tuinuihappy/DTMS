@@ -25,6 +25,7 @@ public sealed class SignalROperatorPoolBroadcaster : IOperatorPoolBroadcaster
     private const string EventAdded = "added";
     private const string EventClaimed = "claimed";
     private const string EventRemoved = "removed";
+    private const string EventAssignedEnded = "assigned_ended";
     private const string OutcomeSent = "sent";
     private const string OutcomeFailed = "failed";
 
@@ -104,6 +105,27 @@ public sealed class SignalROperatorPoolBroadcaster : IOperatorPoolBroadcaster
             _logger.LogWarning(ex,
                 "[PoolBroadcast] Failed to push PoolTripRemoved for Trip {TripId}",
                 tripId);
+        }
+    }
+
+    public async Task BroadcastAssignedTripEndedAsync(string employeeCode, Guid tripId, string outcome,
+        string reason, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _hub.Clients.Group(OperatorPoolHub.OperatorGroup(employeeCode))
+                .AssignedTripEnded(new { tripId, outcome, reason });
+            _metrics.RecordBroadcast(EventAssignedEnded, OutcomeSent);
+            _logger.LogInformation(
+                "[PoolBroadcast] Assigned Trip {TripId} {Outcome} → operator {EmployeeCode}",
+                tripId, outcome, employeeCode);
+        }
+        catch (Exception ex)
+        {
+            _metrics.RecordBroadcast(EventAssignedEnded, OutcomeFailed);
+            _logger.LogWarning(ex,
+                "[PoolBroadcast] Failed to push AssignedTripEnded for Trip {TripId} to {EmployeeCode}",
+                tripId, employeeCode);
         }
     }
 }

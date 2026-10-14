@@ -40,15 +40,9 @@ public sealed class OperatorSyncMiddleware : IMiddleware
             return;
         }
 
-        // External Auth JWTs carry the employee identity under `EmployeeId`
-        // (short custom claim per ADR-014). Fall back to `employeeCode` (dev
-        // fixture) or `nameidentifier` (standard) so unit tests + hand-rolled
-        // tokens keep working. `MapInboundClaims=false` on the JwtBearer
-        // options means `sub` stays as-is — hence the extra fallback.
-        var employeeCode = user.FindFirstValue("EmployeeId")
-            ?? user.FindFirstValue("employeeCode")
-            ?? user.FindFirstValue("sub")
-            ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
+        // Shared with the operator hub, which groups connections by the same
+        // code — see OperatorClaims for the claim fallbacks.
+        var employeeCode = OperatorClaims.EmployeeCode(user);
         var displayName = user.FindFirstValue("displayName")
             ?? user.FindFirstValue(ClaimTypes.Name)
             ?? user.Identity?.Name

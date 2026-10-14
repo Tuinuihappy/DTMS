@@ -150,6 +150,22 @@ export function OperatorPoolProvider({ children }: { children: ReactNode }) {
         const r = removal as { tripId: string };
         dispatch({ type: "REMOVED", tripId: r.tripId });
       },
+      // Sent only to this operator (server group operator:{EmployeeCode}):
+      // a trip they claimed was ended by dispatch. Rides this subscription
+      // because there must be only one on /hubs/operator-pool (see above).
+      AssignedTripEnded: (payload: unknown) => {
+        const e = payload as { tripId: string; outcome?: string; reason?: string };
+        alerts?.raise(
+          {
+            key: `trip-ended:${e.tripId}`,
+            kind: "trip-ended",
+            title: e.outcome === "cancelled" ? "Trip ของคุณถูกยกเลิก" : "Trip ของคุณถูกยุติโดย dispatch",
+            detail: [`Trip ${e.tripId.slice(0, 8)}`, e.reason].filter(Boolean).join(" · "),
+            href: `/m/trips/${e.tripId}`,
+          },
+          { sound: true },
+        );
+      },
     },
   });
 
