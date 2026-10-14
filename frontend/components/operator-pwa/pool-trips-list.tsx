@@ -35,12 +35,12 @@ export function PoolTripsList() {
   }, [refetch]);
 
   // Auto-close the drawer if the trip disappears from the pool while
-  // it was open (someone else claimed it, or an admin cancelled it).
-  // The reducer already removed the row; we surface a toast so the
-  // operator understands why the drawer just closed.
+  // it was open (someone else claimed it, or it was cancelled — the server
+  // sends PoolTripRemoved for that). The reducer already removed the row;
+  // we surface a toast so the operator understands why the drawer closed.
   useEffect(() => {
     if (previewTripId && !previewTrip) {
-      setToast("Trip กว่าจะกด confirm ก็ถูก claim ไปแล้ว");
+      setToast("งานนี้ไม่อยู่ใน Pool แล้ว — มีคนรับไปหรือถูกยกเลิก");
       window.setTimeout(() => setToast(null), 3_000);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
