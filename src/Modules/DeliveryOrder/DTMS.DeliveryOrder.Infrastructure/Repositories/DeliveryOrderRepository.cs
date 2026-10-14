@@ -10,6 +10,8 @@ public class DeliveryOrderRepository : IDeliveryOrderRepository
     private readonly DeliveryOrderDbContext _context;
     public DeliveryOrderRepository(DeliveryOrderDbContext context) => _context = context;
 
+    public void ResetTracking() => _context.ChangeTracker.Clear();
+
     public Task<Domain.Entities.DeliveryOrder?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => _context.DeliveryOrders
             .Include(o => o.Items)

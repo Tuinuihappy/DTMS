@@ -16,6 +16,19 @@ public record DeliveryOrderSearchFilters(
 public interface IDeliveryOrderRepository
 {
     Task<Entities.DeliveryOrder?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Discards ALL tracked state in the unit of work (ChangeTracker.Clear).
+    /// Required before retrying after a DbUpdateConcurrencyException: the
+    /// outbox interceptor drains domain events into OutboxMessage rows
+    /// during SavingChanges (before the DB write), so a failed save leaves
+    /// them queued as Added — a second save on the same context would
+    /// publish an event for a change that never happened. Re-load the
+    /// aggregate after calling this; the old instance's xmin is stale.
+    /// Same contract as ITripRepository.ResetTracking.
+    /// </summary>
+    void ResetTracking();
+
     Task<Entities.DeliveryOrder?> GetByIdAsNoTrackingAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Entities.DeliveryOrder?> GetByRefAsync(string sourceSystemKey, string orderRef, CancellationToken cancellationToken = default);
     Task<List<Entities.DeliveryOrder>> GetByStatusAsync(OrderStatus status, int page, int pageSize, CancellationToken cancellationToken = default);
