@@ -4,13 +4,18 @@ import { usePathname } from "next/navigation";
 import {
   createContext,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   type ReactNode,
 } from "react";
 import { getPoolTrips, type PoolTrip } from "@/lib/api/operator-pool";
 import { useHubSubscription } from "@/lib/hooks/use-hub-subscription";
+import { POOL_FALLBACK_POLL_MS, VISIBILITY_REFETCH_MIN_MS } from "@/lib/operator-pwa/alert-config";
+import { initialPoolWatch, observePool } from "@/lib/operator-pwa/pool-alert-logic";
+import { useOperatorAlerts } from "./operator-alerts";
 
 // WMS PR-4b (PR-D) — Operator pool state, owned once for every /m page.
 //
@@ -50,14 +55,16 @@ type State = {
   trips: PoolTrip[];
   loading: boolean;
   error: string | null;
+  /** A REST load has succeeded at least once — the alert baseline. */
+  loaded: boolean;
 };
 
-const initialState: State = { trips: [], loading: true, error: null };
+const initialState: State = { trips: [], loading: true, error: null, loaded: false };
 
 function reducer(state: State, action: PoolAction): State {
   switch (action.type) {
     case "REFETCH":
-      return { trips: sortFifo(action.trips), loading: false, error: null };
+      return { trips: sortFifo(action.trips), loading: false, error: null, loaded: true };
     case "FAILED":
       return { ...state, loading: false, error: action.error };
     case "ADDED": {
@@ -91,14 +98,24 @@ export type OperatorPoolValue = {
 
 export const OperatorPoolContext = createContext<OperatorPoolValue | null>(null);
 
+/** Pool state, or null outside the /m layout (e.g. for the tab badge). */
+export function useOptionalOperatorPool(): OperatorPoolValue | null {
+  return useContext(OperatorPoolContext);
+}
+
+const POOL_ALERT_KEY = "pool-new";
+
 export function OperatorPoolProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   // The layout also wraps /m/login: no session there, so the hub token and
   // pool fetch would only 401.
   const enabled = !pathname?.startsWith("/m/login");
   const [state, dispatch] = useReducer(reducer, initialState);
+  const alerts = useOperatorAlerts();
+  const lastFetchAt = useRef(0);
 
   const refetch = useCallback(async () => {
+    lastFetchAt.current = Date.now();
     try {
       const trips = await getPoolTrips();
       dispatch({ type: "REFETCH", trips });
@@ -142,6 +159,74 @@ export function OperatorPoolProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (enabled && connected) void refetch();
   }, [enabled, connected, refetch]);
+
+  // Fallback while the realtime feed is down (hub unreachable, wrong hub
+  // URL baked into the build): poll, so new trips still alert — late, not
+  // never. The list-diff below doesn't care where a change came from.
+  useEffect(() => {
+    if (!enabled || connected) return;
+    const id = window.setInterval(() => void refetch(), POOL_FALLBACK_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [enabled, connected, refetch]);
+
+  // Screen back on / app back in front: the socket may be dead without
+  // knowing it yet, so don't trust `connected` — reload, and anything that
+  // landed meanwhile alerts through the diff.
+  useEffect(() => {
+    if (!enabled) return;
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastFetchAt.current < VISIBILITY_REFETCH_MIN_MS) return;
+      void refetch();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [enabled, refetch]);
+
+  // ── New-trip alert ────────────────────────────────────────────────────
+  // Every change to the list is diffed against what was already seen
+  // (pool-alert-logic). New ids → banner (+ sound, coalesced). The banner
+  // tracks which of its trips are still waiting and closes itself once
+  // they've all been claimed or cancelled, or when the pool page opens.
+  const watch = useRef(initialPoolWatch);
+  const pending = useRef<string[]>([]);
+  const raise = alerts?.raise;
+  const dismissAlert = alerts?.dismiss;
+  const sound = alerts?.sound;
+  const onPoolPage = pathname === "/m/pool";
+
+  useEffect(() => {
+    if (!state.loaded || !raise || !dismissAlert) return;
+    const ids = state.trips.map((t) => t.tripId);
+    const obs = observePool(watch.current, ids, Date.now());
+    watch.current = obs.watch;
+
+    const inPool = new Set(ids);
+    const waiting = onPoolPage ? [] : [...pending.current, ...obs.newIds].filter((id) => inPool.has(id));
+    pending.current = waiting;
+
+    if (obs.chime && onPoolPage && sound) sound("pool-new"); // cards are in view; noise only
+    if (waiting.length === 0) {
+      dismissAlert(POOL_ALERT_KEY);
+      return;
+    }
+    const latest = state.trips.find((t) => t.tripId === waiting[waiting.length - 1]);
+    raise(
+      {
+        key: POOL_ALERT_KEY,
+        kind: "pool-new",
+        title: waiting.length === 1 ? "งานใหม่ใน Pool" : `งานใหม่ใน Pool (${waiting.length})`,
+        detail: latest
+          ? `${latest.orderRef || "—"} · ${latest.pickupCode || "?"} → ${latest.dropCode || "?"}`
+          : undefined,
+        href: "/m/pool",
+        onDismiss: () => {
+          pending.current = [];
+        },
+      },
+      { sound: obs.chime },
+    );
+  }, [state.trips, state.loaded, onPoolPage, raise, dismissAlert, sound]);
 
   const optimisticRemove = useCallback(
     (tripId: string) => dispatch({ type: "REMOVED", tripId }),

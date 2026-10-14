@@ -12,6 +12,7 @@
     "check:routes": "node scripts/check-route-protection.mjs",
     "test:overlay": "node --test lib/overlay/layer-stack.test.ts",
     "test:realtime": "node --test lib/realtime/start-with-retry.test.ts",
+    "test:pwa": "node --test lib/operator-pwa/pool-alert-logic.test.ts",
     "check:overlays": "node scripts/check-overlay-keys.mjs"
   },
   "dependencies": {

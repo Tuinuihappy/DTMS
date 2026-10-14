@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useOptionalOperatorPool } from "./operator-pool-provider";
 
 // WMS PR-4b (PR-D) — Two-tab operator nav between "Pool" (available
 // trips) and "My trips" (claimed). Rendered directly below the shell
@@ -15,6 +16,9 @@ const tabs = [
 
 export function OperatorTabsNav() {
   const pathname = usePathname();
+  // Trips waiting in the pool right now — derived from the live list, so it
+  // can't drift when a claim or cancel event is missed.
+  const poolCount = useOptionalOperatorPool()?.trips.length ?? 0;
   return (
     <nav className="flex border-b border-zinc-900 text-sm">
       {tabs.map((t) => {
@@ -31,6 +35,14 @@ export function OperatorTabsNav() {
             }
           >
             {t.label}
+            {t.href === "/m/pool" && poolCount > 0 && (
+              <span
+                aria-label={`${poolCount} trips waiting`}
+                className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-semibold leading-5 text-white"
+              >
+                {poolCount}
+              </span>
+            )}
           </Link>
         );
       })}

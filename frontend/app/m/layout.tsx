@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { AlertBanner } from "@/components/operator-pwa/alert-banner";
+import { OperatorAlertsProvider } from "@/components/operator-pwa/operator-alerts";
 import { OperatorPoolProvider } from "@/components/operator-pwa/operator-pool-provider";
 import { ServiceWorkerRegistrar } from "@/components/operator-pwa/service-worker-registrar";
 import { OverlayRoot } from "@/components/primitives/overlay-root";
@@ -41,7 +43,13 @@ export default function OperatorLayout({
           text colour set on this div. */}
       <OverlayRoot>
         <ServiceWorkerRegistrar />
-        <OperatorPoolProvider>{children}</OperatorPoolProvider>
+        {/* Alerts wrap the pool feed: the feed raises the "new trip" alert. */}
+        <OperatorAlertsProvider>
+          <OperatorPoolProvider>
+            <AlertBanner />
+            {children}
+          </OperatorPoolProvider>
+        </OperatorAlertsProvider>
       </OverlayRoot>
     </div>
   );

@@ -1,6 +1,6 @@
 # แผน: เตือนงานใหม่เข้า Pool ภายในแอป (เสียง + สั่น + แถบเตือน + กันจอดับ)
 
-> **สถานะ**: 🔵 ยังไม่เริ่ม — ร่าง 2026-10-08 (ฉบับแก้หลังรีวิวผลกระทบและรีวิวประสิทธิภาพ)
+> **สถานะ**: 🟡 Phase 1 ✅ (`c38ff16d`) · Phase 2 ✅ (`2c01dc95`, `f9933044`) · Phase 3–4 ปรับแผนแล้ว (ดู "ฉบับแก้ 2026-10-14" ด้านล่าง) — ร่างแรก 2026-10-08
 > **สิ่งที่ขอ**: operator ที่ถือ tablet ที่เปิดแอป PWA ไว้ ได้ยินเสียง รู้สึกถึงการสั่น และเห็นแถบ "งานใหม่" เมื่อมีงานเข้า Pool โดยไม่ต้องใช้อินเทอร์เน็ต
 > **ประเภท / ขนาด**: feature · ขนาด M ประมาณ 9.5 ชม. 4 phase แก้เฉพาะ frontend
 > **ที่มา**: tablet อยู่บน Wi-Fi "Delta-IoT" ที่ไม่มีอินเทอร์เน็ต Web Push (FCM ของ Google) จึงใช้ไม่ได้ (`AbortError: push service error`)
@@ -11,6 +11,37 @@
 > - **ดึงข้อมูลใหม่เมื่อกลับมาเปิดจอ:** แล้วเตือนงานที่เข้ามาระหว่างจอดับ
 > - **realtime ต่อไม่ได้:** ทำทั้ง poll สำรอง และแก้ต้นเหตุ M15 (ลองต่อใหม่เมื่อต่อครั้งแรกไม่ได้)
 > **ที่เก็บแผน**: ไฟล์นี้ (`docs/plans/pool-new-trip-alert.md`)
+
+## ฉบับแก้ 2026-10-14 (ใช้แทนส่วนที่ขัดกันใน Phase 3–4 ด้านล่าง)
+
+**สิ่งที่เปลี่ยนไปตั้งแต่ร่างแรก**
+- SignalR Redis backplane เปิดแล้ว (`6856ed1d`) ทำให้ `PoolTripAdded` ถึง tablet ครบทุกงาน ก่อนหน้านี้หายประมาณครึ่งหนึ่ง
+- `PoolTripRemoved` ถูกส่งจริงแล้ว (`b6344d40`, `PoolTripRemovedBroadcastConsumer`) งานที่ถูกยกเลิกจะหายจาก Pool เอง
+
+**ตัดสินใจกับผู้ใช้เพิ่ม (2026-10-14)**
+- **ตัวเลขบนแท็บ Pool = จำนวนงานรอใน Pool ทั้งหมด** (`trips.length`) ไม่ใช่ "งานใหม่ที่ยังไม่ดู" จึงถูกต้องเสมอโดยไม่ต้องมีตัวนับแยก (แก้ V1)
+- **เปิดแอปหรือ reload:** ไม่ดัง แค่แสดงตัวเลข
+- **กันจอดับ:** เปิดเป็นค่าเริ่มต้น โดยยอมรับว่าเครื่องจะไม่ล็อกหน้าจอระหว่างเปิดแอป และปิดได้ต่อเครื่อง
+- **เพิ่มการเตือน "trip ของคุณถูกยกเลิก"** โดยให้ server ส่งทันทีเฉพาะ operator คนนั้น (Phase 3b)
+
+**ปรับการออกแบบหลังรีวิว**
+- **V2:** ตรวจ "งานใหม่" จากการเปลี่ยนแปลงของรายการ `trips` ใน provider ที่เดียว ไม่ผูกกับแหล่งข้อมูล (event, ดึงสำรอง หรือดึงตอนเปิดจอ) มี id ที่ไม่เคยเห็นก็ดัง (รวมเสียง 3 วินาที) และ `seen` จำแยกจากรายการ (R4)
+- **V3/V4:** กันหลายแท็บดังซ้อนด้วย `navigator.locks` (ใช้ localStorage แทนถ้าไม่รองรับ) และดังเฉพาะแท็บที่แสดงอยู่
+- **V5:** ดึงรายการใหม่ทุกครั้งที่จอกลับมา (`visibilitychange`) ไม่ขึ้นกับ `connected` แต่ห่างกันอย่างน้อย 5 วินาที
+- **I1:** แยกตัวกลาง `useOperatorAlerts` (ประเภท `pool-new`, `trip-ended`) ใช้เสียง การสั่น และแถบร่วมกัน
+- **I2:** ค่าตั้งทั้งหมดอยู่ในไฟล์ `alert-config.ts`
+- **I3:** แถบเตือนใช้ `role="status"` (หรือ `alert` สำหรับ trip ถูกยกเลิก)
+
+### Phase 3b — เตือน "trip ของคุณถูกยกเลิก" (backend + frontend, ~1.5–2 ชม.)
+- **Hub:** `OperatorPoolHub.OnConnectedAsync` ให้เข้ากลุ่ม `operator:{EmployeeCode}` เพิ่ม อ่านรหัสจาก claim ด้วยลำดับเดียวกับ `OperatorSyncMiddleware` (`EmployeeId` → `employeeCode` → `sub` → NameIdentifier) แยกเป็นตัวช่วยที่ใช้ร่วมกัน ไม่ต้อง query ฐานข้อมูลตอนเชื่อมต่อ และ `Unsubscribe` ถอดเฉพาะกลุ่ม pool ไม่แตะกลุ่ม operator
+- **Consumer:** ขยาย `PoolTripRemovedBroadcastConsumer` (**ห้ามเปลี่ยนชื่อคลาส** เพราะชื่อคลาสคือชื่อคิว ถ้าเปลี่ยน คิวเดิมจะค้างโดยไม่มีตัวรับ):
+  - ถ้า trip อยู่ใน Pool → `PoolTripRemoved` (เหมือนเดิม)
+  - ถ้า trip มีคนรับแล้ว (`ClaimedByOperatorId` ไม่ว่าง) → โหลด operator → ส่ง `AssignedTripEnded { tripId, reason, orderRef }` ไปที่ `operator:{EmployeeCode}`
+- **Broadcaster:** เพิ่ม `BroadcastAssignedTripEndedAsync` ใน `IOperatorPoolBroadcaster` และ `IOperatorPoolClient`
+- **Frontend:** provider ฟัง `AssignedTripEnded` แล้วส่งให้ `useOperatorAlerts` (ประเภท `trip-ended`): ดังเสียงต่างจากงานใหม่ (ต่ำลง) และขึ้นแถบแดง "trip ของคุณถูกยกเลิก · {orderRef}" แตะแล้วไปหน้า `/m/trips/{id}`
+- **Test:** consumer ส่งถึง operator ที่รับงานเท่านั้น และไม่ส่งเมื่อ trip จบตามปกติ (Completed ไม่ใช่ event ที่ consumer นี้ฟัง)
+
+**ลำดับ commit:** Phase 3 (frontend) → Phase 3b (backend + frontend) → Phase 4 (frontend) ประมาณ 8 ชม. รวม
 
 ## สรุปการเปลี่ยนแปลง
 
