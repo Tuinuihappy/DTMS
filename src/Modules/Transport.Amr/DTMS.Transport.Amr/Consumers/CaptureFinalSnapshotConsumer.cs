@@ -74,6 +74,18 @@ public sealed class CaptureFinalSnapshotConsumer :
             return;
         }
 
+        // Manual and self-managed trips carry an UpperKey too but were never
+        // sent to RIOT3, so the GET could only come back empty — ~35% of
+        // terminal trips, each a wasted vendor call plus a "no record"
+        // warning. Same gate the reconciler uses
+        // (TripRepository.GetInFlightEnvelopeTripsAsync /
+        // GetTerminalTripsMissingVehicleAsync).
+        if (trip.VendorRequestSnapshot is null)
+        {
+            _logger.LogDebug("[FinalSnapshot] Trip {TripId} was never sent to RIOT3 — skipping.", tripId);
+            return;
+        }
+
         string? raw;
         try
         {

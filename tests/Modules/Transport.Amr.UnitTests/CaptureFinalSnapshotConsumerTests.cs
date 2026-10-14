@@ -20,9 +20,11 @@ namespace VendorAdapter.UnitTests;
 // only under executeVehicle*.
 public class CaptureFinalSnapshotConsumerTests
 {
-    private static Trip TerminalTripMissingVehicle(string upperKey = "upper-G1")
+    // A trip actually sent to RIOT3 carries the request it was sent with.
+    private static Trip TerminalTripMissingVehicle(string upperKey = "upper-G1", bool sentToRiot3 = true)
     {
-        var trip = Trip.CreateForEnvelope(Guid.NewGuid(), upperKey, "RIOT3-ABC");
+        var trip = Trip.CreateForEnvelope(Guid.NewGuid(), upperKey, "RIOT3-ABC",
+            vendorRequestSnapshot: sentToRiot3 ? "{\"upperKey\":\"" + upperKey + "\"}" : null);
         trip.MarkVendorStarted();     // Created → InProgress, NO vehicle captured
         trip.MarkVendorCompleted();   // → Completed, snapshot still null
         return trip;
@@ -126,5 +128,26 @@ public class CaptureFinalSnapshotConsumerTests
         await consumer.Consume(CompletedContext(trip));
 
         await query.DidNotReceive().GetRawByUpperKeyAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Consume_TripNeverSentToRiot3_SkipsVendorFetch()
+    {
+        // Manual and self-managed trips have an UpperKey but no vendor
+        // request: RIOT3 has no record, so asking was a wasted call plus a
+        // "no record" warning on every such trip (~35% of terminal trips).
+        var trip = TerminalTripMissingVehicle(sentToRiot3: false);
+        var repo = Substitute.For<ITripRepository>();
+        repo.GetByIdAsync(trip.Id, Arg.Any<CancellationToken>()).Returns(trip);
+        var query = Substitute.For<IRiot3OrderQueryService>();
+
+        var consumer = new CaptureFinalSnapshotConsumer(
+            repo, query, NullLogger<CaptureFinalSnapshotConsumer>.Instance);
+
+        await consumer.Consume(CompletedContext(trip));
+
+        await query.DidNotReceive().GetRawByUpperKeyAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await repo.DidNotReceive().UpdateAsync(Arg.Any<Trip>(), Arg.Any<CancellationToken>());
+        trip.VendorFinalSnapshot.Should().BeNull();
     }
 }
