@@ -291,12 +291,14 @@ unmount
 
 | Stage | Setup | Capacity (est.) |
 |---|---|---|
-| **Stage 1 — current** | Single API instance, in-memory backplane | ~1 000 concurrent connections |
-| **Stage 2 — light HA** | 2-3 instances + Redis backplane (`SignalR__UseRedisBackplane=true`) | ~10 000 concurrent |
+| **Stage 1** | Single API process, no outbox-worker, in-memory backplane | ~1 000 concurrent connections |
+| **Stage 2 — current** | api + outbox-worker (or 2-3 api instances) + Redis backplane (`SignalR__UseRedisBackplane=true`, the compose default) | ~10 000 concurrent |
 | **Stage 3 — heavy** | Tune backplane channel prefix, watch Redis CPU | ~50 000 concurrent |
 | **Stage 4 — massive** | Azure SignalR Service (managed) | 1 M+ concurrent |
 
 Redis backplane gate is one env var; no code change needed to flip Stage 1 → Stage 2.
+
+**The outbox-worker counts as a second instance.** It runs the same consumers as the api off the same queues, so roughly half of all projector and dispatch hub sends execute in the worker, where no browser is connected. Without the backplane those sends are dropped silently — no error, and the broadcast metrics still record `sent`. The backplane was off in docker-compose until 2026-10-14, which is why pool cards and live list updates arrived only some of the time.
 
 ---
 

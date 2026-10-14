@@ -1,9 +1,13 @@
 # Cap json-file log growth so a chatty container can't fill the WSL2 vhdx
 # disk (which then balloons vmmemWSL's apparent RAM via page cache).
+# podman honours max-size but ignores max-file — it keeps ONE file and
+# truncates it — so max-size is the whole history. At 10m the api kept only
+# ~1.5h (2026-10-10, most of it HttpClient chatter from the RIOT3 pollers,
+# now silenced in appsettings.json); 100m keeps days.
 x-logging: &default-logging
   driver: json-file
   options:
-    max-size: "10m"
+    max-size: "100m"
     max-file: "3"
 
 services:
@@ -403,12 +407,16 @@ services:
       # Comma-separated, scheme://host:port only (no trailing slash).
       # Override via .env to add staging/prod UI hosts.
       - Cors__HubsAllowedOrigins=${Cors__HubsAllowedOrigins:-http://localhost:3000,http://localhost:3001}
-      # Phase F1 — Redis backplane for multi-replica SignalR. Default false
-      # so single-host docker-compose stays in-memory (no Redis round-trip
-      # cost). Flip to true via .env.test when running scale tests or in
-      # production where API has > 1 replica. Conditional wire is at
-      # src/DTMS.Api/Program.cs around AddStackExchangeRedis.
-      - SignalR__UseRedisBackplane=${SignalR__UseRedisBackplane:-false}
+      # Phase F1 — Redis backplane for SignalR. MUST be true whenever the
+      # outbox-worker runs: api and worker are two processes running the same
+      # consumers off the same queues, so about half of every projector's /
+      # dispatcher's hub sends happen in the worker — which no browser is
+      # connected to. With it off those events vanish silently (it was off
+      # until 2026-10-14; pool cards and list updates only arrived when the
+      # api happened to take the message). Turning it off is only safe for a
+      # single api process with no worker. Wire: src/DTMS.Api/Program.cs
+      # around AddStackExchangeRedis. Must match the worker's value below.
+      - SignalR__UseRedisBackplane=${SignalR__UseRedisBackplane:-true}
       # Rate limiting. Enforce=false keeps the original per-IP limit in force
       # while per-caller quotas are only measured (metrics: dtms_ratelimit_*).
       # Turn it on once those measurements have sized the class quotas below.
@@ -650,11 +658,11 @@ services:
       # the listener needs a session-scoped connection. All other
       # DbContexts continue through pgbouncer via DefaultConnection.
       - ConnectionStrings__OutboxListener=Host=postgres;Port=5432;Database=amr_delivery_planning;Username=postgres;Password=postgres
-      # Phase F1 — worker also needs the SignalR backplane on whenever api
-      # uses it. Worker's consumers push to IHubContext<T> during projector
-      # work; without the backplane those broadcasts would only reach clients
-      # connected to the worker (= none, worker doesn't accept hub connects).
-      - SignalR__UseRedisBackplane=${SignalR__UseRedisBackplane:-false}
+      # Phase F1 — the worker's consumers push to IHubContext<T> during
+      # projector/dispatch work; without the backplane those broadcasts only
+      # reach clients connected to the worker (= none, browsers connect to
+      # the api). Must match the api's value — see the comment there.
+      - SignalR__UseRedisBackplane=${SignalR__UseRedisBackplane:-true}
       # Track C (Phase D follow-up) — skip vendor-polling hosted services
       # in this container. The api container is the single owner of:
       #   Riot3HealthPollerService, VendorHealthBroadcaster,

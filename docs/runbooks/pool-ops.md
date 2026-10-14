@@ -138,7 +138,7 @@ If missing:
 - Broadcaster is null-injected (check DI registration in `ModuleServiceRegistration.cs` — search for `IOperatorPoolBroadcaster`).
 
 If present but clients didn't receive:
-- Redis backplane is off in multi-instance mode. Check `SignalR__UseRedisBackplane=true` in the env.
+- Redis backplane is off. It must be on whenever the outbox-worker runs, not only with several api replicas: pool dispatch happens in a consumer, so the worker sends `PoolTripAdded` about half the time. Check `podman exec dtms-api printenv SignalR__UseRedisBackplane` (and the same for `dtms-outbox-worker`) — both must print `true`.
 - Client dropped the connection. Ask operator to check the top-right pill in `/m/pool` — should read "Live" (green dot). If "Reconnecting…" (yellow), the WebSocket dropped.
 - Auth issue. See section 7.
 
