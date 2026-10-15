@@ -59,8 +59,12 @@ export function AdminSystemStatusExperience() {
   });
 
   // SignalR push → write straight into store. No React state.
-  const handleVendorChanged = useCallback((args: unknown[]) => {
-    const snapshot = args[0] as VendorHealthSnapshot | undefined;
+  // useHubSubscription spreads the hub arguments, so the server's one
+  // VendorHealthChanged(dto) arrives as this first parameter — not an array.
+  // (Reading args[0] here silently dropped every push; only the 30 s poll
+  // ever updated the page.)
+  const handleVendorChanged = useCallback((payload: unknown) => {
+    const snapshot = payload as VendorHealthSnapshot | undefined;
     if (snapshot?.vendor) vendorHealthStore.setSnapshot(snapshot);
   }, []);
   const { connected: liveConnected } = useDashboardSubscription("vendor-health", {
