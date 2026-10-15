@@ -1911,72 +1911,83 @@ public class DeliveryOrderTests
             .Should().OnlyContain(i => i.Status == ItemStatus.Delivered);
     }
 
-    // ── V1.2: TripDropCompleted no-POD short-circuit ──────────────────────
-    // The TripDropCompletedConsumer now skips the DroppedOff interstitial
-    // when RequiresDropPod is false: items jump Picked → Delivered at the
-    // drop event itself, RecomputeStatusFromItems runs, and the order can
-    // finalize without waiting for TASK_FINISHED. These tests mirror the
-    // domain-level moves the consumer makes.
+    // ── No-POD flow: Picked → DroppedOff → Delivered ──────────────────────
+    // Since 2026-10-15 TripDropCompletedConsumer lands items at DroppedOff
+    // whatever the POD policy and never recomputes; TripCompletedConsumer
+    // (MarkTripItemsDeliveredOrLeaveForPod + RecomputeStatusFromItems)
+    // takes no-POD items to Delivered and finalizes. These tests mirror
+    // the domain-level moves the two consumers make.
 
     [Fact]
-    public void NoPod_MarkTripItemsDelivered_FromPicked_TransitionsAllToDelivered()
+    public void NoPod_DropCompleted_LandsAtDroppedOff_OrderStaysInFlight()
     {
-        var (order, groupA, _) = MultiGroupOrder();
-        var tripA = Guid.NewGuid();
-        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
-        order.MarkTripItemsPicked(tripA);
-
-        var delivered = order.MarkTripItemsDelivered(tripA);
-
-        delivered.Should().Be(2);
-        order.Items.Where(i => i.TripId == tripA)
-            .Should().OnlyContain(i => i.Status == ItemStatus.Delivered);
-    }
-
-    [Fact]
-    public void NoPod_SingleTripOrder_DroppedAtDropCompleted_FinalizesOrderImmediately()
-    {
-        // Simulates the new TripDropCompletedConsumer path end-to-end on
-        // the domain side: a single-group order with RequiresDropPod=false
-        // should reach Completed at TripDropCompleted, NOT have to wait
-        // for TripCompleted.
         var (order, groupA) = SingleGroupOrder();
         var tripA = Guid.NewGuid();
         order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
         order.MarkTripItemsPicked(tripA);
 
-        order.MarkTripItemsDelivered(tripA);
+        var dropped = order.MarkTripItemsDroppedOff(tripA);
+
+        dropped.Should().Be(2);
+        order.Items.Should().OnlyContain(i => i.Status == ItemStatus.DroppedOff && i.DroppedOffAt != null);
+        order.Status.Should().NotBe(OrderStatus.Completed);
+        order.DomainEvents.OfType<DeliveryOrderCompletedDomainEvent>().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void NoPod_TripCompletedAfterDrop_DeliversAndFinalizesOrder()
+    {
+        var (order, groupA) = SingleGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+        order.MarkTripItemsDroppedOff(tripA);
+
+        var delivered = order.MarkTripItemsDeliveredOrLeaveForPod(tripA, templateRequiresDropPod: false);
         order.RecomputeStatusFromItems();
 
+        delivered.Should().Be(2);
+        order.Items.Should().OnlyContain(i => i.Status == ItemStatus.Delivered);
         order.Status.Should().Be(OrderStatus.Completed);
         order.DomainEvents.OfType<DeliveryOrderCompletedDomainEvent>().Should().ContainSingle();
     }
 
     [Fact]
-    public void NoPod_LateTripCompleted_AfterDropAlreadyDelivered_IsIdempotent()
+    public void NoPod_DuplicateTripCompleted_IsIdempotent()
     {
-        // Safety net check: even if TripDropCompleted already landed items
-        // at Delivered, the trailing TripCompleted (which still fires from
-        // the vendor's TASK_FINISHED) must be a no-op — not bump events,
-        // not re-finalize the order.
+        // A redelivered TripCompleted (webhook + reconciler race) must not
+        // move items again or emit a second finalize event.
         var (order, groupA) = SingleGroupOrder();
         var tripA = Guid.NewGuid();
         order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
         order.MarkTripItemsPicked(tripA);
-
-        // First pass: drop event delivers everything + finalizes.
-        order.MarkTripItemsDelivered(tripA);
-        order.RecomputeStatusFromItems();
-        var completedCountAfterDrop = order.DomainEvents.OfType<DeliveryOrderCompletedDomainEvent>().Count();
-
-        // Second pass: trailing TripCompleted runs the same domain calls.
-        var againDelivered = order.MarkTripItemsDelivered(tripA);
+        order.MarkTripItemsDroppedOff(tripA);
+        order.MarkTripItemsDeliveredOrLeaveForPod(tripA, templateRequiresDropPod: false);
         order.RecomputeStatusFromItems();
 
-        againDelivered.Should().Be(0);                                 // no items moved
+        var again = order.MarkTripItemsDeliveredOrLeaveForPod(tripA, templateRequiresDropPod: false);
+        order.RecomputeStatusFromItems();
+
+        again.Should().Be(0);
         order.Status.Should().Be(OrderStatus.Completed);
-        order.DomainEvents.OfType<DeliveryOrderCompletedDomainEvent>()
-            .Should().HaveCount(completedCountAfterDrop);              // no duplicate finalize event
+        order.DomainEvents.OfType<DeliveryOrderCompletedDomainEvent>().Should().ContainSingle();
+    }
+
+    [Fact]
+    public void NoPod_LateDropAfterTripCompleted_IsNoOp()
+    {
+        // Drop frame lost, TripCompleted delivered first, drop arrives
+        // late: DroppedOff must not step a Delivered item backwards.
+        var (order, groupA) = SingleGroupOrder();
+        var tripA = Guid.NewGuid();
+        order.AssignItemsToTrip(tripA, 1, groupA.Pickup, groupA.Drop);
+        order.MarkTripItemsPicked(tripA);
+        order.MarkTripItemsDeliveredOrLeaveForPod(tripA, templateRequiresDropPod: false);
+
+        var dropped = order.MarkTripItemsDroppedOff(tripA);
+
+        dropped.Should().Be(0);
+        order.Items.Should().OnlyContain(i => i.Status == ItemStatus.Delivered);
     }
 
     [Fact]

@@ -112,8 +112,8 @@ internal sealed class RecordDropCommandHandler : ICommandHandler<RecordDropComma
         await _extensions.SaveChangesAsync(cancellationToken);
 
         // Mirror the vendor-drop event so the DeliveryOrder-side
-        // TripDropCompletedConsumer projects Item.Status PickedUp →
-        // DroppedOff (or Delivered if RequiresDropPod=false). AMR fires
+        // TripDropCompletedConsumer projects Item.Status Picked →
+        // DroppedOff (Delivered comes at trip complete / POD). AMR fires
         // this from the RIOT3 webhook; Manual from the operator's drop
         // action. Idempotent on double-tap via the firstDrop guard.
         if (firstDrop)

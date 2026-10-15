@@ -22,9 +22,8 @@ public interface IDeliveryOrderStatusReader
     /// order doesn't exist OR the field is null — caller treats null as
     /// "fall back to template default"). Used by the vendor webhook to
     /// stamp <see cref="Domain.Events.TripDropCompletedDomainEvent.RequiresDropPod"/>
-    /// at drop-completion time so downstream consumers/projectors can
-    /// decide whether to land items at Delivered (no POD) or DroppedOff
-    /// (POD pending) without taking a hard dependency on DeliveryOrder.
+    /// at drop-completion time as an audit hint (items land at DroppedOff
+    /// either way; the live order's flag decides the later Delivered step).
     /// </summary>
     Task<bool?> GetRequiresDropPodAsync(Guid orderId, CancellationToken cancellationToken = default);
 

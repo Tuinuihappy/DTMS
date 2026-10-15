@@ -188,8 +188,11 @@ Draft → Submitted → Validated → Confirmed → Planning → Planned → Dis
 
 ```
 Pending → Picked → DroppedOff → Delivered        (+ Failed, Returned, Cancelled)
-                └─(ไม่ต้อง POD)──► Delivered
 ```
+
+ทุก order เดินครบ 4 ขั้นไม่ว่าจะบังคับ POD หรือไม่ (ตั้งแต่ 2026-10-15) — `RequiresDropPod`
+ตัดสินแค่ขั้น `DroppedOff → Delivered`: ไม่ต้อง POD = ตอน `TripCompleted`, ต้อง POD = ตอน `/pod-scan`.
+Callback `shipment.droppedoff.v1` ไป OMS ยังยิงตอน drop เหมือนเดิม (ไม่ผูกกับ item status)
 
 ### Trip event → DeliveryOrder consumer
 
@@ -197,8 +200,8 @@ Pending → Picked → DroppedOff → Delivered        (+ Failed, Returned, Canc
 |---|---|---|
 | `TripStartedIntegrationEvent` (จาก `MarkVendorStarted`) | `TripStartedConsumer` | `MarkInProgressIfNotYet()` → `Dispatched → InProgress` |
 | Pickup ที่ pickup station | `TripPickupCompletedConsumer` | `MarkTripItemsPicked()` → items `Pending → Picked` |
-| Drop ที่ drop station | `TripDropCompletedConsumer` | POD required: `Picked → DroppedOff`; ไม่ต้อง POD: `Picked → Delivered` |
-| `TripCompleted` (จาก `MarkVendorCompleted`) | `TripCompletedConsumer` | `MarkTripItemsDeliveredOrLeaveForPod()` + `RecomputeStatusFromItems()` / `MarkAsCompleted()` → `Completed` / `PartiallyCompleted` / `Failed` |
+| Drop ที่ drop station | `TripDropCompletedConsumer` | `MarkTripItemsDroppedOff()` → items `Picked → DroppedOff` ทุกกรณี (ไม่ recompute order) |
+| `TripCompleted` (จาก `MarkVendorCompleted`) | `TripCompletedConsumer` | `MarkTripItemsDeliveredOrLeaveForPod()` (ไม่ต้อง POD: `DroppedOff → Delivered`; ต้อง POD: ไม่แตะ รอ `/pod-scan`) + `RecomputeStatusFromItems()` / `MarkAsCompleted()` → `Completed` / `PartiallyCompleted` / `Failed` |
 | `TripFailed` (จาก `MarkVendorFailed`) | `TripFailedConsumer` | `MarkFailed()` → `Failed` |
 | `TripRejected` (จาก `MarkVendorRejected`) | `TripFailedConsumer` (handler เดียวกัน) | เหมือน `TripFailed` ทุกประการ — ต่างแค่ Trip.Status/history/facts บันทึกเป็น `Rejected` |
 | `TripCancelled` (จาก `Cancel`) | `TripCancelledConsumer` | ปล่อย items ออกจาก trip (`UnassignItemsFromTrip`) + `RecomputeStatusFromItems()`; **ไม่ auto-fail** — order ยัง eligible re-dispatch. cascade เป็น `Cancelled` เฉพาะเมื่อเป็น trip สุดท้ายและ order ยัง in-flight |
@@ -249,15 +252,15 @@ sequenceDiagram
     R-->>WH: SUB_TASK_FINISHED (MOVE/ACT @ drop station)
     WH->>T: TripMissionEvent + drop detection
     T-->>O: TripDropCompleted
-    O->>O: MarkTripItemsDelivered() / DroppedOff (POD)
-    Note over O: items Picked → Delivered
+    O->>O: MarkTripItemsDroppedOff()
+    Note over O: items Picked → DroppedOff
 
     R-->>WH: TASK_FINISHED
     WH->>T: MarkVendorCompleted()
     Note over T: InProgress → Completed
     T-->>O: TripCompleted
-    O->>O: RecomputeStatusFromItems() / MarkAsCompleted()
-    Note over O: InProgress → Completed
+    O->>O: MarkTripItemsDeliveredOrLeaveForPod()<br/>+ RecomputeStatusFromItems()
+    Note over O: items DroppedOff → Delivered (ไม่ต้อง POD)<br/>InProgress → Completed
 ```
 
 > **จุดสังเกต:** `Trip.Status` เปลี่ยนแค่ 2 ครั้ง (`Created→InProgress→Completed`) — pickup/drop
@@ -379,8 +382,8 @@ sequenceDiagram
     R-->>WH: SUB_TASK_FINISHED (drop station, item1)
     WH->>T: drop detection
     T-->>O: TripDropCompleted
-    O->>O: MarkTripItemsDelivered()
-    Note over O: item1 Picked → Delivered<br/>item2 ยัง Picked
+    O->>O: MarkTripItemsDroppedOff()
+    Note over O: item1 Picked → DroppedOff<br/>item2 ยัง Picked
 
     alt Trip จบด้วย TASK_FINISHED (item2 ตกค้าง)
         R-->>WH: TASK_FINISHED

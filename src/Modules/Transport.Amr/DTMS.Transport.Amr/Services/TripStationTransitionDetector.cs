@@ -133,7 +133,7 @@ public static class TripStationTransitionDetector
                 return false;
             }
             // Resolve the order's POD policy so the integration event carries it
-            // (no POD → items land at Delivered; POD → hold at DroppedOff).
+            // (audit only — items land at DroppedOff either way).
             var requiresDropPod = await orderReader.GetRequiresDropPodAsync(
                 trip.DeliveryOrderId, cancellationToken);
             trip.MarkVendorDropCompleted(requiresDropPod, actedAt: actedAt);

@@ -44,9 +44,8 @@ public class ForceDropCompletedTripCommandHandler : ICommandHandler<ForceDropCom
             return Result.Success();
         }
 
-        // RequiresDropPod determines whether items land at Delivered (no POD)
-        // or DroppedOff (POD pending) — same lookup the vendor webhook does
-        // so downstream behaviour matches.
+        // Stamp RequiresDropPod on the drop event (audit only — items land
+        // at DroppedOff either way) — same lookup the vendor webhook does.
         var requiresDropPod = await _orderReader.GetRequiresDropPodAsync(
             trip.DeliveryOrderId, cancellationToken);
 

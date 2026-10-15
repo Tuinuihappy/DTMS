@@ -410,10 +410,10 @@ public class Trip : AggregateRoot<Guid>
     /// <paramref name="requiresDropPod"/> is the parent order's POD policy,
     /// resolved by the caller (vendor webhook) so the integration event
     /// can carry it through to downstream consumers without a cross-module
-    /// read at projection time. Null = unknown; consumers fall back to
-    /// the legacy "land at DroppedOff" path. False = items land at
-    /// Delivered immediately (no POD required); true = items hold at
-    /// DroppedOff pending operator /pod-scan.
+    /// read at projection time. Audit-only since 2026-10-15: items land
+    /// at DroppedOff on drop whatever its value (null = unknown); the
+    /// policy only decides the later DroppedOff → Delivered step
+    /// (TripCompleted for no POD, operator /pod-scan for POD).
     /// </summary>
     public void MarkVendorDropCompleted(bool? requiresDropPod = null,
         string? actor = null, DateTime? actedAt = null)

@@ -117,58 +117,20 @@ public class TripItemsProjectorTests
             Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task TripDropCompleted_PodRequired_FlipsItemStatusToDroppedOff()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(null)]
+    public async Task TripDropCompleted_AnyPodFlag_FlipsItemStatusToDroppedOff(bool? requiresDropPod)
     {
+        // Drop never lands at Delivered, whatever the POD policy — the
+        // DroppedOff → Delivered step belongs to TripCompleted (no POD)
+        // or the POD scan.
         var (projector, store) = Build();
         var tripId = Guid.NewGuid();
         var evt = new TripDropCompletedIntegrationEvent(
             Guid.NewGuid(), DateTime.UtcNow, tripId, DeliveryOrderId: Guid.NewGuid(),
-            RequiresDropPod: true);
-
-        await projector.Consume(Ctx(evt));
-
-        await store.Received(1).UpdateItemStatusForTripAsync(
-            TripItemsProjector.Name,
-            evt.EventId, tripId,
-            newItemStatus: "DroppedOff",
-            evt.OccurredOn,
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task TripDropCompleted_NoPodRequired_FlipsItemStatusStraightToDelivered()
-    {
-        // V1.2 — when the order doesn't require POD, drop is the delivery
-        // moment. Projector skips the DroppedOff interstitial so
-        // dispatch.TripItems matches what DeliveryOrder did on its side.
-        var (projector, store) = Build();
-        var tripId = Guid.NewGuid();
-        var evt = new TripDropCompletedIntegrationEvent(
-            Guid.NewGuid(), DateTime.UtcNow, tripId, DeliveryOrderId: Guid.NewGuid(),
-            RequiresDropPod: false);
-
-        await projector.Consume(Ctx(evt));
-
-        await store.Received(1).UpdateItemStatusForTripAsync(
-            TripItemsProjector.Name,
-            evt.EventId, tripId,
-            newItemStatus: "Delivered",
-            evt.OccurredOn,
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task TripDropCompleted_NullPodFlag_FallsBackToDroppedOff()
-    {
-        // Pre-V1.2 in-flight events have null RequiresDropPod. Projector
-        // stays on the legacy DroppedOff path so a later TripCompleted
-        // still finalizes the row at Delivered — no silent state skip.
-        var (projector, store) = Build();
-        var tripId = Guid.NewGuid();
-        var evt = new TripDropCompletedIntegrationEvent(
-            Guid.NewGuid(), DateTime.UtcNow, tripId, DeliveryOrderId: Guid.NewGuid(),
-            RequiresDropPod: null);
+            RequiresDropPod: requiresDropPod);
 
         await projector.Consume(Ctx(evt));
 

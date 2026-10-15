@@ -14,18 +14,13 @@ namespace DTMS.Dispatch.Application.Projections;
 /// Row lifecycle:
 ///   TripStarted                         → INSERT 1 row per snapshot item
 ///   TripPickupCompleted                 → UPDATE ItemStatus = "Picked"
-///   TripDropCompleted (POD required)    → UPDATE ItemStatus = "DroppedOff"
-///   TripDropCompleted (no POD, V1.2)    → UPDATE ItemStatus = "Delivered"
+///   TripDropCompleted                   → UPDATE ItemStatus = "DroppedOff"
 ///   TripCompleted                       → UPDATE ItemStatus = "Delivered"
 ///   TripFailed / TripCancelled          → UPDATE ItemStatus = "Unbound"
 ///
-/// V1.2 (no-POD branch): TripDropCompletedIntegrationEvent now carries
-/// the parent order's RequiresDropPod flag (stamped by the vendor
-/// webhook). When it's false, the projector skips the DroppedOff
-/// interstitial and writes Delivered directly so the dispatch.TripItems
-/// view matches what the DeliveryOrder side already did. Null flag
-/// (pre-rollout in-flight events) falls back to DroppedOff — the
-/// subsequent TripCompleted still lands the row at Delivered.
+/// Drop always writes DroppedOff, whatever the order's POD policy — the
+/// DeliveryOrder side does the same since 2026-10-15 (the earlier V1.2
+/// no-POD shortcut to Delivered was removed).
 ///
 /// Idempotent (per-EventId inbox) + safe under webhook/reconciler race
 /// (InsertBindingsAsync skips ItemPks that already exist for the trip).
@@ -190,13 +185,7 @@ public class TripItemsProjector :
         => RefreshItemStatusAsync(ctx, ctx.Message.TripId, StatusPicked, nameof(TripPickupCompletedIntegrationEvent));
 
     public Task Consume(ConsumeContext<TripDropCompletedIntegrationEvent> ctx)
-    {
-        // V1.2 — when the order doesn't require POD, drop = delivery.
-        // Null flag (pre-rollout) keeps the legacy DroppedOff path so the
-        // subsequent TripCompleted still finalizes the row at Delivered.
-        var target = ctx.Message.RequiresDropPod == false ? StatusDelivered : StatusDroppedOff;
-        return RefreshItemStatusAsync(ctx, ctx.Message.TripId, target, nameof(TripDropCompletedIntegrationEvent));
-    }
+        => RefreshItemStatusAsync(ctx, ctx.Message.TripId, StatusDroppedOff, nameof(TripDropCompletedIntegrationEvent));
 
     public Task Consume(ConsumeContext<TripCompletedIntegrationEvent> ctx)
         => RefreshItemStatusAsync(ctx, ctx.Message.TripId, StatusDelivered, nameof(TripCompletedIntegrationEvent));
