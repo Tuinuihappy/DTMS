@@ -320,6 +320,10 @@ builder.Services.AddOpenTelemetry()
         // Rate limiting — requests, rejections and the busiest caller's window
         // count per traffic class. Quotas are sized from partition_peak.
         .AddMeter(DTMS.Api.Infrastructure.RateLimiting.RateLimitMetrics.MeterName)
+        // Outbound callback-token refresh: attempts per system/result and
+        // seconds left on each stored token. Was never registered, so the
+        // counter existed but was never exported.
+        .AddMeter(DTMS.Iam.Infrastructure.Callbacks.CallbackRefreshMetrics.MeterName)
         // T1.6 — MassTransit native meter emits messaging.* metrics
         // (consume_duration_seconds, receive_total, retry_total, fault_total)
         // so we don't need to write our own observer for consumer retries.

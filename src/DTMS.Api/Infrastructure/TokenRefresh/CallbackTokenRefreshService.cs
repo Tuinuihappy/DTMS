@@ -49,9 +49,10 @@ public sealed class CallbackTokenRefreshService : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            var anyFailed = false;
             try
             {
-                await SweepOnceAsync(stoppingToken);
+                anyFailed = await SweepOnceAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -59,10 +60,12 @@ public sealed class CallbackTokenRefreshService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Callback token refresh sweep threw — will retry next tick");
+                // Listing the systems failed (DB down) — no system got a try.
+                _logger.LogError(ex, "Callback token refresh sweep threw before refreshing — retrying soon");
+                anyFailed = true;
             }
 
-            var interval = TimeSpan.FromSeconds(Math.Max(1, _options.CurrentValue.PollIntervalSeconds));
+            var interval = NextDelay(_options.CurrentValue, anyFailed);
             try
             {
                 await Task.Delay(interval, stoppingToken);
@@ -71,31 +74,58 @@ public sealed class CallbackTokenRefreshService : BackgroundService
         }
     }
 
-    private async Task SweepOnceAsync(CancellationToken ct)
+    /// <summary>
+    /// Wait before the next sweep: the normal interval, or the shorter retry
+    /// delay when this sweep had a failure (never longer than the interval).
+    /// </summary>
+    internal static TimeSpan NextDelay(CallbackTokenRefreshOptions opts, bool anyFailed)
     {
-        using var scope = _scopeFactory.CreateScope();
-        var repo = scope.ServiceProvider.GetRequiredService<ISystemCredentialRepository>();
-        var refresher = scope.ServiceProvider.GetRequiredService<ICallbackTokenRefresher>();
+        var poll = Math.Max(1, opts.PollIntervalSeconds);
+        var seconds = anyFailed ? Math.Clamp(opts.RetryAfterFailureSeconds, 1, poll) : poll;
+        return TimeSpan.FromSeconds(seconds);
+    }
 
-        var keys = await repo.ListKeysWithTokenRefreshAsync(ct);
-        if (keys.Count == 0) return;
+    /// <summary>Refreshes every system due; returns true when any of them failed.</summary>
+    internal async Task<bool> SweepOnceAsync(CancellationToken ct)
+    {
+        IReadOnlyList<string> keys;
+        using (var scope = _scopeFactory.CreateScope())
+        {
+            var repo = scope.ServiceProvider.GetRequiredService<ISystemCredentialRepository>();
+            keys = (await repo.ListKeysWithTokenRefreshAsync(ct)).ToList();
+        }
+        if (keys.Count == 0) return false;
 
         var opts = _options.CurrentValue;
         using var gate = new SemaphoreSlim(Math.Max(1, opts.MaxParallelism));
-        // Deterministic per-key jitter (0–500ms) spreads the mint calls without
-        // needing shared RNG state — hash the key into the window.
         var tasks = keys.Select(async key =>
         {
-            await gate.WaitAsync(ct);
+            await gate.WaitAsync(ct);   // outside the try: a cancelled wait holds no slot to release
             try
             {
-                var jitterMs = (uint)key.GetHashCode() % 500;
-                await Task.Delay(TimeSpan.FromMilliseconds(jitterMs), ct);
+                // Per-key jitter (0–500 ms) so a sweep doesn't hit every mint
+                // endpoint in the same instant.
+                await Task.Delay(TimeSpan.FromMilliseconds(Jitter(key)), ct);
+
+                // One scope — so one refresher and one DbContext — per system.
+                // A DbContext isn't safe for concurrent use; sharing one across
+                // these parallel refreshes threw "A second operation was started
+                // on this context instance" and dropped a system's refresh most
+                // hours (both are due every sweep).
+                using var scope = _scopeFactory.CreateScope();
+                var refresher = scope.ServiceProvider.GetRequiredService<ICallbackTokenRefresher>();
                 var result = await refresher.RefreshAsync(key, force: false, ct);
                 if (result.Outcome is RefreshOutcome.Refreshed or RefreshOutcome.Failed or RefreshOutcome.Rejected)
                     _logger.LogInformation(
                         "Token refresh system={System} → {Outcome} {Message}",
                         key, result.Outcome, result.Message);
+                return result.Outcome == RefreshOutcome.Failed;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                // Isolated per system: one failing doesn't stop the others.
+                _logger.LogWarning(ex, "Token refresh system={System} failed — retrying soon", key);
+                return true;
             }
             finally
             {
@@ -103,6 +133,15 @@ public sealed class CallbackTokenRefreshService : BackgroundService
             }
         });
 
-        await Task.WhenAll(tasks);
+        var failed = await Task.WhenAll(tasks);
+        return failed.Any(f => f);
+    }
+
+    // Stable across restarts, unlike string.GetHashCode (randomised per process).
+    private static int Jitter(string key)
+    {
+        var h = 0;
+        foreach (var c in key) h = (h * 31 + c) & 0x7fffffff;
+        return h % 500;
     }
 }

@@ -19,6 +19,12 @@ public sealed class CallbackTokenRefreshOptions
     /// ticks — validated at startup.</summary>
     public int PollIntervalSeconds { get; set; } = 3600;
 
+    /// <summary>Seconds to the next sweep after one in which any system failed
+    /// to refresh (mint failed, DB/Redis error). Without it a failure waited a
+    /// full <see cref="PollIntervalSeconds"/>, so three in a row could outlive a
+    /// 3 h token. Capped at <see cref="PollIntervalSeconds"/>.</summary>
+    public int RetryAfterFailureSeconds { get; set; } = 300;
+
     /// <summary>Delay before the first sweep so the app finishes warming up.</summary>
     public int StartupDelaySeconds { get; set; } = 30;
 

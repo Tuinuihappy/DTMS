@@ -17,7 +17,10 @@ namespace DTMS.Iam.Infrastructure.Callbacks;
 /// <para>Safety: a Redis per-key lock serialises the manual (API-tier) and
 /// background (worker-tier) writers so they can't both mint+save the same row;
 /// the fresh reload happens inside the lock. The xmin concurrency token is the
-/// backstop if the lock ever lapses. A perpetual token is never silently
+/// backstop if the lock ever lapses — and when Redis is unreachable the refresh
+/// runs without the lock on that backstop alone (fail-open, like the tiered
+/// cache): an expired token stops every callback, a duplicate mint costs
+/// nothing. A perpetual token is never silently
 /// downgraded, and a newly minted token replaces the current one only when it is
 /// strictly newer (or itself perpetual). Mint failures leave the working token
 /// untouched.</para>
@@ -66,7 +69,21 @@ public sealed class CallbackTokenRefresher : ICallbackTokenRefresher
 
         // SET NX EX — compare-and-delete on release so we never drop a lock a
         // later writer acquired after ours expired.
-        if (!await db.LockTakeAsync(lockKey, lockToken, LockTtl))
+        bool locked;
+        try
+        {
+            locked = await db.LockTakeAsync(lockKey, lockToken, LockTtl);
+        }
+        catch (Exception ex) when (IsRedisUnavailable(ex))
+        {
+            // Redis down: refresh anyway, xmin guards the save (see class doc).
+            _log.LogWarning(ex, "Redis unavailable taking the refresh lock for system={System}; refreshing without it", systemKey);
+            var unlocked = await RefreshLockedAsync(systemKey, force, ct);
+            _metrics.Record(systemKey, unlocked.Outcome.ToString().ToLowerInvariant());
+            return unlocked;
+        }
+
+        if (!locked)
         {
             _metrics.Record(systemKey, "lock_busy");
             return RefreshResult.LockBusy();
@@ -80,9 +97,20 @@ public sealed class CallbackTokenRefresher : ICallbackTokenRefresher
         }
         finally
         {
-            await db.LockReleaseAsync(lockKey, lockToken);
+            try
+            {
+                await db.LockReleaseAsync(lockKey, lockToken);
+            }
+            catch (Exception ex) when (IsRedisUnavailable(ex))
+            {
+                // Redis went away mid-refresh; the lock's TTL frees it.
+            }
         }
     }
+
+    // RedisTimeoutException does not derive from RedisException, so both.
+    private static bool IsRedisUnavailable(Exception ex)
+        => ex is RedisException or RedisTimeoutException;
 
     private async Task<RefreshResult> RefreshLockedAsync(string systemKey, bool force, CancellationToken ct)
     {
@@ -104,6 +132,7 @@ public sealed class CallbackTokenRefresher : ICallbackTokenRefresher
 
         var hasCurrentToken = CallbackTokenInspector.ReadStoredToken(cred.CallbackAuthConfig) is not null;
         var currentExp = CallbackTokenInspector.ReadExpiryFromConfig(cred.CallbackAuthConfig);
+        _metrics.RecordExpiry(systemKey, currentExp);
 
         switch (RefreshPolicy.Evaluate(hasCurrentToken, currentExp, force, settings.RefreshBeforeSeconds, DateTime.UtcNow))
         {
@@ -157,7 +186,19 @@ public sealed class CallbackTokenRefresher : ICallbackTokenRefresher
             return RefreshResult.Skipped("Concurrent update — will re-evaluate next tick.");
         }
 
-        await _cache.InvalidateAsync(systemKey, ct);
+        _metrics.RecordExpiry(systemKey, newExp);
+
+        try
+        {
+            await _cache.InvalidateAsync(systemKey, ct);
+        }
+        catch (Exception ex) when (IsRedisUnavailable(ex))
+        {
+            // The new token is saved; the tiered cache queued this invalidation
+            // and replays it when Redis is back. Until then other processes may
+            // serve the old token from cache — still valid, it hasn't expired.
+            _log.LogWarning(ex, "Saved new token for system={System} but couldn't invalidate the cache; it will replay", systemKey);
+        }
 
         _log.LogInformation(
             "Refreshed outbound token for system={System}; new exp={Exp}",
