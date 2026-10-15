@@ -609,8 +609,12 @@ services:
     restart: unless-stopped
     mem_limit: 1g
     logging: *default-logging
+    # Listens on 8081, not the api's 8080, in every deployment: under podman
+    # (host networking) the two share a namespace and must differ, and keeping
+    # the same port everywhere lets one prometheus.yml scrape outbox-worker:8081
+    # here and on the Linux server alike.
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health/ready"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/health/ready"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -628,6 +632,7 @@ services:
       migrator:
         condition: service_completed_successfully
     environment:
+      - ASPNETCORE_HTTP_PORTS=8081   # see the healthcheck comment above
       - ASPNETCORE_ENVIRONMENT=Development
       # Match the api container — keep .NET GC honest against the 1 GB cap.
       - DOTNET_GCConserveMemory=9

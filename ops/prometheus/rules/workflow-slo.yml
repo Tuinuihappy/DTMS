@@ -18,7 +18,7 @@ groups:
       # order has been wedged at the vendor (e.g. long HANG after a robot
       # fault) and needs a human decision: resume, cancel, or force-complete.
       - alert: AmrTripsStuckBeyondReconcileWindow
-        expr: dtms_workflow_trips_stuck_reconcile > 0
+        expr: max(dtms_workflow_trips_stuck_reconcile) > 0
         for: 10m
         labels:
           severity: P1

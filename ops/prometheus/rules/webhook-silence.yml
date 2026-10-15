@@ -29,7 +29,7 @@ groups:
         # data, which would silently disable the alert).
         expr: >
           (sum(increase(dtms_workflow_notify_frames_total[3m])) or vector(0)) == 0
-          and on() dtms_workflow_reconciler_inflight > 0
+          and on() max(dtms_workflow_reconciler_inflight) > 0
         for: 1m
         labels:
           severity: P1

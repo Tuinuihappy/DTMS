@@ -32,7 +32,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
       },
       "targets": [
-        { "expr": "dtms_workflow_trips_stuck_reconcile", "legendFormat": "stuck", "refId": "A" }
+        { "expr": "max(dtms_workflow_trips_stuck_reconcile)", "legendFormat": "stuck", "refId": "A" }
       ]
     },
     {
@@ -41,8 +41,8 @@
       "description": "stuck = past the window (abandoned). inflight = inside the window, still being reconciled each tick. A rising 'stuck' with flat 'inflight' means trips are aging out unhealed.",
       "gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 },
       "targets": [
-        { "expr": "dtms_workflow_trips_stuck_reconcile", "legendFormat": "stuck (abandoned)", "refId": "A" },
-        { "expr": "dtms_workflow_reconciler_inflight", "legendFormat": "in-flight (in window)", "refId": "B" }
+        { "expr": "max(dtms_workflow_trips_stuck_reconcile)", "legendFormat": "stuck (abandoned)", "refId": "A" },
+        { "expr": "max(dtms_workflow_reconciler_inflight)", "legendFormat": "in-flight (in window)", "refId": "B" }
       ]
     },
     {

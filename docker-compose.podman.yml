@@ -143,6 +143,7 @@ services:
     # ops/podman-lan-forward.ps1 tunnels windows_exporter in.
     extra_hosts:
       - "api:127.0.0.1"
+      - "outbox-worker:127.0.0.1"   # scraped on 8081 (shared host namespace)
       - "host.docker.internal:127.0.0.1"
 
   grafana:

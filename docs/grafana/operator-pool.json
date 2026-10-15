@@ -21,7 +21,7 @@
       "description": "Trips available in the pool right now. Alerts fire when >50 for 5m.",
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "targets": [
-        { "expr": "dtms_pool_depth", "legendFormat": "depth", "refId": "A" }
+        { "expr": "max(dtms_pool_depth)", "legendFormat": "depth", "refId": "A" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -42,7 +42,7 @@
       "title": "Pool depth over time",
       "gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 },
       "targets": [
-        { "expr": "dtms_pool_depth", "legendFormat": "depth", "refId": "A" }
+        { "expr": "max(dtms_pool_depth)", "legendFormat": "depth", "refId": "A" }
       ],
       "fieldConfig": { "defaults": { "unit": "short" } }
     },

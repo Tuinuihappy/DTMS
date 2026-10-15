@@ -24,6 +24,21 @@ scrape_configs:
         labels:
           service: dtms-api
 
+  # The outbox worker runs the same app as the api — every consumer and
+  # projector, the outbox, the callback-token refresh — so about half of the
+  # dtms_* counters only ever move here. Unscraped until 2026-10-15, which hid
+  # e.g. the token refresh failing every hour.
+  #
+  # Some gauges exist in both processes: dtms_pool_depth (both poll the same
+  # DB, same value) and the reconciler gauges (set only on the api; the
+  # worker reports 0). Query them with max() so each stays one series.
+  - job_name: dtms-outbox-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: [outbox-worker:8081]
+        labels:
+          service: dtms-outbox-worker
+
   - job_name: prometheus
     static_configs:
       - targets: [localhost:9090]
