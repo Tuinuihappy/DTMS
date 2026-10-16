@@ -6,9 +6,9 @@
 
 > หมายเหตุ: verifier หักล้างได้แค่ 1 จาก 132 ข้อ — เข้มน้อยกว่าที่ควร ให้ถือ MEDIUM/LOW เป็น "น่าจะจริง" จนกว่าจะเปิดดูเอง
 
-## สถานะ (อัปเดต 2026-10-06)
+## สถานะ (อัปเดต 2026-10-16)
 
-แก้แล้ว HIGH 12 จาก 15, MEDIUM 10 ข้อ (M5, M12, M18, M23, M33, M34, M35, M40, M49, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
+แก้แล้ว HIGH 12 จาก 15, MEDIUM 11 ข้อ (M5, M12, M15, M18, M23, M33, M34, M35, M40, M49, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M16 แก้บางส่วน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
 
 | ข้อ | เรื่อง | Commit |
 |---|---|---|
@@ -28,6 +28,8 @@
 | M5 | dark mode: ปุ่ม Cancel, ปุ่มรอง, filter, input, banner และป้ายสถานะทุกหน้า IAM มีสีของ dark mode | `c01e55a7`, `f6b256a0` |
 | M49 | ไอคอน PWA 192/512 (maskable) + badge ของ notification สร้างจากโลโก้รถบรรทุกบนหัวหน้าเว็บ | `6782f815` |
 | M18 | เมนู Robot, Driver, Auto door และ Active alerts แสดงเป็น "Soon" กดไม่ได้ (แทนลิงก์ 404 และจุดกะพริบ) | `8a6f4171` |
+| M15 | realtime ทุกหน้าลองต่อใหม่เอง (backoff 1s → 30s) เมื่อต่อครั้งแรกไม่ได้หรือ restart หลัง drain ล้ม แล้ว subscribe กลุ่มใหม่ ไม่ต้อง reload หน้า | `c38ff16d` |
+| M16 (บางส่วน) | ข้อมูล pool ย้ายไปอยู่ใน `OperatorPoolProvider` ที่ layout ของ `/m` refetch ที่ล้มเหลวคงรายการเดิมไว้และเก็บ `error` แทนการล้างเป็นว่าง **ที่ยังเหลือ:** `pool-trips-list.tsx` ยังไม่แสดง error และปุ่ม retry และยังไม่ทิ้งผลตอบกลับที่มาช้ากว่า | `2c01dc95` |
 
 **ไม่แก้ (ตัดสินใจ 2026-10-06)**
 - **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile: เจ้าของระบบเลือกข้าม คงไว้ตามเดิม
@@ -272,7 +274,7 @@
 - แก้: ตอน filter เข้าโหมด exact match ให้ตั้ง highlight ไปที่ index ของตัวที่ตรง หรือใน Enter ให้เช็กก่อนว่าถ้า suggestions มีตัวที่ normalize แล้วเท่ากับ value ให้แค่ setOpen(false) ไม่ต้อง pick
 - Verifier: filtered (บรรทัด 59-64) คืน suggestions ทั้งหมดเมื่อ value ตรง exact และ highlight reset เป็น 0 เมื่อ value เปลี่ยน (66-68) Enter (92-97) จึง pick(filtered[0]) แทนค่าที่พิมพ์ ถ้าค่าที่ตรงไม่ใช่ตัวแรก UOM ถูกแทนที่จริง
 
-### M15. Hub start ครั้งแรกล้มแล้ว realtime จะไม่กลับมาจนกว่าจะ reload หน้า — CONFIRMED
+### M15. Hub start ครั้งแรกล้มแล้ว realtime จะไม่กลับมาจนกว่าจะ reload หน้า — CONFIRMED · ✅ แก้แล้ว `c38ff16d`
 - กลุ่ม: core · code
 - ที่: `frontend/lib/realtime/signalr-client.ts:102`
 - ปัญหา: ถ้า connection.start() ครั้งแรกล้ม (backend ยังไม่ขึ้น หรือ hub-token ได้ 401) code จะแค่ log แล้วเก็บ connection ที่อยู่ในสถานะ Disconnected ไว้ใน map ตลอดไป withAutomaticReconnect ทำงานเฉพาะหลังเคยต่อสำเร็จแล้วเท่านั้น ส่วน useHubSubscription ทำแค่ setError ไม่ retry ใน cycleConnectionForDrain (บรรทัด 125-131) comment บอกว่า 'automatic reconnect will pick up' แต่หลังจาก stop() เอง auto-reconnect จะไม่ทำงาน
@@ -280,7 +282,7 @@
 - แก้: ถ้า start ล้ม ให้ลบ entry ออกจาก map (หรือ retry ด้วย backoff เดียวกับ nextRetryDelayInMilliseconds) จะได้ให้ subscriber ถัดไปหรือ retry timer เรียก start ใหม่ได้ ใน drain cycle ถ้า start ล้มให้ schedule retry เอง
 - Verifier: signalr-client.ts:102-110 catch แค่ console.warn แล้วเก็บ entry ไว้ใน map ตลอด getHub คืน existing โดยไม่เช็ก state, ensureStarted คืน ready ที่ resolve แล้ว withAutomaticReconnect ไม่ retry initial start และหลัง stop() เองใน cycleConnectionForDrain ก็ไม่ auto-reconnect ตามที่ comment อ้าง ไม่มีที่ไหนเรียก disposeHub อัตโนมัติ
 
-### M16. usePoolTrips กลบ error ไว้ หน้า pool เลยแสดงว่าว่าง — CONFIRMED
+### M16. usePoolTrips กลบ error ไว้ หน้า pool เลยแสดงว่าว่าง — CONFIRMED · 🟡 แก้บางส่วน `2c01dc95`
 - กลุ่ม: core · code
 - ที่: `frontend/lib/hooks/use-pool-trips.ts:67`
 - ปัญหา: ใน catch ของ refetch มีการ dispatch REFETCH ด้วย trips: [] และ reducer ก็ตั้ง error: null เสมอ ทำให้ state.error ไม่มีทางมีค่า ถ้า GET /api/operator/trips/pool ล้ม (offline, 5xx, 401) operator จะเห็น pool ว่างแทนข้อความ error นอกจากนี้ refetch ที่ยิงพร้อมกันตอน mount กับตอน connected ไม่ได้กันผลตอบกลับที่มาไม่ตามลำดับ
