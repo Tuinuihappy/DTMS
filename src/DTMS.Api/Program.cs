@@ -306,24 +306,10 @@ builder.Services.AddOpenTelemetry()
         // across the async gap.
         .AddSource(DTMS.SharedKernel.Diagnostics.OutboxActivitySource.Name)
         .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)))
-    // P0.3 — projection metrics (lag, throughput, dedup) — Meter name
-    // matches DTMS.SharedKernel.Projection.ProjectionMetrics.MeterName.
-    // P0 Day 4 — DTMS.SignalR meter for hub invocations / connections /
-    // rate-limit drops (HubMetrics class).
-    // T1.6 — DTMS.Workflow meter for workflow SLO (stuck orders, consumer
-    // retries/faults, outbox pending/age, watchdog replays).
+    // Every DTMS meter comes from DtmsMeters.All — one list, guarded by
+    // MeterRegistrationTests so a new meter can't be left unexported.
     .WithMetrics(metrics => metrics
-        .AddMeter("DTMS.Projection")
-        .AddMeter("DTMS.SignalR")
-        .AddMeter("DTMS.Workflow")
-        .AddMeter(DTMS.Api.Infrastructure.Metrics.PoolMetrics.MeterName)
-        // Rate limiting — requests, rejections and the busiest caller's window
-        // count per traffic class. Quotas are sized from partition_peak.
-        .AddMeter(DTMS.Api.Infrastructure.RateLimiting.RateLimitMetrics.MeterName)
-        // Outbound callback-token refresh: attempts per system/result and
-        // seconds left on each stored token. Was never registered, so the
-        // counter existed but was never exported.
-        .AddMeter(DTMS.Iam.Infrastructure.Callbacks.CallbackRefreshMetrics.MeterName)
+        .AddMeter(DTMS.Api.Infrastructure.Metrics.DtmsMeters.All.ToArray())
         // T1.6 — MassTransit native meter emits messaging.* metrics
         // (consume_duration_seconds, receive_total, retry_total, fault_total)
         // so we don't need to write our own observer for consumer retries.

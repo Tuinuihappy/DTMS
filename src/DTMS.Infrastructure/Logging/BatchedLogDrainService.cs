@@ -114,6 +114,7 @@ public sealed class BatchedLogDrainService<T> : BackgroundService
             // Don't propagate — that would tear the drain loop down and
             // grow the backlog. Operator sees the exception in logs and
             // can investigate; lost entries here are bounded by batch size.
+            BatchedLogMetrics.RecordDropped(typeof(T).Name, "flush_failed", batch.Count);
             _log.LogError(ex,
                 "Batched log drain for {Type} failed to flush {Count} entries",
                 typeof(T).Name, batch.Count);
