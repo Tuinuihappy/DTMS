@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import { type AssignedTrip, getAssignedTrips, tripEndedLabel } from "@/lib/api/operator";
 import { usePollSchedule } from "@/lib/hooks/use-poll-schedule";
+import { TripRoute, tripTitle } from "./trip-route";
 
 type LoadState =
   | { kind: "idle" }
@@ -79,14 +80,15 @@ export function TripsList() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-xs uppercase tracking-wide text-zinc-500">
-                  Trip
+                  Order
                 </div>
-                <div className="mt-1 font-mono text-sm text-zinc-200">
-                  {trip.tripId.slice(0, 8)}
+                <div className="mt-1 font-mono text-sm text-zinc-100">
+                  {tripTitle(trip)}
                 </div>
               </div>
               <TripStatusBadge trip={trip} />
             </div>
+            <TripRoute trip={trip} />
             <DeadlineFooter trip={trip} />
           </Link>
         </li>

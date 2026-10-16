@@ -188,15 +188,38 @@ public class TripRepository : ITripRepository
         return rootIds.Count > 0 ? rootIds[0] : tripId;
     }
 
-    public async Task<IReadOnlyDictionary<Guid, TripStatus>> GetStatusesAsync(
+    public async Task<IReadOnlyDictionary<Guid, TripCardSummary>> GetCardSummariesAsync(
         IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default)
     {
-        if (ids.Count == 0) return new Dictionary<Guid, TripStatus>();
-        return await _context.Trips
+        if (ids.Count == 0) return new Dictionary<Guid, TripCardSummary>();
+        // Correlated aggregates over TripItems — EF emits them as scalar
+        // subqueries in the one SELECT, so this stays a single round trip.
+        // Min() picks a stable value for multi-item trips, as the pool does.
+        var rows = await _context.Trips
             .AsNoTracking()
             .Where(t => ids.Contains(t.Id))
-            .Select(t => new { t.Id, t.Status })
-            .ToDictionaryAsync(t => t.Id, t => t.Status, cancellationToken);
+            .Select(t => new
+            {
+                t.Id,
+                t.Status,
+                t.PickupLocationCode,
+                t.DropLocationCode,
+                OrderRef = _context.TripItems.Where(i => i.TripId == t.Id).Min(i => i.OrderRef),
+                ItemPickup = _context.TripItems.Where(i => i.TripId == t.Id).Min(i => i.PickupCode),
+                ItemDrop = _context.TripItems.Where(i => i.TripId == t.Id).Min(i => i.DropCode),
+                ItemCount = _context.TripItems.Count(i => i.TripId == t.Id),
+                TotalWeightKg = _context.TripItems.Where(i => i.TripId == t.Id).Sum(i => i.WeightKg ?? 0.0),
+            })
+            .ToListAsync(cancellationToken);
+        return rows.ToDictionary(
+            r => r.Id,
+            r => new TripCardSummary(
+                r.Status,
+                r.OrderRef,
+                r.PickupLocationCode ?? r.ItemPickup,
+                r.DropLocationCode ?? r.ItemDrop,
+                r.ItemCount,
+                r.TotalWeightKg));
     }
 
     public async Task<List<Trip>> GetByDeliveryOrderIdAsync(Guid deliveryOrderId, CancellationToken cancellationToken = default)

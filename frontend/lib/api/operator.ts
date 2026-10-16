@@ -16,6 +16,13 @@ export type AssignedTrip = {
   // below only record what the operator did; a dispatcher or order cancel
   // shows up here alone. Null if the trip row is gone.
   tripStatus: string | null;
+  // What the pool card showed, so a claimed trip still says where to go.
+  // Optional: a list cached by an older build has none of these.
+  orderRef?: string | null;
+  pickupCode?: string | null;
+  dropCode?: string | null;
+  itemCount?: number;
+  totalWeightKg?: number;
   assignedAt: string;
   acknowledgedAt: string | null;
   pickedUpAt: string | null;

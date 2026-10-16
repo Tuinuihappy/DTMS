@@ -15,6 +15,20 @@ public readonly record struct TripSubTaskLookup(
     DateTime? VendorPickedUpAt,
     DateTime? VendorDroppedAt);
 
+/// <summary>
+/// What an operator's trip card shows (the same fields as the pool card).
+/// Pickup/drop come from the codes frozen on the Trip, falling back to the
+/// item rows for trips dispatched before those were frozen; OrderRef, item
+/// count and weight come from the item rows (dispatch.TripItems).
+/// </summary>
+public sealed record TripCardSummary(
+    TripStatus Status,
+    string? OrderRef,
+    string? PickupCode,
+    string? DropCode,
+    int ItemCount,
+    double TotalWeightKg);
+
 public interface ITripRepository
 {
     Task<Trip?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
@@ -45,12 +59,12 @@ public interface ITripRepository
         string? upperKey, string? vendorOrderKey, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// No-tracking batch lookup of Trip.Status for the given ids, in one
-    /// SELECT. For read paths that only need to know whether a trip is
-    /// still live (the operator app's trip list) — not worth loading the
-    /// aggregates. Ids with no matching trip are absent from the result.
+    /// No-tracking batch lookup of what the operator app's trip list shows
+    /// per trip — live status, order ref, pickup/drop codes, item count and
+    /// weight — in one SELECT. Not worth loading the aggregates. Ids with no
+    /// matching trip are absent from the result.
     /// </summary>
-    Task<IReadOnlyDictionary<Guid, TripStatus>> GetStatusesAsync(
+    Task<IReadOnlyDictionary<Guid, TripCardSummary>> GetCardSummariesAsync(
         IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default);
 
     Task<List<Trip>> GetActiveTripsByVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default);

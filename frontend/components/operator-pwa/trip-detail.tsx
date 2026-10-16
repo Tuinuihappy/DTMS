@@ -15,6 +15,7 @@ import {
 import { usePollSchedule } from "@/lib/hooks/use-poll-schedule";
 import { getCurrentPosition, tryGetCurrentPosition } from "@/lib/operator-pwa/geolocation";
 import { PodCapture } from "./pod-capture";
+import { TripRoute, tripTitle } from "./trip-route";
 
 type Step = "acknowledge" | "pickup" | "drop" | "complete" | "done" | "closed";
 
@@ -185,13 +186,20 @@ export function TripDetail({ tripId }: { tripId: string }) {
       <header className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-xs uppercase tracking-wide text-zinc-500">Trip</div>
-            <div className="mt-0.5 font-mono text-sm text-zinc-200">
-              {trip.tripId.slice(0, 8)}
+            <div className="text-xs uppercase tracking-wide text-zinc-500">Order</div>
+            <div className="mt-0.5 font-mono text-sm text-zinc-100">
+              {tripTitle(trip)}
             </div>
           </div>
           <StepBadge step={step} label={ended} />
         </div>
+        <TripRoute trip={trip} />
+        {/* Kept small for support: the id dispatch and admin search by. */}
+        {trip.orderRef && (
+          <div className="mt-2 font-mono text-[11px] text-zinc-600">
+            Trip {trip.tripId.slice(0, 8)}
+          </div>
+        )}
         <ProgressTimeline trip={trip} />
       </header>
 
