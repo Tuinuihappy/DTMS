@@ -13,7 +13,10 @@ namespace DTMS.Api.Realtime.Drain;
 //   3. Wait for the configured settle window so the broadcast + reconnect
 //      can complete before SIGTERM lands.
 //
-// Hub list is inlined here (5 hubs as of 2026-06-21). Phase 2 will
+// Hub list is inlined here (all 7 hubs; OperatorPoolHub and ManualBoardHub
+// were missing until 2026-10-16, so their tablets never got "__drain" and
+// only noticed the restart when the socket dropped). ConnectionDrainServiceTests
+// fails when a new Hub is not listed. Phase 2 will
 // generalise this via IDrainBroadcaster<THub> + DI enumeration so adding
 // a new hub doesn't require touching this file. For Phase 1 the simpler
 // explicit list is enough — easier to read, easier to debug, no
@@ -28,6 +31,8 @@ public sealed class ConnectionDrainService : IConnectionDrainService
     private readonly IHubContext<TripHub> _tripHub;
     private readonly IHubContext<DashboardHub> _dashboardHub;
     private readonly IHubContext<FleetHub> _fleetHub;
+    private readonly IHubContext<ManualBoardHub> _manualBoardHub;
+    private readonly IHubContext<OperatorPoolHub> _operatorPoolHub;
     private readonly ILogger<ConnectionDrainService> _logger;
 
     public ConnectionDrainService(
@@ -36,6 +41,8 @@ public sealed class ConnectionDrainService : IConnectionDrainService
         IHubContext<TripHub> tripHub,
         IHubContext<DashboardHub> dashboardHub,
         IHubContext<FleetHub> fleetHub,
+        IHubContext<ManualBoardHub> manualBoardHub,
+        IHubContext<OperatorPoolHub> operatorPoolHub,
         ILogger<ConnectionDrainService> logger)
     {
         _orderHub = orderHub;
@@ -43,6 +50,8 @@ public sealed class ConnectionDrainService : IConnectionDrainService
         _tripHub = tripHub;
         _dashboardHub = dashboardHub;
         _fleetHub = fleetHub;
+        _manualBoardHub = manualBoardHub;
+        _operatorPoolHub = operatorPoolHub;
         _logger = logger;
     }
 
@@ -81,6 +90,8 @@ public sealed class ConnectionDrainService : IConnectionDrainService
         await BroadcastDrainSafely("TripHub", _tripHub, cancellationToken);
         await BroadcastDrainSafely("DashboardHub", _dashboardHub, cancellationToken);
         await BroadcastDrainSafely("FleetHub", _fleetHub, cancellationToken);
+        await BroadcastDrainSafely("ManualBoardHub", _manualBoardHub, cancellationToken);
+        await BroadcastDrainSafely("OperatorPoolHub", _operatorPoolHub, cancellationToken);
 
         // Settle window: give clients time to receive "__drain" + reconnect
         // elsewhere. The host's overall shutdown budget (Host.ShutdownTimeout +

@@ -14,8 +14,9 @@ namespace DTMS.Api.Realtime.Filters;
 ///   - Re-throws transparently so other filters / SignalR error handling
 ///     still run.
 ///
-/// On connect:
-///   - Bump connections counter for the hub.
+/// On connect / disconnect:
+///   - Bump the cumulative connections counter, and move the active
+///     connections gauge up and back down.
 ///
 /// Registered as a singleton — no per-invocation state, safe to share.
 /// </summary>
@@ -62,17 +63,31 @@ public sealed class TracingHubFilter : IHubFilter
         }
     }
 
-    public Task OnConnectedAsync(
+    public async Task OnConnectedAsync(
         HubLifetimeContext ctx,
         Func<HubLifetimeContext, Task> next)
     {
-        _metrics.RecordConnected(ctx.Hub.GetType().Name);
-        return next(ctx);
+        var hubName = ctx.Hub.GetType().Name;
+        _metrics.RecordConnected(hubName);
+        await next(ctx);
+        // Only after the hub accepted the connection: SignalR skips
+        // OnDisconnectedAsync when OnConnectedAsync throws, so counting
+        // earlier would leave the active gauge one too high forever.
+        _metrics.RecordActive(hubName, +1);
     }
 
-    public Task OnDisconnectedAsync(
+    public async Task OnDisconnectedAsync(
         HubLifetimeContext ctx,
         Exception? exception,
         Func<HubLifetimeContext, Exception?, Task> next)
-        => next(ctx, exception);
+    {
+        try
+        {
+            await next(ctx, exception);
+        }
+        finally
+        {
+            _metrics.RecordActive(ctx.Hub.GetType().Name, -1);
+        }
+    }
 }

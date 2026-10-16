@@ -64,7 +64,11 @@ public sealed class PoolMetrics : IDisposable
 
         _broadcastTotal = _meter.CreateCounter<long>(
             "dtms.pool.broadcast.total",
-            description: "SignalR pool broadcasts fired. outcome=failed means the hub threw and we swallowed.");
+            // "sent" means SignalR (or the Redis backplane) accepted the
+            // message — a group send succeeds with zero members, so it is
+            // not proof any tablet got it. Read it against
+            // dtms.signalr.hub.connections_active{hub=OperatorPoolHub}.
+            description: "SignalR pool broadcasts handed to the hub. outcome=sent is not delivery: a send to an empty group still succeeds — compare dtms_signalr_hub_connections_active{hub=\"OperatorPoolHub\"}. outcome=failed means the hub threw and we swallowed.");
     }
 
     public void SetDepth(long depth) => _depthSnapshot = depth;

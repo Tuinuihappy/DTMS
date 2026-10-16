@@ -11,6 +11,7 @@ namespace DTMS.Api.Realtime.Observability;
 ///   - dtms.signalr.hub.method.invocations_total{hub, method}
 ///   - dtms.signalr.hub.method.duration_ms{hub, method}  (histogram)
 ///   - dtms.signalr.hub.connections_total{hub}            (counter, cumulative)
+///   - dtms.signalr.hub.connections_active{hub}           (up/down, open right now in this process)
 ///   - dtms.signalr.hub.rate_limited_total{hub, method}
 ///
 /// Meter name <c>DTMS.SignalR</c> is registered in <c>Program.cs</c> so
@@ -23,6 +24,7 @@ public sealed class HubMetrics : IDisposable
     private readonly Meter _meter;
     private readonly Counter<long> _invocations;
     private readonly Counter<long> _connections;
+    private readonly UpDownCounter<long> _active;
     private readonly Counter<long> _rateLimited;
     private readonly Histogram<double> _methodDuration;
 
@@ -38,7 +40,15 @@ public sealed class HubMetrics : IDisposable
         _connections = _meter.CreateCounter<long>(
             "dtms.signalr.hub.connections_total",
             unit: "connections",
-            description: "Cumulative count of hub connect events. Pair with disconnect to derive active count.");
+            description: "Cumulative count of hub connect events. Use connections_active for how many are open now.");
+
+        // No unit on purpose: the Prometheus exporter would append it and
+        // export dtms_signalr_hub_connections_active_connections. Browsers
+        // only connect to the api, so the outbox worker reports nothing
+        // here — sum() across processes is the cluster-wide figure.
+        _active = _meter.CreateUpDownCounter<long>(
+            "dtms.signalr.hub.connections_active",
+            description: "Hub connections open right now. A pool broadcast counted as sent while this is 0 for OperatorPoolHub reached nobody.");
 
         _rateLimited = _meter.CreateCounter<long>(
             "dtms.signalr.hub.rate_limited_total",
@@ -59,6 +69,9 @@ public sealed class HubMetrics : IDisposable
 
     public void RecordConnected(string hubName)
         => _connections.Add(1, Tag("hub", hubName));
+
+    public void RecordActive(string hubName, int delta)
+        => _active.Add(delta, Tag("hub", hubName));
 
     public void RecordRateLimited(string hubName, string methodName)
         => _rateLimited.Add(1, Tag("hub", hubName), Tag("method", methodName));
