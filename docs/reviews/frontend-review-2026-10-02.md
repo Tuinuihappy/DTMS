@@ -8,7 +8,7 @@
 
 ## สถานะ (อัปเดต 2026-10-16)
 
-แก้แล้ว HIGH 12 จาก 15, MEDIUM 11 ข้อ (M5, M12, M15, M18, M23, M33, M34, M35, M40, M49, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M16 แก้บางส่วน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
+แก้แล้ว HIGH 12 จาก 15, MEDIUM 12 ข้อ (M5, M12, M15, M18, M23, M33, M34, M35, M40, M48, M49, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M16 แก้บางส่วน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
 
 | ข้อ | เรื่อง | Commit |
 |---|---|---|
@@ -30,6 +30,7 @@
 | M18 | เมนู Robot, Driver, Auto door และ Active alerts แสดงเป็น "Soon" กดไม่ได้ (แทนลิงก์ 404 และจุดกะพริบ) | `8a6f4171` |
 | M15 | realtime ทุกหน้าลองต่อใหม่เอง (backoff 1s → 30s) เมื่อต่อครั้งแรกไม่ได้หรือ restart หลัง drain ล้ม แล้ว subscribe กลุ่มใหม่ ไม่ต้อง reload หน้า | `c38ff16d` |
 | M16 (บางส่วน) | ข้อมูล pool ย้ายไปอยู่ใน `OperatorPoolProvider` ที่ layout ของ `/m` refetch ที่ล้มเหลวคงรายการเดิมไว้และเก็บ `error` แทนการล้างเป็นว่าง **ที่ยังเหลือ:** `pool-trips-list.tsx` ยังไม่แสดง error และปุ่ม retry และยังไม่ทิ้งผลตอบกลับที่มาช้ากว่า | `2c01dc95` |
+| M48 | My trips และ Trip detail แสดง OrderRef, จุด pickup → drop และจำนวนชิ้น/น้ำหนักแบบการ์ด Pool (backend ส่งมากับ `/api/operator/trips/assigned`) ส่วน tripId เหลือเป็นบรรทัดเล็กในหน้า detail | `d193c8de` |
 
 **ไม่แก้ (ตัดสินใจ 2026-10-06)**
 - **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile: เจ้าของระบบเลือกข้าม คงไว้ตามเดิม
@@ -538,7 +539,7 @@
 - แก้: ก่อน logout ให้เตือนถ้า getQueueDepth()>0 (เสนอ Sync now ก่อน) แล้ว clearQueue() + unsubscribeFromPush() หรือเก็บ userId ไว้ในแต่ละแถวของคิว แล้วข้ามแถวที่ไม่ตรงกับ session ปัจจุบัน
 - Verifier: onLogout เรียกแค่ fetch /api/auth/logout ไม่มี clearQueue หรือ unsubscribeFromPush ส่วน route logout ก็ไม่ได้จัดการ push แถวในคิวไม่มี userId จึงถูก replay ด้วย cookie ของคนถัดไปได้จริงบนเครื่องที่ใช้ร่วมกัน
 
-### M48. My trips และ Trip detail แสดงแค่ tripId 8 ตัว ไม่มี OrderRef หรือจุด pickup/drop — CONFIRMED
+### M48. My trips และ Trip detail แสดงแค่ tripId 8 ตัว ไม่มี OrderRef หรือจุด pickup/drop — CONFIRMED · ✅ แก้แล้ว `d193c8de`
 - กลุ่ม: operator-pwa · uiux
 - ที่: `frontend/components/operator-pwa/trip-detail.tsx:175`
 - ปัญหา: trip-detail.tsx:175 และ trips-list.tsx:84 แสดงแค่ trip.tripId.slice(0, 8) ในขณะที่หน้า Pool (pool-trips-list.tsx:150,159,163) แสดง orderRef, pickupCode, dropCode เพราะ AssignedTrip ไม่มี field เหล่านี้
