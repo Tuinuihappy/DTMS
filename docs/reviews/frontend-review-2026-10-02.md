@@ -8,7 +8,7 @@
 
 ## สถานะ (อัปเดต 2026-10-20)
 
-แก้แล้ว HIGH 12 จาก 15, MEDIUM 24 ข้อ (M5, M12, M15, M16, M18, M23, M30, M31, M32, M33, M34, M35, M36, M38, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
+แก้แล้ว HIGH 12 จาก 15, MEDIUM 27 ข้อ (M5, M12, M15, M16, M18, M21, M23, M25, M27, M30, M31, M32, M33, M34, M35, M36, M38, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
 
 | ข้อ | เรื่อง | Commit |
 |---|---|---|
@@ -34,6 +34,7 @@
 | M42, M44, M46, M47, M50 (+ M43 บางส่วน) | PWA: บันทึก offline ขึ้น 'Saved offline' ไม่ใช่ error สีแดง · โหลด trip ไม่สำเร็จบอกว่าโหลดไม่สำเร็จพร้อมปุ่มลองใหม่ (ไม่ใช่ 'not found') · รับงานจาก Pool ต้องออนไลน์ ไม่เข้าคิวอีก · logout ล้างคิว offline และ push เสมอ และถามก่อนถ้ายังมีรายการค้าง · ปุ่ม Settings, ป้าย queued และลิงก์ Back กดได้ 44px · ฟอร์มขอ override geofence ซ่อนไว้ (ส่งไม่ได้อยู่แล้ว และ geofence ปิด) | `d364498e` |
 | M30, M31, M32, M36 | Dispatch: poll ล้มไม่ทำให้ตาราง trips หาย (แถบเตือน + Retry) · Trip drawer โหลดใหม่เมื่อมี timeline เข้า ป้ายสถานะและปุ่มไม่ค้างค่าเก่า · ?page=N ไม่ถูกรีเซ็ตตอนเปิดหน้า · ประกาศ token --color-wine/--color-flame ทั้ง light และ dark | `703ad77a` |
 | M38 | /dispatch/manual อยู่ใน shell (TopNav + LeftRail) มีเมนู "Manual operators" ใต้ Dispatch (ต้องมี dtms:operator:pool:read) สีเป็น token ทั้งหมด และเวลาใช้ DateTime | `c40cb169` |
+| M21, M25, M27 | Orders: ปุ่มใน drawer ทำงานกับ order ที่ไม่อยู่ในหน้า list (โหลด order มาเอง) · bulk cancel เตือนว่ามี order ที่ dispatched/running กี่รายการ หุ่นจะหยุด · CSV มี BOM (ภาษาไทยไม่เพี้ยนใน Excel) และกัน formula injection ทั้ง CSV ฝั่ง client และ report export ฝั่ง backend (`CsvField`) | `07e80468`, `be275d34` |
 
 **ไม่แก้ (ตัดสินใจ 2026-10-06)**
 - **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile: เจ้าของระบบเลือกข้าม คงไว้ตามเดิม
@@ -326,7 +327,7 @@
 - แก้: เพิ่ม dark:focus-visible:bg-white/[0.06] ส่วน a11y ให้ตัด role=button ออกแล้ววาง <button>/<Link> ที่ครอบ cell หลัก (เช่น OrderRef) แทน หรืออย่างน้อยให้คง role=row ไว้แล้วใช้ aria-label บอก action
 - Verifier: data-row.tsx:73 focus-visible:bg-white/60 ไม่มี dark: variant ขณะที่ hover มี dark:hover:bg-white/[0.03] และบรรทัด 67 ใส่ role=button บน <tr> ซึ่งทับ implicit role=row จริง กระทบทุกตารางที่ใช้ DataRow แบบ interactive แต่เฉพาะผู้ใช้คีย์บอร์ด
 
-### M21. ปุ่ม action ใน drawer เงียบหายเมื่อ order ไม่อยู่ใน list หน้าปัจจุบัน — CONFIRMED
+### M21. ปุ่ม action ใน drawer เงียบหายเมื่อ order ไม่อยู่ใน list หน้าปัจจุบัน — CONFIRMED · ✅ แก้แล้ว `07e80468`
 - กลุ่ม: delivery-orders · code
 - ที่: `frontend/components/delivery-orders/orders-experience.tsx:575`
 - ปัญหา: runAction เริ่มด้วย const target = orders.find(o => o.id === id); if (!target) return; แต่ drawer เปิด order ที่ไม่อยู่ในหน้าปัจจุบันได้ เช่นกด OrderRef ใน Trip drawer ที่ซ้อนอยู่ (onOpenOrder บรรทัด 886) หรือ order ถูก poll/filter ออกจาก list ไปแล้ว
@@ -358,7 +359,7 @@
 - แก้: อ่านสีเส้นจาก getComputedStyle(canvas).color หรือ var(--color-ink-900) และ scale พิกัดด้วย (e.clientX - r.left) * (canvas.width / r.width) รวมถึงแกน y ในทำนองเดียวกัน
 - Verifier: บรรทัด 90 hardcode strokeStyle เป็น "#1a1a1a" บนพื้น dark:bg-white/[0.04] ทับ surface สีเข้ม ใน dark mode จึงแทบมองไม่เห็นเส้น ส่วน canvas ประกาศ width={460} แต่ใช้ class w-full และ pt() (บรรทัด 94-97) ใช้ clientX - rect.left โดยไม่ scale ด้วย canvas.width/rect.width ถ้าความกว้างที่แสดงไม่เท่ากับ 460px เส้นจึงเลื่อนจากตำแหน่งที่ชี้ บนจอแคบจะเลื่อนมาก
 
-### M25. Bulk cancel ไม่เตือนเรื่อง cascade ที่จะหยุด robot — CONFIRMED
+### M25. Bulk cancel ไม่เตือนเรื่อง cascade ที่จะหยุด robot — CONFIRMED · ✅ แก้แล้ว `07e80468`
 - กลุ่ม: delivery-orders · uiux
 - ที่: `frontend/components/delivery-orders/cancel-dialog.tsx:108`
 - ปัญหา: callout เรื่อง cascade แสดงเฉพาะเมื่อ count <= 1 และ dialog bulk ที่ orders-experience.tsx:1192 ไม่ได้ส่ง activeTripCount มา แต่ bulk cancel ใช้กับ order ทุกสถานะที่ถูกเลือกได้ รวมถึง Dispatched/InProgress
@@ -374,7 +375,7 @@
 - แก้: เพิ่ม sortBy, sortDir และ paginationMode ใน deps ของ effect reset page และให้ refresh ใน infinite mode ดึงช่วง 1..page ใหม่ทั้งหมด (pageSize*page) แทนการ append เฉพาะหน้าล่าสุด
 - Verifier: fetchOrders (บรรทัด 357-363) ในโหมด infinite ที่ page>1 จะ append เฉพาะหน้าปัจจุบัน แต่ poll และ SignalR refetch เรียก fetchOrders ตัวเดียวกัน แถวของหน้าก่อนหน้าจึงไม่เคยถูก refresh และ order ที่ถูกลบหรือเปลี่ยนสถานะยังค้างอยู่ deps ของ effect reset page (บรรทัด 303) ไม่มี sortBy, sortDir และ paginationMode เปลี่ยน sort แล้วจึงได้หน้า N ใหม่ไปต่อท้ายข้อมูลที่เรียงแบบเดิม ส่วนการสลับจาก Pages หน้า 3 ไป Scroll จะได้แค่ข้อมูลหน้า 3
 
-### M27. CSV export: ภาษาไทยเพี้ยนใน Excel และเสี่ยง formula injection — CONFIRMED
+### M27. CSV export: ภาษาไทยเพี้ยนใน Excel และเสี่ยง formula injection — CONFIRMED · ✅ แก้แล้ว `07e80468`, `be275d34`
 - กลุ่ม: delivery-orders · code
 - ที่: `frontend/components/delivery-orders/orders-experience.tsx:82`
 - ปัญหา: Blob สร้างเป็น text/csv;charset=utf-8 แต่ไม่มี BOM (﻿) และฟังก์ชัน escape ไม่ได้กันค่าที่ขึ้นต้นด้วย = + - @ ทั้งที่ notes และ requestedBy มาจากระบบภายนอกหรือ free text
