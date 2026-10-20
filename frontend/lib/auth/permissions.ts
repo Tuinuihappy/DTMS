@@ -33,4 +33,9 @@ export const Permissions = {
   Dispatch: {
     TripRead: "dtms:dispatch:trip:read",
   },
+  Operator: {
+    // The manual board (/dispatch/manual) — every feed on it is gated by
+    // this on the API side.
+    PoolRead: "dtms:operator:pool:read",
+  },
 } as const;

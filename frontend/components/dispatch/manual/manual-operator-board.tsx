@@ -72,25 +72,25 @@ export function ManualOperatorBoard() {
   });
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Manual operators</h1>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-[var(--color-ink-500)]">
             Operator board, active trips, and override approvals — Manual transport mode.
           </p>
         </div>
         <button
           type="button"
           onClick={() => trigger()}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="rounded-lg border border-[var(--color-ink-200)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-ink-700)] hover:bg-[var(--color-surface-soft)]"
         >
           Refresh
         </button>
       </header>
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
+        <div className="rounded-xl border border-[var(--color-coral)]/30 bg-[var(--color-coral-soft)] p-4 text-sm text-[var(--color-coral)]">
           {error}
         </div>
       )}

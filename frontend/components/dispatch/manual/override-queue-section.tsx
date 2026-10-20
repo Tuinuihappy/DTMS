@@ -7,6 +7,7 @@ import {
   type OperatorBoardRow,
   type OverrideQueueRow,
 } from "@/lib/api/admin-manual";
+import { DateTime } from "@/components/primitives/date-time";
 import { ModalLayer } from "@/components/primitives/modal-layer";
 
 // Phase 4.6 — Right column: pending geofence override requests.
@@ -61,42 +62,42 @@ export function OverrideQueueSection({ overrides, operators, onChange }: Props) 
   };
 
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-      <header className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+    <section className="rounded-2xl border border-[var(--color-ink-100)] bg-[var(--color-surface)]">
+      <header className="border-b border-[var(--color-ink-100)] px-4 py-3">
+        <h2 className="text-sm font-medium uppercase tracking-wide text-[var(--color-ink-500)]">
           Override queue ({overrides.length})
         </h2>
       </header>
 
       {error && (
-        <div className="mx-4 mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
+        <div className="mx-4 mt-3 rounded-md border border-[var(--color-coral)]/30 bg-[var(--color-coral-soft)] px-3 py-2 text-xs text-[var(--color-coral)]">
           {error}
         </div>
       )}
 
       {overrides.length === 0 ? (
-        <div className="p-6 text-center text-sm text-zinc-500">
+        <div className="p-6 text-center text-sm text-[var(--color-ink-500)]">
           No pending override requests.
         </div>
       ) : (
-        <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+        <ul className="divide-y divide-[var(--color-ink-100)]">
           {overrides.map((row) => (
             <li key={row.id} className="px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-sm">
                     <span className="font-mono">{operatorByEmployeeId(row.operatorId)}</span>
-                    <span className="ml-2 text-xs text-zinc-500">
+                    <span className="ml-2 text-xs text-[var(--color-ink-500)]">
                       trip {row.tripId.slice(0, 8)}
                     </span>
                   </div>
-                  <div className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                  <div className="mt-1 text-xs text-[var(--color-ink-600)]">
                     {row.reason}
                   </div>
-                  <div className="mt-1 text-xs text-zinc-500">
+                  <div className="mt-1 text-xs text-[var(--color-ink-500)]">
                     {row.distanceFromGeofenceM.toFixed(0)}m outside · requested{" "}
-                    {new Date(row.requestedAt).toLocaleTimeString()} · expires{" "}
-                    {new Date(row.expiresAt).toLocaleTimeString()}
+                    <DateTime value={row.requestedAt} variant="time" /> · expires{" "}
+                    <DateTime value={row.expiresAt} variant="time" />
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-2">
@@ -104,7 +105,7 @@ export function OverrideQueueSection({ overrides, operators, onChange }: Props) 
                     type="button"
                     onClick={() => onApprove(row)}
                     disabled={busyId !== null}
-                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                    className="rounded-lg bg-[var(--color-success)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
                   >
                     Approve
                   </button>
@@ -112,7 +113,7 @@ export function OverrideQueueSection({ overrides, operators, onChange }: Props) 
                     type="button"
                     onClick={() => setDenyTarget(row)}
                     disabled={busyId !== null}
-                    className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    className="rounded-lg border border-[var(--color-ink-200)] px-3 py-1.5 text-xs text-[var(--color-ink-700)] hover:bg-[var(--color-surface-soft)] disabled:opacity-50"
                   >
                     Deny
                   </button>
@@ -180,10 +181,10 @@ function DenyDialog({
         >
           <div
             {...panelProps}
-            className="pointer-events-auto w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl outline-none dark:bg-zinc-900"
+            className="pointer-events-auto w-full max-w-md rounded-2xl bg-[var(--color-surface)] p-5 shadow-2xl outline-none"
           >
             <h3 id={titleId} className="text-base font-semibold">Deny override</h3>
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-[var(--color-ink-500)]">
               Override for trip <span className="font-mono">{row.tripId.slice(0, 8)}</span>.
               Reason is shown to the operator.
             </p>
@@ -192,10 +193,10 @@ function DenyDialog({
               onChange={(e) => setReason(e.target.value)}
               rows={4}
               placeholder="e.g. Operator must approach the loading dock — current location is in the parking lot."
-              className="mt-3 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+              className="mt-3 w-full rounded-md border border-[var(--color-ink-200)] bg-[var(--color-surface)] px-2 py-1.5 text-sm"
             />
             {error && (
-              <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
+              <div className="mt-3 rounded-md border border-[var(--color-coral)]/30 bg-[var(--color-coral-soft)] px-2 py-1.5 text-xs text-[var(--color-coral)]">
                 {error}
               </div>
             )}
@@ -203,7 +204,7 @@ function DenyDialog({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
+                className="rounded-md border border-[var(--color-ink-200)] px-3 py-1.5 text-sm text-[var(--color-ink-700)]"
               >
                 Cancel
               </button>
@@ -211,7 +212,7 @@ function DenyDialog({
                 type="button"
                 onClick={submit}
                 disabled={busy || reason.trim().length < 3}
-                className="rounded-md bg-red-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                className="rounded-md bg-[var(--color-coral)] px-3 py-1.5 text-sm text-white disabled:opacity-50"
               >
                 {busy ? "Denying…" : "Confirm deny"}
               </button>

@@ -26,31 +26,31 @@ export function OperatorBoardSection({ operators, trips, onChange }: Props) {
   );
 
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-      <header className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+    <section className="rounded-2xl border border-[var(--color-ink-100)] bg-[var(--color-surface)]">
+      <header className="border-b border-[var(--color-ink-100)] px-4 py-3">
+        <h2 className="text-sm font-medium uppercase tracking-wide text-[var(--color-ink-500)]">
           Operators ({operators.length})
         </h2>
       </header>
       {operators.length === 0 ? (
-        <div className="p-6 text-center text-sm text-zinc-500">
+        <div className="p-6 text-center text-sm text-[var(--color-ink-500)]">
           No operators yet. Operators are created automatically the first time they sign in.
         </div>
       ) : (
-        <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+        <ul className="divide-y divide-[var(--color-ink-100)]">
           {operators.map((op) => {
             const trip = tripByOperator.get(op.id);
             return (
               <li key={op.id} className="flex items-center justify-between px-4 py-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm text-zinc-700 dark:text-zinc-200">
+                    <span className="font-mono text-sm text-[var(--color-ink-700)]">
                       {op.employeeCode}
                     </span>
                     <StatusBadge status={op.status} />
                     <RoleBadge role={op.role} />
                   </div>
-                  <div className="mt-0.5 text-xs text-zinc-500">
+                  <div className="mt-0.5 text-xs text-[var(--color-ink-500)]">
                     {op.displayName}
                     {op.primaryWarehouseId
                       ? ` · WH ${op.primaryWarehouseId.slice(0, 8)}`
@@ -58,8 +58,8 @@ export function OperatorBoardSection({ operators, trips, onChange }: Props) {
                   </div>
                   {trip && (
                     <div className="mt-1 text-xs">
-                      <span className="text-zinc-500">Trip </span>
-                      <span className="font-mono text-zinc-700 dark:text-zinc-200">
+                      <span className="text-[var(--color-ink-500)]">Trip </span>
+                      <span className="font-mono text-[var(--color-ink-700)]">
                         {trip.tripId.slice(0, 8)}
                       </span>{" "}
                       · {tripStageLabel(trip)}
@@ -70,7 +70,7 @@ export function OperatorBoardSection({ operators, trips, onChange }: Props) {
                   <button
                     type="button"
                     onClick={() => setReassignTripId(trip.tripId)}
-                    className="rounded-lg border border-zinc-300 bg-white px-2.5 py-1 text-xs text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    className="rounded-lg border border-[var(--color-ink-200)] bg-[var(--color-surface)] px-2.5 py-1 text-xs text-[var(--color-ink-700)] hover:bg-[var(--color-surface-soft)]"
                   >
                     Reassign
                   </button>
@@ -101,9 +101,9 @@ export function OperatorBoardSection({ operators, trips, onChange }: Props) {
 
 function StatusBadge({ status }: { status: OperatorBoardRow["status"] }) {
   const map: Record<OperatorBoardRow["status"], string> = {
-    Active: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
-    OnLeave: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
-    Deactivated: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
+    Active: "bg-[var(--color-success-soft)] text-[var(--color-success)]",
+    OnLeave: "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)]",
+    Deactivated: "bg-[var(--color-ink-100)] text-[var(--color-ink-600)]",
   };
   return (
     <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${map[status]}`}>
@@ -115,7 +115,7 @@ function StatusBadge({ status }: { status: OperatorBoardRow["status"] }) {
 function RoleBadge({ role }: { role: OperatorBoardRow["role"] }) {
   if (role === "Operator") return null;
   return (
-    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+    <span className="rounded-full bg-[var(--color-pastel-sky)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-pastel-sky-ink)]">
       {role}
     </span>
   );
@@ -171,20 +171,20 @@ function ReassignDialog({
         >
           <div
             {...panelProps}
-            className="pointer-events-auto w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl outline-none dark:bg-zinc-900"
+            className="pointer-events-auto w-full max-w-md rounded-2xl bg-[var(--color-surface)] p-5 shadow-2xl outline-none"
           >
             <h3 id={titleId} className="text-base font-semibold">Reassign trip</h3>
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-[var(--color-ink-500)]">
               Trip <span className="font-mono">{tripId.slice(0, 8)}</span> — pick a different active + idle operator.
             </p>
             <div className="mt-4 flex flex-col gap-3">
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-zinc-500">New operator</span>
+                <span className="text-[var(--color-ink-500)]">New operator</span>
                 <select
                   value={newOperatorId}
                   onChange={(e) => setNewOperatorId(e.target.value)}
                   disabled={busy}
-                  className="h-10 rounded-md border border-zinc-300 bg-white px-2 dark:border-zinc-700 dark:bg-zinc-950"
+                  className="h-10 rounded-md border border-[var(--color-ink-200)] bg-[var(--color-surface)] px-2"
                 >
                   <option value="">— choose —</option>
                   {targets.map((o) => (
@@ -194,23 +194,23 @@ function ReassignDialog({
                   ))}
                 </select>
                 {targets.length === 0 && (
-                  <span className="text-xs text-amber-700 dark:text-amber-300">
+                  <span className="text-xs text-[var(--color-amber-600)]">
                     No idle Active operators available right now.
                   </span>
                 )}
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-zinc-500">Reason (optional)</span>
+                <span className="text-[var(--color-ink-500)]">Reason (optional)</span>
                 <textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   disabled={busy}
                   rows={3}
-                  className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-950"
+                  className="rounded-md border border-[var(--color-ink-200)] bg-[var(--color-surface)] px-2 py-1.5"
                 />
               </label>
               {error && (
-                <div className="rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
+                <div className="rounded-md border border-[var(--color-coral)]/30 bg-[var(--color-coral-soft)] px-2 py-1.5 text-xs text-[var(--color-coral)]">
                   {error}
                 </div>
               )}
@@ -219,7 +219,7 @@ function ReassignDialog({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
+                className="rounded-md border border-[var(--color-ink-200)] px-3 py-1.5 text-sm text-[var(--color-ink-700)]"
               >
                 Cancel
               </button>
@@ -227,7 +227,7 @@ function ReassignDialog({
                 type="button"
                 onClick={submit}
                 disabled={busy || !newOperatorId}
-                className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+                className="rounded-md bg-[var(--color-ink-900)] px-3 py-1.5 text-sm text-[var(--color-surface)] disabled:opacity-50"
               >
                 {busy ? "Reassigning…" : "Confirm reassign"}
               </button>
