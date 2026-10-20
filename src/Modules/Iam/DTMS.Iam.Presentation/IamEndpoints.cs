@@ -70,12 +70,13 @@ public static class IamEndpoints
     private static void MapAuditLogEndpoints(RouteGroupBuilder group)
     {
         group.MapGet("/audit-log",
-            async (string? actor, string? role, string? action, int? page, int? pageSize,
+            async (string? actor, string? role, string? action, string? systemKey,
+                   int? page, int? pageSize,
                    IAuditLogRepository repo, CancellationToken ct) =>
             {
                 var p = page is null or <= 0 ? 1 : page.Value;
                 var s = pageSize is null or <= 0 or > 200 ? 50 : pageSize.Value;
-                var (items, total) = await repo.QueryAsync(actor, role, action, p, s, ct);
+                var (items, total) = await repo.QueryAsync(actor, role, action, p, s, systemKey, ct);
                 return Results.Ok(new
                 {
                     items = items.Select(a => new AuditLogEntryDto(
@@ -86,6 +87,14 @@ public static class IamEndpoints
                     pageSize = s,
                 });
             }).RequirePermission(Permissions.Iam.AuditRead);
+
+        // The actions that occur in the log — the filter dropdown is built
+        // from this, so it can't drift from what the backend writes again
+        // (it listed only removed role/permission actions; review M3).
+        group.MapGet("/audit-log/actions",
+            async (IAuditLogRepository repo, CancellationToken ct) =>
+                Results.Ok(await repo.DistinctActionsAsync(ct)))
+            .RequirePermission(Permissions.Iam.AuditRead);
     }
 
 }

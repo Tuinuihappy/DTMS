@@ -23,9 +23,20 @@ public sealed class AuditLogRepository : IAuditLogRepository
         string? action,
         int page,
         int pageSize,
+        string? systemKey = null,
         CancellationToken ct = default)
     {
         var query = _db.AuditLog.AsNoTracking().AsQueryable();
+
+        // Details is the compact JSON the writers serialize, so the exact
+        // `"systemKey":"oms"` pair (closing quote included — "oms" must not
+        // match "oms2") identifies the system. A substring match, sent as a
+        // parameter; the table grows a few rows a day, so no column/index.
+        if (!string.IsNullOrWhiteSpace(systemKey))
+        {
+            var needle = $"\"systemKey\":\"{systemKey.Trim()}\"";
+            query = query.Where(a => a.Details != null && a.Details.Contains(needle));
+        }
 
         if (!string.IsNullOrWhiteSpace(actorEmployeeId))
             query = query.Where(a => a.ActorEmployeeId == actorEmployeeId);
@@ -42,4 +53,11 @@ public sealed class AuditLogRepository : IAuditLogRepository
             .ToListAsync(ct);
         return (items, total);
     }
+
+    public async Task<IReadOnlyList<string>> DistinctActionsAsync(CancellationToken ct = default)
+        => await _db.AuditLog.AsNoTracking()
+            .Select(a => a.Action)
+            .Distinct()
+            .OrderBy(a => a)
+            .ToListAsync(ct);
 }
