@@ -8,7 +8,7 @@
 
 ## สถานะ (อัปเดต 2026-10-16)
 
-แก้แล้ว HIGH 12 จาก 15, MEDIUM 12 ข้อ (M5, M12, M15, M18, M23, M33, M34, M35, M40, M48, M49, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M16 แก้บางส่วน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
+แก้แล้ว HIGH 12 จาก 15, MEDIUM 14 ข้อ (M5, M12, M15, M16, M18, M23, M33, M34, M35, M40, M45, M48, M49, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
 
 | ข้อ | เรื่อง | Commit |
 |---|---|---|
@@ -29,7 +29,7 @@
 | M49 | ไอคอน PWA 192/512 (maskable) + badge ของ notification สร้างจากโลโก้รถบรรทุกบนหัวหน้าเว็บ | `6782f815` |
 | M18 | เมนู Robot, Driver, Auto door และ Active alerts แสดงเป็น "Soon" กดไม่ได้ (แทนลิงก์ 404 และจุดกะพริบ) | `8a6f4171` |
 | M15 | realtime ทุกหน้าลองต่อใหม่เอง (backoff 1s → 30s) เมื่อต่อครั้งแรกไม่ได้หรือ restart หลัง drain ล้ม แล้ว subscribe กลุ่มใหม่ ไม่ต้อง reload หน้า | `c38ff16d` |
-| M16 (บางส่วน) | ข้อมูล pool ย้ายไปอยู่ใน `OperatorPoolProvider` ที่ layout ของ `/m` refetch ที่ล้มเหลวคงรายการเดิมไว้และเก็บ `error` แทนการล้างเป็นว่าง **ที่ยังเหลือ:** `pool-trips-list.tsx` ยังไม่แสดง error และปุ่ม retry และยังไม่ทิ้งผลตอบกลับที่มาช้ากว่า | `2c01dc95` |
+| M16, M45 | ข้อมูล pool อยู่ใน `OperatorPoolProvider` ที่ layout ของ `/m` refetch ที่ล้มเหลวคงรายการเดิมไว้ หน้า Pool แสดง "โหลด Pool ไม่สำเร็จ" พร้อมปุ่มลองใหม่แทน "Pool is empty" (หรือแถบเตือนเหนือรายการเดิม) และทิ้งผลของ fetch ที่ไม่ใช่ครั้งล่าสุด | `2c01dc95`, `f0a7c44a` |
 | M48 | My trips และ Trip detail แสดง OrderRef, จุด pickup → drop และจำนวนชิ้น/น้ำหนักแบบการ์ด Pool (backend ส่งมากับ `/api/operator/trips/assigned`) ส่วน tripId เหลือเป็นบรรทัดเล็กในหน้า detail | `d193c8de` |
 
 **ไม่แก้ (ตัดสินใจ 2026-10-06)**
@@ -283,7 +283,7 @@
 - แก้: ถ้า start ล้ม ให้ลบ entry ออกจาก map (หรือ retry ด้วย backoff เดียวกับ nextRetryDelayInMilliseconds) จะได้ให้ subscriber ถัดไปหรือ retry timer เรียก start ใหม่ได้ ใน drain cycle ถ้า start ล้มให้ schedule retry เอง
 - Verifier: signalr-client.ts:102-110 catch แค่ console.warn แล้วเก็บ entry ไว้ใน map ตลอด getHub คืน existing โดยไม่เช็ก state, ensureStarted คืน ready ที่ resolve แล้ว withAutomaticReconnect ไม่ retry initial start และหลัง stop() เองใน cycleConnectionForDrain ก็ไม่ auto-reconnect ตามที่ comment อ้าง ไม่มีที่ไหนเรียก disposeHub อัตโนมัติ
 
-### M16. usePoolTrips กลบ error ไว้ หน้า pool เลยแสดงว่าว่าง — CONFIRMED · 🟡 แก้บางส่วน `2c01dc95`
+### M16. usePoolTrips กลบ error ไว้ หน้า pool เลยแสดงว่าว่าง — CONFIRMED · ✅ แก้แล้ว `2c01dc95`, `f0a7c44a`
 - กลุ่ม: core · code
 - ที่: `frontend/lib/hooks/use-pool-trips.ts:67`
 - ปัญหา: ใน catch ของ refetch มีการ dispatch REFETCH ด้วย trips: [] และ reducer ก็ตั้ง error: null เสมอ ทำให้ state.error ไม่มีทางมีค่า ถ้า GET /api/operator/trips/pool ล้ม (offline, 5xx, 401) operator จะเห็น pool ว่างแทนข้อความ error นอกจากนี้ refetch ที่ยิงพร้อมกันตอน mount กับตอน connected ไม่ได้กันผลตอบกลับที่มาไม่ตามลำดับ
@@ -515,7 +515,7 @@
 - แก้: เพิ่ม error state แบบเดียวกับ TripsList (LoadState kind:'error') แสดงข้อความจาก server และปุ่ม 'ลองใหม่' (usePollSchedule().trigger) แยกจากกรณีที่ได้ 200 แต่ไม่พบ trip
 - Verifier: refresh ไม่มี error state finally จะ setLoading(false) ถ้าการโหลดครั้งแรก throw ค่า trip จะยังเป็น null แล้วไปแสดง 'Trip not found or no longer assigned to you' และไม่มีปุ่ม retry
 
-### M45. Pool โหลดไม่สำเร็จ แต่แสดงว่า 'Pool is empty' — CONFIRMED
+### M45. Pool โหลดไม่สำเร็จ แต่แสดงว่า 'Pool is empty' — CONFIRMED · ✅ แก้แล้ว `f0a7c44a` (ซ้ำกับ M16)
 - กลุ่ม: operator-pwa · uiux
 - ที่: `frontend/components/operator-pwa/pool-trips-list.tsx:77`
 - ปัญหา: usePoolTrips.refetch (lib/hooks/use-pool-trips.ts:66-68) จับ error แล้ว dispatch trips: [] โดยไม่ตั้งค่า error ส่วน PoolTripsList ก็ไม่ได้อ่าน error เลย ถ้า offline, 401 หรือ 429 จึงขึ้นเป็น empty state
