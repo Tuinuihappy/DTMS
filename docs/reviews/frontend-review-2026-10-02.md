@@ -8,7 +8,7 @@
 
 ## สถานะ (อัปเดต 2026-10-20)
 
-แก้แล้ว HIGH 12 จาก 15, MEDIUM 35 ข้อ (M5, M12, M13, M14, M15, M16, M18, M20, M21, M22, M23, M24, M25, M26, M27, M28, M29, M30, M31, M32, M33, M34, M35, M36, M38, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
+แก้แล้ว HIGH 12 จาก 15, MEDIUM 36 ข้อ (M5, M12, M13, M14, M15, M16, M17, M18, M20, M21, M22, M23, M24, M25, M26, M27, M28, M29, M30, M31, M32, M33, M34, M35, M36, M38, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
 
 | ข้อ | เรื่อง | Commit |
 |---|---|---|
@@ -38,6 +38,7 @@
 | M22, M24, M26, M28, M29 | Orders: ตัดโหมด Scroll ออก (เหลือแค่ Pages) · ?page=N ไม่ถูกรีเซ็ต · ช่องเซ็นชื่อ: สีเส้นตามธีมและพิกัดตรงนิ้วบนจอแคบ · Items: ป้ายสถานะใช้ -ink token อ่านได้ใน dark mode · แถวใช้ DataRow (คีย์บอร์ดได้) และมีการ์ดสำหรับจอเล็ก | `6377608d` |
 | M14 | UOM: Enter ไม่แทนค่าที่พิมพ์ด้วยคำแนะนำแถวแรกอีก (KG ไม่กลายเป็น EA, BOX ไม่กลายเป็น BOXES) เลือกจากรายการเฉพาะตอนกดลูกศร/ชี้เมาส์ หรือพิมพ์ตรงคำแนะนำ (kg → KG) | `8021354a` |
 | M13, M20 | ช่อง WMS location ใช้สี token ชุดเดียวกับ StationCombobox อ่านได้ใน dark mode · DataRow: แถวที่โฟกัสด้วยคีย์บอร์ดมีสีของ dark mode และเอา role="button" ออกจาก <tr> (คีย์บอร์ดยังเปิดแถวได้) | `d10466d5` |
+| M17 | Combobox ทั้ง 3 ตัว (Station, WMS location, UOM): กด Tab ออกแล้วรายการปิดและทิ้งข้อความที่ยังไม่ได้เลือก · ปุ่ม Clear ของ Station ใช้คีย์บอร์ดได้ · ARIA ครบ (role combobox บน input, aria-controls, aria-activedescendant) | `0a3c58ba` |
 
 **ไม่แก้ (ตัดสินใจ 2026-10-06)**
 - **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile: เจ้าของระบบเลือกข้าม คงไว้ตามเดิม
@@ -298,7 +299,7 @@
 - แก้: เพิ่ม action FAILED ที่เก็บ trips เดิมไว้แล้วตั้ง error: message ให้ UI แสดง error พร้อมปุ่ม retry และใส่ request-id/AbortController เพื่อทิ้งผลตอบกลับที่เก่ากว่า
 - Verifier: catch บรรทัด 67-69 dispatch REFETCH trips: [] และ reducer ตั้ง error: null เสมอ state.error จึงไม่มีวันมีค่า ซ้ำร้าย pool-trips-list.tsx:21 ไม่ได้อ่าน error เลย operator เห็น pool ว่างเมื่อโหลดล้ม
 
-### M17. Combobox ทุกตัว: กด Tab ออกแล้ว list ยังเปิดค้าง, ไม่มี ARIA ของ combobox และปุ่ม Clear ใช้คีย์บอร์ดไม่ได้ — CONFIRMED
+### M17. Combobox ทุกตัว: กด Tab ออกแล้ว list ยังเปิดค้าง, ไม่มี ARIA ของ combobox และปุ่ม Clear ใช้คีย์บอร์ดไม่ได้ — CONFIRMED · ✅ แก้แล้ว `0a3c58ba`
 - กลุ่ม: core · uiux
 - ที่: `frontend/components/primitives/station-combobox.tsx:134`
 - ปัญหา: onBlur แค่ setAutofillGuard(true) ไม่ได้ปิด list เพราะ listener ปิดมีแค่ mousedown ถ้ากด Tab ออก list ที่อยู่ใน portal จะยังลอยค้าง และ input ยังแสดง query ที่ยังไม่ commit ทำให้ดูเหมือนเลือกไปแล้ว input ไม่มี role="combobox", aria-expanded, aria-controls หรือ aria-activedescendant (UomCombobox มีบางส่วน) ปุ่ม Clear ผูกไว้แค่ onMouseDown (บรรทัด 156) จึงกด Enter/Space ไม่ได้ ปัญหาเดียวกันมีใน int-id-combobox.tsx:400/419 และ action-template-combobox.tsx
