@@ -8,7 +8,7 @@
 
 ## สถานะ (อัปเดต 2026-10-20)
 
-แก้แล้ว HIGH 12 จาก 15, MEDIUM 32 ข้อ (M5, M12, M15, M16, M18, M21, M22, M23, M24, M25, M26, M27, M28, M29, M30, M31, M32, M33, M34, M35, M36, M38, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
+แก้แล้ว HIGH 12 จาก 15, MEDIUM 33 ข้อ (M5, M12, M14, M15, M16, M18, M21, M22, M23, M24, M25, M26, M27, M28, M29, M30, M31, M32, M33, M34, M35, M36, M38, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
 
 | ข้อ | เรื่อง | Commit |
 |---|---|---|
@@ -36,6 +36,7 @@
 | M38 | /dispatch/manual อยู่ใน shell (TopNav + LeftRail) มีเมนู "Manual operators" ใต้ Dispatch (ต้องมี dtms:operator:pool:read) สีเป็น token ทั้งหมด และเวลาใช้ DateTime | `c40cb169` |
 | M21, M25, M27 | Orders: ปุ่มใน drawer ทำงานกับ order ที่ไม่อยู่ในหน้า list (โหลด order มาเอง) · bulk cancel เตือนว่ามี order ที่ dispatched/running กี่รายการ หุ่นจะหยุด · CSV มี BOM (ภาษาไทยไม่เพี้ยนใน Excel) และกัน formula injection ทั้ง CSV ฝั่ง client และ report export ฝั่ง backend (`CsvField`) | `07e80468`, `be275d34` |
 | M22, M24, M26, M28, M29 | Orders: ตัดโหมด Scroll ออก (เหลือแค่ Pages) · ?page=N ไม่ถูกรีเซ็ต · ช่องเซ็นชื่อ: สีเส้นตามธีมและพิกัดตรงนิ้วบนจอแคบ · Items: ป้ายสถานะใช้ -ink token อ่านได้ใน dark mode · แถวใช้ DataRow (คีย์บอร์ดได้) และมีการ์ดสำหรับจอเล็ก | `6377608d` |
+| M14 | UOM: Enter ไม่แทนค่าที่พิมพ์ด้วยคำแนะนำแถวแรกอีก (KG ไม่กลายเป็น EA, BOX ไม่กลายเป็น BOXES) เลือกจากรายการเฉพาะตอนกดลูกศร/ชี้เมาส์ หรือพิมพ์ตรงคำแนะนำ (kg → KG) | `8021354a` |
 
 **ไม่แก้ (ตัดสินใจ 2026-10-06)**
 - **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile: เจ้าของระบบเลือกข้าม คงไว้ตามเดิม
@@ -272,7 +273,7 @@
 - แก้: เปลี่ยนไปใช้ class ชุดเดียวกับ StationCombobox: input ใช้ bg-white/65 + dark:bg-white/[0.04] + text-[var(--color-ink-900)] ส่วน panel ใช้ bg-[var(--color-popover)]/95 + border-[var(--color-ink-100)] แถว highlight ใช้ bg-[var(--color-brand-500)]/15 chip inactive ใช้ --color-amber
 - Verifier: บรรทัด 166 และ 217 ใช้ bg-white/border-gray/blue ไม่มี dark: variant input และแถว option ไม่ได้ตั้งสีตัวอักษร จึงได้ body color ซึ่งใน .dark คือ ink-900 #f4f7fe (globals.css:130, 199) panel อยู่ใน body portal จึงได้สีนั้นเช่นกัน ใช้จริงใน create-dialog.tsx:719/735 ข้าง StationCombobox ที่ใช้ token
 
-### M14. UomCombobox: พิมพ์หน่วยให้ตรงตัวแล้วกด Enter กลับได้หน่วยอื่น — CONFIRMED
+### M14. UomCombobox: พิมพ์หน่วยให้ตรงตัวแล้วกด Enter กลับได้หน่วยอื่น — CONFIRMED · ✅ แก้แล้ว `8021354a`
 - กลุ่ม: core · code
 - ที่: `frontend/components/primitives/uom-combobox.tsx:92`
 - ปัญหา: filtered คืน suggestions ทั้งชุดเมื่อค่าที่พิมพ์ตรงกับ suggestion ตัวใดตัวหนึ่งพอดี (บรรทัด 61) และ highlight ถูก reset เป็น 0 ทุกครั้งที่ value เปลี่ยน ถ้าพิมพ์ 'KG' แล้วกด Enter จะได้ pick(filtered[0]) ซึ่งคือ suggestion ตัวแรก (เช่น 'EA') แทน KG
