@@ -8,7 +8,7 @@
 
 ## สถานะ (อัปเดต 2026-10-20)
 
-แก้แล้ว HIGH 12 จาก 15, MEDIUM 36 ข้อ (M5, M12, M13, M14, M15, M16, M17, M18, M20, M21, M22, M23, M24, M25, M26, M27, M28, M29, M30, M31, M32, M33, M34, M35, M36, M38, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
+แก้แล้ว HIGH 12 จาก 15, MEDIUM 40 ข้อ (M1, M2, M3, M4, M5, M12, M13, M14, M15, M16, M17, M18, M20, M21, M22, M23, M24, M25, M26, M27, M28, M29, M30, M31, M32, M33, M34, M35, M36, M38, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
 
 | ข้อ | เรื่อง | Commit |
 |---|---|---|
@@ -40,6 +40,7 @@
 | M13, M20 | ช่อง WMS location ใช้สี token ชุดเดียวกับ StationCombobox อ่านได้ใน dark mode · DataRow: แถวที่โฟกัสด้วยคีย์บอร์ดมีสีของ dark mode และเอา role="button" ออกจาก <tr> (คีย์บอร์ดยังเปิดแถวได้) | `d10466d5` |
 | M17 | Combobox ทั้ง 3 ตัว (Station, WMS location, UOM): กด Tab ออกแล้วรายการปิดและทิ้งข้อความที่ยังไม่ได้เลือก · ปุ่ม Clear ของ Station ใช้คีย์บอร์ดได้ · ARIA ครบ (role combobox บน input, aria-controls, aria-activedescendant) | `0a3c58ba` |
 | M19 (บางส่วน) | TopNav ทุกหน้า: เอาแท็บ Home/Messages/Discover/Wallet/Projects ที่กดไม่ไปไหนออก และเอาจุดแจ้งเตือนสีแดงที่ขึ้นค้างออก ส่วนแถบทักทายบน /dashboard ไม่แก้ | `c0246059` |
+| M1, M2, M3, M4 | IAM audit log: แสดงคอลัมน์ System (กดเพื่อกรอง) และ Details · ตัวเลือก Action มาจาก action ที่มีจริงใน log (`/audit-log/actions`) · filter Role เปลี่ยนเป็น System (backend รับ `systemKey`) · หน่วงเวลาตอนพิมพ์และทิ้งผลเก่า · ปุ่มปิด dialog subscriptions มี aria-label | `c9be5dd0`, `bb11b530` |
 
 **ไม่แก้ (ตัดสินใจ 2026-10-06)**
 - **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile: เจ้าของระบบเลือกข้าม คงไว้ตามเดิม
@@ -172,7 +173,7 @@
 
 ## MEDIUM
 
-### M1. Audit log ไม่แสดง details จึงไม่รู้ว่า action นั้นทำกับ system ไหน — CONFIRMED
+### M1. Audit log ไม่แสดง details จึงไม่รู้ว่า action นั้นทำกับ system ไหน — CONFIRMED · ✅ แก้แล้ว `bb11b530`
 - กลุ่ม: admin · uiux
 - ที่: `frontend/components/admin/iam-audit-log-experience.tsx:198`
 - ปัญหา: backend ปัจจุบันเขียน audit เกือบทุกแถวเป็น action แบบ system-* และ subscription-* (เช่น system-credential-rotated, system-callback-token-revealed, system-hard-deleted ใน SystemAdminEndpoints.cs:81-1115) โดยเก็บ systemKey ไว้ใน `details` (JSON) และ `role` เป็น null แต่ `AuditRow` แสดงแค่ actor, action, role และ permissionCode ส่วน `details` ซึ่งมีอยู่ใน `AuditLogEntryDto.details` ไม่ถูกแสดงเลย
@@ -180,7 +181,7 @@
 - แก้: parse `entry.details` แล้วเพิ่มคอลัมน์ System (หยิบ `systemKey` มาแสดงเป็น font-mono) แสดง JSON ที่เหลือแบบย่อในแถวที่ขยายได้หรือใน tooltip และเปลี่ยนคอลัมน์ Role เป็น Target ให้ตรงกับข้อมูลจริง
 - Verifier: ยืนยันแล้ว: backend เขียน PermissionAuditEntry เป็น action แบบ system-* และ subscription-* โดยใส่ details = JSON {systemKey} และไม่ได้ใส่ role (เช่น SystemAdminEndpoints.cs:1080-1084 system-grant) ส่วน AuditRow แสดงแค่ occurredAt, actor, action, role และ permissionCode โดย AuditLogEntryDto.details (lib/api/iam.ts:28) ไม่ถูกแสดงเลย ผลคือไม่รู้ว่า action ทำกับ system ไหน แต่ลดเหลือ MEDIUM เพราะเป็นข้อมูลที่ขาดหายบนหน้า admin ที่อ่านอย่างเดียว ไม่มีข้อมูลเสียหายหรือ interaction ที่ใช้ไม่ได้
 
-### M2. Audit log ยิง request ทุกครั้งที่พิมพ์ ไม่มี abort และผลลัพธ์อาจมาไม่ตรงลำดับ — CONFIRMED
+### M2. Audit log ยิง request ทุกครั้งที่พิมพ์ ไม่มี abort และผลลัพธ์อาจมาไม่ตรงลำดับ — CONFIRMED · ✅ แก้แล้ว `bb11b530`
 - กลุ่ม: admin · code
 - ที่: `frontend/components/admin/iam-audit-log-experience.tsx:48`
 - ปัญหา: `load` มี deps เป็น [actor, role, action, page] และ effect เรียกมันทุกครั้งที่ค่าเปลี่ยน พอพิมพ์ใน FilterInput จึงยิง `queryAuditLog` ทุกตัวอักษร ทั้งยังไม่ส่ง `signal` และไม่มี AbortController หรือ sequence guard
@@ -188,7 +189,7 @@
 - แก้: ใน effect ให้สร้าง AbortController แล้วส่ง `signal` เข้า `queryAuditLog` (ฟังก์ชันรองรับ `params.signal` อยู่แล้ว) จากนั้น abort ใน cleanup และ debounce ค่า actor/role ประมาณ 300ms ก่อนเอาเข้า deps
 - Verifier: ยืนยันแล้ว: load มี deps [actor, role, action, page] และ effect เรียกทุกครั้งที่ค่าเปลี่ยน ทุกตัวอักษรที่พิมพ์ใน FilterInput จึงยิง request ไม่มี AbortController และไม่มี sequence guard ทั้งที่ queryAuditLog รับ params.signal อยู่แล้ว (lib/api/iam.ts:56,67) ถ้า response กลับมาไม่ตรงลำดับจะทำให้ตารางไม่ตรงกับ filter และ house rule ก็ระบุเรื่อง out-of-order fetch ไว้ตรงๆ
 
-### M3. Audit log: ตัวเลือก Action ใน filter เป็นของ feature ที่ถูกลบไปแล้ว — CONFIRMED
+### M3. Audit log: ตัวเลือก Action ใน filter เป็นของ feature ที่ถูกลบไปแล้ว — CONFIRMED · ✅ แก้แล้ว `bb11b530`
 - กลุ่ม: admin · uiux
 - ที่: `frontend/components/admin/iam-audit-log-experience.tsx:10`
 - ปัญหา: `ACTION_LABELS` ซึ่งใช้เป็น option ของ select มีแค่ grant, revoke, permission-* และ role-* แต่ roles ถูกลบไปตั้งแต่ 2026-08-01 และ permission catalog ก็อ่านได้อย่างเดียว ส่วน backend เขียนเฉพาะ system-* และ subscription-* (SystemAdminEndpoints.cs, SystemSubscriptionEndpoints.cs) ช่อง filter Role (:102) ก็เป็นของ roles ที่ไม่มีแล้ว
@@ -196,7 +197,7 @@
 - แก้: แทน ACTION_LABELS ด้วยรายการ action ที่ backend เขียนจริง (system-created, system-credential-rotated, system-token-issued/revoked, system-grant/revoke, subscription-* ฯลฯ) พร้อม tone ให้ถูก (revoke/delete = coral) และลบ filter Role หรือเปลี่ยนเป็น System
 - Verifier: ยืนยันแล้ว: grep src ไม่พบจุดไหนเขียน action grant, revoke, permission-* หรือ role-* อีกแล้ว (มีแค่ doc comment ใน PermissionAuditEntry.cs:18) ตัวเขียนจริงมีแค่ system-* และ subscription-* แต่ ACTION_LABELS ซึ่งใช้เป็น option ของ dropdown มีแค่ action เก่า จึงกรองหา action ที่มีอยู่จริงไม่ได้ ส่วนแถวทั้งหมดขึ้นเป็น key ดิบ tone ink และ filter Role ก็ไม่ match อะไรเพราะ role เป็น null
 
-### M4. modal ที่เขียนเองใน IAM ไม่มี role=dialog, Esc, focus trap และปุ่ม X ไม่มี aria-label — CONFIRMED
+### M4. modal ที่เขียนเองใน IAM ไม่มี role=dialog, Esc, focus trap และปุ่ม X ไม่มี aria-label — CONFIRMED · ✅ แก้แล้ว `bb11b530`
 - กลุ่ม: admin · uiux
 - ที่: `frontend/components/admin/iam-system-detail-experience.tsx:1720`
 - ปัญหา: `ModalShell` (ใช้กับ 5 modal), `CreateSystemModal` (iam-systems-experience.tsx:378) และ `AddSubscriptionModal` (iam-system-subscriptions-experience.tsx:261) เป็น div fixed ที่เขียนเอง ไม่มี role="dialog" หรือ aria-modal ไม่ย้าย focus เข้า modal ไม่ดัก Esc และคลิก backdrop แล้วไม่ปิด ปุ่ม X ที่ :1726 และ subscriptions:265 ก็ไม่มี aria-label (ไม่ได้อยู่ใน AnimatePresence จึงไม่เจอปัญหา stranded backdrop)
