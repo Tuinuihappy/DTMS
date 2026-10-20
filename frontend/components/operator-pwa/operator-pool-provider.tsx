@@ -113,13 +113,21 @@ export function OperatorPoolProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const alerts = useOperatorAlerts();
   const lastFetchAt = useRef(0);
+  // Fetches overlap (page open, reconnect, fallback poll, screen-on), and
+  // an older one can answer last. Only the newest may write: an older list
+  // would bring back a trip that was claimed since, and an older failure
+  // would raise an error the newer success already disproved.
+  const fetchSeq = useRef(0);
 
   const refetch = useCallback(async () => {
+    const seq = ++fetchSeq.current;
     lastFetchAt.current = Date.now();
     try {
       const trips = await getPoolTrips();
+      if (seq !== fetchSeq.current) return;
       dispatch({ type: "REFETCH", trips });
     } catch (err) {
+      if (seq !== fetchSeq.current) return;
       dispatch({ type: "FAILED", error: err instanceof Error ? err.message : "Pool fetch failed." });
       console.warn("[pool] REST refetch failed:", err);
     }

@@ -19,7 +19,7 @@ import type { PoolTrip } from "@/lib/api/operator-pool";
 // to reconcile the local list.
 export function PoolTripsList() {
   const router = useRouter();
-  const { trips, loading, connected, refetch } = usePoolTrips();
+  const { trips, loading, error, connected, refetch } = usePoolTrips();
   const [previewTripId, setPreviewTripId] = useState<string | null>(null);
   const [busyTripId, setBusyTripId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -81,9 +81,14 @@ export function PoolTripsList() {
   return (
     <div className="flex flex-col">
       <PoolHeader connected={connected} count={trips.length} />
+      {/* A failed load must not read as "no work": with nothing to show it
+          replaces the empty state; with an older list it warns above it. */}
+      {error && !loading && (
+        <PoolLoadError hasTrips={trips.length > 0} onRetry={refetch} />
+      )}
       {loading ? (
         <div className="p-6 text-sm text-zinc-500">Loading pool…</div>
-      ) : trips.length === 0 ? (
+      ) : error && trips.length === 0 ? null : trips.length === 0 ? (
         <div className="m-4 rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 text-center text-sm text-zinc-400">
           Pool is empty — new trips arrive here.
         </div>
@@ -112,6 +117,51 @@ export function PoolTripsList() {
           {toast}
         </div>
       )}
+    </div>
+  );
+}
+
+function PoolLoadError({
+  hasTrips,
+  onRetry,
+}: {
+  hasTrips: boolean;
+  onRetry: () => Promise<void>;
+}) {
+  const [retrying, setRetrying] = useState(false);
+  const retry = async () => {
+    setRetrying(true);
+    try {
+      await onRetry();
+    } finally {
+      setRetrying(false);
+    }
+  };
+  return (
+    <div
+      role="alert"
+      className={`mx-4 mt-4 flex items-center justify-between gap-3 rounded-xl border p-3 text-sm ${
+        hasTrips
+          ? "border-amber-900/60 bg-amber-950/40 text-amber-200"
+          : "border-rose-900/60 bg-rose-950/40 text-rose-200"
+      }`}
+    >
+      <div>
+        <div className="font-medium">โหลด Pool ไม่สำเร็จ</div>
+        <div className="mt-0.5 text-xs opacity-80">
+          {hasTrips
+            ? "รายการด้านล่างอาจไม่ใช่ข้อมูลล่าสุด"
+            : "ยังไม่รู้ว่ามีงานรออยู่หรือไม่ — ตรวจ Wi-Fi แล้วลองใหม่"}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => void retry()}
+        disabled={retrying}
+        className="min-h-11 shrink-0 rounded-lg bg-zinc-100 px-4 text-sm font-medium text-zinc-900 disabled:opacity-50"
+      >
+        {retrying ? "กำลังโหลด…" : "ลองใหม่"}
+      </button>
     </div>
   );
 }
