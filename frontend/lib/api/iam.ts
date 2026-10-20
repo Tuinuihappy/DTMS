@@ -14,17 +14,13 @@ export type AuditLogEntryDto = {
   id: string;
   occurredAt: string;
   actorEmployeeId: string;
-  action:
-    | "grant"
-    | "revoke"
-    | "permission-created"
-    | "permission-updated"
-    | "permission-deleted"
-    | "role-created"
-    | "role-deleted"
-    | string;
+  // system-* / subscription-* today; grant / revoke / role-* in rows from
+  // before roles were removed (2026-08-01). The live list comes from
+  // listAuditActions().
+  action: string;
   role: string | null;
   permissionCode: string | null;
+  // Compact JSON; system-* and subscription-* rows carry "systemKey".
   details: string | null;
 };
 
@@ -51,6 +47,7 @@ export async function queryAuditLog(params: {
   actor?: string;
   role?: string;
   action?: string;
+  systemKey?: string;
   page?: number;
   pageSize?: number;
   signal?: AbortSignal;
@@ -59,6 +56,7 @@ export async function queryAuditLog(params: {
   if (params.actor) search.set("actor", params.actor);
   if (params.role) search.set("role", params.role);
   if (params.action) search.set("action", params.action);
+  if (params.systemKey) search.set("systemKey", params.systemKey);
   if (params.page) search.set("page", String(params.page));
   if (params.pageSize) search.set("pageSize", String(params.pageSize));
 
@@ -67,6 +65,13 @@ export async function queryAuditLog(params: {
   const res = await fetch(url, { signal: params.signal, cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to load audit log: ${res.status}`);
   return (await res.json()) as AuditLogPage;
+}
+
+/** Every action that occurs in the audit log, A→Z. */
+export async function listAuditActions(signal?: AbortSignal): Promise<string[]> {
+  const res = await fetch("/api/admin/iam/audit-log/actions", { signal, cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to load audit actions: ${res.status}`);
+  return (await res.json()) as string[];
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────

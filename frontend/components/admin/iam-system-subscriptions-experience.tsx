@@ -278,7 +278,7 @@ function AddSubscriptionModal({
           >
             <div className="flex items-start justify-between">
               <h2 id={titleId} className="text-base font-semibold text-[var(--color-ink-900)] dark:text-white">Add subscription</h2>
-              <button type="button" onClick={onClose} className="rounded p-1 text-[var(--color-ink-400)] hover:bg-[var(--color-ink-50)]">
+              <button type="button" onClick={onClose} aria-label="Close" className="rounded p-1 text-[var(--color-ink-400)] hover:bg-[var(--color-ink-50)]">
                 <X className="h-4 w-4" />
               </button>
             </div>
