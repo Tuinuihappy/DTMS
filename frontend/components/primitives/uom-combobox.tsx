@@ -129,6 +129,9 @@ export function UomCombobox({
             if (!open) setOpen(true);
           }}
           onFocus={() => setOpen(true)}
+          // Tab away closes the list (only an outside mousedown did before,
+          // review M17). Nothing to discard: the typed text is the value.
+          onBlur={() => setOpen(false)}
           onKeyDown={onKeyDown}
           disabled={disabled}
           placeholder={placeholder}
@@ -165,6 +168,9 @@ export function UomCombobox({
           ref={listRef}
           id={listId}
           role="listbox"
+          // Keep focus in the input when the list (e.g. its scrollbar) is
+          // pressed — otherwise the input's blur closes it mid-scroll.
+          onMouseDown={(e) => e.preventDefault()}
           className="max-h-56 overflow-y-auto rounded-[var(--radius-sm)] border border-white/80 bg-[var(--color-popover)]/95 shadow-[0_18px_42px_-14px_rgba(15,23,42,0.3)] backdrop-blur-md border-[var(--color-ink-100)]"
         >
           {filtered.map((s, i) => (

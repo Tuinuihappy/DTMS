@@ -6,7 +6,7 @@
 // shared loading/error state.
 
 import { AlertTriangle, ChevronDown, MapPin, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { StationOption } from "@/lib/api/facility";
 import { ComboboxListPortal } from "@/components/primitives/combobox-list-portal";
 import { cn, normalizeSearchText } from "@/lib/utils";
@@ -41,6 +41,7 @@ export function StationCombobox({
   // field is actually focused (the DOM node is unlocked directly in
   // onFocus so the first keystroke never races the re-render).
   const [autofillGuard, setAutofillGuard] = useState(true);
+  const listId = useId();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -130,9 +131,26 @@ export function StationCombobox({
             setQuery("");
             setOpen(true);
           }}
-          onBlur={() => setAutofillGuard(true)}
+          // Leaving the field (Tab, or focus moved by code) closes the list
+          // and drops the uncommitted query, so the box shows the station
+          // actually chosen. Only a mousedown outside used to close it, so a
+          // Tab left the list floating and the typed text looking picked
+          // (review M17). Option rows and the list keep focus here on
+          // mousedown, so picking or scrolling doesn't trigger this.
+          onBlur={() => {
+            setAutofillGuard(true);
+            setOpen(false);
+            setQuery("");
+          }}
           onKeyDown={onKeyDown}
           readOnly={autofillGuard}
+          role="combobox"
+          aria-expanded={open}
+          aria-autocomplete="list"
+          aria-controls={listId}
+          aria-activedescendant={
+            open && filtered[highlight] ? `${listId}-${highlight}` : undefined
+          }
           disabled={isDisabled}
           placeholder={
             loading
@@ -152,10 +170,11 @@ export function StationCombobox({
         {value && !loading ? (
           <button
             type="button"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              commit("");
-            }}
+            // mousedown keeps focus off the button (no blur flicker on the
+            // input); onClick does the clearing so Enter/Space work too —
+            // it was mousedown-only, so keyboard users couldn't clear.
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => commit("")}
             className="absolute right-2 top-1/2 grid h-5 w-5 -translate-y-1/2 cursor-pointer place-items-center rounded-full text-[var(--color-ink-400)] transition-colors hover:bg-white/55 hover:text-[var(--color-ink-700)] dark:hover:bg-white/[0.08]"
             aria-label="Clear selection"
           >
@@ -174,7 +193,11 @@ export function StationCombobox({
       <ComboboxListPortal open={open && !loading && !error} anchorRef={wrapperRef} onDismiss={() => setOpen(false)}>
         <ul
           ref={listRef}
+          id={listId}
           role="listbox"
+          // Keep focus in the input when the list (e.g. its scrollbar) is
+          // pressed — otherwise the input's blur closes the list mid-scroll.
+          onMouseDown={(e) => e.preventDefault()}
           className="max-h-56 overflow-y-auto rounded-[var(--radius-sm)] border border-white/80 bg-[var(--color-popover)]/95 shadow-[0_18px_42px_-14px_rgba(15,23,42,0.3)] backdrop-blur-md border-[var(--color-ink-100)]"
         >
           {filtered.length === 0 ? (
@@ -187,6 +210,7 @@ export function StationCombobox({
             filtered.map((s, i) => (
               <li
                 key={s.code}
+                id={`${listId}-${i}`}
                 data-idx={i}
                 role="option"
                 aria-selected={i === highlight}

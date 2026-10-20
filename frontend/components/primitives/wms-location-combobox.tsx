@@ -13,7 +13,7 @@
 //   • Uses MapPin icon (physical location, matches WMS domain semantics).
 
 import { AlertTriangle, ChevronDown, Loader2, MapPin, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   getWmsLocationByCode,
   useWmsLocationSearch,
@@ -46,6 +46,7 @@ export function WmsLocationCombobox({
   // Autofill guard — see StationCombobox: readOnly until focused so
   // Chrome autofill can't desync the DOM text from the search query.
   const [autofillGuard, setAutofillGuard] = useState(true);
+  const listId = useId();
   const [selectedDetail, setSelectedDetail] =
     useState<WmsLocationSummaryDto | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -225,13 +226,7 @@ export function WmsLocationCombobox({
       : null;
 
   return (
-    <div
-      ref={wrapperRef}
-      className={cn("relative", className)}
-      aria-expanded={open}
-      aria-haspopup="listbox"
-      role="combobox"
-    >
+    <div ref={wrapperRef} className={cn("relative", className)}>
       <div
         className={cn(
           // Same palette as StationCombobox beside it. Raw white/gray had no dark
@@ -256,9 +251,27 @@ export function WmsLocationCombobox({
             setAutofillGuard(false);
             setOpen(true);
           }}
-          onBlur={() => setAutofillGuard(true)}
+          // Leaving the field closes the list and drops the uncommitted
+          // query, so the box shows the location actually chosen — a Tab
+          // used to leave the list floating and the typed text looking
+          // picked (review M17). Rows and the panel keep focus here on
+          // mousedown, so picking or scrolling doesn't trigger this.
+          onBlur={() => {
+            setAutofillGuard(true);
+            setOpen(false);
+            setQuery("");
+            setPendingEnter(false);
+          }}
           onKeyDown={onKeyDown}
           readOnly={autofillGuard}
+          // The combobox role belongs on the input, not the wrapper div.
+          role="combobox"
+          aria-expanded={open}
+          aria-autocomplete="list"
+          aria-controls={listId}
+          aria-activedescendant={
+            open && items[highlight] ? `${listId}-${highlight}` : undefined
+          }
           placeholder={placeholder}
           disabled={disabled}
           className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[var(--color-ink-900)] outline-none placeholder:text-[var(--color-ink-400)]"
@@ -271,6 +284,7 @@ export function WmsLocationCombobox({
         {value && !disabled && (
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={clear}
             className="text-[var(--color-ink-400)] hover:text-[var(--color-ink-700)]"
             aria-label="Clear"
@@ -289,6 +303,9 @@ export function WmsLocationCombobox({
       <ComboboxListPortal open={open} anchorRef={wrapperRef} onDismiss={dismissList}>
         <div
           ref={panelRef}
+          // Keep focus in the input when the panel (e.g. its scrollbar) is
+          // pressed — otherwise the input's blur closes it mid-scroll.
+          onMouseDown={(e) => e.preventDefault()}
           className="max-h-64 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-ink-100)] bg-[var(--color-popover)]/95 shadow-[0_18px_42px_-14px_rgba(15,23,42,0.3)] backdrop-blur-md"
         >
           {error && (
@@ -299,6 +316,7 @@ export function WmsLocationCombobox({
           )}
           <ul
             ref={listRef}
+            id={listId}
             role="listbox"
             className="max-h-64 overflow-y-auto py-1"
           >
@@ -321,9 +339,10 @@ export function WmsLocationCombobox({
               return (
                 <li
                   key={loc.id}
+                  id={`${listId}-${idx}`}
                   data-idx={idx}
                   role="option"
-                  aria-selected={isSelected}
+                  aria-selected={isHighlighted}
                   onMouseEnter={() => setHighlight(idx)}
                   onMouseDown={(e) => {
                     // preventDefault so input blur doesn't fire and close the popup
