@@ -9,12 +9,8 @@ import { Avatar } from "@/components/primitives/avatar";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { useShell } from "@/components/shell/shell-context";
 import { useDismissableLayer } from "@/lib/overlay/use-layer";
-import { cn } from "@/lib/utils";
-
-const navItems = ["Home", "Messages", "Discover", "Wallet", "Projects"] as const;
 
 export function TopNav() {
-  const [active, setActive] = useState<(typeof navItems)[number]>("Home");
   const { toggleRailDrawer, railDrawerOpen } = useShell();
 
   // Stay pinned for the first 100 px of scroll, then slide up + fade
@@ -66,33 +62,10 @@ export function TopNav() {
           </span>
         </a>
 
-        {/* Nav items — center */}
-        <nav className="hidden md:flex items-center gap-1 ml-6 mr-auto">
-          {navItems.map((item) => {
-            const isActive = active === item;
-            return (
-              <button
-                key={item}
-                onClick={() => setActive(item)}
-                className={cn(
-                  "relative rounded-full px-4 py-2 text-[14px] transition-colors cursor-pointer",
-                  isActive
-                    ? "font-semibold text-[var(--color-ink-900)]"
-                    : "font-medium text-[var(--color-ink-500)] hover:text-[var(--color-ink-800)]",
-                )}
-              >
-                {item}
-                {isActive && (
-                  <motion.span
-                    layoutId="top-nav-underline"
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                    className="absolute left-3 right-3 -bottom-0.5 h-[2px] rounded-full bg-[var(--color-brand-500)]"
-                  />
-                )}
-              </button>
-            );
-          })}
-        </nav>
+        {/* Spacer. The Home / Messages / Discover / Wallet / Projects tabs
+            that sat here were template placeholders that went nowhere
+            (review M19); the left rail is the navigation. */}
+        <div className="flex-1" aria-hidden />
 
         {/* Search */}
         <div className="hidden lg:flex items-center gap-2 rounded-full bg-[var(--color-ink-50)]/80 pl-4 pr-1.5 py-1.5 w-[320px] transition-colors hover:bg-[var(--color-ink-50)] focus-within:bg-white focus-within:ring-2 focus-within:ring-[var(--color-brand-200)]">
@@ -114,7 +87,9 @@ export function TopNav() {
         <IconBtn label="Settings">
           <Compass className="h-[18px] w-[18px]" strokeWidth={2} />
         </IconBtn>
-        <IconBtn label="Notifications" badge>
+        {/* No unread badge: nothing feeds it yet, and a permanent coral dot
+            told every page it had unread notifications (review M19). */}
+        <IconBtn label="Notifications">
           <Bell className="h-[18px] w-[18px]" strokeWidth={2} />
         </IconBtn>
         <ThemeToggleBtn />
