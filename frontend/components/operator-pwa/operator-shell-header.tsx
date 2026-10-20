@@ -64,36 +64,35 @@ export function OperatorShellHeader({ title }: { title: string }) {
     };
   }, []);
 
+  // Links keep their small pill look but get a 44px tap area (the outer
+  // inline-flex) — the PWA's touch-target floor, for gloves and one hand.
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-950/85 px-4 py-3 backdrop-blur">
+    <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-950/85 px-4 py-1 backdrop-blur">
       <h1 className="truncate text-base font-semibold">{title}</h1>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         {!online && (
           <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-300">
             Offline
           </span>
         )}
         {queueDepth > 0 && needsSignIn && (
-          <Link
-            href="/m/login"
-            className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-300"
-          >
-            {queueDepth} queued · Sign in to send
+          <Link href="/m/login" className="inline-flex min-h-11 items-center px-1">
+            <span className="rounded-full bg-amber-500/15 px-2 py-1 text-xs text-amber-300">
+              {queueDepth} queued · Sign in to send
+            </span>
           </Link>
         )}
         {queueDepth > 0 && !needsSignIn && (
-          <Link
-            href="/m/settings"
-            className="rounded-full bg-zinc-100/10 px-2 py-0.5 text-xs text-zinc-200"
-          >
-            {queueDepth} queued
+          <Link href="/m/settings" className="inline-flex min-h-11 items-center px-1">
+            <span className="rounded-full bg-zinc-100/10 px-2 py-1 text-xs text-zinc-200">
+              {queueDepth} queued
+            </span>
           </Link>
         )}
-        <Link
-          href="/m/settings"
-          className="rounded-full bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300"
-        >
-          Settings
+        <Link href="/m/settings" className="inline-flex min-h-11 items-center pl-1">
+          <span className="rounded-full bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300">
+            Settings
+          </span>
         </Link>
       </div>
     </header>

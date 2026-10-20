@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ModalLayer } from "@/components/primitives/modal-layer";
 import { usePoolTrips } from "@/lib/hooks/use-pool-trips";
-import { acknowledgeTrip } from "@/lib/api/operator";
+import { claimPoolTrip, PoolClaimError } from "@/lib/api/operator";
 import type { PoolTrip } from "@/lib/api/operator-pool";
 
 // WMS PR-4b (PR-D) — Operator pool list. Cards are sorted FIFO by
@@ -51,26 +51,22 @@ export function PoolTripsList() {
     const trip = previewTrip;
     setBusyTripId(trip.tripId);
     try {
-      const result = await acknowledgeTrip(trip.tripId);
-      if (result.delivered) {
-        router.push(`/m/trips/${trip.tripId}`);
-        return;
-      }
-      // Offline — the action is queued; nothing to navigate to yet.
-      setToast("Queued — will retry when you're online");
-      setPreviewTripId(null);
+      // Online only — see claimPoolTrip for why a claim is never queued.
+      await claimPoolTrip(trip.tripId);
+      router.push(`/m/trips/${trip.tripId}`);
+      return;
     } catch (err) {
-      // enqueueAction throws on 4xx. 409 = another operator won the CAS.
-      // The error message from the backend body is like {"error":"TRIP_ALREADY_CLAIMED"}
-      // — we just show a friendly Thai toast + reconcile via refetch.
+      const kind = err instanceof PoolClaimError ? err.kind : "failed";
       const msg = err instanceof Error ? err.message : "Claim failed";
-      const isConflict = msg.includes("TRIP_ALREADY_CLAIMED") || msg.includes("409");
       setToast(
-        isConflict
+        kind === "conflict"
           ? `คนอื่นรับ ${trip.orderRef || "trip"} ไปแล้ว`
-          : `Claim failed: ${msg}`,
+          : kind === "offline"
+            ? "ต้องออนไลน์เพื่อรับงาน — ยังไม่ได้รับงานนี้"
+            : `Claim failed: ${msg}`,
       );
-      setPreviewTripId(null);
+      // Offline keeps the drawer: the operator can retry once back online.
+      if (kind !== "offline") setPreviewTripId(null);
       await refetch();
     } finally {
       setBusyTripId(null);

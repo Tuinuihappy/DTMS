@@ -16,8 +16,13 @@ export default async function OperatorTripDetailPage({
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col">
       <OperatorShellHeader title="Trip detail" />
-      <div className="px-4 py-2 text-xs">
-        <Link href="/m/trips" className="text-zinc-400 hover:text-zinc-200">
+      {/* The only way back in standalone mode (no browser back button), so
+          it gets the 44px touch-target floor, not an inline text link. */}
+      <div className="px-4 pt-2">
+        <Link
+          href="/m/trips"
+          className="inline-flex min-h-11 items-center pr-4 text-sm text-zinc-400 hover:text-zinc-200"
+        >
           ← Back to trips
         </Link>
       </div>

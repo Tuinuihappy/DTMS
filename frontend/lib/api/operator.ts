@@ -130,6 +130,47 @@ export const acknowledgeTrip = (tripId: string) =>
     dedupeKey: `ack:${tripId}`,
   });
 
+/**
+ * Why a pool claim did not go through. "offline" covers both "the device
+ * knows it is offline" and "the request never got an answer".
+ */
+export class PoolClaimError extends Error {
+  constructor(
+    readonly kind: "offline" | "conflict" | "failed",
+    message: string,
+  ) {
+    super(message);
+    this.name = "PoolClaimError";
+  }
+}
+
+/**
+ * Claim a pool trip — online only, never queued. A pool claim is a race
+ * (compare-and-swap on the server): a claim queued offline and replayed
+ * later loses to whoever was online, and the queue drops that 409 without
+ * a word while the operator walks to a pickup that is no longer theirs.
+ * Same endpoint as acknowledgeTrip, which stays queued for trips a
+ * dispatcher assigned directly — nobody races for those.
+ */
+export async function claimPoolTrip(tripId: string): Promise<void> {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    throw new PoolClaimError("offline", "Offline.");
+  }
+  let res: Response;
+  try {
+    res = await fetch(`/api/operator/trips/${encodeURIComponent(tripId)}/acknowledge`, {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch (err) {
+    throw new PoolClaimError("offline", err instanceof Error ? err.message : "Network error.");
+  }
+  if (res.ok) return;
+  const body = (await res.json().catch(() => null)) as { message?: string; error?: string } | null;
+  const message = body?.message ?? body?.error ?? `Request failed (${res.status}).`;
+  throw new PoolClaimError(res.status === 409 ? "conflict" : "failed", message);
+}
+
 export type RecordPickupBody = {
   // Nullable because the geofence is opt-out server-side (Wms:Geofence:Enabled)
   // and the browser cannot see that flag. With the fence off the backend takes
@@ -166,7 +207,8 @@ export const completeTrip = (tripId: string) =>
 
 export type SubmitOverrideBody = {
   tripId: string;
-  expectedWarehouseId: string;
+  /** The leg's WMS location id — the API's ExpectedWmsLocationId. */
+  expectedWmsLocationId: string;
   lat: number;
   lng: number;
   reason: string;
@@ -178,7 +220,7 @@ export const submitGeofenceOverride = (body: SubmitOverrideBody) =>
     path: "/api/operator/geofence/override-request",
     method: "POST",
     body,
-    dedupeKey: `override:${body.tripId}:${body.expectedWarehouseId}`,
+    dedupeKey: `override:${body.tripId}:${body.expectedWmsLocationId}`,
   });
 
 export const presignPod = async (

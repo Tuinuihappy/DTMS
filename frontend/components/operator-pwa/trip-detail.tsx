@@ -8,12 +8,11 @@ import {
   getAssignedTrips,
   recordDrop,
   recordPickup,
-  submitGeofenceOverride,
   tripEndedLabel,
   type AssignedTrip,
 } from "@/lib/api/operator";
 import { usePollSchedule } from "@/lib/hooks/use-poll-schedule";
-import { getCurrentPosition, tryGetCurrentPosition } from "@/lib/operator-pwa/geolocation";
+import { tryGetCurrentPosition } from "@/lib/operator-pwa/geolocation";
 import { PodCapture } from "./pod-capture";
 import { TripRoute, tripTitle } from "./trip-route";
 
@@ -58,19 +57,37 @@ export function TripDetail({ tripId }: { tripId: string }) {
   const [actionBusy, setActionBusy] = useState<Step | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNote, setActionNote] = useState<string | null>(null);
+  // Why the last load failed. Only shown while no trip has loaded yet: a
+  // failed first load is not "not found" (offline, 429, 5xx).
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   const refresh = async () => {
     try {
       const all = await getAssignedTrips();
       const found = all.find((t) => t.tripId === tripId) ?? null;
       setTrip(found);
+      setLoadError(null);
     } catch (err) {
       // Network blip — keep stale state visible, but let the schedule know so
       // it slows down rather than asking again every 8 seconds.
+      setLoadError(err instanceof Error ? err.message : "Load failed.");
       throw err;
     } finally {
       setLoading(false);
     }
+  };
+
+  // The re-read after an action. Its failure is not the action's: offline,
+  // the action was just queued ("Saved offline") and this fetch is bound to
+  // fail — reporting that as the action's error hid the note behind a red
+  // banner. The poll picks the trip up once the connection is back.
+  const refreshAfterAction = () => refresh().catch(() => {});
+
+  const retryLoad = async () => {
+    setRetrying(true);
+    await refresh().catch(() => {});
+    setRetrying(false);
   };
 
   usePollSchedule(
@@ -79,6 +96,29 @@ export function TripDetail({ tripId }: { tripId: string }) {
   );
 
   if (loading) return <div className="p-6 text-sm text-zinc-500">Loading…</div>;
+  if (!trip && loadError) {
+    return (
+      <div
+        role="alert"
+        className="m-4 flex flex-col items-center gap-3 rounded-xl border border-rose-900/60 bg-rose-950/40 p-6 text-center text-sm text-rose-200"
+      >
+        <div>
+          <div className="font-medium">โหลด trip ไม่สำเร็จ</div>
+          <div className="mt-1 text-xs opacity-80">
+            ตรวจ Wi-Fi แล้วลองใหม่ — งานนี้ยังไม่ได้ถูกยกเลิก
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => void retryLoad()}
+          disabled={retrying}
+          className="min-h-11 rounded-lg bg-zinc-100 px-5 text-sm font-medium text-zinc-900 disabled:opacity-50"
+        >
+          {retrying ? "กำลังโหลด…" : "ลองใหม่"}
+        </button>
+      </div>
+    );
+  }
   if (!trip) {
     return (
       <div className="m-4 rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 text-center text-sm text-zinc-400">
@@ -109,7 +149,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
     try {
       const result = await acknowledgeTrip(tripId);
       setActionNote(result.delivered ? "Acknowledged." : "Saved offline — will sync.");
-      await refresh();
+      await refreshAfterAction();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Acknowledge failed.");
     } finally {
@@ -133,7 +173,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
         podKey: pickupPodKey,
       });
       setActionNote(result.delivered ? "Pickup recorded." : "Saved offline — will sync.");
-      await refresh();
+      await refreshAfterAction();
     } catch (err) {
       setActionError(explainLegFailure(err, reason, "Pickup failed."));
     } finally {
@@ -153,7 +193,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
         podKey: dropPodKey,
       });
       setActionNote(result.delivered ? "Drop recorded." : "Saved offline — will sync.");
-      await refresh();
+      await refreshAfterAction();
     } catch (err) {
       setActionError(explainLegFailure(err, reason, "Drop failed."));
     } finally {
@@ -173,7 +213,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
         return;
       }
       setActionNote("Saved offline — will sync.");
-      await refresh();
+      await refreshAfterAction();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Complete failed.");
     } finally {
@@ -203,13 +243,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
         <ProgressTimeline trip={trip} />
       </header>
 
-      {actionError && (
-        <ErrorBanner
-          message={actionError}
-          tripId={trip.tripId}
-          onOverrideSubmitted={(note) => setActionNote(note)}
-        />
-      )}
+      {actionError && <ErrorBanner message={actionError} />}
       {actionNote && !actionError && (
         <div className="rounded-xl border border-emerald-900/60 bg-emerald-950/40 p-3 text-sm text-emerald-200">
           {actionNote}
@@ -377,70 +411,22 @@ function ActionPanel(props: {
   return null;
 }
 
-function ErrorBanner({
-  message,
-  tripId,
-  onOverrideSubmitted,
-}: {
-  message: string;
-  tripId: string;
-  onOverrideSubmitted: (note: string) => void;
-}) {
-  // Geofence-reject errors come through with the prefix GEOFENCE_REJECTED.
-  // Surface a follow-up "request override" affordance so the operator
-  // can recover without restarting the workflow.
+function ErrorBanner({ message }: { message: string }) {
+  // Geofence rejects come through prefixed GEOFENCE_REJECTED. The in-app
+  // "request override" form is hidden until geofencing is switched on
+  // (Wms:Geofence:Enabled is false, no override has ever been filed): it
+  // asked the operator to type a warehouse id the app never shows, and sent
+  // it under a field name the API didn't read (since corrected in
+  // SubmitOverrideBody) — it could not succeed. Before enabling the
+  // geofence, have the API resolve the leg's location from the trip and
+  // bring the form back (review M43).
   const isGeofence = message.startsWith("GEOFENCE_REJECTED");
-  const [warehouseId, setWarehouseId] = useState("");
-  const [reason, setReason] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const submit = async () => {
-    setSubmitting(true);
-    try {
-      const fix = await getCurrentPosition();
-      await submitGeofenceOverride({
-        tripId,
-        expectedWarehouseId: warehouseId,
-        lat: fix.lat,
-        lng: fix.lng,
-        reason,
-        photoUrl: null,
-      });
-      onOverrideSubmitted("Override requested — supervisor will review.");
-    } catch (err) {
-      onOverrideSubmitted(err instanceof Error ? err.message : "Override request failed.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
   return (
     <div className="rounded-xl border border-red-900/60 bg-red-950/40 p-3 text-sm text-red-200">
       <div className="font-medium">{message}</div>
       {isGeofence && (
-        <div className="mt-3 flex flex-col gap-2 border-t border-red-900/60 pt-3 text-xs">
-          <label className="flex flex-col gap-1">
-            Warehouse ID (copy from the trip detail)
-            <input
-              value={warehouseId}
-              onChange={(e) => setWarehouseId(e.target.value)}
-              className="h-10 rounded-md border border-red-900/60 bg-zinc-950 px-2 font-mono text-red-100 outline-none"
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            Reason
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={2}
-              className="rounded-md border border-red-900/60 bg-zinc-950 px-2 py-1.5 text-red-100 outline-none"
-            />
-          </label>
-          <button
-            onClick={submit}
-            disabled={submitting || !warehouseId || !reason}
-            className="h-10 rounded-md bg-red-200 text-xs font-medium text-red-950 disabled:opacity-50"
-          >
-            {submitting ? "Requesting…" : "Request override"}
-          </button>
+        <div className="mt-2 border-t border-red-900/60 pt-2 text-xs">
+          อยู่นอกพื้นที่ของจุดนี้ — แจ้งหัวหน้างานเพื่อขอ override
         </div>
       )}
     </div>

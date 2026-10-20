@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getMyProfile, type OperatorProfile } from "@/lib/api/operator";
+import { ModalLayer } from "@/components/primitives/modal-layer";
 import {
   checkPushSupport,
   getCurrentSubscription,
@@ -132,11 +133,37 @@ export function SettingsPanel() {
     setNote("Offline queue cleared.");
   };
 
-  const onLogout = async () => {
+  // Tablets are shared between shifts. The offline queue's rows carry no
+  // owner, so whatever is left at logout would replay under the next
+  // operator's cookie, and this device's push subscription would keep
+  // delivering the previous operator's trips. So logout always clears both
+  // — and first asks, when something is still unsent.
+  const [unsentAtLogout, setUnsentAtLogout] = useState<number | null>(null);
+
+  const signOut = async () => {
     setBusy(true);
+    try {
+      await unsubscribeFromPush();
+    } catch {
+      // No subscription, or push unsupported — nothing to undo.
+    }
+    try {
+      await clearQueue();
+    } catch {
+      // IndexedDB unavailable — there was no queue to replay either.
+    }
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/m/login");
     router.refresh();
+  };
+
+  const onLogout = async () => {
+    const depth = await getQueueDepth().catch(() => 0);
+    if (depth > 0) {
+      setUnsentAtLogout(depth);
+      return;
+    }
+    await signOut();
   };
 
   return (
@@ -229,7 +256,117 @@ export function SettingsPanel() {
       >
         Log out
       </button>
+
+      {unsentAtLogout !== null && (
+        <LogoutWithUnsentDialog
+          count={unsentAtLogout}
+          onCancel={() => setUnsentAtLogout(null)}
+          onSignOut={signOut}
+        />
+      )}
     </div>
+  );
+}
+
+// Asked when Log out finds actions still in the offline queue. "Send
+// first" drains and signs out only once the queue is empty; "Discard"
+// signs out and the queue is cleared with everything else.
+function LogoutWithUnsentDialog({
+  count,
+  onCancel,
+  onSignOut,
+}: {
+  count: number;
+  onCancel: () => void;
+  onSignOut: () => Promise<void>;
+}) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const [remaining, setRemaining] = useState(count);
+  const [busy, setBusy] = useState<"send" | "discard" | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const sendThenSignOut = async () => {
+    setBusy("send");
+    setProblem(null);
+    const result = await drainQueue();
+    if (result.remaining === 0) {
+      await onSignOut();
+      return;
+    }
+    setRemaining(result.remaining);
+    setProblem(result.lastError ?? "ยังส่งไม่ได้");
+    setBusy(null);
+  };
+
+  const discardThenSignOut = async () => {
+    setBusy("discard");
+    await onSignOut();
+  };
+
+  return (
+    <ModalLayer
+      open
+      onClose={onCancel}
+      dismissible={busy === null}
+      intent="irreversible"
+      safeRef={cancelRef}
+      backdropClassName="bg-black/60"
+    >
+      {({ panelProps, titleId, panelStyle }) => (
+        <div
+          {...panelProps}
+          key="logout-unsent"
+          style={panelStyle}
+          className="fixed inset-x-0 bottom-0 rounded-t-3xl border-t border-zinc-800 bg-zinc-950 shadow-2xl outline-none"
+        >
+          <div className="mx-auto w-full max-w-2xl px-6 pb-6 pt-4">
+            <div className="mx-auto h-1 w-10 rounded-full bg-zinc-700" />
+            <h2 id={titleId} className="mt-4 text-lg font-semibold text-zinc-100">
+              ยังมี {remaining} รายการที่ยังไม่ได้ส่ง
+            </h2>
+            <p className="mt-1 text-sm text-zinc-400">
+              เช่น pickup หรือ drop ที่บันทึกตอน offline ถ้า logout ตอนนี้
+              รายการเหล่านี้จะถูกลบออกจากเครื่อง และจะไม่ถูกส่งในชื่อของคุณ
+            </p>
+            {problem && (
+              <div
+                role="alert"
+                className="mt-3 rounded-xl border border-amber-900/60 bg-amber-950/40 p-3 text-xs text-amber-200"
+              >
+                ส่งไม่สำเร็จ: {problem}
+              </div>
+            )}
+            <div className="mt-5 flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => void sendThenSignOut()}
+                disabled={busy !== null}
+                className="h-12 rounded-2xl bg-cyan-500 text-sm font-semibold text-zinc-950 disabled:opacity-50"
+              >
+                {busy === "send" ? "กำลังส่ง…" : "ส่งก่อน แล้วค่อย logout"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void discardThenSignOut()}
+                disabled={busy !== null}
+                className="h-12 rounded-2xl border border-rose-900/60 bg-rose-950/40 text-sm font-medium text-rose-200 disabled:opacity-50"
+              >
+                {busy === "discard" ? "กำลัง logout…" : "ทิ้งรายการ แล้ว logout"}
+              </button>
+              <button
+                ref={cancelRef}
+                type="button"
+                onClick={onCancel}
+                disabled={busy !== null}
+                className="h-12 rounded-2xl border border-zinc-800 bg-zinc-900 text-sm font-medium text-zinc-300 disabled:opacity-50"
+              >
+                ยกเลิก
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </ModalLayer>
   );
 }
 
