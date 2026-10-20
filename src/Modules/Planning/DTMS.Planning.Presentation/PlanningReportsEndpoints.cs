@@ -103,12 +103,8 @@ public static class PlanningReportsEndpoints
         await writer.FlushAsync(ct);
     }
 
-    private static string Csv(string? v)
-    {
-        if (string.IsNullOrEmpty(v)) return "";
-        var needsQuote = v.Contains(',') || v.Contains('"') || v.Contains('\n') || v.Contains('\r');
-        return needsQuote ? $"\"{v.Replace("\"", "\"\"")}\"" : v;
-    }
+    // Quoting + formula-injection guard live in one place.
+    private static string Csv(string? v) => DTMS.SharedKernel.Text.CsvField.Escape(v);
 
     private static string Dt(DateTime? d)
         => d?.ToString("O", CultureInfo.InvariantCulture) ?? "";
