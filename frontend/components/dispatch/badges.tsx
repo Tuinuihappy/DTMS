@@ -36,8 +36,8 @@ const TONE_BG: Record<TripVisual["tone"], string> = {
   amber: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
   success: "bg-[var(--color-success-soft)] text-[var(--color-success)]",
   coral: "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
-  wine: "bg-[var(--color-wine-soft,#991b1b1a)] text-[var(--color-wine,#991b1b)]",
-  flame: "bg-[var(--color-flame-soft,#ea580c1a)] text-[var(--color-flame,#c2410c)]",
+  wine: "bg-[var(--color-wine-soft)] text-[var(--color-wine)]",
+  flame: "bg-[var(--color-flame-soft)] text-[var(--color-flame)]",
 };
 
 const TONE_DOT: Record<TripVisual["tone"], string> = {
@@ -47,8 +47,8 @@ const TONE_DOT: Record<TripVisual["tone"], string> = {
   amber: "bg-[var(--color-amber)]",
   success: "bg-[var(--color-success)]",
   coral: "bg-[var(--color-coral)]",
-  wine: "bg-[var(--color-wine,#991b1b)]",
-  flame: "bg-[var(--color-flame,#ea580c)]",
+  wine: "bg-[var(--color-wine)]",
+  flame: "bg-[var(--color-flame)]",
 };
 
 export function TripStatusBadge({

@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { ModalLayer } from "@/components/primitives/modal-layer";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getTripDetails,
   isTripInFlight,
@@ -75,8 +75,42 @@ export function TripDetailDrawer({
   // upsert the same row only produces one timeline entry.
   const [liveMissionEvents, setLiveMissionEvents] = useState<TripMissionDto[]>([]);
 
+  // A status change pushed while the drawer is open must reach the header
+  // badge and the action bar, not only the timeline — the list's poll is
+  // paused while the drawer is open, and Pause/Cancel stayed offered on a
+  // trip that had already ended. The hub only sends TimelineUpdated
+  // (StatusChanged is declared but never sent), so each one re-reads the
+  // trip, debounced so a burst of events costs one request.
+  const reloadTimer = useRef<number | null>(null);
+  const reloadLatest = useRef<() => void>(() => {});
+  useEffect(() => {
+    reloadLatest.current = () => {
+      if (!tripId) return;
+      const asked = tripId;
+      getTripDetails(asked, { includeRaw })
+        .then((d) => {
+          // Ignore an answer for a trip the drawer has moved away from.
+          if (d.id === asked) setData((cur) => (cur && cur.id !== asked ? cur : d));
+        })
+        .catch(() => undefined);
+    };
+  }, [tripId, includeRaw]);
+  useEffect(
+    () => () => {
+      if (reloadTimer.current !== null) window.clearTimeout(reloadTimer.current);
+    },
+    [tripId],
+  );
+
   useTripSubscription(tripId, {
-    TimelineUpdated: (entry) => setLiveTimelineEntry(entry as StatusHistoryEntry),
+    TimelineUpdated: (entry) => {
+      setLiveTimelineEntry(entry as StatusHistoryEntry);
+      if (reloadTimer.current !== null) window.clearTimeout(reloadTimer.current);
+      reloadTimer.current = window.setTimeout(() => {
+        reloadTimer.current = null;
+        reloadLatest.current();
+      }, 500);
+    },
     MissionUpdated: (event) =>
       setLiveMissionEvents((prev) => {
         const incoming = event as TripMissionDto;

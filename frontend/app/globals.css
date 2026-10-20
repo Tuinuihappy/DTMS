@@ -57,6 +57,13 @@
   --color-coral-soft: #fde0db;
   --color-success: #10b981;
   --color-success-soft: #d4f3e3;
+  /* Terminal failure (Rejected) and stalled (Hang) trip states. Used with
+     hex fallbacks for months before they were declared, so dark mode got
+     #991b1b on navy (~2:1). */
+  --color-wine: #991b1b;
+  --color-wine-soft: #fbe3e3;
+  --color-flame: #c2410c;
+  --color-flame-soft: #fde8d9;
   --color-info: #0ea5e9;
   --color-info-soft: #e0f2fe;
   --color-violet: #8b5cf6;
@@ -144,6 +151,10 @@
   --color-coral-soft: #2e1410;
   --color-success: #3dd9a4;
   --color-success-soft: #0f2e22;
+  --color-wine: #f87171;
+  --color-wine-soft: #2e1212;
+  --color-flame: #fb923c;
+  --color-flame-soft: #2e1a0e;
   --color-info: #4ec4f8;
   --color-info-soft: #0f2638;
   --color-violet: #b794ff;

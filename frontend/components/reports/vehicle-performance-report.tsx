@@ -125,7 +125,7 @@ export function VehiclePerformanceReport({ window }: { window: Window }) {
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="completed" stackId="a" name="Completed" fill="var(--color-mint, #4ade80)" />
               <Bar dataKey="failed" stackId="a" name="Failed" fill="var(--color-coral, #f87171)" />
-              <Bar dataKey="rejected" stackId="a" name="Rejected" fill="var(--color-wine, #991b1b)" />
+              <Bar dataKey="rejected" stackId="a" name="Rejected" fill="var(--color-wine)" />
               <Bar dataKey="cancelled" stackId="a" name="Cancelled" fill="var(--color-ink-400, #94a3b8)" />
               <Bar dataKey="inProgress" stackId="a" name="In progress" fill="var(--color-amber, #f59e0b)" />
             </BarChart>

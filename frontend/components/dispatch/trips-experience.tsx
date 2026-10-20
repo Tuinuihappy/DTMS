@@ -149,10 +149,16 @@ export function TripsExperience() {
 
   const fetchAbortRef = useRef<AbortController | null>(null);
 
-  // Reset to page 1 when filters change.
+  // Reset to page 1 when filters change — only on a real change. Run on
+  // mount too, it overwrote the ?page=N just read from the URL, so a
+  // refresh or a shared link to page 3 always landed on page 1.
+  const filterKey = [statusFilter, search, vehicleKey, fromDate, toDate, pageSize].join("|");
+  const lastFilterKey = useRef(filterKey);
   useEffect(() => {
+    if (lastFilterKey.current === filterKey) return;
+    lastFilterKey.current = filterKey;
     setPage(1);
-  }, [statusFilter, search, vehicleKey, fromDate, toDate, pageSize]);
+  }, [filterKey]);
 
   // Mirror state back to URL so refresh/back/forward and deep links work.
   useEffect(() => {
@@ -317,6 +323,7 @@ export function TripsExperience() {
         trips={trips}
         loading={loading}
         error={error}
+        onRetry={() => void fetchTrips().catch(() => {})}
         sortBy={sortBy}
         sortDir={sortDir}
         onSortHeader={handleSortHeader}
@@ -514,6 +521,7 @@ function TripsTable({
   trips,
   loading,
   error,
+  onRetry,
   sortBy,
   sortDir,
   onSortHeader,
@@ -522,6 +530,7 @@ function TripsTable({
   trips: TripQueueItemDto[];
   loading: boolean;
   error: string | null;
+  onRetry: () => void;
   sortBy: TripQueueSortKey;
   sortDir: "asc" | "desc";
   onSortHeader: (col: TripQueueSortKey) => void;
@@ -531,10 +540,21 @@ function TripsTable({
     return <TableSkeleton label="Loading trips…" />;
   }
 
-  if (error) {
+  // A failed load replaces the table only when there is nothing to show.
+  // With rows loaded, one failed 15s poll (a 429, a network blip) used to
+  // blank the whole list until a poll succeeded — and the poll backs off
+  // after a failure. Now the rows stay, under a "may be stale" banner.
+  if (error && trips.length === 0) {
     return (
       <div className="rounded-2xl bg-[var(--color-coral-soft)]/40 p-6 text-center backdrop-blur-md border border-[var(--color-coral)]/20">
         <p className="text-[13px] font-semibold text-[var(--color-coral)]">{error}</p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-3 rounded-lg border border-[var(--color-coral)]/30 px-3 py-1.5 text-[12px] font-medium text-[var(--color-coral)] hover:bg-[var(--color-coral-soft)]/40"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -552,6 +572,23 @@ function TripsTable({
 
   return (
     <>
+      {error && (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-amber)]/30 bg-[var(--color-amber-soft)]/40 px-4 py-2"
+        >
+          <span className="text-[12px] text-[var(--color-amber-600)]">
+            Couldn&apos;t refresh — showing the last loaded list. {error}
+          </span>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="shrink-0 rounded-lg px-2 py-1 text-[12px] font-medium text-[var(--color-amber-600)] hover:bg-[var(--color-amber-soft)]/60"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <DataTableShell>
         <DataTableHead>
           <TableTh density="compact">Trip ID</TableTh>

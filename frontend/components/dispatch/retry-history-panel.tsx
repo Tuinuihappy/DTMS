@@ -129,7 +129,7 @@ function AttemptRow({
               : isFailed
                 ? "bg-[var(--color-coral)] text-white ring-[var(--color-coral-soft)]"
                 : isRejected
-                  ? "bg-[var(--color-wine,#991b1b)] text-white ring-[var(--color-wine-soft,#991b1b1a)]"
+                  ? "bg-[var(--color-wine)] text-white ring-[var(--color-wine-soft)]"
                   : isCancelled
                     ? "bg-[var(--color-ink-400)] text-white ring-[var(--color-ink-100)]"
                     : "bg-[var(--color-surface)] text-[var(--color-ink-700)] ring-[var(--color-ink-100)] dark:ring-white/10",
