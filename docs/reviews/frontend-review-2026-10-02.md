@@ -8,7 +8,7 @@
 
 ## สถานะ (อัปเดต 2026-10-20)
 
-แก้แล้ว HIGH 12 จาก 15, MEDIUM 27 ข้อ (M5, M12, M15, M16, M18, M21, M23, M25, M27, M30, M31, M32, M33, M34, M35, M36, M38, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
+แก้แล้ว HIGH 12 จาก 15, MEDIUM 32 ข้อ (M5, M12, M15, M16, M18, M21, M22, M23, M24, M25, M26, M27, M28, M29, M30, M31, M32, M33, M34, M35, M36, M38, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
 
 | ข้อ | เรื่อง | Commit |
 |---|---|---|
@@ -35,6 +35,7 @@
 | M30, M31, M32, M36 | Dispatch: poll ล้มไม่ทำให้ตาราง trips หาย (แถบเตือน + Retry) · Trip drawer โหลดใหม่เมื่อมี timeline เข้า ป้ายสถานะและปุ่มไม่ค้างค่าเก่า · ?page=N ไม่ถูกรีเซ็ตตอนเปิดหน้า · ประกาศ token --color-wine/--color-flame ทั้ง light และ dark | `703ad77a` |
 | M38 | /dispatch/manual อยู่ใน shell (TopNav + LeftRail) มีเมนู "Manual operators" ใต้ Dispatch (ต้องมี dtms:operator:pool:read) สีเป็น token ทั้งหมด และเวลาใช้ DateTime | `c40cb169` |
 | M21, M25, M27 | Orders: ปุ่มใน drawer ทำงานกับ order ที่ไม่อยู่ในหน้า list (โหลด order มาเอง) · bulk cancel เตือนว่ามี order ที่ dispatched/running กี่รายการ หุ่นจะหยุด · CSV มี BOM (ภาษาไทยไม่เพี้ยนใน Excel) และกัน formula injection ทั้ง CSV ฝั่ง client และ report export ฝั่ง backend (`CsvField`) | `07e80468`, `be275d34` |
+| M22, M24, M26, M28, M29 | Orders: ตัดโหมด Scroll ออก (เหลือแค่ Pages) · ?page=N ไม่ถูกรีเซ็ต · ช่องเซ็นชื่อ: สีเส้นตามธีมและพิกัดตรงนิ้วบนจอแคบ · Items: ป้ายสถานะใช้ -ink token อ่านได้ใน dark mode · แถวใช้ DataRow (คีย์บอร์ดได้) และมีการ์ดสำหรับจอเล็ก | `6377608d` |
 
 **ไม่แก้ (ตัดสินใจ 2026-10-06)**
 - **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile: เจ้าของระบบเลือกข้าม คงไว้ตามเดิม
@@ -335,7 +336,7 @@
 - แก้: ส่ง DeliveryOrderDetailDto จาก drawer มาให้ runAction โดยตรง (drawer มี data อยู่แล้ว) หรือ fallback ไปเรียก getOrder(id) เมื่อหาใน orders ไม่เจอ ห้าม return เงียบ
 - Verifier: runAction บรรทัด 575-576 ใช้ orders.find(...) และถ้าไม่เจอก็ return เงียบ ทางเข้าที่ทำให้หาไม่เจอมีจริง: onOpenOrder (บรรทัด 886) ที่ TripDetailDrawer ใช้กระโดดไป order อื่นซึ่งอาจไม่อยู่ในหน้าปัจจุบัน ทุกปุ่มใน footer ของ drawer (detail-drawer.tsx:543-653) ส่งผ่าน onAction ไปที่ runAction จึงกดแล้วไม่เกิดอะไรขึ้นและไม่มี toast แจ้ง
 
-### M22. Deep link ?page=N ถูก reset เป็นหน้า 1 ทุกครั้งที่ mount — CONFIRMED
+### M22. Deep link ?page=N ถูก reset เป็นหน้า 1 ทุกครั้งที่ mount — CONFIRMED · ✅ แก้แล้ว `6377608d`
 - กลุ่ม: delivery-orders · code
 - ที่: `frontend/components/delivery-orders/orders-experience.tsx:301`
 - ปัญหา: effect ที่ setPage(1) เมื่อ filter เปลี่ยน ทำงานตอน mount ด้วย (effect ทำงานรอบแรกเสมอ) ค่า page ที่ hydrate จาก URL (บรรทัด 148-151) จึงถูกเขียนทับเป็น 1 ทันที และ fetch ยิง 2 ครั้ง (page N แล้วตามด้วย page 1)
@@ -351,7 +352,7 @@
 - แก้: ทำ overlay stack กลาง (เช่น hook useEscapeLayer ที่ register ลำดับชั้นแล้วให้เฉพาะชั้นบนสุดตอบ Esc) หรืออย่างน้อยให้ drawer ignore Esc เมื่อ openTripId != null และให้ dialog เรียก e.stopImmediatePropagation() โดย listen ใน capture phase
 - Verifier: ทุก overlay ผูก keydown บน window เอง (detail-drawer:165, trip-detail-drawer:124, state-action-dialog:131, pod-scan-dialog:77, reopen-dialog:46, redispatch-dialog:45, cancel-dialog:40) จาก grep ไม่พบ stopPropagation หรือการเช็ก layer เลย กด Esc ครั้งเดียวจึงยิงทุก listener และปิดทั้ง dialog/trip drawer และ order drawer พร้อมกัน ส่วน comment ที่ detail-drawer.tsx:670-674 ซึ่งบอกว่า Escape ปิดเฉพาะ trip drawer นั้นไม่ตรงกับพฤติกรรมจริง
 
-### M24. Signature pad: เส้นดำมองไม่เห็นใน dark mode และพิกัดเพี้ยนเมื่อ canvas ถูกย่อ — CONFIRMED
+### M24. Signature pad: เส้นดำมองไม่เห็นใน dark mode และพิกัดเพี้ยนเมื่อ canvas ถูกย่อ — CONFIRMED · ✅ แก้แล้ว `6377608d`
 - กลุ่ม: delivery-orders · uiux
 - ที่: `frontend/components/delivery-orders/pod-scan-dialog.tsx:90`
 - ปัญหา: strokeStyle ถูก hardcode เป็น "#1a1a1a" แต่พื้นหลัง canvas ใน dark mode คือ dark:bg-white/[0.04] บน surface #131c38 นอกจากนี้ canvas มี width={460} แต่แสดงด้วย CSS w-full ขณะที่ pt() ใช้ clientX - rect.left โดยไม่คูณ canvas.width / rect.width
@@ -367,7 +368,7 @@
 - แก้: นับ order ที่อยู่ใน ORDER_IN_FLIGHT_STATES จาก bulkCancelTargets แล้วแสดง callout ว่ามี 'N orders in flight จะถูกสั่งหยุดที่ RIOT3' (หรือ query trips แบบ batch)
 - Verifier: cancel-dialog.tsx:108 แสดง callout cascade เฉพาะเมื่อ activeTripCount > 0 && count <= 1 และ CancelOrderDialog ตัว bulk (orders-experience.tsx ราวบรรทัด 1186-1195) ไม่ได้ส่ง activeTripCount มา ส่วน orders-table ก็ไม่มีการจำกัดว่า order สถานะไหนเลือกได้ (grep ไม่พบ disabled หรือ selectable) bulk cancel order ที่กำลังวิ่งจึงไม่มีคำเตือนเรื่อง robot หยุด
 
-### M26. โหมด Scroll (infinite) ทำให้ list ค้างข้อมูลเก่าและปนลำดับ — CONFIRMED
+### M26. โหมด Scroll (infinite) ทำให้ list ค้างข้อมูลเก่าและปนลำดับ — CONFIRMED · ✅ แก้แล้ว `6377608d`
 - กลุ่ม: delivery-orders · code
 - ที่: `frontend/components/delivery-orders/orders-experience.tsx:366`
 - ปัญหา: ในโหมด infinite ที่ page>1 ทั้ง poll 15 วินาที และ SignalR refetch จะเรียก fetchOrders ด้วย page ล่าสุดแล้ว append เท่านั้น แถวของหน้า 1..N-1 จึงไม่เคยถูก refresh นอกจากนี้การเปลี่ยน sort ไม่ reset page (deps บรรทัด 303 ไม่มี sortBy/sortDir) และการสลับจาก Pages หน้า 3 ไป Scroll จะ append หน้า 3 โดยไม่มีหน้า 1-2
@@ -383,7 +384,7 @@
 - แก้: prepend "﻿" ให้เนื้อหาไฟล์ และใน escape ให้เติม ' นำหน้าค่าที่ match /^[=+\-@\t\r]/
 - Verifier: บรรทัด 82 สร้าง Blob จาก lines.join("\n") โดยไม่มี BOM ทำให้ Excel บน Windows อ่านไฟล์ UTF-8 ที่ไม่มี BOM เป็น ANSI และภาษาไทยใน notes/requestedBy จะเพี้ยน ส่วน escape (บรรทัด 59-60) quote เฉพาะค่าที่มี " , หรือ newline ไม่ได้กันค่าที่ขึ้นต้นด้วย = + - @ ตัวที่ผู้ใช้เจอแน่คือภาษาไทยเพี้ยน ส่วน formula injection มาจาก free text ภายในองค์กร ความเสี่ยงจึงต่ำกว่า
 
-### M28. Items: แถวในตารางใช้คีย์บอร์ดไม่ได้ (hand-rolled tr แทน DataRow) — CONFIRMED
+### M28. Items: แถวในตารางใช้คีย์บอร์ดไม่ได้ (hand-rolled tr แทน DataRow) — CONFIRMED · ✅ แก้แล้ว `6377608d`
 - กลุ่ม: delivery-orders · uiux
 - ที่: `frontend/components/items/items-experience.tsx:248`
 - ปัญหา: ใช้ <tr onClick> โดยตรง ไม่มี tabIndex, role หรือ Enter handler และไม่มี focus ring ซึ่ง DataRow primitive (data-row.tsx) ถูกสร้างมาแก้ปัญหานี้โดยเฉพาะ อีกทั้งหน้านี้ไม่มี MobileCardRow สำหรับจอเล็ก
@@ -391,7 +392,7 @@
 - แก้: เปลี่ยนเป็น <DataRow key={it.id} delayIndex={i} onClick={() => setSelectedId(it.id)}> และเพิ่ม mobile card ด้วย MobileCardRow แบบเดียวกับ orders-table
 - Verifier: items-experience.tsx:248-251 ใช้ <tr onClick> โดยไม่มี tabIndex, role หรือ onKeyDown ขณะที่ components/primitives/data-table/data-row.tsx มีทั้ง tabIndex, role=button, handleKeyDown และ focus-visible ring ซึ่ง docstring ระบุว่าสร้างมาแก้ปัญหานี้โดยตรง หน้านี้ไม่มี MobileCardRow ด้วย (grep ไม่พบ)
 
-### M29. Items: status badge และ handling chip อ่านไม่ออกใน dark mode — CONFIRMED
+### M29. Items: status badge และ handling chip อ่านไม่ออกใน dark mode — CONFIRMED · ✅ แก้แล้ว `6377608d`
 - กลุ่ม: delivery-orders · uiux
 - ที่: `frontend/components/items/items-experience.tsx:37`
 - ปัญหา: PENDING, PICKED, DROPPED_OFF, RETURNED (และ handling chip ที่บรรทัด 429) ใช้ text-[var(--color-brand-900)] บนพื้น pastel ใน dark mode ค่า brand-900 คือ #2f3ab8 บน pastel-sky #1b2a60 หรือ pastel-peach #421f18 ทำให้ contrast ประมาณ 1.5:1
