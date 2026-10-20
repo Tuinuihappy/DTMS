@@ -39,6 +39,7 @@
 | M14 | UOM: Enter ไม่แทนค่าที่พิมพ์ด้วยคำแนะนำแถวแรกอีก (KG ไม่กลายเป็น EA, BOX ไม่กลายเป็น BOXES) เลือกจากรายการเฉพาะตอนกดลูกศร/ชี้เมาส์ หรือพิมพ์ตรงคำแนะนำ (kg → KG) | `8021354a` |
 | M13, M20 | ช่อง WMS location ใช้สี token ชุดเดียวกับ StationCombobox อ่านได้ใน dark mode · DataRow: แถวที่โฟกัสด้วยคีย์บอร์ดมีสีของ dark mode และเอา role="button" ออกจาก <tr> (คีย์บอร์ดยังเปิดแถวได้) | `d10466d5` |
 | M17 | Combobox ทั้ง 3 ตัว (Station, WMS location, UOM): กด Tab ออกแล้วรายการปิดและทิ้งข้อความที่ยังไม่ได้เลือก · ปุ่ม Clear ของ Station ใช้คีย์บอร์ดได้ · ARIA ครบ (role combobox บน input, aria-controls, aria-activedescendant) | `0a3c58ba` |
+| M19 (บางส่วน) | TopNav ทุกหน้า: เอาแท็บ Home/Messages/Discover/Wallet/Projects ที่กดไม่ไปไหนออก และเอาจุดแจ้งเตือนสีแดงที่ขึ้นค้างออก ส่วนแถบทักทายบน /dashboard ไม่แก้ | `c0246059` |
 
 **ไม่แก้ (ตัดสินใจ 2026-10-06)**
 - **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile: เจ้าของระบบเลือกข้าม คงไว้ตามเดิม
@@ -315,7 +316,7 @@
 - แก้: เอา 3 รายการที่ยังไม่มีหน้าออก (หรือใส่ requires/flag ซ่อนไว้) และเอา badge ของ Active alerts ออกจนกว่าจะต่อกับข้อมูล alert จริง
 - Verifier: ตรวจแล้ว app/fleet มีแค่ carriers และ carrier-types ไม่มี robots/drivers และไม่มี app/equipment เลย ทั้ง 3 ไม่มี requires จึงทุกคนเห็น 'Active alerts' (238) ไม่มี href และ badge:true ทำให้ RailButton แสดง StatusPulse tone coral ตลอด
 
-### M19. GreetingStrip และ TopNav บน /dashboard ยังแสดงข้อมูล placeholder ปลอม — CONFIRMED
+### M19. GreetingStrip และ TopNav บน /dashboard ยังแสดงข้อมูล placeholder ปลอม — CONFIRMED · 🟡 แก้เฉพาะ TopNav `c0246059` (แถบทักทายบน /dashboard ไม่แก้ ตามการตัดสินใจเรื่อง H4/H12/H13)
 - กลุ่ม: core · uiux
 - ที่: `frontend/components/shell/greeting-strip.tsx:21`
 - ปัญหา: มีข้อความ hardcode เช่น 'All operations nominal', '07:42 GMT+7', 'Good evening' (ไม่ว่าเวลาจริงจะเป็นเท่าไร), 'Three high-priority dispatches ... Eastern Seaboard' ปุ่ม 'Ask Co-pilot' และ 'New dispatch' (บรรทัด 35, 39) ไม่มี onClick ใน top-nav.tsx:13 มี nav 'Messages/Discover/Wallet/Projects' ที่กดแล้วไม่ไปไหน ช่อง search ไม่ทำงาน และ Notifications มี badge coral ค้างไว้ตลอด (บรรทัด 116)
