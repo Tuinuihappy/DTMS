@@ -8,7 +8,7 @@
 
 ## สถานะ (อัปเดต 2026-10-20)
 
-แก้แล้ว HIGH 12 จาก 15, MEDIUM 19 ข้อ (M5, M12, M15, M16, M18, M23, M33, M34, M35, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
+แก้แล้ว HIGH 12 จาก 15, MEDIUM 24 ข้อ (M5, M12, M15, M16, M18, M23, M30, M31, M32, M33, M34, M35, M36, M38, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
 
 | ข้อ | เรื่อง | Commit |
 |---|---|---|
@@ -32,6 +32,8 @@
 | M16, M45 | ข้อมูล pool อยู่ใน `OperatorPoolProvider` ที่ layout ของ `/m` refetch ที่ล้มเหลวคงรายการเดิมไว้ หน้า Pool แสดง "โหลด Pool ไม่สำเร็จ" พร้อมปุ่มลองใหม่แทน "Pool is empty" (หรือแถบเตือนเหนือรายการเดิม) และทิ้งผลของ fetch ที่ไม่ใช่ครั้งล่าสุด | `2c01dc95`, `f0a7c44a` |
 | M48 | My trips และ Trip detail แสดง OrderRef, จุด pickup → drop และจำนวนชิ้น/น้ำหนักแบบการ์ด Pool (backend ส่งมากับ `/api/operator/trips/assigned`) ส่วน tripId เหลือเป็นบรรทัดเล็กในหน้า detail | `d193c8de` |
 | M42, M44, M46, M47, M50 (+ M43 บางส่วน) | PWA: บันทึก offline ขึ้น 'Saved offline' ไม่ใช่ error สีแดง · โหลด trip ไม่สำเร็จบอกว่าโหลดไม่สำเร็จพร้อมปุ่มลองใหม่ (ไม่ใช่ 'not found') · รับงานจาก Pool ต้องออนไลน์ ไม่เข้าคิวอีก · logout ล้างคิว offline และ push เสมอ และถามก่อนถ้ายังมีรายการค้าง · ปุ่ม Settings, ป้าย queued และลิงก์ Back กดได้ 44px · ฟอร์มขอ override geofence ซ่อนไว้ (ส่งไม่ได้อยู่แล้ว และ geofence ปิด) | `d364498e` |
+| M30, M31, M32, M36 | Dispatch: poll ล้มไม่ทำให้ตาราง trips หาย (แถบเตือน + Retry) · Trip drawer โหลดใหม่เมื่อมี timeline เข้า ป้ายสถานะและปุ่มไม่ค้างค่าเก่า · ?page=N ไม่ถูกรีเซ็ตตอนเปิดหน้า · ประกาศ token --color-wine/--color-flame ทั้ง light และ dark | `703ad77a` |
+| M38 | /dispatch/manual อยู่ใน shell (TopNav + LeftRail) มีเมนู "Manual operators" ใต้ Dispatch (ต้องมี dtms:operator:pool:read) สีเป็น token ทั้งหมด และเวลาใช้ DateTime | `c40cb169` |
 
 **ไม่แก้ (ตัดสินใจ 2026-10-06)**
 - **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile: เจ้าของระบบเลือกข้าม คงไว้ตามเดิม
@@ -396,7 +398,7 @@
 - แก้: ใช้คู่ token -ink ที่ออกแบบมาให้อ่านได้ทั้งสองธีม เช่น text-[var(--color-pastel-sky-ink)] หรือ text-[var(--color-pastel-peach-ink)] เหมือน ItemStatusBadge ใน detail-drawer.tsx:894-932 (หรือ reuse component นั้นเลย)
 - Verifier: STATUS_TONE (บรรทัด 36-44) และ handling chip (บรรทัด 429) ใช้ text-[var(--color-brand-900)] ใน dark mode globals.css กำหนด brand-900 เป็น #2f3ab8 บน pastel-sky #1b2a60 หรือ pastel-peach #421f18 ซึ่ง contrast ต่ำมาก ทั้งที่มี token -ink (pastel-sky-ink #c2d0ff, pastel-peach-ink #ffc9b0) ที่ออกแบบมาให้อ่านได้ใน dark mode อยู่แล้ว
 
-### M30. Deep link หรือ refresh ที่มี ?page=N จะถูกรีเซ็ตกลับไปหน้า 1 ทุกครั้ง — CONFIRMED
+### M30. Deep link หรือ refresh ที่มี ?page=N จะถูกรีเซ็ตกลับไปหน้า 1 ทุกครั้ง — CONFIRMED · ✅ แก้แล้ว `703ad77a`
 - กลุ่ม: dispatch · code
 - ที่: `frontend/components/dispatch/trips-experience.tsx:153`
 - ปัญหา: effect `useEffect(() => { setPage(1); }, [statusFilter, search, vehicleKey, fromDate, toDate, pageSize])` ทำงานตอน mount ด้วย จึงเขียนทับค่า page ที่อ่านมาจาก URL ที่บรรทัด 127-130 ทันที ตามด้วย effect ที่บรรทัด 158-171 ซึ่ง replace URL ให้ไม่มี page แล้ว ระหว่างนั้นยังยิง fetch ของ page=N ออกไปก่อนหนึ่งครั้งแล้วค่อย abort
@@ -404,7 +406,7 @@
 - แก้: ข้ามรอบแรกด้วย ref (`const firstRun = useRef(true)`) หรือย้ายการ setPage(1) ไปไว้ใน handler ที่เปลี่ยน filter โดยตรง (onStatusFilter/onFromDate/onToDate/onPageSizeChange) ส่วน search/vehicle ที่ debounce อยู่ ให้เทียบกับค่าก่อนหน้าผ่าน ref
 - Verifier: effect setPage(1) ที่บรรทัด 153-155 ทำงานตอน mount ด้วยเพราะไม่มี guard ใดๆ ค่า page ที่ initializer อ่านจาก ?page=N จึงถูกเขียนทับเป็น 1 ทันที จากนั้น effect ที่ mirror URL ก็ replace URL ตามค่าใหม่ และ fetchTrips รอบแรกยิงออกไปด้วย page=N ก่อนจะถูก abort ตอน re-render ซึ่งขัดกับ comment บรรทัด 157 ที่บอกว่า deep link ใช้ได้
 
-### M31. Poll ที่ล้มเหลวแบบ silent ทำให้ตาราง trips หายไปทั้งตาราง — CONFIRMED
+### M31. Poll ที่ล้มเหลวแบบ silent ทำให้ตาราง trips หายไปทั้งตาราง — CONFIRMED · ✅ แก้แล้ว `703ad77a`
 - กลุ่ม: dispatch · code
 - ที่: `frontend/components/dispatch/trips-experience.tsx:534`
 - ปัญหา: fetchTrips เรียก setError ทุกครั้งที่ล้ม รวมถึงตอนที่ poll เรียกแบบ silent (บรรทัด 208) และ TripsTable เช็ก `if (error)` ก่อนแสดงตาราง จึงเอากล่อง error มาแทนตารางทั้งหมด แม้ trips ที่โหลดไว้แล้วจะยังอยู่ใน state ก็ตาม
@@ -412,7 +414,7 @@
 - แก้: ถ้ามีข้อมูลอยู่แล้ว (trips.length > 0) ให้แสดง error เป็น banner เล็กเหนือตารางพร้อมปุ่มลองใหม่ แล้วคงตารางเดิมไว้ ส่วนกล่อง error แบบเต็มให้ใช้เฉพาะตอนโหลดครั้งแรกที่ยังไม่มีข้อมูล หรือให้ silent poll ไม่ setError เลยก็ได้
 - Verifier: fetchTrips เรียก setError ทั้งตอน silent poll และตอนปกติ (silent มีผลแค่ setRefreshing) ส่วน TripsTable บรรทัด 534 เช็ก if (error) ก่อนจะ render ตาราง จึงเอากล่อง error มาแทนตารางทั้งหมดแม้ trips ยังอยู่ใน state ตารางจะกลับมาก็ต่อเมื่อ poll ครั้งถัดไปสำเร็จ เพราะทุกรอบเรียก setError(null) ก่อน และระหว่างนั้น usePollSchedule ก็ back off เพิ่มเวลาไปเรื่อยๆ
 
-### M32. Trip drawer ไม่อัปเดตสถานะและปุ่ม action เมื่อสถานะ trip เปลี่ยนแบบ realtime — CONFIRMED
+### M32. Trip drawer ไม่อัปเดตสถานะและปุ่ม action เมื่อสถานะ trip เปลี่ยนแบบ realtime — CONFIRMED · ✅ แก้แล้ว `703ad77a`
 - กลุ่ม: dispatch · code
 - ที่: `frontend/components/dispatch/trip-detail-drawer.tsx:78`
 - ปัญหา: useTripSubscription ฟังแค่ TimelineUpdated (ส่งเข้า liveTimelineEntry) กับ MissionUpdated ไม่ได้ re-fetch getTripDetails และไม่ได้ฟัง StatusChanged ที่ trip-hub มีให้ ข้อมูล data.status ที่ใช้กับ TripStatusBadge (บรรทัด 175), isTripInFlight และ TripActionBar (บรรทัด 375-413) จึงเป็นค่าตอนเปิด drawer ไปตลอด อีกทั้ง TripsExperience ยังปิด poll ระหว่างที่ drawer เปิด (enabled: !detailTripId)
@@ -444,7 +446,7 @@
 - แก้: เพิ่ม role="dialog" aria-modal="true" aria-labelledby={id ของ h2} ให้ autoFocus ไปที่ปุ่มปิดหรือช่องแรก ใช้ focus trap และคืน focus ให้ปุ่มที่เปิดตอนปิด ควรทำเป็น primitive กลางคู่กับ OverlayBackdrop เพื่อใช้ร่วมกันทุก dialog
 - Verifier: grep หา role=, aria-modal และ autoFocus ใน drawer, pass-robot-dialog, raise-exception-dialog และ manual/*.tsx ไม่เจอเลย ไม่มี focus trap และไม่คืน focus ตอนปิด ส่วน DataRow ใช้ tabIndex={interactive ? 0 : undefined} (data-row.tsx:66) แถวตารางที่อยู่หลัง backdrop จึงยังรับ focus ได้ ซึ่งขัดกฎ review-frontend.md:81
 
-### M36. Badge Rejected/Hang ใช้ token --color-wine/--color-flame ที่ไม่ได้ประกาศไว้ ทำให้อ่านไม่ออกใน dark mode — CONFIRMED
+### M36. Badge Rejected/Hang ใช้ token --color-wine/--color-flame ที่ไม่ได้ประกาศไว้ ทำให้อ่านไม่ออกใน dark mode — CONFIRMED · ✅ แก้แล้ว `703ad77a`
 - กลุ่ม: dispatch · uiux
 - ที่: `frontend/components/dispatch/badges.tsx:39`
 - ปัญหา: TONE_BG.wine และ flame (บรรทัด 39-40, 50-51) ใช้ var(--color-wine,#991b1b) และ var(--color-flame,#c2410c) แต่ app/globals.css ไม่มี token ทั้งสองตัวนี้ (grep ไม่เจอ) จึงใช้ hex fallback ตลอด ซึ่งไม่มีค่าสำหรับ .dark ที่ retry-history-panel.tsx:132 ก็เป็นแบบเดียวกัน
@@ -460,7 +462,7 @@
 - แก้: เอาตัวตนของผู้กดจาก session ฝั่ง backend (ให้ endpoint stamp decidedBy จาก JWT เอง) แล้วตัดพารามิเตอร์ decidedBy ฝั่ง client ออก ถ้ายังทำไม่ได้ อย่างน้อยให้ UI แสดงว่าบันทึกในนามใคร
 - Verifier: pickDispatcherId เลือก Admin/Supervisor คนแรกในรายชื่อ ฝั่ง backend AdminManualOperatorEndpoints.cs:94/111 ก็รับ body.DecidedByOperatorId ไปใช้ตรงๆ โดยไม่ stamp จาก JWT ทุก decision ใน audit จึงลงชื่อคนเดียวกันที่ผิด แม้ comment จะบอกว่าเป็น placeholder ของ MVP ที่ตั้งใจไว้ ผลก็ยังทำให้ audit ผิดจริง ส่วนกรณีที่ยังไม่มี Admin operator แล้วกด approve ไม่ได้ก็มีอยู่จริง (บรรทัด 45-48)
 
-### M38. หน้า /dispatch/manual ไม่มี shell นำทาง ใช้สี Tailwind ดิบ และใช้ backdrop ที่เขียนเอง — CONFIRMED
+### M38. หน้า /dispatch/manual ไม่มี shell นำทาง ใช้สี Tailwind ดิบ และใช้ backdrop ที่เขียนเอง — CONFIRMED · ✅ แก้แล้ว `c40cb169`
 - กลุ่ม: dispatch · uiux
 - ที่: `frontend/components/dispatch/manual/manual-operator-board.tsx:75`
 - ปัญหา: app/dispatch/manual/page.tsx render แค่ ManualOperatorBoard โดยไม่มี TopNav/LeftRail แบบที่ app/dispatch/trips/page.tsx มี และไม่มีลิงก์จากที่ไหนในแอปเลย (grep 'dispatch/manual' เจอแค่ตัวเอง) ทั้ง 3 ไฟล์ใน manual/ ใช้ zinc-*, red-*, emerald-*, blue-* แทน token ใน globals.css ส่วน ReassignDialog (operator-board-section.tsx:164) และ DenyDialog (override-queue-section.tsx:173) ทำ backdrop `fixed inset-0 bg-black/60` เอง ไม่ใช้ OverlayBackdrop, ไม่มี Esc และคลิกนอก dialog แล้วปิดได้แม้ตอน busy เวลาในคิวก็ใช้ toLocaleTimeString (override-queue-section.tsx:97) แทน DateTime primitive
