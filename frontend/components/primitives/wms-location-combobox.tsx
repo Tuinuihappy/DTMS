@@ -234,11 +234,13 @@ export function WmsLocationCombobox({
     >
       <div
         className={cn(
-          "flex h-9 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500",
-          disabled && "cursor-not-allowed bg-gray-50 opacity-60",
+          // Same palette as StationCombobox beside it. Raw white/gray had no dark
+          // variant, so dark mode drew near-white text on white (review M13).
+          "flex h-9 items-center gap-1.5 rounded-[var(--radius-sm)] border border-white/70 bg-white/65 px-2.5 text-[var(--color-ink-900)] backdrop-blur transition-colors focus-within:border-[var(--color-brand-500)]/40 focus-within:bg-white focus-within:ring-2 focus-within:ring-[var(--color-brand-500)]/20 dark:border-white/[0.06] dark:bg-white/[0.04] dark:focus-within:bg-white/[0.08]",
+          disabled && "cursor-not-allowed opacity-60",
         )}
       >
-        <MapPin className="h-3.5 w-3.5 flex-none text-gray-400" />
+        <MapPin className="h-3.5 w-3.5 flex-none text-[var(--color-ink-400)]" />
         <input
           ref={inputRef}
           type="text"
@@ -259,10 +261,10 @@ export function WmsLocationCombobox({
           readOnly={autofillGuard}
           placeholder={placeholder}
           disabled={disabled}
-          className="min-w-0 flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-gray-400"
+          className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[var(--color-ink-900)] outline-none placeholder:text-[var(--color-ink-400)]"
         />
         {displayZone && !open && (
-          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+          <span className="rounded bg-[var(--color-ink-100)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-ink-600)]">
             {displayZone}
           </span>
         )}
@@ -270,7 +272,7 @@ export function WmsLocationCombobox({
           <button
             type="button"
             onClick={clear}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-[var(--color-ink-400)] hover:text-[var(--color-ink-700)]"
             aria-label="Clear"
           >
             <X className="h-3.5 w-3.5" />
@@ -278,7 +280,7 @@ export function WmsLocationCombobox({
         )}
         <ChevronDown
           className={cn(
-            "h-3.5 w-3.5 flex-none text-gray-400 transition-transform",
+            "h-3.5 w-3.5 flex-none text-[var(--color-ink-400)] transition-transform",
             open && "rotate-180",
           )}
         />
@@ -287,10 +289,10 @@ export function WmsLocationCombobox({
       <ComboboxListPortal open={open} anchorRef={wrapperRef} onDismiss={dismissList}>
         <div
           ref={panelRef}
-          className="max-h-64 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
+          className="max-h-64 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-ink-100)] bg-[var(--color-popover)]/95 shadow-[0_18px_42px_-14px_rgba(15,23,42,0.3)] backdrop-blur-md"
         >
           {error && (
-            <div className="flex items-center gap-1.5 border-b border-gray-100 bg-red-50 px-2.5 py-1.5 text-xs text-red-700">
+            <div className="flex items-center gap-1.5 border-b border-[var(--color-ink-100)] bg-[var(--color-coral-soft)] px-2.5 py-1.5 text-xs text-[var(--color-coral)]">
               <AlertTriangle className="h-3 w-3" />
               {error}
             </div>
@@ -301,13 +303,13 @@ export function WmsLocationCombobox({
             className="max-h-64 overflow-y-auto py-1"
           >
             {loading && (
-              <li className="flex items-center gap-1.5 px-2.5 py-2 text-xs text-gray-500">
+              <li className="flex items-center gap-1.5 px-2.5 py-2 text-xs text-[var(--color-ink-500)]">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 {catalogLoading ? "Loading locations…" : "Searching…"}
               </li>
             )}
             {!loading && items.length === 0 && (
-              <li className="px-2.5 py-2 text-xs text-gray-500">
+              <li className="px-2.5 py-2 text-xs text-[var(--color-ink-500)]">
                 {query.trim()
                   ? `No locations match "${query.trim()}"`
                   : "Type to search WMS locations…"}
@@ -330,22 +332,24 @@ export function WmsLocationCombobox({
                   }}
                   className={cn(
                     "flex cursor-pointer items-center gap-2 px-2.5 py-1.5 text-xs",
-                    isHighlighted && "bg-blue-50",
+                    isHighlighted
+                      ? "bg-[var(--color-brand-500)]/15 text-[var(--color-ink-900)] dark:text-white"
+                      : "text-[var(--color-ink-700)] dark:text-[var(--color-ink-200)]",
                     isSelected && "font-medium",
-                    !loc.isActive && "text-gray-400 italic",
+                    !loc.isActive && "text-[var(--color-ink-400)] italic",
                   )}
                 >
-                  <MapPin className="h-3 w-3 flex-none text-gray-400" />
+                  <MapPin className="h-3 w-3 flex-none text-[var(--color-ink-400)]" />
                   <span className="flex-1 truncate">
                     <span className="font-mono">{loc.code}</span>
                     {loc.displayName && loc.displayName !== loc.code && (
-                      <span className="ml-1.5 text-gray-500">
+                      <span className="ml-1.5 text-[var(--color-ink-500)]">
                         {loc.displayName}
                       </span>
                     )}
                   </span>
                   {loc.parentLocationDisplayName && (
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                    <span className="rounded bg-[var(--color-ink-100)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-ink-600)]">
                       {loc.parentLocationDisplayName}
                     </span>
                   )}
@@ -358,7 +362,7 @@ export function WmsLocationCombobox({
               );
             })}
             {!loading && hiddenCount > 0 && (
-              <li className="px-2.5 py-1.5 text-[11px] text-gray-500">
+              <li className="px-2.5 py-1.5 text-[11px] text-[var(--color-ink-500)]">
                 Showing {items.length} of {server.total} — keep typing to narrow
               </li>
             )}

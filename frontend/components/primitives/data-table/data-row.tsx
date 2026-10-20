@@ -64,13 +64,18 @@ export function DataRow({
       onClick={interactive ? onClick : undefined}
       onKeyDown={handleKeyDown}
       tabIndex={interactive ? 0 : undefined}
-      role={interactive ? "button" : undefined}
+      // No role="button": on a <tr> it replaced the row role, so screen
+      // readers stopped reading cells against their column headers, and it
+      // nested a "button" around the id cell and row-menu buttons. The row
+      // stays focusable and Enter/Space still open it (review M20).
       className={cn(
         "group border-t border-[var(--color-ink-100)]/60 dark:border-white/[0.04]",
         "transition-colors duration-150",
         interactive && "cursor-pointer hover:bg-white/40 dark:hover:bg-white/[0.03]",
+        // Focus fill needs its own dark shade: white/60 under the dark
+        // theme's near-white text made the focused row unreadable.
         interactive &&
-          "focus-visible:outline-none focus-visible:bg-white/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-brand-500)]",
+          "focus-visible:outline-none focus-visible:bg-white/60 dark:focus-visible:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-brand-500)]",
         selected &&
           "bg-[var(--color-pastel-sky)]/40 dark:bg-[var(--color-pastel-sky)]/60",
         disabled && "opacity-70",
