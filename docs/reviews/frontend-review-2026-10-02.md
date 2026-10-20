@@ -8,7 +8,7 @@
 
 ## สถานะ (อัปเดต 2026-10-20)
 
-แก้แล้ว HIGH 12 จาก 15, MEDIUM 33 ข้อ (M5, M12, M14, M15, M16, M18, M21, M22, M23, M24, M25, M26, M27, M28, M29, M30, M31, M32, M33, M34, M35, M36, M38, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
+แก้แล้ว HIGH 12 จาก 15, MEDIUM 35 ข้อ (M5, M12, M13, M14, M15, M16, M18, M20, M21, M22, M23, M24, M25, M26, M27, M28, M29, M30, M31, M32, M33, M34, M35, M36, M38, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
 
 | ข้อ | เรื่อง | Commit |
 |---|---|---|
@@ -37,6 +37,7 @@
 | M21, M25, M27 | Orders: ปุ่มใน drawer ทำงานกับ order ที่ไม่อยู่ในหน้า list (โหลด order มาเอง) · bulk cancel เตือนว่ามี order ที่ dispatched/running กี่รายการ หุ่นจะหยุด · CSV มี BOM (ภาษาไทยไม่เพี้ยนใน Excel) และกัน formula injection ทั้ง CSV ฝั่ง client และ report export ฝั่ง backend (`CsvField`) | `07e80468`, `be275d34` |
 | M22, M24, M26, M28, M29 | Orders: ตัดโหมด Scroll ออก (เหลือแค่ Pages) · ?page=N ไม่ถูกรีเซ็ต · ช่องเซ็นชื่อ: สีเส้นตามธีมและพิกัดตรงนิ้วบนจอแคบ · Items: ป้ายสถานะใช้ -ink token อ่านได้ใน dark mode · แถวใช้ DataRow (คีย์บอร์ดได้) และมีการ์ดสำหรับจอเล็ก | `6377608d` |
 | M14 | UOM: Enter ไม่แทนค่าที่พิมพ์ด้วยคำแนะนำแถวแรกอีก (KG ไม่กลายเป็น EA, BOX ไม่กลายเป็น BOXES) เลือกจากรายการเฉพาะตอนกดลูกศร/ชี้เมาส์ หรือพิมพ์ตรงคำแนะนำ (kg → KG) | `8021354a` |
+| M13, M20 | ช่อง WMS location ใช้สี token ชุดเดียวกับ StationCombobox อ่านได้ใน dark mode · DataRow: แถวที่โฟกัสด้วยคีย์บอร์ดมีสีของ dark mode และเอา role="button" ออกจาก <tr> (คีย์บอร์ดยังเปิดแถวได้) | `d10466d5` |
 
 **ไม่แก้ (ตัดสินใจ 2026-10-06)**
 - **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile: เจ้าของระบบเลือกข้าม คงไว้ตามเดิม
@@ -265,7 +266,7 @@
 - แก้: เก็บ query ที่ items ชุดปัจจุบันตอบไว้ (เช่นให้ hook คืน resolvedQuery) แล้วยอมให้ Enter commit ได้ก็ต่อเมื่อ !loading และ resolvedQuery === query ถ้ามีแถวที่ code ตรงกับ query แบบ exact ให้เลือกแถวนั้นก่อน ถ้ายังไม่พร้อมให้ตั้ง flag ไว้แล้ว commit หลังผลมาถึง
 - Verifier: useWmsLocationSearch เก็บ items ชุดเก่าไว้ระหว่าง debounce 300ms/fetch และ highlight reset เฉพาะเมื่อ items เปลี่ยน onKeyDown Enter (บรรทัด 135-137) commit(items[highlight]) โดยไม่เช็ก loading/query จริง แต่เคส wedge scanner ไม่เกิดเพราะ handheld ไม่ส่ง Enter (house rule) และหลัง commit ช่องแสดง code ที่เลือกให้เห็น ไม่ได้เงียบทั้งหมด จึงลดเป็น MEDIUM
 
-### M13. WmsLocationCombobox ใช้สี gray/blue/white ตรงๆ ใน dark mode เลยอ่านตัวอักษรไม่ออก — CONFIRMED
+### M13. WmsLocationCombobox ใช้สี gray/blue/white ตรงๆ ใน dark mode เลยอ่านตัวอักษรไม่ออก — CONFIRMED · ✅ แก้แล้ว `d10466d5`
 - กลุ่ม: core · uiux
 - ที่: `frontend/components/primitives/wms-location-combobox.tsx:166`
 - ปัญหา: wrapper ใช้ bg-white, border-gray-300 และ focus-within:border-blue-500 ส่วน panel ที่บรรทัด 216 ใช้ bg-white กับ border-gray-200 ไม่มี dark: variant เลย ทั้ง input และแถวในรายการไม่ได้ตั้งสีตัวอักษร จึงได้ body color มา ซึ่งใน .dark คือ --color-ink-900 #f4f7fe (globals.css:199, 135) ผลคือตัวอักษรเกือบขาวบนพื้นขาว นอกจากนี้ยังไม่เข้าชุดกับ StationCombobox ที่อยู่ข้างกันใน create-dialog ซึ่งใช้ token
@@ -321,7 +322,7 @@
 - แก้: ผูก greeting/สถานะกับข้อมูลจริง (เช่น vendor-health summary) หรือเอาออก แล้วซ่อนปุ่มและ nav ที่ไม่มีปลายทาง
 - Verifier: greeting-strip.tsx hardcode 'All operations nominal', '07:42 GMT+7', 'Good evening', 'Three high-priority dispatches ... Eastern Seaboard' ปุ่ม 2 ปุ่มไม่มี onClick ใช้ใน app/dashboard/page.tsx top-nav.tsx:13 มี navItems Messages/Discover/Wallet/Projects และ Notifications badge ค้าง TopNav ใช้ทั้ง dashboard และหน้า admin ทุกหน้า
 
-### M20. DataRow: แถวที่ focus อยู่อ่านไม่ออกใน dark mode และ role=button ทำลาย semantics ของตาราง — CONFIRMED
+### M20. DataRow: แถวที่ focus อยู่อ่านไม่ออกใน dark mode และ role=button ทำลาย semantics ของตาราง — CONFIRMED · ✅ แก้แล้ว `d10466d5`
 - กลุ่ม: core · uiux
 - ที่: `frontend/components/primitives/data-table/data-row.tsx:73`
 - ปัญหา: focus-visible:bg-white/60 ไม่มี dark: variant ใน dark mode ตัวอักษร ink-900 (#f4f7fe) จึงอยู่บนพื้นขาว 60% และใส่ role="button" ไว้บน <tr> (บรรทัด 67) ทำให้ screen reader ไม่อ่าน cell ตามหัวคอลัมน์ และยังซ้อน interactive กับ IdCell หรือปุ่ม row menu ที่อยู่ข้างใน
