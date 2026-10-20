@@ -15,6 +15,10 @@ export function CancelOrderDialog({
   // InProgress / Paused). Surfaces as a callout so the operator knows
   // robots will be told to stop, not just bookkeeping.
   activeTripCount = 0,
+  // Bulk only: how many of the selected orders are Dispatched / InProgress
+  // / Held, i.e. may have a trip on the move. Counted from the list rows —
+  // no per-order trip fetch for a batch.
+  activeOrderCount = 0,
   onClose,
   onConfirm,
 }: {
@@ -26,6 +30,7 @@ export function CancelOrderDialog({
   count?: number;
   busy: boolean;
   activeTripCount?: number;
+  activeOrderCount?: number;
   onClose: () => void;
   onConfirm: (reason: string) => void;
 }) {
@@ -108,6 +113,17 @@ export function CancelOrderDialog({
                       <strong>Cascade:</strong> {activeTripCount} in-flight trip
                       {activeTripCount === 1 ? "" : "s"} will be cancelled at RIOT3 — robot
                       {activeTripCount === 1 ? "" : "s"} will stop and return to base.
+                    </span>
+                  </div>
+                )}
+                {activeOrderCount > 0 && count > 1 && (
+                  <div className="mt-3 flex items-start gap-2 rounded-lg bg-[var(--color-coral-soft)]/60 px-3 py-2 text-[11.5px] leading-relaxed text-[var(--color-coral)]">
+                    <Bot className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={2.4} />
+                    <span>
+                      <strong>Cascade:</strong> {activeOrderCount} of these {count} orders{" "}
+                      {activeOrderCount === 1 ? "is" : "are"} already dispatched or running —
+                      their in-flight trips will be cancelled, and any robot on them will stop
+                      and return to base.
                     </span>
                   </div>
                 )}

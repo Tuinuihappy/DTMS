@@ -55,9 +55,13 @@ function exportCsv(rows: DeliveryOrderListDto[]) {
     "SubmittedAt",
     "Notes",
   ];
+  // Same rules as the backend report exports (CsvField): a cell starting
+  // with = + - @ (or tab / CR) is run as a formula by Excel, and notes and
+  // requestedBy come from OMS / free text — prefix ' unless it's a number.
   const escape = (v: unknown) => {
-    const s = v == null ? "" : String(v);
-    return /["\n,]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    let s = v == null ? "" : String(v);
+    if (/^[=+\-@\t\r]/.test(s) && !/^[+-]?\d+(\.\d+)?$/.test(s)) s = `'${s}`;
+    return /["\r\n,]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = [
     headers.join(","),
@@ -79,7 +83,9 @@ function exportCsv(rows: DeliveryOrderListDto[]) {
         .join(","),
     ),
   ];
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+  // The BOM tells Excel the file is UTF-8; without it Excel on a Thai
+  // Windows reads it as TIS-620 and Thai notes/names turn to mojibake.
+  const blob = new Blob(["﻿", lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -295,6 +301,8 @@ function ExperienceInner() {
         timer: ReturnType<typeof setTimeout>;
         snapshot: DeliveryOrderListDto;
         reason: string;
+        // Was the row on this page? Undo only puts back what it hid.
+        listed: boolean;
       }
     >
   >(new Map());
@@ -450,11 +458,14 @@ function ExperienceInner() {
         // Pull fresh server state — the order is now truly Cancelled.
         fetchOrders({ silent: true });
       } catch (e) {
-        // Restore the row if the upstream call ultimately failed.
-        setOrders((prev) =>
-          prev.find((o) => o.id === id) ? prev : [pending.snapshot, ...prev],
-        );
-        setTotalCount((n) => n + 1);
+        // Restore the row if the upstream call ultimately failed — only
+        // one this page had hidden.
+        if (pending.listed) {
+          setOrders((prev) =>
+            prev.find((o) => o.id === id) ? prev : [pending.snapshot, ...prev],
+          );
+          setTotalCount((n) => n + 1);
+        }
         toast.push({
           tone: "error",
           message: `Cancel failed: ${(e as Error).message}`,
@@ -469,6 +480,8 @@ function ExperienceInner() {
     if (!pending) return;
     clearTimeout(pending.timer);
     pendingCancelsRef.current.delete(id);
+    // Cancelled from a drawer while not on this page: nothing was hidden.
+    if (!pending.listed) return;
     // Insert the snapshot back at its original position if we can; if
     // pagination has shifted, drop it at the top — the next poll will
     // sort everything out.
@@ -575,8 +588,23 @@ function ExperienceInner() {
       id: string,
       reason?: string,
     ) => {
-      const target = orders.find((o) => o.id === id);
-      if (!target) return;
+      const listed = orders.find((o) => o.id === id);
+      let target: DeliveryOrderListDto | undefined = listed;
+      if (!target) {
+        // The drawer can show an order that is not on this page — opened
+        // from a Trip drawer's OrderRef, or polled/filtered off the list
+        // since. Returning here made every drawer button do nothing, with
+        // no message. Load the order instead.
+        try {
+          target = await getOrder(id);
+        } catch (e) {
+          toast.push({
+            tone: "error",
+            message: `Couldn't load the order: ${(e as Error).message}`,
+          });
+          return;
+        }
+      }
 
       if (action === "edit") {
         void openEdit(id);
@@ -640,7 +668,7 @@ function ExperienceInner() {
 
         const snapshot = target;
         setOrders((prev) => prev.filter((o) => o.id !== id));
-        setTotalCount((n) => Math.max(0, n - 1));
+        if (listed) setTotalCount((n) => Math.max(0, n - 1));
         setSelected((prev) => {
           const n = new Set(prev);
           n.delete(id);
@@ -654,6 +682,7 @@ function ExperienceInner() {
           timer,
           snapshot,
           reason: reason ?? "Cancelled by user.",
+          listed: !!listed,
         });
 
         toast.push({
@@ -1191,6 +1220,11 @@ function ExperienceInner() {
           bulkCancelTargets ? `${bulkCancelTargets.length} orders` : null
         }
         count={bulkCancelTargets?.length ?? 0}
+        activeOrderCount={
+          bulkCancelTargets?.filter((o) =>
+            (["Dispatched", "InProgress", "Held"] as OrderStatus[]).includes(o.orderStatus),
+          ).length ?? 0
+        }
         busy={busy}
         onClose={() => setBulkCancelTargets(null)}
         onConfirm={runBulkCancel}
