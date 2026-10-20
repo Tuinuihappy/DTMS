@@ -12,7 +12,7 @@
 // then silently lost.
 
 import { ChevronDown } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ComboboxListPortal } from "@/components/primitives/combobox-list-portal";
 import { cn, normalizeSearchText } from "@/lib/utils";
 
@@ -36,7 +36,13 @@ export function UomCombobox({
   inputClassName,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState(0);
+  // -1 = no row chosen. Typed text is the value here, so no row may be
+  // highlighted until the operator chooses one (arrows / hover) or the text
+  // already names it. Defaulting to row 0 made Enter replace the typed unit
+  // with the first suggestion: "KG" + Enter saved "EA", "BOX" saved "BOXES"
+  // (frontend review M14).
+  const [highlight, setHighlight] = useState(-1);
+  const listId = useId();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -63,12 +69,19 @@ export function UomCombobox({
     return suggestions.filter((s) => normalizeSearchText(s).includes(q));
   }, [value, suggestions]);
 
+  // On every edit: point at the suggestion the text spells exactly (so Enter
+  // on "kg" gives the canonical "KG"), otherwise at nothing. Keyed on
+  // value/open only — `filtered` is derived from them in the same render,
+  // and a caller passing a fresh suggestions array each render must not
+  // reset the arrow-key position.
   useEffect(() => {
-    setHighlight(0);
+    const q = normalizeSearchText(value);
+    setHighlight(q ? filtered.findIndex((s) => normalizeSearchText(s) === q) : -1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, open]);
 
   useEffect(() => {
-    if (!open || !listRef.current) return;
+    if (!open || !listRef.current || highlight < 0) return;
     const el = listRef.current.querySelector(
       `[data-idx="${highlight}"]`,
     ) as HTMLElement | null;
@@ -88,12 +101,13 @@ export function UomCombobox({
       setHighlight((h) => Math.min(Math.max(filtered.length - 1, 0), h + 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setHighlight((h) => Math.max(0, h - 1));
+      setHighlight((h) => (h <= 0 ? h : h - 1));
     } else if (e.key === "Enter") {
-      // Enter on a highlighted row picks it; otherwise the typed text is
-      // already the value, so just close instead of swallowing it.
+      // Enter picks a row only when one is highlighted — chosen by arrow or
+      // hover, or spelled exactly. Otherwise the typed text is already the
+      // value, so just close instead of replacing it.
       e.preventDefault();
-      if (open && filtered[highlight]) pick(filtered[highlight]);
+      if (open && highlight >= 0 && filtered[highlight]) pick(filtered[highlight]);
       else setOpen(false);
     }
     // Esc is handled by the layer stack (ComboboxListPortal's onDismiss).
@@ -122,6 +136,10 @@ export function UomCombobox({
           role="combobox"
           aria-expanded={open}
           aria-autocomplete="list"
+          aria-controls={listId}
+          aria-activedescendant={
+            open && highlight >= 0 && filtered[highlight] ? `${listId}-${highlight}` : undefined
+          }
           className={cn(
             // No font-mono here (unlike StationCombobox): a unit can be Thai
             // or any other script, and no monospace stack carries those
@@ -145,12 +163,14 @@ export function UomCombobox({
       <ComboboxListPortal open={open} anchorRef={wrapperRef} onDismiss={() => setOpen(false)}>
         <ul
           ref={listRef}
+          id={listId}
           role="listbox"
           className="max-h-56 overflow-y-auto rounded-[var(--radius-sm)] border border-white/80 bg-[var(--color-popover)]/95 shadow-[0_18px_42px_-14px_rgba(15,23,42,0.3)] backdrop-blur-md border-[var(--color-ink-100)]"
         >
           {filtered.map((s, i) => (
             <li
               key={s}
+              id={`${listId}-${i}`}
               data-idx={i}
               role="option"
               aria-selected={i === highlight}
