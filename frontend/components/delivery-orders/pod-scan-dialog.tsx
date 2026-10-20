@@ -83,13 +83,22 @@ export function PodScanDialog({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "#1a1a1a";
+    // Ink follows the theme: the canvas's own text colour is the ink token
+    // (dark in light mode, light in dark mode). A fixed #1a1a1a vanished on
+    // the dark surface.
+    ctx.strokeStyle = getComputedStyle(canvas).color;
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     let drawing = false;
+    // The canvas draws at 460×160 but is shown at the dialog's width (w-full),
+    // so map from displayed pixels to canvas pixels — unscaled, the line ran
+    // off from the finger on narrow screens.
     const pt = (e: PointerEvent) => {
       const r = canvas.getBoundingClientRect();
-      return { x: e.clientX - r.left, y: e.clientY - r.top };
+      return {
+        x: ((e.clientX - r.left) * canvas.width) / r.width,
+        y: ((e.clientY - r.top) * canvas.height) / r.height,
+      };
     };
     const down = (e: PointerEvent) => {
       drawing = true;
@@ -261,7 +270,7 @@ export function PodScanDialog({
                     ref={sigRef}
                     width={460}
                     height={160}
-                    className="mt-1 w-full rounded-lg border border-dashed border-[var(--color-ink-100)] bg-[var(--color-surface-soft)] touch-none cursor-crosshair dark:border-white/10 dark:bg-white/[0.04]"
+                    className="mt-1 w-full rounded-lg border border-dashed border-[var(--color-ink-100)] bg-[var(--color-surface-soft)] text-[var(--color-ink-900)] touch-none cursor-crosshair dark:border-white/10 dark:bg-white/[0.04]"
                   />
                   <p className="mt-1 text-[10.5px] text-[var(--color-ink-400)]">
                     Draw signature with mouse / finger. A hash of the image is

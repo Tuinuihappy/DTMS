@@ -20,6 +20,8 @@ import {
   TableTh,
 } from "@/components/primitives/data-table/table-shell";
 import { TableEmptyState } from "@/components/primitives/data-table/table-empty-state";
+import { DataRow } from "@/components/primitives/data-table/data-row";
+import { MobileCardRow } from "@/components/primitives/data-table/mobile-card-row";
 import { GlassCard } from "@/components/primitives/glass-card";
 import {
   formatItemStatus,
@@ -33,13 +35,15 @@ import {
 import { Permissions } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
 
+// Each pastel pairs with its own -ink token, which flips light in dark mode.
+// brand-900 stays dark in both, so on the dark pastels it read at ~1.5:1.
 const STATUS_TONE: Record<ItemStatusWire, string> = {
-  PENDING: "bg-[var(--color-pastel-sky)] text-[var(--color-brand-900)]",
-  PICKED: "bg-[var(--color-pastel-lavender)] text-[var(--color-brand-900)]",
-  DROPPED_OFF: "bg-[var(--color-pastel-peach)] text-[var(--color-brand-900)]",
+  PENDING: "bg-[var(--color-pastel-sky)] text-[var(--color-pastel-sky-ink)]",
+  PICKED: "bg-[var(--color-pastel-lavender)] text-[var(--color-pastel-lavender-ink)]",
+  DROPPED_OFF: "bg-[var(--color-pastel-peach)] text-[var(--color-pastel-peach-ink)]",
   DELIVERED: "bg-[var(--color-success-soft)] text-[var(--color-success)]",
   FAILED: "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
-  RETURNED: "bg-[var(--color-pastel-peach)] text-[var(--color-brand-900)]",
+  RETURNED: "bg-[var(--color-pastel-peach)] text-[var(--color-pastel-peach-ink)]",
   CANCELLED: "bg-[var(--color-ink-100)] text-[var(--color-ink-500)] dark:bg-white/[0.06]",
 };
 
@@ -234,7 +238,7 @@ function ItemsInner() {
         />
       ) : (
         <>
-          <DataTableShell className={cn(loading && "opacity-60 transition-opacity")}>
+          <DataTableShell className={cn("hidden md:block", loading && "opacity-60 transition-opacity")}>
             <DataTableHead>
               <TableTh>Item</TableTh>
               <TableTh>Order</TableTh>
@@ -244,12 +248,10 @@ function ItemsInner() {
               <TableTh>Status</TableTh>
             </DataTableHead>
             <DataTableBody>
-              {rows.map((it) => (
-                <tr
-                  key={it.id}
-                  onClick={() => setSelectedId(it.id)}
-                  className="cursor-pointer border-t border-white/40 transition-colors hover:bg-white/40 dark:border-white/[0.05] dark:hover:bg-white/[0.04]"
-                >
+              {/* DataRow, not a bare <tr onClick>: Tab focus, Enter/Space and
+                  a focus ring, like every other table. */}
+              {rows.map((it, i) => (
+                <DataRow key={it.id} delayIndex={i} onClick={() => setSelectedId(it.id)}>
                   <TableTd>
                     <div className="font-mono text-[12.5px] font-semibold text-[var(--color-ink-900)]">
                       {it.itemId}
@@ -288,10 +290,49 @@ function ItemsInner() {
                   <TableTd>
                     <StatusBadge status={it.status} />
                   </TableTd>
-                </tr>
+                </DataRow>
               ))}
             </DataTableBody>
           </DataTableShell>
+
+          {/* Mobile cards — the table is hidden below md, as on Orders. */}
+          <div
+            className={cn(
+              "md:hidden overflow-hidden rounded-[var(--radius-xl)] glass divide-y divide-[var(--color-ink-100)]/60 dark:divide-white/[0.04]",
+              loading && "opacity-60 transition-opacity",
+            )}
+          >
+            {rows.map((it, i) => (
+              <MobileCardRow
+                key={it.id}
+                delayIndex={i}
+                ariaLabel={`Item ${it.itemId} — ${formatItemStatus(it.status)}`}
+                onClick={() => setSelectedId(it.id)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-mono text-[13px] font-semibold text-[var(--color-ink-900)] truncate">
+                      {it.itemId}
+                    </div>
+                    <div className="mt-0.5 text-[11.5px] text-[var(--color-ink-500)] truncate">
+                      {it.order.orderRef}
+                    </div>
+                  </div>
+                  <StatusBadge status={it.status} />
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-3 text-[12px] text-[var(--color-ink-700)]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono">{it.pickupLocationCode}</span>
+                    <ArrowRight className="h-3 w-3 text-[var(--color-ink-400)]" strokeWidth={2.4} />
+                    <span className="font-mono">{it.dropLocationCode}</span>
+                  </div>
+                  <span className="font-mono tabular-nums">
+                    {it.quantity.value} {it.quantity.uom}
+                  </span>
+                </div>
+              </MobileCardRow>
+            ))}
+          </div>
 
           <GlassCard>
             <Pagination
@@ -428,7 +469,7 @@ function ItemDetailDrawer({
                         {detail.handlingInstructions.map((h) => (
                           <span
                             key={h}
-                            className="rounded-full bg-[var(--color-pastel-mint)] px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--color-brand-900)]"
+                            className="rounded-full bg-[var(--color-pastel-mint)] px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--color-pastel-mint-ink)]"
                           >
                             {formatItemStatus(h)}
                           </span>

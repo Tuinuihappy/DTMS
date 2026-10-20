@@ -29,7 +29,7 @@ import { CreateOrderDialog } from "./create-dialog";
 import { OrderDetailDrawer } from "./detail-drawer";
 import { FilterBar } from "./filter-bar";
 import { OrdersTable, type SortColumn, type SortDir } from "./orders-table";
-import { InfiniteFooter, Pagination, type PageSize } from "./pagination";
+import { Pagination, type PageSize } from "./pagination";
 import { PodScanDialog } from "./pod-scan-dialog";
 import { RedispatchDialog } from "./redispatch-dialog";
 import { ReopenDialog } from "./reopen-dialog";
@@ -142,14 +142,6 @@ function ExperienceInner() {
   const [hasActiveJob, setHasActiveJob] = useState<boolean>(
     () => searchParams.get("hasActiveJob") === "true",
   );
-  // Phase P4 — pagination mode toggle (persisted in localStorage so the
-  // operator keeps their preference across visits).
-  const [paginationMode, setPaginationMode] = useState<"paged" | "infinite">(() => {
-    if (typeof window === "undefined") return "paged";
-    const stored = window.localStorage.getItem("orders:pagination-mode");
-    return stored === "infinite" ? "infinite" : "paged";
-  });
-
   // Pagination state
   const [page, setPage] = useState(() => {
     const n = Number(searchParams.get("page"));
@@ -308,10 +300,15 @@ function ExperienceInner() {
   >(new Map());
 
   // Reset to page 1 whenever a filter changes — otherwise the user might
-  // be stranded on page 7 of a 12-row result.
+  // be stranded on page 7 of a 12-row result. Only on a real change: run
+  // on mount too, it overwrote the ?page=N just read from the URL.
+  const filterKey = [priority, transportMode, search, hasFailedTrip, hasActiveJob, pageSize].join("|");
+  const lastFilterKey = useRef(filterKey);
   useEffect(() => {
+    if (lastFilterKey.current === filterKey) return;
+    lastFilterKey.current = filterKey;
     setPage(1);
-  }, [priority, transportMode, search, hasFailedTrip, hasActiveJob, pageSize]);
+  }, [filterKey]);
 
   // Mirror state back to the URL so refresh/back/forward and share links
   // restore the view. router.replace (not push) keeps history clean.
@@ -330,12 +327,6 @@ function ExperienceInner() {
     const qs = p.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }, [priority, transportMode, search, hasFailedTrip, hasActiveJob, page, pageSize, sortBy, sortDir, router, pathname]);
-
-  // Persist pagination mode preference across visits.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("orders:pagination-mode", paginationMode);
-  }, [paginationMode]);
 
   // `signal` comes from the poll schedule when this runs on a timer, so a
   // refused poll can back off; a manual refresh brings its own.
@@ -372,16 +363,10 @@ function ExperienceInner() {
         // Server now handles Active/Completed buckets via WHERE Status IN
         // (...). totalCount is authoritative for pagination — no more
         // client-side post-filter or upper-bound counts.
-        // In infinite-scroll mode, page>1 appends rather than replaces so
-        // a "Load more" tap extends the list instead of swapping it.
-        if (paginationMode === "infinite" && page > 1) {
-          setOrders((prev) => {
-            const seen = new Set(prev.map((o) => o.id));
-            return [...prev, ...res.items.filter((o) => !seen.has(o.id))];
-          });
-        } else {
-          setOrders(res.items);
-        }
+        // Paged only. A "Scroll" (load-more) mode used to append page N to
+        // the list, so polls and realtime refreshed only the last page and
+        // rows above went stale — removed (frontend review M26).
+        setOrders(res.items);
         setTotalCount(res.totalCount);
       } catch (e) {
         if (signal.aborted || (e as Error).name === "AbortError") return;
@@ -396,7 +381,7 @@ function ExperienceInner() {
         }
       }
     },
-    [priority, transportMode, search, hasFailedTrip, hasActiveJob, page, pageSize, sortBy, sortDir, paginationMode],
+    [priority, transportMode, search, hasFailedTrip, hasActiveJob, page, pageSize, sortBy, sortDir],
   );
 
   useEffect(() => {
@@ -889,26 +874,14 @@ function ExperienceInner() {
             transition={{ duration: 0.4, delay: 0.15 }}
             className="mt-2 rounded-[var(--radius-xl)] glass"
           >
-            {paginationMode === "paged" ? (
-              <Pagination
-                total={totalCount}
-                page={page}
-                pageSize={pageSize}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-                mode={paginationMode}
-                onModeChange={setPaginationMode}
-              />
-            ) : (
-              <InfiniteFooter
-                shown={orders.length}
-                total={totalCount}
-                loading={refreshing}
-                onLoadMore={() => setPage((p) => p + 1)}
-                mode={paginationMode}
-                onModeChange={setPaginationMode}
-              />
-            )}
+            <Pagination
+              total={totalCount}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+
           </motion.div>
         )}
       </div>
