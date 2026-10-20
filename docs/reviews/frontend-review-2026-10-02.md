@@ -6,9 +6,9 @@
 
 > หมายเหตุ: verifier หักล้างได้แค่ 1 จาก 132 ข้อ — เข้มน้อยกว่าที่ควร ให้ถือ MEDIUM/LOW เป็น "น่าจะจริง" จนกว่าจะเปิดดูเอง
 
-## สถานะ (อัปเดต 2026-10-16)
+## สถานะ (อัปเดต 2026-10-20)
 
-แก้แล้ว HIGH 12 จาก 15, MEDIUM 14 ข้อ (M5, M12, M15, M16, M18, M23, M33, M34, M35, M40, M45, M48, M49, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
+แก้แล้ว HIGH 12 จาก 15, MEDIUM 19 ข้อ (M5, M12, M15, M16, M18, M23, M33, M34, M35, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน M4, L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
 
 | ข้อ | เรื่อง | Commit |
 |---|---|---|
@@ -31,6 +31,7 @@
 | M15 | realtime ทุกหน้าลองต่อใหม่เอง (backoff 1s → 30s) เมื่อต่อครั้งแรกไม่ได้หรือ restart หลัง drain ล้ม แล้ว subscribe กลุ่มใหม่ ไม่ต้อง reload หน้า | `c38ff16d` |
 | M16, M45 | ข้อมูล pool อยู่ใน `OperatorPoolProvider` ที่ layout ของ `/m` refetch ที่ล้มเหลวคงรายการเดิมไว้ หน้า Pool แสดง "โหลด Pool ไม่สำเร็จ" พร้อมปุ่มลองใหม่แทน "Pool is empty" (หรือแถบเตือนเหนือรายการเดิม) และทิ้งผลของ fetch ที่ไม่ใช่ครั้งล่าสุด | `2c01dc95`, `f0a7c44a` |
 | M48 | My trips และ Trip detail แสดง OrderRef, จุด pickup → drop และจำนวนชิ้น/น้ำหนักแบบการ์ด Pool (backend ส่งมากับ `/api/operator/trips/assigned`) ส่วน tripId เหลือเป็นบรรทัดเล็กในหน้า detail | `d193c8de` |
+| M42, M44, M46, M47, M50 (+ M43 บางส่วน) | PWA: บันทึก offline ขึ้น 'Saved offline' ไม่ใช่ error สีแดง · โหลด trip ไม่สำเร็จบอกว่าโหลดไม่สำเร็จพร้อมปุ่มลองใหม่ (ไม่ใช่ 'not found') · รับงานจาก Pool ต้องออนไลน์ ไม่เข้าคิวอีก · logout ล้างคิว offline และ push เสมอ และถามก่อนถ้ายังมีรายการค้าง · ปุ่ม Settings, ป้าย queued และลิงก์ Back กดได้ 44px · ฟอร์มขอ override geofence ซ่อนไว้ (ส่งไม่ได้อยู่แล้ว และ geofence ปิด) | `d364498e` |
 
 **ไม่แก้ (ตัดสินใจ 2026-10-06)**
 - **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile: เจ้าของระบบเลือกข้าม คงไว้ตามเดิม
@@ -491,7 +492,7 @@
 - แก้: ถอด capture ออกเพื่อให้ระบบปฏิบัติการแสดงตัวเลือก "กล้อง/คลังรูป" เอง หรือทำเป็นสองปุ่ม "ถ่ายรูป" (มี capture) กับ "เลือกไฟล์" (multiple ไม่มี capture)
 - Verifier: attachment-gallery.tsx:64-65 ใส่ทั้ง capture="environment" และ multiple จริง บน Android Chrome และ iOS Safari ค่า capture จะเปิดกล้องตรงทันทีโดยไม่มีตัวเลือกคลังรูปหรือไฟล์ และ multiple จะไม่มีผล คอมเมนต์ที่บอกว่า 'one control serving both entry points' ถูกเฉพาะเมื่อเทียบเดสก์ท็อปกับมือถือ ไม่ได้รองรับรูปเก่าในเครื่องมือถือ ต่างจาก POD (operator-pwa/pod-capture.tsx) ที่ตั้งใจให้ถ่ายสดจริง ส่วน gallery สำหรับรูปความเสียหายควรเลือกรูปเดิมได้
 
-### M42. บันทึก offline สำเร็จแล้ว แต่หน้าจอกลับแสดง error สีแดงแทน 'Saved offline' — CONFIRMED
+### M42. บันทึก offline สำเร็จแล้ว แต่หน้าจอกลับแสดง error สีแดงแทน 'Saved offline' — CONFIRMED · ✅ แก้แล้ว `d364498e`
 - กลุ่ม: operator-pwa · code
 - ที่: `frontend/components/operator-pwa/trip-detail.tsx:101`
 - ปัญหา: ใน onAcknowledge/onPickup/onDrop/onComplete จะ setActionNote("Saved offline — will sync.") ก่อน แล้วจึง await refresh() แต่ refresh rethrow (บรรทัด 66) ตอน offline fetch จะ throw 'Failed to fetch' ไปเข้า catch แล้ว setActionError ซึ่งบรรทัด 190 (actionNote && !actionError) จะซ่อน note ไว้
@@ -499,7 +500,7 @@
 - แก้: ห่อ refresh() หลัง action ด้วย try/catch แยก (หรือ void refresh().catch(()=>{})) และเรียก refresh เฉพาะเมื่อ result.delivered เท่านั้น ให้ error ของ action กับ error ของการ refresh แยกจากกัน
 - Verifier: ตอน offline enqueueAction จะคืน delivered:false แล้วโค้ด setActionNote("Saved offline…") ต่อด้วย await refresh() แต่ getAssignedTrips เรียก fetch ซึ่ง throw และ refresh ก็ rethrow ต่อ จึงไปเข้า catch แล้ว setActionError บรรทัด 190 (actionNote && !actionError) เลยซ่อน note ไว้ ผู้ใช้จึงเห็นแบนเนอร์แดงแทนข้อความ 'Saved offline'
 
-### M43. ผลการขอ geofence override ไม่เคยแสดงให้เห็น และช่อง Warehouse ID ให้ไปคัดลอกค่าที่หน้าจอไม่ได้แสดง — CONFIRMED
+### M43. ผลการขอ geofence override ไม่เคยแสดงให้เห็น และช่อง Warehouse ID ให้ไปคัดลอกค่าที่หน้าจอไม่ได้แสดง — CONFIRMED · 🟡 ซ่อนฟอร์มไว้ `d364498e` (geofence ปิดอยู่ — ต้องให้ API หา location จาก trip ก่อนเปิด)
 - กลุ่ม: operator-pwa · uiux
 - ที่: `frontend/components/operator-pwa/trip-detail.tsx:187`
 - ปัญหา: ErrorBanner ส่งผลผ่าน onOverrideSubmitted → setActionNote แต่ actionError ยังค้างอยู่ บรรทัด 190 จึงซ่อน note ไว้ทั้งกรณีสำเร็จและล้มเหลว ฟอร์มยังค้างให้กรอกต่อ นอกจากนี้ label บรรทัด 383 เขียนว่า 'Warehouse ID (copy from the trip detail)' แต่ trip detail ไม่ได้แสดง warehouse ID ที่ไหนเลย
@@ -507,7 +508,7 @@
 - แก้: ให้ onOverrideSubmitted ล้าง actionError (setActionError(null)) ก่อน set note หรือแสดงผลภายใน ErrorBanner เอง และเติม expectedWarehouseId จากข้อมูล trip หรือจาก body ของ GEOFENCE_REJECTED แทนการให้พิมพ์เอง
 - Verifier: onOverrideSubmitted แค่ setActionNote แต่ไม่ล้าง actionError บรรทัด 190 จึงซ่อน note ไว้ทั้งกรณีสำเร็จและล้มเหลว ส่วน AssignedTrip ก็ไม่มี warehouse field และ TripDetail ไม่ได้แสดง warehouse ID ที่ไหนเลย label ที่บอกให้ 'copy from the trip detail' จึงทำตามไม่ได้
 
-### M44. โหลด trip ไม่สำเร็จ (offline/429/5xx) แต่แสดงว่า 'Trip not found or no longer assigned to you' — CONFIRMED
+### M44. โหลด trip ไม่สำเร็จ (offline/429/5xx) แต่แสดงว่า 'Trip not found or no longer assigned to you' — CONFIRMED · ✅ แก้แล้ว `d364498e`
 - กลุ่ม: operator-pwa · uiux
 - ที่: `frontend/components/operator-pwa/trip-detail.tsx:78`
 - ปัญหา: refresh ตั้ง loading=false ใน finally แต่ไม่มี state สำหรับ error ถ้าการโหลดครั้งแรกล้มเหลว trip จะยังเป็น null และเข้า branch 'not found'
@@ -523,7 +524,7 @@
 - แก้: ใน hook ให้ dispatch error (และคง trips เดิมไว้) แล้วให้ PoolTripsList แสดงแบนเนอร์ error พร้อมปุ่ม Retry แยกจาก empty state
 - Verifier: ใน use-pool-trips.ts refetch ตอน catch จะ dispatch REFETCH trips:[] โดยไม่ set error (reducer ยังตั้ง error:null ด้วย) PoolTripsList ไม่อ่าน error เลยแสดง 'Pool is empty' แย่กว่านั้นคือ refetch ที่ล้มเหลวตอน reconnect จะล้างรายการที่มีอยู่ทิ้งด้วย
 
-### M46. กด claim ตอน offline ระบบเข้าคิวไว้แล้วบอกว่า 'Queued' แต่ถ้าแพ้ CAS ทีหลัง action จะถูกทิ้งเงียบๆ — CONFIRMED
+### M46. กด claim ตอน offline ระบบเข้าคิวไว้แล้วบอกว่า 'Queued' แต่ถ้าแพ้ CAS ทีหลัง action จะถูกทิ้งเงียบๆ — CONFIRMED · ✅ แก้แล้ว `d364498e`
 - กลุ่ม: operator-pwa · code
 - ที่: `frontend/components/operator-pwa/pool-trips-list.tsx:50`
 - ปัญหา: acknowledgeTrip ส่งผ่าน enqueueAction ตอน offline หรือเจอ network error จึงถูกเก็บลงคิว การ claim จาก pool เป็นการแข่งกัน (CAS) ตอน replay ถ้าคนอื่นรับไปแล้วจะได้ 409 ซึ่ง isPermanentFailure ลบทิ้งโดยไม่มีใครเห็น
@@ -531,7 +532,7 @@
 - แก้: การ claim ควรทำแบบ online เท่านั้น: เรียก fetch ตรงโดยไม่ผ่านคิว ถ้า navigator.onLine===false หรือเจอ network error ให้แสดงว่า 'ต้องออนไลน์เพื่อรับงาน' แทนการเข้าคิว
 - Verifier: acknowledgeTrip ส่งผ่าน enqueueAction ตอน offline จึงถูกเข้าคิวและขึ้น toast 'Queued' พอ replay แล้วได้ 409 TRIP_ALREADY_CLAIMED ทั้ง drainQueue และ sw.js จะลบแถวทิ้ง แล้ว header ก็ไม่ได้แสดง lastError การ claim ที่แพ้จึงหายไปเงียบๆ
 
-### M47. Logout ไม่ล้างคิว offline และ push subscription บนเครื่องที่ใช้ร่วมกัน — CONFIRMED
+### M47. Logout ไม่ล้างคิว offline และ push subscription บนเครื่องที่ใช้ร่วมกัน — CONFIRMED · ✅ แก้แล้ว `d364498e`
 - กลุ่ม: operator-pwa · code
 - ที่: `frontend/components/operator-pwa/settings-panel.tsx:120`
 - ปัญหา: onLogout เรียกแค่ /api/auth/logout แถวในคิว IDB 'dtms-operator' ไม่มีข้อมูลว่าเป็นของ user คนไหน และ push subscription ยังผูกกับบัญชีเดิม ถ้า operator คนถัดไป login บนแท็บเล็ตเครื่องเดียวกัน drain จะ replay action ของคนก่อนด้วย cookie ของคนใหม่ (ได้ 4xx แล้วถูกทิ้ง) และ notification ของคนก่อนจะเด้งบนเครื่องคนใหม่
@@ -555,7 +556,7 @@
 - แก้: เพิ่มไฟล์ public/icons/operator-192.png, operator-512.png (maskable แยกจาก any) และ operator-badge.png (monochrome)
 - Verifier: ใน frontend/public มีแค่ manifest.webmanifest กับ sw.js ไม่มีโฟลเดอร์ icons ไฟล์ /icons/operator-192.png, operator-512.png และ operator-badge.png ที่อ้างถึงจึงเป็น 404 ทั้งหมด install prompt จึงไม่ขึ้นและ notification ไม่มีไอคอน
 
-### M50. ปุ่ม Settings, pill 'queued' และลิงก์ Back เล็กกว่า 44px — CONFIRMED
+### M50. ปุ่ม Settings, pill 'queued' และลิงก์ Back เล็กกว่า 44px — CONFIRMED · ✅ แก้แล้ว `d364498e`
 - กลุ่ม: operator-pwa · uiux
 - ที่: `frontend/components/operator-pwa/operator-shell-header.tsx:70`
 - ปัญหา: ลิงก์ Settings ใช้ px-3 py-1.5 text-xs สูงประมาณ 28px pill 'N queued' (บรรทัด 63) ใช้ py-0.5 สูงประมาณ 20px และลิงก์ '← Back to trips' ใน app/m/trips/[id]/page.tsx:20 เป็น inline text-xs สูงประมาณ 16px
