@@ -5,6 +5,7 @@
 // search (useWmsLocationSearch).
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { errorMessageFrom } from "./errors";
 
 export type WmsLocationSummaryDto = {
   id: string;                            // Guid — internal WMS location id
@@ -51,8 +52,7 @@ export async function searchWmsLocations(
     : "/api/wms/locations";
   const res = await fetch(url, { cache: "no-store", signal: opts.signal });
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(text || `Failed to search WMS locations (${res.status})`);
+    throw new Error(await errorMessageFrom(res, `Failed to search WMS locations (${res.status})`));
   }
   return res.json();
 }

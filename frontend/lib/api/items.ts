@@ -3,6 +3,8 @@
 //   GET /api/v1/items/{itemId} (detail)         → backend GetItemQuery
 // Reached through the same-origin Next proxy (app/api/items/**).
 
+import { errorMessageFrom } from "./errors";
+
 // Item status arrives from the backend as SnakeCaseUpper (global
 // JsonStringEnumConverter). The `status` FILTER param, however, is parsed
 // server-side with Enum.TryParse on the C# member name, so the filter must
@@ -107,8 +109,7 @@ export async function searchItems(
     signal,
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(text || `Failed to load items (${res.status})`);
+    throw new Error(await errorMessageFrom(res, `Failed to load items (${res.status})`));
   }
   return res.json();
 }

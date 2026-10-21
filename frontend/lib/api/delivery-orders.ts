@@ -3,7 +3,7 @@
 // Next.js route handlers under app/api/delivery-orders/* — these helpers
 // are what client components call.
 
-import { throwIfRateLimited } from "@/lib/api/errors";
+import { throwIfRateLimited, errorMessageFrom } from "@/lib/api/errors";
 
 export type OrderStatus =
   | "Draft"
@@ -151,8 +151,7 @@ export async function confirmItemPod(
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(text || `POD scan failed (${res.status})`);
+    throw new Error(await errorMessageFrom(res, `POD scan failed (${res.status})`));
   }
 }
 

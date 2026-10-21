@@ -56,3 +56,25 @@ export async function throwIfRateLimited(res: Response): Promise<void> {
     seconds,
   );
 }
+
+/**
+ * The human sentence in a failed response, or `fallback`. The BFF proxy
+ * turns every non-2xx into JSON `{ message }` (proxyToBackend), so reading
+ * the body with res.text() put a raw `{"message":"…"}` in front of users
+ * (frontend review M10). Reads message / detail / error, then plain text,
+ * then gives up to the fallback.
+ */
+export async function errorMessageFrom(res: Response, fallback: string): Promise<string> {
+  const text = await res.text().catch(() => "");
+  if (!text) return fallback;
+  try {
+    const body = JSON.parse(text) as { message?: unknown; detail?: unknown; error?: unknown };
+    const msg = [body?.message, body?.detail, body?.error].find(
+      (v): v is string => typeof v === "string" && v.trim() !== "",
+    );
+    return msg ?? fallback;
+  } catch {
+    // Not JSON: a short plain-text reason is fine to show, an HTML page is not.
+    return text.length <= 300 && !text.trimStart().startsWith("<") ? text : fallback;
+  }
+}

@@ -1,4 +1,4 @@
-import { throwIfRateLimited } from "@/lib/api/errors";
+import { throwIfRateLimited, errorMessageFrom } from "@/lib/api/errors";
 
 export type StationDto = {
   id: string;
@@ -60,8 +60,7 @@ export async function getStations(opts?: {
     cache: "no-store",
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(text || `Failed to load stations (${res.status})`);
+    throw new Error(await errorMessageFrom(res, `Failed to load stations (${res.status})`));
   }
   return res.json();
 }
@@ -231,8 +230,7 @@ export async function getMapRobotPositions(
   });
   await throwIfRateLimited(res);
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(text || `Failed to load robot positions (${res.status})`);
+    throw new Error(await errorMessageFrom(res, `Failed to load robot positions (${res.status})`));
   }
   return res.json();
 }
@@ -240,8 +238,7 @@ export async function getMapRobotPositions(
 export async function listMaps(): Promise<MapSummaryDto[]> {
   const res = await fetch("/api/facility/maps", { cache: "no-store" });
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(text || `Failed to load maps (${res.status})`);
+    throw new Error(await errorMessageFrom(res, `Failed to load maps (${res.status})`));
   }
   return res.json();
 }
