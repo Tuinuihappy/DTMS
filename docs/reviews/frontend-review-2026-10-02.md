@@ -6,9 +6,9 @@
 
 > หมายเหตุ: verifier หักล้างได้แค่ 1 จาก 132 ข้อ — เข้มน้อยกว่าที่ควร ให้ถือ MEDIUM/LOW เป็น "น่าจะจริง" จนกว่าจะเปิดดูเอง
 
-## สถานะ (อัปเดต 2026-10-20)
+## สถานะ (อัปเดต 2026-10-21)
 
-แก้แล้ว HIGH 12 จาก 15, MEDIUM 40 ข้อ (M1, M2, M3, M4, M5, M12, M13, M14, M15, M16, M17, M18, M20, M21, M22, M23, M24, M25, M26, M27, M28, M29, M30, M31, M32, M33, M34, M35, M36, M38, M40, M42, M44, M45, M46, M47, M48, M49, M50, M57) และ LOW 1 ข้อ (L41) ส่วน L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
+แก้แล้ว HIGH 12 จาก 15, MEDIUM 53 ข้อ (ทุกข้อยกเว้น M37 และ M43 ที่รอเปิด geofence, M19 และ M55 ที่แก้บางส่วน และ M53 ที่ไม่แก้) และ LOW 1 ข้อ (L41) ส่วน L28, L29 แก้เฉพาะส่วนที่เป็นเรื่อง dialog และ M43 ซ่อนฟอร์มไว้ก่อน ทุกข้อ commit บน main และ rebuild แล้ว หัวข้อที่แก้แล้วมีป้าย ✅ พร้อม commit
 
 | ข้อ | เรื่อง | Commit |
 |---|---|---|
@@ -41,6 +41,10 @@
 | M17 | Combobox ทั้ง 3 ตัว (Station, WMS location, UOM): กด Tab ออกแล้วรายการปิดและทิ้งข้อความที่ยังไม่ได้เลือก · ปุ่ม Clear ของ Station ใช้คีย์บอร์ดได้ · ARIA ครบ (role combobox บน input, aria-controls, aria-activedescendant) | `0a3c58ba` |
 | M19 (บางส่วน) | TopNav ทุกหน้า: เอาแท็บ Home/Messages/Discover/Wallet/Projects ที่กดไม่ไปไหนออก และเอาจุดแจ้งเตือนสีแดงที่ขึ้นค้างออก ส่วนแถบทักทายบน /dashboard ไม่แก้ | `c0246059` |
 | M1, M2, M3, M4 | IAM audit log: แสดงคอลัมน์ System (กดเพื่อกรอง) และ Details · ตัวเลือก Action มาจาก action ที่มีจริงใน log (`/audit-log/actions`) · filter Role เปลี่ยนเป็น System (backend รับ `systemKey`) · หน่วงเวลาตอนพิมพ์และทิ้งผลเก่า · ปุ่มปิด dialog subscriptions มี aria-label | `c9be5dd0`, `bb11b530` |
+| M6, M7, M8, M9 | Analytics: ป้ายความสดของข้อมูลใช้เวลาของ projection จริง · KPI แสดงว่าโหลดไม่สำเร็จแทนเลข 0 · tile "In flight" เปลี่ยนเป็น "Dispatched (24h)" ตามข้อมูลจริง · ช่วงเวลาใน Reports เลื่อนตามชั่วโมง | `42ed9db2` |
+| M10, M11 | API layer: ข้อความ error แสดงเหตุผลจาก API แทน JSON ดิบ (`errorMessageFrom`) · route export CSV มี timeout 60 วินาที, ตอบ 502/504 และส่งเหตุผลจาก backend (`proxyCsvExport`) | `6f664662` |
+| M51, M52, M54 | Shell: เอาฟอร์ม Create account ปลอมออก (บอกให้ไปที่ onboarding portal) · โหลด permissions ล้มแล้ว retry (1s→30s) แทน "Insufficient permissions" ถาวร · ปุ่ม Try again และ badge อีก 2 จุดอ่านได้ใน dark mode | `79b53230` |
+| M55 (บางส่วน), M56, M58, M39, M41 | ลิงก์ order จาก Jobs เปิด drawer ได้ และ drawer ของ Job แสดง OrderRef · สลับ map เร็วๆ หรือสแกน carrier ติดกัน ไม่ได้ผลเก่าทับ · ข้อความ amber บนพื้นอ่อนใช้ amber-600 (12 ไฟล์) · มือถือเลือกรูปจากคลังได้ (เอา capture ออก) | `35c57967` |
 
 **ไม่แก้ (ตัดสินใจ 2026-10-06)**
 - **H4, H12, H13 — ข้อมูล mock** ใน /dashboard, /home และหน้า Profile: เจ้าของระบบเลือกข้าม คงไว้ตามเดิม
@@ -213,7 +217,7 @@
 - แก้: เติม `dark:bg-white/[0.05] dark:border-white/[0.08]` ให้ปุ่มรองตามที่ iam-systems-experience.tsx:272 ทำไว้แล้ว และให้ banner ใช้ token `bg-[var(--color-coral-soft)] text-[var(--color-coral)]` แบบ replay-dialog.tsx:207
 - Verifier: ยืนยันแล้ว: ปุ่มที่ :402, 478, 700, 729, 765, 773, 874, 901 ใช้ bg-white text-ink-600 โดยไม่มี dark:bg-* (ink-600 ใน dark = #a6b0cb บนพื้นขาว) ขณะที่ iam-systems-experience.tsx:272 มี dark:bg-white/[0.05] ส่วน error banner :423, subscriptions:133,306, input/select และ toneClass ใน audit-log ก็ไม่มี dark variant ซึ่ง globals.css:16 ระบุไว้ชัดว่าต้องใส่ (บรรทัด 783 เป็น onClick ไม่ใช่ className แต่ปุ่มตัวเดียวกันก็มีปัญหานี้)
 
-### M6. DataFreshnessChip ได้เวลาที่ client fetch เสร็จ ไม่ใช่ lastEventAt ของ projection — CONFIRMED
+### M6. DataFreshnessChip ได้เวลาที่ client fetch เสร็จ ไม่ใช่ lastEventAt ของ projection — CONFIRMED · ✅ แก้แล้ว `42ed9db2`
 - กลุ่ม: analytics · code
 - ที่: `frontend/components/dashboard/kpi-rail.tsx:104`
 - ปัญหา: `<DataFreshnessChip lastEventAt={lastUpdated ?? data.lastEventAt} />` โดย `lastUpdated` คือ `new Date()` ตอนที่ fetch สำเร็จ (use-projection-poll.ts:51) และมีค่าเสมอเมื่อมี data แบบเดียวกันอยู่ที่ dispatch-funnel.tsx:104, orders-analysis-experience.tsx:97 และ robots-analysis-experience.tsx:97 ซึ่งขัดกับ contract ของ chip เอง (data-freshness-chip.tsx:18-20 "NOT the wall clock when the API responded")
@@ -221,7 +225,7 @@
 - แก้: ส่ง `data.lastEventAt` อย่างเดียว ถ้ากังวลว่าช่วงเงียบตอนกลางคืนจะขึ้น Stale ให้แยกเป็นสอง chip คือ "Fetched" (จาก lastUpdated) กับ "Last event" (จาก lastEventAt) แทนการใช้ `??` รวมกัน
 - Verifier: ยืนยันแล้ว: ทั้ง 4 จุดใช้ `lastUpdated ?? data.lastEventAt` โดย lastUpdated มาจาก new Date() ตอน fetch สำเร็จ และมีค่าทุกครั้งที่มี data จึงไม่เคย fallback ไปใช้ lastEventAt เลย chip จะไม่ขึ้น stale ตราบใดที่ API ยังตอบได้ ซึ่งขัดกับ doc ของ chip เอง commit f2dbc140 ไม่ได้บอกเหตุผลไว้ว่าตั้งใจทำแบบนี้ แต่อาจตั้งใจเลี่ยงไม่ให้ขึ้น stale ในช่วงที่ไม่มี event เลยให้ MEDIUM
 
-### M7. KpiRail ไม่แสดง error เมื่อโหลดไม่สำเร็จ จะเห็นเป็น 0 ทุก tile — CONFIRMED
+### M7. KpiRail ไม่แสดง error เมื่อโหลดไม่สำเร็จ จะเห็นเป็น 0 ทุก tile — CONFIRMED · ✅ แก้แล้ว `42ed9db2`
 - กลุ่ม: analytics · code
 - ที่: `frontend/components/dashboard/kpi-rail.tsx:52`
 - ปัญหา: destructure มาแค่ `{ data, lastUpdated, refresh }` ไม่ได้ใช้ `error` หรือ `loading` และบรรทัด 74 fallback เป็น `EMPTY_TOTALS` ถ้าโหลดครั้งแรกล้มเหลว (401/429/500) tile จะแสดง 0 ตลอด ถ้าล้มเหลวภายหลังก็จะค้างค่าเก่าโดยไม่มีอะไรบอก (ต่างจาก DispatchFunnel ที่แสดง error ไว้ที่บรรทัด 129-133)
@@ -229,7 +233,7 @@
 - แก้: ดึง `error` และ `loading` มาใช้ ตอน `data === null` ให้แสดง skeleton หรือ "—" แทน 0 และตอนมี error ให้แสดงแถบ coral แบบเดียวกับ dispatch-funnel.tsx:129
 - Verifier: ยืนยันแล้ว: KpiRail destructure มาแค่ { data, lastUpdated, refresh } แล้ว fallback เป็น EMPTY_TOTALS ทุก tile จึงแสดง 0 เมื่อโหลดล้มเหลว และไม่มีการแสดง error เลย ต่างจาก dispatch-funnel.tsx:129-133 ที่แสดง error ไว้
 
-### M8. tile "In flight" (ติดป้าย Live) นับจำนวนครั้งที่เปลี่ยนสถานะ ไม่ใช่จำนวน order ที่กำลังวิ่งอยู่ — CONFIRMED
+### M8. tile "In flight" (ติดป้าย Live) นับจำนวนครั้งที่เปลี่ยนสถานะ ไม่ใช่จำนวน order ที่กำลังวิ่งอยู่ — CONFIRMED · ✅ แก้แล้ว `42ed9db2`
 - กลุ่ม: analytics · uiux
 - ที่: `frontend/components/dashboard/kpi-rail.tsx:131`
 - ปัญหา: `inFlight = t.dispatched + t.inProgress` แต่ OrderFunnelHourly นับ event การเปลี่ยนสถานะรายชั่วโมง (src/Modules/DeliveryOrder/.../OrderFunnelProjector.cs:11-12) ผลรวม 24h จึงนับ order เดียวซ้ำ 2 ครั้ง (Dispatched แล้ว InProgress) และนับรวม order ที่ complete ไปแล้วด้วย tile นี้ยังติด StatusPulse "Live" (บรรทัด 143-147) ส่วน orders-analysis-experience.tsx:77 tile "Dispatched" ก็บวกแบบเดียวกัน
@@ -237,7 +241,7 @@
 - แก้: เปลี่ยน label เป็น "Dispatched (24h)" ใช้ `t.dispatched` อย่างเดียว และเอา pulse ออก ถ้าต้องการจำนวนที่กำลังวิ่งจริงให้ดึง count ปัจจุบันจาก OrderListView แทน funnel ส่วน orders-analysis:77 ก็ไม่ควรบวก inProgress เข้าไป
 - Verifier: ยืนยันแล้ว: OrderFunnelProjector นับเพิ่มคอลัมน์ตาม event การเปลี่ยนสถานะ (Dispatched และ InProgress แยกกัน) ส่วน buildKpis คำนวณ inFlight = dispatched + inProgress พร้อม pulse "Live" order เดียวที่ผ่านทั้งสองสถานะจึงถูกนับสองครั้ง และนับรวม order ที่จบไปแล้วด้วย ตัวเลขนี้จึงไม่ใช่จำนวนงานที่กำลังวิ่งอยู่จริง ส่วน orders-analysis:77 บวกแบบเดียวกัน
 
-### M9. Reports poll ทุก 5 นาทีด้วยช่วงเวลาที่ถูกตรึงไว้ตอนเปิดหน้า — CONFIRMED
+### M9. Reports poll ทุก 5 นาทีด้วยช่วงเวลาที่ถูกตรึงไว้ตอนเปิดหน้า — CONFIRMED · ✅ แก้แล้ว `42ed9db2`
 - กลุ่ม: analytics · code
 - ที่: `frontend/components/reports/reports-experience.tsx:38`
 - ปัญหา: `useMemo(() => buildWindowRange(windowKey), [windowKey])` คำนวณ `toUtc` (ต้นชั่วโมงถัดไป) แค่ครั้งเดียว การ poll ทุก 5 นาทีจึงส่ง from/to ชุดเดิมตลอด ต่างจาก kpi-rail.tsx:49 และ dispatch-funnel.tsx:56 ที่เรียก `defaultWindow()` ใหม่ในทุก fetch
@@ -245,7 +249,7 @@
 - แก้: ส่ง `windowKey` (ไม่ใช่ range) ลงไปที่ report แล้วเรียก `buildWindowRange(windowKey)` ภายใน fetcher ทำพร้อมกับการแก้ finding เรื่องเปลี่ยน window แล้วไม่ refetch ได้เลย
 - Verifier: ยืนยันแล้ว: buildWindowRange ถูก useMemo ไว้ด้วย [windowKey] ทำให้ toUtc ตรึงไว้ที่ต้นชั่วโมงถัดไปนับจากตอนเลือก ทุกรอบ poll 5 นาทีจึงส่ง range เดิมซ้ำ หลังผ่านชั่วโมงนั้นไปแล้ว order ใหม่จะไม่เข้ามาใน report อีก ต่างจาก kpi-rail และ orders-analysis ที่สร้าง window ใหม่ภายใน fetcher ทุกครั้ง
 
-### M10. ข้อความ error ที่แสดงให้ผู้ใช้เป็น JSON ดิบ {"message":...} เพราะ client อ่านด้วย res.text() — CONFIRMED
+### M10. ข้อความ error ที่แสดงให้ผู้ใช้เป็น JSON ดิบ {"message":...} เพราะ client อ่านด้วย res.text() — CONFIRMED · ✅ แก้แล้ว `6f664662`
 - กลุ่ม: api-layer · code
 - ที่: `frontend/lib/api/delivery-orders.ts:155`
 - ปัญหา: proxyToBackend (lib/api/proxy-helpers.ts:126-170) แปลงทุก non-2xx เป็น JSON `{ message }` แต่ client หลายจุดใส่ res.text() ลง Error ตรงๆ ได้แก่ confirmItemPod (delivery-orders.ts:155), getStations / getMapRobotPositions / listMaps (facility.ts:64, 235, 244), searchItems (items.ts:111), searchWmsLocations (wms-locations.ts:54) และ send() ใน fleet-attachments.ts:48 ที่ตัดได้แค่เครื่องหมายคำพูด ไม่ได้ parse JSON
@@ -253,7 +257,7 @@
 - แก้: parse JSON แล้วดึง message/detail แบบเดียวกับ unwrap() ใน delivery-orders.ts:275 ดีที่สุดคือรวมเป็น helper ตัวเดียว เช่น readApiError(res) ใน lib/api/errors.ts ที่เรียก throwIfRateLimited ก่อน แล้วอ่าน message ?? detail ?? error ให้ทุกไฟล์ใช้ร่วมกัน
 - Verifier: route ที่เกี่ยวข้อง (pod-scan, facility/stations, items, wms/locations, fleet/attachments) ใช้ proxyToBackend ทั้งหมด ซึ่งคืน non-2xx เป็น NextResponse.json({ message }) ส่วน confirmItemPod, getStations, getMapRobotPositions, listMaps, searchItems, searchWmsLocations ใส่ res.text() ลงใน Error ตรงๆ และ fleet-attachments send() ตัดได้แค่ quote ที่หัวกับท้าย ผู้ใช้จึงเห็น {"message":...} ดิบ ต่างจาก unwrap() ที่ parse JSON ให้
 
-### M11. route export CSV ไม่มี try/catch และ timeout และทิ้งข้อความ error จาก backend — CONFIRMED
+### M11. route export CSV ไม่มี try/catch และ timeout และทิ้งข้อความ error จาก backend — CONFIRMED · ✅ แก้แล้ว `6f664662`
 - กลุ่ม: api-layer · code
 - ที่: `frontend/app/api/reports/orders-export/route.ts:22`
 - ปัญหา: orders-export, trips-export และ jobs-export (โค้ดเหมือนกัน) เรียก fetch(url) โดยไม่มี try/catch และ AbortController ถ้า backend ล่มหรือค้าง จะเกิด unhandled rejection หรือ request แขวนไม่มีกำหนด ถ้าไม่ ok ก็คืน `Export failed: ${status}` (บรรทัด 31-35) ทิ้ง message/detail ของ backend และ Retry-After ไป ซึ่งต่างจาก proxyToBackend ที่จัดการทั้งสามเรื่องนี้
@@ -477,7 +481,7 @@
 - แก้: ครอบด้วย TopNav/LeftRail และ main layout แบบเดียวกับ trips page แล้วเพิ่มลิงก์ใน left-rail เปลี่ยนสีเป็น token (--color-success/amber/coral, surface) เปลี่ยน dialog ไปใช้ OverlayBackdrop และ AnimatePresence ตามแบบ RaiseExceptionDialog และแสดงเวลาด้วย <DateTime>
 - Verifier: app/dispatch/manual/page.tsx render แค่ ManualOperatorBoard ไม่มี TopNav/LeftRail แบบหน้า trips และ grep 'dispatch/manual' นอก .next ก็เจอแค่ไฟล์ page เอง ใน manual/*.tsx ใช้ zinc/red/emerald/blue ดิบรวมราว 42 จุด ReassignDialog กับ DenyDialog ใช้ div fixed inset-0 bg-black/60 ที่ onClick={onClose} ปิดได้โดยไม่เช็ก busy ส่วน toLocaleTimeString อยู่ที่ override-queue-section.tsx:97-98 ตรงตามที่รายงานทุกข้อ
 
-### M39. Scan dialog: ผล lookup ของรหัสที่สแกนก่อนอาจทับผลของรหัสที่สแกนทีหลัง — CONFIRMED
+### M39. Scan dialog: ผล lookup ของรหัสที่สแกนก่อนอาจทับผลของรหัสที่สแกนทีหลัง — CONFIRMED · ✅ แก้แล้ว `35c57967`
 - กลุ่ม: fleet · code
 - ที่: `frontend/components/fleet/carrier-scan-dialog.tsx:103`
 - ปัญหา: resolve() ไม่มี request token และไม่มี AbortController ตัวอย่างเช่น สแกน A ที่ไม่อยู่ใน knownCarriers (บนหน้า carriers คือแค่ rows ของหน้าปัจจุบัน 25 แถว จึงพลาดบ่อย) ระบบจะเรียก `await getCarrier(A)` แล้วถ้าสแกน B ที่อยู่ใน knownCarriers ต่อทันที B จะ settle ทันที ต่อมาเมื่อ response ของ A กลับมา settle(A) จะ setState ทับเป็น found=A ปัญหาเดียวกันเกิดได้กับ lookup ผ่าน network สองครั้งที่ตอบกลับสลับลำดับ
@@ -493,7 +497,7 @@
 - แก้: แยก ModalShell ที่ carrier-type-form-dialog ใช้อยู่แล้วออกมาเป็น primitive กลาง แล้วเพิ่ม role="dialog" aria-modal aria-labelledby, Esc (ข้ามตอน busy), autoFocus ที่ input แรกหรือปุ่มหลัก และคืน focus ตอนปิด จากนั้นให้ทั้ง 6 จุดใช้ primitive นี้
 - Verifier: grep หา role=, Escape และ autoFocus ใน components/fleet และ components/attachments พบเฉพาะใน carrier-scan-dialog.tsx (64, 187, 219) และ attachment-lightbox.tsx:75 ส่วน CarrierTypeDeleteDialog, PhotosDialog และ maintenance panel ที่เปิดดูเป็น motion.div/aside ธรรมดา ไม่มี role, ไม่ปิดด้วย Esc และไม่จัดการ focus ซึ่งขัดกับ house rule ใน review-frontend.md:81 ('focus moves in on open, returns on close, Esc closes, focus trapped')
 
-### M41. capture="environment" ทำให้มือถือเลือกรูปที่ถ่ายไว้แล้วไม่ได้ — CONFIRMED
+### M41. capture="environment" ทำให้มือถือเลือกรูปที่ถ่ายไว้แล้วไม่ได้ — CONFIRMED · ✅ แก้แล้ว `35c57967`
 - กลุ่ม: fleet · uiux
 - ที่: `frontend/components/attachments/attachment-gallery.tsx:64`
 - ปัญหา: input file ใส่ `capture="environment"` คู่กับ `multiple` บน Android Chrome และ iOS Safari ค่า capture จะเปิดกล้องตรงทันทีโดยไม่มีตัวเลือกคลังรูป และ multiple จะถูกเมินไป คอมเมนต์บอกว่า control เดียวรองรับทั้งสองทาง แต่บนมือถือรองรับได้แค่ทางเดียว
@@ -573,7 +577,7 @@
 - แก้: ให้ทุก target มีขนาดอย่างน้อย min-h-11 min-w-11 (เช่น inline-flex items-center px-3 min-h-11) และทำลิงก์ Back ให้เป็นปุ่มเต็มแถวหรือย้ายไปไว้ใน header
 - Verifier: house rule ของ Operator PWA กำหนดให้ touch target ≥ 44px ลิงก์ Settings (px-3 py-1.5 text-xs), pill queued (py-0.5) และลิงก์ Back แบบ inline text-xs ใน app/m/trips/[id]/page.tsx เล็กกว่าที่กำหนดชัดเจน หน้า trip detail ไม่มี tabs nav ลิงก์ Back จึงเป็นทางกลับหลักในโหมด standalone
 
-### M51. ฟอร์ม Create account เป็นของปลอม แต่บอกผู้ใช้ว่าสร้างบัญชีสำเร็จแล้ว — CONFIRMED
+### M51. ฟอร์ม Create account เป็นของปลอม แต่บอกผู้ใช้ว่าสร้างบัญชีสำเร็จแล้ว — CONFIRMED · ✅ แก้แล้ว `79b53230`
 - กลุ่ม: shell-pages · uiux
 - ที่: `frontend/components/login/auth-panel.tsx:99`
 - ปัญหา: handleSignUpSubmit (บรรทัด 99-122) ไม่เรียก backend เลย มีแค่ setTimeout ที่สลับ status เป็น success แล้วขึ้น banner ว่า "Account created. Sign in with the credentials you just registered" (บรรทัด 332) ทั้งที่ระบบเป็น LDAP-only และไม่มี endpoint สมัครสมาชิก ปุ่ม CTA บนหน้า landing ('Get started', 'Start free trial' ที่ hero.tsx:74, top-nav.tsx:578, cta-banner.tsx:166) ลิงก์ไป /login?mode=signup ซึ่งเปิดฟอร์มนี้เป็นค่าเริ่มต้น (บรรทัด 38) และ SIGNUP_URL ก็ hardcode เป็น IP ภายในไว้ (บรรทัด 28)
@@ -581,7 +585,7 @@
 - แก้: ลบ SignUpForm กับ mode "up" ออก ให้ 'Create account' เป็น <a href={SIGNUP_URL} target="_blank" rel="noopener noreferrer"> ธรรมดาที่บอกชัดว่าจะไปที่ portal ภายนอก ย้าย SIGNUP_URL ไปไว้ใน env และเปลี่ยน CTA บน landing ให้ชี้ไปที่ /login
 - Verifier: handleSignUpSubmit (auth-panel.tsx:99-122) ไม่เรียก backend จริง มีแค่ setTimeout แล้วขึ้น banner 'Account created' และคอมเมนต์ก็เขียนว่า 'theatrical only' ส่วน CTA บน landing ลิงก์ไป /login?mode=signup จริง (hero.tsx:74, cta-banner.tsx:52, top-nav.tsx:115 ไม่ใช่บรรทัด 578 ตามที่รายงาน) ขอลดเป็น MEDIUM เพราะการกดแท็บ 'Create account' หรือลิงก์ 'Create an account' จะเปิด SIGNUP_URL (portal ภายนอก) ให้ด้วย จึงยังมีทางไปสมัครจริงได้ แต่ถ้าเข้าผ่าน ?mode=signup จะไม่เปิด portal และฟอร์มก็ยังโกหกว่าสร้างบัญชีสำเร็จแล้ว
 
-### M52. โหลด permissions พลาดครั้งเดียว ผู้ใช้จะเห็น 'Insufficient permissions' ถาวร — CONFIRMED
+### M52. โหลด permissions พลาดครั้งเดียว ผู้ใช้จะเห็น 'Insufficient permissions' ถาวร — CONFIRMED · ✅ แก้แล้ว `79b53230`
 - กลุ่ม: shell-pages · code
 - ที่: `frontend/components/auth/auth-provider.tsx:108`
 - ปัญหา: .catch(() => setPermissions([])) ทำให้ทุก error กลายเป็น "ไม่มีสิทธิ์" ถาวร ไม่ว่าจะเป็น network ล่ม, API เพิ่ง restart, session หมดอายุ (401) หรือ AbortError ตอน cleanup โค้ดไม่ retry และ effect จะรันใหม่เฉพาะเมื่อ status หรือ employeeCode เปลี่ยน นอกจากนี้ AbortError จาก cleanup ยัง setPermissions([]) ทับค่า null ที่ effect ใหม่เพิ่งตั้งไว้ด้วย
@@ -589,7 +593,7 @@
 - แก้: แยก state permissionsError ออกมา ให้ PermissionGuard แสดง 'โหลดสิทธิ์ไม่สำเร็จ' พร้อมปุ่ม retry เมื่อ error เป็น AbortError (ctrl.signal.aborted) ไม่ต้อง set state ถ้าได้ 401 ให้เรียก logout() หรือ redirect ไป /login และพิจารณา retry แบบ backoff 1-2 ครั้ง
 - Verifier: auth-provider.tsx:108 ใช้ .catch(() => setPermissions([])) จับทุก error รวมถึง AbortError ด้วย effect มี deps แค่ [status, user?.employeeCode] และไม่มีการ retry PermissionGuard จึงขึ้น 'Insufficient permissions' ถ้าการ fetch ครั้งแรกล้มเหลว จนกว่าจะ reload ส่วน AbortError จะทำให้เห็นแค่แวบเดียว เพราะ fetch ใหม่จะเขียนทับค่าในภายหลัง
 
-### M53. หน้า Profile ส่วนใหญ่เป็นข้อมูล mock ที่แสดงเหมือนเป็นข้อมูลของผู้ใช้เอง — CONFIRMED
+### M53. หน้า Profile ส่วนใหญ่เป็นข้อมูล mock ที่แสดงเหมือนเป็นข้อมูลของผู้ใช้เอง — CONFIRMED · ⏭️ ไม่แก้ (ข้อมูลตัวอย่างในหน้า Profile อยู่ในการตัดสินใจเดียวกับ H4/H12/H13)
 - กลุ่ม: shell-pages · uiux
 - ที่: `frontend/components/profile/profile-stats.tsx:24`
 - ปัญหา: ส่วนที่เป็นข้อมูลคงที่มีดังนี้: stats ทั้ง 5 ตัว (profile-stats.tsx:24-69), ใบรับรอง CDL/Hazmat, เบอร์โทร, depot และกะ (tab-overview.tsx:10-51), timeline ใน Activity (tab-activity.tsx:17-53), 'Eastern Seaboard · Sector 04' กับ 'clocked in 06:12' (profile-hero.tsx:108-115) และ footer 'Profile last synced 12 sec ago' กับ build 4aa1133 (app/profile/page.tsx:21-25) ปุ่ม Share/Edit profile (profile-hero.tsx:128-138) และ 'View full log' ไม่มี onClick ส่วนตัวเลือกภาษาและ toggle แจ้งเตือน (tab-preferences.tsx:44-51, 159) ไม่ได้บันทึกที่ไหน และ error จาก useProfile ก็ไม่ถูกแสดงเลย
@@ -597,7 +601,7 @@
 - แก้: เก็บไว้เฉพาะข้อมูลจริง คือชื่อ, employeeId, role, email และรูปจาก /api/profile รวมถึง ThemeSwitcher ส่วนที่เหลือให้ลบหรือติดป้ายว่าเป็นตัวอย่าง และให้ ProfileHero แสดง profile.error เมื่อ status === "error"
 - Verifier: app/profile/page.tsx hardcode 'Profile last synced 12 sec ago' กับ build 4aa1133 ไว้ ปุ่ม Share/Edit profile ใน profile-hero.tsx:128,132 ไม่มี onClick และ toggle ใน tab-preferences.tsx:159 เป็นแค่ useState ภายใน ส่วน profile-hero ใช้ข้อมูลเฉพาะเมื่อ status==='ready' โดยไม่แสดง error เลย
 
-### M54. ปุ่ม 'Try again' ในหน้า error อ่านไม่ออกใน dark mode — CONFIRMED
+### M54. ปุ่ม 'Try again' ในหน้า error อ่านไม่ออกใน dark mode — CONFIRMED · ✅ แก้แล้ว `79b53230`
 - กลุ่ม: shell-pages · uiux
 - ที่: `frontend/app/error.tsx:39`
 - ปัญหา: ปุ่มใช้ bg-[var(--color-ink-900)] คู่กับ text-white แต่ใน .dark ค่า --color-ink-900 คือ #f4f7fe (globals.css:130) และตอน hover ค่า ink-800 คือ #e1e7f4 จึงกลายเป็นตัวอักษรขาวบนพื้นเกือบขาว
@@ -605,7 +609,7 @@
 - แก้: เปลี่ยนเป็น bg-[var(--color-brand-900)] text-white แบบเดียวกับปุ่มหลักอื่นๆ (เช่น auth-panel SubmitButton) หรือเพิ่ม dark:text-[var(--color-surface)]
 - Verifier: app/error.tsx:39 ใช้ bg-[var(--color-ink-900)] text-white แต่ในบล็อก .dark ของ globals.css:130 ค่า --color-ink-900 คือ #f4f7fe และ ink-800 คือ #e1e7f4 ใน dark mode จึงกลายเป็นตัวอักษรขาวบนพื้นเกือบขาว
 
-### M55. ลิงก์ Order ในคิว Jobs ใช้ ?orderId= ที่หน้า list ไม่อ่าน และแสดง GUID แทน OrderRef — CONFIRMED
+### M55. ลิงก์ Order ในคิว Jobs ใช้ ?orderId= ที่หน้า list ไม่อ่าน และแสดง GUID แทน OrderRef — CONFIRMED · 🟡 แก้บางส่วน `35c57967` (ลิงก์เปิด drawer ของ order ได้ และ drawer ของ Job แสดง OrderRef แต่แถวในตารางยังเป็น id สั้น เพราะ Planning ไม่ได้เก็บ OrderRef ต้อง join ฝั่ง backend)
 - กลุ่ม: templates · code
 - ที่: `frontend/components/planning/jobs-experience.tsx:344`
 - ปัญหา: ลิงก์ทั้งใน row (บรรทัด 344) และใน drawer (บรรทัด 583) ชี้ไป `/delivery-orders/list?orderId=${job.deliveryOrderId}` แต่ orders-experience.tsx อ่าน query param แค่ priority/transport/q/hasFailedTrip/hasActiveJob/page/size/sortBy/sortDir ไม่มี orderId ข้อความลิงก์ยังเป็น `deliveryOrderId.slice(0,8)…` ซึ่งเป็น GUID ภายใน เพราะ JobDto (lib/api/jobs.ts:20) มีแค่ deliveryOrderId
@@ -613,7 +617,7 @@
 - แก้: ให้ JobDto คืน orderRef มาด้วยแล้วลิงก์ไป `/delivery-orders/list?q=<orderRef>` ซึ่งหน้า list รองรับอยู่แล้ว พร้อมแสดง orderRef แทน GUID อีกทางคือเพิ่มการอ่าน `orderId` ใน orders-experience ให้เปิด drawer ของ order นั้น
 - Verifier: jobs-experience.tsx:344 และ :583 ลิงก์ไป `?orderId=` แต่ orders-experience.tsx อ่านแค่ priority/transport/q/hasFailedTrip/hasActiveJob/page/size/sortBy/sortDir ไม่มีที่ไหนอ่าน orderId ทั้งใน orders-experience และ app/delivery-orders/list ข้อความลิงก์เป็น deliveryOrderId.slice(0,8) ซึ่งเป็น GUID ไม่ใช่ OrderRef
 
-### M56. สลับ map เร็วๆ แล้ว station ของ map เก่าอาจมาทับ map ที่เลือกอยู่ — CONFIRMED
+### M56. สลับ map เร็วๆ แล้ว station ของ map เก่าอาจมาทับ map ที่เลือกอยู่ — CONFIRMED · ✅ แก้แล้ว `35c57967`
 - กลุ่ม: templates · code
 - ที่: `frontend/components/facility/maps-experience.tsx:257`
 - ปัญหา: refreshStations(mapId) เรียก getStations แล้ว setStations(all) ทันทีที่ได้ผล ไม่มี AbortController และไม่ได้เช็กว่า mapId ยังตรงกับ map ที่เลือกอยู่ effect บรรทัด 270-272 ก็ไม่มี cleanup ถ้ากด map A แล้วตามด้วย B และ response ของ A ช้ากว่า ผลของ A จะมาทับทีหลัง
@@ -629,7 +633,7 @@
 - แก้: ใช้ pattern เดียวกับ reopen-dialog.tsx ทุกตัว คือเพิ่ม useEffect ที่ฟัง Escape (ข้ามเมื่อ busy) ใส่ role="dialog" aria-modal="true" aria-labelledby บน panel และ focus ปุ่มหลักหรือ input แรกตอนเปิด
 - Verifier: grep ไม่เจอ Escape, role="dialog" หรือ aria-modal ใน create-from-template-dialog, order-templates/detail-drawer, ConfirmDeleteDialog ทั้งสองไฟล์ และ station-edit-drawer ตัว OverlayBackdrop primitive ก็ไม่ได้จัดการ Esc ให้ ขณะที่ jobs-experience.tsx:516, action-templates/create-dialog.tsx:66 และ reopen-dialog.tsx:46,74 มี Esc แล้ว จึงไม่สอดคล้องกันจริง
 
-### M58. ข้อความสี amber บนพื้นอ่อนใน light mode contrast ต่ำ (~2:1) — CONFIRMED
+### M58. ข้อความสี amber บนพื้นอ่อนใน light mode contrast ต่ำ (~2:1) — CONFIRMED · ✅ แก้แล้ว `35c57967`
 - กลุ่ม: templates · uiux
 - ที่: `frontend/components/planning/badges.tsx:34`
 - ปัญหา: TONE_BG.amber ใช้ `text-[var(--color-amber)]` (#f59e0b) บน --color-amber-soft (#fef0d4) กับ badge Assigned/Committed ขนาด 10.5px ใน globals.css:52-54 เขียนไว้ชัดว่า amber บนพื้นขาวได้ประมาณ 2:1 และมี --color-amber-600 ไว้ใช้กับข้อความ ปัญหาเดียวกันอยู่ใน create-from-template-dialog.tsx:408 (กล่อง pending 'still confirming') และ :434 ('outcome unknown')
