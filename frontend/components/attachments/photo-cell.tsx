@@ -100,7 +100,7 @@ export function PhotoCell({
         />
       )}
       {photoCount > 1 && (
-        <span className="absolute bottom-0.5 right-0.5 rounded-full bg-[var(--color-ink-900)]/80 px-1 text-[9px] font-semibold leading-[14px] text-white">
+        <span className="absolute bottom-0.5 right-0.5 rounded-full bg-[var(--color-ink-900)]/80 px-1 text-[9px] font-semibold leading-[14px] text-[var(--color-surface)]">
           {photoCount}
         </span>
       )}

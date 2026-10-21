@@ -116,7 +116,7 @@ export function CarrierMaintenancePanel({
                           {e.reason}
                         </span>
                         {e.isOpen && (
-                          <span className="shrink-0 rounded-full bg-[var(--color-ink-900)] px-2 py-0.5 text-[10px] font-semibold text-white">
+                          <span className="shrink-0 rounded-full bg-[var(--color-ink-900)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-surface)]">
                             Open
                           </span>
                         )}

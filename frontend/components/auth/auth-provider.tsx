@@ -102,11 +102,34 @@ export function AuthProvider({
       setPermissions(null);
       return;
     }
+    // One failed load used to become [] — "Insufficient permissions" on
+    // every guarded page until a full reload, for what was often an API
+    // restart or a network blip (review M52). Only a 401/403 is an answer;
+    // anything else is retried with back-off (1s → 30s) while the gate keeps
+    // showing "Loading permissions…".
     const ctrl = new AbortController();
-    getMyPermissions(ctrl.signal)
-      .then((perms) => setPermissions(perms))
-      .catch(() => setPermissions([]));   // network/auth failure: deny by default
-    return () => ctrl.abort();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let attempt = 0;
+    const load = () => {
+      getMyPermissions(ctrl.signal)
+        .then((perms) => setPermissions(perms))
+        .catch((e: unknown) => {
+          if (ctrl.signal.aborted) return;
+          const status = Number(/(\d{3})$/.exec((e as Error)?.message ?? "")?.[1]);
+          if (status === 401 || status === 403) {
+            setPermissions([]); // a real "no": deny
+            return;
+          }
+          const delay = Math.min(1000 * 2 ** attempt, 30_000);
+          attempt += 1;
+          timer = setTimeout(load, delay);
+        });
+    };
+    load();
+    return () => {
+      ctrl.abort();
+      if (timer) clearTimeout(timer);
+    };
   }, [status, user?.employeeCode]);
 
   const hasPermission = useCallback(

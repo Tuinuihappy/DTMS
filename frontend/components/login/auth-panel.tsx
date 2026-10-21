@@ -39,18 +39,6 @@ export function AuthPanel() {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
-  // After a successful sign-up we route back to the sign-in tab so the
-  // user authenticates with the credentials they just registered. The
-  // banner + prefilled username give them a clear signal that the account
-  // exists; password is intentionally left blank.
-  const [justCreated, setJustCreated] = useState(false);
-  const [prefilledUsername, setPrefilledUsername] = useState("");
-  // Sign-up password fields are controlled so we can show a real-time
-  // "passwords do not match" indicator without waiting for submit.
-  const [signUpPassword, setSignUpPassword] = useState("");
-  const [signUpConfirmPassword, setSignUpConfirmPassword] = useState("");
-  const [signUpError, setSignUpError] = useState<string | null>(null);
-
   // Safety net for the post-login redirect. If the auth proxy bounces the
   // navigation straight back to /login (e.g. the browser refused the
   // session cookie), the pathname never changes, this component never
@@ -92,42 +80,11 @@ export function AuthPanel() {
     }, 4000);
   };
 
-  // Sign-up: theatrical only — no backend endpoint exists yet. On "success"
-  // flip back to sign-in with the just-registered username pre-filled and
-  // a welcome banner shown. Password/confirm-password must match before
-  // we let the submit proceed (HTML5 handles the email format check).
-  const handleSignUpSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (status !== "idle") return;
-    if (signUpPassword !== signUpConfirmPassword) {
-      setSignUpError("Passwords do not match");
-      return;
-    }
-    if (signUpPassword.length === 0) {
-      setSignUpError("Password is required");
-      return;
-    }
-    const username = (new FormData(e.currentTarget).get("username") as string) || "";
-    setSignUpError(null);
-    setStatus("submitting");
-    window.setTimeout(() => setStatus("success"), 950);
-    window.setTimeout(() => {
-      setPrefilledUsername(username);
-      setJustCreated(true);
-      setMode("in");
-      setStatus("idle");
-      setSignUpPassword("");
-      setSignUpConfirmPassword("");
-    }, 1700);
-  };
-
   // Dismiss the welcome banner the moment the user manually navigates
   // away from sign-in (e.g. flips back to sign-up). Also clears stale
   // sign-up validation errors when switching tabs.
   const handleModeChange = (next: Mode) => {
-    if (next !== "in") setJustCreated(false);
     setError(null);
-    setSignUpError(null);
     setMode(next);
   };
 
@@ -226,21 +183,36 @@ export function AuthPanel() {
               key="in"
               status={status}
               onSubmit={handleSignInSubmit}
-              welcome={justCreated}
-              defaultUsername={prefilledUsername}
+              welcome={false}
+              defaultUsername=""
               error={error}
             />
           ) : (
-            <SignUpForm
+            // Accounts come from the company directory (sign-in is LDAP-only).
+            // The in-page form here used to fake a sign-up — a timer, then
+            // "Account created. Sign in with the credentials you just
+            // registered" — with nothing created (review M51).
+            <motion.div
               key="up"
-              status={status}
-              onSubmit={handleSignUpSubmit}
-              password={signUpPassword}
-              setPassword={setSignUpPassword}
-              confirmPassword={signUpConfirmPassword}
-              setConfirmPassword={setSignUpConfirmPassword}
-              error={signUpError}
-            />
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.35, ease }}
+              className="space-y-3 rounded-2xl border border-[var(--color-ink-100)] bg-white/60 p-5 text-[13px] leading-relaxed text-[var(--color-ink-700)] dark:bg-white/[0.04]"
+            >
+              <p className="font-semibold text-[var(--color-ink-900)]">Accounts aren&apos;t created here</p>
+              <p>
+                Sign-in uses your company (AD) account. New accounts are set up in the
+                employee onboarding portal; once yours exists, sign in with it here.
+              </p>
+              <button
+                type="button"
+                onClick={() => window.open(SIGNUP_URL, "_blank", "noopener,noreferrer")}
+                className="cursor-pointer font-medium text-[var(--color-brand-900)] underline decoration-[var(--color-brand-200)] underline-offset-[3px] hover:decoration-[var(--color-brand-500)] dark:text-[var(--color-brand-400)]"
+              >
+                Open the onboarding portal
+              </button>
+            </motion.div>
           )}
         </AnimatePresence>
 
@@ -395,120 +367,6 @@ function SignInForm({
           label="Take the wheel"
           submittingLabel="Routing…"
           successLabel="On the road"
-        />
-      </FieldStagger>
-    </motion.form>
-  );
-}
-
-function SignUpForm({
-  status,
-  onSubmit,
-  password,
-  setPassword,
-  confirmPassword,
-  setConfirmPassword,
-  error,
-}: {
-  status: Status;
-  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
-  password: string;
-  setPassword: (v: string) => void;
-  confirmPassword: string;
-  setConfirmPassword: (v: string) => void;
-  error: string | null;
-}) {
-  // Show the inline mismatch hint as soon as the user has typed anything
-  // into Confirm password — no need to wait for submit.
-  const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
-  // Mirror the form's HTML5 validity into React so the submit button can
-  // visually reflect "all required fields filled + email well-formed" in
-  // real time. `required` + `type="email"` already prevent submit; this is
-  // purely for the disabled state UX. Recomputed on every keystroke via
-  // `onInput` on the <form>.
-  const formRef = useRef<HTMLFormElement>(null);
-  const [formValid, setFormValid] = useState(false);
-  const refreshFormValidity = () => {
-    if (formRef.current) setFormValid(formRef.current.checkValidity());
-  };
-  const blockSubmit = mismatch || !formValid;
-
-  return (
-    <motion.form
-      ref={formRef}
-      onInput={refreshFormValidity}
-      onSubmit={onSubmit}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }}
-      transition={{ duration: 0.3, ease }}
-      className="relative space-y-5"
-    >
-      <FieldStagger delay={0.05}>
-        <FloatingInput label="Employee No." name="employeeNo" autoComplete="off" required />
-      </FieldStagger>
-      <FieldStagger delay={0.11}>
-        <FloatingInput label="Username" name="username" autoComplete="username" required />
-      </FieldStagger>
-      <FieldStagger delay={0.17}>
-        <FloatingInput label="Display name" name="displayName" autoComplete="name" required />
-      </FieldStagger>
-      <FieldStagger delay={0.23}>
-        <FloatingInput label="Email" type="email" name="email" autoComplete="email" required />
-      </FieldStagger>
-      <FieldStagger delay={0.29}>
-        <PasswordInput
-          label="Password"
-          name="password"
-          autoComplete="new-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </FieldStagger>
-      <FieldStagger delay={0.35}>
-        <PasswordInput
-          label="Confirm password"
-          name="confirmPassword"
-          autoComplete="new-password"
-          required
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-        />
-      </FieldStagger>
-      <AnimatePresence initial={false}>
-        {(mismatch || error) && (
-          <motion.div
-            key="signup-error"
-            initial={{ opacity: 0, y: -4, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: "auto" }}
-            exit={{ opacity: 0, y: -4, height: 0 }}
-            transition={{ duration: 0.32, ease }}
-            className="overflow-hidden"
-            role="alert"
-            aria-live="polite"
-          >
-            <div
-              className="flex items-start gap-2.5 rounded-2xl px-4 py-3 text-[12.5px] leading-relaxed ring-1"
-              style={{
-                background: "color-mix(in srgb, var(--color-coral) 14%, transparent)",
-                color: "var(--color-coral)",
-                borderColor: "transparent",
-              }}
-            >
-              <AlertCircle className="mt-[2px] h-4 w-4 shrink-0" strokeWidth={2.4} />
-              <span>{mismatch ? "Passwords do not match" : error}</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <FieldStagger delay={0.41}>
-        <SubmitButton
-          status={status}
-          label="Create account"
-          submittingLabel="Creating account…"
-          successLabel="Account created"
-          disabled={blockSubmit}
         />
       </FieldStagger>
     </motion.form>
