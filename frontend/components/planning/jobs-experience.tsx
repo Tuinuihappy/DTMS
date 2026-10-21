@@ -19,6 +19,7 @@ import { ToastProvider, useToast } from "@/components/delivery-orders/toast";
 import { StatusTimelineSection } from "@/components/projection/status-timeline-section";
 import type { StatusHistoryEntry } from "@/lib/api/status-history";
 import { getJobStatusHistory } from "@/lib/api/status-history";
+import { getOrder } from "@/lib/api/delivery-orders";
 import { useJobQueueSubscription, useJobSubscription } from "@/lib/realtime/hubs/job-hub";
 import {
   DataRow,
@@ -480,7 +481,25 @@ function JobDetailDrawer({
   const [error, setError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [liveTimelineEntry, setLiveTimelineEntry] = useState<StatusHistoryEntry | null>(null);
+  // The order's OrderRef — the reference people know. Planning stores only
+  // the order id, so the drawer looks it up once (review M55).
+  const [orderRef, setOrderRef] = useState<string | null>(null);
   const toast = useToast();
+
+  const orderId = data?.deliveryOrderId ?? null;
+  useEffect(() => {
+    setOrderRef(null);
+    if (!orderId) return;
+    let cancelled = false;
+    getOrder(orderId)
+      .then((o) => {
+        if (!cancelled) setOrderRef(o.orderRef);
+      })
+      .catch(() => undefined); // keep showing the id
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId]);
 
   // Phase P1 — JobHub live timeline updates while the drawer is open.
   useJobSubscription(jobId, {
@@ -576,8 +595,9 @@ function JobDetailDrawer({
                     <Link
                       href={`/delivery-orders/list?orderId=${data.deliveryOrderId}`}
                       className="font-mono text-[12px] text-[var(--color-brand-900)] underline-offset-4 hover:underline dark:text-[var(--color-brand-500)]"
+                      title={data.deliveryOrderId}
                     >
-                      {data.deliveryOrderId}
+                      {orderRef ?? data.deliveryOrderId}
                     </Link>
                   </Field>
                   <Field label="Pattern">{data.pattern}</Field>

@@ -96,7 +96,7 @@ export function RaiseExceptionDialog({
               className="pointer-events-auto relative w-full max-w-md overflow-hidden rounded-[var(--radius-xl)] glass-strong outline-none"
             >
               <header className="flex items-start gap-3 px-6 pt-5">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--color-amber-soft)] text-[var(--color-amber)]">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--color-amber-soft)] text-[var(--color-amber-600)]">
                   <AlertTriangle className="h-5 w-5" strokeWidth={2.2} />
                 </span>
                 <div className="min-w-0 flex-1">

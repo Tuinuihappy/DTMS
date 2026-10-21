@@ -216,7 +216,10 @@ function ExperienceInner() {
 
   // UI state
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [detailId, setDetailId] = useState<string | null>(null);
+  // ?orderId= opens that order's drawer — the Jobs queue links here by id.
+  // Nothing read it before, so those links landed on page 1 of the whole
+  // list (review M55).
+  const [detailId, setDetailId] = useState<string | null>(() => searchParams.get("orderId"));
   // Bumped after an action on the open order succeeds, so the drawer
   // reloads without closing (setDetailId(sameId) is a no-op).
   const [detailRefreshKey, setDetailRefreshKey] = useState(0);

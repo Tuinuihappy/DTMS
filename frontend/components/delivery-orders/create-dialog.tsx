@@ -936,7 +936,7 @@ export function CreateOrderDialog({
                                             className={cn(
                                               "rounded-full px-2.5 py-1 text-[10.5px] font-semibold transition-all",
                                               active
-                                                ? "bg-[var(--color-amber-soft)] text-[var(--color-amber)] shadow-[0_2px_8px_-3px_rgba(245,158,11,0.4)]"
+                                                ? "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)] shadow-[0_2px_8px_-3px_rgba(245,158,11,0.4)]"
                                                 : "bg-white/50 text-[var(--color-ink-600)] hover:bg-white/80 dark:bg-white/[0.05] dark:hover:bg-white/[0.1]",
                                             )}
                                           >

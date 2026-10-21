@@ -137,7 +137,7 @@ function KpiCard({ tile, index }: { tile: Tile; index: number }) {
               "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold tracking-tight",
               tile.trend.dir === "up"
                 ? "bg-[var(--color-success-soft)] text-[var(--color-success)]"
-                : "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
+                : "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)]",
             )}
           >
             <TrendArrow dir={tile.trend.dir} />

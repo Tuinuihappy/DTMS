@@ -33,7 +33,7 @@ const TONE_BG: Record<TripVisual["tone"], string> = {
   ink: "bg-[var(--color-ink-100)] text-[var(--color-ink-700)]",
   sky: "bg-[var(--color-pastel-sky)] text-[var(--color-pastel-sky-ink)]",
   peach: "bg-[var(--color-pastel-peach)] text-[var(--color-pastel-peach-ink)]",
-  amber: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
+  amber: "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)]",
   success: "bg-[var(--color-success-soft)] text-[var(--color-success)]",
   coral: "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
   wine: "bg-[var(--color-wine-soft)] text-[var(--color-wine)]",

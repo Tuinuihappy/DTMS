@@ -180,7 +180,7 @@ function StatusBadge({ status }: { status: ProjectorStatus }) {
     },
     stale: {
       label: "Stale",
-      cls: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
+      cls: "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)]",
     },
     idle: {
       label: "Idle",

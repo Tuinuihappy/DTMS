@@ -780,7 +780,7 @@ function eventTone(eventType: string): { chip: string; dot: string } {
     };
   if (e.includes("amend") || e.includes("hold"))
     return {
-      chip: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
+      chip: "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)]",
       dot: "bg-[var(--color-amber)]",
     };
   return {
@@ -820,7 +820,7 @@ function DrawerActionButton({
     sky:
       "bg-[var(--color-pastel-sky)] text-[var(--color-pastel-sky-ink)] hover:bg-[var(--color-pastel-sky)]/80",
     amber:
-      "bg-[var(--color-amber-soft)] text-[var(--color-amber)] hover:bg-[var(--color-amber-soft)]/80",
+      "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)] hover:bg-[var(--color-amber-soft)]/80",
   };
   return (
     <motion.button
@@ -907,7 +907,7 @@ const STATUS_VISUAL: Record<
     title: "Awaiting dispatch or in vendor queue",
   },
   Picked: {
-    className: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
+    className: "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)]",
     dot: "bg-[var(--color-amber)]",
     title: "Robot picked up — in transit to drop station",
   },

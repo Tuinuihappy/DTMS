@@ -40,9 +40,9 @@ const CONFIG: Record<StateActionVariant, VariantConfig> = {
     submitLabel: "Hold",
     icon: <PauseCircle className="h-4 w-4" strokeWidth={2.4} />,
     bubbleClass:
-      "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
+      "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)]",
     submitClass:
-      "bg-[var(--color-amber-soft)] text-[var(--color-amber)] hover:bg-[var(--color-amber-soft)]/80",
+      "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)] hover:bg-[var(--color-amber-soft)]/80",
   },
   release: {
     title: "Release held order",
@@ -90,9 +90,9 @@ const CONFIG: Record<StateActionVariant, VariantConfig> = {
     submitLabel: "Abandon",
     icon: <Ban className="h-4 w-4" strokeWidth={2.4} />,
     bubbleClass:
-      "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
+      "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)]",
     submitClass:
-      "bg-[var(--color-amber-soft)] text-[var(--color-amber)] hover:bg-[var(--color-amber-soft)]/80",
+      "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)] hover:bg-[var(--color-amber-soft)]/80",
   },
 };
 

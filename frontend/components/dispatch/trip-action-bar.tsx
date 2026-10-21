@@ -206,7 +206,7 @@ export function TripActionBar({
 type Tone = "amber" | "success" | "lavender" | "coral" | "sky";
 
 const TONE_CLS: Record<Tone, string> = {
-  amber: "bg-[var(--color-amber-soft)] text-[var(--color-amber)] hover:bg-[var(--color-amber-soft)]/80",
+  amber: "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)] hover:bg-[var(--color-amber-soft)]/80",
   success:
     "bg-[var(--color-success-soft)] text-[var(--color-success)] hover:bg-[var(--color-success-soft)]/80",
   lavender:

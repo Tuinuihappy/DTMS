@@ -58,6 +58,7 @@ export function CarrierScanDialog({
 }) {
   const [state, setState] = useState<Resolution>({ kind: "idle" });
   const lastScan = useRef<{ code: string; at: number } | null>(null);
+  const scanSeq = useRef(0);
 
   const resolve = useCallback(
     async (raw: string) => {
@@ -75,6 +76,10 @@ export function CarrierScanDialog({
         return;
       }
       lastScan.current = { code, at: now };
+      // Every accepted scan takes a ticket; a lookup only reports if it is
+      // still the newest. Scanning A (not on this page, so fetched) then B
+      // used to let A's slower answer land last and show A (review M39).
+      const mine = ++scanSeq.current;
 
       if (!CODE_PATTERN.test(code)) {
         setState({
@@ -94,6 +99,7 @@ export function CarrierScanDialog({
       setState({ kind: "resolving" });
       try {
         const found = await getCarrier(code);
+        if (mine !== scanSeq.current) return;
         if (!found) {
           setState({ kind: "error", message: `No carrier with code ${code}.` });
           beep("bad");
@@ -101,6 +107,7 @@ export function CarrierScanDialog({
         }
         settle(found);
       } catch (e) {
+        if (mine !== scanSeq.current) return;
         setState({ kind: "error", message: (e as Error).message });
         beep("bad");
       }

@@ -178,7 +178,7 @@ function StatusChip({
 }) {
   const palette: Record<NonNullable<TimelineEntry["dotTone"]>, string> = {
     success: "bg-[var(--color-success-soft)] text-[var(--color-success)]",
-    warning: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
+    warning: "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)]",
     error: "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
     info: "bg-[var(--color-pastel-sky)] text-[var(--color-pastel-sky-ink)]",
     neutral:

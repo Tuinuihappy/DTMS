@@ -39,7 +39,7 @@ const TONE_BG: Record<StatusVisual["tone"], string> = {
   mint: "bg-[var(--color-pastel-mint)] text-[var(--color-pastel-mint-ink)]",
   peach: "bg-[var(--color-pastel-peach)] text-[var(--color-pastel-peach-ink)]",
   success: "bg-[var(--color-success-soft)] text-[var(--color-success)]",
-  amber: "bg-[var(--color-amber-soft)] text-[var(--color-amber)]",
+  amber: "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)]",
   coral: "bg-[var(--color-coral-soft)] text-[var(--color-coral)]",
 };
 

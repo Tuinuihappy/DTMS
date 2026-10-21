@@ -254,17 +254,23 @@ export function MapsExperience() {
     };
   }, []);
 
-  // Stations refetch when selected map changes.
+  // Stations refetch when selected map changes. Each load takes a ticket;
+  // only the newest may write. Clicking map A then B used to let A's
+  // slower answer land last and show A's stations under B (review M56).
+  const stationsSeq = useRef(0);
   const refreshStations = useCallback(async (mapId: string) => {
+    const mine = ++stationsSeq.current;
     setLoading(true);
     try {
       const all = await getStations({ includeInactive: true, mapId });
+      if (mine !== stationsSeq.current) return;
       setStations(all);
       setError(null);
     } catch (err) {
+      if (mine !== stationsSeq.current) return;
       setError(err instanceof Error ? err.message : "Failed to load stations");
     } finally {
-      setLoading(false);
+      if (mine === stationsSeq.current) setLoading(false);
     }
   }, []);
 

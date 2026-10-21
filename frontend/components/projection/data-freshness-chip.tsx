@@ -52,7 +52,7 @@ export function DataFreshnessChip({
     state === "live"
       ? "bg-[var(--color-success-soft)] text-[var(--color-success)]"
       : state === "stale"
-        ? "bg-[var(--color-amber-soft)] text-[var(--color-amber)]"
+        ? "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)]"
         : "bg-[var(--color-ink-100)] text-[var(--color-ink-500)] dark:bg-white/[0.06]";
 
   const dot =

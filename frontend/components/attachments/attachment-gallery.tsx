@@ -59,9 +59,10 @@ export function AttachmentGallery({
               ref={inputRef}
               type="file"
               accept={ACCEPT}
-              // Opens the rear camera on a phone and the file picker on a
-              // desktop — one control serving both entry points.
-              capture="environment"
+              // No capture="environment": on Android Chrome and iOS Safari
+              // it jumps straight to the camera — no photo library, and
+              // `multiple` ignored (review M41). Without it the phone offers
+              // Camera *or* Photos, and a desktop gets the file picker.
               multiple
               onChange={onPick}
               className="hidden"
