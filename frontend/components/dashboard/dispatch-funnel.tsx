@@ -101,7 +101,7 @@ export function DispatchFunnel() {
         subtitle="Pipeline conversion — last 24 hours"
         action={
           <div className="flex items-center gap-1.5">
-            {data?.lastEventAt && <DataFreshnessChip lastEventAt={lastUpdated ?? data.lastEventAt} />}
+            {data?.lastEventAt && <DataFreshnessChip lastEventAt={data.lastEventAt} />}
             <button
               type="button"
               onClick={refresh}

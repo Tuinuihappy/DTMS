@@ -95,7 +95,7 @@ export function OrdersAnalysisExperience() {
         </div>
         <div className="flex items-center gap-1.5">
           {data?.lastEventAt && (
-            <DataFreshnessChip lastEventAt={lastUpdated ?? data.lastEventAt} />
+            <DataFreshnessChip lastEventAt={data.lastEventAt} />
           )}
           <WindowToggle value={window} onChange={setWindow} />
           <button

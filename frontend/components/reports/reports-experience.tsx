@@ -9,7 +9,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { JobFailuresReport } from "./job-failures-report";
 import { LeadTimeReport } from "./lead-time-report";
@@ -35,7 +35,16 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; hint: string }[
 export function ReportsExperience() {
   const [tab, setTab] = useState<TabKey>("orders");
   const [windowKey, setWindowKey] = useState<ReportWindow>("7d");
-  const window = useMemo(() => buildWindowRange(windowKey), [windowKey]);
+  // The window ends at the top of the next hour, so it must roll forward
+  // when the hour turns. Built once, the 5-minute polls kept asking for the
+  // same from/to for as long as the page stayed open (review M9).
+  const [hour, setHour] = useState(() => Math.floor(Date.now() / 3_600_000));
+  useEffect(() => {
+    const id = setInterval(() => setHour(Math.floor(Date.now() / 3_600_000)), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const window = useMemo(() => buildWindowRange(windowKey), [windowKey, hour]);
   const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
 
   return (

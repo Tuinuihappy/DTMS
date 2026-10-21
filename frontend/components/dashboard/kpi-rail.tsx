@@ -49,7 +49,7 @@ export function KpiRail() {
     (signal: AbortSignal) => getOrderFunnel(defaultWindow(), signal),
     [],
   );
-  const { data, lastUpdated, refresh } = useProjectionPoll(fetcher, { intervalMs: 15_000 });
+  const { data, error, refresh } = useProjectionPoll(fetcher, { intervalMs: 15_000 });
 
   // Phase P3.x — KPI rail reads the same OrderFunnel projection as
   // /dashboard/orders, so it subscribes to the same "orders" board. The
@@ -70,6 +70,30 @@ export function KpiRail() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, []);
+
+  // A first load that failed (401 / 429 / 5xx) used to fall through to
+  // EMPTY_TOTALS and show 0 on every tile — read as "nothing happened
+  // today" (review M7). Say it failed instead; a later failure keeps the
+  // last numbers but flags them.
+  if (!data && error) {
+    return (
+      <div className="col-span-12 md:col-span-6 lg:col-span-4">
+        <GlassCard variant="default" className="flex h-full flex-col items-start gap-3 p-5">
+          <div className="text-[13px] font-semibold text-[var(--color-coral)]">
+            Couldn&apos;t load today&apos;s order counts
+          </div>
+          <div className="text-[12px] text-[var(--color-ink-500)]">{error}</div>
+          <button
+            type="button"
+            onClick={() => refresh()}
+            className="rounded-full border border-[var(--color-ink-100)] bg-white/70 px-3 py-1.5 text-[11.5px] font-medium text-[var(--color-ink-700)] hover:bg-white dark:bg-white/[0.05] dark:hover:bg-white/[0.12]"
+          >
+            Retry
+          </button>
+        </GlassCard>
+      </div>
+    );
+  }
 
   const totals = data?.totals ?? EMPTY_TOTALS;
   const kpis = buildKpis(totals);
@@ -100,8 +124,12 @@ export function KpiRail() {
                 <StatusPulse tone="amber" />
                 Live
               </span>
+            ) : i === 0 && error ? (
+              <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--color-coral)]">
+                Refresh failed
+              </span>
             ) : i === 0 && data?.lastEventAt ? (
-              <DataFreshnessChip lastEventAt={lastUpdated ?? data.lastEventAt} />
+              <DataFreshnessChip lastEventAt={data.lastEventAt} />
             ) : null}
           </div>
 
@@ -128,7 +156,6 @@ const EMPTY_TOTALS: OrderFunnelTotals = {
 
 function buildKpis(t: OrderFunnelTotals): KpiSpec[] {
   const confirmedTotal = t.confirmed;
-  const inFlight = t.dispatched + t.inProgress;
   const completed = t.completed + t.partiallyCompleted;
   const lost = t.failed + t.cancelled + t.rejected;
 
@@ -139,11 +166,14 @@ function buildKpis(t: OrderFunnelTotals): KpiSpec[] {
       value: confirmedTotal,
       tone: "brand",
     },
+    // Was "In flight" with a Live badge, summing dispatched + inProgress.
+    // OrderFunnelHourly counts status-change EVENTS, so that counted one
+    // order twice (Dispatched, then InProgress) and kept finished ones —
+    // not orders on the move now (review M8). Shown for what it is.
     {
       icon: <Activity className="h-4 w-4" strokeWidth={2.2} />,
-      label: "In flight",
-      value: inFlight,
-      pulse: true,
+      label: "Dispatched (24h)",
+      value: t.dispatched,
       tone: "amber",
     },
     {
