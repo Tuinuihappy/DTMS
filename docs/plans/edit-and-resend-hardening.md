@@ -1,6 +1,6 @@
 # Edit & resend hardening (P0) — implementation plan (rev 2)
 
-> **Status**: 🔵 Not started — drafted 2026-10-22, revised after self-review the same day
+> **Status**: 🟡 Phases 1–4 committed (7e29fa67, 3bc677db, ccdcab41, 45c05fc8) + 5.1 EF harness PASS on dev Postgres (rolled back) — 2026-10-22. **Not deployed** (user: deploy later, at a quiet time); 5.3 live test by the user
 > **Ask**: ทำให้ order ที่ Failed แก้ไขแล้วส่งซ้ำได้อย่างปลอดภัยบนระบบจริง — ปิดช่องโหว่, เช็ค route (template + resolve) ก่อนส่งซ้ำ, แยก idempotency ตามผู้เรียก, แล้ว commit + deploy
 > **Kind / size**: feature + hardening · M, ~11.5h, 5 phases
 > **Parent**: งาน Edit & resend ใน working tree (ยังไม่ commit)
