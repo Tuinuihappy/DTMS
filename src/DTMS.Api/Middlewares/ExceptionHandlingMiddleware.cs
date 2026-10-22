@@ -156,6 +156,11 @@ public class ExceptionHandlingMiddleware
             // and the message is written for the caller.
             DTMS.Dispatch.Application.Services.TransportModeNotEnabledException =>
                 (StatusCodes.Status422UnprocessableEntity, "Transport Mode Not Enabled"),
+            // Same reasoning: a well-formed order naming a route nothing can
+            // carry out (no usable OrderTemplate). The title tells it apart
+            // from the idempotency filter's 422 "Idempotency-Key conflict".
+            DTMS.Dispatch.Application.Services.RouteNotDispatchableException =>
+                (StatusCodes.Status422UnprocessableEntity, "Route Not Dispatchable"),
             _ => (StatusCodes.Status500InternalServerError, "Internal Server Error")
         };
 }

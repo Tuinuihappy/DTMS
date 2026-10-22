@@ -37,3 +37,12 @@ public sealed class TransportModeNotEnabledException : Exception
 
     public TransportMode Mode { get; }
 }
+
+/// <summary>
+/// Raised when an order names a route its transport mode can't dispatch —
+/// for AMR, no active OrderTemplate for the pickup → drop pair, or one that
+/// doesn't resolve. Surfaces as 422 "Route Not Dispatchable": the request
+/// is well-formed, but nothing would carry it out. The message names the
+/// routes by the caller's location codes.
+/// </summary>
+public sealed class RouteNotDispatchableException(string message) : Exception(message);

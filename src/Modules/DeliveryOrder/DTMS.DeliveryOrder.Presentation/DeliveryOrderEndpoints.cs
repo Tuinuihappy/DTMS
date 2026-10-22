@@ -12,6 +12,7 @@ using DTMS.DeliveryOrder.Application.Commands.RejectDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.ReleaseDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.ReopenDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.ResendShipmentDroppedOff;
+using DTMS.DeliveryOrder.Application.Commands.ReviseAndResendDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Commands.ResendShipmentPickedUp;
 using DTMS.DeliveryOrder.Application.Commands.ResendShipmentStarted;
 using DTMS.DeliveryOrder.Application.Commands.SubmitDeliveryOrder;
@@ -38,6 +39,10 @@ public record RejectOrderRequest(string Reason, string? RejectedBy = null);
 public record HoldOrderRequest(string Reason, string? HeldBy = null);
 public record ReleaseOrderRequest(string? ReleasedBy = null);
 public record ReopenOrderRequest(string ReopenedBy, string Reason, bool AutoRetry = false);
+public record ReviseAndResendOrderRequest(
+    string Reason, Priority Priority,
+    Application.Commands.CreateDraftDeliveryOrder.ServiceWindowDto ServiceWindow,
+    List<RevisedItemDto> Items);
 public record AbandonOrderRequest(string AbandonedBy, string Reason);
 public record RedispatchOrderRequest(string RedispatchedBy, string Reason, double WeightFallbackKg = 0);
 public record ResendSourceNotificationRequest(string? RequestedBy = null);
@@ -114,6 +119,24 @@ public static class DeliveryOrderEndpoints
             var result = await sender.Send(new ReopenDeliveryOrderCommand(id, body.ReopenedBy, body.Reason, body.AutoRetry));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequireIdempotencyKey().RequirePermission(Permissions.DeliveryOrder.OrderReopen);
+
+        // POST /api/v1/delivery-orders/{id}/revise-and-resend — "Edit &
+        // resend" for a Failed order: overwrite priority, service window and
+        // items (incl. pickup/drop codes), re-resolve the codes, and send the
+        // order back through Planning as a fresh attempt so the new trip
+        // fires the shipment.* callbacks to the source system. Unlike
+        // reopen + trip retry (which replays the old trip's frozen route),
+        // this re-plans from the edited items. Needs both write (it edits)
+        // and reopen (it revives a terminal order).
+        group.MapPost("/{id:guid}/revise-and-resend",
+            async (Guid id, [FromBody] ReviseAndResendOrderRequest body, ISender sender) =>
+        {
+            var result = await sender.Send(new ReviseAndResendDeliveryOrderCommand(
+                id, body.Reason, body.Priority, body.ServiceWindow, body.Items));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        }).RequireIdempotencyKey()
+          .RequirePermission(Permissions.DeliveryOrder.OrderWrite)
+          .RequirePermission(Permissions.DeliveryOrder.OrderReopen);
 
         // POST /api/v1/delivery-orders/{id}/abandon-after-trip-cancel —
         // Phase b11 escape hatch (Option B). Operator-driven close-out

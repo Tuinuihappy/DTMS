@@ -76,4 +76,20 @@ internal sealed class AmrDispatchStrategy : IDispatchStrategy
             VendorOrderKey: result.Value.VendorOrderKey,
             TemplateName: result.Value.TemplateName));
     }
+
+    // The template half of DispatchByRouteAsync, per route — the only AMR
+    // failures that can be known before RIOT3 is called.
+    public async Task<IReadOnlyList<RouteProblem>> CheckRoutesAsync(
+        IReadOnlyCollection<(Guid Pickup, Guid Drop)> routes,
+        CancellationToken cancellationToken = default)
+    {
+        var problems = new List<RouteProblem>();
+        foreach (var (pickup, drop) in routes)
+        {
+            var check = await _planningDispatch.CheckRouteAsync(pickup, drop, cancellationToken);
+            if (check.IsFailure)
+                problems.Add(new RouteProblem(pickup, drop, check.Error));
+        }
+        return problems;
+    }
 }

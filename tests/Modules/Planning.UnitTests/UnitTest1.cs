@@ -1306,6 +1306,50 @@ public class DispatchOrderTemplateServiceTests
         result.Error.Should().Contain("vendor rejected");
     }
 
+    private static DTMS.Planning.Application.Services.DispatchOrderTemplateService CheckSvc(
+        OrderTemplate? matching, StubResolver? resolver = null, StubDispatcher? dispatcher = null)
+        => new(new StubTemplateRepo(matching), resolver ?? new StubResolver(), dispatcher ?? new StubDispatcher(),
+            new StubSender(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<DTMS.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
+
+    [Fact]
+    public async Task CheckRoute_NoTemplate_FailsWithoutDispatching()
+    {
+        var dispatcher = new StubDispatcher();
+
+        var result = await CheckSvc(matching: null, dispatcher: dispatcher)
+            .CheckRouteAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("no active OrderTemplate");
+        dispatcher.Called.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CheckRoute_TemplateDoesNotResolve_FailsNamingTheTemplate()
+    {
+        var template = TemplateFor(Guid.NewGuid(), Guid.NewGuid(), "SHELF3_to_PACK1");
+
+        var result = await CheckSvc(template, new StubResolver { FailWith = "ActionTemplate 'LIFT' not found" })
+            .CheckRouteAsync(template.PickupStationId!.Value, template.DropStationId!.Value);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("SHELF3_to_PACK1").And.Contain("LIFT");
+    }
+
+    [Fact]
+    public async Task CheckRoute_TemplateResolves_SucceedsWithoutDispatching()
+    {
+        var template = TemplateFor(Guid.NewGuid(), Guid.NewGuid());
+        var dispatcher = new StubDispatcher();
+
+        var result = await CheckSvc(template, dispatcher: dispatcher)
+            .CheckRouteAsync(template.PickupStationId!.Value, template.DropStationId!.Value);
+
+        result.IsSuccess.Should().BeTrue();
+        dispatcher.Called.Should().BeFalse();
+    }
+
     private sealed class StubTemplateRepo : DTMS.Planning.Domain.Repositories.IOrderTemplateRepository
     {
         private readonly OrderTemplate? _matching;
@@ -1328,9 +1372,11 @@ public class DispatchOrderTemplateServiceTests
     private sealed class StubResolver : DTMS.Planning.Application.Services.IOrderTemplateResolver
     {
         public string? AppointVehicleKey { get; set; }
+        public string? FailWith { get; set; }
         public Task<DTMS.Planning.Application.Services.ResolvedOrder> ResolveAsync(
             OrderTemplate template, CancellationToken c = default)
         {
+            if (FailWith is not null) throw new InvalidOperationException(FailWith);
             var resolved = new DTMS.Planning.Application.Services.ResolvedOrder(
                 Name: template.Name,
                 Priority: template.Priority,

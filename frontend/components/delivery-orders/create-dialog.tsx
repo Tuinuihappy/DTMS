@@ -17,6 +17,7 @@ import { ModalLayer } from "@/components/primitives/modal-layer";
 import { useEffect, useState } from "react";
 import {
   createOrder,
+  reviseAndResendOrder,
   updateOrder,
   type CreateOrderPayload,
   type DeliveryOrderDetailDto,
@@ -39,6 +40,10 @@ import {
 } from "@/lib/datetime";
 
 type ItemFormState = {
+  // Server Id of an existing order item — set only when the form is
+  // hydrated from an order; "Edit & resend" sends it so the item is
+  // edited in place. Lines without one are new items.
+  id?: string;
   itemId: string;
   description: string;
   pickup: string;
@@ -69,6 +74,8 @@ type FormState = {
   windowEarliest: string; // datetime-local string ("YYYY-MM-DDTHH:mm")
   windowLatest: string;
   items: ItemFormState[];
+  // "Edit & resend" only — why the failed order is being resent.
+  reason: string;
 };
 
 const EMPTY_ITEM: ItemFormState = {
@@ -117,6 +124,7 @@ function blankForm(): FormState {
     windowEarliest: "",
     windowLatest: "",
     items: [{ ...EMPTY_ITEM }],
+    reason: "",
   };
 }
 
@@ -132,7 +140,9 @@ function formFromOrder(o: DeliveryOrderDetailDto): FormState {
     requiresPickupPod: o.requiresPickupPod ?? false,
     windowEarliest: toDateTimeLocalInput(o.serviceWindow?.earliestUtc),
     windowLatest: toDateTimeLocalInput(o.serviceWindow?.latestUtc),
+    reason: "",
     items: o.items.map((it) => ({
+      id: it.id,
       itemId: it.itemId,
       description: it.description ?? "",
       pickup: it.pickupLocationCode,
@@ -229,6 +239,7 @@ export function CreateOrderDialog({
   open,
   editing = null,
   duplicating = null,
+  revising = null,
   onClose,
   onCreated,
 }: {
@@ -244,11 +255,18 @@ export function CreateOrderDialog({
   // would be stale). items[] are kept verbatim. Ignored if `editing`
   // is also set — edit wins.
   duplicating?: DeliveryOrderDetailDto | null;
+  // "Edit & resend" mode — a Failed order is pre-filled; priority,
+  // service window and items (incl. pickup / drop) are editable, the
+  // operator states a reason, and submit sends the order back through
+  // planning (POST /revise-and-resend). OrderRef, transport mode, POD
+  // flags and notes are the source system's and stay read-only.
+  revising?: DeliveryOrderDetailDto | null;
   onClose: () => void;
   onCreated: () => void;
 }) {
   const isEdit = editing !== null;
-  const isDuplicate = !isEdit && duplicating !== null;
+  const isRevise = !isEdit && revising !== null;
+  const isDuplicate = !isEdit && !isRevise && duplicating !== null;
   const [step, setStep] = useState<0 | 1>(0);
   const [form, setForm] = useState<FormState>(blankForm);
   const [submitting, setSubmitting] = useState(false);
@@ -268,6 +286,8 @@ export function CreateOrderDialog({
       setStep(0);
       if (editing) {
         setForm(formFromOrder(editing));
+      } else if (revising) {
+        setForm(formFromOrder(revising));
       } else if (duplicating) {
         // Pre-fill from the source order, but clear the fields that
         // can't be reused. The user picks a new orderRef and decides
@@ -284,7 +304,7 @@ export function CreateOrderDialog({
       }
       setError(null);
     }
-  }, [open, editing, duplicating]);
+  }, [open, editing, revising, duplicating]);
 
   useEffect(() => {
     if (!open) return;
@@ -316,8 +336,11 @@ export function CreateOrderDialog({
         (!form.windowEarliest ||
           !form.windowLatest ||
           new Date(form.windowLatest).getTime() >=
-            new Date(form.windowEarliest).getTime())
-      : form.items.every(
+            new Date(form.windowEarliest).getTime()) &&
+        // Edit & resend is an audited recovery action — a reason is required.
+        (!isRevise || form.reason.trim().length > 0)
+      : form.items.length > 0 &&
+        form.items.every(
           (it) =>
             it.itemId.trim() &&
             it.pickup.trim() &&
@@ -340,6 +363,13 @@ export function CreateOrderDialog({
       const payload = buildPayload(form);
       if (editing) {
         await updateOrder(editing.id, payload);
+      } else if (revising) {
+        await reviseAndResendOrder(revising.id, {
+          reason: form.reason.trim(),
+          priority: payload.priority,
+          serviceWindow: payload.serviceWindow,
+          items: payload.items.map((it, idx) => ({ ...it, id: form.items[idx].id })),
+        });
       } else {
         await createOrder(payload);
       }
@@ -350,7 +380,9 @@ export function CreateOrderDialog({
         (e as Error).message ||
           (editing
             ? "Failed to update order."
-            : isDuplicate
+            : isRevise
+              ? "Failed to resend order."
+              : isDuplicate
               ? "Failed to create reorder."
               : "Failed to create order."),
       );
@@ -396,9 +428,11 @@ export function CreateOrderDialog({
                   <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--color-ink-400)]">
                     {isEdit
                       ? `Edit draft · ${editing!.orderRef} · Step ${step + 1} / 2`
-                      : isDuplicate
-                        ? `Reorder of ${duplicating!.orderRef} · Step ${step + 1} / 2`
-                        : `New delivery order · Step ${step + 1} / 2`}
+                      : isRevise
+                        ? `Edit & resend · ${revising!.orderRef} · Step ${step + 1} / 2`
+                        : isDuplicate
+                          ? `Reorder of ${duplicating!.orderRef} · Step ${step + 1} / 2`
+                          : `New delivery order · Step ${step + 1} / 2`}
                   </div>
                   <h2 id={titleId} className="font-display mt-1 text-[1.4rem] font-semibold text-[var(--color-ink-900)]">
                     {step === 0 ? "Order details" : "Pick & drop"}
@@ -461,13 +495,13 @@ export function CreateOrderDialog({
                             setForm({ ...form, orderRef: e.target.value })
                           }
                           placeholder="DO-20260604-001"
-                          readOnly={isEdit}
+                          readOnly={isEdit || isRevise}
                           className={cn(
                             inputCls,
-                            isEdit && "cursor-not-allowed opacity-70",
+                            (isEdit || isRevise) && "cursor-not-allowed opacity-70",
                           )}
                           title={
-                            isEdit
+                            isEdit || isRevise
                               ? "Order reference can't be changed after creation"
                               : undefined
                           }
@@ -513,7 +547,13 @@ export function CreateOrderDialog({
                                   : form.items,
                               });
                             }}
-                            className={inputCls}
+                            disabled={isRevise}
+                            title={
+                              isRevise
+                                ? "Transport mode comes from the source system and can't be changed on resend"
+                                : undefined
+                            }
+                            className={cn(inputCls, isRevise && "cursor-not-allowed opacity-70")}
                           >
                             <option value="Amr">AMR</option>
                             <option value="Manual">Manual</option>
@@ -554,9 +594,11 @@ export function CreateOrderDialog({
                             <motion.button
                               key={opt.key}
                               type="button"
-                              whileTap={{ scale: 0.96 }}
+                              whileTap={isRevise ? undefined : { scale: 0.96 }}
                               onClick={opt.toggle}
+                              disabled={isRevise}
                               className={cn(
+                                isRevise && "cursor-not-allowed opacity-60",
                                 "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition-all",
                                 opt.active
                                   ? "bg-[var(--color-brand-900)] text-white shadow-[0_2px_8px_-3px_rgba(15,23,42,0.45)] dark:bg-[var(--color-brand-500)]"
@@ -636,15 +678,35 @@ export function CreateOrderDialog({
                           and even then read the actor from an audit-safe
                           source rather than a free-text box. */}
 
-                      <Field label="Notes">
-                        <textarea
-                          value={form.notes}
-                          onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                          placeholder="Anything ops needs to know…"
-                          rows={3}
-                          className={cn(inputCls, "resize-none")}
-                        />
-                      </Field>
+                      {isRevise ? (
+                        <>
+                          <Field label="Reason for resend" required>
+                            <textarea
+                              value={form.reason}
+                              onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                              placeholder="What was wrong, and what you changed…"
+                              rows={3}
+                              maxLength={500}
+                              className={cn(inputCls, "resize-none")}
+                            />
+                          </Field>
+                          <p className="text-[11.5px] leading-relaxed text-[var(--color-ink-500)]">
+                            Saving re-plans the order as a new attempt. The new trip
+                            sends its started / picked-up / dropped-off updates to{" "}
+                            {revising!.sourceSystemDisplayName || "the source system"} as usual.
+                          </p>
+                        </>
+                      ) : (
+                        <Field label="Notes">
+                          <textarea
+                            value={form.notes}
+                            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                            placeholder="Anything ops needs to know…"
+                            rows={3}
+                            className={cn(inputCls, "resize-none")}
+                          />
+                        </Field>
+                      )}
                     </motion.div>
                   )}
 
@@ -1043,14 +1105,18 @@ export function CreateOrderDialog({
                       {submitting
                         ? isEdit
                           ? "Saving…"
-                          : isDuplicate
-                            ? "Creating reorder…"
-                            : "Creating…"
+                          : isRevise
+                            ? "Resending…"
+                            : isDuplicate
+                              ? "Creating reorder…"
+                              : "Creating…"
                         : isEdit
                           ? "Save changes"
-                          : isDuplicate
-                            ? "Create reorder"
-                            : "Create order"}
+                          : isRevise
+                            ? "Save & resend"
+                            : isDuplicate
+                              ? "Create reorder"
+                              : "Create order"}
                     </motion.button>
                   )}
                 </div>

@@ -28,6 +28,26 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
         _logger = logger;
     }
 
+    public async Task<Result> CheckRouteAsync(
+        Guid pickupStationId, Guid dropStationId, CancellationToken cancellationToken = default)
+    {
+        // Same two steps, same order, as DispatchByRouteAsync below — kept
+        // separate so the live dispatch path is untouched.
+        var template = await _templateRepository.FindByRouteAsync(pickupStationId, dropStationId, cancellationToken);
+        if (template is null)
+            return Result.Failure("no active OrderTemplate is registered for this route");
+
+        try
+        {
+            await _resolver.ResolveAsync(template, cancellationToken);
+            return Result.Success();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result.Failure($"OrderTemplate '{template.Name}' does not resolve: {ex.Message}");
+        }
+    }
+
     public async Task<Result<DispatchTemplateResult>> DispatchByRouteAsync(
         Guid deliveryOrderId,
         Guid pickupStationId,

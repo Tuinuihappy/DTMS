@@ -25,6 +25,16 @@ public interface IDispatchOrderTemplateService
         string? appointQueueWaitAreaOverride = null,
         Guid? jobId = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The pre-vendor half of <see cref="DispatchByRouteAsync"/> without its
+    /// side effects: is there an active OrderTemplate for the route, and does
+    /// it resolve? Lets a caller refuse an order up front instead of letting
+    /// it fail in Planning. Failure carries the reason only — the caller
+    /// knows the route's location codes and names it.
+    /// </summary>
+    Task<Result> CheckRouteAsync(
+        Guid pickupStationId, Guid dropStationId, CancellationToken cancellationToken = default);
 }
 
 public sealed record DispatchTemplateResult(

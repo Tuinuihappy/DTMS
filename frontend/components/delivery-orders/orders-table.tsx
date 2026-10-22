@@ -34,7 +34,7 @@ import {
   resolveEmptyStateVariant,
 } from "@/components/primitives/data-table";
 
-type RowAction = "edit" | "reorder" | "submit" | "delete";
+type RowAction = "edit" | "revise" | "reorder" | "submit" | "delete";
 
 export type SortColumn =
   | "createdDate"
@@ -53,6 +53,8 @@ const DELETABLE: OrderStatus[] = ["Draft"];
 function allowedActions(o: DeliveryOrderListDto): RowAction[] {
   const out: RowAction[] = [];
   if (EDITABLE.includes(o.orderStatus)) out.push("edit");
+  // Edit & resend — fix a Failed order's data and re-plan it.
+  if (o.orderStatus === "Failed") out.push("revise");
   if (SUBMITTABLE.includes(o.orderStatus)) out.push("submit");
   if (DELETABLE.includes(o.orderStatus)) out.push("delete");
   // Reorder is always available — the source order is unchanged, and a
@@ -362,6 +364,15 @@ function RowMenu({
           >
             <Pencil className="h-3.5 w-3.5" strokeWidth={2.2} />
             Edit draft
+          </MenuItem>
+        )}
+        {actions.includes("revise") && (
+          <MenuItem
+            tone="brand"
+            onClick={() => { setOpen(false); onAction("revise", order); }}
+          >
+            <Pencil className="h-3.5 w-3.5" strokeWidth={2.2} />
+            Edit &amp; resend
           </MenuItem>
         )}
         {actions.includes("reorder") && (

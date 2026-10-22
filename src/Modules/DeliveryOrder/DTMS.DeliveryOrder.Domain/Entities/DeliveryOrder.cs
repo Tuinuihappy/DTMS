@@ -558,6 +558,16 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
     {
         if (Status != OrderStatus.Submitted)
             throw new InvalidOperationException("Only submitted orders can be validated.");
+        ApplyLocationMaps(stationMap, wmsLocationMap);
+
+        Status = OrderStatus.Validated;
+        AddDomainEvent(new DeliveryOrderValidatedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
+    }
+
+    private void ApplyLocationMaps(
+        IReadOnlyDictionary<string, Guid>? stationMap,
+        IReadOnlyDictionary<string, Guid>? wmsLocationMap)
+    {
         if (stationMap is null && wmsLocationMap is null)
             throw new ArgumentException(
                 "At least one of stationMap / wmsLocationMap must be provided",
@@ -587,9 +597,6 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
                 item.SetWmsLocationIds(pickupLoc, dropLoc);
             }
         }
-
-        Status = OrderStatus.Validated;
-        AddDomainEvent(new DeliveryOrderValidatedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id));
     }
 
     public void Confirm(double weightFallbackKg)
@@ -798,6 +805,109 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         // history makes it clear an operator re-triggered planning.
         AddDomainEvent(new DeliveryOrderRedispatchedDomainEvent(
             Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+    }
+
+    /// <summary>
+    /// Step 1 of "edit &amp; resend" on a Failed order: overwrite priority,
+    /// service window and the item set. Revision lines with an
+    /// <see cref="ItemRevision.ExistingItemId"/> edit that item in place (its
+    /// Id, ItemSeq and POD history survive); lines without one add a new item;
+    /// items no line names are removed. Every surviving item goes back to an
+    /// unbound Pending with its resolved location Ids cleared — the caller
+    /// re-resolves the codes and finishes with <see cref="ResendAfterRevision"/>.
+    /// The order stays Failed until then, so a failed re-validation leaves
+    /// nothing half-applied once the unit of work is discarded.
+    /// </summary>
+    public ItemRevisionOutcome ReviseFailed(
+        Priority priority, ServiceWindow? serviceWindow, IReadOnlyList<ItemRevision> revisions)
+    {
+        if (Status != OrderStatus.Failed)
+            throw new InvalidOperationException(
+                $"Only Failed orders can be revised and resent. Current status: {Status}.");
+        if (revisions.Count == 0)
+            throw new InvalidOperationException("A revised order must keep at least one item.");
+
+        var keptIds = new HashSet<Guid>();
+        foreach (var id in revisions.Select(r => r.ExistingItemId).OfType<Guid>())
+        {
+            if (!keptIds.Add(id))
+                throw new InvalidOperationException($"Item {id} appears more than once in the revision.");
+            if (_items.All(i => i.Id != id))
+                throw new InvalidOperationException($"Item {id} does not belong to this order.");
+        }
+
+        // A Failed order has no Delivered item by construction (delivered == 0
+        // is what made it Failed) — guard anyway so a revision can never
+        // silently rewrite or drop goods that already arrived.
+        if (_items.FirstOrDefault(i => i.Status == ItemStatus.Delivered) is { } delivered)
+            throw new InvalidOperationException(
+                $"Item '{delivered.ItemId}' is already delivered and cannot be revised.");
+
+        var removed = _items.Where(i => !keptIds.Contains(i.Id)).ToList();
+        // Removing a row would cascade its POD scans away — the scan is audit
+        // evidence, so an item that was physically scanned stays on the order.
+        if (removed.FirstOrDefault(i => i.PodEvents.Count > 0) is { } scanned)
+            throw new InvalidOperationException(
+                $"Item '{scanned.ItemId}' has scan history and cannot be removed — edit it instead.");
+
+        // New items continue after the highest seq the order ever used, removed
+        // rows included, so the (DeliveryOrderId, ItemSeq) unique index can't
+        // collide whatever order EF flushes the delete and the insert in.
+        var nextSeq = _items.Count == 0 ? 1 : _items.Max(i => i.ItemSeq) + 1;
+        foreach (var item in removed)
+            _items.Remove(item);
+
+        var added = new List<Item>();
+        foreach (var r in revisions)
+        {
+            if (r.ExistingItemId is { } id)
+            {
+                _items.Single(i => i.Id == id).Revise(r);
+                continue;
+            }
+
+            var item = new Item(Id, r.PickupLocationCode, r.DropLocationCode, nextSeq++, r.ItemId,
+                r.Description, r.LoadUnitProfileCode, r.Dimensions, r.WeightKg, r.Quantity,
+                r.Hazmat, r.Temperature, r.HandlingInstructions);
+            _items.Add(item);
+            added.Add(item);
+        }
+
+        Priority = priority;
+        ServiceWindow = serviceWindow;
+        TotalWeightKg = _items.Sum(i => i.WeightKg ?? 0);
+        TotalQuantity = _items.Sum(i => i.Quantity.Value);
+        TotalItems = _items.Count;
+
+        return new ItemRevisionOutcome(added, removed);
+    }
+
+    /// <summary>
+    /// Step 2 of "edit &amp; resend": bind the re-resolved location Ids
+    /// (same maps <see cref="MarkAsValidated"/> takes), move the order back to
+    /// Confirmed and re-raise the Confirmed event so Planning dispatches the
+    /// revised items as a fresh attempt. The new trips' lifecycle events drive
+    /// the source system's shipment callbacks exactly as on a first dispatch.
+    /// Raises Amended + Reopened + Redispatched alongside so the timeline,
+    /// status history and list view all show the operator's action.
+    /// </summary>
+    public void ResendAfterRevision(
+        IReadOnlyDictionary<string, Guid>? stationMap,
+        IReadOnlyDictionary<string, Guid>? wmsLocationMap,
+        double weightFallbackKg,
+        string reason)
+    {
+        if (Status != OrderStatus.Failed)
+            throw new InvalidOperationException(
+                $"Only Failed orders can be revised and resent. Current status: {Status}.");
+
+        ApplyLocationMaps(stationMap, wmsLocationMap);
+
+        Status = OrderStatus.Confirmed;
+        AddDomainEvent(new DeliveryOrderAmendedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+        AddDomainEvent(new DeliveryOrderReopenedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
+        AddDomainEvent(BuildConfirmedEvent(weightFallbackKg));
+        AddDomainEvent(new DeliveryOrderRedispatchedDomainEvent(Guid.NewGuid(), DateTime.UtcNow, Id, reason));
     }
 
     public void Cancel(string reason)

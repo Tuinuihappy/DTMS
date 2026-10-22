@@ -126,6 +126,20 @@ public class ExceptionHandlingMiddlewareTests
     }
 
     [Fact]
+    public async Task RouteNotDispatchable_Maps422_WithItsOwnTitle()
+    {
+        // Same status as the idempotency filter's 422 conflict — the title is
+        // what lets a caller tell the two apart.
+        var ex = new DTMS.Dispatch.Application.Services.RouteNotDispatchableException(
+            "No usable route for SHELF3 → PACK-1.");
+        var body = await RunWith(ex);
+
+        body.GetProperty("status").GetInt32().Should().Be(422);
+        body.GetProperty("title").GetString().Should().Be("Route Not Dispatchable");
+        body.GetProperty("detail").GetString().Should().Be(ex.Message);
+    }
+
+    [Fact]
     public async Task UniqueViolation_Maps409_WithoutLeakingTheIndexName()
     {
         // Unique violations are the sibling of DbUpdateConcurrencyException:

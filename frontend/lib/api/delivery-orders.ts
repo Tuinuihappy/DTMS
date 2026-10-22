@@ -557,6 +557,39 @@ export async function reopenOrder(
   return unwrap<ReopenOrderResult>(res);
 }
 
+// "Edit & resend" for a Failed order — edits priority, service window and
+// items (incl. pickup/drop codes), then sends the order back through
+// planning as a fresh attempt so the new trip fires the shipment.*
+// callbacks to the source system. Item `id` keeps an existing item;
+// omit it to add one; existing items left out are removed. OrderRef,
+// transport mode and POD flags are not part of the request.
+export type ReviseAndResendPayload = {
+  reason: string;
+  priority: Priority;
+  serviceWindow: CreateOrderPayload["serviceWindow"];
+  items: Array<CreateOrderPayload["items"][number] & { id?: string }>;
+};
+
+export async function reviseAndResendOrder(
+  id: string,
+  payload: ReviseAndResendPayload,
+): Promise<DeliveryOrderDetailDto> {
+  const res = await fetch(`/api/delivery-orders/${id}/revise-and-resend`, {
+    method: "POST",
+    headers: mutationHeaders(),
+    body: JSON.stringify({
+      ...payload,
+      priority: upperSnakeFromPascal(payload.priority),
+      items: payload.items.map((it) => ({
+        ...it,
+        handlingInstructions: it.handlingInstructions?.map((h) => upperSnakeFromPascal(h)),
+      })),
+    }),
+  });
+  const raw = await unwrap<DeliveryOrderDetailDto>(res);
+  return normalizeOrder(raw);
+}
+
 export async function redispatchOrder(
   id: string,
   body: { redispatchedBy: string; reason: string; weightFallbackKg?: number },

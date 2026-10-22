@@ -101,6 +101,43 @@ public class Item : Entity<Guid>
         Status = ItemStatus.Pending;
     }
 
+    /// <summary>Overwrite the item's content while keeping its identity (Id,
+    /// ItemSeq, POD history) — the Failed-order revise path. The previous
+    /// attempt is over, so the item goes back to an unbound Pending and its
+    /// resolved station / WMS Ids are cleared: the codes may have changed,
+    /// and the order's re-validation sets them again before re-planning.</summary>
+    internal void Revise(ItemRevision revision)
+    {
+        if (string.IsNullOrWhiteSpace(revision.PickupLocationCode))
+            throw new ArgumentException("PickupLocationCode must not be empty.", nameof(revision));
+        if (string.IsNullOrWhiteSpace(revision.DropLocationCode))
+            throw new ArgumentException("DropLocationCode must not be empty.", nameof(revision));
+        ArgumentNullException.ThrowIfNull(revision.Quantity);
+
+        PickupLocationCode = revision.PickupLocationCode.Trim();
+        DropLocationCode = revision.DropLocationCode.Trim();
+        ItemId = revision.ItemId;
+        Description = revision.Description;
+        LoadUnitProfileCode = revision.LoadUnitProfileCode;
+        Dimensions = revision.Dimensions;
+        WeightKg = revision.WeightKg;
+        Quantity = revision.Quantity;
+        Hazmat = revision.Hazmat;
+        Temperature = revision.Temperature;
+        HandlingInstructions = revision.HandlingInstructions is null
+            ? Array.Empty<HandlingInstruction>()
+            : revision.HandlingInstructions.Distinct().ToArray();
+
+        Status = ItemStatus.Pending;
+        TripId = null;
+        AttemptNumber = null;
+        DroppedOffAt = null;
+        PickupStationId = null;
+        DropStationId = null;
+        PickupWmsLocationId = null;
+        DropWmsLocationId = null;
+    }
+
     internal void SetStationIds(Guid pickupStationId, Guid dropStationId)
     {
         PickupStationId = pickupStationId;

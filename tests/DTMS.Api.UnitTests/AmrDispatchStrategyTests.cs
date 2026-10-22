@@ -119,4 +119,19 @@ public class AmrDispatchStrategyTests
         result.IsFailure.Should().BeTrue();
         result.Error.Should().Contain("OrderTemplate");
     }
+
+    [Fact]
+    public async Task CheckRoutes_ReportsEveryFailingRoute_AndOnlyThose()
+    {
+        var (okP, okD) = (Guid.NewGuid(), Guid.NewGuid());
+        var (badP, badD) = (Guid.NewGuid(), Guid.NewGuid());
+        _planning.CheckRouteAsync(okP, okD, Arg.Any<CancellationToken>()).Returns(Result.Success());
+        _planning.CheckRouteAsync(badP, badD, Arg.Any<CancellationToken>())
+            .Returns(Result.Failure("no active OrderTemplate is registered for this route"));
+
+        var problems = await CreateStrategy().CheckRoutesAsync([(okP, okD), (badP, badD)]);
+
+        problems.Should().ContainSingle()
+            .Which.Should().Be(new RouteProblem(badP, badD, "no active OrderTemplate is registered for this route"));
+    }
 }

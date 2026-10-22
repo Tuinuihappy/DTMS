@@ -41,7 +41,24 @@ public interface IDispatchStrategy
     Task<Result<DispatchGroupOutcome>> DispatchGroupAsync(
         DispatchGroupRequest request,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Pre-flight for <see cref="DispatchGroupAsync"/>: which of these
+    /// (pickup, drop) routes would fail before reaching the vendor? Empty =
+    /// all dispatchable. Lets a caller refuse an order synchronously instead
+    /// of letting it fail in Planning. The default answers "all fine" — only
+    /// modes with a pre-vendor failure (AMR: no / unresolvable OrderTemplate)
+    /// override it. Manual's locations are already checked when the order's
+    /// WMS codes are resolved.
+    /// </summary>
+    Task<IReadOnlyList<RouteProblem>> CheckRoutesAsync(
+        IReadOnlyCollection<(Guid Pickup, Guid Drop)> routes,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<RouteProblem>>([]);
 }
+
+/// <summary>A route <see cref="IDispatchStrategy.CheckRoutesAsync"/> found undispatchable, and why.</summary>
+public sealed record RouteProblem(Guid Pickup, Guid Drop, string Reason);
 
 /// <summary>
 /// Primitive projection of an order item that the strategy uses to

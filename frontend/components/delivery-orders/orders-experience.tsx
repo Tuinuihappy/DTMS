@@ -232,6 +232,8 @@ function ExperienceInner() {
   // but submits as a fresh POST. orderRef and serviceWindow are cleared
   // inside the dialog; items are kept verbatim.
   const [reorderingOrder, setReorderingOrder] = useState<DeliveryOrderDetailDto | null>(null);
+  // Edit & resend — a Failed order, pre-filled in the create dialog.
+  const [revisingOrder, setRevisingOrder] = useState<DeliveryOrderDetailDto | null>(null);
   const [busy, setBusy] = useState(false);
   // Cancel dialog state — single-target uses `cancelTarget`; bulk uses
   // `bulkCancelTargets` (the dialog component is the same, but bulk
@@ -557,6 +559,32 @@ function ExperienceInner() {
     [toast],
   );
 
+  // Edit & resend — Failed orders only. Full detail for a lossless prefill
+  // (same reason as openEdit); the drawer is closed so the wider dialog
+  // doesn't stack over it, and reopened on success via the refresh path.
+  const openRevise = useCallback(
+    async (id: string) => {
+      try {
+        const detail = await getOrder(id);
+        if (detail.orderStatus !== "Failed") {
+          toast.push({
+            tone: "error",
+            message: "Only failed orders can be edited and resent.",
+          });
+          return;
+        }
+        setDetailId(null);
+        setRevisingOrder(detail);
+      } catch (e) {
+        toast.push({
+          tone: "error",
+          message: `Couldn't load order: ${(e as Error).message}`,
+        });
+      }
+    },
+    [toast],
+  );
+
   // Submit/confirm fire immediately; delete routes through the cancel
   // dialog so we can capture the reason the backend's audit log expects.
   // Edit opens the create dialog in edit mode (fetches full detail first).
@@ -572,7 +600,8 @@ function ExperienceInner() {
         | "hold"
         | "release"
         | "reject"
-        | "abandon",
+        | "abandon"
+        | "revise",
       id: string,
       reason?: string,
     ) => {
@@ -601,6 +630,11 @@ function ExperienceInner() {
 
       if (action === "reorder") {
         void openReorder(id);
+        return;
+      }
+
+      if (action === "revise") {
+        void openRevise(id);
         return;
       }
 
@@ -724,6 +758,7 @@ function ExperienceInner() {
       detailId,
       openEdit,
       openReorder,
+      openRevise,
       flushCancel,
       undoCancel,
       fetchOrders,
@@ -979,6 +1014,21 @@ function ExperienceInner() {
             message: `Reorder created from ${reorderingOrder?.orderRef ?? "source"}`,
           });
           fetchOrders({ silent: true });
+        }}
+      />
+
+      <CreateOrderDialog
+        open={revisingOrder !== null}
+        revising={revisingOrder}
+        onClose={() => setRevisingOrder(null)}
+        onCreated={() => {
+          const ref = revisingOrder?.orderRef ?? "Order";
+          toast.push({
+            tone: "success",
+            message: `${ref} updated and sent back to planning.`,
+          });
+          fetchOrders({ silent: true });
+          if (revisingOrder) setDetailId(revisingOrder.id);
         }}
       />
 

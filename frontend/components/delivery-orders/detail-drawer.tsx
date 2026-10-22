@@ -11,6 +11,7 @@ import {
   Hash,
   History,
   PauseCircle,
+  PencilLine,
   PlayCircle,
   RotateCcw,
   Send,
@@ -50,7 +51,8 @@ type Action =
   | "release"
   | "reject"
   | "abandon"
-  | "reorder";
+  | "reorder"
+  | "revise";
 
 const ORDER_IN_FLIGHT_STATES = [
   "Confirmed",
@@ -568,6 +570,20 @@ export function OrderDetailDrawer({
                       onClick={() => onAction("delete", data.id)}
                     >
                       Cancel order
+                    </DrawerActionButton>
+                  )}
+                  {/* Edit & resend — fix the failed order's data (items,
+                      pickup / drop, priority, window) and re-plan it as a
+                      fresh attempt, so the new trip sends the shipment
+                      callbacks to the source system. Reopen (below) instead
+                      retries the old trip's route unchanged. */}
+                  {can(data.orderStatus, ["Failed"]) && (
+                    <DrawerActionButton
+                      tone="brand"
+                      icon={<PencilLine className="h-3.5 w-3.5" strokeWidth={2.4} />}
+                      onClick={() => onAction("revise", data.id)}
+                    >
+                      Edit &amp; resend
                     </DrawerActionButton>
                   )}
                   {can(data.orderStatus, ["Failed", "Cancelled"]) && (
