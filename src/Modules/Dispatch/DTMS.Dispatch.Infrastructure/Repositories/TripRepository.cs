@@ -222,6 +222,15 @@ public class TripRepository : ITripRepository
                 r.TotalWeightKg));
     }
 
+    public async Task<IReadOnlyList<TripAttemptRef>> GetAttemptRefsByDeliveryOrderIdAsync(
+        Guid deliveryOrderId, CancellationToken cancellationToken = default)
+        => await _context.Trips
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(t => t.DeliveryOrderId == deliveryOrderId)
+            .Select(t => new TripAttemptRef(t.Id, t.UpperKey, t.AttemptNumber, t.Status, t.PreviousAttemptId))
+            .ToListAsync(cancellationToken);
+
     public async Task<List<Trip>> GetByDeliveryOrderIdAsync(Guid deliveryOrderId, CancellationToken cancellationToken = default)
     {
         // Include Events so the order-level full-audit query (Phase 4.2)

@@ -80,6 +80,7 @@ public class DeliveryOrderValidatedConsumerModeGuardTests
             Substitute.For<ISelfManagedDispatchService>(),
             sender,
             new WorkflowMetrics(),
+            Substitute.For<DTMS.Dispatch.Domain.Repositories.ITripRepository>(),
             NullLogger<DeliveryOrderValidatedConsumer>.Instance);
         return (consumer, registry, sender);
     }

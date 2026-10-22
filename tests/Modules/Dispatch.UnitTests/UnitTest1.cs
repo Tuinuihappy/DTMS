@@ -1356,6 +1356,11 @@ internal sealed class FakeTripRepository : ITripRepository
     public Task<List<Trip>> GetByDeliveryOrderIdAsync(Guid deliveryOrderId, CancellationToken ct = default)
         => Task.FromResult(deliveryOrderId == _trip.DeliveryOrderId ? new List<Trip> { _trip } : new List<Trip>());
 
+    public Task<IReadOnlyList<TripAttemptRef>> GetAttemptRefsByDeliveryOrderIdAsync(Guid deliveryOrderId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<TripAttemptRef>>(deliveryOrderId == _trip.DeliveryOrderId
+            ? [new TripAttemptRef(_trip.Id, _trip.UpperKey, _trip.AttemptNumber, _trip.Status, _trip.PreviousAttemptId)]
+            : []);
+
     public Task AddAsync(Trip trip, CancellationToken ct = default) => Task.CompletedTask;
 
     public Task UpdateAsync(Trip trip, CancellationToken ct = default)

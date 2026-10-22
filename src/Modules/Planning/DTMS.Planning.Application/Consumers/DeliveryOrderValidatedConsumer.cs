@@ -7,6 +7,7 @@ using DTMS.DeliveryOrder.Application.Commands.RecomputeOrderStatus;
 using DTMS.DeliveryOrder.Domain.Enums;
 using DTMS.DeliveryOrder.IntegrationEvents;
 using DTMS.Dispatch.Application.Services;
+using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Planning.Application.Commands.CreateJobAnchor;
 using DTMS.Planning.Application.Commands.MarkJobDispatched;
 using DTMS.Planning.Application.Commands.MarkJobFailed;
@@ -17,6 +18,7 @@ using DTMS.SharedKernel.Diagnostics;
 using MassTransit;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using TripStatus = DTMS.Dispatch.Domain.Enums.TripStatus;
 
 namespace DTMS.Planning.Application.Consumers;
 
@@ -37,6 +39,7 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
     private readonly ISelfManagedDispatchService _selfManaged;
     private readonly ISender _sender;
     private readonly WorkflowMetrics _metrics;
+    private readonly ITripRepository _tripRepository;
     private readonly ILogger<DeliveryOrderValidatedConsumer> _logger;
 
     public DeliveryOrderValidatedConsumer(
@@ -44,12 +47,14 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         ISelfManagedDispatchService selfManaged,
         ISender sender,
         WorkflowMetrics metrics,
+        ITripRepository tripRepository,
         ILogger<DeliveryOrderValidatedConsumer> logger)
     {
         _strategyRegistry = strategyRegistry;
         _selfManaged = selfManaged;
         _sender = sender;
         _metrics = metrics;
+        _tripRepository = tripRepository;
         _logger = logger;
     }
 
@@ -187,11 +192,27 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         // loop continues so unrelated groups still get a chance. If even the
         // MarkJobFailed call faults we log critical and rethrow — we cannot
         // leave the job stuck at Created silently (that was the OD-0374 bug).
+        // A re-plan (revise-and-resend, admin redispatch) finds the earlier
+        // attempts' trips here; a first plan finds none.
+        var priorTrips = await _tripRepository.GetAttemptRefsByDeliveryOrderIdAsync(evt.DeliveryOrderId, ct);
+
         var successCount = 0;
         foreach (var (groupIndex, group) in groups.Index())
         {
             var items = group.Items;
-            var upperKey = EnvelopeUpperKey.Build(evt.DeliveryOrderId, groupIndex + 1);
+            var plan = NextAttempt(priorTrips, evt.DeliveryOrderId, groupIndex + 1);
+            if (plan.Skip)
+            {
+                // Its items are still bound to that trip, so the group counts
+                // as in vendor hands for the order's Dispatched transition.
+                successCount++;
+                _logger.LogInformation(
+                    "[AutoPlan] Group {G} already has trip {TripId} ({Status}) — not re-dispatching",
+                    groupIndex + 1, plan.ExistingTrip!.Id, plan.ExistingTrip.Status);
+                continue;
+            }
+            var (attemptNumber, previousAttemptId) = (plan.AttemptNumber, plan.PreviousAttemptId);
+            var upperKey = EnvelopeUpperKey.Build(evt.DeliveryOrderId, groupIndex + 1, attemptNumber);
             var jobId = jobIdByGroup.GetValueOrDefault(groupIndex);
 
             using var groupScope = _logger.BeginScope(new Dictionary<string, object?>
@@ -220,6 +241,8 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
                     DropStationId:   group.DropStationId   ?? Guid.Empty,
                     UpperKey: upperKey,
                     JobId: jobId == Guid.Empty ? null : jobId,
+                    AttemptNumber: attemptNumber,
+                    PreviousAttemptId: previousAttemptId,
                     SlaDeadline: evt.LatestUtc,
                     PickupWmsLocationId: group.PickupWmsLocationId,
                     DropWmsLocationId:   group.DropWmsLocationId,
@@ -397,4 +420,54 @@ public class DeliveryOrderValidatedConsumer : IConsumer<DeliveryOrderConfirmedIn
         Enum.TryParse<TransportMode>(raw, ignoreCase: true, out var parsed)
             ? parsed
             : TransportMode.Amr;
+
+    /// <summary>What to do with one dispatch group, given the order's earlier trips.</summary>
+    /// <param name="Skip">The group already has a running or completed trip — dispatch nothing.</param>
+    /// <param name="ExistingTrip">The chain tip when skipping (for the log line).</param>
+    internal sealed record GroupAttempt(
+        bool Skip, int AttemptNumber, Guid? PreviousAttemptId, TripAttemptRef? ExistingTrip = null);
+
+    /// <summary>
+    /// Decides a group's dispatch from the tip of its retry chain:
+    /// <list type="bullet">
+    ///   <item>No earlier trip (every first plan) → attempt 1, the historical upperKey.</item>
+    ///   <item>Tip Failed / Cancelled / Rejected (revise-and-resend, admin
+    ///         redispatch) → one past the tip, linked to it. Reusing the old
+    ///         upperKey would make RIOT3 run a robot (it doesn't dedupe) while
+    ///         CreateEnvelopeTrip, idempotent on upperKey, hands back the dead
+    ///         trip — so the run's webhooks and the source's shipment callbacks
+    ///         would attach to it. The link keeps the source's shipmentId (root
+    ///         of the chain), exactly like a trip retry.</item>
+    ///   <item>Tip still running, or Completed → skip. The Confirmed event is
+    ///         re-raised by Release (an order can be held mid-run) and redelivered
+    ///         by MassTransit; dispatching again would send RIOT3 a second robot
+    ///         for goods already on the way or delivered.</item>
+    /// </list>
+    /// </summary>
+    internal static GroupAttempt NextAttempt(
+        IReadOnlyList<TripAttemptRef> priorTrips, Guid deliveryOrderId, int groupIndex)
+    {
+        TripAttemptRef? tip = null;
+        var tipAttempt = 0;
+        foreach (var trip in priorTrips)
+        {
+            if (!EnvelopeUpperKey.TryParse(trip.UpperKey, out var orderId, out var g, out var parsedAttempt)
+                || orderId != deliveryOrderId || g != groupIndex)
+                continue;
+
+            var attempt = Math.Max(parsedAttempt, trip.AttemptNumber);
+            if (attempt > tipAttempt)
+            {
+                tip = trip;
+                tipAttempt = attempt;
+            }
+        }
+
+        if (tip is null) return new GroupAttempt(false, 1, null);
+
+        var ended = tip.Status is TripStatus.Failed or TripStatus.Cancelled or TripStatus.Rejected;
+        return ended
+            ? new GroupAttempt(false, tipAttempt + 1, tip.Id)
+            : new GroupAttempt(true, tipAttempt, tip.PreviousAttemptId, tip);
+    }
 }

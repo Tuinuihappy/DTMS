@@ -30,6 +30,17 @@ public class CreateJobAnchorCommandHandler : ICommandHandler<CreateJobAnchorComm
         var match = existing.FirstOrDefault(j => j.GroupIndex == request.GroupIndex);
         if (match is not null)
         {
+            // A re-plan after the order was revised may route this group
+            // through different stations; MarkJobDispatched rebinds the ended
+            // Job to the new trip, so point its anchor at the new route too.
+            if (match.Status is JobStatus.Failed or JobStatus.Cancelled
+                && (match.PickupStationId != request.PickupStationId || match.DropStationId != request.DropStationId))
+            {
+                match.SetEnvelopeAnchor(request.GroupIndex, request.PickupStationId, request.DropStationId);
+                await _jobRepository.UpdateAsync(match, cancellationToken);
+            }
+
+
             _logger.LogInformation(
                 "[CreateJobAnchor] ↺ Job {JobId} already exists for order {OrderId} group {Group} — returning existing (idempotent)",
                 match.Id, request.DeliveryOrderId, request.GroupIndex);

@@ -95,6 +95,9 @@ public class DispatchDbContext : DbContext
             // index stays small.
             builder.HasIndex(t => t.JobId)
                 .HasFilter("\"JobId\" != '00000000-0000-0000-0000-000000000000'");
+            // Order → its trips (planning's attempt lookup, reopen, redispatch,
+            // the order drawer). Migration 20261022100000.
+            builder.HasIndex(t => t.DeliveryOrderId);
             builder.Ignore(t => t.DomainEvents);
             // Optimistic concurrency via the Postgres xmin system column
             // (same pattern as DeliveryOrder/Iam). Trips are written by HTTP

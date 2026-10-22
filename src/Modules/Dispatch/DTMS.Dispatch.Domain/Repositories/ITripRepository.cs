@@ -3,6 +3,11 @@ using DTMS.Dispatch.Domain.Enums;
 
 namespace DTMS.Dispatch.Domain.Repositories;
 
+/// <summary>Retry-lineage projection of a Trip (see
+/// <see cref="ITripRepository.GetAttemptRefsByDeliveryOrderIdAsync"/>).</summary>
+public sealed record TripAttemptRef(
+    Guid Id, string UpperKey, int AttemptNumber, TripStatus Status, Guid? PreviousAttemptId);
+
 /// <summary>
 /// Lightweight projection for the sub-task webhook hot path: everything the
 /// handler needs to record a mission row and decide whether the pickup/drop
@@ -102,6 +107,15 @@ public interface ITripRepository
     /// stop on the vendor side.
     /// </summary>
     Task<List<Trip>> GetByDeliveryOrderIdAsync(Guid deliveryOrderId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The retry-lineage fields of every Trip of a DeliveryOrder — untracked,
+    /// no Events. Planning reads it on every order it plans to decide each
+    /// group's attempt, so it must stay a cheap index lookup (zero rows for a
+    /// first plan).
+    /// </summary>
+    Task<IReadOnlyList<TripAttemptRef>> GetAttemptRefsByDeliveryOrderIdAsync(
+        Guid deliveryOrderId, CancellationToken cancellationToken = default);
 
     Task AddAsync(Trip trip, CancellationToken cancellationToken = default);
     Task UpdateAsync(Trip trip, CancellationToken cancellationToken = default);

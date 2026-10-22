@@ -46,7 +46,14 @@ public class MarkJobDispatchedCommandHandler : ICommandHandler<MarkJobDispatched
 
         try
         {
-            job.MarkDispatched(request.TripId, request.VendorOrderKey);
+            // Re-plan of an order whose earlier attempt ended (revise-and-
+            // resend, admin redispatch): CreateJobAnchor handed back this
+            // group's existing Job, now Failed/Cancelled. Bind it to the new
+            // trip the same way a trip retry does, so the Job follows it.
+            if (job.Status is Domain.Enums.JobStatus.Failed or Domain.Enums.JobStatus.Cancelled)
+                job.RebindToRetryTrip(request.TripId, request.VendorOrderKey);
+            else
+                job.MarkDispatched(request.TripId, request.VendorOrderKey);
             await _jobRepository.UpdateAsync(job, cancellationToken);
             return Result.Success();
         }

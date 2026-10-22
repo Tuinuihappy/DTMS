@@ -269,6 +269,8 @@ namespace DTMS.Dispatch.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DeliveryOrderId");
+
                     b.HasIndex("JobId")
                         .HasFilter("\"JobId\" != '00000000-0000-0000-0000-000000000000'");
 
