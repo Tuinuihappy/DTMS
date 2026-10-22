@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DTMS.Iam.Application.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
@@ -21,7 +22,11 @@ namespace DTMS.DeliveryOrder.Presentation.Idempotency;
 public sealed class IdempotencyKeyFilter : IEndpointFilter
 {
     private const string HeaderName = "Idempotency-Key";
-    private const string CacheKeyPrefix = "idempotency:v2:";
+    // v3 — the entry is scoped to the caller (see CallerScope). v2 keyed on
+    // the raw header alone, so two callers that happened to pick the same key
+    // shared one entry: an identical body replayed the other caller's
+    // response, a different one got a false 422 conflict.
+    private const string CacheKeyPrefix = "idempotency:v3:";
 
     private readonly IDistributedCache _cache;
     private readonly ILogger<IdempotencyKeyFilter> _logger;
@@ -77,7 +82,7 @@ public sealed class IdempotencyKeyFilter : IEndpointFilter
             http.Request.Path.Value ?? string.Empty,
             context.Arguments);
 
-        var cacheKey = CacheKeyPrefix + key;
+        var cacheKey = CacheKeyPrefix + CallerScope(http) + ":" + key;
         var cached = await _cache.GetStringAsync(cacheKey, http.RequestAborted);
 
         if (cached is not null)
@@ -118,5 +123,21 @@ public sealed class IdempotencyKeyFilter : IEndpointFilter
         // Endpoint didn't return an IResult (rare in minimal-API mutation handlers) —
         // let ASP.NET process the value as-is; we just don't cache it.
         return result;
+    }
+
+    /// <summary>
+    /// Who the key belongs to: a source system (its principal key), a user
+    /// (EmployeeId, else the name claim — the same order
+    /// HttpContextCurrentUserAccessor uses), or nobody. Read from the request
+    /// rather than injected: this filter is a singleton, so a scoped accessor
+    /// can't be a constructor dependency.
+    /// </summary>
+    internal static string CallerScope(HttpContext http)
+    {
+        if (http.Items["principal"] is SystemPrincipal system)
+            return $"sys:{system.Key}";
+
+        var user = http.User.FindFirst("EmployeeId")?.Value ?? http.User.Identity?.Name;
+        return string.IsNullOrWhiteSpace(user) ? "anon" : $"usr:{user}";
     }
 }

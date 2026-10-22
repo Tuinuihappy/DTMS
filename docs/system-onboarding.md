@@ -115,9 +115,18 @@ curl -X POST https://dtms.internal/oauth/token \
 # from the JWT sub claim, not the URL — the endpoint has no {key} segment.
 curl -X POST https://dtms.internal/api/v1/source/delivery-orders \
   -H "Authorization: Bearer eyJ..." \
+  -H "Idempotency-Key: 7f3c9e2a-..." \
   -H "Content-Type: application/json" \
   -d '{...order payload...}'
 ```
+
+`Idempotency-Key` is mandatory on order create (400 without it). Use a new
+value (a UUID) per logical order and send the **same** value when retrying
+a request whose response you didn't get: within 24 h DTMS replays the
+original successful response instead of creating a second order. Keys are
+scoped to your system — another system using the same value never sees
+your response. The same key with a different body is a 422 "Idempotency-Key
+conflict". Error responses (4xx) are not replayed: a retry runs again.
 
 Partner code outline (any language):
 ```

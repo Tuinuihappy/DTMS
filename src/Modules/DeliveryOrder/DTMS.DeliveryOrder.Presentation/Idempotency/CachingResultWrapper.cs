@@ -7,8 +7,8 @@ namespace DTMS.DeliveryOrder.Presentation.Idempotency;
 /// <summary>
 /// Wraps an inner <see cref="IResult"/>, captures the response body bytes by
 /// temporarily swapping <see cref="HttpResponse.Body"/> with a memory stream,
-/// then stores the result under <c>idempotency:v2:{key}</c> so subsequent
-/// requests with the same Idempotency-Key replay the same response.
+/// then stores the result under <c>idempotency:v3:{caller}:{key}</c> so subsequent
+/// requests from the same caller with the same Idempotency-Key replay the same response.
 /// Only 2xx and 4xx responses are cached — 5xx are left for the client to retry.
 /// </summary>
 internal sealed class CachingResultWrapper : IResult
