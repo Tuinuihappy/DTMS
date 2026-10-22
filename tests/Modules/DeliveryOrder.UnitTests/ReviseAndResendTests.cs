@@ -123,6 +123,20 @@ public class ReviseAndResendTests
     }
 
     [Fact]
+    public void Revise_RepeatedItemId_ThrowsNamingIt_BeforeChangingAnything()
+    {
+        var order = FailedOrder();
+        var before = order.Items.Select(i => i.PickupLocationCode).ToList();
+
+        var act = () => order.ReviseFailed(Priority.High, Window(),
+            [Line(order.Items.First().Id, "SKU-7"), Line(null, " SKU-7 ")]);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*SKU-7*more than once*");
+        order.Priority.Should().Be(Priority.Normal);
+        order.Items.Select(i => i.PickupLocationCode).Should().Equal(before);
+    }
+
+    [Fact]
     public void Revise_ForeignOrDuplicateItemId_Throws()
     {
         var order = FailedOrder();

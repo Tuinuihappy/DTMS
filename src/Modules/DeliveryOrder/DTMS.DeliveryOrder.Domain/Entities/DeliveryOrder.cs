@@ -827,6 +827,14 @@ public class DeliveryOrder : AggregateRoot<Guid>, IAuditable
         if (revisions.Count == 0)
             throw new InvalidOperationException("A revised order must keep at least one item.");
 
+        // ItemId is unique per order in the DB (case-sensitive, like Ordinal).
+        // Catch a repeat here, by name, instead of letting the INSERT fail as
+        // an anonymous 409 "Duplicate Value".
+        if (revisions.GroupBy(r => r.ItemId.Trim(), StringComparer.Ordinal)
+                .FirstOrDefault(g => g.Count() > 1) is { } repeated)
+            throw new InvalidOperationException(
+                $"Item id '{repeated.Key}' appears more than once — each item needs its own id.");
+
         var keptIds = new HashSet<Guid>();
         foreach (var id in revisions.Select(r => r.ExistingItemId).OfType<Guid>())
         {
