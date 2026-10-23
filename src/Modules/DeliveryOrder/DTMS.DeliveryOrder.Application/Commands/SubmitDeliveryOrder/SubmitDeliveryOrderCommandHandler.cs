@@ -19,6 +19,7 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
     private readonly IOrderAuditEventRepository _auditRepo;
     private readonly IStationValidationService _stationValidation;
     private readonly IDispatchStrategyRegistry _strategyRegistry;
+    private readonly IRouteDispatchGuard _routeGuard;
     private readonly DeliveryOrderOptions _options;
     private readonly ILogger<SubmitDeliveryOrderCommandHandler> _logger;
 
@@ -27,6 +28,7 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
         IOrderAuditEventRepository auditRepo,
         IStationValidationService stationValidation,
         IDispatchStrategyRegistry strategyRegistry,
+        IRouteDispatchGuard routeGuard,
         IOptions<DeliveryOrderOptions> options,
         ILogger<SubmitDeliveryOrderCommandHandler> logger)
     {
@@ -34,6 +36,7 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
         _auditRepo = auditRepo;
         _stationValidation = stationValidation;
         _strategyRegistry = strategyRegistry;
+        _routeGuard = routeGuard;
         _options = options.Value;
         _logger = logger;
     }
@@ -71,6 +74,9 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
             var stationResult = await _stationValidation.BuildStationMapAsync(order.Items, cancellationToken);
             if (stationResult.IsFailure) return Result<SubmitDeliveryOrderResult>.Failure(stationResult.Error);
             stationMap = stationResult.Value;
+            // No usable order template for a route → 422 now, not a Failed
+            // order in a few seconds. Nothing has been changed yet.
+            await _routeGuard.EnsureDispatchableAsync(order.OrderRef, order.Items, mode, stationMap, cancellationToken);
         }
         else
         {

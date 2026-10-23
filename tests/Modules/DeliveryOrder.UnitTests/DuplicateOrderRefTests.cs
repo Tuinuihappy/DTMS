@@ -138,7 +138,7 @@ public class DuplicateOrderRefTests
             repo, Substitute.For<IOrderAuditEventRepository>(),
             Substitute.For<IOrderActivityProjectionStore>(),
             stations,
-            Substitute.For<ICurrentUserAccessor>(), origins, registry,
+            Substitute.For<ICurrentUserAccessor>(), origins, registry, RouteGuards.Passing(),
             Options.Create(new DeliveryOrderOptions()),
             NullLogger<CreateUpstreamDeliveryOrderCommandHandler>.Instance);
         return (handler, repo, stations);

@@ -31,6 +31,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IOrderOriginResolver _originResolver;
     private readonly IDispatchStrategyRegistry _strategyRegistry;
+    private readonly IRouteDispatchGuard _routeGuard;
     private readonly DeliveryOrderOptions _options;
     private readonly ILogger<CreateUpstreamDeliveryOrderCommandHandler> _logger;
 
@@ -42,6 +43,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         ICurrentUserAccessor currentUser,
         IOrderOriginResolver originResolver,
         IDispatchStrategyRegistry strategyRegistry,
+        IRouteDispatchGuard routeGuard,
         IOptions<DeliveryOrderOptions> options,
         ILogger<CreateUpstreamDeliveryOrderCommandHandler> logger)
     {
@@ -52,6 +54,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         _currentUser = currentUser;
         _originResolver = originResolver;
         _strategyRegistry = strategyRegistry;
+        _routeGuard = routeGuard;
         _options = options.Value;
         _logger = logger;
     }
@@ -155,6 +158,14 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
                 return Result<UpstreamOrderAckDto>.Failure(stationResult.Error);
             }
             stationMap = stationResult.Value;
+
+            // A route with no usable order template is refused here, 422 in
+            // this response, with nothing saved. Before, the order was
+            // accepted (201), failed in Planning seconds later, and the source
+            // system never heard — it kept the goods reserved for a shipment
+            // that would never move. Nothing saved also means the caller can
+            // fix the route and send the same OrderRef again (no 409).
+            await _routeGuard.EnsureDispatchableAsync(order.OrderRef, order.Items, mode, stationMap, cancellationToken);
         }
         else
         {

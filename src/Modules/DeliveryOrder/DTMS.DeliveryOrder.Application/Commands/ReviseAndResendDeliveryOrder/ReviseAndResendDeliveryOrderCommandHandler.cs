@@ -28,6 +28,7 @@ public class ReviseAndResendDeliveryOrderCommandHandler
     private readonly ITripRepository _tripRepository;
     private readonly IStationValidationService _stationValidation;
     private readonly IDispatchStrategyRegistry _strategyRegistry;
+    private readonly IRouteDispatchGuard _routeGuard;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly DeliveryOrderOptions _options;
     private readonly ILogger<ReviseAndResendDeliveryOrderCommandHandler> _logger;
@@ -39,6 +40,7 @@ public class ReviseAndResendDeliveryOrderCommandHandler
         ITripRepository tripRepository,
         IStationValidationService stationValidation,
         IDispatchStrategyRegistry strategyRegistry,
+        IRouteDispatchGuard routeGuard,
         ICurrentUserAccessor currentUser,
         IOptions<DeliveryOrderOptions> options,
         ILogger<ReviseAndResendDeliveryOrderCommandHandler> logger)
@@ -49,6 +51,7 @@ public class ReviseAndResendDeliveryOrderCommandHandler
         _tripRepository = tripRepository;
         _stationValidation = stationValidation;
         _strategyRegistry = strategyRegistry;
+        _routeGuard = routeGuard;
         _currentUser = currentUser;
         _options = options.Value;
         _logger = logger;
@@ -113,7 +116,9 @@ public class ReviseAndResendDeliveryOrderCommandHandler
                 if (stationResult.IsFailure)
                     return Result<DeliveryOrderDetailDto>.Failure(stationResult.Error);
                 stationMap = stationResult.Value;
-                await EnsureRoutesDispatchableAsync(order, mode, stationMap, cancellationToken);
+                // Refuse a revision onto a route nothing can carry out — 422,
+                // before anything is saved, instead of failing again in Planning.
+                await _routeGuard.EnsureDispatchableAsync(order.OrderRef, order.Items, mode, stationMap, cancellationToken);
             }
             else
             {
@@ -159,34 +164,5 @@ public class ReviseAndResendDeliveryOrderCommandHandler
             _logger.LogWarning("[ReviseAndResend] Concurrency conflict on Order {OrderId}.", request.OrderId);
             return Result<DeliveryOrderDetailDto>.Failure("The order was modified by another process. Please retry.");
         }
-    }
-
-    /// <summary>
-    /// Refuse the resend when any of the revised order's routes has no usable
-    /// OrderTemplate — otherwise it is planned, fails the same way in seconds,
-    /// and lands back at Failed with nobody told why. The routes are exactly
-    /// the AMR dispatch groups (one per pickup → drop station pair).
-    /// </summary>
-    private async Task EnsureRoutesDispatchableAsync(
-        Domain.Entities.DeliveryOrder order, TransportMode mode,
-        IReadOnlyDictionary<string, Guid> stationMap, CancellationToken ct)
-    {
-        var routes = order.Items
-            .GroupBy(i => (Pickup: stationMap[i.PickupLocationCode], Drop: stationMap[i.DropLocationCode]))
-            .ToDictionary(g => g.Key, g => (g.First().PickupLocationCode, g.First().DropLocationCode));
-
-        var problems = await _strategyRegistry.Get(mode).CheckRoutesAsync(routes.Keys, ct);
-        if (problems.Count == 0) return;
-
-        var detail = string.Join("; ", problems.Select(p =>
-        {
-            var (pickup, drop) = routes[(p.Pickup, p.Drop)];
-            return $"{pickup} → {drop}: {p.Reason}";
-        }));
-        _logger.LogWarning("[ReviseAndResend] Order {OrderId} refused — undispatchable route(s): {Detail}",
-            order.Id, detail);
-        throw new RouteNotDispatchableException(
-            $"Can't resend order '{order.OrderRef}' — {detail}. " +
-            "Pick a route that has an active order template, or add one, then resend.");
     }
 }

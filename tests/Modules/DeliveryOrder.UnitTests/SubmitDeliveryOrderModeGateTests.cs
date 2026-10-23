@@ -69,7 +69,7 @@ public class SubmitDeliveryOrderModeGateTests
         registry.IsRegistered(TransportMode.Manual).Returns(manualRegistered);
 
         var handler = new SubmitDeliveryOrderCommandHandler(
-            repo, Substitute.For<IOrderAuditEventRepository>(), stations, registry,
+            repo, Substitute.For<IOrderAuditEventRepository>(), stations, registry, RouteGuards.Passing(),
             Options.Create(new DeliveryOrderOptions()),
             NullLogger<SubmitDeliveryOrderCommandHandler>.Instance);
         return (handler, repo, stations, registry);

@@ -99,7 +99,7 @@ public class ReviseAndResendHandlerTests
             repo,
             Substitute.For<IOrderAmendmentRepository>(),
             Substitute.For<IOrderAuditEventRepository>(),
-            trips, stations, registry, user,
+            trips, stations, registry, new RouteDispatchGuard(registry), user,
             Options.Create(new DeliveryOrderOptions()),
             NullLogger<ReviseAndResendDeliveryOrderCommandHandler>.Instance);
         return (handler, repo, strategy);

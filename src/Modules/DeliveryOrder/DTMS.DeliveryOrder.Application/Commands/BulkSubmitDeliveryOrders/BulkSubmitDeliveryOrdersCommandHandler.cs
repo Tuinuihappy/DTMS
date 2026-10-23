@@ -19,6 +19,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IOrderOriginResolver _originResolver;
     private readonly IDispatchStrategyRegistry _strategyRegistry;
+    private readonly IRouteDispatchGuard _routeGuard;
     private readonly DeliveryOrderOptions _options;
 
     public BulkSubmitDeliveryOrdersCommandHandler(
@@ -27,6 +28,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         ICurrentUserAccessor currentUser,
         IOrderOriginResolver originResolver,
         IDispatchStrategyRegistry strategyRegistry,
+        IRouteDispatchGuard routeGuard,
         IOptions<DeliveryOrderOptions> options)
     {
         _repo = repo;
@@ -34,6 +36,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         _currentUser = currentUser;
         _originResolver = originResolver;
         _strategyRegistry = strategyRegistry;
+        _routeGuard = routeGuard;
         _options = options.Value;
     }
 
@@ -132,6 +135,15 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                     continue;
                 }
                 stationMap = stationResult.Value;
+
+                // Same route check as single submit, collected per order so one
+                // route without a template doesn't abort the batch.
+                if (await _routeGuard.FindProblemAsync(order.OrderRef, order.Items, mode, stationMap, cancellationToken)
+                    is { } routeProblem)
+                {
+                    failures.Add(new BulkSubmitFailure(order.OrderRef, routeProblem));
+                    continue;
+                }
             }
             else
             {
