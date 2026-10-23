@@ -264,9 +264,9 @@ const actions: RailAction[] = [
 ];
 
 // Sections, by what the operator is doing. Items are looked up by label in
-// `actions` above, so the menu data stays in one list. ADMIN is pinned to
-// the bottom of the panel (outside the scroll area): most operators never
-// use it, and it shouldn't push the daily pages off screen.
+// `actions` above, so the menu data stays in one list. Admin comes last —
+// most operators never use it. Everything scrolls as one list; nothing is
+// pinned (user preference, 2026-10-23).
 type RailSection = { label?: string; items: RailAction[] };
 
 const byLabel = (labels: string[]): RailAction[] =>
@@ -286,6 +286,7 @@ const FOOTER: RailSection = {
   label: "Admin",
   items: byLabel(["Access control", "Projection health", "System status", "Active alerts"]),
 };
+const ALL_SECTIONS: RailSection[] = [...SECTIONS, FOOTER];
 
 const COLLAPSED_PX = RAIL_COLLAPSED_PX;
 const EXPANDED_PX = RAIL_EXPANDED_PX;
@@ -361,8 +362,13 @@ export function LeftRail({ initialExpanded = false }: { initialExpanded?: boolea
       className="hidden lg:flex flex-col fixed left-4 top-20 bottom-4 z-30"
       aria-label="Main navigation"
     >
-      {/* Collapse toggle — first pill, outside the scroll area. */}
-      <div className={cn("shrink-0 px-2 pb-1", !expanded && "flex justify-center")}>
+      {/* One scroll area for everything — toggle, pages and Admin all move
+          together; nothing is pinned. Soft fade at both ends says there's
+          more. */}
+      <nav
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%_-_8px),transparent)]"
+      >
+      <div className={cn("pb-2", !expanded && "flex justify-center")}>
         <button
           type="button"
           aria-label={expanded ? "Collapse panel" : "Expand panel"}
@@ -380,17 +386,8 @@ export function LeftRail({ initialExpanded = false }: { initialExpanded?: boolea
           {expanded && <span className="whitespace-nowrap">Collapse</span>}
         </button>
       </div>
-
-      {/* Scroll area — soft fade at both ends says there's more. */}
-      <nav
-        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,transparent,black_10px,black_calc(100%_-_10px),transparent)]"
-      >
-        <RailNav sections={SECTIONS} expanded={expanded} scope="rail" />
+        <RailNav sections={ALL_SECTIONS} expanded={expanded} scope="rail" />
       </nav>
-
-      <div className="shrink-0 px-2 pt-1">
-        <RailNav sections={[FOOTER]} expanded={expanded} scope="rail" />
-      </div>
     </motion.aside>
 
     {/* ── Tablet-portrait drawer ──────────────────────────────────── */}
@@ -431,11 +428,8 @@ export function LeftRail({ initialExpanded = false }: { initialExpanded?: boolea
 
             {/* Always expanded in the drawer; same sections as the rail. */}
             <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
-              <RailNav sections={SECTIONS} expanded scope="drawer" onNavigate={closeRailDrawer} />
+              <RailNav sections={ALL_SECTIONS} expanded scope="drawer" onNavigate={closeRailDrawer} />
             </nav>
-            <div className="shrink-0 border-t border-[var(--color-ink-100)]/70 px-3 pb-3 pt-1 dark:border-white/[0.06]">
-              <RailNav sections={[FOOTER]} expanded scope="drawer" onNavigate={closeRailDrawer} />
-            </div>
           </motion.aside>
       )}
     </ModalLayer>
