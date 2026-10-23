@@ -445,7 +445,7 @@ export function LeftRail({ initialExpanded = false }: { initialExpanded?: boolea
 
 /* -------------------------------------------------------------------------- */
 /* RailNav — sections of rows. Expanded: small caps label over each section.  */
-/* Collapsed: a short hairline between sections instead.                      */
+/* Collapsed: no separator — one continuous column of pills.                  */
 /* -------------------------------------------------------------------------- */
 function RailNav({
   sections,
@@ -461,17 +461,14 @@ function RailNav({
   onNavigate?: () => void;
 }) {
   return (
-    <>
+    <div className="flex flex-col gap-2">
       {sections.map((s, si) => (
         <div key={s.label ?? `s${si}`}>
-          {s.label &&
-            (expanded ? (
-              <div className="px-2.5 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-ink-400)] whitespace-nowrap">
-                {s.label}
-              </div>
-            ) : (
-              <div aria-hidden className="mx-auto my-2 h-px w-6 bg-[var(--color-ink-900)]/[0.08] dark:bg-white/[0.08]" />
-            ))}
+          {s.label && expanded && (
+            <div className="px-2.5 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-ink-400)] whitespace-nowrap">
+              {s.label}
+            </div>
+          )}
           <ul className={cn("flex flex-col gap-2", !expanded && "items-center")}>
             {s.items.map((a) => (
               <li key={a.label}>
@@ -485,7 +482,7 @@ function RailNav({
           </ul>
         </div>
       ))}
-    </>
+    </div>
   );
 }
 
