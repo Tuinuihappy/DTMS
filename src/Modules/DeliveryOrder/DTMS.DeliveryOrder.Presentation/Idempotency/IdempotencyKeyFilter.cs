@@ -126,18 +126,27 @@ public sealed class IdempotencyKeyFilter : IEndpointFilter
     }
 
     /// <summary>
-    /// Who the key belongs to: a source system (its principal key), a user
-    /// (EmployeeId, else the name claim — the same order
-    /// HttpContextCurrentUserAccessor uses), or nobody. Read from the request
-    /// rather than injected: this filter is a singleton, so a scoped accessor
-    /// can't be a constructor dependency.
+    /// Who the key belongs to: a source system (its principal key), a user, or
+    /// nobody. The user id follows the same chain as
+    /// <c>ClaimsPrincipalExtensions.ResolveUserId</c> in DTMS.Api (not reachable
+    /// from this module) — real LDAP tokens carry the employee id in <c>sub</c>
+    /// only. Read from the request rather than injected: this filter is a
+    /// singleton, so a scoped accessor can't be a constructor dependency.
     /// </summary>
     internal static string CallerScope(HttpContext http)
     {
         if (http.Items["principal"] is SystemPrincipal system)
             return $"sys:{system.Key}";
 
-        var user = http.User.FindFirst("EmployeeId")?.Value ?? http.User.Identity?.Name;
+        var user = http.User.FindFirst("EmployeeId")?.Value
+                   ?? http.User.FindFirst("employeeCode")?.Value
+                   ?? http.User.Identity?.Name;
+        if (string.IsNullOrWhiteSpace(user))
+        {
+            var sub = http.User.FindFirst("sub")?.Value;
+            if (!string.IsNullOrWhiteSpace(sub) && !sub.StartsWith("system:", StringComparison.Ordinal))
+                user = sub;
+        }
         return string.IsNullOrWhiteSpace(user) ? "anon" : $"usr:{user}";
     }
 }

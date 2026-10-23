@@ -29,6 +29,14 @@ public class IdempotencyCallerScopeTests
         => IdempotencyKeyFilter.CallerScope(Http(name: "Sunisa")).Should().Be("usr:Sunisa");
 
     [Fact]
+    public void LdapUser_IdentifiedBySubOnly_ScopesBySub()
+        => IdempotencyKeyFilter.CallerScope(Http(sub: "86347852")).Should().Be("usr:86347852");
+
+    [Fact]
+    public void SystemSub_WithoutPrincipal_IsNeverAUser()
+        => IdempotencyKeyFilter.CallerScope(Http(sub: "system:oms")).Should().Be("anon");
+
+    [Fact]
     public void NoIdentity_IsAnon()
         => IdempotencyKeyFilter.CallerScope(Http()).Should().Be("anon");
 
@@ -50,7 +58,8 @@ public class IdempotencyCallerScopeTests
         cache.Lookups.Should().Equal("idempotency:v3:sys:oms:ORDER-1", "idempotency:v3:sys:wms:ORDER-1");
     }
 
-    private static HttpContext Http(string? system = null, string? employeeId = null, string? name = null)
+    private static HttpContext Http(string? system = null, string? employeeId = null, string? name = null,
+        string? sub = null)
     {
         var http = new DefaultHttpContext();
         http.Request.Method = "POST";
@@ -61,6 +70,7 @@ public class IdempotencyCallerScopeTests
         var claims = new List<Claim>();
         if (employeeId is not null) claims.Add(new Claim("EmployeeId", employeeId));
         if (name is not null) claims.Add(new Claim(ClaimTypes.Name, name));
+        if (sub is not null) claims.Add(new Claim("sub", sub));
         if (claims.Count > 0)
             http.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
         return http;
