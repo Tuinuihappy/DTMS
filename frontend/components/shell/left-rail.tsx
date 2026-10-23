@@ -368,7 +368,7 @@ export function LeftRail({ initialExpanded = false }: { initialExpanded?: boolea
       <nav
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%_-_8px),transparent)]"
       >
-      <div className={cn("pb-2", !expanded && "flex justify-center")}>
+      <div className="pb-2">
         <button
           type="button"
           aria-label={expanded ? "Collapse panel" : "Expand panel"}
@@ -383,7 +383,7 @@ export function LeftRail({ initialExpanded = false }: { initialExpanded?: boolea
           >
             <ChevronLeft className="h-4 w-4" strokeWidth={2} />
           </motion.span>
-          {expanded && <span className="whitespace-nowrap">Collapse</span>}
+          <RowLabel expanded={expanded}>Collapse</RowLabel>
         </button>
       </div>
         <RailNav sections={ALL_SECTIONS} expanded={expanded} scope="rail" />
@@ -458,12 +458,20 @@ function RailNav({
     <div className="flex flex-col gap-2">
       {sections.map((s, si) => (
         <div key={s.label ?? `s${si}`}>
-          {s.label && expanded && (
-            <div className="px-2.5 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-ink-400)] whitespace-nowrap">
-              {s.label}
-            </div>
+          {s.label && (
+            <motion.div
+              initial={false}
+              animate={{ height: expanded ? "auto" : 0, opacity: expanded ? 1 : 0 }}
+              transition={{ height: spring.gentle, opacity: expanded ? T.base : T.exit }}
+              aria-hidden={!expanded}
+              className="overflow-hidden"
+            >
+              <div className="px-2.5 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-ink-400)] whitespace-nowrap">
+                {s.label}
+              </div>
+            </motion.div>
           )}
-          <ul className={cn("flex flex-col gap-2", !expanded && "items-center")}>
+          <ul className="flex flex-col gap-2">
             {s.items.map((a) => (
               <li key={a.label}>
                 {a.children ? (
@@ -487,7 +495,40 @@ const rowBase =
 // border + padding + half a 16px icon) — the TopNav logo is centred on
 // the same line (top-nav.tsx). px-[11px] expanded keeps it from drifting
 // a pixel when the rail opens.
-const rowShape = (expanded: boolean) => (expanded ? "h-10 w-full gap-3 px-[11px]" : "h-10 w-10 justify-center");
+//
+// Same shape in both states on purpose: rows are always w-full with that
+// fixed padding, so collapsing is just the rail's width spring clipping
+// them down to a 40px circle — the exact reverse of expanding. (Swapping
+// to a w-10 circle on collapse snapped every row before the width moved.)
+// The row itself must not clip: the sliding active pill (layoutId) lives
+// inside it and would be cut off mid-flight. RowLabel does the clipping.
+const rowShape = (_expanded: boolean) => "h-10 w-full gap-3 px-[11px]";
+
+/** Row text that stays mounted: clipped by the row as the rail narrows,
+ *  fading out fast on collapse and in a beat later on expand. */
+function RowLabel({
+  expanded,
+  trailing,
+  children,
+}: {
+  expanded: boolean;
+  /** Chevron / Soon tag — clipped together with the text. */
+  trailing?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      aria-hidden={!expanded || undefined}
+      className={cn(
+        "relative flex min-w-0 flex-1 items-center gap-2 overflow-hidden transition-opacity",
+        expanded ? "opacity-100 duration-200 delay-75" : "opacity-0 duration-100",
+      )}
+    >
+      <span className="min-w-0 flex-1 whitespace-nowrap text-left">{children}</span>
+      {trailing}
+    </span>
+  );
+}
 const rowIdle =
   "bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] hover:bg-white hover:text-[var(--color-ink-900)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_6px_14px_-4px_rgba(15,23,42,0.14)] dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_-2px_rgba(0,0,0,0.5)]";
 
@@ -615,12 +656,7 @@ function RailButton({
           {...tipProps}
         >
           <span className="flex h-4 w-4 shrink-0 items-center justify-center opacity-60">{action.icon}</span>
-          {expanded && (
-            <>
-              <span className="min-w-0 flex-1 truncate whitespace-nowrap text-left">{action.label}</span>
-              <SoonTag />
-            </>
-          )}
+          <RowLabel expanded={expanded} trailing={<SoonTag />}>{action.label}</RowLabel>
         </span>
         {!expanded && (
           <FloatBeside anchor={ref} open={hover}>
@@ -636,7 +672,7 @@ function RailButton({
     <>
       {active && <ActivePill scope={scope} />}
       <span className="relative flex h-4 w-4 shrink-0 items-center justify-center">{action.icon}</span>
-      {expanded && <span className="relative min-w-0 flex-1 truncate whitespace-nowrap text-left">{action.label}</span>}
+      <RowLabel expanded={expanded}>{action.label}</RowLabel>
       {action.badge && (
         <span className={cn("absolute inline-flex", expanded ? "right-2.5 top-1/2 -translate-y-1/2" : "right-1 top-1")}>
           <StatusPulse tone="coral" />
@@ -795,32 +831,34 @@ function RailGroup({
           {action.icon}
         </span>
 
-        {expanded && (
-          <>
-            <span className="relative min-w-0 flex-1 truncate whitespace-nowrap text-left">{action.label}</span>
+        <RowLabel
+          expanded={expanded}
+          trailing={
             <motion.span
-              animate={{ rotate: accordionOpen ? 90 : 0 }}
+              animate={{ rotate: accordionOpen && expanded ? 90 : 0 }}
               transition={spring.snappy}
               className={cn(
-                "relative flex h-3.5 w-3.5 shrink-0 items-center justify-center",
+                "flex h-3.5 w-3.5 shrink-0 items-center justify-center",
                 parentCarriesPill ? "text-white/70" : "text-[var(--color-ink-400)]",
               )}
             >
               <ChevronRight className="h-3.5 w-3.5" strokeWidth={2.2} />
             </motion.span>
-          </>
-        )}
+          }
+        >
+          {action.label}
+        </RowLabel>
       </button>
 
       {/* ── Inline accordion (expanded rail) ─────────────────────────── */}
-      {expanded && (
+      {(
         <AnimatePresence initial={false}>
-          {accordionOpen && (
+          {expanded && accordionOpen && (
             <motion.ul
               key="acc"
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1, transition: { height: T.base, opacity: T.fast } }}
-              exit={{ height: 0, opacity: 0, transition: { height: T.fast, opacity: T.exit } }}
+              exit={{ height: 0, opacity: 0, transition: { height: spring.gentle, opacity: T.exit } }}
               className="relative mt-1 overflow-hidden"
             >
               {/* Thread under the parent's icon column. */}
