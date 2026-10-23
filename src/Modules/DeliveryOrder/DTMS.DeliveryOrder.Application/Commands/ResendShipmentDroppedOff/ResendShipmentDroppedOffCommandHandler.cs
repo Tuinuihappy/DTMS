@@ -8,6 +8,7 @@ using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Iam.Application.Callbacks;
+using DTMS.SharedKernel.Auth;
 using DTMS.SharedKernel.Messaging;
 using DTMS.SharedKernel.Outbox;
 using Microsoft.Extensions.Logging;
@@ -25,6 +26,7 @@ public class ResendShipmentDroppedOffCommandHandler
     private readonly IOrderAuditEventRepository _auditRepository;
     private readonly IOrderActivityProjectionStore _activityStore;
     private readonly ISourceCallbackOutboxSuperseder _outboxSuperseder;
+    private readonly ICurrentActorContext _actor;
     private readonly ILogger<ResendShipmentDroppedOffCommandHandler> _logger;
 
     public ResendShipmentDroppedOffCommandHandler(
@@ -36,6 +38,7 @@ public class ResendShipmentDroppedOffCommandHandler
         IOrderAuditEventRepository auditRepository,
         IOrderActivityProjectionStore activityStore,
         ISourceCallbackOutboxSuperseder outboxSuperseder,
+        ICurrentActorContext actor,
         ILogger<ResendShipmentDroppedOffCommandHandler> logger)
     {
         _formatterResolver = formatterResolver;
@@ -46,6 +49,7 @@ public class ResendShipmentDroppedOffCommandHandler
         _auditRepository = auditRepository;
         _activityStore = activityStore;
         _outboxSuperseder = outboxSuperseder;
+        _actor = actor;
         _logger = logger;
     }
 
@@ -172,6 +176,9 @@ public class ResendShipmentDroppedOffCommandHandler
                 trip.Id, source);
         }
 
+        // Who pressed resend, from the authenticated request — the body's
+        // RequestedBy is client-supplied and only a fallback.
+        var actor = _actor.Current;
         try
         {
             await _activityStore.AppendAsync(
@@ -181,12 +188,14 @@ public class ResendShipmentDroppedOffCommandHandler
                 category: UpstreamCallbackAudit.Category,
                 eventType: UpstreamCallbackAudit.ArrivedManuallyResent,
                 details: auditDetails,
-                actorId: request.RequestedBy,
+                actorId: actor.UserId ?? request.RequestedBy,
                 occurredAt: DateTime.UtcNow,
                 relatedTripId: trip.Id,
                 attemptNumber: trip.AttemptNumber,
                 cancellationToken: cancellationToken,
-                systemKey: source);
+                systemKey: source,
+                channel: actor.Channel.ToString(),
+                displayName: string.IsNullOrWhiteSpace(actor.DisplayName) ? null : actor.DisplayName);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

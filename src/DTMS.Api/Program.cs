@@ -402,6 +402,17 @@ builder.Services.AddActorContext(sp =>
             if (!string.IsNullOrWhiteSpace(sp.DisplayName))
                 displayName = sp.DisplayName;
         }
+        else if (ctx.Request.Path.StartsWithSegments("/api/webhooks/riot3"))
+        {
+            // The robot vendor reporting progress — unauthenticated (secret in
+            // the URL), so without this branch it fell through as an anonymous
+            // web user: TriggeredBy "http", channel ManualWeb. It is a system,
+            // the way the legacy "vendor-webhook" source mapped to SystemApi.
+            principalId = "system:riot3";
+            type = DTMS.SharedKernel.Auth.PrincipalType.System;
+            channel = DTMS.SharedKernel.Auth.SourceChannel.SystemApi;
+            displayName = "RIOT3";
+        }
         else
         {
             principalId = string.IsNullOrWhiteSpace(employeeId)

@@ -50,8 +50,10 @@ public class OrderCancelledCascadeConsumerTests
         var cmd = await Captured(sender);
         cmd.Origin.Should().BeNull("an operator is not a source system");
         cmd.ActionBy.Should().Be("86347852");
+        // The caller's own channel carries over, so the cascaded trip row in the
+        // timeline shows the same Web badge as the order row that caused it.
         actor.Received(1).BeginScope(Arg.Is<ActorContext>(a =>
-            a.PrincipalId == "user:86347852" && a.Channel == SourceChannel.InternalJob));
+            a.PrincipalId == "user:86347852" && a.Channel == SourceChannel.ManualWeb));
     }
 
     [Fact]

@@ -39,4 +39,9 @@ public record DeliveryOrderConfirmedIntegrationEventV1(
     // of RIOT3/operator-pool; RequestedBy is the actor stamped on both.
     bool SelfManaged = false,
     string? RequestedBy = null,
-    string SchemaVersion = "1.0") : IIntegrationEvent;
+    string SchemaVersion = "1.0",
+    // Who confirmed it — the same actor fields every other lifecycle event
+    // carries, so the order timeline's "OrderConfirmed" row names someone.
+    string? TriggeredBy = null,
+    string? Channel = null,
+    string? DisplayName = null) : IIntegrationEvent;

@@ -24,8 +24,13 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
 
     public IReadOnlyCollection<IIntegrationEvent> Map(IDomainEvent domainEvent)
     {
-        var triggeredBy = _actor.Current.TriggeredBy;
-        var correlationId = _actor.Current.CorrelationId;
+        var actor = _actor.Current;
+        var triggeredBy = actor.TriggeredBy;
+        var correlationId = actor.CorrelationId;
+        // Same shape as DeliveryOrderDomainEventMapper, so a trip row in the
+        // order timeline names its actor exactly like an order row does.
+        var channel = actor.Channel.ToString();
+        var displayName = string.IsNullOrWhiteSpace(actor.DisplayName) ? null : actor.DisplayName;
 
         return domainEvent switch
         {
@@ -51,7 +56,8 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     // V1.2 enrichment (Phase P5.3) — Items snapshot for
                     // TripItemsProjector. Pass-through from the domain event
                     // (caller populated via ITripItemSnapshotProvider).
-                    Items: evt.Items)
+                    Items: evt.Items,
+                    Channel: channel, DisplayName: displayName)
             ],
             // WMS PR-4b — Manual pool dispatch. Consumed by the SignalR
             // pool broadcaster + TripItems projector (no upstream callback —
@@ -71,14 +77,16 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
             [
                 new TripPickupCompletedIntegrationEvent(
                     evt.EventId, evt.OccurredOn, evt.TripId, evt.DeliveryOrderId,
-                    TriggeredBy: triggeredBy, CorrelationId: correlationId)
+                    TriggeredBy: triggeredBy, CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             TripDropCompletedDomainEvent evt =>
             [
                 new TripDropCompletedIntegrationEvent(
                     evt.EventId, evt.OccurredOn, evt.TripId, evt.DeliveryOrderId,
                     TriggeredBy: triggeredBy, CorrelationId: correlationId,
-                    RequiresDropPod: evt.RequiresDropPod)
+                    RequiresDropPod: evt.RequiresDropPod,
+                    Channel: channel, DisplayName: displayName)
             ],
             TripCompletedDomainEvent evt =>
             [
@@ -90,7 +98,8 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     evt.DeliveryOrderId,
                     evt.VendorUpperKey,
                     TriggeredBy: triggeredBy,
-                    CorrelationId: correlationId)
+                    CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             TripFailedDomainEvent evt =>
             [
@@ -103,7 +112,8 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     evt.Reason,
                     evt.VendorUpperKey,
                     TriggeredBy: triggeredBy,
-                    CorrelationId: correlationId)
+                    CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             TripRejectedDomainEvent evt =>
             [
@@ -116,7 +126,8 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     evt.Reason,
                     evt.VendorUpperKey,
                     TriggeredBy: triggeredBy,
-                    CorrelationId: correlationId)
+                    CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             TripCancelledDomainEvent evt =>
             [
@@ -129,7 +140,8 @@ public class DispatchDomainEventMapper : IDomainEventToIntegrationEventMapper
                     evt.Reason,
                     evt.VendorUpperKey,
                     TriggeredBy: triggeredBy,
-                    CorrelationId: correlationId)
+                    CorrelationId: correlationId,
+                    Channel: channel, DisplayName: displayName)
             ],
             // Phase P1 (b12) — pause/resume transitions for the Trip status
             // timeline. Domain payload carries only TripId; the projector

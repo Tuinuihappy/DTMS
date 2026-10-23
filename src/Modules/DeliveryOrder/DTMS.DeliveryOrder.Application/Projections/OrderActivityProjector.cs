@@ -139,7 +139,9 @@ public class OrderActivityProjector :
 
     public Task Consume(ConsumeContext<DeliveryOrderConfirmedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
-            "OrderConfirmed", details: null);
+            "OrderConfirmed", details: null,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<DeliveryOrderDispatchedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatOrderLifecycle,
@@ -203,48 +205,62 @@ public class OrderActivityProjector :
             channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     // ── Trip execution handlers ──────────────────────────────────────────
+    // Every row names its actor the way the order rows do (id + display name
+    // + channel): an operator or user for manual actions, "RIOT3" for what
+    // the robot reported through its webhook, "system" for background jobs
+    // such as the reconciler. Events published before the fields existed
+    // carry nulls and render id-only, as they did.
 
     public Task Consume(ConsumeContext<TripStartedIntegrationEvent> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatTripExecution,
             "TripStarted",
             details: ctx.Message.VehicleId == Guid.Empty ? null : $"vehicle {ctx.Message.VehicleId}",
-            relatedTripId: ctx.Message.TripId);
+            relatedTripId: ctx.Message.TripId,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<TripPickupCompletedIntegrationEvent> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatTripExecution,
             "TripPickupCompleted", details: null,
-            relatedTripId: ctx.Message.TripId);
+            relatedTripId: ctx.Message.TripId,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<TripDropCompletedIntegrationEvent> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatTripExecution,
             "TripDropCompleted", details: null,
-            relatedTripId: ctx.Message.TripId);
+            relatedTripId: ctx.Message.TripId,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<TripCompletedIntegrationEvent> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatTripExecution,
             "TripCompleted",
             details: string.IsNullOrWhiteSpace(ctx.Message.VendorUpperKey) ? null : $"upper={ctx.Message.VendorUpperKey}",
-            relatedTripId: ctx.Message.TripId);
+            relatedTripId: ctx.Message.TripId,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<TripFailedIntegrationEvent> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatTripExecution,
             "TripFailed", ctx.Message.Reason,
-            relatedTripId: ctx.Message.TripId);
+            relatedTripId: ctx.Message.TripId,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public Task Consume(ConsumeContext<TripRejectedIntegrationEventV1> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatTripExecution,
             "TripRejected", ctx.Message.Reason,
-            relatedTripId: ctx.Message.TripId);
+            relatedTripId: ctx.Message.TripId,
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
-    // Unlike its neighbours this one carries the actor: "who stopped this trip"
-    // is the question the timeline gets asked about a cancel, and the answer is
-    // already on the event. The other trip-execution rows describe things the
-    // vendor did on its own, so they have no actor to show.
     public Task Consume(ConsumeContext<TripCancelledIntegrationEvent> ctx)
         => Project(ctx, ctx.Message.DeliveryOrderId, CatTripExecution,
             "TripCancelled", ctx.Message.Reason,
             relatedTripId: ctx.Message.TripId,
-            actorId: ctx.Message.TriggeredBy);
+            actorId: ctx.Message.TriggeredBy,
+            channel: ctx.Message.Channel, displayName: ctx.Message.DisplayName);
 
     public async Task Consume(ConsumeContext<TripResumedIntegrationEventV1> ctx)
     {

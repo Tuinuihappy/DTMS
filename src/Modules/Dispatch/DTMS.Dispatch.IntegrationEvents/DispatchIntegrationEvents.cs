@@ -27,7 +27,11 @@ public record TripStartedIntegrationEvent(
     string? VendorVehicleKey = null,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    IReadOnlyList<TripItemSnapshot>? Items = null) : IIntegrationEvent;
+    IReadOnlyList<TripItemSnapshot>? Items = null,
+    // Who did it, as the order timeline shows it (ActorContext.Channel /
+    // DisplayName) — same fields the DeliveryOrder lifecycle events carry.
+    string? Channel = null,
+    string? DisplayName = null) : IIntegrationEvent;
 
 // WMS PR-4b — Manual pool dispatch. Fires when Trip enters the
 // available-pool state (Status → Dispatched). Consumed by:
@@ -81,7 +85,11 @@ public sealed record TripItemSnapshot(
 public record TripPickupCompletedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId,
     string? TriggeredBy = null,
-    Guid? CorrelationId = null) : IIntegrationEvent;
+    Guid? CorrelationId = null,
+    // Who did it, as the order timeline shows it (ActorContext.Channel /
+    // DisplayName) — same fields the DeliveryOrder lifecycle events carry.
+    string? Channel = null,
+    string? DisplayName = null) : IIntegrationEvent;
 
 // RequiresDropPod (V1.2) — order's POD policy at drop-completion time.
 // False → DeliveryOrder lands items at Delivered immediately and the
@@ -92,7 +100,11 @@ public record TripDropCompletedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid DeliveryOrderId,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    bool? RequiresDropPod = null) : IIntegrationEvent;
+    bool? RequiresDropPod = null,
+    // Who did it, as the order timeline shows it (ActorContext.Channel /
+    // DisplayName) — same fields the DeliveryOrder lifecycle events carry.
+    string? Channel = null,
+    string? DisplayName = null) : IIntegrationEvent;
 
 // VendorUpperKey is the composite envelope correlation key
 // (see EnvelopeUpperKey) that RIOT3 echoes back on every webhook.
@@ -100,13 +112,21 @@ public record TripCompletedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId,
     string VendorUpperKey,
     string? TriggeredBy = null,
-    Guid? CorrelationId = null) : IIntegrationEvent;
+    Guid? CorrelationId = null,
+    // Who did it, as the order timeline shows it (ActorContext.Channel /
+    // DisplayName) — same fields the DeliveryOrder lifecycle events carry.
+    string? Channel = null,
+    string? DisplayName = null) : IIntegrationEvent;
 
 public record TripFailedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId,
     string Reason, string VendorUpperKey,
     string? TriggeredBy = null,
-    Guid? CorrelationId = null) : IIntegrationEvent;
+    Guid? CorrelationId = null,
+    // Who did it, as the order timeline shows it (ActorContext.Channel /
+    // DisplayName) — same fields the DeliveryOrder lifecycle events carry.
+    string? Channel = null,
+    string? DisplayName = null) : IIntegrationEvent;
 
 // Vendor refused the trip post-dispatch, before execution (RIOT3
 // TASK_REJECTED / orderState REJECTED). Consumers that treat this the same
@@ -117,12 +137,20 @@ public record TripRejectedIntegrationEventV1(
     string Reason, string VendorUpperKey,
     string? TriggeredBy = null,
     Guid? CorrelationId = null,
-    string SchemaVersion = "1.0") : IIntegrationEvent;
+    string SchemaVersion = "1.0",
+    // Who did it, as the order timeline shows it (ActorContext.Channel /
+    // DisplayName) — same fields the DeliveryOrder lifecycle events carry.
+    string? Channel = null,
+    string? DisplayName = null) : IIntegrationEvent;
 
 public record TripCancelledIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid DeliveryOrderId, string Reason, string? VendorUpperKey,
     string? TriggeredBy = null,
-    Guid? CorrelationId = null) : IIntegrationEvent;
+    Guid? CorrelationId = null,
+    // Who did it, as the order timeline shows it (ActorContext.Channel /
+    // DisplayName) — same fields the DeliveryOrder lifecycle events carry.
+    string? Channel = null,
+    string? DisplayName = null) : IIntegrationEvent;
 
 public record ExceptionRaisedIntegrationEvent(
     Guid EventId, DateTime OccurredOn, Guid TripId, Guid JobId, Guid ExceptionId,

@@ -1,4 +1,5 @@
 using DTMS.DeliveryOrder.Application.Projections;
+using DTMS.DeliveryOrder.Application.Services;
 using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.SharedKernel.Outbox;
@@ -35,15 +36,18 @@ public sealed class SourceCallbackOutcomeConsumer : IConsumer<SourceCallbackOutc
 
     private readonly IOrderAuditEventRepository _auditRepository;
     private readonly IOrderActivityProjectionStore _activityStore;
+    private readonly IOrderOriginResolver _origins;
     private readonly ILogger<SourceCallbackOutcomeConsumer> _logger;
 
     public SourceCallbackOutcomeConsumer(
         IOrderAuditEventRepository auditRepository,
         IOrderActivityProjectionStore activityStore,
+        IOrderOriginResolver origins,
         ILogger<SourceCallbackOutcomeConsumer> logger)
     {
         _auditRepository = auditRepository;
         _activityStore = activityStore;
+        _origins = origins;
         _logger = logger;
     }
 
@@ -75,11 +79,15 @@ public sealed class SourceCallbackOutcomeConsumer : IConsumer<SourceCallbackOutc
             category: UpstreamCallbackAudit.Category,
             eventType: auditType,
             details: details,
-            actorId: null,
+            // The row reports the receiving system's answer, so that system is
+            // the actor — named like the source-system rows (OrderSubmitted…).
+            actorId: evt.SystemKey,
             occurredAt: DateTime.UtcNow,
             relatedTripId: evt.TripId,
             attemptNumber: null,
             cancellationToken: ct,
+            channel: nameof(DTMS.SharedKernel.Auth.SourceChannel.SystemApi),
+            displayName: (await _origins.GetByKeyAsync(evt.SystemKey, ct))?.DisplayName ?? evt.SystemKey,
             systemKey: evt.SystemKey);
 
         _logger.LogInformation(

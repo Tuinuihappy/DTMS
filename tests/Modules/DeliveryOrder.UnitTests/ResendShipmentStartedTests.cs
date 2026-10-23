@@ -111,6 +111,7 @@ public class ResendShipmentStartedTests
 
         var handler = new ResendShipmentStartedCommandHandler(
             resolver, dispatcher, lookup, trips, orders, operators, audit, activity, superseder,
+            new DTMS.SharedKernel.Auth.AsyncLocalActorContext(),
             NullLogger<ResendShipmentStartedCommandHandler>.Instance);
 
         return new Harness(handler, dispatcher, audit, resolver, superseder, formatter,

@@ -205,11 +205,15 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
                 category: "OrderLifecycle",
                 eventType: "OrderUpstreamIngested",
                 details: ingestedDetails,
-                actorId: null,
+                // The source system is the actor, named the way the
+                // OrderSubmitted row beside it names it.
+                actorId: origin.Key,
                 occurredAt: DateTime.UtcNow,
                 relatedTripId: null,
                 attemptNumber: null,
                 cancellationToken,
+                channel: nameof(DTMS.SharedKernel.Auth.SourceChannel.SystemApi),
+                displayName: origin.DisplayName,
                 systemKey: origin.Key);
 
             await _repository.SaveChangesAsync(cancellationToken);

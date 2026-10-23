@@ -51,7 +51,8 @@ public class DeliveryOrderDomainEventMapper : IDomainEventToIntegrationEventMapp
                         i.HandlingInstructions,
                         i.PickupWmsLocationId, i.DropWmsLocationId)).ToList(),
                     evt.RequestedTransportMode,
-                    evt.SelfManaged, evt.RequestedBy)
+                    evt.SelfManaged, evt.RequestedBy,
+                    TriggeredBy: triggeredBy, Channel: channel, DisplayName: displayName)
             ],
             DeliveryOrderCancelledDomainEvent evt =>
             [

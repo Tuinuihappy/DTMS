@@ -36,6 +36,48 @@ public class OrderActivityProjectorTests
     }
 
     [Fact]
+    public async Task OrderConfirmed_NamesWhoConfirmedIt()
+    {
+        var (projector, store) = Build();
+        var orderId = Guid.NewGuid();
+        var evt = new DeliveryOrderConfirmedIntegrationEventV1(
+            Guid.NewGuid(), DateTime.UtcNow, orderId,
+            "Normal", null, null, null, Array.Empty<ItemSummaryDto>(),
+            TriggeredBy: "86347852", Channel: "ManualWeb", DisplayName: "titpooja");
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).AppendAsync(
+            OrderActivityProjector.Name, evt.EventId, orderId,
+            "OrderLifecycle", "OrderConfirmed", null,
+            actorId: "86347852", evt.OccurredOn, (Guid?)null, (int?)null,
+            Arg.Any<CancellationToken>(),
+            channel: "ManualWeb", displayName: "titpooja");
+    }
+
+    [Fact]
+    public async Task TripRowsFromTheRobot_NameRiot3LikeAnySystem()
+    {
+        // Trip rows used to carry no actor at all; every one now names it the
+        // way order rows do — here the RIOT3 webhook's system actor.
+        var (projector, store) = Build();
+        var orderId = Guid.NewGuid();
+        var tripId = Guid.NewGuid();
+        var evt = new TripPickupCompletedIntegrationEvent(
+            Guid.NewGuid(), DateTime.UtcNow, tripId, orderId,
+            TriggeredBy: "riot3", Channel: "SystemApi", DisplayName: "RIOT3");
+
+        await projector.Consume(Ctx(evt));
+
+        await store.Received(1).AppendAsync(
+            OrderActivityProjector.Name, evt.EventId, orderId,
+            "TripExecution", "TripPickupCompleted", null,
+            actorId: "riot3", evt.OccurredOn, tripId, (int?)null,
+            Arg.Any<CancellationToken>(),
+            channel: "SystemApi", displayName: "RIOT3");
+    }
+
+    [Fact]
     public async Task OrderAmended_AppendsRowWithAmendmentCategory()
     {
         var (projector, store) = Build();

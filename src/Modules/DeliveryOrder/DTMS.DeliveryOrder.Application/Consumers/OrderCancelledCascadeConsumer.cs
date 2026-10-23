@@ -91,7 +91,11 @@ public class OrderCancelledCascadeConsumer : IConsumer<DeliveryOrderCancelledInt
                 : (isSystemCaller ? $"system:{evt.TriggeredBy}" : $"user:{evt.TriggeredBy}"),
             type: isSystemCaller ? PrincipalType.System : PrincipalType.User,
             displayName: evt.DisplayName ?? string.Empty,
-            channel: isSystemCaller ? SourceChannel.SystemApi : SourceChannel.InternalJob,
+            // Keep the caller's own channel (Web / PWA / System) so the cascaded
+            // trip row carries the same badge as the order row that caused it.
+            channel: Enum.TryParse<SourceChannel>(evt.Channel, out var callerChannel)
+                ? callerChannel
+                : SourceChannel.InternalJob,
             onBehalfOf: null,
             correlationId: evt.CorrelationId));
 

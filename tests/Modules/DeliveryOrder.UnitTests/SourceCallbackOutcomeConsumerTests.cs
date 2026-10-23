@@ -21,8 +21,11 @@ public class SourceCallbackOutcomeConsumerTests
     {
         var audit = Substitute.For<IOrderAuditEventRepository>();
         var activity = Substitute.For<IOrderActivityProjectionStore>();
+        var origins = Substitute.For<DTMS.DeliveryOrder.Application.Services.IOrderOriginResolver>();
+        origins.GetByKeyAsync("oms", Arg.Any<CancellationToken>())
+            .Returns(new DTMS.DeliveryOrder.Application.Services.OrderOrigin("oms", "OMS"));
         return (new SourceCallbackOutcomeConsumer(
-            audit, activity, NullLogger<SourceCallbackOutcomeConsumer>.Instance), audit, activity);
+            audit, activity, origins, NullLogger<SourceCallbackOutcomeConsumer>.Instance), audit, activity);
     }
 
     private static ConsumeContext<SourceCallbackOutcome> Ctx(

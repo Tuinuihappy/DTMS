@@ -8,6 +8,7 @@ using DTMS.DeliveryOrder.Domain.Entities;
 using DTMS.DeliveryOrder.Domain.Repositories;
 using DTMS.Dispatch.Domain.Repositories;
 using DTMS.Iam.Application.Callbacks;
+using DTMS.SharedKernel.Auth;
 using DTMS.SharedKernel.Messaging;
 using DTMS.SharedKernel.Outbox;
 using DTMS.Transport.Manual.Domain.Repositories;
@@ -27,6 +28,7 @@ public class ResendShipmentStartedCommandHandler
     private readonly IOrderAuditEventRepository _auditRepository;
     private readonly IOrderActivityProjectionStore _activityStore;
     private readonly ISourceCallbackOutboxSuperseder _outboxSuperseder;
+    private readonly ICurrentActorContext _actor;
     private readonly ILogger<ResendShipmentStartedCommandHandler> _logger;
 
     public ResendShipmentStartedCommandHandler(
@@ -39,6 +41,7 @@ public class ResendShipmentStartedCommandHandler
         IOrderAuditEventRepository auditRepository,
         IOrderActivityProjectionStore activityStore,
         ISourceCallbackOutboxSuperseder outboxSuperseder,
+        ICurrentActorContext actor,
         ILogger<ResendShipmentStartedCommandHandler> logger)
     {
         _formatterResolver = formatterResolver;
@@ -50,6 +53,7 @@ public class ResendShipmentStartedCommandHandler
         _auditRepository = auditRepository;
         _activityStore = activityStore;
         _outboxSuperseder = outboxSuperseder;
+        _actor = actor;
         _logger = logger;
     }
 
@@ -212,6 +216,9 @@ public class ResendShipmentStartedCommandHandler
         // P2.5 mirror: resend outcomes don't flow through an integration
         // event, so the OrderActivity projector can't pick them up. Write
         // directly to the unified timeline the upstream-notification UI reads.
+        // Who pressed resend, from the authenticated request — the body's
+        // RequestedBy is client-supplied and only a fallback.
+        var actor = _actor.Current;
         try
         {
             await _activityStore.AppendAsync(
@@ -221,12 +228,14 @@ public class ResendShipmentStartedCommandHandler
                 category: UpstreamCallbackAudit.Category,
                 eventType: UpstreamCallbackAudit.ManuallyResent,
                 details: auditDetails,
-                actorId: request.RequestedBy,
+                actorId: actor.UserId ?? request.RequestedBy,
                 occurredAt: DateTime.UtcNow,
                 relatedTripId: trip.Id,
                 attemptNumber: trip.AttemptNumber,
                 cancellationToken: cancellationToken,
-                systemKey: source);
+                systemKey: source,
+                channel: actor.Channel.ToString(),
+                displayName: string.IsNullOrWhiteSpace(actor.DisplayName) ? null : actor.DisplayName);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

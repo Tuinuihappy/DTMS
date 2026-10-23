@@ -86,6 +86,7 @@ public class ResendShipmentPickedUpTests
             resolver, Substitute.For<ISourceCallbackDispatcher>(), lookup, trips, orders,
             Substitute.For<IOrderAuditEventRepository>(), Substitute.For<IOrderActivityProjectionStore>(),
             Substitute.For<ISourceCallbackOutboxSuperseder>(),
+            new DTMS.SharedKernel.Auth.AsyncLocalActorContext(),
             NullLogger<ResendShipmentPickedUpCommandHandler>.Instance);
 
         var result = await handler.Handle(
@@ -156,6 +157,7 @@ public class ResendShipmentPickedUpTests
 
         var handler = new ResendShipmentPickedUpCommandHandler(
             resolver, dispatcher, lookup, trips, orders, audit, activity, superseder,
+            new DTMS.SharedKernel.Auth.AsyncLocalActorContext(),
             NullLogger<ResendShipmentPickedUpCommandHandler>.Instance);
 
         return new Harness(handler, dispatcher, audit, superseder, formatter,

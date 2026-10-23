@@ -88,6 +88,7 @@ public class ResendShipmentDroppedOffTests
             resolver, Substitute.For<ISourceCallbackDispatcher>(), lookup, trips, orders,
             Substitute.For<IOrderAuditEventRepository>(), Substitute.For<IOrderActivityProjectionStore>(),
             Substitute.For<ISourceCallbackOutboxSuperseder>(),
+            new DTMS.SharedKernel.Auth.AsyncLocalActorContext(),
             NullLogger<ResendShipmentDroppedOffCommandHandler>.Instance);
 
         var result = await handler.Handle(
@@ -159,6 +160,7 @@ public class ResendShipmentDroppedOffTests
 
         var handler = new ResendShipmentDroppedOffCommandHandler(
             resolver, dispatcher, lookup, trips, orders, audit, activity, superseder,
+            new DTMS.SharedKernel.Auth.AsyncLocalActorContext(),
             NullLogger<ResendShipmentDroppedOffCommandHandler>.Instance);
 
         return new Harness(handler, dispatcher, audit, superseder, formatter,
