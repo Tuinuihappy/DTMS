@@ -355,33 +355,29 @@ export function LeftRail({ initialExpanded = false }: { initialExpanded?: boolea
         x: T.base,
         width: spring.gentle,
       }}
-      // One panel, top-aligned. The old stack was a column of separate
-      // pills centred vertically with no scroll: once it outgrew the
-      // viewport it overflowed both ways, up under the TopNav logo and
-      // off the bottom.
-      className="hidden lg:flex flex-col fixed left-4 top-20 bottom-4 z-30 overflow-hidden rounded-[22px] glass"
+      // Top-aligned and scrollable. The stack used to be centred
+      // vertically with no scroll: once it outgrew the viewport it
+      // overflowed both ways, up under the TopNav logo and off the bottom.
+      className="hidden lg:flex flex-col fixed left-4 top-20 bottom-4 z-30"
       aria-label="Main navigation"
     >
-      <div className={cn("flex h-12 shrink-0 items-center", expanded ? "justify-between pl-4 pr-2" : "justify-center")}>
-        {expanded && (
-          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--color-ink-400)] whitespace-nowrap">
-            Menu
-          </span>
-        )}
+      {/* Collapse toggle — first pill, outside the scroll area. */}
+      <div className={cn("shrink-0 px-2 pb-1", !expanded && "flex justify-center")}>
         <button
           type="button"
           aria-label={expanded ? "Collapse panel" : "Expand panel"}
           aria-expanded={expanded}
           onClick={() => setExpanded((e) => !e)}
-          className="grid h-8 w-8 place-items-center rounded-lg text-[var(--color-ink-500)] transition-colors hover:bg-[var(--color-ink-900)]/[0.05] hover:text-[var(--color-ink-900)] dark:hover:bg-white/[0.08] dark:hover:text-white"
+          className={cn(rowBase, rowShape(expanded), rowIdle)}
         >
           <motion.span
             animate={{ rotate: expanded ? 0 : 180 }}
             transition={spring.snappy}
-            className="flex"
+            className="flex h-4 w-4 shrink-0 items-center justify-center"
           >
-            <ChevronLeft className="h-4 w-4" strokeWidth={2.2} />
+            <ChevronLeft className="h-4 w-4" strokeWidth={2} />
           </motion.span>
+          {expanded && <span className="whitespace-nowrap">Collapse</span>}
         </button>
       </div>
 
@@ -392,7 +388,7 @@ export function LeftRail({ initialExpanded = false }: { initialExpanded?: boolea
         <RailNav sections={SECTIONS} expanded={expanded} scope="rail" />
       </nav>
 
-      <div className="shrink-0 border-t border-[var(--color-ink-900)]/[0.06] px-2 pb-2 pt-1 dark:border-white/[0.06]">
+      <div className="shrink-0 px-2 pt-1">
         <RailNav sections={[FOOTER]} expanded={expanded} scope="rail" />
       </div>
     </motion.aside>
@@ -476,7 +472,7 @@ function RailNav({
             ) : (
               <div aria-hidden className="mx-auto my-2 h-px w-6 bg-[var(--color-ink-900)]/[0.08] dark:bg-white/[0.08]" />
             ))}
-          <ul className={cn("flex flex-col gap-0.5", !expanded && "items-center")}>
+          <ul className={cn("flex flex-col gap-2", !expanded && "items-center")}>
             {s.items.map((a) => (
               <li key={a.label}>
                 {a.children ? (
@@ -493,15 +489,16 @@ function RailNav({
   );
 }
 
+// Every row is its own white pill (the rail's look — kept on purpose).
 const rowBase =
-  "relative flex items-center rounded-xl text-[12.5px] font-medium tracking-tight transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-500)]";
-const rowShape = (expanded: boolean) => (expanded ? "h-9 w-full gap-3 px-2.5" : "h-10 w-10 justify-center");
+  "relative flex items-center rounded-full text-[12.5px] font-medium tracking-tight transition-[background-color,box-shadow,color] duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-500)]";
+const rowShape = (expanded: boolean) => (expanded ? "h-10 w-full gap-3 px-3" : "h-10 w-10 justify-center");
 const rowIdle =
-  "text-[var(--color-ink-600)] hover:bg-[var(--color-ink-900)]/[0.05] hover:text-[var(--color-ink-900)] dark:text-[var(--color-ink-500)] dark:hover:bg-white/[0.06] dark:hover:text-white";
+  "bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] hover:bg-white hover:text-[var(--color-ink-900)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_6px_14px_-4px_rgba(15,23,42,0.14)] dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_-2px_rgba(0,0,0,0.5)]";
 
 /** The one filled thing in the panel. Shared layoutId per scope, so it
  *  slides from the old page's row to the new one. */
-function ActivePill({ scope, rounded = "rounded-xl" }: { scope: string; rounded?: string }) {
+function ActivePill({ scope, rounded = "rounded-full" }: { scope: string; rounded?: string }) {
   return (
     <motion.span
       layoutId={`${scope}-active`}
@@ -619,7 +616,7 @@ function RailButton({
           aria-disabled="true"
           tabIndex={0}
           aria-label={`${action.label} (coming soon)`}
-          className={cn(rowBase, rowShape(expanded), "cursor-not-allowed text-[var(--color-ink-400)]")}
+          className={cn(rowBase, rowShape(expanded), "cursor-not-allowed border border-dashed border-[var(--color-ink-200)] text-[var(--color-ink-400)] dark:border-white/[0.12]")}
           {...tipProps}
         >
           <span className="flex h-4 w-4 shrink-0 items-center justify-center opacity-60">{action.icon}</span>
@@ -652,7 +649,7 @@ function RailButton({
       )}
     </>
   );
-  const className = cn(rowBase, rowShape(expanded), active ? "text-white" : rowIdle);
+  const className = cn(rowBase, rowShape(expanded), active ? "border border-transparent text-white" : rowIdle);
 
   return (
     <>
@@ -787,9 +784,9 @@ function RailGroup({
           rowBase,
           rowShape(expanded),
           parentCarriesPill
-            ? "text-white"
+            ? "border border-transparent text-white"
             : hasActiveChild
-              ? "font-semibold text-[var(--color-ink-900)] dark:text-white"
+              ? cn(rowIdle, "ring-2 ring-[var(--color-brand-200)] text-[var(--color-ink-900)] dark:ring-[var(--color-brand-500)]/40")
               : rowIdle,
         )}
       >
@@ -829,7 +826,7 @@ function RailGroup({
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1, transition: { height: T.base, opacity: T.fast } }}
               exit={{ height: 0, opacity: 0, transition: { height: T.fast, opacity: T.exit } }}
-              className="relative overflow-hidden"
+              className="relative mt-1 overflow-hidden"
             >
               {/* Thread under the parent's icon column. */}
               <span
@@ -843,7 +840,7 @@ function RailGroup({
                     {c.soon ? (
                       <span
                         aria-disabled="true"
-                        className="relative flex h-8 cursor-not-allowed items-center gap-2.5 rounded-lg px-2.5 text-[12px] font-medium text-[var(--color-ink-400)]"
+                        className="relative flex h-8 cursor-not-allowed items-center gap-2.5 rounded-full px-2.5 text-[12px] font-medium text-[var(--color-ink-400)]"
                       >
                         <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center opacity-60">{c.icon}</span>
                         <span className="flex-1 truncate">{c.label}</span>
@@ -855,11 +852,13 @@ function RailGroup({
                         onClick={onChildNavigate}
                         aria-current={active ? "page" : undefined}
                         className={cn(
-                          "relative flex h-8 items-center gap-2.5 rounded-lg px-2.5 text-[12px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[var(--color-brand-500)]",
-                          active ? "text-white" : rowIdle,
+                          "relative flex h-8 items-center gap-2.5 rounded-full px-2.5 text-[12px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[var(--color-brand-500)]",
+                          active
+                            ? "text-white"
+                            : "text-[var(--color-ink-600)] hover:bg-white/80 hover:text-[var(--color-ink-900)] dark:hover:bg-white/[0.06]",
                         )}
                       >
-                        {active && <ActivePill scope={scope} rounded="rounded-lg" />}
+                        {active && <ActivePill scope={scope} />}
                         <span className="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center">{c.icon}</span>
                         <span className="relative truncate">{c.label}</span>
                       </Link>
