@@ -1,3 +1,4 @@
+using DTMS.DeliveryOrder.Application.Diagnostics;
 using System.Text.Json;
 using DTMS.DeliveryOrder.Application.Commands.AmendDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Options;
@@ -30,6 +31,7 @@ public class ReviseAndResendDeliveryOrderCommandHandler
     private readonly IDispatchStrategyRegistry _strategyRegistry;
     private readonly IRouteDispatchGuard _routeGuard;
     private readonly ICurrentUserAccessor _currentUser;
+    private readonly OrderIntakeMetrics _intake;
     private readonly DeliveryOrderOptions _options;
     private readonly ILogger<ReviseAndResendDeliveryOrderCommandHandler> _logger;
 
@@ -42,9 +44,11 @@ public class ReviseAndResendDeliveryOrderCommandHandler
         IDispatchStrategyRegistry strategyRegistry,
         IRouteDispatchGuard routeGuard,
         ICurrentUserAccessor currentUser,
+        OrderIntakeMetrics intake,
         IOptions<DeliveryOrderOptions> options,
         ILogger<ReviseAndResendDeliveryOrderCommandHandler> logger)
     {
+        _intake = intake;
         _repository = repository;
         _amendmentRepo = amendmentRepo;
         _auditRepo = auditRepo;
@@ -80,9 +84,14 @@ public class ReviseAndResendDeliveryOrderCommandHandler
 
         // Same gate as the create paths — an unregistered mode would fail
         // every item in Planning and land the order straight back at Failed.
+        const string path = OrderIntakeMetrics.Paths.Resend;
+        var system = order.SourceSystemKey;
         var mode = order.RequestedTransportMode ?? TransportMode.Amr;
         if (!_strategyRegistry.IsRegistered(mode))
+        {
+            _intake.Rejected(path, system, OrderIntakeMetrics.Reasons.ModeDisabled, mode.ToString());
             throw new TransportModeNotEnabledException(mode);
+        }
 
         var revisedBy = _currentUser.GetCurrentUserName() ?? "system";
         var originalSnapshot = JsonSerializer.Serialize(OrderSnapshotV1.From(order));
@@ -114,17 +123,30 @@ public class ReviseAndResendDeliveryOrderCommandHandler
             {
                 var stationResult = await _stationValidation.BuildStationMapAsync(order.Items, cancellationToken);
                 if (stationResult.IsFailure)
+                {
+                    var (failReason, failCode) = StationValidationService.ClassifyFailure(stationResult.Error);
+                    _intake.Rejected(path, system, failReason, failCode);
                     return Result<DeliveryOrderDetailDto>.Failure(stationResult.Error);
+                }
                 stationMap = stationResult.Value;
                 // Refuse a revision onto a route nothing can carry out — 422,
                 // before anything is saved, instead of failing again in Planning.
-                await _routeGuard.EnsureDispatchableAsync(order.OrderRef, order.Items, mode, stationMap, cancellationToken);
+                if (await _routeGuard.CheckAsync(order.OrderRef, order.Items, mode, stationMap, cancellationToken)
+                    is { } routeRejection)
+                {
+                    _intake.RoutesRejected(path, system, routeRejection.Routes);
+                    throw routeRejection.ToException();
+                }
             }
             else
             {
                 var wmsResult = await _stationValidation.BuildWmsLocationMapAsync(order.Items, cancellationToken);
                 if (wmsResult.IsFailure)
+                {
+                    var (failReason, failCode) = StationValidationService.ClassifyFailure(wmsResult.Error);
+                    _intake.Rejected(path, system, failReason, failCode);
                     return Result<DeliveryOrderDetailDto>.Failure(wmsResult.Error);
+                }
                 wmsLocationMap = wmsResult.Value;
             }
 
@@ -149,6 +171,7 @@ public class ReviseAndResendDeliveryOrderCommandHandler
                 "[ReviseAndResend] Order {OrderId} '{OrderRef}' revised by {By} ({Items} items, +{Added} -{Removed}) and sent back to Planning: {Reason}",
                 order.Id, order.OrderRef, revisedBy, order.Items.Count,
                 outcome.Added.Count, outcome.Removed.Count, request.Reason);
+            _intake.Accepted(path, system);
 
             return Result<DeliveryOrderDetailDto>.Success(DeliveryOrderMapper.MapToDetailDto(order));
         }
@@ -157,6 +180,7 @@ public class ReviseAndResendDeliveryOrderCommandHandler
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
             _logger.LogWarning("[ReviseAndResend] Order {OrderId} rejected: {Error}", request.OrderId, ex.Message);
+            _intake.Rejected(path, system, OrderIntakeMetrics.Reasons.Invalid);
             return Result<DeliveryOrderDetailDto>.Failure(ex.Message);
         }
         catch (DbUpdateConcurrencyException)

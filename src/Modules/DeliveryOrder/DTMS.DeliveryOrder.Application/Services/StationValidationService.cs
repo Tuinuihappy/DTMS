@@ -16,6 +16,27 @@ public class StationValidationService : IStationValidationService
         _wmsLocationLookup = wmsLocationLookup;
     }
 
+    /// <summary>
+    /// Reads back which check a failure message from this service came from,
+    /// and the code it names — for the intake metrics' reason/location labels.
+    /// Lives beside the messages it parses; StationValidationClassifyTests pins
+    /// every message shape so a reworded one can't silently fall to "invalid".
+    /// </summary>
+    public static (string Reason, string? Code) ClassifyFailure(string error)
+    {
+        var code = error.StartsWith('\'') && error.IndexOf('\'', 1) is > 0 and var end
+            ? error[1..end]
+            : null;
+        var reason =
+            error.EndsWith("is not a valid station code.", StringComparison.Ordinal) ? Diagnostics.OrderIntakeMetrics.Reasons.StationUnknown
+            : error.Contains("is deactivated and cannot be used", StringComparison.Ordinal) ? Diagnostics.OrderIntakeMetrics.Reasons.StationInactive
+            : error.Contains("is currently offline", StringComparison.Ordinal) ? Diagnostics.OrderIntakeMetrics.Reasons.StationOffline
+            : error.EndsWith("is not a valid WMS location.", StringComparison.Ordinal) ? Diagnostics.OrderIntakeMetrics.Reasons.WmsLocationUnknown
+            : error.Contains("is no longer active in WMS", StringComparison.Ordinal) ? Diagnostics.OrderIntakeMetrics.Reasons.WmsLocationInactive
+            : Diagnostics.OrderIntakeMetrics.Reasons.Invalid;
+        return (reason, reason == Diagnostics.OrderIntakeMetrics.Reasons.Invalid ? null : code);
+    }
+
     // AMR path (existing) — interpret location codes as station codes.
     // The order's PickupLocationCode / DropLocationCode resolve to AMR
     // station Ids. Inactive / manually-overridden stations are rejected

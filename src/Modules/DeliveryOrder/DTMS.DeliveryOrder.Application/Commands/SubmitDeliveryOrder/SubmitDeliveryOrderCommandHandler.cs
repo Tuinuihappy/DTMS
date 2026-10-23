@@ -1,3 +1,4 @@
+using DTMS.DeliveryOrder.Application.Diagnostics;
 using DTMS.DeliveryOrder.Application.Options;
 using DTMS.DeliveryOrder.Application.QualityIssues;
 using DTMS.DeliveryOrder.Application.Queries.GetDeliveryOrder;
@@ -20,6 +21,7 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
     private readonly IStationValidationService _stationValidation;
     private readonly IDispatchStrategyRegistry _strategyRegistry;
     private readonly IRouteDispatchGuard _routeGuard;
+    private readonly OrderIntakeMetrics _intake;
     private readonly DeliveryOrderOptions _options;
     private readonly ILogger<SubmitDeliveryOrderCommandHandler> _logger;
 
@@ -29,9 +31,11 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
         IStationValidationService stationValidation,
         IDispatchStrategyRegistry strategyRegistry,
         IRouteDispatchGuard routeGuard,
+        OrderIntakeMetrics intake,
         IOptions<DeliveryOrderOptions> options,
         ILogger<SubmitDeliveryOrderCommandHandler> logger)
     {
+        _intake = intake;
         _repository = repository;
         _auditRepo = auditRepo;
         _stationValidation = stationValidation;
@@ -47,10 +51,14 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
         if (order is null)
             return Result<SubmitDeliveryOrderResult>.Failure($"Order {request.OrderId} not found.");
 
+        const string path = OrderIntakeMetrics.Paths.Submit;
+        var system = order.SourceSystemKey;
+
         var readiness = SubmitReadinessCheck.Check(order);
         if (!readiness.IsValid)
         {
             _logger.LogWarning("[Submit] Order {OrderId} not ready to submit: {Error}.", request.OrderId, readiness.Error);
+            _intake.Rejected(path, system, OrderIntakeMetrics.Reasons.Invalid);
             return Result<SubmitDeliveryOrderResult>.Failure(readiness.Error);
         }
 
@@ -64,7 +72,10 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
         // through and stall at Planning (no consumer can group it). Surfaces
         // as 422 via the ExceptionHandlingMiddleware mapping.
         if (!_strategyRegistry.IsRegistered(mode))
+        {
+            _intake.Rejected(path, system, OrderIntakeMetrics.Reasons.ModeDisabled, mode.ToString());
             throw new TransportModeNotEnabledException(mode);
+        }
 
         IReadOnlyDictionary<string, Guid>? stationMap = null;
         IReadOnlyDictionary<string, Guid>? wmsLocationMap = null;
@@ -72,17 +83,32 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
         if (mode == TransportMode.Amr)
         {
             var stationResult = await _stationValidation.BuildStationMapAsync(order.Items, cancellationToken);
-            if (stationResult.IsFailure) return Result<SubmitDeliveryOrderResult>.Failure(stationResult.Error);
+            if (stationResult.IsFailure)
+            {
+                var (reason, code) = StationValidationService.ClassifyFailure(stationResult.Error);
+                _intake.Rejected(path, system, reason, code);
+                return Result<SubmitDeliveryOrderResult>.Failure(stationResult.Error);
+            }
             stationMap = stationResult.Value;
             // No usable order template for a route → 422 now, not a Failed
             // order in a few seconds. Nothing has been changed yet.
-            await _routeGuard.EnsureDispatchableAsync(order.OrderRef, order.Items, mode, stationMap, cancellationToken);
+            if (await _routeGuard.CheckAsync(order.OrderRef, order.Items, mode, stationMap, cancellationToken)
+                is { } routeRejection)
+            {
+                _intake.RoutesRejected(path, system, routeRejection.Routes);
+                throw routeRejection.ToException();
+            }
         }
         else
         {
             // Manual → WMS location-code interpretation.
             var wmsResult = await _stationValidation.BuildWmsLocationMapAsync(order.Items, cancellationToken);
-            if (wmsResult.IsFailure) return Result<SubmitDeliveryOrderResult>.Failure(wmsResult.Error);
+            if (wmsResult.IsFailure)
+            {
+                var (reason, code) = StationValidationService.ClassifyFailure(wmsResult.Error);
+                _intake.Rejected(path, system, reason, code);
+                return Result<SubmitDeliveryOrderResult>.Failure(wmsResult.Error);
+            }
             wmsLocationMap = wmsResult.Value;
         }
 
@@ -110,6 +136,7 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
 
             _logger.LogInformation("[Submit] Order {OrderId} '{OrderRef}' submitted → confirmed ({WarningCount} warning(s)).",
                 order.Id, order.OrderRef, warnings.Count);
+            _intake.Accepted(path, system);
 
             return Result<SubmitDeliveryOrderResult>.Success(new SubmitDeliveryOrderResult(
                 DeliveryOrderMapper.MapToDetailDto(order),
@@ -118,6 +145,7 @@ public class SubmitDeliveryOrderCommandHandler : ICommandHandler<SubmitDeliveryO
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning("[Submit] Order {OrderId} submit failed: {Error}.", request.OrderId, ex.Message);
+            _intake.Rejected(path, system, OrderIntakeMetrics.Reasons.Invalid);
             return Result<SubmitDeliveryOrderResult>.Failure(ex.Message);
         }
         catch (DbUpdateConcurrencyException)

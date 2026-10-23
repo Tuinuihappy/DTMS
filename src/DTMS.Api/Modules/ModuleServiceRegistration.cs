@@ -393,6 +393,7 @@ public static class ModuleServiceRegistration
         services.AddScoped<IStationLookup, CachedStationLookup>();
         services.AddScoped<IStationValidationService, StationValidationService>();
         services.AddScoped<IRouteDispatchGuard, RouteDispatchGuard>();
+        services.AddSingleton<DTMS.DeliveryOrder.Application.Diagnostics.OrderIntakeMetrics>();
         // Phase 2.6 — Warehouse lookup adapter (DeliveryOrder.Application
         // contract → Facility module's read service). Not yet consumed by
         // order validation (MarkAsValidated still uses stations only);

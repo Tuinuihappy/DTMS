@@ -74,7 +74,7 @@ public class BulkSubmitModeGateTests
 
         var handler = new BulkSubmitDeliveryOrdersCommandHandler(
             repo, stations, Substitute.For<ICurrentUserAccessor>(),
-            origins, registry, RouteGuards.Passing(), Options.Create(new DeliveryOrderOptions()));
+            origins, registry, RouteGuards.Passing(), new DTMS.DeliveryOrder.Application.Diagnostics.OrderIntakeMetrics(), Options.Create(new DeliveryOrderOptions()));
         return (handler, repo, stations);
     }
 

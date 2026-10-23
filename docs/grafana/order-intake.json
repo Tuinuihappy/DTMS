@@ -1,0 +1,440 @@
+{
+  "uid": "dtms-order-intake",
+  "title": "DTMS — Order Intake",
+  "tags": [
+    "dtms",
+    "orders",
+    "intake"
+  ],
+  "schemaVersion": 38,
+  "refresh": "1m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "annotations": {
+    "list": []
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "system",
+        "label": "Source system",
+        "type": "query",
+        "datasource": null,
+        "query": {
+          "query": "label_values(dtms_order_intake_accepted_total, system)",
+          "refId": "system"
+        },
+        "definition": "label_values(dtms_order_intake_accepted_total, system)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "text",
+      "title": "How to read this",
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Orders that reached a handler and were **accepted into planning** vs **refused at the door** (meter `DTMS.OrderIntake`).\n\n- **path** — `source` = POST /api/v1/source/delivery-orders (OMS…), `submit` / `bulk_submit` = DTMS UI, `resend` = Edit & resend.\n- **reason** — `route_not_dispatchable` (no usable order template → 422), `station_unknown` / `station_inactive` / `station_offline` (AMR), `wms_location_unknown` / `wms_location_inactive` (Manual), `mode_disabled` (422), `duplicate_ref` (409), `invalid` (other 400).\n- **location** — the station / WMS code at fault, or `PICKUP → DROP` for a route. A route refusal counts once per failing route.\n\nNot counted: body-validation 400s rejected before a handler runs — see `iam.SystemRequestLog`. Note: OMS retries a refused order (seen: 3× in ~20 s), so one bad order can count several times."
+      },
+      "id": 1
+    },
+    {
+      "type": "stat",
+      "title": "Refused in range",
+      "description": "Orders refused at intake over the selected time range (all paths).",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 20
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(dtms_order_intake_rejected_total{system=~\"$system\"}[$__range])) or vector(0)",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "id": 2
+    },
+    {
+      "type": "stat",
+      "title": "Accepted in range",
+      "description": "Orders accepted into planning over the selected time range.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(dtms_order_intake_accepted_total{system=~\"$system\"}[$__range])) or vector(0)",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "id": 3
+    },
+    {
+      "type": "stat",
+      "title": "Refusal rate",
+      "description": "Refused / (accepted + refused). Route refusals count per route, so this can read slightly high for multi-route orders.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.02
+              },
+              {
+                "color": "red",
+                "value": 0.1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(dtms_order_intake_rejected_total{system=~\"$system\"}[$__range])) / clamp_min(sum(increase(dtms_order_intake_rejected_total{system=~\"$system\"}[$__range])) + sum(increase(dtms_order_intake_accepted_total{system=~\"$system\"}[$__range])), 1)",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "id": 4
+    },
+    {
+      "type": "stat",
+      "title": "No template (routes)",
+      "description": "Route refusals — an order arrived on a pickup → drop pair with no usable order template (422).",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(dtms_order_intake_rejected_total{system=~\"$system\",reason=\"route_not_dispatchable\"}[$__range])) or vector(0)",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "id": 5
+    },
+    {
+      "type": "timeseries",
+      "title": "Accepted vs refused per 5 min, by path",
+      "description": "Bars per 5-minute bucket.",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            },
+            "drawStyle": "bars"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (path) (increase(dtms_order_intake_accepted_total{system=~\"$system\"}[5m]))",
+          "legendFormat": "accepted · {{path}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (path) (increase(dtms_order_intake_rejected_total{system=~\"$system\"}[5m]))",
+          "legendFormat": "refused · {{path}}",
+          "refId": "B"
+        }
+      ],
+      "id": 6
+    },
+    {
+      "type": "timeseries",
+      "title": "Refused per 5 min, by reason",
+      "description": "Which check is refusing orders.",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            },
+            "drawStyle": "bars"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (reason) (increase(dtms_order_intake_rejected_total{system=~\"$system\"}[5m]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ],
+      "id": 7
+    },
+    {
+      "type": "table",
+      "title": "Most refused locations / routes in range",
+      "description": "Fix these first: add or activate the order template (route_not_dispatchable), re-activate or replace the station / WMS location, or ask the source system to stop sending it.",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "targets": [
+        {
+          "expr": "topk(20, sum by (reason, location, path, system) (increase(dtms_order_intake_rejected_total{system=~\"$system\",location!=\"\"}[$__range])) > 0)",
+          "instant": true,
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "location": 0,
+              "reason": 1,
+              "path": 2,
+              "system": 3,
+              "Value": 4
+            },
+            "renameByName": {
+              "location": "Location / route",
+              "reason": "Reason",
+              "path": "Path",
+              "system": "System",
+              "Value": "Refused"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Refused",
+            "desc": true
+          }
+        ]
+      },
+      "id": 8
+    }
+  ]
+}

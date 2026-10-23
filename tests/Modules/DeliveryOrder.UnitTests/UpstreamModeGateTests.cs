@@ -78,7 +78,7 @@ public class UpstreamModeGateTests
         var handler = new CreateUpstreamDeliveryOrderCommandHandler(
             repo, Substitute.For<IOrderAuditEventRepository>(), activity,
             Substitute.For<IStationValidationService>(),
-            Substitute.For<ICurrentUserAccessor>(), origins, registry, RouteGuards.Passing(),
+            Substitute.For<ICurrentUserAccessor>(), origins, registry, RouteGuards.Passing(), new DTMS.DeliveryOrder.Application.Diagnostics.OrderIntakeMetrics(),
             Options.Create(new DeliveryOrderOptions()),
             NullLogger<CreateUpstreamDeliveryOrderCommandHandler>.Instance);
         return (handler, repo, activity);

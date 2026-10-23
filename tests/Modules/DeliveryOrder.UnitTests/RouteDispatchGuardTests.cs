@@ -61,9 +61,10 @@ public class RouteDispatchGuardTests
     {
         var guard = new RouteDispatchGuard(Registry());
 
-        var problem = await guard.FindProblemAsync("OD-1", ItemsFrom("SHELF3", "SHELF5"), TransportMode.Amr, Stations);
+        var problem = await guard.CheckAsync("OD-1", ItemsFrom("SHELF3", "SHELF5"), TransportMode.Amr, Stations);
 
-        problem.Should().Contain("OD-1").And.Contain("SHELF3 → PACK-1").And.NotContain("SHELF5");
+        problem!.Message.Should().Contain("OD-1").And.Contain("SHELF3 → PACK-1").And.NotContain("SHELF5");
+        problem.Routes.Should().Equal("SHELF3 → PACK-1");
     }
 
     [Fact]
@@ -71,7 +72,7 @@ public class RouteDispatchGuardTests
     {
         var guard = new RouteDispatchGuard(Registry());
 
-        (await guard.FindProblemAsync("OD-1", ItemsFrom("SHELF5"), TransportMode.Amr, Stations)).Should().BeNull();
+        (await guard.CheckAsync("OD-1", ItemsFrom("SHELF5"), TransportMode.Amr, Stations)).Should().BeNull();
     }
 
     [Fact]
@@ -80,7 +81,7 @@ public class RouteDispatchGuardTests
         var registry = Registry();
         var guard = new RouteDispatchGuard(registry);
 
-        (await guard.FindProblemAsync("OD-1", ItemsFrom("SHELF3"), TransportMode.Manual, stationMap: null))
+        (await guard.CheckAsync("OD-1", ItemsFrom("SHELF3"), TransportMode.Manual, stationMap: null))
             .Should().BeNull();
         registry.DidNotReceive().Get(Arg.Any<TransportMode>());
     }
@@ -98,7 +99,7 @@ public class RouteDispatchGuardTests
         var registry = Registry();
         var handler = new CreateUpstreamDeliveryOrderCommandHandler(
             repo, Substitute.For<IOrderAuditEventRepository>(), activity, stations,
-            Substitute.For<ICurrentUserAccessor>(), origins, registry, new RouteDispatchGuard(registry),
+            Substitute.For<ICurrentUserAccessor>(), origins, registry, new RouteDispatchGuard(registry), new DTMS.DeliveryOrder.Application.Diagnostics.OrderIntakeMetrics(),
             Options.Create(new DeliveryOrderOptions()),
             NullLogger<CreateUpstreamDeliveryOrderCommandHandler>.Instance);
 
@@ -127,7 +128,7 @@ public class RouteDispatchGuardTests
         var registry = Registry();
         var handler = new BulkSubmitDeliveryOrdersCommandHandler(
             repo, stations, Substitute.For<ICurrentUserAccessor>(), origins, registry,
-            new RouteDispatchGuard(registry), Options.Create(new DeliveryOrderOptions()));
+            new RouteDispatchGuard(registry), new DTMS.DeliveryOrder.Application.Diagnostics.OrderIntakeMetrics(), Options.Create(new DeliveryOrderOptions()));
 
         CreateDraftDeliveryOrderCommand Order(string orderRef, string pickup) => new(
             orderRef,

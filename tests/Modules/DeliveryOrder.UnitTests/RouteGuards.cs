@@ -9,13 +9,13 @@ namespace DeliveryOrder.UnitTests;
 internal static class RouteGuards
 {
     /// <summary>Every route is dispatchable. (An unstubbed substitute would
-    /// answer FindProblemAsync with "" — a problem — not null.)</summary>
+    /// answer CheckAsync with a substitute rejection, not null.)</summary>
     public static IRouteDispatchGuard Passing()
     {
         var guard = Substitute.For<IRouteDispatchGuard>();
-        guard.FindProblemAsync(Arg.Any<string>(), Arg.Any<IReadOnlyCollection<Item>>(), Arg.Any<TransportMode>(),
+        guard.CheckAsync(Arg.Any<string>(), Arg.Any<IReadOnlyCollection<Item>>(), Arg.Any<TransportMode>(),
                 Arg.Any<IReadOnlyDictionary<string, Guid>?>(), Arg.Any<CancellationToken>())
-            .Returns((string?)null);
+            .Returns((RouteRejection?)null);
         return guard;
     }
 }

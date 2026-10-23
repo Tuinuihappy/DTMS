@@ -1,3 +1,4 @@
+using DTMS.DeliveryOrder.Application.Diagnostics;
 using DTMS.DeliveryOrder.Application.Options;
 using DTMS.DeliveryOrder.Application.Projections;
 using DTMS.DeliveryOrder.Application.QualityIssues;
@@ -32,6 +33,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
     private readonly IOrderOriginResolver _originResolver;
     private readonly IDispatchStrategyRegistry _strategyRegistry;
     private readonly IRouteDispatchGuard _routeGuard;
+    private readonly OrderIntakeMetrics _intake;
     private readonly DeliveryOrderOptions _options;
     private readonly ILogger<CreateUpstreamDeliveryOrderCommandHandler> _logger;
 
@@ -44,9 +46,11 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         IOrderOriginResolver originResolver,
         IDispatchStrategyRegistry strategyRegistry,
         IRouteDispatchGuard routeGuard,
+        OrderIntakeMetrics intake,
         IOptions<DeliveryOrderOptions> options,
         ILogger<CreateUpstreamDeliveryOrderCommandHandler> logger)
     {
+        _intake = intake;
         _repository = repository;
         _auditRepo = auditRepo;
         _activityStore = activityStore;
@@ -79,12 +83,19 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         // RIOT3 lifecycle) and auto-acks + auto-picks-up at trip creation using
         // RequestedBy as the actor. Reject up front with clear 400s; the domain
         // guards both invariants defensively too.
+        const string path = OrderIntakeMetrics.Paths.Source;
         if (request.SelfManaged && request.RequestedTransportMode != Domain.Enums.TransportMode.Manual)
+        {
+            _intake.Rejected(path, origin.Key, OrderIntakeMetrics.Reasons.Invalid);
             return Result<UpstreamOrderAckDto>.Failure(
                 "selfManaged is only supported for Manual transport mode (requestedTransportMode=Manual).");
+        }
         if (request.SelfManaged && string.IsNullOrWhiteSpace(request.RequestedBy))
+        {
+            _intake.Rejected(path, origin.Key, OrderIntakeMetrics.Reasons.Invalid);
             return Result<UpstreamOrderAckDto>.Failure(
                 "requestedBy is required when selfManaged is true — it is the actor recorded on the auto acknowledge + pickup.");
+        }
 
         // OrderRef is a business reference, not an idempotency key — retries are
         // the Idempotency-Key header's job (mandatory on this route), so reusing
@@ -93,14 +104,20 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         // unique-index arm can only report that some unique value did.
         var existing = await _repository.GetByRefAsync(request.SourceSystemKey, request.OrderRef, cancellationToken);
         if (existing is not null)
+        {
+            _intake.Rejected(path, origin.Key, OrderIntakeMetrics.Reasons.DuplicateRef);
             throw ConflictingReuse(existing);
+        }
 
         // Confirm-time gate — this path creates + confirms in one call, so an
         // unregistered mode would go straight to the Planning consumer and
         // stall. Surfaces as 422 via the ExceptionHandlingMiddleware mapping.
         var requestedMode = request.RequestedTransportMode ?? Domain.Enums.TransportMode.Amr;
         if (!_strategyRegistry.IsRegistered(requestedMode))
+        {
+            _intake.Rejected(path, origin.Key, OrderIntakeMetrics.Reasons.ModeDisabled, requestedMode.ToString());
             throw new TransportModeNotEnabledException(requestedMode);
+        }
 
         Domain.Entities.DeliveryOrder order;
         try
@@ -137,6 +154,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning("[Upstream] Order '{OrderRef}' build failed: {Error}.", request.OrderRef, ex.Message);
+            _intake.Rejected(path, origin.Key, OrderIntakeMetrics.Reasons.Invalid);
             return Result<UpstreamOrderAckDto>.Failure(ex.Message);
         }
 
@@ -155,6 +173,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
             if (stationResult.IsFailure)
             {
                 _logger.LogWarning("[Upstream] Order '{OrderRef}' station mapping failed: {Error}.", request.OrderRef, stationResult.Error);
+                RecordLocationRejection(path, origin.Key, stationResult.Error);
                 return Result<UpstreamOrderAckDto>.Failure(stationResult.Error);
             }
             stationMap = stationResult.Value;
@@ -165,7 +184,12 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
             // system never heard — it kept the goods reserved for a shipment
             // that would never move. Nothing saved also means the caller can
             // fix the route and send the same OrderRef again (no 409).
-            await _routeGuard.EnsureDispatchableAsync(order.OrderRef, order.Items, mode, stationMap, cancellationToken);
+            if (await _routeGuard.CheckAsync(order.OrderRef, order.Items, mode, stationMap, cancellationToken)
+                is { } routeRejection)
+            {
+                _intake.RoutesRejected(path, origin.Key, routeRejection.Routes);
+                throw routeRejection.ToException();
+            }
         }
         else
         {
@@ -173,6 +197,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
             if (wmsResult.IsFailure)
             {
                 _logger.LogWarning("[Upstream] Order '{OrderRef}' WMS location mapping failed: {Error}.", request.OrderRef, wmsResult.Error);
+                RecordLocationRejection(path, origin.Key, wmsResult.Error);
                 return Result<UpstreamOrderAckDto>.Failure(wmsResult.Error);
             }
             wmsLocationMap = wmsResult.Value;
@@ -231,6 +256,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
 
             _logger.LogInformation("[Upstream] Order {OrderId} '{OrderRef}' from {SourceSystemKey} auto-pipelined to Confirmed ({WarningCount} warning(s)).",
                 order.Id, order.OrderRef, order.SourceSystemKey, warnings.Count);
+            _intake.Accepted(path, origin.Key);
 
             return Result<UpstreamOrderAckDto>.Success(
                 new UpstreamOrderAckDto(DeliveryOrderMapper.MapToDetailDto(order), warnings));
@@ -238,6 +264,7 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning("[Upstream] Order '{OrderRef}' pipeline failed: {Error}.", request.OrderRef, ex.Message);
+            _intake.Rejected(path, origin.Key, OrderIntakeMetrics.Reasons.Invalid);
             return Result<UpstreamOrderAckDto>.Failure(ex.Message);
         }
         catch (DbUpdateConcurrencyException)
@@ -255,8 +282,15 @@ public class CreateUpstreamDeliveryOrderCommandHandler : ICommandHandler<CreateU
             var raced = await _repository.GetByRefAsync(request.SourceSystemKey, request.OrderRef, cancellationToken);
             if (raced is null) throw;
 
+            _intake.Rejected(path, origin.Key, OrderIntakeMetrics.Reasons.DuplicateRef);
             throw ConflictingReuse(raced);
         }
+    }
+
+    private void RecordLocationRejection(string path, string system, string error)
+    {
+        var (reason, code) = StationValidationService.ClassifyFailure(error);
+        _intake.Rejected(path, system, reason, code);
     }
 
     /// <summary>

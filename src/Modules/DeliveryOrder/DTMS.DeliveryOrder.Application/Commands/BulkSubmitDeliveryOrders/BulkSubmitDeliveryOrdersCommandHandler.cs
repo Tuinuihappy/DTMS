@@ -1,3 +1,4 @@
+using DTMS.DeliveryOrder.Application.Diagnostics;
 using DTMS.DeliveryOrder.Application.Commands.CreateDraftDeliveryOrder;
 using DTMS.DeliveryOrder.Application.Options;
 using DTMS.DeliveryOrder.Application.QualityIssues;
@@ -20,6 +21,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
     private readonly IOrderOriginResolver _originResolver;
     private readonly IDispatchStrategyRegistry _strategyRegistry;
     private readonly IRouteDispatchGuard _routeGuard;
+    private readonly OrderIntakeMetrics _intake;
     private readonly DeliveryOrderOptions _options;
 
     public BulkSubmitDeliveryOrdersCommandHandler(
@@ -29,8 +31,10 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         IOrderOriginResolver originResolver,
         IDispatchStrategyRegistry strategyRegistry,
         IRouteDispatchGuard routeGuard,
+        OrderIntakeMetrics intake,
         IOptions<DeliveryOrderOptions> options)
     {
+        _intake = intake;
         _repo = repo;
         _stationValidation = stationValidation;
         _currentUser = currentUser;
@@ -52,6 +56,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
         // cached / claim-first) + one JWT read for RequestedBy.
         var origin = await _originResolver.GetInternalAsync(cancellationToken);
         var actor = _currentUser.GetCurrentUserName();
+        const string path = OrderIntakeMetrics.Paths.BulkSubmit;
 
         // validate and build orders first (sequential — shares DbContext safely)
         var pendingOrders = new List<Domain.Entities.DeliveryOrder>();
@@ -63,6 +68,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
             {
                 var errors = string.Join("; ", validation.Errors.Select(e => e.ErrorMessage));
                 failures.Add(new BulkSubmitFailure(cmd.OrderRef, errors));
+                _intake.Rejected(path, origin.Key, OrderIntakeMetrics.Reasons.Invalid);
                 continue;
             }
 
@@ -98,6 +104,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
             catch (InvalidOperationException ex)
             {
                 failures.Add(new BulkSubmitFailure(cmd.OrderRef, ex.Message));
+                _intake.Rejected(path, origin.Key, OrderIntakeMetrics.Reasons.Invalid);
                 continue;
             }
 
@@ -120,6 +127,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
             {
                 failures.Add(new BulkSubmitFailure(
                     order.OrderRef, new TransportModeNotEnabledException(mode).Message));
+                _intake.Rejected(path, origin.Key, OrderIntakeMetrics.Reasons.ModeDisabled, mode.ToString());
                 continue;
             }
 
@@ -132,16 +140,19 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                 if (stationResult.IsFailure)
                 {
                     failures.Add(new BulkSubmitFailure(order.OrderRef, stationResult.Error));
+                    var (reason, code) = StationValidationService.ClassifyFailure(stationResult.Error);
+                    _intake.Rejected(path, origin.Key, reason, code);
                     continue;
                 }
                 stationMap = stationResult.Value;
 
                 // Same route check as single submit, collected per order so one
                 // route without a template doesn't abort the batch.
-                if (await _routeGuard.FindProblemAsync(order.OrderRef, order.Items, mode, stationMap, cancellationToken)
-                    is { } routeProblem)
+                if (await _routeGuard.CheckAsync(order.OrderRef, order.Items, mode, stationMap, cancellationToken)
+                    is { } routeRejection)
                 {
-                    failures.Add(new BulkSubmitFailure(order.OrderRef, routeProblem));
+                    failures.Add(new BulkSubmitFailure(order.OrderRef, routeRejection.Message));
+                    _intake.RoutesRejected(path, origin.Key, routeRejection.Routes);
                     continue;
                 }
             }
@@ -151,6 +162,8 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
                 if (wmsResult.IsFailure)
                 {
                     failures.Add(new BulkSubmitFailure(order.OrderRef, wmsResult.Error));
+                    var (reason, code) = StationValidationService.ClassifyFailure(wmsResult.Error);
+                    _intake.Rejected(path, origin.Key, reason, code);
                     continue;
                 }
                 wmsLocationMap = wmsResult.Value;
@@ -175,6 +188,7 @@ public class BulkSubmitDeliveryOrdersCommandHandler : ICommandHandler<BulkSubmit
             var orders = pendingOrders.Where(o => succeededIds.Contains(o.Id));
             await _repo.AddRangeAsync(orders, cancellationToken);
             await _repo.SaveChangesAsync(cancellationToken);
+            _intake.Accepted(path, origin.Key, succeeded.Count);
         }
 
         return Result<BulkSubmitResult>.Success(new BulkSubmitResult(succeeded, failures));

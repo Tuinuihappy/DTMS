@@ -5,6 +5,15 @@ using DTMS.Dispatch.Application.Services;
 namespace DTMS.DeliveryOrder.Application.Services;
 
 /// <summary>
+/// Why an order was refused for its routes: the caller-readable message, and
+/// each failing route as "PICKUP → DROP" (the intake metrics' location label).
+/// </summary>
+public sealed record RouteRejection(string Message, IReadOnlyList<string> Routes)
+{
+    public RouteNotDispatchableException ToException() => new(Message);
+}
+
+/// <summary>
 /// Refuses an order up front when one of its routes can't be dispatched —
 /// for AMR, no active OrderTemplate for a pickup → drop station pair, or one
 /// that doesn't resolve. Without it the order is accepted, planned, fails in
@@ -18,23 +27,18 @@ public interface IRouteDispatchGuard
 {
     /// <summary>
     /// Null when every route of <paramref name="items"/> is dispatchable;
-    /// otherwise a caller-readable sentence naming each failing route by its
-    /// location codes. For callers that collect failures (Bulk submit).
+    /// otherwise the rejection, naming each failing route by its location
+    /// codes. Callers throw <see cref="RouteRejection.ToException"/> (422) or,
+    /// in a batch, collect the message.
     /// </summary>
-    Task<string?> FindProblemAsync(
-        string orderRef, IReadOnlyCollection<Item> items, TransportMode mode,
-        IReadOnlyDictionary<string, Guid>? stationMap, CancellationToken ct = default);
-
-    /// <summary>Throws <see cref="RouteNotDispatchableException"/> (422) when
-    /// <see cref="FindProblemAsync"/> finds one.</summary>
-    Task EnsureDispatchableAsync(
+    Task<RouteRejection?> CheckAsync(
         string orderRef, IReadOnlyCollection<Item> items, TransportMode mode,
         IReadOnlyDictionary<string, Guid>? stationMap, CancellationToken ct = default);
 }
 
 public sealed class RouteDispatchGuard(IDispatchStrategyRegistry strategies) : IRouteDispatchGuard
 {
-    public async Task<string?> FindProblemAsync(
+    public async Task<RouteRejection?> CheckAsync(
         string orderRef, IReadOnlyCollection<Item> items, TransportMode mode,
         IReadOnlyDictionary<string, Guid>? stationMap, CancellationToken ct = default)
     {
@@ -45,25 +49,16 @@ public sealed class RouteDispatchGuard(IDispatchStrategyRegistry strategies) : I
 
         var routes = items
             .GroupBy(i => (Pickup: stationMap[i.PickupLocationCode], Drop: stationMap[i.DropLocationCode]))
-            .ToDictionary(g => g.Key, g => (g.First().PickupLocationCode, g.First().DropLocationCode));
+            .ToDictionary(g => g.Key, g => $"{g.First().PickupLocationCode} → {g.First().DropLocationCode}");
 
         var problems = await strategies.Get(mode).CheckRoutesAsync(routes.Keys, ct);
         if (problems.Count == 0) return null;
 
-        var detail = string.Join("; ", problems.Select(p =>
-        {
-            var (pickup, drop) = routes[(p.Pickup, p.Drop)];
-            return $"{pickup} → {drop}: {p.Reason}";
-        }));
-        return $"Order '{orderRef}' can't be dispatched — {detail}. " +
-               "Add or activate an order template for the route, then send the order again.";
-    }
-
-    public async Task EnsureDispatchableAsync(
-        string orderRef, IReadOnlyCollection<Item> items, TransportMode mode,
-        IReadOnlyDictionary<string, Guid>? stationMap, CancellationToken ct = default)
-    {
-        if (await FindProblemAsync(orderRef, items, mode, stationMap, ct) is { } problem)
-            throw new RouteNotDispatchableException(problem);
+        var failing = problems.Select(p => routes[(p.Pickup, p.Drop)]).ToList();
+        var detail = string.Join("; ", problems.Select(p => $"{routes[(p.Pickup, p.Drop)]}: {p.Reason}"));
+        return new RouteRejection(
+            $"Order '{orderRef}' can't be dispatched — {detail}. " +
+            "Add or activate an order template for the route, then send the order again.",
+            failing);
     }
 }

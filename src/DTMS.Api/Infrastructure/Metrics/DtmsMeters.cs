@@ -25,5 +25,7 @@ public static class DtmsMeters
         DTMS.Iam.Infrastructure.Callbacks.CallbackRefreshMetrics.MeterName,
         // Batched log writers (iam.SystemRequestLog): enqueued / dropped by reason.
         DTMS.Infrastructure.Logging.BatchedLogMetrics.MeterName,
+        // Orders accepted into planning vs refused at intake, by path / reason / location.
+        DTMS.DeliveryOrder.Application.Diagnostics.OrderIntakeMetrics.MeterName,
     ];
 }
