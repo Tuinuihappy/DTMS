@@ -27,7 +27,10 @@ export function TopNav() {
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={T.base}
-      className="fixed top-4 inset-x-4 z-40 mx-auto max-w-[1440px]"
+      // lg+: full width, so the logo is anchored to the viewport edge like
+      // the left rail — centred at 1440px it drifted right of the rail's
+      // icon column on wide screens.
+      className="fixed top-4 inset-x-4 z-40 mx-auto max-w-[1440px] lg:max-w-none"
     >
       <motion.div
         style={{ opacity, y: driftY, pointerEvents }}
@@ -47,7 +50,9 @@ export function TopNav() {
         {/* Logo + wordmark */}
         <a
           href="#"
-          className="flex items-center gap-3 pl-1 pr-4 py-1.5 rounded-full transition-colors hover:bg-[var(--color-ink-50)]/60"
+          // lg:pl-0.5 → 36px mark spans x 26–62, centre 44px = the rail's
+          // icon column (left-rail.tsx rowShape).
+          className="flex items-center gap-3 pl-1 lg:pl-0.5 pr-4 py-1.5 rounded-full transition-colors hover:bg-[var(--color-ink-50)]/60"
         >
           <span
             className="relative grid h-9 w-9 place-items-center rounded-[10px] text-[var(--color-ink-900)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_6px_14px_-4px_rgba(15,23,42,0.18)]"

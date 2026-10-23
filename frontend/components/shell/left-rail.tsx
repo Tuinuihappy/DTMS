@@ -489,7 +489,11 @@ function RailNav({
 // Every row is its own white pill (the rail's look — kept on purpose).
 const rowBase =
   "relative flex items-center rounded-full text-[12.5px] font-medium tracking-tight transition-[background-color,box-shadow,color] duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-500)]";
-const rowShape = (expanded: boolean) => (expanded ? "h-10 w-full gap-3 px-3" : "h-10 w-10 justify-center");
+// Icon column sits at x = 44px in both states (rail left-4 + px-2 + 1px
+// border + padding + half a 16px icon) — the TopNav logo is centred on
+// the same line (top-nav.tsx). px-[11px] expanded keeps it from drifting
+// a pixel when the rail opens.
+const rowShape = (expanded: boolean) => (expanded ? "h-10 w-full gap-3 px-[11px]" : "h-10 w-10 justify-center");
 const rowIdle =
   "bg-white/80 text-[var(--color-ink-700)] border border-[var(--color-ink-100)]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_2px_6px_-2px_rgba(15,23,42,0.08)] hover:bg-white hover:text-[var(--color-ink-900)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_6px_14px_-4px_rgba(15,23,42,0.14)] dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_-2px_rgba(0,0,0,0.5)]";
 
