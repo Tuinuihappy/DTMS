@@ -2,6 +2,7 @@
 
 import { ArrowDown, Repeat2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LiveDot, SwapOnChange } from "@/components/delivery-orders/badges";
 import type { TripStatus } from "@/lib/api/trips";
 
 // Trip status → pastel tone. Mirrors the order-side palette so a busy
@@ -54,9 +55,13 @@ const TONE_DOT: Record<TripVisual["tone"], string> = {
 export function TripStatusBadge({
   status,
   size = "sm",
+  ping = size === "md",
 }: {
   status: TripStatus;
   size?: "sm" | "md";
+  /** Expanding ring on live statuses. Defaults on for the `md` (drawer
+   *  header) size only — down a table the dot breathes instead. */
+  ping?: boolean;
 }) {
   const v = TRIP_VISUAL[status] ?? { label: status, tone: "ink" as const };
   const sizes = size === "md" ? "px-2.5 py-1 text-[11.5px]" : "px-2 py-[3px] text-[10.5px]";
@@ -64,22 +69,20 @@ export function TripStatusBadge({
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full font-semibold uppercase tracking-[0.08em] whitespace-nowrap",
+        // Background/text crossfade when the status (tone) changes.
+        "transition-colors duration-300",
         sizes,
         TONE_BG[v.tone],
       )}
     >
-      <span className="relative inline-flex h-1.5 w-1.5">
-        <span className={cn("absolute inset-0 rounded-full", TONE_DOT[v.tone])} />
-        {v.pulse && (
-          <span
-            className={cn(
-              "absolute inset-0 rounded-full animate-ping opacity-60",
-              TONE_DOT[v.tone],
-            )}
-          />
+      <SwapOnChange value={status}>
+        {v.pulse ? (
+          <LiveDot className={TONE_DOT[v.tone]} ping={ping} />
+        ) : (
+          <span className={cn("inline-flex h-1.5 w-1.5 rounded-full", TONE_DOT[v.tone])} />
         )}
-      </span>
-      {v.label}
+        {v.label}
+      </SwapOnChange>
     </span>
   );
 }
@@ -142,10 +145,8 @@ export function MissionStateBadge({ state }: { state: string }) {
       )}
     >
       {isPulsing && (
-        <span className="relative inline-flex h-1.5 w-1.5">
-          <span className="absolute inset-0 rounded-full bg-current opacity-80" />
-          <span className="absolute inset-0 rounded-full bg-current animate-ping opacity-50" />
-        </span>
+        // Breathe, not ping: this badge repeats down the mission timeline.
+        <span className="breathe inline-flex h-1.5 w-1.5 rounded-full bg-current opacity-80" />
       )}
       {config.label}
     </span>

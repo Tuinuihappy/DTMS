@@ -124,7 +124,7 @@ export function CarrierTypeDeleteDialog({
                   whileHover={busy ? {} : { y: -1 }}
                   whileTap={busy ? {} : { scale: 0.97 }}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all",
+                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-[background-color,box-shadow,color,opacity]",
                     busy
                       ? "cursor-not-allowed bg-[var(--color-ink-100)] text-[var(--color-ink-400)] dark:bg-white/[0.04]"
                       : "bg-[var(--color-coral)] text-white hover:shadow-[0_14px_36px_-12px_rgba(220,80,80,0.6)]",

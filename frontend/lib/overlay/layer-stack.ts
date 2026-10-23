@@ -15,7 +15,7 @@
 // as its parent registers FIRST; the parent rule keeps it on top anyway.
 //
 // z-index band: 100 + position × 10. Above all page chrome (≤ z-50) and
-// below toasts (z-[200], delivery-orders/toast.tsx) so a toast is never
+// below toasts (z-[200], primitives/toast.tsx) so a toast is never
 // hidden behind a dialog. Nine layers fit before the band is clamped.
 //
 // Kept free of React so it can be tested with `node --test` (pass a bare

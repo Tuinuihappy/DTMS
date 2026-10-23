@@ -268,7 +268,7 @@ export function StateActionDialog({
                   type="submit"
                   disabled={!canSubmit}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.06em] transition-all",
+                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.06em] transition-[background-color,border-color,box-shadow,color,opacity]",
                     canSubmit
                       ? cfg.submitClass
                       : "cursor-not-allowed bg-[var(--color-ink-100)] text-[var(--color-ink-400)] dark:bg-white/[0.04]",

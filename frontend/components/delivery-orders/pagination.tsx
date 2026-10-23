@@ -83,7 +83,7 @@ export function Pagination({
                 onClick={() => onPageChange(p)}
                 whileTap={{ scale: 0.92 }}
                 className={cn(
-                  "min-w-7 h-7 rounded-md px-1.5 text-[11.5px] font-mono font-semibold tabular-nums transition-all",
+                  "min-w-7 h-7 rounded-md px-1.5 text-[11.5px] font-mono font-semibold tabular-nums transition-[background-color,border-color,box-shadow,color,opacity]",
                   p === page
                     ? "bg-[var(--color-brand-900)] text-white shadow-[0_6px_14px_-6px_rgba(15,23,42,0.45)] dark:bg-[var(--color-brand-500)]"
                     : "text-[var(--color-ink-600)] hover:bg-white/60 dark:hover:bg-white/[0.06]",

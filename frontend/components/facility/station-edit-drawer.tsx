@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
+import { spring } from "@/lib/motion";
 import { ModalLayer } from "@/components/primitives/modal-layer";
 import {
   AlertTriangle,
@@ -147,7 +148,9 @@ export function StationEditDrawer({
         open={open}
         onClose={onClose}
         dismissible={!busy}
-        backdropClassName="bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
+        // Dim only, and an opaque panel: blurring a live, repainting map
+        // canvas behind a sliding panel costs a full re-blur every frame.
+        backdropClassName="bg-[var(--color-ink-900)]/40"
       >
         {({ panelProps, titleId, panelStyle }) => (
           <motion.aside
@@ -157,8 +160,8 @@ export function StationEditDrawer({
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 320, damping: 34 }}
-            className="fixed inset-y-0 right-0 flex w-full max-w-md flex-col bg-[var(--color-canvas)]/95 backdrop-blur-2xl shadow-[-20px_0_60px_-20px_rgba(15,23,42,0.35)] dark:bg-[var(--color-canvas)]/90 outline-none"
+            transition={spring.drawer}
+            className="fixed inset-y-0 right-0 flex w-full max-w-md flex-col bg-[var(--color-surface)] shadow-[-20px_0_60px_-20px_rgba(15,23,42,0.35)] outline-none"
           >
             {/* Header */}
             <div className="relative shrink-0 overflow-hidden">

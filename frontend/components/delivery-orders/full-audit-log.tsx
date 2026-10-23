@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
+import { T, spring, stagger } from "@/lib/motion";
 import { getFullOrderAudit, type FullAuditEntryDto, type FullOrderAuditDto } from "@/lib/api/delivery-orders";
 import { cn } from "@/lib/utils";
 import { DateTime } from "@/components/primitives/date-time";
@@ -44,6 +45,9 @@ export function FullAuditLog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<SourceFilter>("All");
+  // Id of the last hub-pushed entry, highlighted once so a row landing
+  // mid-read is noticed. Cleared after the CSS flash has played.
+  const [flashId, setFlashId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +84,9 @@ export function FullAuditLog({
       );
       return { ...prev, totalEntries: merged.length, entries: merged };
     });
+    setFlashId(liveEntry.id);
+    const t = setTimeout(() => setFlashId((cur) => (cur === liveEntry.id ? null : cur)), 1500);
+    return () => clearTimeout(t);
   }, [liveEntry]);
 
   // Count per source, used in filter chips so operators see what's
@@ -115,7 +122,7 @@ export function FullAuditLog({
         {Array.from({ length: 3 }).map((_, i) => (
           <div
             key={i}
-            className="h-12 animate-pulse rounded-xl bg-[var(--color-ink-100)] dark:bg-white/[0.05]"
+            className="h-12 skeleton-pulse rounded-xl bg-[var(--color-ink-100)] dark:bg-white/[0.05]"
           />
         ))}
       </div>
@@ -138,16 +145,27 @@ export function FullAuditLog({
               type="button"
               onClick={() => setFilter(s)}
               className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.06em] transition-all",
+                "relative inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.06em] transition-[background-color,border-color,box-shadow,color,opacity]",
                 active
-                  ? "bg-[var(--color-brand-500)] text-white"
+                  ? "text-white"
                   : "bg-[var(--color-ink-100)] text-[var(--color-ink-700)] hover:bg-[var(--color-ink-200)] dark:bg-white/[0.06] dark:text-[var(--color-ink-500)]",
               )}
             >
-              {labelFor(s)}
+              {/* The active fill slides between chips, so the eye follows
+                  the filter change. layoutId is per-order: two drawers'
+                  logs must not share a pill. */}
+              {active && (
+                <motion.span
+                  layoutId={`audit-filter-pill-${orderId}`}
+                  transition={spring.snappy}
+                  className="absolute inset-0 rounded-full bg-[var(--color-brand-500)]"
+                  aria-hidden
+                />
+              )}
+              <span className="relative">{labelFor(s)}</span>
               <span
                 className={cn(
-                  "rounded-full px-1 font-mono text-[9px] tabular-nums",
+                  "relative rounded-full px-1 font-mono text-[9px] tabular-nums",
                   active ? "bg-white/30" : "bg-[var(--color-ink-200)] dark:bg-white/10",
                 )}
               >
@@ -170,6 +188,7 @@ export function FullAuditLog({
             entry={entry}
             onOpenTrip={onOpenTrip}
             delayIndex={idx}
+            flash={entry.id === flashId}
           />
         ))}
       </ol>
@@ -181,10 +200,12 @@ function AuditEntryRow({
   entry,
   onOpenTrip,
   delayIndex,
+  flash,
 }: {
   entry: FullAuditEntryDto;
   onOpenTrip?: (id: string) => void;
   delayIndex: number;
+  flash: boolean;
 }) {
   const visual = sourceVisual(entry.source);
   const Icon = visual.icon;
@@ -193,8 +214,10 @@ function AuditEntryRow({
     <motion.li
       initial={{ opacity: 0, x: -6 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.28, delay: Math.min(delayIndex * 0.03, 0.4) }}
-      className="relative"
+      transition={{ ...T.base, delay: stagger(delayIndex) }}
+      // Flash on the <li>, not the card: the card has its own fill, which
+      // the animation's end frame would hide until the class came off.
+      className={cn("relative rounded-xl", flash && "row-flash")}
     >
       <span
         aria-hidden

@@ -6,8 +6,9 @@ import {
   Route,
   Truck,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, useInView, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import { ease as easing } from "@/lib/motion";
 
 /* -------------------------------------------------------------------------- */
 /* BrandScene — the left half of /login.                                       */
@@ -28,7 +29,7 @@ import { useEffect, useRef, useState } from "react";
 /*   5. Trust footnote                                                         */
 /* -------------------------------------------------------------------------- */
 
-const ease = [0.22, 1, 0.36, 1] as const;
+const ease = easing.out;
 
 const WORDS = ["Move.", "Deliver.", "Arrive."] as const;
 
@@ -48,7 +49,7 @@ const PILLS: PillSpec[] = [
     tone: "sky",
     angle: -120,
     radius: 290,
-    delay: 0.95,
+    delay: 0.35,
   },
   {
     label: "Smart dispatch",
@@ -56,7 +57,7 @@ const PILLS: PillSpec[] = [
     tone: "peach",
     angle: -40,
     radius: 310,
-    delay: 1.05,
+    delay: 0.42,
   },
   {
     label: "Driver comms",
@@ -64,7 +65,7 @@ const PILLS: PillSpec[] = [
     tone: "mint",
     angle: 80,
     radius: 300,
-    delay: 1.15,
+    delay: 0.49,
   },
 ];
 
@@ -83,6 +84,14 @@ const ARC_PADDING = 80; // extra room around the orbit so dashes don't clip
 export function BrandScene() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  // The ambient loops (truck bob, pill float, sparkle orbit) are CSS
+  // keyframes — compositor-only, and the global reduced-motion rule stills
+  // them. They also pause while the scene is out of view, and never start
+  // when the OS asks for reduced motion.
+  const inView = useInView(containerRef);
+  const reduced = useReducedMotion();
+  const loopState: React.CSSProperties["animationPlayState"] =
+    inView && !reduced ? "running" : "paused";
 
   useEffect(() => {
     const el = containerRef.current;
@@ -137,9 +146,9 @@ export function BrandScene() {
               <motion.div
                 initial={{ opacity: 0, scale: 0.85, y: 8 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ duration: 0.7, delay: p.delay, ease }}
+                transition={{ duration: 0.5, delay: p.delay, ease }}
               >
-                <FeaturePill tone={p.tone} icon={p.icon} label={p.label} />
+                <FeaturePill tone={p.tone} icon={p.icon} label={p.label} playState={loopState} />
               </motion.div>
             </div>
           );
@@ -151,14 +160,14 @@ export function BrandScene() {
           <motion.div
             initial={{ opacity: 0, scale: 0.72, rotate: -18 }}
             animate={{ opacity: 1, scale: 1, rotate: -8 }}
-            transition={{ duration: 0.95, delay: 0.55, ease }}
+            transition={{ duration: 0.6, delay: 0.15, ease }}
             className="relative"
           >
-            <motion.div
-              animate={{ y: [0, -6, 0] }}
-              transition={{ duration: 6, ease: "easeInOut", repeat: Infinity }}
+            <div
               className="grid place-items-center rounded-[28%] text-white"
               style={{
+                animation: "float-y 6s ease-in-out infinite",
+                animationPlayState: loopState,
                 width: truckSize,
                 height: truckSize,
                 background:
@@ -172,14 +181,14 @@ export function BrandScene() {
                 strokeWidth={2.1}
                 style={{ transform: "rotate(8deg)" }}
               />
-            </motion.div>
+            </div>
 
-            {/* Slow revolving sparkle — single warm dot orbiting the mark. */}
-            <motion.span
+            {/* Slow revolving sparkle — single warm dot orbiting the mark.
+                `spin` is Tailwind's animate-spin keyframe, slowed down. */}
+            <span
               aria-hidden
-              animate={{ rotate: 360 }}
-              transition={{ duration: 14, ease: "linear", repeat: Infinity }}
               className="absolute inset-0 grid place-items-center"
+              style={{ animation: "spin 14s linear infinite", animationPlayState: loopState }}
             >
               <span
                 className="block rounded-full"
@@ -190,7 +199,7 @@ export function BrandScene() {
                     "radial-gradient(circle at top, var(--color-amber) 0%, transparent 6%)",
                 }}
               />
-            </motion.span>
+            </span>
           </motion.div>
         </div>
       </div>
@@ -203,7 +212,7 @@ export function BrandScene() {
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.2, ease }}
+            transition={{ duration: 0.4, delay: 0.05, ease }}
             className="mt-12 inline-flex items-center gap-2 rounded-full border border-[var(--color-ink-100)] bg-white/65 px-3 py-1.5 text-[11.5px] font-medium text-[var(--color-ink-600)] backdrop-blur dark:border-white/[0.06] dark:bg-white/[0.05]"
           >
             <span className="relative flex h-1.5 w-1.5">
@@ -217,9 +226,11 @@ export function BrandScene() {
             {WORDS.map((w, i) => (
               <motion.span
                 key={w}
-                initial={{ opacity: 0, y: 18, filter: "blur(8px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                transition={{ duration: 0.75, delay: 0.3 + i * 0.13, ease }}
+                // Opacity + y only — animating filter: blur() on display
+                // text repaints every glyph each frame.
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 + i * 0.08, ease }}
                 className="block"
               >
                 {w}
@@ -232,7 +243,7 @@ export function BrandScene() {
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 1.4 }}
+          transition={{ duration: 0.4, delay: 0.5 }}
           className="mt-10 inline-flex items-center gap-3 text-[11.5px] uppercase tracking-[0.22em] text-[var(--color-ink-400)]"
         >
           <span
@@ -255,19 +266,24 @@ function FeaturePill({
   tone,
   icon: Icon,
   label,
+  playState,
 }: {
   tone: "sky" | "peach" | "mint";
   icon: typeof Truck;
   label: string;
+  playState: React.CSSProperties["animationPlayState"];
 }) {
   const bg = `var(--color-pastel-${tone})`;
   const ink = `var(--color-pastel-${tone}-ink)`;
   return (
-    <motion.span
-      animate={{ y: [0, -4, 0] }}
-      transition={{ duration: 7, ease: "easeInOut", repeat: Infinity }}
+    <span
       className="glass glass-edge inline-flex items-center gap-2.5 rounded-full px-4 py-2.5 backdrop-blur"
-      style={{ background: bg, borderColor: "rgba(255,255,255,0.5)" }}
+      style={{
+        background: bg,
+        borderColor: "rgba(255,255,255,0.5)",
+        animation: "float-y 7s ease-in-out infinite",
+        animationPlayState: playState,
+      }}
     >
       <span
         className="grid h-7 w-7 place-items-center rounded-full"
@@ -281,7 +297,7 @@ function FeaturePill({
       >
         {label}
       </span>
-    </motion.span>
+    </span>
   );
 }
 
@@ -326,7 +342,7 @@ function ConstellationArcs({ scale, size }: { scale: number; size: number }) {
             strokeDasharray="3 6"
             initial={{ pathLength: 0, opacity: 0 }}
             animate={{ pathLength: 1, opacity: 0.55 }}
-            transition={{ duration: 1.4, delay: p.delay + 0.2, ease }}
+            transition={{ duration: 0.8, delay: p.delay + 0.1, ease }}
           />
         );
       })}

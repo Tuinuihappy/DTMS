@@ -1,7 +1,8 @@
 "use client";
 
 import { AlertTriangle, RefreshCw } from "lucide-react";
-import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { startTransition, useEffect } from "react";
 
 export default function RouteError({
   error,
@@ -10,9 +11,18 @@ export default function RouteError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const router = useRouter();
   useEffect(() => {
     console.error("[route-error]", error);
   }, [error]);
+
+  // reset() alone re-renders the client boundary but does not re-fetch a
+  // server component that threw — "Try again" would fail the same way.
+  const retry = () =>
+    startTransition(() => {
+      router.refresh();
+      reset();
+    });
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6">
@@ -35,7 +45,7 @@ export default function RouteError({
         </div>
         <div className="flex gap-2 justify-center pt-2">
           <button
-            onClick={reset}
+            onClick={retry}
             className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-ink-900)] px-4 py-2 text-sm font-medium text-[var(--color-surface)] hover:bg-[var(--color-ink-800)] transition-colors"
           >
             <RefreshCw className="h-3.5 w-3.5" strokeWidth={2.2} />

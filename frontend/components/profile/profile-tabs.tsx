@@ -3,13 +3,14 @@
 import { Activity, Bell, ShieldCheck, UserCircle2 } from "lucide-react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { useState } from "react";
+import { ease, T } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { TabActivity } from "./tab-activity";
 import { TabOverview } from "./tab-overview";
 import { TabPreferences } from "./tab-preferences";
 import { TabSecurity } from "./tab-security";
 
-const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+const EASE = ease.out;
 
 type TabKey = "overview" | "activity" | "security" | "preferences";
 
@@ -27,7 +28,7 @@ export function ProfileTabs() {
     <motion.section
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 1.05, ease: EASE }}
+      transition={{ duration: 0.4, delay: 0.2, ease: EASE }}
       className="mt-10"
     >
       {/* Tab strip */}
@@ -99,7 +100,7 @@ export function ProfileTabs() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.32, ease: EASE }}
+            transition={T.base}
           >
             {active === "overview" && <TabOverview />}
             {active === "activity" && <TabActivity />}

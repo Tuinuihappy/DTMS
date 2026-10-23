@@ -16,6 +16,7 @@ import {
 } from "@/components/primitives/data-table/table-shell";
 import { TableEmptyState } from "@/components/primitives/data-table/table-empty-state";
 import { GlassCard } from "@/components/primitives/glass-card";
+import { useToast } from "@/components/primitives/toast";
 import {
   getCarrierTypeProfiles,
   type CarrierTypeProfile,
@@ -48,11 +49,37 @@ function Inner() {
   const [deleting, setDeleting] = useState<CarrierTypeProfile | null>(null);
   const [photos, setPhotos] = useState<PhotosTarget | null>(null);
 
+  // A reload after save keeps the table on screen (dimmed) and, if it fails,
+  // reports it as a banner above the table — it used to replace the whole
+  // page with the error even though the data shown was still good.
+  const [reloading, setReloading] = useState(false);
   const reloadCarriers = useCallback(() => {
+    setReloading(true);
     getCarrierTypeProfiles()
-      .then(setCarriers)
-      .catch((e: Error) => setError(e.message));
+      .then((c) => {
+        setCarriers(c);
+        setError(null);
+      })
+      .catch((e: Error) => setError(e.message || "Failed to reload carrier types"))
+      .finally(() => setReloading(false));
   }, []);
+
+  // Success toast + a one-shot highlight on the saved row (`n` re-keys it so
+  // saving the same type twice flashes twice).
+  const toast = useToast();
+  const [flash, setFlash] = useState<{ code: string; n: number } | null>(null);
+  const onSaved = useCallback(
+    (code: string) => {
+      toast.push({ tone: "success", message: `Carrier type ${code} saved` });
+      setFlash((f) => ({ code, n: (f?.n ?? 0) + 1 }));
+      reloadCarriers();
+    },
+    [toast, reloadCarriers],
+  );
+  const onDeleted = useCallback(() => {
+    if (deleting) toast.push({ tone: "success", message: `Carrier type ${deleting.code} deleted` });
+    reloadCarriers();
+  }, [deleting, toast, reloadCarriers]);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,7 +113,18 @@ function Inner() {
         </div>
       </header>
 
-      {error ? (
+      {/* With data already loaded, an error is a banner over it; only a
+          failed FIRST load (nothing to show) takes the page. */}
+      {error && carriers.length > 0 && (
+        <div
+          role="alert"
+          className="rounded-xl bg-[var(--color-coral-soft)] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)]"
+        >
+          {error}
+        </div>
+      )}
+
+      {error && carriers.length === 0 ? (
         <GlassCard className="px-6 py-10 text-center">
           <p className="text-[13px] font-medium text-[var(--color-coral)]">{error}</p>
         </GlassCard>
@@ -95,7 +133,10 @@ function Inner() {
           <Loader2 className="h-6 w-6 animate-spin text-[var(--color-ink-400)]" strokeWidth={2.2} />
         </GlassCard>
       ) : (
-        <>
+        <div
+          aria-busy={reloading}
+          className={cn("transition-opacity duration-150", reloading && "opacity-60")}
+        >
           <Section
             title="Carrier type profiles"
             icon={Boxes}
@@ -131,8 +172,16 @@ function Inner() {
                   <TableTh align="right">{""}</TableTh>
                 </DataTableHead>
                 <DataTableBody>
-                  {carriers.map((c) => (
-                    <tr key={c.id} className="border-t border-white/40 dark:border-white/[0.05]">
+                  {carriers.map((c) => {
+                    const flashed = flash?.code === c.code;
+                    return (
+                    <tr
+                      key={flashed ? `${c.id}:${flash.n}` : c.id}
+                      className={cn(
+                        "border-t border-white/40 dark:border-white/[0.05]",
+                        flashed && "row-flash",
+                      )}
+                    >
                       <TableTd>
                         {/* Straight to the carriers of this type — the registry
                             page already filters by type, so the code is the
@@ -251,25 +300,26 @@ function Inner() {
                         </div>
                       </TableTd>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </DataTableBody>
               </DataTableShell>
             )}
           </Section>
-        </>
+        </div>
       )}
 
       <CarrierTypeFormDialog
         open={carrierDialog}
         carrierType={editing}
         onClose={() => setCarrierDialog(false)}
-        onSaved={reloadCarriers}
+        onSaved={onSaved}
       />
 
       <CarrierTypeDeleteDialog
         carrierType={deleting}
         onClose={() => setDeleting(null)}
-        onDeleted={reloadCarriers}
+        onDeleted={onDeleted}
       />
 
       <PhotosDialog

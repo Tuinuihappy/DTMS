@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { listItem, spring } from "@/lib/motion";
 import type { ActionTemplateDto } from "@/lib/api/action-templates";
 import { DateTime } from "@/components/primitives/date-time";
 
@@ -44,7 +45,7 @@ export function ActionTemplateDrawer({
         onClose={onClose}
         dismissible={!busy}
         initialFocus="panel"
-        backdropClassName="bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
+        backdropClassName="bg-[var(--color-ink-900)]/40"
       >
         {({ panelProps, titleId, panelStyle }) =>
           open && template && (
@@ -55,8 +56,8 @@ export function ActionTemplateDrawer({
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 320, damping: 34 }}
-            className="fixed inset-y-0 right-0 flex w-full max-w-md flex-col bg-[var(--color-canvas)]/95 backdrop-blur-2xl shadow-[-20px_0_60px_-20px_rgba(15,23,42,0.35)] dark:bg-[var(--color-canvas)]/90 outline-none"
+            transition={spring.drawer}
+            className="fixed inset-y-0 right-0 flex w-full max-w-md flex-col bg-[var(--color-canvas)] shadow-[-20px_0_60px_-20px_rgba(15,23,42,0.35)] outline-none"
           >
             <div className="relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-pastel-lavender)]/40 via-transparent to-[var(--color-pastel-sky)]/40 pointer-events-none" />
@@ -120,7 +121,7 @@ export function ActionTemplateDrawer({
                         key={`${p.key}-${i}`}
                         initial={{ opacity: 0, x: 6 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.04, duration: 0.22 }}
+                        transition={listItem(i)}
                         className="flex items-center justify-between gap-3 rounded-[var(--radius-sm)] border border-white/70 bg-white/55 px-3 py-2 text-[12.5px] dark:border-white/[0.06] dark:bg-white/[0.04]"
                       >
                         <span className="font-mono text-[11.5px] uppercase tracking-[0.05em] text-[var(--color-ink-500)]">
@@ -301,7 +302,7 @@ function DrawerAction({
   variant: "primary" | "secondary" | "ghost";
 }) {
   const base =
-    "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50";
+    "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-semibold transition-[background-color,box-shadow,color,opacity,filter] disabled:cursor-not-allowed disabled:opacity-50";
   const styles =
     variant === "primary"
       ? "bg-[var(--color-brand-900)] text-white shadow-[0_4px_16px_-6px_rgba(15,23,42,0.45)] hover:shadow-[0_6px_20px_-6px_rgba(15,23,42,0.55)] dark:bg-[var(--color-brand-500)]"

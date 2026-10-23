@@ -5,15 +5,11 @@ import { KpiRail } from "@/components/dashboard/kpi-rail";
 import { LiveActivityCard } from "@/components/dashboard/live-activity-card";
 import { PriorityShipments } from "@/components/dashboard/priority-shipments";
 import { GreetingStrip } from "@/components/shell/greeting-strip";
-import { LeftRail } from "@/components/shell/left-rail";
-import { TopNav } from "@/components/shell/top-nav";
 
 export default function DashboardPage() {
   return (
     <>
-      <TopNav />
-      <LeftRail />
-      <main className="layer-content mx-auto max-w-[1340px] px-4 pb-24 pt-28 sm:px-6 md:px-6 md:pt-32 lg:pl-[var(--rail-width,80px)] lg:pr-6 transition-[padding] duration-300 ease-out">
+      <main className="layer-content mx-auto max-w-[1340px] px-4 pb-24 pt-28 sm:px-6 md:px-6 md:pt-32 lg:pl-[var(--rail-width,80px)] lg:pr-6">
         <GreetingStrip />
 
         <section className="grid grid-cols-12 gap-5 md:grid-flow-dense lg:grid-flow-row">

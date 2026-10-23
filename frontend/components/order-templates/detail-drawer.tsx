@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { listItem, spring } from "@/lib/motion";
 import type {
   OrderTemplateDto,
   OrderTemplateMissionDto,
@@ -55,7 +56,7 @@ export function OrderTemplateDrawer({
         onClose={onClose}
         dismissible={!busy}
         initialFocus="panel"
-        backdropClassName="bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
+        backdropClassName="bg-[var(--color-ink-900)]/40"
       >
         {({ panelProps, titleId, panelStyle }) =>
           open && template && (
@@ -66,8 +67,8 @@ export function OrderTemplateDrawer({
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 320, damping: 34 }}
-            className="fixed inset-y-0 right-0 flex w-full max-w-lg flex-col bg-[var(--color-canvas)]/95 backdrop-blur-2xl shadow-[-20px_0_60px_-20px_rgba(15,23,42,0.35)] dark:bg-[var(--color-canvas)]/90 outline-none"
+            transition={spring.drawer}
+            className="fixed inset-y-0 right-0 flex w-full max-w-lg flex-col bg-[var(--color-canvas)] shadow-[-20px_0_60px_-20px_rgba(15,23,42,0.35)] outline-none"
           >
             {/* Header */}
             <div className="relative overflow-hidden">
@@ -312,7 +313,7 @@ function MissionStep({
     <motion.li
       initial={{ opacity: 0, x: 8 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.05, duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      transition={listItem(index)}
       className="relative flex gap-3"
     >
       {/* Rail */}
@@ -341,7 +342,7 @@ function MissionStep({
 
       {/* Card */}
       <div className="flex-1 pb-2.5">
-        <div className="rounded-[var(--radius-sm)] border border-white/70 bg-white/65 px-3 py-2.5 backdrop-blur dark:border-white/[0.06] dark:bg-white/[0.04]">
+        <div className="rounded-[var(--radius-sm)] border border-white/70 bg-white/65 px-3 py-2.5 dark:border-white/[0.06] dark:bg-white/[0.04]">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-ink-400)]">
               #{mission.sequence + 1}
@@ -619,7 +620,7 @@ function DrawerAction({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-semibold transition-[background-color,box-shadow,color,opacity,filter] disabled:cursor-not-allowed disabled:opacity-50",
         DRAWER_STYLES[variant],
       )}
     >
@@ -644,7 +645,7 @@ function DrawerLink({
     <Link
       href={href}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-semibold transition-all",
+        "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-semibold transition-[background-color,box-shadow,color,opacity,filter]",
         DRAWER_STYLES[variant],
       )}
     >

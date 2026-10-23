@@ -2,7 +2,8 @@
 
 import { Activity, CircleCheck, AlertTriangle, AlertCircle, HelpCircle, RefreshCw } from "lucide-react";
 import { motion } from "motion/react";
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { T, stagger } from "@/lib/motion";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import {
@@ -23,12 +24,11 @@ import { vendorHealthStore } from "@/lib/realtime/vendor-health-store";
 import { cn } from "@/lib/utils";
 import { DateTime } from "@/components/primitives/date-time";
 
-// Entry animation matches the dashboard cards (kpi-rail / dispatch-funnel
-// pattern) — fade + 18px slide-up, 0.55s, cubic-out ease, staggered per
-// card index. `initial` fires once on mount so SignalR-driven re-renders
-// don't replay the animation.
-const ENTRY_EASE = [0.22, 1, 0.36, 1] as const;
-const ENTRY_DURATION = 0.55;
+// Entry animation: shared motion tokens — short fade + slide-up, capped
+// stagger per card index. `initial` fires once on mount so SignalR-driven
+// re-renders don't replay the animation; a status CHANGE gets its own
+// one-shot flash instead (ComponentCard).
+const ENTRY = { opacity: 0, y: 8 } as const;
 
 // System status page wired through an external store (vendorHealthStore).
 // SignalR pushes and the 30s REST poll both write straight into the
@@ -81,9 +81,9 @@ export function AdminSystemStatusExperience() {
     <div className="space-y-6">
       <motion.header
         className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"
-        initial={{ opacity: 0, y: 18 }}
+        initial={ENTRY}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: ENTRY_DURATION, ease: ENTRY_EASE }}
+        transition={T.base}
       >
         <div>
           <h1 className="text-[1.7rem] font-semibold text-[var(--color-ink-900)]">
@@ -125,7 +125,7 @@ export function AdminSystemStatusExperience() {
             </GlassCard>
           )}
           {infraIds.map((id, i) => (
-            <ComponentCard key={id} vendor={id} animationDelay={0.4 + i * 0.06} />
+            <ComponentCard key={id} vendor={id} animationDelay={stagger(i)} />
           ))}
         </div>
       </section>
@@ -146,7 +146,7 @@ export function AdminSystemStatusExperience() {
             <ComponentCard
               key={id}
               vendor={id}
-              animationDelay={0.4 + (infraIds.length + i) * 0.06}
+              animationDelay={stagger(infraIds.length + i)}
             />
           ))}
         </div>
@@ -246,9 +246,9 @@ const SummaryTile = memo(function SummaryTile({ icon, label, value, tone, index 
     <GlassCard
       variant={variant as "default" | "pastel-mint" | "pastel-peach" | "pastel-lavender"}
       className="p-4"
-      initial={{ opacity: 0, y: 18 }}
+      initial={ENTRY}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: ENTRY_DURATION, delay: 0.15 + index * 0.06, ease: ENTRY_EASE }}
+      transition={{ ...T.base, delay: stagger(index, 0.04) }}
     >
       <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-[var(--color-ink-500)]">
         {icon}
@@ -270,6 +270,21 @@ const SummaryTile = memo(function SummaryTile({ icon, label, value, tone, index 
 // so SignalR-driven updates never replay the entrance animation.
 function ComponentCard({ vendor, animationDelay = 0 }: { vendor: string; animationDelay?: number }) {
   const snapshot = useVendorSnapshot(vendor);
+  const status = snapshot?.status;
+
+  // One-shot tint when the status flips under the operator's eyes — not on
+  // first mount (prev is unset then). Bumping the key remounts the overlay,
+  // which restarts the CSS animation.
+  const prevStatus = useRef(status);
+  const [flashKey, setFlashKey] = useState(0);
+  useEffect(() => {
+    if (status === undefined) return;
+    if (prevStatus.current !== undefined && prevStatus.current !== status) {
+      setFlashKey((k) => k + 1);
+    }
+    prevStatus.current = status;
+  }, [status]);
+
   if (!snapshot) return null;
 
   const meta = statusMeta(snapshot.status);
@@ -278,10 +293,19 @@ function ComponentCard({ vendor, animationDelay = 0 }: { vendor: string; animati
     <GlassCard
       variant="default"
       className="p-5"
-      initial={{ opacity: 0, y: 18 }}
+      initial={ENTRY}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: ENTRY_DURATION, delay: animationDelay, ease: ENTRY_EASE }}
+      transition={{ ...T.base, delay: animationDelay }}
     >
+      {/* .row-flash animates background-color to transparent; on its own
+          overlay so it never clobbers the card's glass background. */}
+      {flashKey > 0 && (
+        <span
+          key={flashKey}
+          aria-hidden
+          className="row-flash pointer-events-none absolute inset-0"
+        />
+      )}
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">

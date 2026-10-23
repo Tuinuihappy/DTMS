@@ -58,7 +58,7 @@ export function FilterBar({
             placeholder="Search by ref, requester, notes…"
             className={cn(
               "w-full rounded-full bg-white/60 py-2.5 pl-10 pr-9 text-[13px] font-medium",
-              "border border-white/70 backdrop-blur-md transition-all duration-200",
+              "border border-white/70 backdrop-blur-md transition-[background-color,border-color,box-shadow,color,opacity] duration-200",
               "placeholder:text-[var(--color-ink-400)] text-[var(--color-ink-900)]",
               "focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/40 focus:border-[var(--color-brand-500)]/30",
               "dark:bg-white/[0.05] dark:border-white/10",
@@ -100,7 +100,7 @@ export function FilterBar({
             className={cn(
               "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-semibold",
               "bg-[var(--color-brand-900)] text-white shadow-[0_10px_28px_-12px_rgba(15,23,42,0.45)]",
-              "transition-all hover:shadow-[0_14px_36px_-12px_rgba(15,23,42,0.6)]",
+              "transition-[background-color,border-color,box-shadow,color,opacity] hover:shadow-[0_14px_36px_-12px_rgba(15,23,42,0.6)]",
               "dark:bg-[var(--color-brand-500)] dark:text-[var(--color-ink-50)]",
             )}
           >
@@ -177,7 +177,7 @@ function ToolbarButton({
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-semibold",
         "bg-white/60 text-[var(--color-ink-700)] border border-white/70",
-        "transition-all hover:bg-white/90",
+        "transition-[background-color,border-color,box-shadow,color,opacity] hover:bg-white/90",
         "dark:bg-white/[0.05] dark:text-[var(--color-ink-700)] dark:border-white/10 dark:hover:bg-white/[0.1]",
         "disabled:opacity-50 disabled:cursor-not-allowed",
       )}

@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { ConfirmPoints, useConfirm } from "@/components/primitives/confirm-dialog";
+import { useToast } from "@/components/primitives/toast";
 import {
   activateSystem,
   deactivateSystem,
@@ -67,6 +69,8 @@ import { copyText } from "@/lib/clipboard";
 // modal on the list page.
 
 export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) {
+  const { confirm, confirmDialog } = useConfirm();
+  const toast = useToast();
   const [data, setData] = useState<SystemDetailDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -235,11 +239,20 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
   };
 
   const onDeactivate = async () => {
-    if (!confirm(`Deactivate "${systemKey}"? Inbound auth will return 401.`)) return;
+    if (
+      !(await confirm({
+        title: `Deactivate "${systemKey}"?`,
+        body: "Inbound auth for this system will return 401 until it is activated again.",
+        confirmLabel: "Deactivate",
+        tone: "danger",
+      }))
+    )
+      return;
     setBusy(true);
     try {
       await deactivateSystem(systemKey);
       await load();
+      toast.push({ tone: "success", message: `"${systemKey}" deactivated.` });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -273,12 +286,21 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
       setError("A freshly rotated key is still visible above — copy it before rotating again.");
       return;
     }
-    if (!confirm(
-      `Rotate the API key for "${systemKey}"?\n\n` +
-      `• The current key stops working the moment you click OK.\n` +
-      `• A NEW key will be shown ONCE in a banner — copy it then test it.\n` +
-      `• Do NOT rotate again until you have copied + verified the new key.`,
-    )) return;
+    if (!(await confirm({
+      title: "Rotate API key?",
+      body: (
+        <ConfirmPoints
+          intro={<>Rotate the API key for <b>{systemKey}</b>.</>}
+          points={[
+            "The current key stops working the moment you confirm.",
+            "A NEW key is shown ONCE in a banner — copy it, then test it.",
+            "Do NOT rotate again until you have copied and verified the new key.",
+          ]}
+        />
+      ),
+      confirmLabel: "Rotate key",
+      tone: "danger",
+    }))) return;
     setBusy(true);
     try {
       const r = await rotateCredential(systemKey);
@@ -322,17 +344,29 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
   };
 
   const onRevokeToken = async (jti: string) => {
-    if (!confirm(
-      `Revoke this token?\n\n` +
-      `• The token stops authenticating on its NEXT request (revocation is immediate).\n` +
-      `• Other tokens for "${systemKey}" are unaffected.\n` +
-      `• This cannot be undone — the partner will need a new token.`,
-    )) return;
+    if (
+      !(await confirm({
+        title: "Revoke this token?",
+        body: (
+          <ConfirmPoints
+            points={[
+              "The token stops authenticating on its NEXT request — revocation is immediate.",
+              <>Other tokens for <b>{systemKey}</b> are unaffected.</>,
+              "This cannot be undone — the partner will need a new token.",
+            ]}
+          />
+        ),
+        confirmLabel: "Revoke token",
+        tone: "danger",
+      }))
+    )
+      return;
     setRevokingJti(jti);
     setError(null);
     try {
       await revokeToken(systemKey, jti);
       await loadIssuedTokens();
+      toast.push({ tone: "success", message: "Token revoked." });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -356,6 +390,7 @@ export function IamSystemDetailExperience({ systemKey }: { systemKey: string }) 
 
   return (
     <div className="space-y-6">
+      {confirmDialog}
       <header className="space-y-2">
         <Link
           href="/admin/systems"

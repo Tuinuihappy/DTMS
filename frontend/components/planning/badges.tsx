@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { LiveDot, SwapOnChange } from "@/components/delivery-orders/badges";
 import type { JobStatus } from "@/lib/api/jobs";
 
 // Job status → tone palette. Mirrors the Trip-side colors so the eye
@@ -50,9 +51,13 @@ const TONE_DOT: Record<JobVisual["tone"], string> = {
 export function JobStatusBadge({
   status,
   size = "sm",
+  ping = size === "md",
 }: {
   status: JobStatus;
   size?: "sm" | "md";
+  /** Expanding ring on live statuses. Defaults on for the `md` (drawer
+   *  header) size only — down a table the dot breathes instead. */
+  ping?: boolean;
 }) {
   const v = JOB_VISUAL[status] ?? { label: status, tone: "ink" as const };
   const sizes =
@@ -61,22 +66,19 @@ export function JobStatusBadge({
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full font-semibold uppercase tracking-[0.08em] whitespace-nowrap",
+        "transition-colors duration-300",
         sizes,
         TONE_BG[v.tone],
       )}
     >
-      <span className="relative inline-flex h-1.5 w-1.5">
-        <span className={cn("absolute inset-0 rounded-full", TONE_DOT[v.tone])} />
-        {v.pulse && (
-          <span
-            className={cn(
-              "absolute inset-0 rounded-full animate-ping opacity-60",
-              TONE_DOT[v.tone],
-            )}
-          />
+      <SwapOnChange value={status}>
+        {v.pulse ? (
+          <LiveDot className={TONE_DOT[v.tone]} ping={ping} />
+        ) : (
+          <span className={cn("inline-flex h-1.5 w-1.5 rounded-full", TONE_DOT[v.tone])} />
         )}
-      </span>
-      {v.label}
+        {v.label}
+      </SwapOnChange>
     </span>
   );
 }

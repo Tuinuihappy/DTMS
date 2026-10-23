@@ -5,6 +5,7 @@ import { ModalLayer } from "@/components/primitives/modal-layer";
 import { Copy, Sparkles, Workflow, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { T, spring } from "@/lib/motion";
 import {
   createActionTemplate,
   DEFAULT_ACTION_TYPE,
@@ -111,8 +112,8 @@ export function ActionTemplateDialog({
               {...panelProps}
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
-              transition={{ type: "spring", stiffness: 360, damping: 30 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12, transition: T.exit }}
+              transition={spring.dialog}
               className={cn(
                 "pointer-events-auto relative w-full max-w-xl overflow-hidden rounded-[var(--radius-xl)] outline-none",
                 "glass-strong",
@@ -223,7 +224,7 @@ export function ActionTemplateDialog({
                               setForm((f) => ({ ...f, actionCategory: opt.value }))
                             }
                             className={cn(
-                              "flex-1 rounded-[var(--radius-sm)] px-4 py-3 text-left transition-all",
+                              "flex-1 rounded-[var(--radius-sm)] px-4 py-3 text-left transition-[background-color,border-color,box-shadow,color,opacity]",
                               active
                                 ? "bg-[var(--color-brand-900)] text-white shadow-[0_4px_16px_-6px_rgba(15,23,42,0.55)] dark:bg-[var(--color-brand-500)]"
                                 : "bg-white/55 text-[var(--color-ink-700)] hover:bg-white/80 dark:bg-white/[0.05] dark:hover:bg-white/[0.1]",
@@ -369,7 +370,7 @@ export function ActionTemplateDialog({
                   onClick={handleSubmit}
                   disabled={!canSubmit || submitting}
                   className={cn(
-                    "rounded-full px-5 py-2 text-[12.5px] font-semibold transition-all",
+                    "rounded-full px-5 py-2 text-[12.5px] font-semibold transition-[background-color,border-color,box-shadow,color,opacity]",
                     "bg-[var(--color-brand-900)] text-white shadow-[0_4px_18px_-6px_rgba(15,23,42,0.45)] hover:shadow-[0_6px_22px_-6px_rgba(15,23,42,0.55)] dark:bg-[var(--color-brand-500)]",
                     "disabled:cursor-not-allowed disabled:opacity-50",
                   )}
@@ -397,7 +398,7 @@ export function ActionTemplateDialog({
 
 const inputCls = cn(
   "w-full rounded-lg bg-white/70 px-3 py-2 text-[13px] font-medium",
-  "border border-white/80 backdrop-blur-md transition-all",
+  "border border-white/80 backdrop-blur-md transition-[background-color,border-color,box-shadow,color,opacity]",
   "placeholder:text-[var(--color-ink-400)] text-[var(--color-ink-900)]",
   "focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/40 focus:border-[var(--color-brand-500)]/30",
   "dark:bg-white/[0.05] dark:border-white/10",

@@ -148,11 +148,13 @@ export function TabOverview() {
 
               {/* Decorative odometer bar */}
               <div className="mt-4 h-1 rounded-full bg-[var(--color-ink-100)] dark:bg-white/[0.06]">
+                {/* scaleX over a static width — no per-frame re-layout. */}
                 <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: i === 0 ? "76%" : "42%" }}
-                  transition={{ duration: 0.9, delay: 0.4 + i * 0.06, ease: EASE }}
-                  className="h-full rounded-full bg-gradient-to-r from-[var(--color-coral)] to-[var(--color-brand-500)]"
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ duration: 0.4, delay: 0.2 + i * 0.04, ease: EASE }}
+                  className="h-full origin-left rounded-full bg-gradient-to-r from-[var(--color-coral)] to-[var(--color-brand-500)]"
+                  style={{ width: i === 0 ? "76%" : "42%" }}
                 />
               </div>
             </motion.div>

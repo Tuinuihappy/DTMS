@@ -1,11 +1,12 @@
 "use client";
 
-import { Loader2, Repeat2, X } from "lucide-react";
+import { Check, Loader2, Repeat2, X } from "lucide-react";
 import { motion } from "motion/react";
 import { ModalLayer } from "@/components/primitives/modal-layer";
 import { useEffect, useRef, useState } from "react";
 import type { TripStatus } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
+import { T, spring } from "@/lib/motion";
 
 export const DEFAULT_CANCEL_REASON = "Cancelled by operator";
 
@@ -35,14 +36,24 @@ export function TripConfirmDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  // Brief success tick before the dialog closes itself.
+  const [done, setDone] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (open) {
       setBusy(false);
       setError(null);
       setReason("");
+      setDone(false);
     }
   }, [open]);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
 
   // Focus opens on Keep (intent="irreversible"); Esc closes only this
   // dialog, not the trip drawer underneath (layer stack).
@@ -53,7 +64,10 @@ export function TripConfirmDialog({
     setError(null);
     try {
       await onConfirm(reason.trim() || DEFAULT_CANCEL_REASON);
-      onClose();
+      // The action has already gone through; the ~350ms tick only delays
+      // the close, so the operator sees it landed before the dialog goes.
+      setDone(true);
+      closeTimerRef.current = setTimeout(onClose, 350);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -68,7 +82,7 @@ export function TripConfirmDialog({
     <ModalLayer
       open={open}
       onClose={onClose}
-      dismissible={!busy}
+      dismissible={!busy && !done}
       intent="irreversible"
       safeRef={keepRef}
       backdropClassName="bg-[var(--color-ink-900)]/55 backdrop-blur-md"
@@ -83,8 +97,8 @@ export function TripConfirmDialog({
               {...panelProps}
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
-              transition={{ type: "spring", stiffness: 360, damping: 30 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12, transition: T.exit }}
+              transition={spring.dialog}
               className="pointer-events-auto relative w-full max-w-md overflow-hidden rounded-[var(--radius-xl)] glass-strong outline-none"
             >
               <header className="flex items-start gap-3 px-6 pt-5">
@@ -189,27 +203,36 @@ export function TripConfirmDialog({
                 </button>
                 <motion.button
                   type="button"
-                  onClick={() => !busy && void handleConfirm()}
-                  disabled={busy}
-                  whileHover={!busy ? { y: -1 } : {}}
-                  whileTap={!busy ? { scale: 0.97 } : {}}
+                  onClick={() => !busy && !done && void handleConfirm()}
+                  disabled={busy || done}
+                  aria-busy={busy || undefined}
+                  whileHover={!busy && !done ? { y: -1 } : {}}
+                  whileTap={!busy && !done ? { scale: 0.97 } : {}}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all",
-                    busy
+                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-[background-color,border-color,box-shadow,color,opacity]",
+                    done
+                      ? "bg-[var(--color-success)] text-white"
+                      : busy
                       ? "bg-[var(--color-ink-100)] text-[var(--color-ink-400)] cursor-not-allowed dark:bg-white/[0.04]"
                       : isCancel
                         ? "bg-[var(--color-coral)] text-white"
                         : "bg-[var(--color-brand-500)] text-white",
                   )}
                 >
-                  {busy ? (
+                  {done ? (
+                    <Check className="h-3.5 w-3.5" strokeWidth={2.6} />
+                  ) : busy ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2.4} />
                   ) : isCancel ? (
                     <X className="h-3.5 w-3.5" strokeWidth={2.4} />
                   ) : (
                     <Repeat2 className="h-3.5 w-3.5" strokeWidth={2.4} />
                   )}
-                  {busy
+                  {done
+                    ? isCancel
+                      ? "Cancelled"
+                      : "Retried"
+                    : busy
                     ? isCancel
                       ? "Cancelling…"
                       : "Retrying…"

@@ -8,9 +8,9 @@ import {
   Send,
   Trash2,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useFlashOnChange } from "@/lib/hooks/use-flash-on-change";
 import type {
   DeliveryOrderListDto,
   OrderStatus,
@@ -26,6 +26,7 @@ import {
   DataTableHead,
   DataTableShell,
   MobileCardRow,
+  RowGroup,
   SortableTh,
   TableEmptyState,
   TableSkeleton,
@@ -69,6 +70,9 @@ function shortRef(ref: string): string {
 
 type Props = {
   orders: DeliveryOrderListDto[];
+  // page|sort|filter key of `orders` — drives the query-change fade and
+  // keeps realtime row flashes off navigation.
+  signature: string;
   loading: boolean;
   selected: Set<string>;
   onSelectionChange: (next: Set<string>) => void;
@@ -82,10 +86,20 @@ type Props = {
   // can offer "Clear filters" instead of "Create your first order".
   hasFilters: boolean;
   onClearFilters: () => void;
+  // Load failure. Replaces the table only while there is nothing to show —
+  // without it a failed first load fell through to "No orders yet".
+  error?: string | null;
+  onRetry?: () => void;
 };
+
+// What counts as "this row changed" for the realtime flash.
+const orderId = (o: DeliveryOrderListDto) => o.id;
+const orderVersion = (o: DeliveryOrderListDto) =>
+  `${o.orderStatus}|${o.updatedDate ?? ""}`;
 
 export function OrdersTable({
   orders,
+  signature,
   loading,
   selected,
   onSelectionChange,
@@ -97,10 +111,13 @@ export function OrdersTable({
   search,
   hasFilters,
   onClearFilters,
+  error,
+  onRetry,
 }: Props) {
   const allSelected = orders.length > 0 && orders.every((o) => selected.has(o.id));
   const someSelected = orders.some((o) => selected.has(o.id));
   const headerRef = useRef<HTMLInputElement>(null);
+  const flashing = useFlashOnChange(orders, orderId, orderVersion, signature);
   useEffect(() => {
     if (headerRef.current) {
       headerRef.current.indeterminate = !allSelected && someSelected;
@@ -124,6 +141,21 @@ export function OrdersTable({
 
   if (loading && orders.length === 0)
     return <TableSkeleton label="Loading orders…" />;
+  if (error && orders.length === 0)
+    return (
+      <div className="rounded-2xl border border-[var(--color-coral)]/20 bg-[var(--color-coral-soft)]/40 p-6 text-center" role="alert">
+        <p className="text-[13px] font-semibold text-[var(--color-coral)]">Couldn&apos;t load orders · {error}</p>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="mt-3 rounded-lg border border-[var(--color-coral)]/30 px-3 py-1.5 text-[12px] font-medium text-[var(--color-coral)] hover:bg-[var(--color-coral-soft)]/40"
+          >
+            Retry
+          </button>
+        )}
+      </div>
+    );
   if (!loading && orders.length === 0)
     return (
       <OrdersEmptyState
@@ -181,12 +213,12 @@ export function OrdersTable({
             <span className="sr-only">Actions</span>
           </TableTh>
         </DataTableHead>
-        <DataTableBody>
-          <AnimatePresence initial={false}>
+        <DataTableBody signature={signature}>
             {orders.map((o, i) => (
               <DataRow
                 key={o.id}
                 delayIndex={i}
+                flash={flashing.has(o.id)}
                 selected={selected.has(o.id)}
                 onClick={() => onOpenDetail(o.id)}
               >
@@ -266,18 +298,21 @@ export function OrdersTable({
                 </TableTd>
               </DataRow>
             ))}
-          </AnimatePresence>
         </DataTableBody>
       </DataTableShell>
 
       {/* Mobile cards — separate glass card so the table primitives stay
           table-shaped. Same domain content, different layout. */}
-      <div className="md:hidden overflow-hidden rounded-[var(--radius-xl)] glass divide-y divide-[var(--color-ink-100)]/60 dark:divide-white/[0.04]">
-        <AnimatePresence initial={false}>
+      <RowGroup
+        as="div"
+        signature={signature}
+        className="md:hidden overflow-hidden rounded-[var(--radius-xl)] glass divide-y divide-[var(--color-ink-100)]/60 dark:divide-white/[0.04]"
+      >
           {orders.map((o, i) => (
             <MobileCardRow
               key={o.id}
               delayIndex={i}
+              flash={flashing.has(o.id)}
               selected={selected.has(o.id)}
               ariaLabel={`Order ${o.orderRef} — ${o.orderStatus}`}
               onClick={() => onOpenDetail(o.id)}
@@ -315,8 +350,7 @@ export function OrdersTable({
               </div>
             </MobileCardRow>
           ))}
-        </AnimatePresence>
-      </div>
+      </RowGroup>
     </>
   );
 }
@@ -340,7 +374,7 @@ function RowMenu({
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="rounded-md p-1.5 text-[var(--color-ink-500)] opacity-0 transition-all group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--color-ink-100)] hover:text-[var(--color-ink-900)] dark:hover:bg-white/10"
+        className="rounded-md p-1.5 text-[var(--color-ink-500)] opacity-0 transition-[background-color,color,opacity] group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--color-ink-100)] hover:text-[var(--color-ink-900)] dark:hover:bg-white/10"
         aria-label={`Actions for ${order.orderRef}`}
         aria-haspopup="menu"
         aria-expanded={open}

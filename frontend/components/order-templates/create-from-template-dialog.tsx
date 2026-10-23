@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { T, listItem } from "@/lib/motion";
 import { formatRelative } from "@/lib/datetime";
 import {
   createOrderFromTemplate,
@@ -232,7 +233,7 @@ export function CreateFromTemplateDialog({
               {...panelProps}
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.18 } }}
+              exit={{ opacity: 0, scale: 0.96, y: 12, transition: T.exit }}
               transition={{ type: "spring", stiffness: 320, damping: 30 }}
               className="pointer-events-auto glass-strong relative flex w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-xl)] outline-none"
               style={{ maxHeight: "min(90vh, 760px)" }}
@@ -392,7 +393,7 @@ export function CreateFromTemplateDialog({
                       key="result"
                       initial={{ opacity: 0, scale: 0.96 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                      transition={T.base}
                       className="space-y-5"
                     >
                       <SuccessCard result={result} />
@@ -604,7 +605,7 @@ function SuccessCard({ result }: { result: CreateFromTemplateResult }) {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      transition={T.base}
       className="relative overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-[var(--color-success-soft)] to-[var(--color-pastel-mint-tail)] px-5 py-4"
     >
       <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-white/40 blur-2xl" />
@@ -732,7 +733,7 @@ function ResolvedMissionRow({
     <motion.div
       initial={{ opacity: 0, x: 6 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.04, duration: 0.28 }}
+      transition={listItem(index)}
       className="flex items-start gap-2.5 rounded-[var(--radius-sm)] border border-white/70 bg-white/55 px-3 py-2 dark:border-white/[0.06] dark:bg-white/[0.04]"
     >
       <span
@@ -898,7 +899,7 @@ function FooterBtn({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-[12.5px] font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-[12.5px] font-semibold transition-[background-color,border-color,box-shadow,color,opacity] disabled:cursor-not-allowed disabled:opacity-50",
         FOOTER_STYLES[variant],
       )}
     >

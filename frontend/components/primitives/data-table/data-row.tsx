@@ -3,6 +3,8 @@
 import { motion } from "motion/react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { T, stagger } from "@/lib/motion";
+import { useRowEntrance } from "./row-group";
 
 /**
  * Clickable table row with keyboard + a11y baked in.
@@ -13,14 +15,21 @@ import { cn } from "@/lib/utils";
  * accessibility issue across every transactional table. Centralising it
  * here means future tables pick up the fix for free.
  *
- * The `delayIndex` prop drives the staggered fade-in animation (cap at
- * ~0.4s so a 50-row page doesn't take forever to settle).
+ * The `delayIndex` prop drives a short staggered fade-in (capped by
+ * `stagger()`). Inside a RowGroup / `DataTableBody signature=…` it plays
+ * on the table's first load only; after that the group fades as a whole.
+ * No exit animation: rows used to fade out for 0.18s while the new page
+ * faded in, so the table was briefly two pages tall.
+ *
+ * `flash` paints the one-shot `.row-flash` highlight (see
+ * useFlashOnChange) when the row changed under the operator's eyes.
  */
 export function DataRow({
   onClick,
   selected = false,
   disabled = false,
   delayIndex = 0,
+  flash = false,
   className,
   children,
 }: {
@@ -29,10 +38,12 @@ export function DataRow({
   /** Visually dim the row without removing it (e.g. inactive templates). */
   disabled?: boolean;
   delayIndex?: number;
+  flash?: boolean;
   className?: string;
   children: ReactNode;
 }) {
   const interactive = !!onClick;
+  const entrance = useRowEntrance();
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTableRowElement>) => {
     if (!interactive) return;
@@ -53,14 +64,9 @@ export function DataRow({
       // slide out from under an in-flight click (mousedown and mouseup
       // land on different rows → the browser never fires click). Reorders
       // snap instantly instead, keeping rows hit-testable.
-      initial={{ opacity: 0, y: 6 }}
+      initial={entrance ? { opacity: 0, y: 4 } : false}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, transition: { duration: 0.18 } }}
-      transition={{
-        duration: 0.4,
-        delay: Math.min(delayIndex * 0.025, 0.4),
-        ease: [0.22, 1, 0.36, 1],
-      }}
+      transition={{ ...T.fast, delay: stagger(delayIndex) }}
       onClick={interactive ? onClick : undefined}
       onKeyDown={handleKeyDown}
       tabIndex={interactive ? 0 : undefined}
@@ -79,6 +85,7 @@ export function DataRow({
         selected &&
           "bg-[var(--color-pastel-sky)]/40 dark:bg-[var(--color-pastel-sky)]/60",
         disabled && "opacity-70",
+        flash && "row-flash",
         className,
       )}
     >

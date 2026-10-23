@@ -6,6 +6,7 @@ import { ModalLayer } from "@/components/primitives/modal-layer";
 import { useEffect, useState } from "react";
 import { raiseTripException } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
+import { T, spring } from "@/lib/motion";
 
 // Dispatcher-side "flag an exception" on a trip. POSTs to
 // /trips/{id}/exceptions; the trip stays in its current status (an
@@ -91,8 +92,8 @@ export function RaiseExceptionDialog({
               {...panelProps}
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
-              transition={{ type: "spring", stiffness: 360, damping: 30 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12, transition: T.exit }}
+              transition={spring.dialog}
               className="pointer-events-auto relative w-full max-w-md overflow-hidden rounded-[var(--radius-xl)] glass-strong outline-none"
             >
               <header className="flex items-start gap-3 px-6 pt-5">
@@ -184,7 +185,7 @@ export function RaiseExceptionDialog({
                   whileHover={canSubmit ? { y: -1 } : {}}
                   whileTap={canSubmit ? { scale: 0.97 } : {}}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all",
+                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-[background-color,border-color,box-shadow,color,opacity]",
                     canSubmit
                       ? "bg-[var(--color-amber)] text-white hover:shadow-[0_14px_36px_-12px_rgba(217,119,6,0.55)]"
                       : "bg-[var(--color-ink-100)] text-[var(--color-ink-400)] cursor-not-allowed dark:bg-white/[0.04]",

@@ -2,6 +2,7 @@
 
 import type { ReactNode, ThHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
+import { RowGroup } from "./row-group";
 
 // Density baked into the shell so every consumer sees the same row
 // rhythm. Picked from the orders-table baseline that the audit flagged
@@ -61,7 +62,20 @@ export function DataTableHead({ children }: { children: ReactNode }) {
   );
 }
 
-export function DataTableBody({ children }: { children: ReactNode }) {
+/**
+ * `signature` (optional) — the page/sort/filter key of the rows shown.
+ * When given, the body becomes a RowGroup: rows animate in on first load
+ * only, and a query change fades the body instead of every row.
+ */
+export function DataTableBody({
+  children,
+  signature,
+}: {
+  children: ReactNode;
+  signature?: string;
+}) {
+  if (signature !== undefined)
+    return <RowGroup signature={signature}>{children}</RowGroup>;
   return <tbody>{children}</tbody>;
 }
 

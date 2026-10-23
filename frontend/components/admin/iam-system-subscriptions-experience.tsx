@@ -3,6 +3,8 @@
 import { AlertCircle, ArrowLeft, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useConfirm } from "@/components/primitives/confirm-dialog";
+import { useToast } from "@/components/primitives/toast";
 import {
   createSubscription,
   deleteSubscription,
@@ -20,6 +22,8 @@ import { cn } from "@/lib/utils";
 // of psql.
 
 export function IamSystemSubscriptionsExperience({ systemKey }: { systemKey: string }) {
+  const { confirm, confirmDialog } = useConfirm();
+  const toast = useToast();
   const [items, setItems] = useState<SubscriptionDto[]>([]);
   const [eventTypes, setEventTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,11 +75,20 @@ export function IamSystemSubscriptionsExperience({ systemKey }: { systemKey: str
   };
 
   const onDelete = async (eventType: string) => {
-    if (!confirm(`Delete subscription for "${eventType}"? Past callbacks already in the outbox will still dispatch; new events stop fanning out to this system.`)) return;
+    if (
+      !(await confirm({
+        title: `Delete subscription for "${eventType}"?`,
+        body: "Callbacks already in the outbox will still dispatch; new events stop fanning out to this system.",
+        confirmLabel: "Delete subscription",
+        tone: "danger",
+      }))
+    )
+      return;
     markBusy(eventType);
     try {
       await deleteSubscription(systemKey, eventType);
       await load();
+      toast.push({ tone: "success", message: `Subscription "${eventType}" deleted.` });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -89,6 +102,7 @@ export function IamSystemSubscriptionsExperience({ systemKey }: { systemKey: str
 
   return (
     <div className="space-y-6">
+      {confirmDialog}
       <header className="space-y-2">
         <Link
           href={`/admin/systems/${encodeURIComponent(systemKey)}`}

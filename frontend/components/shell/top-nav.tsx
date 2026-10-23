@@ -8,6 +8,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { Avatar } from "@/components/primitives/avatar";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { useShell } from "@/components/shell/shell-context";
+import { T } from "@/lib/motion";
 import { useDismissableLayer } from "@/lib/overlay/use-layer";
 
 export function TopNav() {
@@ -22,9 +23,10 @@ export function TopNav() {
 
   return (
     <motion.header
-      initial={{ opacity: 0, y: -12 }}
+      // Persistent shell — plays once per full load, not per navigation.
+      initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+      transition={T.base}
       className="fixed top-4 inset-x-4 z-40 mx-auto max-w-[1440px]"
     >
       <motion.div

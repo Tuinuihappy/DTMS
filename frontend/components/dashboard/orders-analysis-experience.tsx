@@ -9,6 +9,7 @@ import { OrderStatusChart } from "./order-status-chart";
 import { getOrderFunnel } from "@/lib/api/dashboard";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
 import { useDashboardSubscription } from "@/lib/realtime/hubs/dashboard-hub";
+import { stagger, T } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 // Phase P3.2 — Order analysis subpage. Drills the OrderFunnelHourly
@@ -118,7 +119,7 @@ export function OrdersAnalysisExperience() {
             variant="default"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.05 + i * 0.05 }}
+            transition={{ ...T.slow, delay: stagger(i, 0.03) }}
             className="p-4"
           >
             <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--color-ink-500)]">

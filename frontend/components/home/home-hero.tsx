@@ -6,9 +6,11 @@ import Link from "next/link";
 
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { DateTime } from "@/components/primitives/date-time";
+import { useFirstVisit } from "@/components/dashboard/use-first-visit";
+import { ease as easing } from "@/lib/motion";
 import { HeroLiveMap } from "./hero-live-map";
 
-const ease = [0.22, 1, 0.36, 1] as const;
+const ease = easing.out;
 
 /* -------------------------------------------------------------------------- */
 /* HomeHero — the operator's premium hero on /home.                            */
@@ -18,15 +20,17 @@ const ease = [0.22, 1, 0.36, 1] as const;
 /* -------------------------------------------------------------------------- */
 export function HomeHero({ firstName }: { firstName: string }) {
   const greeting = useGreeting();
+  // Entrance plays on the first /home visit of the session only.
+  const first = useFirstVisit("home");
   return (
     <section className="relative">
       <div className="grid grid-cols-1 items-center gap-10 md:grid-cols-12 md:gap-10 lg:gap-12">
         {/* Copy column */}
         <div className="md:col-span-6 lg:col-span-5">
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={first ? { opacity: 0, y: 10 } : false}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, ease }}
+            transition={{ duration: 0.4, ease }}
             className="inline-flex items-center gap-2 rounded-full border border-[var(--color-ink-100)] bg-white/60 px-3 py-1.5 text-[11.5px] font-medium text-[var(--color-ink-600)] backdrop-blur dark:bg-white/[0.05]"
           >
             <StatusPulse tone="success" />
@@ -36,9 +40,9 @@ export function HomeHero({ firstName }: { firstName: string }) {
           </motion.div>
 
           <motion.h1
-            initial={{ opacity: 0, y: 14 }}
+            initial={first ? { opacity: 0, y: 12 } : false}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.65, delay: 0.05, ease }}
+            transition={{ duration: 0.4, delay: 0.04, ease }}
             className="mt-5 font-display text-[2.4rem] leading-[1.04] tracking-[-0.035em] font-semibold text-[var(--color-ink-900)] sm:text-[2.75rem] md:text-[3.1rem] lg:text-[3.6rem]"
           >
             {greeting},{" "}
@@ -49,9 +53,9 @@ export function HomeHero({ firstName }: { firstName: string }) {
               <span className="relative z-[1]">live.</span>
               {/* Animated highlight bar that grows in on mount */}
               <motion.span
-                initial={{ scaleX: 0 }}
+                initial={first ? { scaleX: 0 } : false}
                 animate={{ scaleX: 1 }}
-                transition={{ duration: 0.7, delay: 0.6, ease }}
+                transition={{ duration: 0.4, delay: 0.25, ease }}
                 style={{ transformOrigin: "left" }}
                 className="absolute -bottom-1 left-0 right-0 h-[0.45em] rounded-full bg-[var(--color-amber)] opacity-70 z-0"
                 aria-hidden
@@ -60,9 +64,9 @@ export function HomeHero({ firstName }: { firstName: string }) {
           </motion.h1>
 
           <motion.p
-            initial={{ opacity: 0, y: 14 }}
+            initial={first ? { opacity: 0, y: 12 } : false}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.65, delay: 0.12, ease }}
+            transition={{ duration: 0.4, delay: 0.08, ease }}
             className="mt-5 max-w-md text-[15px] leading-relaxed text-[var(--color-ink-500)] md:text-[16px]"
           >
             Every station, every robot, every order — streaming straight from
@@ -71,9 +75,9 @@ export function HomeHero({ firstName }: { firstName: string }) {
           </motion.p>
 
           <motion.div
-            initial={{ opacity: 0, y: 14 }}
+            initial={first ? { opacity: 0, y: 12 } : false}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.65, delay: 0.2, ease }}
+            transition={{ duration: 0.4, delay: 0.12, ease }}
             className="mt-7 flex flex-wrap items-center gap-3"
           >
             <Link
@@ -97,9 +101,9 @@ export function HomeHero({ firstName }: { firstName: string }) {
           {/* Tiny inline trust strip — gives the hero a little texture without
               shouting numbers at the user (FleetPulseStrip below does that). */}
           <motion.div
-            initial={{ opacity: 0 }}
+            initial={first ? { opacity: 0 } : false}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
             className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] font-mono tracking-tight text-[var(--color-ink-400)]"
           >
             <span className="inline-flex items-center gap-1.5">
@@ -117,9 +121,9 @@ export function HomeHero({ firstName }: { firstName: string }) {
 
         {/* Live map column */}
         <motion.div
-          initial={{ opacity: 0, y: 14 }}
+          initial={first ? { opacity: 0, y: 12 } : false}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.1, ease }}
+          transition={{ duration: 0.4, delay: 0.06, ease }}
           className="md:col-span-6 lg:col-span-7"
         >
           <HeroLiveMap />

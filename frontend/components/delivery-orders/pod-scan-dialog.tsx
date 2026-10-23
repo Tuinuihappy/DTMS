@@ -306,7 +306,7 @@ export function PodScanDialog({
                   type="submit"
                   disabled={!canSubmit}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.06em] transition-all",
+                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.06em] transition-[background-color,border-color,box-shadow,color,opacity]",
                     canSubmit
                       ? "bg-[var(--color-success)] text-white hover:shadow-[0_14px_36px_-12px_rgba(16,185,129,0.5)]"
                       : "cursor-not-allowed bg-[var(--color-ink-100)] text-[var(--color-ink-400)] dark:bg-white/[0.04]",
@@ -334,7 +334,7 @@ function MethodTab({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] transition-all",
+        "inline-flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] transition-[background-color,border-color,box-shadow,color,opacity]",
         active
           ? "bg-[var(--color-brand-500)] text-white"
           : "text-[var(--color-ink-500)] hover:bg-[var(--color-ink-100)] dark:hover:bg-white/[0.04]",

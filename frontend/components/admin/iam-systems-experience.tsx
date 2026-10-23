@@ -16,6 +16,8 @@ import {
 } from "@/lib/api/iam-systems";
 import { OneTimeSecretBanner } from "@/components/admin/one-time-secret-banner";
 import { ModalLayer } from "@/components/primitives/modal-layer";
+import { ConfirmPoints, useConfirm } from "@/components/primitives/confirm-dialog";
+import { useToast } from "@/components/primitives/toast";
 import { cn } from "@/lib/utils";
 
 // Phase S.6 — federated source-system admin (SystemClient list + CRUD).
@@ -24,6 +26,8 @@ import { cn } from "@/lib/utils";
 // onboarding ritual. Detail page lives at /admin/systems/[key].
 
 export function IamSystemsExperience() {
+  const { confirm, confirmDialog } = useConfirm();
+  const toast = useToast();
   const [items, setItems] = useState<SystemSummaryDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,11 +86,20 @@ export function IamSystemsExperience() {
   };
 
   const handleDeactivate = async (key: string) => {
-    if (!confirm(`Deactivate system "${key}"? Inbound auth will start returning 401.`)) return;
+    if (
+      !(await confirm({
+        title: `Deactivate "${key}"?`,
+        body: "Inbound auth for this system will start returning 401 until it is activated again.",
+        confirmLabel: "Deactivate",
+        tone: "danger",
+      }))
+    )
+      return;
     markBusy(key);
     try {
       await deactivateSystem(key);
       await load();
+      toast.push({ tone: "success", message: `"${key}" deactivated.` });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -95,20 +108,31 @@ export function IamSystemsExperience() {
   };
 
   const handleDelete = async (key: string) => {
-    if (!confirm(
-      `Hard delete system "${key}"?\n\n` +
-      `• Removes the SystemClient row + cascades to its credential, ` +
-      `permissions, and subscriptions.\n` +
-      `• Historical orders, outbox entries, and audit log references ` +
-      `survive — they carry the key as a string, not a foreign key.\n` +
-      `• The key value becomes available for re-onboarding under a ` +
-      `fresh identity if you ever recreate it.\n\n` +
-      `Only do this for retired systems / test cleanup.`,
-    )) return;
+    if (
+      !(await confirm({
+        title: `Hard delete "${key}"?`,
+        body: (
+          <>
+            <ConfirmPoints
+              points={[
+                "Removes the SystemClient row and cascades to its credential, permissions and subscriptions.",
+                "Historical orders, outbox entries and audit references survive — they carry the key as a string, not a foreign key.",
+                "The key becomes available for re-onboarding under a fresh identity.",
+              ]}
+            />
+            <p className="mt-2 font-semibold">Only for retired systems / test cleanup.</p>
+          </>
+        ),
+        confirmLabel: "Delete permanently",
+        tone: "danger",
+      }))
+    )
+      return;
     markBusy(key);
     try {
       await deleteSystem(key);
       await load();
+      toast.push({ tone: "success", message: `"${key}" deleted.` });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -121,12 +145,21 @@ export function IamSystemsExperience() {
       setError(`A freshly issued key for "${secret.key}" is still visible — copy it before rotating any system again.`);
       return;
     }
-    if (!confirm(
-      `Rotate the API key for "${key}"?\n\n` +
-      `• The current key stops working the moment you click OK.\n` +
-      `• A NEW key will be shown ONCE in a banner — copy it then test it.\n` +
-      `• Do NOT rotate again until you have copied + verified the new key.`,
-    )) return;
+    if (!(await confirm({
+      title: "Rotate API key?",
+      body: (
+        <ConfirmPoints
+          intro={<>Rotate the API key for <b>{key}</b>.</>}
+          points={[
+            "The current key stops working the moment you confirm.",
+            "A NEW key is shown ONCE in a banner — copy it, then test it.",
+            "Do NOT rotate again until you have copied and verified the new key.",
+          ]}
+        />
+      ),
+      confirmLabel: "Rotate key",
+      tone: "danger",
+    }))) return;
     markBusy(key);
     try {
       const res: RotateCredentialResponse = await rotateCredential(key);
@@ -145,6 +178,7 @@ export function IamSystemsExperience() {
 
   return (
     <div className="space-y-6">
+      {confirmDialog}
       <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-[1.7rem] font-semibold text-[var(--color-ink-900)]">Source systems</h1>

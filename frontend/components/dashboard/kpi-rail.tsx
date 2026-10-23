@@ -9,7 +9,9 @@ import { DataFreshnessChip } from "@/components/projection/data-freshness-chip";
 import { getOrderFunnel, type OrderFunnelTotals } from "@/lib/api/dashboard";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
 import { useDashboardSubscription } from "@/lib/realtime/hubs/dashboard-hub";
+import { stagger, T } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { useFirstVisit } from "./use-first-visit";
 
 // Phase P3 — Real data from deliveryorder.OrderFunnelHourly. Each tile
 // pulls a slice of the totals returned for the trailing 24 hours.
@@ -50,6 +52,7 @@ export function KpiRail() {
     [],
   );
   const { data, error, refresh } = useProjectionPoll(fetcher, { intervalMs: 15_000 });
+  const first = useFirstVisit("dashboard");
 
   // Phase P3.x — KPI rail reads the same OrderFunnel projection as
   // /dashboard/orders, so it subscribes to the same "orders" board. The
@@ -105,9 +108,9 @@ export function KpiRail() {
           key={k.label}
           variant="default"
           interactive
-          initial={{ opacity: 0, y: 18 }}
+          initial={first ? { opacity: 0, y: 12 } : false}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.2 + i * 0.06, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ ...T.slow, delay: 0.04 + stagger(i, 0.03) }}
           className="p-5"
         >
           <div className="flex items-start justify-between gap-3">

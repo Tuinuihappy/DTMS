@@ -6,7 +6,9 @@ import { useState } from "react";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { NumberTicker } from "@/components/primitives/number-ticker";
 import { peakDayIndex, weekActivity } from "@/lib/mock-data";
+import { dur, ease, stagger, T } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { useFirstVisit } from "./use-first-visit";
 
 const periods = ["Day", "Week", "Month"] as const;
 
@@ -16,14 +18,16 @@ export function LiveActivityCard() {
 
   const max = Math.max(...weekActivity.map((d) => d.shipments));
   const peak = weekActivity[active];
+  // Entrance plays on the first dashboard visit of the session only.
+  const first = useFirstVisit("dashboard");
 
   return (
     <GlassCard
       variant="strong"
       className="p-6 md:p-7 lg:p-8 col-span-12 lg:col-span-8"
-      initial={{ opacity: 0, y: 24 }}
+      initial={first ? { opacity: 0, y: 16 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+      transition={T.slow}
     >
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -78,29 +82,29 @@ export function LiveActivityCard() {
               onClick={() => setActive(i)}
               className="relative group flex flex-col items-center justify-end cursor-pointer"
             >
-              {/* Stem */}
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: stemHeight, opacity: 1 }}
-                transition={{
-                  duration: 0.9,
-                  delay: 0.4 + i * 0.06,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-                className="relative mb-10 w-px"
-                style={{
-                  background: isActive
-                    ? "linear-gradient(180deg, var(--color-brand-900), rgba(14,21,48,0.05))"
-                    : "linear-gradient(180deg, var(--color-ink-200), rgba(124,137,166,0.05))",
-                }}
-              >
-                {/* Dot at top */}
+              {/* Stem — fixed-height box; the line inside grows with
+                  scaleY from the baseline (transform, not height, so the
+                  chart doesn't re-lay-out every frame). The dot is a
+                  sibling so the scale doesn't squash it. */}
+              <div className="relative mb-10 w-px" style={{ height: stemHeight }}>
                 <motion.div
-                  initial={{ scale: 0, opacity: 0 }}
+                  initial={first ? { scaleY: 0, opacity: 0 } : false}
+                  animate={{ scaleY: 1, opacity: 1 }}
+                  transition={{ duration: dur.slow, delay: stagger(i, 0.03), ease: ease.out }}
+                  className="absolute inset-0 origin-bottom"
+                  style={{
+                    background: isActive
+                      ? "linear-gradient(180deg, var(--color-brand-900), rgba(14,21,48,0.05))"
+                      : "linear-gradient(180deg, var(--color-ink-200), rgba(124,137,166,0.05))",
+                  }}
+                />
+                {/* Dot at top — pops as its stem lands. */}
+                <motion.div
+                  initial={first ? { scale: 0, opacity: 0 } : false}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{
-                    duration: 0.5,
-                    delay: 0.95 + i * 0.06,
+                    duration: dur.base,
+                    delay: 0.2 + stagger(i, 0.03),
                     ease: [0.34, 1.56, 0.64, 1],
                   }}
                   className={cn(
@@ -110,7 +114,7 @@ export function LiveActivityCard() {
                       : "bg-white border-2 border-[var(--color-ink-300)] group-hover:border-[var(--color-brand-500)]",
                   )}
                 />
-              </motion.div>
+              </div>
 
               {/* Tooltip on active */}
               <AnimatePresence>
@@ -121,7 +125,7 @@ export function LiveActivityCard() {
                     initial={{ opacity: 0, y: 6, scale: 0.94 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 6, scale: 0.94 }}
-                    transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                    transition={T.base}
                     className="absolute z-10 rounded-2xl bg-[var(--color-brand-900)] text-white px-3 py-2 shadow-[0_10px_30px_-10px_rgba(14,21,48,0.6)]"
                     style={{ bottom: stemHeight + 22 }}
                   >

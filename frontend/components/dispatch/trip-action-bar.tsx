@@ -4,6 +4,7 @@ import { AlertTriangle, ChevronsRight, Pause, Play, Repeat2, X } from "lucide-re
 import { useState } from "react";
 import { cancelTrip, pauseTrip, resumeTrip, retryTrip, type TripStatus } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/primitives/button";
 import { PassRobotDialog } from "./pass-robot-dialog";
 import { RaiseExceptionDialog } from "./raise-exception-dialog";
 import { TripConfirmDialog } from "./trip-confirm-dialog";
@@ -232,22 +233,24 @@ function ActionButton({
   onClick: () => void;
   title?: string;
 }) {
+  // Spinner takes the icon's slot (spinning the action's own icon read
+  // as decoration, not "working"); the label stays, so no width jump.
   return (
-    <button
-      type="button"
+    <Button
       onClick={onClick}
       disabled={disabled}
+      pending={busy}
       title={title}
+      icon={<Icon className="h-3.5 w-3.5" strokeWidth={2.4} />}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.06em] transition-all duration-200",
-        disabled
+        "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.06em] duration-200",
+        disabled && !busy
           ? "cursor-not-allowed bg-[var(--color-ink-100)] text-[var(--color-ink-400)] dark:bg-white/[0.04]"
           : TONE_CLS[tone],
-        busy && "opacity-60",
+        busy && "opacity-70",
       )}
     >
-      <Icon className={cn("h-3.5 w-3.5", busy && "animate-spin")} strokeWidth={2.4} />
       {label}
-    </button>
+    </Button>
   );
 }

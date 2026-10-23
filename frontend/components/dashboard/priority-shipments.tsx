@@ -6,7 +6,9 @@ import { AvatarStack } from "@/components/primitives/avatar";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { SectionLabel } from "@/components/primitives/section-label";
 import { priorityShipments, type PriorityShipment } from "@/lib/mock-data";
+import { ease, stagger, T } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { useFirstVisit } from "./use-first-visit";
 
 const tierStyles: Record<PriorityShipment["tier"], { card: string; ink: string; chip: string; bar: string; route: string }> = {
   sky: {
@@ -33,19 +35,24 @@ const tierStyles: Record<PriorityShipment["tier"], { card: string; ink: string; 
 };
 
 export function PriorityShipments() {
+  const first = useFirstVisit("dashboard");
   return (
     <div className="col-span-12 mt-2">
       <SectionLabel
         title="Priority dispatches"
         subtitle="Three shipments need supervisor approval before their window closes today."
         action={
-          <a
-            href="#"
-            className="inline-flex items-center gap-1 rounded-full border border-[var(--color-ink-100)] bg-white/70 px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-ink-700)] backdrop-blur transition-colors hover:bg-white dark:bg-white/[0.06] dark:hover:bg-white/[0.12]"
+          // No priority list page exists yet — inert rather than href="#",
+          // which jumped the dashboard to the top.
+          <button
+            type="button"
+            disabled
+            title="The full priority list isn't available yet"
+            className="inline-flex items-center gap-1 rounded-full border border-[var(--color-ink-100)] bg-white/70 px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-ink-700)] backdrop-blur disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/[0.06]"
           >
             See all 14
             <ChevronRight className="h-3.5 w-3.5" strokeWidth={2.4} />
-          </a>
+          </button>
         }
         className="mb-5"
       />
@@ -58,13 +65,9 @@ export function PriorityShipments() {
               key={s.id}
               variant={t.card as "pastel-sky"}
               interactive
-              initial={{ opacity: 0, y: 24 }}
+              initial={first ? { opacity: 0, y: 12 } : false}
               animate={{ opacity: 1, y: 0 }}
-              transition={{
-                duration: 0.55,
-                delay: 0.5 + i * 0.08,
-                ease: [0.22, 1, 0.36, 1],
-              }}
+              transition={{ ...T.slow, delay: 0.18 + stagger(i, 0.04) }}
               className="p-6 min-h-[260px] flex flex-col"
             >
               {/* Top badge */}
@@ -115,15 +118,14 @@ export function PriorityShipments() {
               {/* Progress */}
               <div className="mt-4">
                 <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-white/50 dark:bg-white/[0.08]">
+                  {/* Static width, animated scaleX from the left edge —
+                      transform instead of re-laying-out width each frame. */}
                   <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${pct}%` }}
-                    transition={{
-                      duration: 1.1,
-                      delay: 0.85 + i * 0.08,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
-                    className={cn("h-full rounded-full", t.bar)}
+                    initial={first ? { scaleX: 0 } : false}
+                    animate={{ scaleX: 1 }}
+                    transition={{ duration: 0.4, delay: 0.25 + stagger(i, 0.04), ease: ease.out }}
+                    className={cn("h-full origin-left rounded-full", t.bar)}
+                    style={{ width: `${pct}%` }}
                   />
                 </div>
                 <div className={cn("mt-2 flex justify-between font-mono text-[10.5px] opacity-80", t.ink)}>

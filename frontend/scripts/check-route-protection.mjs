@@ -50,17 +50,28 @@ if (!existsSync(APP_DIR) || !statSync(APP_DIR).isDirectory()) {
 const prefixes = matcherPrefixes();
 const unguarded = [];
 
-for (const entry of readdirSync(APP_DIR, { withFileTypes: true })) {
-  if (!entry.isDirectory()) continue;
-  const name = entry.name;
-  // `api` authenticates per-route and must return 401 rather than redirect.
-  // Private folders (_x), route groups ((x)), slots (@x) and dynamic
-  // segments ([x]) are not addressable top-level prefixes.
-  if (name === "api" || /^[_(@[]/.test(name)) continue;
-  if (!hasPage(join(APP_DIR, name))) continue;
-  if (prefixes.has(name) || PUBLIC_TOP_LEVEL.has(name)) continue;
-  unguarded.push(name);
+// Route groups ((x)) add nothing to the URL, so their children ARE
+// top-level prefixes — scan inside them. The signed-in pages all live in
+// app/(app)/ (the shared shell layout); skipping groups would make this
+// guard blind to every one of them.
+function scan(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const name = entry.name;
+    if (name.startsWith("(")) {
+      scan(join(dir, name));
+      continue;
+    }
+    // `api` authenticates per-route and must return 401 rather than redirect.
+    // Private folders (_x), slots (@x) and dynamic segments ([x]) are not
+    // addressable top-level prefixes.
+    if (name === "api" || /^[_@[]/.test(name)) continue;
+    if (!hasPage(join(dir, name))) continue;
+    if (prefixes.has(name) || PUBLIC_TOP_LEVEL.has(name)) continue;
+    unguarded.push(name);
+  }
 }
+scan(APP_DIR);
 
 if (unguarded.length > 0) {
   console.error(

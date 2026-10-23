@@ -1,5 +1,8 @@
 "use client";
 
+import { useId } from "react";
+import { motion } from "motion/react";
+import { spring } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 export type ReportWindow = "24h" | "7d" | "30d" | "90d";
@@ -36,23 +39,43 @@ export function WindowToggle({
   onChange: (w: ReportWindow) => void;
 }) {
   const options: ReportWindow[] = ["24h", "7d", "30d", "90d"];
+  // Unique per instance so two toggles on one page never share a pill.
+  const pillId = useId();
   return (
-    <div className="inline-flex rounded-full bg-[var(--color-surface-soft)] p-1 dark:bg-white/[0.04]">
-      {options.map((opt) => (
-        <button
-          key={opt}
-          type="button"
-          onClick={() => onChange(opt)}
-          className={cn(
-            "rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] transition-colors",
-            value === opt
-              ? "bg-[var(--color-brand-900)] text-white dark:bg-[var(--color-brand-500)] dark:text-[var(--color-ink-50)]"
-              : "text-[var(--color-ink-500)] hover:text-[var(--color-ink-900)]",
-          )}
-        >
-          {opt}
-        </button>
-      ))}
+    <div
+      role="group"
+      aria-label="Report window"
+      className="inline-flex rounded-full bg-[var(--color-surface-soft)] p-1 dark:bg-white/[0.04]"
+    >
+      {options.map((opt) => {
+        const active = value === opt;
+        return (
+          <button
+            key={opt}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(opt)}
+            className={cn(
+              "relative rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] transition-colors",
+              active
+                ? "text-white dark:text-[var(--color-ink-50)]"
+                : "text-[var(--color-ink-500)] hover:text-[var(--color-ink-900)]",
+            )}
+          >
+            {/* The active fill slides between options rather than blinking
+                from one to the next. */}
+            {active && (
+              <motion.span
+                layoutId={pillId}
+                aria-hidden
+                className="absolute inset-0 rounded-full bg-[var(--color-brand-900)] dark:bg-[var(--color-brand-500)]"
+                transition={spring.snappy}
+              />
+            )}
+            <span className="relative">{opt}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -20,6 +20,7 @@ import {
   type TripMissionDto,
 } from "@/lib/api/trips";
 import { cn } from "@/lib/utils";
+import { T, spring } from "@/lib/motion";
 import { StatusTimelineSection } from "@/components/projection/status-timeline-section";
 import type { StatusHistoryEntry } from "@/lib/api/status-history";
 import { getTripStatusHistory } from "@/lib/api/status-history";
@@ -121,25 +122,36 @@ export function TripDetailDrawer({
       }),
   });
 
+  // Which trip `data` belongs to. A refetch for the same trip (the
+  // "Include raw" toggle) keeps the drawer on screen; only a different
+  // trip goes back to the skeleton.
+  const loadedTripRef = useRef<string | null>(null);
+
   useEffect(() => {
     // Reset live pushes whenever the drawer switches to a different
     // trip — otherwise events from the previous trip would leak into
-    // the new one. Reset on every effect run (not just tripId === null)
-    // so reopening the same trip after a close also starts clean.
+    // the new one. Keyed on tripId only: toggling "Include raw" used to
+    // run this too and wiped the live mission events it is meant to keep.
+    // Reopening the same trip goes through tripId === null, so it also
+    // starts clean.
     setLiveMissionEvents([]);
     setLiveTimelineEntry(null);
-    if (!tripId) {
-      setData(null);
-      setError(null);
-      return;
-    }
+    setData(null);
+    setError(null);
+    loadedTripRef.current = null;
+  }, [tripId]);
+
+  useEffect(() => {
+    if (!tripId) return;
     let cancelled = false;
-    setLoading(true);
+    if (loadedTripRef.current !== tripId) setLoading(true);
     setError(null);
 
     getTripDetails(tripId, { includeRaw })
       .then((d) => {
-        if (!cancelled) setData(d);
+        if (cancelled) return;
+        loadedTripRef.current = tripId;
+        setData(d);
       })
       .catch((e: Error) => {
         if (!cancelled) setError(e.message);
@@ -164,7 +176,7 @@ export function TripDetailDrawer({
         open={!!tripId}
         onClose={onClose}
         initialFocus="panel"
-        backdropClassName="bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
+        backdropClassName="bg-[var(--color-ink-900)]/40"
       >
         {({ panelProps, titleId, panelStyle }) =>
           tripId && (
@@ -175,7 +187,7 @@ export function TripDetailDrawer({
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 340, damping: 38 }}
+            transition={spring.drawer}
             className={cn(
               "fixed right-0 top-0 flex h-full w-full flex-col overflow-hidden outline-none",
               "sm:w-[min(640px,100vw)]",
@@ -189,7 +201,7 @@ export function TripDetailDrawer({
                   Trip
                 </div>
                 {loading && !data ? (
-                  <div className="mt-2 h-7 w-40 animate-pulse rounded-md bg-[var(--color-ink-100)]" />
+                  <div className="mt-2 h-7 w-40 skeleton-pulse rounded-md bg-[var(--color-ink-100)]" />
                 ) : (
                   <h2 id={titleId} className="mt-1 font-mono text-[1.3rem] font-semibold text-[var(--color-ink-900)] truncate">
                     {data?.vendorOrderKey ?? data?.upperKey?.slice(0, 18) ?? tripId.slice(0, 8)}
@@ -229,7 +241,7 @@ export function TripDetailDrawer({
                   {Array.from({ length: 5 }).map((_, i) => (
                     <div
                       key={i}
-                      className="h-14 animate-pulse rounded-xl bg-[var(--color-ink-100)] dark:bg-white/[0.05]"
+                      className="h-14 skeleton-pulse rounded-xl bg-[var(--color-ink-100)] dark:bg-white/[0.05]"
                     />
                   ))}
                 </div>
@@ -253,9 +265,9 @@ export function TripDetailDrawer({
                 const failingMissions = getFailingMissions(mergedMissions);
                 return (
                 <motion.div
-                  initial={{ opacity: 0, y: 8 }}
+                  initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4 }}
+                  transition={T.fast}
                   className="space-y-6"
                 >
                   {data.failureReason && (

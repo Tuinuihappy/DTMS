@@ -5,10 +5,12 @@ import { motion } from "motion/react";
 import type { ReactNode } from "react";
 
 import { StatusPulse } from "@/components/primitives/status-pulse";
+import { useFirstVisit } from "@/components/dashboard/use-first-visit";
+import { ease as easing, stagger } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { HeroLiveMap } from "./hero-live-map";
 
-const ease = [0.22, 1, 0.36, 1] as const;
+const ease = easing.out;
 
 type Tone = "brand" | "success" | "amber" | "ink";
 
@@ -107,11 +109,12 @@ export function HomeOverview() {
 /* label, large value, sparkline along the bottom.                            */
 /* -------------------------------------------------------------------------- */
 function KpiCard({ tile, index }: { tile: Tile; index: number }) {
+  const first = useFirstVisit("home");
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={first ? { opacity: 0, y: 10 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.1 + index * 0.06, ease }}
+      transition={{ duration: 0.4, delay: 0.08 + stagger(index, 0.04), ease }}
       className="relative flex flex-col justify-between rounded-[var(--radius-xl)] glass-strong glass-edge p-4 sm:p-5 overflow-hidden min-h-[140px]"
     >
       {/* Top row: icon chip + trend / live badge */}

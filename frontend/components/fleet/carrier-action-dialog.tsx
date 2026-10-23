@@ -256,7 +256,7 @@ export function CarrierActionDialog({
                   whileHover={canConfirm && !busy ? { y: -1 } : {}}
                   whileTap={canConfirm && !busy ? { scale: 0.97 } : {}}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all",
+                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-[background-color,box-shadow,color,opacity]",
                     !canConfirm || busy
                       ? "cursor-not-allowed bg-[var(--color-ink-100)] text-[var(--color-ink-400)] dark:bg-white/[0.04]"
                       : spec.tone === "danger"

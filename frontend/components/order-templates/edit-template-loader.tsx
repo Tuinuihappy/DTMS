@@ -1,7 +1,6 @@
 "use client";
 
 import { AlertTriangle, ArrowLeft } from "lucide-react";
-import { motion } from "motion/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getOrderTemplate, type OrderTemplateDto } from "@/lib/api/order-templates";
@@ -33,17 +32,11 @@ export function EditTemplateLoader({ id }: { id: string }) {
   if (loading) {
     return (
       <div className="space-y-5">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0.4, 0.7, 0.4] }}
-          transition={{ duration: 1.4, repeat: Infinity }}
-          className="h-16 rounded-[var(--radius-xl)] bg-[var(--color-ink-100)] dark:bg-white/[0.04]"
+        <div
+          className="skeleton-pulse h-16 rounded-[var(--radius-xl)] bg-[var(--color-ink-100)] dark:bg-white/[0.04]"
         />
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0.4, 0.7, 0.4] }}
-          transition={{ duration: 1.4, repeat: Infinity, delay: 0.1 }}
-          className="h-72 rounded-[var(--radius-xl)] bg-[var(--color-ink-100)] dark:bg-white/[0.04]"
+        <div
+          className="skeleton-pulse h-72 rounded-[var(--radius-xl)] bg-[var(--color-ink-100)] dark:bg-white/[0.04]"
         />
       </div>
     );

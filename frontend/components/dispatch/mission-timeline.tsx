@@ -1,7 +1,9 @@
 "use client";
 
 import { ArrowRight, CircleAlert, MapPin, Zap } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
+import { T } from "@/lib/motion";
 import type { TripMissionDto } from "@/lib/api/trips";
 import { resolveRiot3ErrorAction } from "@/lib/vendor/riot3-error-codes";
 import {
@@ -55,14 +57,20 @@ export function MissionTimeline({
         aria-hidden
         className="absolute left-[7px] top-2 bottom-2 w-px bg-[var(--color-ink-100)] dark:bg-white/10"
       />
-      {sorted.map((m, idx) => (
-        <MissionRow
-          key={`${m.missionKey}-${m.state}-${idx}`}
-          mission={m}
-          seq={idx + 1}
-          actionNames={actionNames}
-        />
-      ))}
+      {/* Keyed by (missionKey, state) — the same pair the drawer dedups
+          on — not by position: an index in the key remounted every row
+          below a live insert. initial={false}: rows present when the
+          drawer opens just appear; only ones pushed live fade in. */}
+      <AnimatePresence initial={false}>
+        {sorted.map((m, idx) => (
+          <MissionRow
+            key={`${m.missionKey}|${m.state}`}
+            mission={m}
+            seq={idx + 1}
+            actionNames={actionNames}
+          />
+        ))}
+      </AnimatePresence>
     </ol>
   );
 }
@@ -87,7 +95,12 @@ function MissionRow({
   const resolvedActionName = actCode ? actionNames.get(actCode) : undefined;
 
   return (
-    <li className="relative">
+    <motion.li
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={T.base}
+      className="relative"
+    >
       {/* dot on the rail */}
       <span
         aria-hidden
@@ -190,6 +203,6 @@ function MissionRow({
           )}
         </div>
       </div>
-    </li>
+    </motion.li>
   );
 }

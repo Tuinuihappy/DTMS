@@ -1,9 +1,10 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { ModalLayer } from "@/components/primitives/modal-layer";
 import {
   AlertTriangle,
+  Check,
   FileStack,
   Layers,
   Plus,
@@ -21,7 +22,10 @@ import { GlassCard } from "@/components/primitives/glass-card";
 import { NumberTicker } from "@/components/primitives/number-ticker";
 import { SectionLabel } from "@/components/primitives/section-label";
 import { StatusPulse } from "@/components/primitives/status-pulse";
+import { useToast } from "@/components/primitives/toast";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/primitives/button";
+import { T, spring, stagger } from "@/lib/motion";
 import { Pagination, type PageSize } from "@/components/delivery-orders/pagination";
 import {
   activateOrderTemplate,
@@ -89,15 +93,20 @@ export function OrderTemplatesExperience() {
   const [selected, setSelected] = useState<OrderTemplateDto | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<OrderTemplateDto | null>(null);
+  // Brief "Deleted" tick in the confirm dialog before it closes.
+  const [deleteDone, setDeleteDone] = useState(false);
+  // page|sort|filter key of the rows currently in `records`.
+  const [dataSig, setDataSig] = useState("");
   const [dispatching, setDispatching] = useState<OrderTemplateDto | null>(null);
 
-  const [toast, setToast] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flash = useCallback((kind: "ok" | "err", msg: string) => {
-    setToast({ kind, msg });
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 3200);
-  }, []);
+  // App-wide toast (app/providers.tsx) — survives navigation, stacks,
+  // and is announced to screen readers; this used to be a local pill.
+  const toast = useToast();
+  const flash = useCallback(
+    (kind: "ok" | "err", msg: string) =>
+      toast.push({ tone: kind === "ok" ? "success" : "error", message: msg }),
+    [toast],
+  );
 
   useEffect(() => {
     setPage(1);
@@ -120,6 +129,9 @@ export function OrderTemplatesExperience() {
         const result = await listOrderTemplates(params, signal);
         setRecords(result.records ?? []);
         setTotal(result.total ?? 0);
+        // Recorded with the rows so the table fades on a query change,
+        // not on a refresh after an edit.
+        setDataSig([page, pageSize, debouncedSearch, sortBy, sortDir, statusFilter].join("|"));
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
         setError((e as Error).message || "Failed to load templates.");
@@ -204,7 +216,10 @@ export function OrderTemplatesExperience() {
     setBusyId(t.id);
     try {
       await deleteOrderTemplate(t.id);
-      await refresh();
+      setDeleteDone(true);
+      // The tick needs ~350ms on screen; overlap it with the refetch
+      // rather than adding it on top.
+      await Promise.all([refresh(), new Promise((r) => setTimeout(r, 350))]);
       setSelected((cur) => (cur?.id === t.id ? null : cur));
       flash("ok", `Deleted "${t.name}".`);
     } catch (e) {
@@ -212,6 +227,7 @@ export function OrderTemplatesExperience() {
     } finally {
       setBusyId(null);
       setConfirmDelete(null);
+      setDeleteDone(false);
     }
   }
 
@@ -224,7 +240,7 @@ export function OrderTemplatesExperience() {
         action={
           <Link
             href="/delivery-orders/order-templates/new"
-            className="group inline-flex items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-4 py-2 text-[12.5px] font-semibold text-white shadow-[0_6px_22px_-8px_rgba(15,23,42,0.55)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_28px_-8px_rgba(15,23,42,0.65)] dark:bg-[var(--color-brand-500)]"
+            className="group inline-flex items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-4 py-2 text-[12.5px] font-semibold text-white shadow-[0_6px_22px_-8px_rgba(15,23,42,0.55)] transition-[translate,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_8px_28px_-8px_rgba(15,23,42,0.65)] dark:bg-[var(--color-brand-500)]"
           >
             <Plus className="h-3.5 w-3.5 transition-transform group-hover:rotate-90" strokeWidth={2.4} />
             New template
@@ -239,7 +255,7 @@ export function OrderTemplatesExperience() {
           label="Total templates"
           value={kpi.total}
           tone="brand"
-          delay={0}
+          delay={stagger(0)}
           loading={stats === null}
         />
         <KpiTile
@@ -247,7 +263,7 @@ export function OrderTemplatesExperience() {
           label="Active"
           value={kpi.active}
           tone="success"
-          delay={0.05}
+          delay={stagger(1)}
           loading={stats === null}
           live={kpi.active > 0 && stats !== null}
         />
@@ -257,7 +273,7 @@ export function OrderTemplatesExperience() {
           value={kpi.avgMissions}
           decimals={1}
           tone="lavender"
-          delay={0.1}
+          delay={stagger(2)}
           loading={stats === null}
         />
         <KpiTile
@@ -265,14 +281,15 @@ export function OrderTemplatesExperience() {
           label="Vehicle-bound"
           value={kpi.withVehicleBinding}
           tone="peach"
-          delay={0.15}
+          delay={stagger(3)}
           loading={stats === null}
         />
       </div>
 
       {/* Filter bar */}
-      <motion.div
-        layout
+      {/* No `layout`: it re-measured this blurred bar on every render
+          and tweened it whenever the error banner below appeared. */}
+      <div
         className="glass flex flex-wrap items-center gap-2 rounded-[var(--radius)] px-3 py-2"
       >
         <div className="relative flex-1 min-w-[180px]">
@@ -305,7 +322,7 @@ export function OrderTemplatesExperience() {
                 type="button"
                 onClick={() => setStatusFilter(opt)}
                 className={cn(
-                  "cursor-pointer rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] transition-all",
+                  "cursor-pointer rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] transition-[background-color,box-shadow,color]",
                   active
                     ? "bg-[var(--color-brand-900)] text-white shadow-[0_2px_6px_-2px_rgba(15,23,42,0.35)] dark:bg-[var(--color-brand-500)]"
                     : "text-[var(--color-ink-600)] hover:text-[var(--color-ink-900)]",
@@ -329,13 +346,14 @@ export function OrderTemplatesExperience() {
           />
           Refresh
         </button>
-      </motion.div>
+      </div>
 
       {/* Error */}
       {error && (
         <motion.div
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={T.fast}
           className="flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-coral)]/30 bg-[var(--color-coral)]/10 px-3 py-2 text-[12.5px] text-[var(--color-coral)]"
         >
           <AlertTriangle className="h-4 w-4" strokeWidth={2.2} />
@@ -347,6 +365,7 @@ export function OrderTemplatesExperience() {
       <div className="space-y-0">
         <OrderTemplatesTable
           templates={records}
+          signature={dataSig}
           loading={loading}
           busyId={busyId}
           sortBy={sortBy}
@@ -364,9 +383,9 @@ export function OrderTemplatesExperience() {
         />
         {!loading && totalCount > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.15 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={T.fast}
             className="mt-2 rounded-[var(--radius-xl)] glass"
           >
             <Pagination
@@ -408,30 +427,11 @@ export function OrderTemplatesExperience() {
       <ConfirmDeleteDialog
         template={confirmDelete}
         busy={busyId === confirmDelete?.id}
+        done={deleteDone}
         onCancel={() => setConfirmDelete(null)}
         onConfirm={(t) => handleDelete(t)}
       />
 
-      {/* Toast */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            key="toast"
-            initial={{ opacity: 0, y: 24, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.96, transition: { duration: 0.14 } }}
-            transition={{ type: "spring", stiffness: 340, damping: 28 }}
-            className={cn(
-              "pointer-events-none fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full px-5 py-2.5 text-[12.5px] font-semibold shadow-[0_10px_30px_-10px_rgba(15,23,42,0.45)]",
-              toast.kind === "ok"
-                ? "bg-[var(--color-ink-900)] text-white dark:bg-[var(--color-brand-500)]"
-                : "bg-[var(--color-coral)] text-white",
-            )}
-          >
-            {toast.msg}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -462,7 +462,7 @@ function KpiTile({
       variant="default"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, delay: 0.08 + delay, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ ...T.base, delay }}
       className="p-4 sm:p-5"
     >
       <div className="flex items-start justify-between gap-3">
@@ -487,12 +487,7 @@ function KpiTile({
         </div>
         <div className="mt-1 flex items-baseline gap-1 font-mono text-[1.55rem] sm:text-[1.65rem] font-semibold leading-none text-[var(--color-ink-900)]">
           {loading ? (
-            <motion.span
-              initial={{ opacity: 0.3 }}
-              animate={{ opacity: [0.3, 0.7, 0.3] }}
-              transition={{ duration: 1.4, repeat: Infinity }}
-              className="inline-block h-7 w-12 rounded-md bg-[var(--color-ink-100)] dark:bg-white/10"
-            />
+            <span className="skeleton-pulse inline-block h-7 w-12 rounded-md bg-[var(--color-ink-100)] dark:bg-white/10" />
           ) : (
             <NumberTicker value={value} decimals={decimals} />
           )}
@@ -507,11 +502,13 @@ function KpiTile({
 function ConfirmDeleteDialog({
   template,
   busy,
+  done,
   onCancel,
   onConfirm,
 }: {
   template: OrderTemplateDto | null;
   busy: boolean;
+  done: boolean;
   onCancel: () => void;
   onConfirm: (t: OrderTemplateDto) => void;
 }) {
@@ -538,8 +535,8 @@ function ConfirmDeleteDialog({
               {...panelProps}
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
-              transition={{ type: "spring", stiffness: 360, damping: 30 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12, transition: T.exit }}
+              transition={spring.dialog}
               className="pointer-events-auto glass-strong relative w-full max-w-sm overflow-hidden rounded-[var(--radius-xl)] p-6 outline-none"
             >
               <div className="flex items-start gap-3">
@@ -567,15 +564,26 @@ function ConfirmDeleteDialog({
                 >
                   Cancel
                 </button>
-                <motion.button
-                  type="button"
-                  whileTap={{ scale: 0.96 }}
+                <Button
                   onClick={() => onConfirm(template)}
+                  pending={busy && !done}
                   disabled={busy}
-                  className="cursor-pointer rounded-full bg-[var(--color-coral)] px-5 py-2 text-[12.5px] font-semibold text-white shadow-[0_6px_20px_-8px_rgba(244,79,79,0.5)] disabled:opacity-50"
+                  className={cn(
+                    "inline-flex cursor-pointer items-center gap-1.5 rounded-full px-5 py-2 text-[12.5px] font-semibold text-white shadow-[0_6px_20px_-8px_rgba(244,79,79,0.5)]",
+                    done
+                      ? "bg-[var(--color-success)]"
+                      : "bg-[var(--color-coral)] disabled:opacity-50",
+                  )}
                 >
-                  {busy ? "Deleting…" : "Delete"}
-                </motion.button>
+                  {done ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" strokeWidth={2.6} />
+                      Deleted
+                    </>
+                  ) : (
+                    "Delete"
+                  )}
+                </Button>
               </div>
             </motion.div>
           </div>

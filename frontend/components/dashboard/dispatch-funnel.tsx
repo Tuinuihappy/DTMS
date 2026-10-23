@@ -9,7 +9,9 @@ import { DataFreshnessChip } from "@/components/projection/data-freshness-chip";
 import { getOrderFunnel } from "@/lib/api/dashboard";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
 import { useDashboardSubscription } from "@/lib/realtime/hubs/dashboard-hub";
+import { ease, T } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { useFirstVisit } from "./use-first-visit";
 
 // Phase P3 — Real data from deliveryorder.OrderFunnelHourly via the
 // /api/dashboard/order-funnel endpoint. Replaces the previous mock
@@ -87,14 +89,19 @@ export function DispatchFunnel() {
     ? ((stages[3].count / stages[0].count) * 100).toFixed(1) + "%"
     : "—";
   const lostCount = stages[4].count;
+  const first = useFirstVisit("dashboard");
+  // Data already cached when the card mounted (return visit): show it
+  // still. Data arriving after mount: grow the columns once.
+  const hadDataAtMount = useRef(data != null).current;
+  const growColumns = data ? first || !hadDataAtMount : first;
 
   return (
     <GlassCard
       variant="default"
       className="col-span-12 md:col-span-6 lg:col-span-5 p-6"
-      initial={{ opacity: 0, y: 18 }}
+      initial={first ? { opacity: 0, y: 12 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, delay: 0.7, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ ...T.slow, delay: 0.08 }}
     >
       <SectionLabel
         title="Dispatch funnel"
@@ -140,27 +147,28 @@ export function DispatchFunnel() {
           return (
             <div key={f.label} className="flex flex-col items-center justify-end gap-3">
               <div className="relative w-full h-full flex flex-col justify-end items-center">
-                <div className="flex flex-col items-center gap-[3px] w-full">
+                {/* One scaleY per column over static ticks — up to 130
+                    separately animated spans before. Keyed on whether real
+                    data is in, so the column grows once when the first
+                    fetch lands rather than jumping from the empty state;
+                    later polls change the tick count in place. */}
+                <motion.div
+                  key={data ? "data" : "empty"}
+                  initial={growColumns ? { scaleY: 0, opacity: 0 } : false}
+                  animate={{ scaleY: 1, opacity: 1 }}
+                  transition={{ duration: 0.4, delay: 0.1 + i * 0.04, ease: ease.out }}
+                  className="flex flex-col items-center gap-[3px] w-full origin-bottom"
+                >
                   {Array.from({ length: ticks }).map((_, t) => (
-                    <motion.span
+                    <span
                       key={t}
-                      initial={{ scaleX: 0, opacity: 0 }}
-                      animate={{ scaleX: 1, opacity: 1 }}
-                      transition={{
-                        duration: 0.3,
-                        delay: 0.1 + i * 0.05 + t * 0.012,
-                        ease: [0.22, 1, 0.36, 1],
-                      }}
-                      className={cn(
-                        "h-[3px] w-full rounded-full origin-bottom",
-                        toneClass[f.tone],
-                      )}
+                      className={cn("h-[3px] w-full rounded-full", toneClass[f.tone])}
                       style={{
                         opacity: 0.25 + (t / ticks) * 0.75,
                       }}
                     />
                   ))}
-                </div>
+                </motion.div>
               </div>
 
               <div className="text-center pt-2 border-t border-[var(--color-ink-100)] w-full">

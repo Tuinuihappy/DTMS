@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { Suspense } from "react";
+import { useMediaQuery } from "@/lib/hooks/use-media-query";
+import { ease as easing, T } from "@/lib/motion";
 import { AuthPanel } from "./auth-panel";
 import { BrandScene } from "./brand-scene";
 
@@ -20,35 +22,34 @@ import { BrandScene } from "./brand-scene";
 /* takes the rest. Animations gracefully scale.                                */
 /* -------------------------------------------------------------------------- */
 
-const ease = [0.22, 1, 0.36, 1] as const;
+const ease = easing.out;
 
 export function LoginExperience() {
+  // One form, one layout that reflows. It used to render AuthPanel twice
+  // (desktop + mobile, one hidden by CSS): two username/password inputs
+  // for password managers to pick from, and the desktop BrandScene's
+  // endless loops ticking on phones where nobody could see them.
+  const desktop = useMediaQuery("(min-width: 1024px)");
   return (
     <main className="layer-content relative min-h-svh w-full overflow-x-clip">
       <PageAtmosphere />
       <TopBar />
 
-      {/* DESKTOP — side-by-side ─────────────────────────────────────────── */}
-      <div className="hidden lg:grid relative z-10 min-h-svh grid-cols-[1.05fr_1fr] xl:grid-cols-[1.15fr_1fr]">
-        <div className="relative">
-          <BrandScene />
-        </div>
-        <div className="relative grid place-items-center px-8 py-16 xl:px-12">
-          <Suspense fallback={null}>
-            <AuthPanel />
-          </Suspense>
-        </div>
-      </div>
-
-      {/* MOBILE / TABLET — stacked ──────────────────────────────────────── */}
-      <div className="lg:hidden relative z-10 flex min-h-svh flex-col">
-        {/* Compact brand band — hides the constellation orbit (which needs
-            wide canvas) but keeps the eyebrow + heading + trust footnote. */}
-        <div className="relative pt-20">
-          <CompactBrand />
-        </div>
-        {/* Form */}
-        <div className="relative flex-1 px-5 pb-12 pt-6 sm:px-8">
+      <div className="relative z-10 flex min-h-svh flex-col lg:grid lg:grid-cols-[1.05fr_1fr] xl:grid-cols-[1.15fr_1fr]">
+        {desktop ? (
+          <div className="relative lg:col-start-1 lg:row-start-1">
+            <BrandScene />
+          </div>
+        ) : (
+          // Compact brand band — no constellation orbit (needs a wide
+          // canvas) but keeps the eyebrow + heading + trust footnote.
+          <div className="relative pt-20 lg:hidden">
+            <CompactBrand />
+          </div>
+        )}
+        {/* Pinned to column 2 so the form doesn't start in column 1 and
+            jump right when BrandScene mounts after hydration. */}
+        <div className="relative flex-1 px-5 pb-12 pt-6 sm:px-8 lg:col-start-2 lg:row-start-1 lg:grid lg:place-items-center lg:px-8 lg:py-16 xl:px-12">
           <div className="mx-auto w-full max-w-[440px]">
             <Suspense fallback={null}>
               <AuthPanel />
@@ -106,7 +107,7 @@ function TopBar() {
     <motion.div
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, delay: 0.15, ease }}
+      transition={T.base}
       className="absolute left-5 top-5 z-20 sm:left-7 sm:top-7"
     >
       <Link
@@ -134,7 +135,7 @@ function CompactBrand() {
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.55, delay: 0.2, ease }}
+        transition={{ duration: 0.4, delay: 0.05, ease }}
         className="inline-flex items-center gap-2 rounded-full border border-[var(--color-ink-100)] bg-white/65 px-3 py-1.5 text-[11px] font-medium text-[var(--color-ink-600)] backdrop-blur dark:border-white/[0.06] dark:bg-white/[0.05]"
       >
         <span className="relative flex h-1.5 w-1.5">
@@ -148,9 +149,11 @@ function CompactBrand() {
         {WORDS.map((w, i) => (
           <motion.span
             key={w}
-            initial={{ opacity: 0, y: 14, filter: "blur(8px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ duration: 0.7, delay: 0.3 + i * 0.12, ease }}
+            // Opacity + y only — animating filter: blur() on display text
+            // repaints every glyph each frame.
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.1 + i * 0.07, ease }}
             className="inline-block mr-2"
           >
             {w}

@@ -1,15 +1,23 @@
 "use client";
 
 import { ArrowUpRight, Sparkles } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, useInView, useReducedMotion } from "motion/react";
 import Link from "next/link";
+import { useRef } from "react";
+import { ease as easing } from "@/lib/motion";
 
-const ease = [0.22, 1, 0.36, 1] as const;
+const ease = easing.out;
 
 export function CtaBanner() {
+  // The shard's drift only runs while the banner is on screen.
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref);
+  const reduced = useReducedMotion();
+  const live = inView && !reduced;
   return (
     <section id="pricing" className="mx-auto max-w-[1240px] px-4 pt-24 sm:px-6 md:pt-32">
       <motion.div
+        ref={ref}
         initial={{ opacity: 0, y: 22 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-15%" }}
@@ -21,8 +29,8 @@ export function CtaBanner() {
 
         {/* Floating iridescent shard accent */}
         <motion.div
-          animate={{ y: [0, -10, 0], rotate: [0, 8, 0] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          animate={live ? { y: [0, -10, 0], rotate: [0, 8, 0] } : { y: 0, rotate: 0 }}
+          transition={live ? { duration: 8, repeat: Infinity, ease: "easeInOut" } : { duration: 0 }}
           className="absolute -top-8 -right-8 h-48 w-48 rounded-full opacity-70"
           style={{
             background:

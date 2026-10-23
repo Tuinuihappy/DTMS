@@ -1,7 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
+import { T, listItem, spring, stagger } from "@/lib/motion";
 import {
   Activity,
   AlertTriangle,
@@ -41,6 +51,7 @@ import { SectionLabel } from "@/components/primitives/section-label";
 import { StatusPulse } from "@/components/primitives/status-pulse";
 import { DateTime } from "@/components/primitives/date-time";
 import { useDismissableLayer } from "@/lib/overlay/use-layer";
+import { useToast } from "@/components/primitives/toast";
 import { cn } from "@/lib/utils";
 import {
   clearStationOverride,
@@ -172,7 +183,12 @@ function rotateDelta(dxPx: number, dyPx: number, rotation: number) {
 
 // un-rotated SVG pixel position → screen position (forward rotation, for
 // HTML overlays that mirror a world-space anchor, e.g. the robot tooltip)
-function svgToScreen(svgX: number, svgY: number, rect: DOMRect, rotation: number) {
+function svgToScreen(
+  svgX: number,
+  svgY: number,
+  rect: { width: number; height: number },
+  rotation: number,
+) {
   if (rotation === 0) return { x: svgX, y: svgY };
   const cx = rect.width / 2;
   const cy = rect.height / 2;
@@ -188,6 +204,41 @@ function typeKey(raw: string | undefined | null): TypeKey {
   const t = (raw ?? "NORMAL").toString().toUpperCase();
   return (TYPE_KEYS as string[]).includes(t) ? (t as TypeKey) : "NORMAL";
 }
+
+/* -------------------------------------------------------------------------- */
+/* World extents — raw (unpadded) min/max of a point set.                     */
+/* -------------------------------------------------------------------------- */
+type Extent = { minX: number; minY: number; maxX: number; maxY: number };
+
+function growExtent(e: Extent | null, x: number, y: number): Extent {
+  if (!e) return { minX: x, minY: y, maxX: x, maxY: y };
+  return {
+    minX: Math.min(e.minX, x),
+    minY: Math.min(e.minY, y),
+    maxX: Math.max(e.maxX, x),
+    maxY: Math.max(e.maxY, y),
+  };
+}
+
+function unionExtent(a: Extent | null, b: Extent | null): Extent | null {
+  if (!a) return b;
+  if (!b) return a;
+  return growExtent(growExtent(a, b.minX, b.minY), b.maxX, b.maxY);
+}
+
+function sameExtent(a: Extent | null, b: Extent | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.minX === b.minX && a.minY === b.minY && a.maxX === b.maxX && a.maxY === b.maxY;
+}
+
+/* Station marker sizes in screen px — tuned for "small enough to inspect   */
+/* 1 m aisle spacing, big enough to click". Converted to world units via    */
+/* worldPerPx at render so they stay constant on screen at any zoom.        */
+const DOT_PX = 5;
+const RING_PX = 11;
+const HALO_PX = 22;
+const STROKE_PX = 1.2;
 
 /* -------------------------------------------------------------------------- */
 /* Time-ago — last-sync stamp without a heavy date lib.                       */
@@ -225,10 +276,15 @@ export function MapsExperience() {
   const [syncing, setSyncing] = useState(false);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [lastSync, setLastSync] = useState<Date | null>(null);
-  const [toast, setToast] = useState<{
-    kind: "ok" | "err";
-    msg: string;
-  } | null>(null);
+  // App-wide toast (app/providers.tsx). Same call shape as the local
+  // toast this replaced; the identity is stable, so the callbacks below
+  // that call it don't list it.
+  const toastApi = useToast();
+  const setToast = useCallback(
+    (t: { kind: "ok" | "err"; msg: string }) =>
+      toastApi.push({ tone: t.kind === "ok" ? "success" : "error", message: t.msg }),
+    [toastApi],
+  );
   // In-place edit drawer state. Driven by canvas clicks + table double-clicks.
   const [editingStationId, setEditingStationId] = useState<string | null>(null);
   const [editBusy, setEditBusy] = useState(false);
@@ -278,13 +334,6 @@ export function MapsExperience() {
     if (selectedMapId) void refreshStations(selectedMapId);
   }, [selectedMapId, refreshStations]);
 
-  // Auto-dismiss toast after 4s.
-  useEffect(() => {
-    if (!toast) return;
-    const t = window.setTimeout(() => setToast(null), 4000);
-    return () => window.clearTimeout(t);
-  }, [toast]);
-
   // Sync cooldown countdown — ticks once per second until it hits zero.
   // Set by onSync after every attempt (success or failure) to throttle
   // rage-clicks against the external RIOT3 vendor.
@@ -318,20 +367,24 @@ export function MapsExperience() {
       if (!selectedMapId) return;
       setEditBusy(true);
       try {
+        let msg: string;
         if (op.kind === "update") {
           await updateStation(station.id, { type: op.type, code: op.code });
-          setToast({ kind: "ok", msg: `Saved ${station.name}` });
+          msg = `Saved ${station.name}`;
         } else if (op.kind === "force-offline") {
           await forceStationOffline(station.id, {
             reason: op.reason,
             durationMinutes: op.durationMinutes,
           });
-          setToast({ kind: "ok", msg: `${station.name} force-offline for ${op.durationMinutes}m` });
+          msg = `${station.name} force-offline for ${op.durationMinutes}m`;
         } else {
           await clearStationOverride(station.id);
-          setToast({ kind: "ok", msg: `${station.name} restored` });
+          msg = `${station.name} restored`;
         }
+        // Toast after the refresh — it used to say "Saved" while the
+        // canvas still showed the old station.
         await refreshStations(selectedMapId);
+        setToast({ kind: "ok", msg });
       } catch (err) {
         setToast({
           kind: "err",
@@ -413,7 +466,6 @@ export function MapsExperience() {
         onSubmit={handleEditSubmit}
       />
 
-      <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }
@@ -437,9 +489,9 @@ function HeaderStrip({
   const cooling = cooldownRemaining > 0;
   return (
     <motion.div
-      initial={{ opacity: 0, y: -10 }}
+      initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+      transition={T.base}
       className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"
     >
       <SectionLabel
@@ -549,13 +601,9 @@ function KpiStrip({
       {tiles.map((t, i) => (
         <motion.div
           key={t.label}
-          initial={{ opacity: 0, y: 14 }}
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{
-            duration: 0.5,
-            delay: 0.08 + i * 0.06,
-            ease: [0.22, 1, 0.36, 1],
-          }}
+          transition={{ ...T.base, delay: stagger(i, 0.04) }}
         >
           <GlassCard variant={t.variant} className="p-4 md:p-5 h-full">
             <div className="flex items-start justify-between gap-2">
@@ -580,9 +628,9 @@ function KpiStrip({
         </motion.div>
       ))}
       <motion.div
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.36, ease: [0.22, 1, 0.36, 1] }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ ...T.base, delay: stagger(4, 0.04) }}
         className="col-span-2 md:col-span-4"
       >
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-mono tracking-tight text-[var(--color-ink-500)]">
@@ -634,9 +682,9 @@ function MapSelectorRail({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+      transition={T.base}
       className="-mx-1 flex gap-2 overflow-x-auto pb-1 pl-1 pr-1"
       role="tablist"
       aria-label="Maps"
@@ -652,14 +700,12 @@ function MapSelectorRail({
             onClick={() => onSelect(m.id)}
             initial={{ opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{
-              duration: 0.4,
-              delay: 0.14 + i * 0.06,
-              ease: [0.22, 1, 0.36, 1],
-            }}
+            transition={listItem(i)}
             whileHover={{ y: -1 }}
             className={cn(
-              "group relative flex shrink-0 items-center gap-3 rounded-[18px] px-4 py-2.5 text-left transition-all duration-200 cursor-pointer",
+              // Not transition-all: whileHover owns transform, and a CSS
+              // transition on it would fight Motion's per-frame writes.
+              "group relative flex shrink-0 items-center gap-3 rounded-[18px] px-4 py-2.5 text-left transition-[background-color,box-shadow,color,opacity] duration-200 cursor-pointer",
               "border",
               active
                 ? "bg-white text-[var(--color-ink-900)] border-transparent shadow-[inset_0_1px_0_rgba(255,255,255,1),0_18px_36px_-14px_rgba(14,21,48,0.25)] dark:bg-[var(--color-surface-soft)]"
@@ -670,7 +716,7 @@ function MapSelectorRail({
               <motion.span
                 layoutId="map-selector-active"
                 className="absolute -inset-px rounded-[18px] ring-2 ring-[var(--color-brand-200)] dark:ring-[var(--color-brand-500)]/30 pointer-events-none"
-                transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                transition={spring.snappy}
               />
             )}
             <span
@@ -729,7 +775,6 @@ export function CanvasCard({
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [pinned, setPinned] = useState<string | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
-  const [hoverRobotId, setHoverRobotId] = useState<string | null>(null);
   // True browser fullscreen via the Fullscreen API — covers browser chrome
   // (tabs, address bar) too, not just an in-page overlay. The card ref is
   // the element we request fullscreen on; `fullscreenchange` is the source
@@ -764,7 +809,14 @@ export function CanvasCard({
   // Container ref — the wrapper div that holds the SVG. The container is
   // NEVER rotated, so its getBoundingClientRect() is the stable rectangle we
   // do all px↔world math against (the SVG's own rect is the rotated bbox).
-  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  // Also mirrored into state: LiveRobots portals its HTML overlays (tooltip,
+  // live chip) into it, and needs a render once it exists.
+  const canvasContainerRef = useRef<HTMLDivElement | null>(null);
+  const [canvasEl, setCanvasEl] = useState<HTMLDivElement | null>(null);
+  const attachCanvas = useCallback((el: HTMLDivElement | null) => {
+    canvasContainerRef.current = el;
+    setCanvasEl(el);
+  }, []);
   // Operation-instructions popup. Click outside or press ESC to dismiss.
   // The wrapper ref is the trigger button + popup pair so we can ignore
   // clicks that originated inside either of them.
@@ -785,22 +837,24 @@ export function CanvasCard({
     };
   }, [showInstructions]);
 
-  // Live robot positions for this map. The hook handles polling,
-  // visibility-change pausing, and abort on map switch / unmount.
-  const { positions: robots, lastTickMs } = useRobotPositions(map?.id ?? null);
-  // Force a re-render every 30 s so the "X s ago" indicator stays current
-  // even when no robots arrive (e.g. RIOT3 is reachable but empty).
-  const [, forceTick] = useState(0);
-  useEffect(() => {
-    const t = window.setInterval(() => forceTick((n) => (n + 1) % 1_000), 30_000);
-    return () => window.clearInterval(t);
+  // Live robots are NOT polled here: the 1 s poll lives in <LiveRobots>, so
+  // a tick re-renders only the robot layer, never the stations / grid /
+  // chrome of this card. The one thing the card needs from robots is their
+  // extent, and LiveRobots reports that only when a robot is outside the
+  // station cluster (see onRobotExtent) — so a normal tick costs zero
+  // renders here.
+  const [robotExtent, setRobotExtent] = useState<Extent | null>(null);
+  const onRobotExtent = useCallback((next: Extent | null) => {
+    setRobotExtent((prev) => (sameExtent(prev, next) ? prev : next));
   }, []);
-  // Measured SVG width in CSS pixels — drives the world-unit ↔ screen-px
+  // Measured SVG size in CSS pixels — width drives the world-unit ↔ screen-px
   // conversion so dot/halo/stroke sizes stay constant on screen no matter
   // how big the world coordinate range is. Without this, a 72 m × 69 m map
   // turns every dot into a 600 mm blob that hides 1–2 m aisle spacing.
+  // Height (with width) places the robot tooltip without measuring the DOM.
   const svgRef = useRef<SVGSVGElement>(null);
-  const [svgWidth, setSvgWidth] = useState(800);
+  const [svgSize, setSvgSize] = useState({ w: 800, h: 600 });
+  const svgWidth = svgSize.w;
   useEffect(() => {
     if (!svgRef.current) return;
     const el = svgRef.current;
@@ -809,7 +863,10 @@ export function CanvasCard({
       // would return the rotated bbox (larger when rotation isn't a multiple
       // of 90°) and skew the px↔world ratio that drives dot sizing.
       const w = el.clientWidth;
-      if (w > 0) setSvgWidth(w);
+      const h = el.clientHeight;
+      if (w > 0 && h > 0) {
+        setSvgSize((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
+      }
     };
     update();
     const ro = new ResizeObserver(update);
@@ -817,24 +874,25 @@ export function CanvasCard({
     return () => ro.disconnect();
   }, []);
 
-  // Compute the world bounds across BOTH stations and live robots so a robot
-  // driving outside the station cluster doesn't disappear off-canvas. 8%
-  // padding so points never sit on the frame edge.
+  const stationExtent = useMemo(() => {
+    let ext: Extent | null = null;
+    for (const s of stations) ext = growExtent(ext, s.x, s.y);
+    return ext;
+  }, [stations]);
+
+  // World bounds across BOTH stations and live robots so a robot driving
+  // outside the station cluster doesn't disappear off-canvas. 8% padding so
+  // points never sit on the frame edge.
+  const mapW = map?.width;
+  const mapH = map?.height;
   const bounds = useMemo(() => {
-    const points: { x: number; y: number }[] = [];
-    for (const s of stations) points.push({ x: s.x, y: s.y });
-    for (const r of robots) points.push({ x: r.x, y: r.y });
-    if (points.length === 0) {
-      const W = map?.width ?? 1000;
-      const H = map?.height ?? 700;
+    const ext = unionExtent(stationExtent, robotExtent);
+    if (!ext) {
+      const W = mapW ?? 1000;
+      const H = mapH ?? 700;
       return { minX: 0, minY: 0, maxX: W, maxY: H };
     }
-    const xs = points.map((p) => p.x);
-    const ys = points.map((p) => p.y);
-    let minX = Math.min(...xs);
-    let maxX = Math.max(...xs);
-    let minY = Math.min(...ys);
-    let maxY = Math.max(...ys);
+    let { minX, maxX, minY, maxY } = ext;
     const padX = Math.max((maxX - minX) * 0.08, 200);
     const padY = Math.max((maxY - minY) * 0.08, 200);
     minX -= padX;
@@ -842,7 +900,7 @@ export function CanvasCard({
     minY -= padY;
     maxY += padY;
     return { minX, minY, maxX, maxY };
-  }, [stations, robots, map]);
+  }, [stationExtent, robotExtent, mapW, mapH]);
 
   const viewW = bounds.maxX - bounds.minX;
   const viewH = bounds.maxY - bounds.minY;
@@ -1130,25 +1188,43 @@ export function CanvasCard({
     [recenter],
   );
 
-  const active = pinned ?? hoverId;
-  const activeStation = stations.find((s) => s.id === active) ?? null;
+  // The full detail card is for the PINNED station only. Hover gets a light
+  // in-canvas label (StationFocus): sweeping the pointer across a dense
+  // aisle used to remount the card per dot, which read as flicker.
+  const pinnedStation = stations.find((s) => s.id === pinned) ?? null;
+  const focusStation = stations.find((s) => s.id === (pinned ?? hoverId)) ?? null;
+  const hoverStation =
+    hoverId && hoverId !== pinned ? (stations.find((s) => s.id === hoverId) ?? null) : null;
+
+  // Stable handlers for the memoised station layer — new closures per
+  // render would defeat the memo.
+  const onStationEnter = useCallback((id: string) => setHoverId(id), []);
+  const onStationLeave = useCallback(
+    (id: string) => setHoverId((cur) => (cur === id ? null : cur)),
+    [],
+  );
+  const onStationToggle = useCallback(
+    (id: string) => setPinned((cur) => (cur === id ? null : id)),
+    [],
+  );
+
+  // Stations play their entrance once per map — the first time its stations
+  // arrive — not on every refetch or revisit. Read during render (it only
+  // picks `initial` for dots that are mounting right now); marked after.
+  const seenMapsRef = useRef(new Set<string>());
+  const animateStationsIn = !!map?.id && !seenMapsRef.current.has(map.id);
+  useEffect(() => {
+    if (map?.id && stations.length > 0) seenMapsRef.current.add(map.id);
+  }, [map?.id, stations.length]);
 
   // World units per screen pixel. Stays valid even if pxPerWorld is small
   // (large maps) — `r` in world space then maps back to a constant on-screen
   // size, so adjacent stations never overlap when their real spacing > a few
   // pixels apart. Driven off the current viewport so zoom recomputes radii.
+  // Pan keeps view.w, so it keeps worldPerPx — the station layer's memo
+  // holds through a pan.
   const pxPerWorld = svgWidth > 0 ? svgWidth / view.w : 1;
   const worldPerPx = 1 / pxPerWorld;
-  // Tuned for "small enough to inspect 1 m aisle spacing, big enough to click".
-  const DOT_PX = 5;
-  const RING_PX = 11;
-  const HALO_PX = 22;
-  const STROKE_PX = 1.2;
-  const r = DOT_PX * worldPerPx;
-  const ringR = RING_PX * worldPerPx;
-  const haloR = HALO_PX * worldPerPx;
-  const sw = STROKE_PX * worldPerPx;
-  const sw2 = 1.5 * worldPerPx;
   // Zoom feedback signals — used by LOD label visibility and could drive
   // any future zoom-tiered overlays (footprints, labels, etc).
   //   labelOpacity: hidden at fit-all, fades in 2×→4× so dense clusters
@@ -1213,7 +1289,7 @@ export function CanvasCard({
           stays centered — wider screens just get letterboxed margins, never
           a stretched cartography. */}
       <div
-        ref={canvasContainerRef}
+        ref={attachCanvas}
         className={cn(
           "relative",
           isFullscreen
@@ -1320,165 +1396,31 @@ export function CanvasCard({
               return lines;
             })()}
           </g>
-          {/* Stations — pulse for active, dim for inactive, ring for offline override.
-              r/ringR/haloR/sw are world-unit values computed from the measured
-              screen-px target so dot size stays constant regardless of map extent. */}
-          {stations.map((s, i) => {
-            const k = typeKey(s.type);
-            const meta = TYPE_META[k];
-            const isActiveDot = s.id === active;
-            return (
-              <motion.g
-                key={s.id}
-                initial={{ opacity: 0, scale: 0.4 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{
-                  duration: 0.5,
-                  delay: 0.2 + Math.min(i, 60) * 0.018,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-                style={{ transformOrigin: `${s.x}px ${s.y}px` }}
-                onMouseEnter={() => setHoverId(s.id)}
-                onMouseLeave={() => setHoverId((id) => (id === s.id ? null : id))}
-                onClick={(e) => {
-                  // Ignore the click if the user just finished a pan gesture.
-                  if (dragMoved.current) return;
-                  e.stopPropagation();
-                  setPinned((id) => (id === s.id ? null : s.id));
-                }}
-                className="cursor-pointer"
-              >
-                {/* Soft halo — only on active dots, kept subtle so dense
-                    aisles don't blur into a single blob. */}
-                {s.isActive && (
-                  <circle
-                    cx={s.x}
-                    cy={s.y}
-                    r={haloR}
-                    fill={`url(#station-glow-${k})`}
-                    opacity={0.55}
-                  />
-                )}
-
-                {/* Breathing ring on active */}
-                {s.isActive && (
-                  <motion.circle
-                    cx={s.x}
-                    cy={s.y}
-                    r={ringR}
-                    fill="none"
-                    stroke={meta.swatch}
-                    strokeOpacity={0.35}
-                    strokeWidth={sw2}
-                    initial={{ opacity: 0.55, scale: 0.85 }}
-                    animate={{
-                      opacity: [0.55, 0, 0.55],
-                      scale: [0.85, 1.5, 0.85],
-                    }}
-                    transition={{
-                      duration: 2.4,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                      delay: (i % 7) * 0.18,
-                    }}
-                    style={{ transformOrigin: `${s.x}px ${s.y}px` }}
-                  />
-                )}
-
-                {/* Selected ring */}
-                {isActiveDot && (
-                  <circle
-                    cx={s.x}
-                    cy={s.y}
-                    r={ringR * 1.1}
-                    fill="none"
-                    stroke={meta.swatch}
-                    strokeWidth={sw * 1.6}
-                    strokeOpacity={0.95}
-                  />
-                )}
-
-                {/* Manual-offline override */}
-                {s.isManualOverrideActive && (
-                  <circle
-                    cx={s.x}
-                    cy={s.y}
-                    r={ringR}
-                    fill="none"
-                    stroke="var(--color-amber)"
-                    strokeWidth={sw}
-                    strokeDasharray={`${r * 0.8} ${r * 0.6}`}
-                  />
-                )}
-
-                {/* Core dot */}
-                <circle
-                  cx={s.x}
-                  cy={s.y}
-                  r={r}
-                  fill={meta.swatch}
-                  fillOpacity={s.isActive ? 1 : 0.35}
-                  stroke="white"
-                  strokeOpacity={0.85}
-                  strokeWidth={sw2 * 0.6}
-                />
-
-                {/* Inactive cross */}
-                {!s.isActive && (
-                  <g
-                    stroke="white"
-                    strokeOpacity={0.85}
-                    strokeWidth={sw2 * 0.6}
-                    strokeLinecap="round"
-                  >
-                    <line
-                      x1={s.x - r * 0.5}
-                      y1={s.y - r * 0.5}
-                      x2={s.x + r * 0.5}
-                      y2={s.y + r * 0.5}
-                    />
-                    <line
-                      x1={s.x - r * 0.5}
-                      y1={s.y + r * 0.5}
-                      x2={s.x + r * 0.5}
-                      y2={s.y - r * 0.5}
-                    />
-                  </g>
-                )}
-
-                {/* LOD label — station code below the dot, fades in once
-                    the user has zoomed past 2× so dense fit-all clusters
-                    aren't drowned in text. Baseline sits BELOW the halo
-                    (haloR = 22 px) plus a breathing-room margin so glyphs
-                    don't render on top of the soft glow. Inner scale(1 -1)
-                    undoes the parent Y-flip so glyphs render upright;
-                    pixel-locked fontSize keeps the label the same screen
-                    size at every zoom. */}
-                {labelOpacity > 0 && s.code && (
-                  <g
-                    transform={`translate(${s.x} ${s.y}) scale(1 -1)`}
-                    pointerEvents="none"
-                  >
-                    <text
-                      x={0}
-                      y={haloR + 10 * worldPerPx}
-                      fontSize={11 * worldPerPx}
-                      textAnchor="middle"
-                      fill="var(--color-ink-700)"
-                      stroke="white"
-                      strokeWidth={3 * worldPerPx}
-                      strokeOpacity={0.85}
-                      paintOrder="stroke"
-                      opacity={labelOpacity}
-                      style={{ fontWeight: 600 }}
-                    >
-                      {s.code}
-                    </text>
-                  </g>
-                )}
-              </motion.g>
-            );
-          })}
+          {/* Stations — memoised (StationLayer) so a robot tick, a pan or the
+              cursor read-out never re-renders the dot groups; only zoom and
+              data changes do. The pinned / hovered station's ring, pulse and
+              label draw on top in StationFocus / StationHoverLabel, which is
+              all that a hover touches. */}
+          <StationLayer
+            stations={stations}
+            worldPerPx={worldPerPx}
+            labelOpacity={labelOpacity}
+            animateIn={animateStationsIn}
+            dragMovedRef={dragMoved}
+            onEnter={onStationEnter}
+            onLeave={onStationLeave}
+            onToggle={onStationToggle}
+          />
+          {focusStation && (
+            <StationFocus
+              key={focusStation.id}
+              station={focusStation}
+              worldPerPx={worldPerPx}
+            />
+          )}
+          {hoverStation && (
+            <StationHoverLabel station={hoverStation} worldPerPx={worldPerPx} />
+          )}
 
           {/* Origin marker */}
           <g>
@@ -1494,59 +1436,28 @@ export function CanvasCard({
           {/* Live robot layer — sits between stations and vignette so robots
               draw on top of the topology but the corner vignette still
               applies. Rendered in the same flipped Y space as everything
-              else, so its world coords match station coords. */}
-          <RobotLayer
-            positions={robots}
+              else, so its world coords match station coords. Owns the 1 s
+              poll, the hovered robot and its tooltip (see LiveRobots). */}
+          <LiveRobots
+            mapId={map?.id ?? null}
             worldPerPx={worldPerPx}
-            hoverId={hoverRobotId}
-            onHover={setHoverRobotId}
+            view={view}
+            rotation={rotation}
+            size={svgSize}
+            overlayEl={canvasEl}
+            stationExtent={stationExtent}
+            onExtent={onRobotExtent}
           />
 
           </g>{/* end Y-flip wrapper */}
         </svg>
 
-        {/* Robot tooltip — HTML overlay positioned in screen space from the
-            hovered robot's world coords. The data layer is Y-flipped, so the
-            robot at data y is rendered at SVG y = 2*view.y + view.h - y;
-            screen-px conversion mirrors that. */}
-        {(() => {
-          const hovered = robots.find((r) => r.deviceKey === hoverRobotId);
-          if (!hovered) return null;
-          const container = canvasContainerRef.current;
-          if (!container) return null;
-          const rect = container.getBoundingClientRect();
-          // Robot world coord → un-rotated SVG px → screen px (forward rotation).
-          // The tooltip is absolutely positioned inside the container, so left/top
-          // are relative to it (not the page).
-          const svgPx = ((hovered.x - view.x) / view.w) * rect.width;
-          const svgPy = ((view.y + view.h - hovered.y) / view.h) * rect.height;
-          const { x: left, y: top } = svgToScreen(svgPx, svgPy, rect, rotation);
-          return <RobotTooltip robot={hovered} left={left} top={top} />;
-        })()}
-
-        {/* Live indicator — top-left chip above the canvas grid. Shows tick
-            age + robot count so operators can sanity-check the stream. */}
-        <div className="pointer-events-none absolute top-4 left-4 flex items-center gap-1.5 rounded-full glass px-2.5 py-1 text-[10.5px] font-mono tracking-tight text-[var(--color-ink-700)]">
-          <StatusPulse tone={lastTickMs ? "success" : "amber"} />
-          <span>
-            {robots.length} robot{robots.length === 1 ? "" : "s"}
-          </span>
-          {lastTickMs && (
-            <span className="text-[var(--color-ink-400)]">
-              · {((performance.now() - lastTickMs) / 1000).toFixed(0)}s
-            </span>
-          )}
-        </div>
-
-        {/* Floating compass + hint */}
+        {/* Compass + hint. Static: an endless 14 s wobble was a JS loop
+            running all shift on a screen people mostly glance at. */}
         <div className="pointer-events-none absolute top-4 right-4 flex items-center gap-2">
-          <motion.div
-            animate={{ rotate: [0, 6, -4, 0] }}
-            transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-            className="glass-bubble grid h-10 w-10 place-items-center rounded-full text-[var(--color-ink-700)]"
-          >
+          <div className="glass-bubble grid h-10 w-10 place-items-center rounded-full text-[var(--color-ink-700)]">
             <Navigation className="h-4 w-4" strokeWidth={2.2} />
-          </motion.div>
+          </div>
         </div>
 
         {/* Zoom controls — bottom-right floating stack. Buttons round-trip
@@ -1661,7 +1572,7 @@ export function CanvasCard({
                 initial={{ opacity: 0, scale: 0.96, x: 8 }}
                 animate={{ opacity: 1, scale: 1, x: 0 }}
                 exit={{ opacity: 0, scale: 0.96, x: 8 }}
-                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                transition={T.fast}
                 role="dialog"
                 aria-label="Operation instructions"
                 className="absolute bottom-0 right-full mr-2 w-[320px] rounded-[18px] glass-strong p-4 shadow-[0_30px_60px_-20px_rgba(15,23,42,0.45)]"
@@ -1680,13 +1591,14 @@ export function CanvasCard({
 
         {/* Pinned station detail */}
         <AnimatePresence>
-          {activeStation && (
+          {pinnedStation && (
+            // One fixed key: pinning another station swaps the content in
+            // place; only pin / unpin animate.
             <motion.div
-              key={activeStation.id}
+              key="pinned-station"
               initial={{ opacity: 0, y: 8, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.97 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              animate={{ opacity: 1, y: 0, scale: 1, transition: T.base }}
+              exit={{ opacity: 0, y: 8, scale: 0.97, transition: T.exit }}
               className="pointer-events-auto absolute left-4 bottom-4 max-w-[320px] glass-strong rounded-[20px] p-4"
             >
               <button
@@ -1700,11 +1612,11 @@ export function CanvasCard({
               >
                 <X className="h-3.5 w-3.5" strokeWidth={2.2} />
               </button>
-              <StationDetail station={activeStation} />
+              <StationDetail station={pinnedStation} />
               {onEditStation && (
                 <button
                   type="button"
-                  onClick={() => onEditStation(activeStation.id)}
+                  onClick={() => onEditStation(pinnedStation.id)}
                   className="mt-3 inline-flex w-full items-center justify-center gap-1.5 h-8 rounded-full bg-[var(--color-brand-900)] text-white text-[11.5px] font-semibold tracking-tight cursor-pointer hover:-translate-y-px transition-transform shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_18px_-10px_rgba(14,21,48,0.55)] dark:bg-[var(--color-brand-500)]"
                 >
                   <Pencil className="h-3 w-3" strokeWidth={2.5} />
@@ -1718,6 +1630,384 @@ export function CanvasCard({
     </GlassCard>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* StationLayer — every station dot. Memoised: its props only change on data  */
+/* refresh and zoom (worldPerPx / labelOpacity), so robot polls, pans, hover  */
+/* and the cursor read-out skip it entirely. Halo for active, dim + cross for */
+/* inactive, dashed ring for a force-offline override. No per-dot animation   */
+/* loops — the pulse lives on the one focused station (StationFocus).         */
+/* -------------------------------------------------------------------------- */
+const StationLayer = memo(function StationLayer({
+  stations,
+  worldPerPx,
+  labelOpacity,
+  animateIn,
+  dragMovedRef,
+  onEnter,
+  onLeave,
+  onToggle,
+}: {
+  stations: StationDto[];
+  worldPerPx: number;
+  labelOpacity: number;
+  /** First load of this map — play the (short) entrance. */
+  animateIn: boolean;
+  /** True when the pointer-up ending this click was really a pan/pinch. */
+  dragMovedRef: React.RefObject<boolean>;
+  onEnter: (id: string) => void;
+  onLeave: (id: string) => void;
+  onToggle: (id: string) => void;
+}) {
+  const r = DOT_PX * worldPerPx;
+  const ringR = RING_PX * worldPerPx;
+  const haloR = HALO_PX * worldPerPx;
+  const sw = STROKE_PX * worldPerPx;
+  const sw2 = 1.5 * worldPerPx;
+  return (
+    <g>
+      {stations.map((s, i) => {
+        const k = typeKey(s.type);
+        const meta = TYPE_META[k];
+        return (
+          <motion.g
+            key={s.id}
+            // Whole map in ≤ ~0.3 s: fast fade + tiny capped stagger. A
+            // 0.5 s pop with a 1.3 s tail was a wait on every visit.
+            initial={animateIn ? { opacity: 0, scale: 0.6 } : false}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ ...T.fast, delay: stagger(i, 0.002, 0.1) }}
+            style={{ transformOrigin: `${s.x}px ${s.y}px` }}
+            onMouseEnter={() => onEnter(s.id)}
+            onMouseLeave={() => onLeave(s.id)}
+            onClick={(e) => {
+              // Ignore the click if the user just finished a pan gesture.
+              if (dragMovedRef.current) return;
+              e.stopPropagation();
+              onToggle(s.id);
+            }}
+            className="cursor-pointer"
+          >
+            {/* Soft halo — only on active dots, kept subtle so dense
+                aisles don't blur into a single blob. */}
+            {s.isActive && (
+              <circle
+                cx={s.x}
+                cy={s.y}
+                r={haloR}
+                fill={`url(#station-glow-${k})`}
+                opacity={0.55}
+              />
+            )}
+
+            {/* Manual-offline override */}
+            {s.isManualOverrideActive && (
+              <circle
+                cx={s.x}
+                cy={s.y}
+                r={ringR}
+                fill="none"
+                stroke="var(--color-amber)"
+                strokeWidth={sw}
+                strokeDasharray={`${r * 0.8} ${r * 0.6}`}
+              />
+            )}
+
+            {/* Core dot */}
+            <circle
+              cx={s.x}
+              cy={s.y}
+              r={r}
+              fill={meta.swatch}
+              fillOpacity={s.isActive ? 1 : 0.35}
+              stroke="white"
+              strokeOpacity={0.85}
+              strokeWidth={sw2 * 0.6}
+            />
+
+            {/* Inactive cross */}
+            {!s.isActive && (
+              <g
+                stroke="white"
+                strokeOpacity={0.85}
+                strokeWidth={sw2 * 0.6}
+                strokeLinecap="round"
+              >
+                <line
+                  x1={s.x - r * 0.5}
+                  y1={s.y - r * 0.5}
+                  x2={s.x + r * 0.5}
+                  y2={s.y + r * 0.5}
+                />
+                <line
+                  x1={s.x - r * 0.5}
+                  y1={s.y + r * 0.5}
+                  x2={s.x + r * 0.5}
+                  y2={s.y - r * 0.5}
+                />
+              </g>
+            )}
+
+            {/* LOD label — station code below the dot, fades in once
+                the user has zoomed past 2× so dense fit-all clusters
+                aren't drowned in text. Baseline sits BELOW the halo
+                (haloR = 22 px) plus a breathing-room margin so glyphs
+                don't render on top of the soft glow. Inner scale(1 -1)
+                undoes the parent Y-flip so glyphs render upright;
+                pixel-locked fontSize keeps the label the same screen
+                size at every zoom. */}
+            {labelOpacity > 0 && s.code && (
+              <g
+                transform={`translate(${s.x} ${s.y}) scale(1 -1)`}
+                pointerEvents="none"
+              >
+                <text
+                  x={0}
+                  y={haloR + 10 * worldPerPx}
+                  fontSize={11 * worldPerPx}
+                  textAnchor="middle"
+                  fill="var(--color-ink-700)"
+                  stroke="white"
+                  strokeWidth={3 * worldPerPx}
+                  strokeOpacity={0.85}
+                  paintOrder="stroke"
+                  opacity={labelOpacity}
+                  style={{ fontWeight: 600 }}
+                >
+                  {s.code}
+                </text>
+              </g>
+            )}
+          </motion.g>
+        );
+      })}
+    </g>
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* StationFocus — selection ring for the pinned (else hovered) station, plus  */
+/* a CSS ping ring if it's active. The only pulsing station on the map: one   */
+/* pulse says "this one"; ~hundreds of JS loops said nothing and cost frames. */
+/* pointer-events none so it never steals the hover from the dot below.       */
+/* -------------------------------------------------------------------------- */
+function StationFocus({
+  station,
+  worldPerPx,
+}: {
+  station: StationDto;
+  worldPerPx: number;
+}) {
+  const meta = TYPE_META[typeKey(station.type)];
+  const ringR = RING_PX * worldPerPx;
+  const sw = STROKE_PX * worldPerPx;
+  return (
+    <g pointerEvents="none">
+      {station.isActive && (
+        <circle
+          cx={station.x}
+          cy={station.y}
+          r={ringR}
+          fill="none"
+          stroke={meta.swatch}
+          strokeOpacity={0.5}
+          strokeWidth={1.5 * worldPerPx}
+          className="animate-ping"
+          // fill-box: scale about the ring's own centre, not the SVG origin.
+          style={{
+            transformBox: "fill-box",
+            transformOrigin: "center",
+            animationDuration: "2s",
+          }}
+        />
+      )}
+      <circle
+        cx={station.x}
+        cy={station.y}
+        r={ringR * 1.1}
+        fill="none"
+        stroke={meta.swatch}
+        strokeWidth={sw * 1.6}
+        strokeOpacity={0.95}
+      />
+    </g>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* StationHoverLabel — lightweight name tag above a hovered, unpinned station. */
+/* The full card is click-to-pin; a sweep across an aisle just retitles this. */
+/* -------------------------------------------------------------------------- */
+function StationHoverLabel({
+  station,
+  worldPerPx,
+}: {
+  station: StationDto;
+  worldPerPx: number;
+}) {
+  const ringR = RING_PX * worldPerPx;
+  return (
+    <g
+      transform={`translate(${station.x} ${station.y}) scale(1 -1)`}
+      pointerEvents="none"
+    >
+      <text
+        x={0}
+        y={-(ringR * 1.1 + 7 * worldPerPx)}
+        fontSize={11.5 * worldPerPx}
+        textAnchor="middle"
+        fill="var(--color-ink-900)"
+        stroke="white"
+        strokeWidth={3.5 * worldPerPx}
+        strokeOpacity={0.9}
+        paintOrder="stroke"
+        style={{ fontWeight: 600 }}
+      >
+        {station.code ? `${station.code} · ${station.name}` : station.name}
+      </text>
+    </g>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* LiveRobots — the robot layer plus everything that changes on a 1 s poll:   */
+/* positions, the hovered robot, its tooltip and the live chip. Owning the    */
+/* poll here is the point: a tick re-renders this subtree only. Rendered      */
+/* inside the SVG's Y-flip group; the HTML bits portal into the canvas div.   */
+/* -------------------------------------------------------------------------- */
+const LiveRobots = memo(function LiveRobots({
+  mapId,
+  worldPerPx,
+  view,
+  rotation,
+  size,
+  overlayEl,
+  stationExtent,
+  onExtent,
+}: {
+  mapId: string | null;
+  worldPerPx: number;
+  view: { x: number; y: number; w: number; h: number };
+  rotation: number;
+  size: { w: number; h: number };
+  overlayEl: HTMLDivElement | null;
+  stationExtent: Extent | null;
+  /** Robot extent, or null while every robot is inside the station cluster. */
+  onExtent: (e: Extent | null) => void;
+}) {
+  // The hook handles polling, visibility-change pausing, backoff and abort
+  // on map switch / unmount.
+  const { positions: robots, lastTickMs, error } = useRobotPositions(mapId);
+  const [hoverId, setHoverId] = useState<string | null>(null);
+
+  // Report robots that would fall off a stations-only frame. Null while all
+  // are inside the cluster, so the parent's state doesn't change per tick.
+  useEffect(() => {
+    let ext: Extent | null = null;
+    for (const r of robots) ext = growExtent(ext, r.x, r.y);
+    if (
+      ext &&
+      stationExtent &&
+      ext.minX >= stationExtent.minX &&
+      ext.minY >= stationExtent.minY &&
+      ext.maxX <= stationExtent.maxX &&
+      ext.maxY <= stationExtent.maxY
+    ) {
+      ext = null;
+    }
+    onExtent(ext);
+  }, [robots, stationExtent, onExtent]);
+
+  // Tooltip rides the marker's spring: the marker reports its sprung world
+  // position each frame (onHoverMove), and we write the tooltip's transform
+  // directly — no React render, no DOM measuring. It used to sit at the
+  // poll target and jump once a second while the marker glided. The frame
+  // ref lets the stable callback see the latest view / rotation / size.
+  const tipRef = useRef<HTMLDivElement | null>(null);
+  const lastPos = useRef<{ x: number; y: number } | null>(null);
+  const frameRef = useRef({ view, rotation, size });
+  frameRef.current = { view, rotation, size };
+  const placeTip = useCallback((x: number, y: number) => {
+    lastPos.current = { x, y };
+    const el = tipRef.current;
+    if (!el) return;
+    const { view: v, rotation: rot, size: s } = frameRef.current;
+    // World → un-rotated SVG px (data layer is Y-flipped) → container px.
+    const svgPx = ((x - v.x) / v.w) * s.w;
+    const svgPy = ((v.y + v.h - y) / v.h) * s.h;
+    const p = svgToScreen(svgPx, svgPy, { width: s.w, height: s.h }, rot);
+    el.style.transform = `translate(${p.x}px, ${p.y}px)`;
+  }, []);
+  // Pan / zoom / rotate / resize move the tooltip even when the robot is
+  // parked.
+  useLayoutEffect(() => {
+    const p = lastPos.current;
+    if (p) placeTip(p.x, p.y);
+  }, [view, rotation, size, placeTip]);
+
+  // If the anchor remounts while the robot is parked (e.g. it dropped out of
+  // one poll), no spring frame will come to place it — place it on attach.
+  const attachTip = useCallback(
+    (el: HTMLDivElement | null) => {
+      tipRef.current = el;
+      const p = lastPos.current;
+      if (el && p) placeTip(p.x, p.y);
+    },
+    [placeTip],
+  );
+
+  const onHover = useCallback((id: string | null) => {
+    if (id === null) lastPos.current = null;
+    setHoverId(id);
+  }, []);
+
+  const hovered = hoverId ? robots.find((r) => r.deviceKey === hoverId) : undefined;
+
+  return (
+    <>
+      <RobotLayer
+        positions={robots}
+        worldPerPx={worldPerPx}
+        hoverId={hoverId}
+        onHover={onHover}
+        onHoverMove={placeTip}
+      />
+      {overlayEl &&
+        createPortal(
+          <>
+            {hovered && (
+              // Zero-size anchor at the robot; transform written by placeTip
+              // only, never by React, so a poll re-render can't snap it back.
+              <div ref={attachTip} className="pointer-events-none absolute left-0 top-0 z-10">
+                <RobotTooltip robot={hovered} />
+              </div>
+            )}
+            {/* Live indicator — top-left chip above the canvas grid. Robot
+                count + tick age so operators can sanity-check the stream;
+                when polls fail it says so instead of a frozen "Xs". */}
+            <div className="pointer-events-none absolute top-4 left-4 flex items-center gap-1.5 rounded-full glass px-2.5 py-1 text-[10.5px] font-mono tracking-tight text-[var(--color-ink-700)]">
+              <StatusPulse tone={error ? "coral" : lastTickMs ? "success" : "amber"} />
+              {error ? (
+                <span title={error}>Robots offline · retrying</span>
+              ) : (
+                <>
+                  <span>
+                    {robots.length} robot{robots.length === 1 ? "" : "s"}
+                  </span>
+                  {lastTickMs && (
+                    <span className="text-[var(--color-ink-400)]">
+                      · {((performance.now() - lastTickMs) / 1000).toFixed(0)}s
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+          </>,
+          overlayEl,
+        )}
+    </>
+  );
+});
 
 /* -------------------------------------------------------------------------- */
 /* OperationInstructions — popover content explaining mouse + touch gestures. */
@@ -1968,9 +2258,9 @@ function StationDirectory({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 14 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ ...T.base, delay: 0.06 }}
     >
       <GlassCard variant="strong" className="overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 px-5 md:px-6 py-4 border-b border-white/40 dark:border-white/[0.06]">
@@ -2070,10 +2360,7 @@ function StationDirectory({
                       key={s.id}
                       initial={{ opacity: 0, y: 4 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{
-                        duration: 0.28,
-                        delay: Math.min(i, 30) * 0.015,
-                      }}
+                      transition={listItem(i)}
                       className="border-t border-white/30 dark:border-white/[0.04] hover:bg-white/45 dark:hover:bg-white/[0.04] transition-colors"
                     >
                       <td className="px-5 md:px-6 py-3 font-mono text-[11.5px] font-semibold tabular-nums tracking-tight text-[var(--color-ink-900)]">
@@ -2193,59 +2480,3 @@ function TypeChip({
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* Toast — bottom-center notification with success / error tone.              */
-/* -------------------------------------------------------------------------- */
-function Toast({
-  toast,
-  onDismiss,
-}: {
-  toast: { kind: "ok" | "err"; msg: string } | null;
-  onDismiss: () => void;
-}) {
-  return (
-    <AnimatePresence>
-      {toast && (
-        <motion.div
-          key={toast.msg}
-          initial={{ opacity: 0, y: 16, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 16, scale: 0.97 }}
-          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2"
-        >
-          <div
-            className={cn(
-              "flex items-center gap-3 rounded-full pl-4 pr-2 py-2 text-[12.5px] font-medium tracking-tight",
-              "glass-strong shadow-[0_30px_60px_-20px_rgba(15,23,42,0.4)]",
-            )}
-          >
-            <span
-              className={cn(
-                "grid h-7 w-7 place-items-center rounded-full",
-                toast.kind === "ok"
-                  ? "bg-[var(--color-success)] text-white"
-                  : "bg-[var(--color-coral)] text-white",
-              )}
-            >
-              {toast.kind === "ok" ? (
-                <CheckCircle2 className="h-4 w-4" strokeWidth={2.2} />
-              ) : (
-                <AlertTriangle className="h-4 w-4" strokeWidth={2.2} />
-              )}
-            </span>
-            <span className="text-[var(--color-ink-800)]">{toast.msg}</span>
-            <button
-              type="button"
-              aria-label="Dismiss"
-              onClick={onDismiss}
-              className="grid h-7 w-7 place-items-center rounded-full text-[var(--color-ink-500)] hover:bg-white/60 dark:hover:bg-white/[0.06] cursor-pointer"
-            >
-              <X className="h-3.5 w-3.5" strokeWidth={2.2} />
-            </button>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}

@@ -64,7 +64,7 @@ export function RetryHistoryPanel({
         {Array.from({ length: 2 }).map((_, i) => (
           <div
             key={i}
-            className="h-16 animate-pulse rounded-xl bg-[var(--color-ink-100)] dark:bg-white/[0.05]"
+            className="h-16 skeleton-pulse rounded-xl bg-[var(--color-ink-100)] dark:bg-white/[0.05]"
           />
         ))}
       </div>

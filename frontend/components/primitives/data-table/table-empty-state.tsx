@@ -52,14 +52,14 @@ export function TableEmptyState({
       role="status"
       data-variant={variant}
     >
-      <motion.div
-        animate={{ y: [0, -4, 0] }}
-        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-        className="mx-auto grid h-16 w-16 place-items-center rounded-[20px] bg-gradient-to-br from-[var(--color-pastel-sky)] to-[var(--color-pastel-lavender)] text-[var(--color-brand-900)]"
+      {/* Float is CSS (.float-y): a JS loop here re-rendered on the main
+          thread forever and ignored reduced motion. */}
+      <div
+        className="float-y mx-auto grid h-16 w-16 place-items-center rounded-[20px] bg-gradient-to-br from-[var(--color-pastel-sky)] to-[var(--color-pastel-lavender)] text-[var(--color-brand-900)]"
         aria-hidden
       >
         <Icon className="h-6 w-6" strokeWidth={2} />
-      </motion.div>
+      </div>
       <h3 className="font-display mt-5 text-lg font-semibold text-[var(--color-ink-900)]">
         {title}
       </h3>
@@ -72,7 +72,7 @@ export function TableEmptyState({
           onClick={action.onClick}
           whileHover={{ y: -1 }}
           whileTap={{ scale: 0.97 }}
-          className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-4 py-2 text-[12px] font-semibold text-white transition-all hover:shadow-[0_14px_36px_-12px_rgba(15,23,42,0.6)] dark:bg-[var(--color-brand-500)]"
+          className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-4 py-2 text-[12px] font-semibold text-white transition-shadow hover:shadow-[0_14px_36px_-12px_rgba(15,23,42,0.6)] dark:bg-[var(--color-brand-500)]"
         >
           {action.label}
         </motion.button>

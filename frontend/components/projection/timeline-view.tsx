@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
+import { listItem } from "@/lib/motion";
 import { DateTime } from "@/components/primitives/date-time";
 
 // Phase P0.F4 — Reusable vertical timeline component shared across
@@ -83,7 +84,7 @@ function TimelineRow({ entry, index }: { entry: TimelineEntry; index: number }) 
     <motion.li
       initial={{ opacity: 0, x: -6 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.32, delay: Math.min(index * 0.03, 0.4) }}
+      transition={listItem(index)}
       className="relative"
     >
       {/* Dot marker — sits exactly on the vertical thread */}

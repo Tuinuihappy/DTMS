@@ -3,6 +3,8 @@
 import { motion } from "motion/react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { T, stagger } from "@/lib/motion";
+import { useRowEntrance } from "./row-group";
 
 /**
  * Mobile card-layout counterpart to <DataRow>. Used inside the
@@ -15,12 +17,16 @@ import { cn } from "@/lib/utils";
  * the mobile card layouts kept raw `<motion.div onClick>` (interactive
  * div with no keyboard handler — flagged in the audit as the last
  * a11y gap). This primitive closes that.
+ *
+ * Motion matches DataRow: short entrance on first load only (inside a
+ * RowGroup), no exit, `flash` for the realtime-change highlight.
  */
 export function MobileCardRow({
   onClick,
   selected = false,
   disabled = false,
   delayIndex = 0,
+  flash = false,
   ariaLabel,
   className,
   children,
@@ -30,6 +36,7 @@ export function MobileCardRow({
   /** Visually dim the card without removing it (e.g. inactive templates). */
   disabled?: boolean;
   delayIndex?: number;
+  flash?: boolean;
   /** Forwarded as aria-label — useful so screen readers announce the row
    *  context (e.g. "Order DEMO-001 — Submitted") even when the visible
    *  content is a stack of badges and icons. */
@@ -38,6 +45,7 @@ export function MobileCardRow({
   children: ReactNode;
 }) {
   const interactive = !!onClick;
+  const entrance = useRowEntrance();
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!interactive) return;
@@ -55,10 +63,9 @@ export function MobileCardRow({
       // No `layout` here on purpose — same rationale as DataRow: list
       // pages refetch on SignalR hints, and a position tween lets cards
       // slide out from under an in-flight tap. Reorders snap instantly.
-      initial={{ opacity: 0, y: 6 }}
+      initial={entrance ? { opacity: 0, y: 4 } : false}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.35, delay: Math.min(delayIndex * 0.03, 0.4) }}
+      transition={{ ...T.fast, delay: stagger(delayIndex) }}
       onClick={interactive ? onClick : undefined}
       onKeyDown={handleKeyDown}
       tabIndex={interactive ? 0 : undefined}
@@ -72,6 +79,7 @@ export function MobileCardRow({
         selected &&
           "bg-[var(--color-pastel-sky)]/40 dark:bg-[var(--color-pastel-sky)]/60",
         disabled && "opacity-70",
+        flash && "row-flash",
         className,
       )}
     >

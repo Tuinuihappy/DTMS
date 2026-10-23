@@ -28,7 +28,8 @@ export function CarrierFormDialog({
   carrier: Carrier | null;
   carrierTypes: CarrierTypeProfile[];
   onClose: () => void;
-  onSaved: () => void;
+  /** Gets the saved carrier's code, so the list can confirm and highlight it. */
+  onSaved: (carrierCode: string) => void;
 }) {
   const isEdit = carrier !== null;
 
@@ -81,7 +82,7 @@ export function CarrierFormDialog({
           commissionedAt: commissioned,
         });
       }
-      onSaved();
+      onSaved(isEdit ? carrier.carrierCode : code.trim());
       onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -227,7 +228,7 @@ export function CarrierFormDialog({
                   whileHover={canSubmit && !busy ? { y: -1 } : {}}
                   whileTap={canSubmit && !busy ? { scale: 0.97 } : {}}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all",
+                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-[background-color,box-shadow,color,opacity]",
                     canSubmit && !busy
                       ? "bg-[var(--color-brand-900)] text-white hover:shadow-[0_14px_36px_-12px_rgba(15,23,42,0.6)] dark:bg-[var(--color-brand-500)]"
                       : "bg-[var(--color-ink-100)] text-[var(--color-ink-400)] cursor-not-allowed dark:bg-white/[0.04]",

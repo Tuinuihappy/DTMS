@@ -11,9 +11,10 @@ import { motion } from "motion/react";
 import Link from "next/link";
 
 import { GlassCard } from "@/components/primitives/glass-card";
+import { ease as easing, stagger } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-const ease = [0.22, 1, 0.36, 1] as const;
+const ease = easing.out;
 
 type Action = {
   label: string;
@@ -71,7 +72,7 @@ export function QuickActions() {
         initial={{ opacity: 0, y: 14 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-15%" }}
-        transition={{ duration: 0.55, ease }}
+        transition={{ duration: 0.4, ease }}
         className="flex items-end justify-between gap-4"
       >
         <div>
@@ -98,7 +99,7 @@ export function QuickActions() {
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-10%" }}
-            transition={{ duration: 0.5, delay: 0.06 * i, ease }}
+            transition={{ duration: 0.4, delay: stagger(i, 0.04), ease }}
           >
             <Link href={a.href} className="block group">
               <GlassCard

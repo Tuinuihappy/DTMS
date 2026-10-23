@@ -10,7 +10,6 @@ import {
   Trash2,
   Workflow,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ActionTemplateDto } from "@/lib/api/action-templates";
@@ -23,6 +22,7 @@ import {
   DataTableHead,
   DataTableShell,
   MobileCardRow,
+  RowGroup,
   SortableTh,
   TableEmptyState,
   TableSkeleton,
@@ -45,6 +45,9 @@ function paramPreview(t: ActionTemplateDto): { key: string; value: string }[] {
 
 type Props = {
   templates: ActionTemplateDto[];
+  // page|sort|filter key of `templates` — the table fades on a query
+  // change instead of re-staggering every row.
+  signature: string;
   loading: boolean;
   busyId: string | null;
   onOpenDetail: (t: ActionTemplateDto) => void;
@@ -60,6 +63,7 @@ type Props = {
 
 export function TemplatesTable({
   templates,
+  signature,
   loading,
   busyId,
   onOpenDetail,
@@ -106,8 +110,7 @@ export function TemplatesTable({
             <span className="sr-only">Actions</span>
           </TableTh>
         </DataTableHead>
-        <DataTableBody>
-          <AnimatePresence initial={false}>
+        <DataTableBody signature={signature}>
             {templates.map((t, i) => (
               <DataRow
                 key={t.id}
@@ -157,14 +160,16 @@ export function TemplatesTable({
                 </TableTd>
               </DataRow>
             ))}
-          </AnimatePresence>
         </DataTableBody>
       </DataTableShell>
 
       {/* Mobile cards — separate glass card so the table primitives stay
           table-shaped. Same domain content, different layout. */}
-      <div className="md:hidden overflow-hidden rounded-[var(--radius-xl)] glass divide-y divide-[var(--color-ink-100)]/60 dark:divide-white/[0.04]">
-        <AnimatePresence initial={false}>
+      <RowGroup
+        as="div"
+        signature={signature}
+        className="md:hidden overflow-hidden rounded-[var(--radius-xl)] glass divide-y divide-[var(--color-ink-100)]/60 dark:divide-white/[0.04]"
+      >
           {templates.map((t, i) => (
             <MobileCardRow
               key={t.id}
@@ -197,8 +202,7 @@ export function TemplatesTable({
               </div>
             </MobileCardRow>
           ))}
-        </AnimatePresence>
-      </div>
+      </RowGroup>
     </>
   );
 }
@@ -294,20 +298,15 @@ function ActiveBadge({ active }: { active: boolean }) {
           : "bg-[var(--color-ink-100)] text-[var(--color-ink-500)] dark:bg-white/[0.06] dark:text-[var(--color-ink-400)]",
       )}
     >
+      {/* CSS breathe, not a motion loop: this badge repeats down the
+          table (twice — the hidden mobile list too), and a JS loop per
+          row kept the main thread busy for a decorative dot. */}
       <span
         className={cn(
-          "relative inline-flex h-1.5 w-1.5 rounded-full",
-          active ? "bg-[var(--color-success)]" : "bg-[var(--color-ink-300)]",
+          "inline-flex h-1.5 w-1.5 rounded-full",
+          active ? "breathe bg-[var(--color-success)]" : "bg-[var(--color-ink-300)]",
         )}
-      >
-        {active && (
-          <motion.span
-            className="absolute inset-0 rounded-full bg-[var(--color-success)]"
-            animate={{ scale: [1, 2.2, 1], opacity: [0.55, 0, 0.55] }}
-            transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
-          />
-        )}
-      </span>
+      />
       {active ? "Active" : "Inactive"}
     </span>
   );
@@ -374,7 +373,7 @@ function RowMenu({
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={busy}
-        className="rounded-md p-1.5 text-[var(--color-ink-500)] opacity-0 transition-all group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--color-ink-100)] hover:text-[var(--color-ink-900)] disabled:opacity-30 dark:hover:bg-white/10"
+        className="rounded-md p-1.5 text-[var(--color-ink-500)] opacity-0 transition-[background-color,color,opacity] group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--color-ink-100)] hover:text-[var(--color-ink-900)] disabled:opacity-30 dark:hover:bg-white/10"
         aria-label={`Actions for ${template.actionName}`}
         aria-haspopup="menu"
         aria-expanded={open}

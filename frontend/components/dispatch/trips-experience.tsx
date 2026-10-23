@@ -35,6 +35,7 @@ import {
 } from "@/components/primitives/data-table";
 import { useTripListSubscription } from "@/lib/realtime/hubs/trip-hub";
 import { usePollSchedule } from "@/lib/hooks/use-poll-schedule";
+import { useFlashOnChange } from "@/lib/hooks/use-flash-on-change";
 import { Pagination, type PageSize } from "@/components/delivery-orders/pagination";
 import { TripStatusBadge, AttemptBadge } from "./badges";
 import { TripDetailDrawer } from "./trip-detail-drawer";
@@ -145,6 +146,8 @@ export function TripsExperience() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // page|sort|filter key of the rows currently in `trips`.
+  const [dataSig, setDataSig] = useState("");
   const [detailTripId, setDetailTripId] = useState<string | null>(null);
 
   const fetchAbortRef = useRef<AbortController | null>(null);
@@ -209,6 +212,12 @@ export function TripsExperience() {
         );
         setTrips(res.items);
         setTotalCount(res.totalCount);
+        // Recorded with the rows, not when the request starts — the old
+        // page stays up until now, and the table's query fade and
+        // realtime flashes key off what's displayed.
+        setDataSig(
+          [statusFilter, search, vehicleKey, fromDate, toDate, sortBy, sortDir, page, pageSize].join("|"),
+        );
       } catch (e) {
         if (signal.aborted || (e as Error).name === "AbortError") return;
         setError((e as Error).message || "Failed to load trips.");
@@ -319,16 +328,29 @@ export function TripsExperience() {
         onClear={clearFilters}
       />
 
+      {/* Dim the old rows while a user-initiated fetch is in flight;
+          silent polls don't dim. */}
+      <div
+        aria-busy={refreshing || undefined}
+        className={cn(
+          "flex flex-col gap-4 transition-opacity duration-150",
+          refreshing && trips.length > 0 && "opacity-60",
+        )}
+      >
       <TripsTable
         trips={trips}
+        signature={dataSig}
         loading={loading}
         error={error}
+        hasFilters={hasFilters}
+        onClearFilters={clearFilters}
         onRetry={() => void fetchTrips().catch(() => {})}
         sortBy={sortBy}
         sortDir={sortDir}
         onSortHeader={handleSortHeader}
         onOpenTrip={setDetailTripId}
       />
+      </div>
 
       <Pagination
         total={totalCount}
@@ -517,10 +539,18 @@ function FiltersBar(props: {
   );
 }
 
+// What counts as "this row changed" for the realtime flash.
+const tripId = (t: TripQueueItemDto) => t.id;
+const tripVersion = (t: TripQueueItemDto) =>
+  [t.status, t.vendorVehicleKey, t.claimedByOperatorId, t.startedAt, t.completedAt, t.failureReason].join("|");
+
 function TripsTable({
   trips,
+  signature,
   loading,
   error,
+  hasFilters,
+  onClearFilters,
   onRetry,
   sortBy,
   sortDir,
@@ -528,14 +558,19 @@ function TripsTable({
   onOpenTrip,
 }: {
   trips: TripQueueItemDto[];
+  signature: string;
   loading: boolean;
   error: string | null;
+  hasFilters: boolean;
+  onClearFilters: () => void;
   onRetry: () => void;
   sortBy: TripQueueSortKey;
   sortDir: "asc" | "desc";
   onSortHeader: (col: TripQueueSortKey) => void;
   onOpenTrip: (id: string) => void;
 }) {
+  const flashing = useFlashOnChange(trips, tripId, tripVersion, signature);
+
   if (loading && trips.length === 0) {
     return <TableSkeleton label="Loading trips…" />;
   }
@@ -560,12 +595,19 @@ function TripsTable({
   }
 
   if (trips.length === 0) {
-    return (
+    return hasFilters ? (
       <TableEmptyState
         variant="no-filter-match"
         icon={Filter}
         title="No trips match your filters"
         body="Try widening the date range, clearing the search, or switching to All."
+        action={{ label: "Clear filters", onClick: onClearFilters }}
+      />
+    ) : (
+      <TableEmptyState
+        variant="no-data"
+        title="No trips yet"
+        body="Trips appear here as soon as an order is dispatched."
       />
     );
   }
@@ -634,9 +676,14 @@ function TripsTable({
             Completed
           </SortableTh>
         </DataTableHead>
-        <DataTableBody>
+        <DataTableBody signature={signature}>
           {trips.map((t, i) => (
-            <DataRow key={t.id} delayIndex={i} onClick={() => onOpenTrip(t.id)}>
+            <DataRow
+              key={t.id}
+              delayIndex={i}
+              flash={flashing.has(t.id)}
+              onClick={() => onOpenTrip(t.id)}
+            >
               <TableTd density="compact">
                 <IdCell id={t.id} label="trip id" />
               </TableTd>

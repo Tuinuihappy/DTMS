@@ -37,7 +37,9 @@ import {
   StateActionDialog,
   type StateActionVariant,
 } from "./state-action-dialog";
-import { ToastProvider, useToast } from "./toast";
+import { useToast } from "@/components/primitives/toast";
+import { T } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/datetime";
 import { usePollSchedule } from "@/lib/hooks/use-poll-schedule";
 
@@ -108,6 +110,8 @@ function useDebouncedValue<T>(value: T, delay = 350): T {
 const PRIORITY_VALUES: Array<Priority | "All"> = ["All", "Low", "Normal", "High", "Critical"];
 const TRANSPORT_VALUES: Array<TransportMode | "All"> = ["All", "Amr", "Manual"];
 const PAGE_SIZE_VALUES: PageSize[] = [10, 25, 50, 100];
+// Cancel is a delayed write; Undo works for this long.
+const CANCEL_UNDO_MS = 6_000;
 const SORT_COLUMNS: SortColumn[] = [
   "createdDate",
   "orderRef",
@@ -213,6 +217,8 @@ function ExperienceInner() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // page|sort|filter key of the rows currently in `orders`.
+  const [dataSig, setDataSig] = useState("");
 
   // UI state
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -371,8 +377,19 @@ function ExperienceInner() {
         // Paged only. A "Scroll" (load-more) mode used to append page N to
         // the list, so polls and realtime refreshed only the last page and
         // rows above went stale — removed (frontend review M26).
-        setOrders(res.items);
-        setTotalCount(res.totalCount);
+        // Rows cancelled inside their undo window are still live on the
+        // server until the timer flushes — keep them hidden, or a poll or
+        // realtime hint brings the "cancelled" order back for a few seconds.
+        const hidden = pendingCancelsRef.current;
+        const items = hidden.size ? res.items.filter((o) => !hidden.has(o.id)) : res.items;
+        setOrders(items);
+        setTotalCount(res.totalCount - (res.items.length - items.length));
+        // Recorded with the rows, not when the request starts: the old
+        // page stays on screen until this lands, and the table keys its
+        // query-change fade and realtime flashes off what's displayed.
+        setDataSig(
+          [priority, transportMode, search, hasFailedTrip, hasActiveJob, page, pageSize, sortBy, sortDir].join("|"),
+        );
       } catch (e) {
         if (signal.aborted || (e as Error).name === "AbortError") return;
         setError((e as Error).message || "Failed to load orders.");
@@ -699,7 +716,7 @@ function ExperienceInner() {
         if (detailId === id) setDetailId(null);
         setCancelTarget(null);
 
-        const timer = setTimeout(() => void flushCancel(id), 6_000);
+        const timer = setTimeout(() => void flushCancel(id), CANCEL_UNDO_MS);
         pendingCancelsRef.current.set(id, {
           timer,
           snapshot,
@@ -711,6 +728,9 @@ function ExperienceInner() {
           tone: "info",
           message: `Cancelling ${target.orderRef}…`,
           action: { label: "Undo", onClick: () => undoCancel(id) },
+          // Same clock as the real DELETE — the toast leaves exactly when
+          // Undo stops being possible.
+          durationMs: CANCEL_UNDO_MS,
         });
         return;
       }
@@ -834,9 +854,9 @@ function ExperienceInner() {
     <div className="space-y-5 sm:space-y-6">
       {/* Hero / section title */}
       <motion.div
-        initial={{ opacity: 0, y: -8 }}
+        initial={{ opacity: 0, y: -6 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        transition={T.base}
       >
         <SectionLabel
           icon={<ClipboardList className="h-4 w-4" strokeWidth={2.2} />}
@@ -883,8 +903,19 @@ function ExperienceInner() {
 
       {/* Table + Pagination */}
       <div className="space-y-0">
+        {/* Dim the old rows while a user-initiated fetch (page, sort,
+            filter, Refresh) is in flight, so it's clear they're about to
+            be replaced. Silent polls don't dim — they'd pulse every 15s. */}
+        <div
+          aria-busy={refreshing || undefined}
+          className={cn(
+            "transition-opacity duration-150",
+            refreshing && orders.length > 0 && "opacity-60",
+          )}
+        >
         <OrdersTable
           orders={orders}
+          signature={dataSig}
           loading={loading}
           selected={selected}
           onSelectionChange={setSelected}
@@ -897,19 +928,26 @@ function ExperienceInner() {
           hasFilters={
             priority !== "All" ||
             transportMode !== "All" ||
-            search.trim() !== ""
+            search.trim() !== "" ||
+            hasFailedTrip ||
+            hasActiveJob
           }
           onClearFilters={() => {
             setPriority("All");
             setTransportMode("All");
             setSearchInput("");
+            setHasFailedTrip(false);
+            setHasActiveJob(false);
           }}
+          error={error}
+          onRetry={() => void fetchOrders().catch(() => {})}
         />
+        </div>
         {!loading && totalCount > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.15 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={T.fast}
             className="mt-2 rounded-[var(--radius-xl)] glass"
           >
             <Pagination
@@ -1259,10 +1297,7 @@ function ExperienceInner() {
   );
 }
 
+// Toasts come from the app-wide provider (app/providers.tsx).
 export function OrdersExperience() {
-  return (
-    <ToastProvider>
-      <ExperienceInner />
-    </ToastProvider>
-  );
+  return <ExperienceInner />;
 }

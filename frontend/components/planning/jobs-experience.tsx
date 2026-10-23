@@ -15,7 +15,7 @@ import {
   type JobsQueueResult,
   type JobsQueueSortKey,
 } from "@/lib/api/jobs";
-import { ToastProvider, useToast } from "@/components/delivery-orders/toast";
+import { useToast } from "@/components/primitives/toast";
 import { StatusTimelineSection } from "@/components/projection/status-timeline-section";
 import type { StatusHistoryEntry } from "@/lib/api/status-history";
 import { getJobStatusHistory } from "@/lib/api/status-history";
@@ -34,6 +34,7 @@ import {
 } from "@/components/primitives/data-table";
 import { JobStatusBadge } from "./badges";
 import { cn } from "@/lib/utils";
+import { spring } from "@/lib/motion";
 
 // Phase b10-frontend.2 — operator queue across every order. Three tabs
 // drive the status-set filter:
@@ -57,12 +58,9 @@ const TAB_LABELS: Record<TabKey, string> = {
 
 const PAGE_SIZE = 20;
 
+// Toasts come from the app-wide provider (app/providers.tsx).
 export function JobsExperience() {
-  return (
-    <ToastProvider>
-      <JobsExperienceInner />
-    </ToastProvider>
-  );
+  return <JobsExperienceInner />;
 }
 
 function JobsExperienceInner() {
@@ -77,6 +75,9 @@ function JobsExperienceInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openJobId, setOpenJobId] = useState<string | null>(null);
+  // tab|page|sort key of the rows currently in `data` — recorded with the
+  // rows so the table fades on a query change, not on a refetch.
+  const [dataSig, setDataSig] = useState("");
 
   const fetch = useCallback(
     async (signal?: AbortSignal) => {
@@ -90,7 +91,10 @@ function JobsExperienceInner() {
           sortBy,
           sortDir,
         });
-        if (!signal?.aborted) setData(res);
+        if (!signal?.aborted) {
+          setData(res);
+          setDataSig([tab, page, sortBy, sortDir].join("|"));
+        }
       } catch (e) {
         if (!signal?.aborted) setError((e as Error).message);
       } finally {
@@ -181,6 +185,7 @@ function JobsExperienceInner() {
 
       <JobsTable
         jobs={data?.items ?? []}
+        signature={dataSig}
         loading={loading && data === null}
         sortBy={sortBy}
         sortDir={sortDir}
@@ -240,6 +245,7 @@ function Tabs({
 
 function JobsTable({
   jobs,
+  signature,
   loading,
   sortBy,
   sortDir,
@@ -248,6 +254,7 @@ function JobsTable({
   onRetried,
 }: {
   jobs: JobDto[];
+  signature: string;
   loading: boolean;
   sortBy: JobsQueueSortKey;
   sortDir: "asc" | "desc";
@@ -300,7 +307,7 @@ function JobsTable({
           <span className="sr-only">Actions</span>
         </TableTh>
       </DataTableHead>
-      <DataTableBody>
+      <DataTableBody signature={signature}>
         {jobs.map((j, i) => (
           <JobRow
             key={j.id}
@@ -405,7 +412,7 @@ function JobRow({
               }
             }}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all",
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-[background-color,border-color,box-shadow,color,opacity]",
               busy
                 ? "cursor-not-allowed bg-[var(--color-ink-100)] text-[var(--color-ink-400)] dark:bg-white/[0.04]"
                 : "bg-[var(--color-pastel-lavender)] text-[var(--color-pastel-lavender-ink)] hover:bg-[var(--color-pastel-lavender)]/80",
@@ -536,7 +543,7 @@ function JobDetailDrawer({
         open={!!jobId}
         onClose={onClose}
         initialFocus="panel"
-        backdropClassName="bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
+        backdropClassName="bg-[var(--color-ink-900)]/40"
       >
         {({ panelProps, titleId, panelStyle }) =>
           jobId && (
@@ -547,7 +554,7 @@ function JobDetailDrawer({
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 340, damping: 38 }}
+            transition={spring.drawer}
             className="fixed right-0 top-0 flex h-full w-full flex-col bg-[var(--color-surface)] shadow-[0_30px_80px_-20px_rgba(15,23,42,0.5)] sm:w-[min(520px,100vw)] outline-none"
           >
             <header className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--color-ink-100)] px-6 py-5 dark:border-white/[0.06]">
@@ -556,7 +563,7 @@ function JobDetailDrawer({
                   Planning job
                 </div>
                 {loading || !data ? (
-                  <div className="mt-2 h-7 w-48 animate-pulse rounded-md bg-[var(--color-ink-100)]" />
+                  <div className="mt-2 h-7 w-48 skeleton-pulse rounded-md bg-[var(--color-ink-100)]" />
                 ) : (
                   <>
                     <h2 id={titleId} className="font-mono mt-1 truncate text-[1.2rem] font-semibold text-[var(--color-ink-900)]">
@@ -660,7 +667,7 @@ function JobDetailDrawer({
                     }
                   }}
                   className={cn(
-                    "inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-all",
+                    "inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-[background-color,border-color,box-shadow,color,opacity]",
                     retrying
                       ? "cursor-not-allowed bg-[var(--color-ink-100)] text-[var(--color-ink-400)] dark:bg-white/[0.04]"
                       : "bg-[var(--color-brand-900)] text-white hover:shadow-[0_14px_36px_-12px_rgba(15,23,42,0.6)] dark:bg-[var(--color-brand-500)] dark:text-[var(--color-ink-50)]",

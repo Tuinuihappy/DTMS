@@ -2,15 +2,11 @@ import { ProfileProvider } from "@/components/profile/profile-context";
 import { ProfileHero } from "@/components/profile/profile-hero";
 import { ProfileStats } from "@/components/profile/profile-stats";
 import { ProfileTabs } from "@/components/profile/profile-tabs";
-import { LeftRail } from "@/components/shell/left-rail";
-import { TopNav } from "@/components/shell/top-nav";
 
 export default function ProfilePage() {
   return (
     <ProfileProvider>
-      <TopNav />
-      <LeftRail />
-      <main className="layer-content mx-auto max-w-[1340px] px-4 pb-24 pt-28 sm:px-6 md:px-6 md:pt-32 lg:pl-[var(--rail-width,80px)] lg:pr-6 transition-[padding] duration-300 ease-out">
+      <main className="layer-content mx-auto max-w-[1340px] px-4 pb-24 pt-28 sm:px-6 md:px-6 md:pt-32 lg:pl-[var(--rail-width,80px)] lg:pr-6">
         <ProfileHero />
         <ProfileStats />
         <ProfileTabs />

@@ -42,6 +42,14 @@ import { StatusPulse } from "@/components/primitives/status-pulse";
 import { useShell } from "@/components/shell/shell-context";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Permissions } from "@/lib/auth/permissions";
+import { listItem, spring, T } from "@/lib/motion";
+import {
+  RAIL_COLLAPSED_LANE,
+  RAIL_COLLAPSED_PX,
+  RAIL_COOKIE,
+  RAIL_EXPANDED_LANE,
+  RAIL_EXPANDED_PX,
+} from "@/lib/shell";
 import { cn } from "@/lib/utils";
 
 type RailChild = {
@@ -254,44 +262,41 @@ const actions: RailAction[] = [
   { icon: <AlertTriangle className="h-4 w-4" strokeWidth={2} />, label: "Active alerts", soon: true },
 ];
 
-const COLLAPSED_PX = 56;
-const EXPANDED_PX = 232;
-// Total horizontal space the rail consumes on the page (rail width + the
-// fixed left-4 inset + an 8 px breathing buffer). The dashboard's <main>
-// reads this from `--rail-width` to shift its left padding in lock-step.
-const COLLAPSED_RAIL_LANE = `${COLLAPSED_PX + 16 + 8}px`; // 80 px
-const EXPANDED_RAIL_LANE = `${EXPANDED_PX + 16 + 0}px`; //  248 px
-const STORAGE_KEY = "tms-rail-expanded";
+const COLLAPSED_PX = RAIL_COLLAPSED_PX;
+const EXPANDED_PX = RAIL_EXPANDED_PX;
+// Pre-cookie versions kept the state in localStorage under the same name.
+const LEGACY_STORAGE_KEY = RAIL_COOKIE;
 
-export function LeftRail() {
-  // Rail expansion — persisted to localStorage and broadcast to <main>
-  // via the `--rail-width` CSS variable on <html>. We default to false
-  // for SSR (the markup matches), then hydrate the saved value on mount.
-  const [expanded, setExpanded] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+export function LeftRail({ initialExpanded = false }: { initialExpanded?: boolean }) {
+  // Rail expansion — persisted to a cookie (app/(app)/layout.tsx reads it
+  // on the server, so the first render is already the right width) and
+  // broadcast to <main> via the `--rail-width` CSS variable on <html>.
+  const [expanded, setExpanded] = useState(initialExpanded);
 
   // Drawer state (tablet portrait) lives in ShellContext — TopNav's
   // hamburger toggles it. ESC closes; route changes auto-close.
   const { railDrawerOpen, closeRailDrawer } = useShell();
 
+  // One-time carry-over from the localStorage era: someone who had the
+  // rail open keeps it open after this change.
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) === "1";
-    setExpanded(saved);
-    document.documentElement.style.setProperty(
-      "--rail-width",
-      saved ? EXPANDED_RAIL_LANE : COLLAPSED_RAIL_LANE,
-    );
-    setHydrated(true);
+    try {
+      if (!document.cookie.includes(`${RAIL_COOKIE}=`) && localStorage.getItem(LEGACY_STORAGE_KEY) === "1") {
+        setExpanded(true);
+      }
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    } catch {
+      // Storage blocked — the cookie alone is fine.
+    }
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
-    localStorage.setItem(STORAGE_KEY, expanded ? "1" : "0");
+    document.cookie = `${RAIL_COOKIE}=${expanded ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
     document.documentElement.style.setProperty(
       "--rail-width",
-      expanded ? EXPANDED_RAIL_LANE : COLLAPSED_RAIL_LANE,
+      expanded ? RAIL_EXPANDED_LANE : RAIL_COLLAPSED_LANE,
     );
-  }, [expanded, hydrated]);
+  }, [expanded]);
 
   // Lock body scroll while the drawer is open. Esc is ModalLayer's.
   useEffect(() => {
@@ -306,12 +311,15 @@ export function LeftRail() {
   return (
     <>
     <motion.aside
-      initial={{ opacity: 0, x: -12 }}
+      // The shell is persistent (app/(app)/layout.tsx), so this entrance
+      // plays once per full load, not per navigation. Width starts at its
+      // real value — no spring from collapsed on first paint.
+      initial={{ opacity: 0, x: -8, width: expanded ? EXPANDED_PX : COLLAPSED_PX }}
       animate={{ opacity: 1, x: 0, width: expanded ? EXPANDED_PX : COLLAPSED_PX }}
       transition={{
-        opacity: { duration: 0.55, delay: 0.15, ease: [0.22, 1, 0.36, 1] },
-        x: { duration: 0.55, delay: 0.15, ease: [0.22, 1, 0.36, 1] },
-        width: { type: "spring", stiffness: 220, damping: 28, mass: 0.6 },
+        opacity: T.base,
+        x: T.base,
+        width: spring.gentle,
       }}
       className="hidden lg:flex flex-col fixed left-4 top-20 bottom-4 z-30 pointer-events-none"
       aria-label="Quick actions"
@@ -328,13 +336,9 @@ export function LeftRail() {
           {actions.map((a, i) => (
             <motion.li
               key={a.label}
-              initial={{ opacity: 0, y: -8, scale: 0.85 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{
-                duration: 0.4,
-                delay: 0.25 + i * 0.04,
-                ease: [0.22, 1, 0.36, 1],
-              }}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={listItem(i)}
             >
               {a.children ? (
                 <RailGroup action={a} expanded={expanded} />

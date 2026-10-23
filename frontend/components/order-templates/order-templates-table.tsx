@@ -14,7 +14,6 @@ import {
   Truck,
   Workflow,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -29,6 +28,7 @@ import {
   DataTableHead,
   DataTableShell,
   MobileCardRow,
+  RowGroup,
   SortableTh,
   TableEmptyState,
   TableSkeleton,
@@ -44,6 +44,9 @@ type RowAction = "toggle" | "delete";
 
 type Props = {
   templates: OrderTemplateDto[];
+  // page|sort|filter key of `templates` — the table fades on a query
+  // change instead of re-staggering every row.
+  signature: string;
   loading: boolean;
   busyId: string | null;
   onOpenDetail: (t: OrderTemplateDto) => void;
@@ -59,6 +62,7 @@ type Props = {
 
 export function OrderTemplatesTable({
   templates,
+  signature,
   loading,
   busyId,
   onOpenDetail,
@@ -109,8 +113,7 @@ export function OrderTemplatesTable({
             Operation
           </TableTh>
         </DataTableHead>
-        <DataTableBody>
-          <AnimatePresence initial={false}>
+        <DataTableBody signature={signature}>
             {templates.map((t, i) => (
               <DataRow
                 key={t.id}
@@ -192,19 +195,18 @@ export function OrderTemplatesTable({
                 <TableTd align="right">
                   <div className="flex items-center justify-end gap-1.5">
                     {t.isActive && (
-                      <motion.button
+                      <button
                         type="button"
-                        whileTap={{ scale: 0.94 }}
                         onClick={(e) => {
                           e.stopPropagation();
                           onDispatch(t);
                         }}
                         title={`Create order from ${t.name}`}
-                        className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-[var(--color-brand-900)] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.08em] text-white opacity-0 shadow-[0_4px_12px_-4px_rgba(15,23,42,0.45)] transition-all group-hover:opacity-100 focus-visible:opacity-100 hover:-translate-y-0.5 dark:bg-[var(--color-brand-500)]"
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-[var(--color-brand-900)] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.08em] text-white opacity-0 shadow-[0_4px_12px_-4px_rgba(15,23,42,0.45)] transition-[opacity,translate,scale] duration-150 group-hover:opacity-100 focus-visible:opacity-100 hover:-translate-y-0.5 active:scale-[.94] dark:bg-[var(--color-brand-500)]"
                       >
                         <Rocket className="h-3 w-3" strokeWidth={2.4} />
                         Create
-                      </motion.button>
+                      </button>
                     )}
                     <RowMenu
                       template={t}
@@ -217,14 +219,16 @@ export function OrderTemplatesTable({
                 </TableTd>
               </DataRow>
             ))}
-          </AnimatePresence>
         </DataTableBody>
       </DataTableShell>
 
       {/* Mobile cards — separate glass card so the table primitives stay
           table-shaped. Same domain content, different layout. */}
-      <div className="md:hidden overflow-hidden rounded-[var(--radius-xl)] glass divide-y divide-[var(--color-ink-100)]/60 dark:divide-white/[0.04]">
-        <AnimatePresence initial={false}>
+      <RowGroup
+        as="div"
+        signature={signature}
+        className="md:hidden overflow-hidden rounded-[var(--radius-xl)] glass divide-y divide-[var(--color-ink-100)]/60 dark:divide-white/[0.04]"
+      >
           {templates.map((t, i) => (
             <MobileCardRow
               key={t.id}
@@ -264,23 +268,21 @@ export function OrderTemplatesTable({
                 />
               </div>
               {t.isActive && (
-                <motion.button
+                <button
                   type="button"
-                  whileTap={{ scale: 0.96 }}
                   onClick={(e) => {
                     e.stopPropagation();
                     onDispatch(t);
                   }}
-                  className="mt-3 inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-3 py-2 text-[11.5px] font-semibold text-white dark:bg-[var(--color-brand-500)]"
+                  className="mt-3 inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-3 py-2 text-[11.5px] font-semibold text-white transition-transform duration-150 active:scale-[.98] dark:bg-[var(--color-brand-500)]"
                 >
                   <Rocket className="h-3.5 w-3.5" strokeWidth={2.3} />
                   Create order from this template
-                </motion.button>
+                </button>
               )}
             </MobileCardRow>
           ))}
-        </AnimatePresence>
-      </div>
+      </RowGroup>
     </>
   );
 }
@@ -447,20 +449,15 @@ function ActiveBadge({ active }: { active: boolean }) {
           : "bg-[var(--color-ink-100)] text-[var(--color-ink-500)] dark:bg-white/[0.06] dark:text-[var(--color-ink-400)]",
       )}
     >
+      {/* CSS breathe, not a motion loop: this badge repeats down the
+          table (twice — the hidden mobile list too), and a JS loop per
+          row kept the main thread busy for a decorative dot. */}
       <span
         className={cn(
-          "relative inline-flex h-1.5 w-1.5 rounded-full",
-          active ? "bg-[var(--color-success)]" : "bg-[var(--color-ink-300)]",
+          "inline-flex h-1.5 w-1.5 rounded-full",
+          active ? "breathe bg-[var(--color-success)]" : "bg-[var(--color-ink-300)]",
         )}
-      >
-        {active && (
-          <motion.span
-            className="absolute inset-0 rounded-full bg-[var(--color-success)]"
-            animate={{ scale: [1, 2.2, 1], opacity: [0.55, 0, 0.55] }}
-            transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
-          />
-        )}
-      </span>
+      />
       {active ? "Active" : "Inactive"}
     </span>
   );
@@ -491,7 +488,7 @@ function RowMenu({
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={busy}
-        className="cursor-pointer rounded-md p-1.5 text-[var(--color-ink-500)] transition-all hover:bg-[var(--color-ink-100)] hover:text-[var(--color-ink-900)] disabled:opacity-30 dark:hover:bg-white/10"
+        className="cursor-pointer rounded-md p-1.5 text-[var(--color-ink-500)] transition-colors hover:bg-[var(--color-ink-100)] hover:text-[var(--color-ink-900)] disabled:opacity-30 dark:hover:bg-white/10"
         aria-label={`Actions for ${template.name}`}
         aria-haspopup="menu"
         aria-expanded={open}

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { motion } from "motion/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, useInView, useReducedMotion } from "motion/react";
 import { Activity, Layers, Map as MapIcon, Radio } from "lucide-react";
 
 import { NumberTicker } from "@/components/primitives/number-ticker";
@@ -14,8 +14,9 @@ import {
   type StationDto,
 } from "@/lib/api/facility";
 import { useRobotPositions } from "@/components/facility/robot-layer";
+import { ease as easing, stagger } from "@/lib/motion";
 
-const ease = [0.22, 1, 0.36, 1] as const;
+const ease = easing.out;
 
 /* -------------------------------------------------------------------------- */
 /* FleetPulseStrip — a slim "live ops" band that sits between the hero and    */
@@ -89,6 +90,13 @@ export function FleetPulseStrip() {
     },
   ];
 
+  // The top-edge sheen loops only while the strip is on screen, and not at
+  // all under reduced motion.
+  const stripRef = useRef<HTMLDivElement>(null);
+  const inView = useInView(stripRef);
+  const reduced = useReducedMotion();
+  const sheenLive = inView && !reduced;
+
   const freshness = lastTickMs
     ? `${((performance.now() - lastTickMs) / 1000).toFixed(0)}s ago`
     : "syncing";
@@ -96,18 +104,19 @@ export function FleetPulseStrip() {
   return (
     <section className="mt-16 md:mt-20">
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
+        ref={stripRef}
+        initial={{ opacity: 0, y: 12 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-12%" }}
-        transition={{ duration: 0.6, ease }}
+        transition={{ duration: 0.4, ease }}
         className="glass-strong glass-edge relative overflow-hidden rounded-[var(--radius-xl)] px-5 py-4 sm:px-7 sm:py-5"
       >
         {/* Animated sheen along the top edge — Linear-style "alive" detail. */}
         <motion.span
           aria-hidden
           initial={{ x: "-100%" }}
-          animate={{ x: "200%" }}
-          transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
+          animate={sheenLive ? { x: "200%" } : { x: "-100%" }}
+          transition={sheenLive ? { duration: 6, repeat: Infinity, ease: "linear" } : { duration: 0 }}
           className="pointer-events-none absolute -top-px left-0 h-px w-1/3"
           style={{
             background:
@@ -146,7 +155,7 @@ export function FleetPulseStrip() {
                 initial={{ opacity: 0, y: 8 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.1 + i * 0.06, ease }}
+                transition={{ duration: 0.4, delay: 0.08 + stagger(i, 0.04), ease }}
                 className={cn(
                   "flex flex-col gap-0.5 md:flex-row md:items-baseline md:gap-3",
                   i > 0 && "md:border-l md:border-[var(--color-ink-100)]/70 md:pl-6 dark:md:border-white/[0.06]",

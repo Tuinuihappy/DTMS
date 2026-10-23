@@ -11,6 +11,7 @@ import {
   Copy,
   GripVertical,
   Layers,
+  Loader2,
   Map as MapIcon,
   Navigation,
   Plus,
@@ -26,6 +27,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { T } from "@/lib/motion";
 import {
   createOrderTemplate,
   updateOrderTemplate,
@@ -449,12 +451,7 @@ export function TemplateEditor({
             className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-[var(--color-brand-900)] px-5 py-2 text-[12.5px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(15,23,42,0.55)] transition-shadow disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[var(--color-brand-500)]"
           >
             {busy ? (
-              <motion.span
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                className="inline-block h-3.5 w-3.5 rounded-full border-2 border-white/40 border-t-white"
-                aria-hidden
-              />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2.4} aria-hidden />
             ) : (
               <Save className="h-3.5 w-3.5" strokeWidth={2.3} />
             )}
@@ -736,8 +733,8 @@ function MissionRow({
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -4, transition: { duration: 0.18 } }}
-      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      exit={{ opacity: 0, y: -4, transition: T.exit }}
+      transition={T.base}
       whileDrag={{
         scale: 1.015,
         boxShadow: "0 24px 48px -16px rgba(15,23,42,0.35)",
@@ -865,7 +862,7 @@ function MissionRow({
                       type="button"
                       onClick={() => onChange({ actionVariant: v })}
                       className={cn(
-                        "cursor-pointer rounded-full px-3 py-1 transition-all",
+                        "cursor-pointer rounded-full px-3 py-1 transition-[background-color,border-color,box-shadow,color,opacity]",
                         active
                           ? "bg-[var(--color-brand-900)] text-white dark:bg-[var(--color-brand-500)]"
                           : "text-[var(--color-ink-600)] hover:text-[var(--color-ink-900)]",
@@ -1002,9 +999,9 @@ function EditorCard({
 }) {
   return (
     <motion.section
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      transition={T.base}
       className="rounded-[var(--radius-xl)] glass p-5 sm:p-6"
     >
       <div className="mb-4 flex items-center justify-between gap-2">
@@ -1263,7 +1260,7 @@ function TypeToggle({
             type="button"
             onClick={() => onChange(t)}
             className={cn(
-              "cursor-pointer rounded-full px-2 py-0.5 transition-all",
+              "cursor-pointer rounded-full px-2 py-0.5 transition-[background-color,border-color,box-shadow,color,opacity]",
               active
                 ? isMove
                   ? "bg-[var(--color-pastel-mint-ink)] text-white shadow-[0_2px_6px_-2px_rgba(0,0,0,0.3)]"

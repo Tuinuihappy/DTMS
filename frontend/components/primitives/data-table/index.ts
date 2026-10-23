@@ -16,6 +16,7 @@ export {
 export { SortableTh } from "./sortable-th";
 export { DataRow } from "./data-row";
 export { MobileCardRow } from "./mobile-card-row";
+export { RowGroup, useRowEntrance } from "./row-group";
 export { TableSkeleton, TableSkeletonRows } from "./table-skeleton";
 export {
   TableEmptyState,

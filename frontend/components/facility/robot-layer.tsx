@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
+  cancelFrame,
+  frame,
   motion,
   useMotionValue,
+  useReducedMotion,
   useSpring,
 } from "motion/react";
 import {
@@ -16,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { T } from "@/lib/motion";
 import { usePollSchedule } from "@/lib/hooks/use-poll-schedule";
 import {
   getMapRobotPositions,
@@ -139,11 +143,15 @@ export function RobotLayer({
   worldPerPx,
   hoverId,
   onHover,
+  onHoverMove,
 }: {
   positions: RobotPositionDto[];
   worldPerPx: number;
   hoverId: string | null;
   onHover: (deviceKey: string | null) => void;
+  /** Called with the hovered robot's on-screen (sprung) world position every
+   *  frame it moves, so an HTML tooltip can ride along with the marker. */
+  onHoverMove?: (x: number, y: number) => void;
 }) {
   // Icon ~14 px tall on screen, battery ring at 11 px radius.
   const iconSize = 14 * worldPerPx;
@@ -161,6 +169,7 @@ export function RobotLayer({
           iconSize={iconSize}
           isHover={hoverId === p.deviceKey}
           onHover={onHover}
+          onMove={hoverId === p.deviceKey ? onHoverMove : undefined}
         />
       ))}
     </g>
@@ -184,6 +193,7 @@ function RobotMarker({
   iconSize,
   isHover,
   onHover,
+  onMove,
 }: {
   p: RobotPositionDto;
   ringR: number;
@@ -191,10 +201,12 @@ function RobotMarker({
   iconSize: number;
   isHover: boolean;
   onHover: (deviceKey: string | null) => void;
+  onMove?: (x: number, y: number) => void;
 }) {
   const state = classifyState(p);
   const meta = STATE_META[state];
   const isOffline = state === "OFFLINE";
+  const isAlarm = state === "ERROR";
   const opacity = isOffline ? 0.45 : 1;
 
   // Battery arc — empty = no arc, full = full circle.
@@ -213,23 +225,39 @@ function RobotMarker({
   const ySpring = useSpring(yMv, { stiffness: 90, damping: 22 });
   const thetaSpring = useSpring(thetaMv, { stiffness: 110, damping: 24 });
 
+  // MotionConfig's reducedMotion never reaches a hand-driven useSpring, so
+  // check it here: with reduced motion the marker jumps to each poll's
+  // position instead of gliding.
+  const reduceMotion = useReducedMotion();
   useEffect(() => {
     xMv.set(p.x);
     yMv.set(p.y);
     thetaMv.set(p.theta);
-  }, [p.x, p.y, p.theta, xMv, yMv, thetaMv]);
+    if (reduceMotion) {
+      // jump() stops the glide the .set() above just started.
+      xSpring.jump(p.x);
+      ySpring.jump(p.y);
+      thetaSpring.jump(p.theta);
+    }
+  }, [p.x, p.y, p.theta, xMv, yMv, thetaMv, xSpring, ySpring, thetaSpring, reduceMotion]);
+
+  // Latest hover-move callback, read by the frame writer below without
+  // re-subscribing the springs every time hover changes.
+  const onMoveRef = useRef(onMove);
 
   // Bypass Motion's component-layer attribute binding (which silently no-ops
   // for some SVG transform shapes at huge world units) and write the SVG
-  // `transform` attribute by hand. Each spring's `.on("change")` fires on
-  // every animation frame; setAttribute is cheap and guaranteed to commit.
+  // `transform` attribute by hand. x and y each fire `change` every frame;
+  // both schedule the same writer on Motion's render step, which de-dupes
+  // it, so it's one setAttribute per frame instead of two.
   const groupRef = useRef<SVGGElement>(null);
   const triangleRef = useRef<SVGGElement>(null);
   useEffect(() => {
     const writeGroup = () => {
-      const el = groupRef.current;
-      if (!el) return;
-      el.setAttribute("transform", `translate(${xSpring.get()} ${ySpring.get()})`);
+      const x = xSpring.get();
+      const y = ySpring.get();
+      groupRef.current?.setAttribute("transform", `translate(${x} ${y})`);
+      onMoveRef.current?.(x, y);
     };
     const writeTriangle = () => {
       const el = triangleRef.current;
@@ -237,35 +265,57 @@ function RobotMarker({
       const deg = (thetaSpring.get() * 180) / Math.PI;
       el.setAttribute("transform", `rotate(${deg})`);
     };
+    const scheduleGroup = () => frame.render(writeGroup);
+    const scheduleTriangle = () => frame.render(writeTriangle);
     writeGroup();
     writeTriangle();
     const unsubs = [
-      xSpring.on("change", writeGroup),
-      ySpring.on("change", writeGroup),
-      thetaSpring.on("change", writeTriangle),
+      xSpring.on("change", scheduleGroup),
+      ySpring.on("change", scheduleGroup),
+      thetaSpring.on("change", scheduleTriangle),
     ];
-    return () => unsubs.forEach((u) => u());
+    return () => {
+      unsubs.forEach((u) => u());
+      cancelFrame(writeGroup);
+      cancelFrame(writeTriangle);
+    };
   }, [xSpring, ySpring, thetaSpring]);
+
+  // On hover start, hand the tooltip the marker's current position before
+  // paint, so it opens on the marker rather than one frame later.
+  useLayoutEffect(() => {
+    onMoveRef.current = onMove;
+    onMove?.(xSpring.get(), ySpring.get());
+  }, [onMove, xSpring, ySpring]);
 
   return (
     <motion.g
       ref={groupRef}
       animate={{ opacity }}
-      transition={{ opacity: { duration: 0.3 } }}
+      transition={{ opacity: T.base }}
       onMouseEnter={() => onHover(p.deviceKey)}
       onMouseLeave={() => onHover(null)}
       className="cursor-pointer"
     >
-      {/* Active glow halo */}
+      {/* Glow halo — static. Only a robot in alarm (error / e-stop) gets a
+          ping ring: a fleet of endlessly breathing halos is a JS loop per
+          robot and says nothing, while one pulsing robot reads as "look
+          here". CSS, so it runs on the compositor and the reduced-motion
+          rule stills it. */}
       {!isOffline && (
-        <motion.circle
+        <circle cx={0} cy={0} r={ringR * 1.55} fill={meta.color} opacity={0.18} />
+      )}
+      {isAlarm && (
+        <circle
           cx={0}
           cy={0}
           r={ringR * 1.55}
-          fill={meta.color}
-          opacity={0.18}
-          animate={{ scale: [1, 1.15, 1] }}
-          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+          fill="none"
+          stroke={meta.color}
+          strokeWidth={stroke * 1.2}
+          className="animate-ping"
+          style={{ transformBox: "fill-box", transformOrigin: "center" }}
+          pointerEvents="none"
         />
       )}
 
@@ -340,26 +390,18 @@ function RobotMarker({
 /* -------------------------------------------------------------------------- */
 /* RobotTooltip — HTML overlay tooltip pinned to the hovered robot.           */
 /* Rendered outside the SVG so text is real CSS (anti-aliased) and we get     */
-/* glass styling. The parent computes screen-px coords from world coords.     */
+/* glass styling. Renders at its parent's origin, anchored by its bottom      */
+/* centre; the parent moves itself onto the robot's screen position.          */
 /* -------------------------------------------------------------------------- */
-export function RobotTooltip({
-  robot,
-  left,
-  top,
-}: {
-  robot: RobotPositionDto;
-  left: number;
-  top: number;
-}) {
+export function RobotTooltip({ robot }: { robot: RobotPositionDto }) {
   const state = classifyState(robot);
   const meta = STATE_META[state];
   return (
     <motion.div
       initial={{ opacity: 0, y: 6, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-      style={{ left, top }}
-      className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+12px)] glass-strong rounded-[16px] px-3.5 py-3 min-w-[220px] max-w-[280px] shadow-[0_30px_60px_-20px_rgba(15,23,42,0.45)]"
+      transition={T.fast}
+      className="pointer-events-none absolute left-0 top-0 -translate-x-1/2 -translate-y-[calc(100%+12px)] glass-strong rounded-[16px] px-3.5 py-3 min-w-[220px] max-w-[280px] shadow-[0_30px_60px_-20px_rgba(15,23,42,0.45)]"
     >
       <div className="flex items-start gap-2.5">
         <span

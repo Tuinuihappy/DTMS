@@ -92,7 +92,7 @@ export function SavedFiltersMenu({
         className={cn(
           "inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-semibold",
           "bg-white/60 text-[var(--color-ink-700)] border border-white/70",
-          "transition-all hover:bg-white/90",
+          "transition-[background-color,border-color,box-shadow,color,opacity] hover:bg-white/90",
           "dark:bg-white/[0.05] dark:text-[var(--color-ink-700)] dark:border-white/10 dark:hover:bg-white/[0.1]",
         )}
       >

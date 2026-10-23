@@ -34,6 +34,7 @@ import { UomCombobox } from "@/components/primitives/uom-combobox";
 import { WmsLocationCombobox } from "@/components/primitives/wms-location-combobox";
 import { useWmsLocationCatalog } from "@/lib/api/wms-locations";
 import { cn } from "@/lib/utils";
+import { T, spring } from "@/lib/motion";
 import {
   fromDateTimeLocalInput,
   toDateTimeLocalInput,
@@ -415,8 +416,8 @@ export function CreateOrderDialog({
               {...panelProps}
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
-              transition={{ type: "spring", stiffness: 360, damping: 30 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12, transition: T.exit }}
+              transition={spring.dialog}
               className={cn(
                 "pointer-events-auto relative w-full max-w-2xl overflow-hidden rounded-[var(--radius-xl)] outline-none",
                 "glass-strong",
@@ -452,10 +453,13 @@ export function CreateOrderDialog({
               <div className="px-6">
                 <div className="relative h-1 overflow-hidden rounded-full bg-[var(--color-ink-100)] dark:bg-white/10">
                   <motion.div
+                    // scaleX, not width: width re-laid-out the header on
+                    // every frame of the spring; a transform stays on the
+                    // compositor.
                     initial={false}
-                    animate={{ width: step === 0 ? "50%" : "100%" }}
-                    transition={{ type: "spring", stiffness: 220, damping: 28 }}
-                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-[var(--color-brand-500)] to-[var(--color-brand-400)]"
+                    animate={{ scaleX: step === 0 ? 0.5 : 1 }}
+                    transition={spring.gentle}
+                    className="absolute inset-0 origin-left bg-gradient-to-r from-[var(--color-brand-500)] to-[var(--color-brand-400)]"
                   />
                 </div>
               </div>
@@ -599,7 +603,7 @@ export function CreateOrderDialog({
                               disabled={isRevise}
                               className={cn(
                                 isRevise && "cursor-not-allowed opacity-60",
-                                "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition-all",
+                                "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition-[background-color,border-color,box-shadow,color,opacity]",
                                 opt.active
                                   ? "bg-[var(--color-brand-900)] text-white shadow-[0_2px_8px_-3px_rgba(15,23,42,0.45)] dark:bg-[var(--color-brand-500)]"
                                   : "bg-white/50 text-[var(--color-ink-600)] hover:bg-white/80 dark:bg-white/[0.05] dark:hover:bg-white/[0.1]",
@@ -996,7 +1000,7 @@ export function CreateOrderDialog({
                                               });
                                             }}
                                             className={cn(
-                                              "rounded-full px-2.5 py-1 text-[10.5px] font-semibold transition-all",
+                                              "rounded-full px-2.5 py-1 text-[10.5px] font-semibold transition-[background-color,border-color,box-shadow,color,opacity]",
                                               active
                                                 ? "bg-[var(--color-amber-soft)] text-[var(--color-amber-600)] shadow-[0_2px_8px_-3px_rgba(245,158,11,0.4)]"
                                                 : "bg-white/50 text-[var(--color-ink-600)] hover:bg-white/80 dark:bg-white/[0.05] dark:hover:bg-white/[0.1]",
@@ -1023,7 +1027,7 @@ export function CreateOrderDialog({
                             items: [...form.items, { ...EMPTY_ITEM }],
                           })
                         }
-                        className="inline-flex items-center gap-1.5 rounded-full bg-white/40 px-3 py-1.5 text-[12px] font-semibold text-[var(--color-brand-500)] transition-all hover:bg-white/70 dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-white/40 px-3 py-1.5 text-[12px] font-semibold text-[var(--color-brand-500)] transition-[background-color,border-color,box-shadow,color,opacity] hover:bg-white/70 dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
                       >
                         <Plus className="h-3.5 w-3.5" strokeWidth={2.4} />
                         Add another item
@@ -1074,7 +1078,7 @@ export function CreateOrderDialog({
                       whileHover={canAdvance ? { y: -1 } : {}}
                       whileTap={canAdvance ? { scale: 0.97 } : {}}
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all",
+                        "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-[background-color,border-color,box-shadow,color,opacity]",
                         canAdvance
                           ? "bg-[var(--color-brand-900)] text-white hover:shadow-[0_14px_36px_-12px_rgba(15,23,42,0.6)] dark:bg-[var(--color-brand-500)]"
                           : "bg-[var(--color-ink-100)] text-[var(--color-ink-400)] cursor-not-allowed dark:bg-white/[0.04]",
@@ -1091,7 +1095,7 @@ export function CreateOrderDialog({
                       whileHover={canAdvance && !submitting ? { y: -1 } : {}}
                       whileTap={canAdvance && !submitting ? { scale: 0.97 } : {}}
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all",
+                        "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-[background-color,border-color,box-shadow,color,opacity]",
                         canAdvance && !submitting
                           ? "bg-[var(--color-success)] text-white hover:shadow-[0_14px_36px_-12px_rgba(16,185,129,0.55)]"
                           : "bg-[var(--color-ink-100)] text-[var(--color-ink-400)] cursor-not-allowed dark:bg-white/[0.04]",
@@ -1131,7 +1135,7 @@ export function CreateOrderDialog({
 
 const inputCls = cn(
   "w-full rounded-lg bg-white/70 px-3 py-2 text-[13px] font-medium",
-  "border border-white/80 backdrop-blur-md transition-all",
+  "border border-white/80 backdrop-blur-md transition-[background-color,border-color,box-shadow,color,opacity]",
   "placeholder:text-[var(--color-ink-400)] text-[var(--color-ink-900)]",
   "focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/40 focus:border-[var(--color-brand-500)]/30",
   "dark:bg-white/[0.05] dark:border-white/10",

@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "motion/react";
+import { motion, useInView, useReducedMotion } from "motion/react";
+import { useRef } from "react";
 
 /**
  * Faux-3D hero piece — no Three.js / Spline. Just CSS + Motion:
@@ -12,27 +13,41 @@ import { motion } from "motion/react";
  *   - One "hero shard" anchored centre-right with a refraction sheen.
  *
  * The whole thing reads as a chunky 3D object on a holographic dais
- * without paying the WebGL / runtime cost. Loops are 6-12 s and
- * `prefers-reduced-motion` halts them via the globals.css guard.
+ * without paying the WebGL / runtime cost. Loops are 6-12 s, run only
+ * while the visual is on screen, and never start under reduced motion.
  */
 export function FauxThreeDVisual() {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref);
+  const reduced = useReducedMotion();
+  const live = inView && !reduced;
   return (
-    <div className="relative aspect-[5/6] md:aspect-[4/5] w-full select-none [perspective:1200px]">
-      {/* Mesh gradient atmosphere — rotates slowly behind everything */}
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
-        className="absolute inset-[-15%] opacity-90"
+    <div ref={ref} className="relative aspect-[5/6] md:aspect-[4/5] w-full select-none [perspective:1200px]">
+      {/* Mesh gradient atmosphere — rotates slowly behind everything.
+          The blur sits on a static child and only the wrapper rotates (CSS
+          `spin`, compositor-only): with will-change the blurred layer is
+          rasterised once and turned as a texture, instead of re-running a
+          40px blur over an oversized layer every frame. */}
+      <div
+        className="absolute inset-[-15%] opacity-90 will-change-transform"
         style={{
-          background:
-            "radial-gradient(circle at 25% 30%, #b8c5ff 0%, transparent 40%)," +
-            "radial-gradient(circle at 80% 20%, #ffcdb2 0%, transparent 45%)," +
-            "radial-gradient(circle at 70% 80%, #c7f0d8 0%, transparent 40%)," +
-            "radial-gradient(circle at 20% 75%, #e5cfff 0%, transparent 45%)",
-          filter: "blur(40px)",
+          animation: "spin 60s linear infinite",
+          animationPlayState: live ? "running" : "paused",
         }}
         aria-hidden
-      />
+      >
+        <div
+          className="h-full w-full"
+          style={{
+            background:
+              "radial-gradient(circle at 25% 30%, #b8c5ff 0%, transparent 40%)," +
+              "radial-gradient(circle at 80% 20%, #ffcdb2 0%, transparent 45%)," +
+              "radial-gradient(circle at 70% 80%, #c7f0d8 0%, transparent 40%)," +
+              "radial-gradient(circle at 20% 75%, #e5cfff 0%, transparent 45%)",
+            filter: "blur(40px)",
+          }}
+        />
+      </div>
 
       {/* Soft white dais — a faint disc the shards "stand on" */}
       <div
@@ -51,6 +66,7 @@ export function FauxThreeDVisual() {
         rotateRange={[-8, 8]}
         yRange={[0, -14]}
         duration={9}
+        live={live}
       >
         <div
           className="h-full w-full rounded-full"
@@ -79,6 +95,7 @@ export function FauxThreeDVisual() {
         rotateRange={[-4, 4]}
         yRange={[0, -10]}
         duration={11}
+        live={live}
       >
         <div
           className="relative h-full w-full overflow-hidden rounded-[40%]"
@@ -117,6 +134,7 @@ export function FauxThreeDVisual() {
         rotateRange={[-12, 12]}
         yRange={[0, 12]}
         duration={7}
+        live={live}
       >
         <div
           className="h-full w-full rounded-full"
@@ -136,6 +154,7 @@ export function FauxThreeDVisual() {
         rotateRange={[-6, 6]}
         yRange={[0, -8]}
         duration={8}
+        live={live}
       >
         <div
           className="h-full w-full rounded-full"
@@ -164,6 +183,7 @@ export function FauxThreeDVisual() {
         rotateRange={[-15, 15]}
         yRange={[-6, 6]}
         duration={6}
+        live={live}
       >
         <div
           className="h-full w-full rounded-full"
@@ -204,28 +224,36 @@ function FloatingShard({
   yRange,
   rotateRange,
   duration,
+  live,
 }: {
   children: React.ReactNode;
   className?: string;
   yRange: [number, number];
   rotateRange: [number, number];
   duration: number;
+  /** False offscreen / under reduced motion — the loop stops at rest. */
+  live: boolean;
 }) {
   return (
     <motion.div
-      animate={{
-        y: yRange,
-        rotate: rotateRange,
-      }}
-      transition={{
-        y: { duration, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" },
-        rotate: {
-          duration: duration * 1.3,
-          repeat: Infinity,
-          repeatType: "reverse",
-          ease: "easeInOut",
-        },
-      }}
+      animate={
+        live
+          ? { y: yRange, rotate: rotateRange }
+          : { y: yRange[0], rotate: 0 }
+      }
+      transition={
+        live
+          ? {
+              y: { duration, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" },
+              rotate: {
+                duration: duration * 1.3,
+                repeat: Infinity,
+                repeatType: "reverse",
+                ease: "easeInOut",
+              },
+            }
+          : { duration: 0 }
+      }
       className={className}
       style={{ transformStyle: "preserve-3d" }}
     >

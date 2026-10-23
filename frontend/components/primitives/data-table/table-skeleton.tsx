@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -8,6 +5,11 @@ import { cn } from "@/lib/utils";
  * layout doesn't shift on data arrival (CLS audit win). Renders inside
  * the glass shell so callers can drop it directly under their search/
  * filter chrome.
+ *
+ * The pulse is CSS (.skeleton-pulse in globals.css), not a motion loop:
+ * it runs off the main thread, costs no renders, and the reduced-motion
+ * rule stills it. No "use client" needed — app/(app)/loading.tsx renders
+ * it from the server.
  */
 export function TableSkeleton({
   rows = 6,
@@ -34,12 +36,10 @@ export function TableSkeleton({
       </div>
       <div className="space-y-2 px-2 pb-2">
         {Array.from({ length: rows }).map((_, i) => (
-          <motion.div
+          <div
             key={i}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [0.4, 0.7, 0.4] }}
-            transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.06 }}
-            className="h-12 rounded-xl bg-[var(--color-ink-100)] dark:bg-white/[0.04]"
+            className="skeleton-pulse h-12 rounded-xl bg-[var(--color-ink-100)] dark:bg-white/[0.04]"
+            style={{ animationDelay: `${i * 60}ms` }}
             aria-hidden
           />
         ))}
@@ -69,11 +69,9 @@ export function TableSkeletonRows({
       {Array.from({ length: rows }).map((_, i) => (
         <tr key={i} aria-hidden>
           <td colSpan={colSpan} className="px-3 py-2">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: [0.4, 0.7, 0.4] }}
-              transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.06 }}
-              className="h-6 rounded-md bg-[var(--color-ink-100)] dark:bg-white/[0.04]"
+            <div
+              className="skeleton-pulse h-6 rounded-md bg-[var(--color-ink-100)] dark:bg-white/[0.04]"
+              style={{ animationDelay: `${i * 60}ms` }}
             />
           </td>
         </tr>

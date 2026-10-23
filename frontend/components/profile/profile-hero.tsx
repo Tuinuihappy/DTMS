@@ -6,8 +6,9 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useProfileData } from "@/components/profile/profile-context";
 import { Avatar } from "@/components/primitives/avatar";
 import { StatusPulse } from "@/components/primitives/status-pulse";
+import { ease } from "@/lib/motion";
 
-const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+const EASE = ease.out;
 
 export function ProfileHero() {
   const { user } = useAuth();
@@ -30,7 +31,7 @@ export function ProfileHero() {
     <motion.section
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.65, ease: EASE }}
+      transition={{ duration: 0.5, ease: EASE }}
       className="relative overflow-hidden rounded-[var(--radius-2xl)] mt-2"
     >
       <HeroBackdrop />
@@ -42,7 +43,7 @@ export function ProfileHero() {
             <motion.div
               initial={{ opacity: 0, scale: 0.92, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.15, ease: EASE }}
+              transition={{ duration: 0.5, delay: 0.06, ease: EASE }}
               className="relative"
             >
               <div className="relative rounded-full p-[3px] bg-gradient-to-br from-white/95 via-white/70 to-white/30 shadow-[0_18px_42px_-18px_rgba(15,23,42,0.5)] dark:from-white/40 dark:via-white/15 dark:to-white/5">
@@ -76,7 +77,7 @@ export function ProfileHero() {
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55, delay: 0.25, ease: EASE }}
+                transition={{ duration: 0.4, delay: 0.1, ease: EASE }}
                 className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/30 px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-[var(--color-ink-700)] backdrop-blur-md dark:border-white/10 dark:bg-white/[0.08] dark:text-[var(--color-ink-700)]"
               >
                 <ShieldCheck className="h-3 w-3 text-[var(--color-brand-500)]" strokeWidth={2.4} />
@@ -86,7 +87,7 @@ export function ProfileHero() {
               <motion.h1
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.65, delay: 0.32, ease: EASE }}
+                transition={{ duration: 0.45, delay: 0.13, ease: EASE }}
                 className="mt-3 font-display text-[2.2rem] leading-[1.05] font-semibold tracking-[-0.035em] text-[var(--color-ink-900)] sm:text-[2.65rem] md:text-[3rem]"
               >
                 {displayName}
@@ -95,7 +96,7 @@ export function ProfileHero() {
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55, delay: 0.42, ease: EASE }}
+                transition={{ duration: 0.4, delay: 0.16, ease: EASE }}
                 className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-[var(--color-ink-600)]"
               >
                 <span className="inline-flex items-center gap-1.5 font-mono text-[12.5px] tracking-tight text-[var(--color-ink-700)]">
@@ -122,7 +123,7 @@ export function ProfileHero() {
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.5, ease: EASE }}
+            transition={{ duration: 0.4, delay: 0.2, ease: EASE }}
             className="flex flex-wrap items-center gap-2.5"
           >
             <button className="inline-flex items-center gap-2 rounded-full border border-[var(--color-ink-200)]/70 bg-white/70 px-4 py-2.5 text-[13px] font-medium text-[var(--color-ink-700)] backdrop-blur-md transition-all hover:-translate-y-px hover:bg-white cursor-pointer dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.12]">
@@ -206,79 +207,43 @@ function HeroBackdrop() {
         aria-hidden
       >
         <defs>
+          {/* One gradient for both themes — stop colours and stroke widths
+              switch via CSS (dark:), so a single set of paths animates
+              instead of a hidden duplicate set drawing itself offscreen. */}
           <linearGradient id="route-line" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="rgba(255,107,91,0)" />
-            <stop offset="40%" stopColor="rgba(255,107,91,0.45)" />
-            <stop offset="100%" stopColor="rgba(79,93,255,0.55)" />
-          </linearGradient>
-          <linearGradient id="route-line-dark" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="rgba(255,123,109,0)" />
-            <stop offset="40%" stopColor="rgba(255,123,109,0.55)" />
-            <stop offset="100%" stopColor="rgba(139,149,255,0.7)" />
+            <stop offset="0%" className="[stop-color:rgba(255,107,91,0)] dark:[stop-color:rgba(255,123,109,0)]" />
+            <stop offset="40%" className="[stop-color:rgba(255,107,91,0.45)] dark:[stop-color:rgba(255,123,109,0.55)]" />
+            <stop offset="100%" className="[stop-color:rgba(79,93,255,0.55)] dark:[stop-color:rgba(139,149,255,0.7)]" />
           </linearGradient>
         </defs>
 
-        {/* Light routes */}
-        <g className="dark:hidden">
+        <g>
           <motion.path
             d="M -20 280 Q 200 220 380 240 T 720 180 T 1220 90"
             stroke="url(#route-line)"
-            strokeWidth={1.4}
+            className="[stroke-width:1.4] dark:[stroke-width:1.6]"
             fill="none"
             initial={{ pathLength: 0, opacity: 0 }}
             animate={{ pathLength: 1, opacity: 1 }}
-            transition={{ duration: 1.8, ease: EASE, delay: 0.1 }}
+            transition={{ duration: 0.9, ease: EASE, delay: 0.05 }}
           />
           <motion.path
             d="M -20 60 Q 240 130 460 100 T 820 200 T 1220 260"
             stroke="url(#route-line)"
-            strokeWidth={1}
+            className="[stroke-width:1] dark:[stroke-width:1.1]"
             fill="none"
             initial={{ pathLength: 0, opacity: 0 }}
             animate={{ pathLength: 1, opacity: 0.7 }}
-            transition={{ duration: 2.1, ease: EASE, delay: 0.3 }}
+            transition={{ duration: 1, ease: EASE, delay: 0.1 }}
           />
           <motion.path
             d="M -20 180 Q 260 230 520 200 T 980 140 T 1220 170"
-            stroke="rgba(15,23,42,0.06)"
-            strokeWidth={0.8}
+            className="stroke-[rgba(15,23,42,0.06)] [stroke-width:0.8] dark:stroke-[rgba(255,255,255,0.08)] dark:[stroke-width:0.9]"
             strokeDasharray="3 6"
             fill="none"
             initial={{ pathLength: 0 }}
             animate={{ pathLength: 1 }}
-            transition={{ duration: 2.4, ease: EASE, delay: 0.5 }}
-          />
-        </g>
-
-        {/* Dark routes */}
-        <g className="hidden dark:block">
-          <motion.path
-            d="M -20 280 Q 200 220 380 240 T 720 180 T 1220 90"
-            stroke="url(#route-line-dark)"
-            strokeWidth={1.6}
-            fill="none"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ pathLength: 1, opacity: 1 }}
-            transition={{ duration: 1.8, ease: EASE, delay: 0.1 }}
-          />
-          <motion.path
-            d="M -20 60 Q 240 130 460 100 T 820 200 T 1220 260"
-            stroke="url(#route-line-dark)"
-            strokeWidth={1.1}
-            fill="none"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ pathLength: 1, opacity: 0.75 }}
-            transition={{ duration: 2.1, ease: EASE, delay: 0.3 }}
-          />
-          <motion.path
-            d="M -20 180 Q 260 230 520 200 T 980 140 T 1220 170"
-            stroke="rgba(255,255,255,0.08)"
-            strokeWidth={0.9}
-            strokeDasharray="3 6"
-            fill="none"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ duration: 2.4, ease: EASE, delay: 0.5 }}
+            transition={{ duration: 1.1, ease: EASE, delay: 0.15 }}
           />
         </g>
 
@@ -297,7 +262,7 @@ function HeroBackdrop() {
             className="fill-[var(--color-coral)] dark:fill-[var(--color-coral)]"
             initial={{ opacity: 0, scale: 0 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4, delay: 1.2 + i * 0.12, ease: EASE }}
+            transition={{ duration: 0.3, delay: 0.5 + i * 0.06, ease: EASE }}
           />
         ))}
       </svg>

@@ -1,9 +1,17 @@
 "use client";
 
-import { motion } from "motion/react";
+import {
+  type AnimationPlaybackControls,
+  motion,
+  useAnimate,
+  useInView,
+  useReducedMotion,
+} from "motion/react";
+import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/primitives/avatar";
+import { ease as easing } from "@/lib/motion";
 
-const ease = [0.22, 1, 0.36, 1] as const;
+const ease = easing.out;
 
 type Testimonial = {
   quote: string;
@@ -114,16 +122,48 @@ function Marquee({
   reverse?: boolean;
   className?: string;
 }) {
+  // One long-lived animation, paused rather than torn down: offscreen
+  // nobody sees it, and on hover the reader needs the card to hold still.
+  // Never started under reduced motion — the row just sits there.
+  const [scope, animate] = useAnimate<HTMLDivElement>();
+  const controls = useRef<AnimationPlaybackControls | null>(null);
+  const inView = useInView(scope);
+  const reduced = useReducedMotion();
+  const [hovered, setHovered] = useState(false);
+  const live = inView && !hovered && !reduced;
+
+  useEffect(() => {
+    if (reduced) return;
+    const c = animate(
+      scope.current,
+      { x: reverse ? ["-50%", "0%"] : ["0%", "-50%"] },
+      { duration: speed, repeat: Infinity, ease: "linear" },
+    );
+    c.pause();
+    controls.current = c;
+    return () => {
+      c.stop();
+      controls.current = null;
+    };
+  }, [animate, scope, reverse, speed, reduced]);
+
+  useEffect(() => {
+    const c = controls.current;
+    if (!c) return;
+    if (live) c.play();
+    else c.pause();
+  }, [live, reduced, reverse, speed]);
+
   return (
-    <div className={"flex gap-4 " + (className ?? "")}>
-      <motion.div
-        animate={{ x: reverse ? ["-50%", "0%"] : ["0%", "-50%"] }}
-        transition={{ duration: speed, repeat: Infinity, ease: "linear" }}
-        className="flex shrink-0 gap-4"
-      >
+    <div
+      className={"flex gap-4 " + (className ?? "")}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+    >
+      <div ref={scope} className="flex shrink-0 gap-4">
         {children}
         {children}
-      </motion.div>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,9 @@
 "use client";
 
 import { Bot, Hand } from "lucide-react";
+import { motion } from "motion/react";
+import { useState, type ReactNode } from "react";
+import { T } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { OrderStatus, Priority, TransportMode } from "@/lib/api/delivery-orders";
 
@@ -54,29 +57,81 @@ const TONE_DOT: Record<StatusVisual["tone"], string> = {
   coral: "bg-[var(--color-coral)]",
 };
 
-export function StatusBadge({ status, size = "sm" }: { status: OrderStatus; size?: "sm" | "md" }) {
+/**
+ * Re-plays a short fade on its children when `value` changes after mount,
+ * so a status flipping under the operator's eyes (poll / realtime) reads
+ * as a change, not a silent swap. Plain fragment until the first change:
+ * a 50-row table mounts no motion nodes for it.
+ */
+export function SwapOnChange({ value, children }: { value: string; children: ReactNode }) {
+  const [prev, setPrev] = useState(value);
+  const [gen, setGen] = useState(0);
+  if (value !== prev) {
+    setPrev(value);
+    setGen((g) => g + 1);
+  }
+  if (gen === 0) return <>{children}</>;
+  return (
+    <motion.span
+      key={gen}
+      initial={{ opacity: 0, y: 3 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={T.fast}
+      // Same gap as the badge, so wrapping the dot + label doesn't shift them.
+      className="inline-flex items-center gap-1.5"
+    >
+      {children}
+    </motion.span>
+  );
+}
+
+/**
+ * Live dot. `ping` (the expanding ring) is for a badge shown once — a
+ * drawer header. Down a table it was dozens of compositor loops of noise;
+ * there the dot breathes instead.
+ */
+export function LiveDot({ className, ping }: { className: string; ping: boolean }) {
+  return (
+    <span className="relative inline-flex h-1.5 w-1.5">
+      <span className={cn("absolute inset-0 rounded-full", className, !ping && "breathe")} />
+      {ping && (
+        <span className={cn("absolute inset-0 rounded-full animate-ping opacity-60", className)} />
+      )}
+    </span>
+  );
+}
+
+export function StatusBadge({
+  status,
+  size = "sm",
+  ping = size === "md",
+}: {
+  status: OrderStatus;
+  size?: "sm" | "md";
+  /** Expanding ring on live statuses. Defaults on for the `md` (drawer
+   *  header) size only. */
+  ping?: boolean;
+}) {
   const v = STATUS_VISUAL[status] ?? { label: status, tone: "ink" as const };
   const sizes = size === "md" ? "px-2.5 py-1 text-[11.5px]" : "px-2 py-[3px] text-[10.5px]";
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full font-semibold uppercase tracking-[0.08em] whitespace-nowrap",
+        // Background/text crossfade when the status (tone) changes.
+        "transition-colors duration-300",
         sizes,
         TONE_BG[v.tone],
       )}
     >
-      <span className="relative inline-flex h-1.5 w-1.5">
-        <span className={cn("absolute inset-0 rounded-full", TONE_DOT[v.tone])} />
-        {v.pulse && (
-          <span
-            className={cn(
-              "absolute inset-0 rounded-full animate-ping opacity-60",
-              TONE_DOT[v.tone],
-            )}
-          />
+      <SwapOnChange value={status}>
+        {v.pulse ? (
+          <LiveDot className={TONE_DOT[v.tone]} ping={ping} />
+        ) : (
+          <span className={cn("inline-flex h-1.5 w-1.5 rounded-full", TONE_DOT[v.tone])} />
         )}
-      </span>
-      {v.label}
+        {v.label}
+      </SwapOnChange>
     </span>
   );
 }
@@ -122,7 +177,7 @@ export function PriorityBadge({ priority }: { priority: Priority }) {
           <span
             key={n}
             className={cn(
-              "w-[3px] rounded-full transition-all",
+              "w-[3px] rounded-full transition-opacity",
               n <= v.bars ? "bg-current" : "bg-current opacity-15",
             )}
             style={{ height: `${4 + n * 2}px` }}
@@ -184,7 +239,7 @@ export function FilterChip({
       type="button"
       onClick={onClick}
       className={cn(
-        "group inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all duration-200",
+        "group inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-[background-color,box-shadow,color,scale] duration-200",
         "border border-transparent",
         active
           ? cn(TONE_BG[tone], "shadow-[0_4px_14px_-6px_rgba(15,23,42,0.18)] scale-[1.02]")

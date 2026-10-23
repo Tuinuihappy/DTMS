@@ -38,6 +38,7 @@ import { TripDetailDrawer } from "@/components/dispatch/trip-detail-drawer";
 import { FullAuditLog } from "./full-audit-log";
 import { useOrderHubSubscription } from "@/lib/realtime/hubs/order-hub";
 import type { FullAuditEntryDto } from "@/lib/api/delivery-orders";
+import { T, listItem, spring } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { DateTime } from "@/components/primitives/date-time";
 import { PriorityBadge, StatusBadge, TransportModeBadge } from "./badges";
@@ -104,13 +105,50 @@ export function OrderDetailDrawer({
   // here because FullAuditLog covers all categories including status.
   const [liveActivityEntry, setLiveActivityEntry] = useState<FullAuditEntryDto | null>(null);
 
-  useOrderHubSubscription(orderId, {
-    ActivityUpdated: (entry) => setLiveActivityEntry(entry as FullAuditEntryDto),
-  });
-
   // Which order the load effect last fetched — tells a refreshKey reload
   // apart from switching to a different order.
   const loadedOrderIdRef = useRef<string | null>(null);
+
+  // Live activity also changes what the header shows — status badge, the
+  // action buttons, trip states — not only the audit log. Re-read the
+  // order (debounced, so a burst costs one request), the same way the
+  // trip drawer does. Without it the badge stayed on the status the
+  // drawer opened with.
+  const reloadTimer = useRef<number | null>(null);
+  const reloadLatest = useRef<() => void>(() => {});
+  useEffect(() => {
+    reloadLatest.current = () => {
+      if (!orderId) return;
+      const asked = orderId;
+      getOrder(asked)
+        .then((d) => {
+          if (loadedOrderIdRef.current === asked) setData(d);
+        })
+        .catch(() => undefined);
+      getTripsByOrder(asked)
+        .then((t) => {
+          if (loadedOrderIdRef.current === asked) setTrips(t);
+        })
+        .catch(() => undefined);
+    };
+  }, [orderId]);
+  useEffect(
+    () => () => {
+      if (reloadTimer.current !== null) window.clearTimeout(reloadTimer.current);
+    },
+    [orderId],
+  );
+
+  useOrderHubSubscription(orderId, {
+    ActivityUpdated: (entry) => {
+      setLiveActivityEntry(entry as FullAuditEntryDto);
+      if (reloadTimer.current !== null) window.clearTimeout(reloadTimer.current);
+      reloadTimer.current = window.setTimeout(() => {
+        reloadTimer.current = null;
+        reloadLatest.current();
+      }, 500);
+    },
+  });
 
   useEffect(() => {
     if (!orderId) {
@@ -128,6 +166,10 @@ export function OrderDetailDrawer({
     const reloadingSameOrder = loadedOrderIdRef.current === orderId;
     loadedOrderIdRef.current = orderId;
     if (!reloadingSameOrder) {
+      // Switching orders: drop the previous one now, or its body and
+      // badges sit under the new order's skeleton title until the fetch
+      // lands.
+      setData(null);
       setLoading(true);
       setTimeline(null);
       setTrips(null);
@@ -184,7 +226,7 @@ export function OrderDetailDrawer({
         open={!!orderId}
         onClose={onClose}
         initialFocus="panel"
-        backdropClassName="bg-[var(--color-ink-900)]/40 backdrop-blur-sm"
+        backdropClassName="bg-[var(--color-ink-900)]/40"
       >
         {({ panelProps, titleId, panelStyle }) =>
           orderId && (
@@ -195,7 +237,7 @@ export function OrderDetailDrawer({
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 340, damping: 38 }}
+            transition={spring.drawer}
             className={cn(
               "fixed right-0 top-0 flex h-full w-full flex-col overflow-hidden outline-none",
               "sm:w-[min(560px,100vw)]",
@@ -209,7 +251,7 @@ export function OrderDetailDrawer({
                   Delivery order
                 </div>
                 {loading ? (
-                  <div className="mt-2 h-7 w-40 animate-pulse rounded-md bg-[var(--color-ink-100)]" />
+                  <div className="mt-2 h-7 w-40 skeleton-pulse rounded-md bg-[var(--color-ink-100)]" />
                 ) : (
                   <h2 id={titleId} className="font-mono mt-1 text-[1.4rem] font-semibold text-[var(--color-ink-900)] truncate">
                     {data?.orderRef ?? "—"}
@@ -246,7 +288,7 @@ export function OrderDetailDrawer({
                   {Array.from({ length: 6 }).map((_, i) => (
                     <div
                       key={i}
-                      className="h-14 animate-pulse rounded-xl bg-[var(--color-ink-100)] dark:bg-white/[0.05]"
+                      className="h-14 skeleton-pulse rounded-xl bg-[var(--color-ink-100)] dark:bg-white/[0.05]"
                     />
                   ))}
                 </div>
@@ -254,9 +296,12 @@ export function OrderDetailDrawer({
 
               {data && (
                 <motion.div
-                  initial={{ opacity: 0, y: 8 }}
+                  // Keyed by order so hopping between orders crossfades;
+                  // a same-order reload updates in place.
+                  key={data.id}
+                  initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4 }}
+                  transition={T.fast}
                   className="space-y-6"
                 >
                   {/* Meta */}
@@ -337,7 +382,7 @@ export function OrderDetailDrawer({
                             key={j.id}
                             initial={{ opacity: 0, x: -6 }}
                             animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.32, delay: i * 0.04 }}
+                            transition={listItem(i)}
                             className="rounded-xl border border-[var(--color-ink-100)] bg-[var(--color-surface)] px-4 py-3 dark:border-white/[0.05] dark:bg-white/[0.02]"
                           >
                             <div className="flex items-center gap-2 flex-wrap">
@@ -383,8 +428,8 @@ export function OrderDetailDrawer({
                             onClick={() => setOpenTripId(t.id)}
                             initial={{ opacity: 0, x: -6 }}
                             animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.32, delay: i * 0.04 }}
-                            className="group flex w-full items-center justify-between gap-3 rounded-xl border border-[var(--color-ink-100)] bg-[var(--color-surface)] px-4 py-3 text-left transition-all hover:border-[var(--color-brand-500)]/40 hover:bg-[var(--color-surface-soft)] dark:border-white/[0.05] dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
+                            transition={listItem(i)}
+                            className="group flex w-full items-center justify-between gap-3 rounded-xl border border-[var(--color-ink-100)] bg-[var(--color-surface)] px-4 py-3 text-left transition-[background-color,border-color,box-shadow,color,opacity] hover:border-[var(--color-brand-500)]/40 hover:bg-[var(--color-surface-soft)] dark:border-white/[0.05] dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
                           >
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -449,7 +494,7 @@ export function OrderDetailDrawer({
                           key={it.id}
                           initial={{ opacity: 0, x: -8 }}
                           animate={{ opacity: 1, x: 0 }}
-                          transition={{ duration: 0.35, delay: i * 0.04 }}
+                          transition={listItem(i)}
                           className="rounded-xl border border-[var(--color-ink-100)] bg-[var(--color-surface)] px-4 py-3 dark:border-white/[0.05] dark:bg-white/[0.02]"
                         >
                           <div className="flex items-start justify-between gap-3">
@@ -845,7 +890,7 @@ function DrawerActionButton({
       whileHover={{ y: -1 }}
       whileTap={{ scale: 0.97 }}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all",
+        "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-[background-color,border-color,box-shadow,color,opacity]",
         tones[tone],
       )}
     >

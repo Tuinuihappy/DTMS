@@ -7,16 +7,18 @@ import {
   Truck,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { ease as easing } from "@/lib/motion";
 
 /* -------------------------------------------------------------------------- */
-/* LandingIntro — fixed-overlay boot sequence shown on every entry to /.       */
+/* LandingIntro — fixed-overlay boot sequence, once per browser session.      */
 /*                                                                            */
 /* A miniature constellation comes online: truck mark scales in centre, three  */
 /* pastel pills (Live freight / Smart dispatch / Driver comms) materialize at  */
 /* 25/50/75% with their arcs fading in alongside, a big 0→100 counter and      */
 /* progress bar climb together, then T · M · S brand letters stagger-reveal    */
-/* near the end. Hits 100 → holds 320ms → fades 450ms.                         */
+/* near the end. Hits 100 → holds 100ms → fades 200ms (~850ms total). A click */
+/* or any key skips it; later visits to / in the same session skip it.        */
 /*                                                                            */
 /* Theme-aware via the existing canvas + pastel + ink tokens.                  */
 /*                                                                            */
@@ -29,10 +31,32 @@ import { useEffect, useState } from "react";
 /* prefers-reduced-motion fast-forwards to 100 and dismisses in 200ms.         */
 /* -------------------------------------------------------------------------- */
 
-const CLIMB_MS = 1500;
-const HOLD_MS = 320;
-const FADE_MS = 450;
-const ease = [0.22, 1, 0.36, 1] as const;
+const CLIMB_MS = 550;
+const HOLD_MS = 100;
+const FADE_MS = 200;
+const ease = easing.out;
+
+// sessionStorage flag: the intro has played in this tab session. app/page.tsx
+// carries a tiny inline script that reads it before first paint and sets
+// data-intro-seen on <html>, so a reload of / doesn't flash the overlay
+// while React hydrates. Keep the key in sync with INTRO_SEEN_KEY there.
+const INTRO_SEEN_KEY = "dtms.landing-intro.seen";
+
+function introSeen(): boolean {
+  try {
+    return window.sessionStorage.getItem(INTRO_SEEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markIntroSeen() {
+  try {
+    window.sessionStorage.setItem(INTRO_SEEN_KEY, "1");
+  } catch {
+    // Storage blocked (private mode, policy) — the intro just plays again.
+  }
+}
 
 // Three letters of the brand mark — stagger-revealed near the end of the climb.
 const WORDS = ["T", "M", "S"] as const;
@@ -88,8 +112,25 @@ export function LandingIntro() {
   // the SSR-vs-client size jolt (server renders scale=1 → client recomputes
   // → layout shifted big→small on first paint).
   const [mounted, setMounted] = useState(false);
+  // Already played this session: unmount outright, skipping the exit fade.
+  const [skipped, setSkipped] = useState(false);
+  const dismiss = useCallback(() => setVisible(false), []);
+
+  // Before paint: a client-side navigation back to / mounts this fresh, and
+  // an already-seen intro must not show for even a frame.
+  useLayoutEffect(() => {
+    if (introSeen()) setSkipped(true);
+  }, []);
+
+  // Marked on dismissal rather than on start: under StrictMode the start
+  // effect runs twice, and marking there would make the second run bail
+  // with the overlay stuck on screen.
+  useEffect(() => {
+    if (!visible) markIntroSeen();
+  }, [visible]);
 
   useEffect(() => {
+    if (introSeen()) return;
     const updateScale = () => setScale(computeScale());
     updateScale();
     setMounted(true);
@@ -121,11 +162,14 @@ export function LandingIntro() {
       }
     };
     raf = requestAnimationFrame(tick);
+    // Any key skips the intro — the page underneath is already rendered.
+    window.addEventListener("keydown", dismiss);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", updateScale);
+      window.removeEventListener("keydown", dismiss);
     };
-  }, []);
+  }, [dismiss]);
 
   const truckSize = Math.round(TRUCK_BASE * scale);
   const pillRadius = Math.round(PILL_RADIUS_BASE * scale);
@@ -137,6 +181,8 @@ export function LandingIntro() {
   const percentFontRem = Math.max(1.2, PERCENT_FONT_BASE * scale);
   const taglineFontPx = Math.max(12, TAGLINE_FONT_BASE * scale);
 
+  if (skipped) return null;
+
   return (
     <AnimatePresence>
       {visible && (
@@ -145,7 +191,8 @@ export function LandingIntro() {
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: FADE_MS / 1000, ease }}
-          className="fixed inset-0 z-[60] flex items-center justify-center overflow-hidden bg-[var(--color-canvas)]"
+          onClick={dismiss}
+          className="fixed inset-0 z-[60] flex cursor-pointer items-center justify-center overflow-hidden bg-[var(--color-canvas)] [html[data-intro-seen]_&]:hidden"
           aria-hidden
         >
           <IntroAtmosphere />
@@ -295,7 +342,7 @@ function Constellation({
                 scale: shown ? 1 : 0.7,
                 y: shown ? 0 : 6,
               }}
-              transition={{ duration: 0.5, ease }}
+              transition={{ duration: 0.25, ease }}
             >
               <Pill tone={p.tone} icon={p.icon} label={p.label} />
             </motion.div>
@@ -307,12 +354,11 @@ function Constellation({
       <motion.div
         initial={{ opacity: 0, scale: 0.7, rotate: -16 }}
         animate={{ opacity: 1, scale: 1, rotate: -8 }}
-        transition={{ duration: 0.85, delay: 0.05, ease }}
+        transition={{ duration: 0.4, ease }}
         className="relative"
       >
-        <motion.div
-          animate={{ y: [0, -4, 0] }}
-          transition={{ duration: 5, ease: "easeInOut", repeat: Infinity }}
+        {/* No idle bob — the whole sequence is over in under a second. */}
+        <div
           className="grid place-items-center rounded-[28%] text-white"
           style={{
             width: truckSize,
@@ -328,7 +374,7 @@ function Constellation({
             strokeWidth={2.1}
             style={{ transform: "rotate(8deg)" }}
           />
-        </motion.div>
+        </div>
       </motion.div>
     </div>
   );
@@ -413,13 +459,15 @@ function ProgressBar({
       className="mt-5 h-[3px] overflow-hidden rounded-full bg-[var(--color-ink-100)] dark:bg-white/[0.08]"
       style={{ width }}
     >
+      {/* scaleX, not width — the fill updates every frame of the climb and
+          a width change re-lays-out the bar each time. */}
       <div
-        className="h-full rounded-full"
+        className="h-full w-full origin-left rounded-full"
         style={{
-          width: `${progress}%`,
+          transform: `scaleX(${progress / 100})`,
           background:
             "linear-gradient(90deg, var(--color-brand-500), var(--color-brand-900))",
-          transition: "width 0.16s ease-out",
+          transition: "transform 0.1s ease-out",
           boxShadow: "0 0 12px -2px var(--color-brand-500)",
         }}
       />
@@ -452,7 +500,7 @@ function Tagline({
             key={w}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: shown ? 1 : 0, y: shown ? 0 : 6 }}
-            transition={{ duration: 0.35, ease }}
+            transition={{ duration: 0.2, ease }}
           >
             {w}
           </motion.span>

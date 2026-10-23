@@ -12,6 +12,7 @@ import {
 } from "@/lib/api/dashboard";
 import { useProjectionPoll } from "@/lib/hooks/use-projection-poll";
 import { useDashboardSubscription } from "@/lib/realtime/hubs/dashboard-hub";
+import { stagger, T } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 // Phase P3.2 — Robot analysis subpage. Reads fleet.FleetUtilizationHourly
@@ -113,7 +114,7 @@ export function RobotsAnalysisExperience() {
       {/* Current-state strip */}
       <section className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {stateTiles.map((s, i) => (
-          <StateTile key={s.label} {...s} delay={i * 0.05} />
+          <StateTile key={s.label} {...s} delay={stagger(i, 0.03)} />
         ))}
       </section>
 
@@ -176,7 +177,7 @@ function StateTile({
       variant="default"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay }}
+      transition={{ ...T.slow, delay }}
       className="p-4"
     >
       <div className="flex items-start justify-between gap-2">

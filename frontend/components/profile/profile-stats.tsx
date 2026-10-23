@@ -5,9 +5,10 @@ import { motion } from "motion/react";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { NumberTicker } from "@/components/primitives/number-ticker";
 import { StatusPulse } from "@/components/primitives/status-pulse";
+import { ease, stagger } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+const EASE = ease.out;
 
 type Stat = {
   icon: React.ReactNode;
@@ -90,7 +91,7 @@ export function ProfileStats() {
           interactive
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.65 + i * 0.07, ease: EASE }}
+          transition={{ duration: 0.4, delay: 0.1 + stagger(i, 0.025), ease: EASE }}
           className={cn(
             "p-5",
             // First card on small grid (cols=2) gets a span to anchor as
@@ -142,7 +143,7 @@ export function ProfileStats() {
                 )}
               </div>
             </div>
-            <Sparkline values={s.spark} tone={s.tone} delay={0.85 + i * 0.07} />
+            <Sparkline values={s.spark} tone={s.tone} delay={0.25 + stagger(i, 0.025)} />
           </div>
         </GlassCard>
       ))}
@@ -186,7 +187,7 @@ function Sparkline({
       className="overflow-visible shrink-0"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.6, delay }}
+      transition={{ duration: 0.3, delay }}
     >
       <defs>
         <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
@@ -199,7 +200,7 @@ function Sparkline({
         fill={`url(#${id})`}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.7, delay: delay + 0.2 }}
+        transition={{ duration: 0.4, delay: delay + 0.1 }}
       />
       <motion.polyline
         points={points}
@@ -210,7 +211,7 @@ function Sparkline({
         strokeLinejoin="round"
         initial={{ pathLength: 0 }}
         animate={{ pathLength: 1 }}
-        transition={{ duration: 0.9, delay, ease: EASE }}
+        transition={{ duration: 0.5, delay, ease: EASE }}
       />
       <circle
         cx={w}

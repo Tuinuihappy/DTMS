@@ -381,7 +381,7 @@ function StageRow({
             onClick={onResend}
             disabled={resendState.kind === "sending"}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all",
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-[background-color,border-color,box-shadow,color,opacity]",
               "bg-[var(--color-brand-900)] text-white hover:shadow-[0_8px_20px_-8px_rgba(15,23,42,0.5)]",
               "disabled:opacity-50 disabled:cursor-not-allowed",
               "dark:bg-[var(--color-brand-500)] dark:text-[var(--color-ink-50)]",

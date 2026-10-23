@@ -6,7 +6,9 @@ import { useState } from "react";
 import { Avatar } from "@/components/primitives/avatar";
 import { GlassCard } from "@/components/primitives/glass-card";
 import { StatusPulse } from "@/components/primitives/status-pulse";
+import { stagger, T } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { useFirstVisit } from "./use-first-visit";
 
 // pseudo-random waveform values
 const waveform = [
@@ -16,14 +18,15 @@ const waveform = [
 
 export function CommsCard() {
   const [playing, setPlaying] = useState(false);
+  const first = useFirstVisit("dashboard");
 
   return (
     <GlassCard
       variant="ink"
       className="col-span-12 md:col-span-6 lg:col-span-3 p-6 relative overflow-hidden"
-      initial={{ opacity: 0, y: 18 }}
+      initial={first ? { opacity: 0, y: 12 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, delay: 0.75, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ ...T.slow, delay: 0.15 }}
     >
       {/* Background glow */}
       <div className="absolute -top-12 -right-10 h-44 w-44 rounded-full bg-[var(--color-brand-500)] opacity-30 blur-3xl" aria-hidden />
@@ -69,7 +72,7 @@ export function CommsCard() {
                 return (
                   <motion.span
                     key={i}
-                    initial={{ scaleY: 0 }}
+                    initial={first ? { scaleY: 0 } : false}
                     animate={
                       playing
                         ? {
@@ -85,7 +88,7 @@ export function CommsCard() {
                             ease: "easeInOut",
                             delay: i * 0.03,
                           }
-                        : { duration: 0.5, delay: 0.85 + i * 0.012 }
+                        : { duration: 0.3, delay: 0.15 + stagger(i, 0.004) }
                     }
                     className={cn(
                       "w-[3px] rounded-full origin-center",

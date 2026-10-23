@@ -94,7 +94,7 @@ function ModalShell({
                   whileHover={canSubmit && !busy ? { y: -1 } : {}}
                   whileTap={canSubmit && !busy ? { scale: 0.97 } : {}}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all",
+                    "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-[background-color,box-shadow,color,opacity]",
                     canSubmit && !busy
                       ? "bg-[var(--color-brand-900)] text-white hover:shadow-[0_14px_36px_-12px_rgba(15,23,42,0.6)] dark:bg-[var(--color-brand-500)]"
                       : "bg-[var(--color-ink-100)] text-[var(--color-ink-400)] cursor-not-allowed dark:bg-white/[0.04]",
@@ -129,7 +129,8 @@ export function CarrierTypeFormDialog({
   /** null → register mode; a profile → edit mode with the code locked. */
   carrierType: CarrierTypeProfile | null;
   onClose: () => void;
-  onSaved: () => void;
+  /** Gets the saved type's code, so the page can confirm and highlight it. */
+  onSaved: (code: string) => void;
 }) {
   const isEdit = carrierType !== null;
 
@@ -179,7 +180,7 @@ export function CarrierTypeFormDialog({
       } else {
         await createCarrierTypeProfile({ code: code.trim(), ...fields });
       }
-      onSaved();
+      onSaved(isEdit ? carrierType.code : code.trim());
       onClose();
     } catch (e) {
       setError((e as Error).message);

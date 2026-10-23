@@ -19,6 +19,7 @@ import {
 } from "@/components/primitives/data-table/table-shell";
 import { TableEmptyState } from "@/components/primitives/data-table/table-empty-state";
 import { GlassCard } from "@/components/primitives/glass-card";
+import { useToast } from "@/components/primitives/toast";
 import { getCarrierTypeProfiles, type CarrierTypeProfile } from "@/lib/api/fleet-carrier-types";
 import { getCarriers, type Carrier, type CarrierStatus } from "@/lib/api/fleet-carriers";
 import { Permissions } from "@/lib/auth/permissions";
@@ -32,6 +33,17 @@ import { CarrierRowMenu } from "./carrier-row-menu";
 import { CarrierScanDialog } from "./carrier-scan-dialog";
 
 const STATUSES: CarrierStatus[] = ["Available", "InUse", "Maintenance", "Retired"];
+
+// Success toast per row action — the dialog closes on success, so without
+// this the only confirmation was the row quietly changing.
+const ACTION_DONE: Record<CarrierAction, string> = {
+  maintenance: "sent for maintenance",
+  "return-to-service": "returned to service",
+  location: "location updated",
+  retire: "retired",
+  unretire: "back in circulation",
+  delete: "deleted",
+};
 
 export function CarriersExperience() {
   return (
@@ -66,6 +78,18 @@ function Inner() {
   const [carrierTypes, setCarrierTypes] = useState<CarrierTypeProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // After the first successful load, a refetch (filter, page, save) keeps the
+  // current rows on screen, dimmed, instead of swapping the table for a
+  // spinner — which also threw away the scroll position.
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  // Row to highlight after a save / action; `n` re-keys the row so the same
+  // carrier saved twice flashes twice.
+  const [flash, setFlash] = useState<{ code: string; n: number } | null>(null);
+  const toast = useToast();
+  const confirmSaved = (code: string, what: string) => {
+    toast.push({ tone: "success", message: `${code} ${what}` });
+    setFlash((f) => ({ code, n: (f?.n ?? 0) + 1 }));
+  };
 
   // Form dialog serves both register (formCarrier === null while open) and
   // edit; the two share every field but the code.
@@ -108,6 +132,7 @@ function Inner() {
         if (ac.signal.aborted) return;
         setRows(res.data);
         setTotal(res.totalCount);
+        setLoadedOnce(true);
       })
       .catch((e: Error) => {
         if (!ac.signal.aborted) setError(e.message || "Failed to load carriers");
@@ -232,11 +257,26 @@ function Inner() {
         </form>
       </GlassCard>
 
-      {error ? (
+      {/* With rows already on screen a failed refetch is a banner above
+          them, not a replacement for them. */}
+      {error && loadedOnce && (
+        <div
+          role="alert"
+          className="rounded-xl bg-[var(--color-coral-soft)] px-3 py-2 text-[11.5px] font-medium text-[var(--color-coral)]"
+        >
+          {error}
+        </div>
+      )}
+
+      <div
+        aria-busy={loading}
+        className={cn("space-y-5 transition-opacity duration-150", loading && loadedOnce && "opacity-60")}
+      >
+      {error && !loadedOnce ? (
         <GlassCard className="px-6 py-10 text-center">
           <p className="text-[13px] font-medium text-[var(--color-coral)]">{error}</p>
         </GlassCard>
-      ) : loading ? (
+      ) : !loadedOnce ? (
         <GlassCard className="grid place-items-center px-6 py-16">
           <Loader2 className="h-6 w-6 animate-spin text-[var(--color-ink-400)]" strokeWidth={2.2} />
         </GlassCard>
@@ -264,8 +304,16 @@ function Inner() {
               <TableTh align="right">{""}</TableTh>
             </DataTableHead>
             <DataTableBody>
-              {rows.map((c) => (
-                <tr key={c.id} className="border-t border-white/40 dark:border-white/[0.05]">
+              {rows.map((c) => {
+                const flashed = flash?.code === c.carrierCode;
+                return (
+                <tr
+                  key={flashed ? `${c.id}:${flash.n}` : c.id}
+                  className={cn(
+                    "border-t border-white/40 dark:border-white/[0.05]",
+                    flashed && "row-flash",
+                  )}
+                >
                   <TableTd>
                     <span className="font-mono text-[12.5px] font-semibold text-[var(--color-ink-900)]">
                       {c.carrierCode}
@@ -343,7 +391,8 @@ function Inner() {
                     />
                   </TableTd>
                 </tr>
-              ))}
+                );
+              })}
             </DataTableBody>
           </DataTableShell>
 
@@ -361,20 +410,29 @@ function Inner() {
           </GlassCard>
         </>
       )}
+      </div>
 
       <CarrierFormDialog
         open={formOpen}
         carrier={formCarrier}
         carrierTypes={carrierTypes}
         onClose={() => setFormOpen(false)}
-        onSaved={() => refresh()}
+        onSaved={(code) => {
+          confirmSaved(code, formCarrier ? "saved" : "registered");
+          refresh();
+        }}
       />
 
       <CarrierActionDialog
         action={action}
         carrier={actionCarrier}
         onClose={() => setAction(null)}
-        onDone={() => refresh()}
+        onDone={() => {
+          if (action && actionCarrier) {
+            confirmSaved(actionCarrier.carrierCode, ACTION_DONE[action]);
+          }
+          refresh();
+        }}
       />
 
       <CarrierMaintenancePanel
