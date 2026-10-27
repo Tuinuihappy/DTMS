@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { ModalLayer } from "@/components/primitives/modal-layer";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getTripDetails,
   isTripInFlight,
@@ -32,7 +32,6 @@ import {
   getFailingMissions,
 } from "./mission-failure-alert";
 import { MissionTimeline } from "./mission-timeline";
-import { MissionTrack } from "./mission-track";
 import { RetryHistoryPanel } from "./retry-history-panel";
 import { SnapshotInspector } from "./snapshot-inspector";
 import { TripActionBar } from "./trip-action-bar";
@@ -166,20 +165,6 @@ export function TripDetailDrawer({
     };
   }, [tripId, includeRaw]);
 
-  // Fold SignalR pushes into the fetched missions list so the header
-  // track, banner, chip and Mission Timeline reflect new vendor events
-  // without waiting for a manual refresh. Dedup by (missionKey, state)
-  // matches both the backend unique index and the live-push dedup, so a
-  // webhook arriving microseconds after a fetch is harmless.
-  const mergedMissions = useMemo(() => {
-    if (!data) return [];
-    const seen = new Set(data.missions.map((m) => `${m.missionKey}|${m.state}`));
-    return [
-      ...data.missions,
-      ...liveMissionEvents.filter((m) => !seen.has(`${m.missionKey}|${m.state}`)),
-    ];
-  }, [data, liveMissionEvents]);
-
   const refresh = () => {
     if (!tripId) return;
     getTripDetails(tripId, { includeRaw }).then(setData).catch(() => undefined);
@@ -233,7 +218,6 @@ export function TripDetailDrawer({
                     />
                   </div>
                 )}
-                {data && <MissionTrack missions={mergedMissions} />}
               </div>
               <button
                 type="button"
@@ -264,6 +248,17 @@ export function TripDetailDrawer({
               )}
 
               {data && (() => {
+                // Fold SignalR pushes into the fetched missions list so
+                // the banner + chip + Mission Timeline reflect new vendor
+                // events without waiting for a manual refresh. Dedup by
+                // (missionKey, state) matches both the backend unique
+                // index and the live-push dedup, so a webhook arriving
+                // microseconds after a fetch is harmless.
+                const seen = new Set(data.missions.map((m) => `${m.missionKey}|${m.state}`));
+                const mergedMissions = [
+                  ...data.missions,
+                  ...liveMissionEvents.filter((m) => !seen.has(`${m.missionKey}|${m.state}`)),
+                ];
                 // Compute once per render so the alert banner, the Status
                 // Timeline "N issues" chip, and the Resume button's warning
                 // style all stay in sync from the same source of truth.
