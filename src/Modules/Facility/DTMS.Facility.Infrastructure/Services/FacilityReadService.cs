@@ -79,55 +79,6 @@ public sealed class FacilityReadService : IFacilityReadService
             .Select(s => (Guid?)s.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-    public async Task<StationVendorTarget?> GetStationVendorTargetAsync(
-        Guid stationId,
-        CancellationToken cancellationToken = default)
-    {
-        var target = await (
-            from station in _db.Stations.AsNoTracking()
-            join map in _db.Maps.AsNoTracking() on station.MapId equals map.Id
-            where station.Id == stationId
-            select new
-            {
-                StationId = station.Id,
-                station.MapId,
-                MapVendorRef = map.VendorRef,
-                StationVendorRef = station.VendorRef,
-                station.Actions
-            })
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (target == null ||
-            string.IsNullOrWhiteSpace(target.MapVendorRef) ||
-            string.IsNullOrWhiteSpace(target.StationVendorRef))
-        {
-            return null;
-        }
-
-        // Project the domain value-object map into the plain Application DTO
-        // so callers (Dispatch) don't import Facility.Domain.
-        IReadOnlyDictionary<string, StationActionConfig>? actions = null;
-        if (target.Actions is { Count: > 0 })
-        {
-            var projected = new Dictionary<string, StationActionConfig>(StringComparer.OrdinalIgnoreCase);
-            foreach (var kv in target.Actions)
-            {
-                projected[kv.Key] = new StationActionConfig(
-                    kv.Value.ActionType,
-                    kv.Value.Category,
-                    kv.Value.Parameters);
-            }
-            actions = projected;
-        }
-
-        return new StationVendorTarget(
-            target.StationId,
-            target.MapId,
-            target.MapVendorRef.Trim(),
-            target.StationVendorRef.Trim(),
-            actions);
-    }
-
     public async Task<IReadOnlyDictionary<string, StationLookupResult>> ResolveStationsBatchAsync(
         IReadOnlyList<string> locationCodes,
         CancellationToken cancellationToken = default)
