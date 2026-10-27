@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Compass, LogOut, Menu, Moon, Search, Sun, Truck, User } from "lucide-react";
+import { Bell, LogOut, Menu, Moon, Sun, Truck, User } from "lucide-react";
 import { AnimatePresence, motion, useScroll, useTransform } from "motion/react";
 import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
@@ -74,26 +74,10 @@ export function TopNav() {
             (review M19); the left rail is the navigation. */}
         <div className="flex-1" aria-hidden />
 
-        {/* Search */}
-        <div className="hidden lg:flex items-center gap-2 rounded-full bg-[var(--color-ink-50)]/80 pl-4 pr-1.5 py-1.5 w-[320px] transition-colors hover:bg-[var(--color-ink-50)] focus-within:bg-white focus-within:ring-2 focus-within:ring-[var(--color-brand-200)]">
-          <input
-            type="text"
-            placeholder="Enter your search request..."
-            className="flex-1 bg-transparent text-[13.5px] text-[var(--color-ink-900)] placeholder:text-[var(--color-ink-400)] outline-none"
-            aria-label="Search"
-          />
-          <button
-            aria-label="Search"
-            className="grid h-8 w-8 place-items-center rounded-full text-[var(--color-ink-500)] hover:bg-white hover:text-[var(--color-ink-800)] cursor-pointer transition-colors"
-          >
-            <Search className="h-4 w-4" strokeWidth={2.2} />
-          </button>
-        </div>
+        {/* The search box and the compass "Settings" button that sat here
+            were template placeholders wired to nothing — removed by user
+            decision 2026-10-27. */}
 
-        {/* Icon buttons */}
-        <IconBtn label="Settings">
-          <Compass className="h-[18px] w-[18px]" strokeWidth={2} />
-        </IconBtn>
         {/* No unread badge: nothing feeds it yet, and a permanent coral dot
             told every page it had unread notifications (review M19). */}
         <IconBtn label="Notifications">
