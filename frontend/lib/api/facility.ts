@@ -46,6 +46,10 @@ export type SyncMapStationsResultDto = {
   updated: number;
   reactivated: number;
   deactivated: number;
+  /** RIOT3 re-created a station under a new id; the existing row was kept. */
+  rebound: number;
+  /** New stations added without a Code because it was already taken. */
+  codeConflicts: number;
 };
 
 export async function getStations(opts?: {

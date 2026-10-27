@@ -59,13 +59,34 @@ public class Station : Entity<Guid>
     }
     public void Deactivate() => IsActive = false;
     public void Reactivate() => IsActive = true;
-    public void UpdateFromVendor(string name, double x, double y, double yaw)
+    /// <summary>
+    /// Applies RIOT3's view of this station. Returns true only when something
+    /// actually changed, so the sync can report real deltas and skip no-op writes.
+    /// </summary>
+    public bool UpdateFromVendor(string name, double x, double y, double yaw)
     {
-        Name = name;
-        Coordinate = new Coordinate(x, y, yaw);
+        var changed = false;
+        if (Name != name)
+        {
+            Name = name;
+            changed = true;
+        }
+
+        var coordinate = new Coordinate(x, y, yaw);
+        if (!coordinate.Equals(Coordinate))
+        {
+            Coordinate = coordinate;
+            changed = true;
+        }
+
         // RIOT3 reactivation does NOT override an operator's manual force-offline.
-        if (!ManualOverrideOffline || IsManualOverrideExpired(DateTime.UtcNow))
+        if (!IsActive && (!ManualOverrideOffline || IsManualOverrideExpired(DateTime.UtcNow)))
+        {
             IsActive = true;
+            changed = true;
+        }
+
+        return changed;
     }
 
     public void ForceOffline(string reason, string by, TimeSpan duration, DateTime nowUtc)

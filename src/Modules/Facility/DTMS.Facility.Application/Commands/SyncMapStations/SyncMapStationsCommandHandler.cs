@@ -2,8 +2,10 @@ using System.Collections.Concurrent;
 using DTMS.Facility.Application.Services;
 using DTMS.Facility.Domain.Entities;
 using DTMS.Facility.Domain.Repositories;
+using DTMS.Facility.Domain.Services;
 using DTMS.Facility.Domain.ValueObjects;
 using DTMS.SharedKernel.Messaging;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
 namespace DTMS.Facility.Application.Commands.SyncMapStations;
@@ -19,17 +21,20 @@ internal sealed class SyncMapStationsCommandHandler
     private readonly IMapRepository _mapRepo;
     private readonly IStationRepository _stationRepo;
     private readonly IRiot3FacilityClient _riot3;
+    private readonly IDistributedCache _cache;
     private readonly ILogger<SyncMapStationsCommandHandler> _logger;
 
     public SyncMapStationsCommandHandler(
         IMapRepository mapRepo,
         IStationRepository stationRepo,
         IRiot3FacilityClient riot3,
+        IDistributedCache cache,
         ILogger<SyncMapStationsCommandHandler> logger)
     {
         _mapRepo = mapRepo;
         _stationRepo = stationRepo;
         _riot3 = riot3;
+        _cache = cache;
         _logger = logger;
     }
 
@@ -68,69 +73,162 @@ internal sealed class SyncMapStationsCommandHandler
                     $"RIOT3 unreachable while syncing map {map.Name}: {ex.Message}");
             }
 
-            var riot3ByVendorRef = riot3Stations.ToDictionary(s => s.Id.ToString());
+            // A duplicated id in the payload used to throw out of ToDictionary and
+            // fail the whole sync — keep the first and carry on.
+            var riot3ByVendorRef = new Dictionary<string, Riot3StationInfo>();
+            foreach (var s in riot3Stations)
+            {
+                if (!riot3ByVendorRef.TryAdd(s.Id.ToString(), s))
+                    _logger.LogWarning(
+                        "SyncMapStations: map {Name} — RIOT3 listed station id {Id} twice; keeping the first",
+                        map.Name, s.Id);
+            }
 
+            var allStations = await _stationRepo.GetAllByMapAsync(map.Id, ct);
             // VendorRef-only — manual stations (no VendorRef) are off-limits to RIOT3 sync.
-            var dbStations = (await _stationRepo.GetAllByMapAsync(map.Id, ct))
-                .Where(s => s.VendorRef != null)
-                .ToList();
+            var dbStations = allStations.Where(s => s.VendorRef != null).ToList();
             var dbByVendorRef = dbStations.ToDictionary(s => s.VendorRef!);
 
-            int added = 0, updated = 0, deactivated = 0, reactivated = 0;
+            // Last line of defence against a bad-but-successful answer: a live map
+            // never legitimately drops to zero stations, so refuse rather than
+            // deactivate everything.
+            if (riot3ByVendorRef.Count == 0 && dbStations.Any(s => s.IsActive))
+                return Result<SyncMapStationsResult>.Failure(
+                    $"RIOT3 returned no stations for map {map.Name} — refusing to deactivate " +
+                    $"{dbStations.Count(s => s.IsActive)} active stations.");
+
+            // Rows RIOT3 no longer knows by id. A re-created station (same name,
+            // new id) takes one of these over instead of colliding on the
+            // (MapId, Code) unique index — which used to fail SaveChanges and
+            // stall the whole map's sync on every cycle.
+            var removed = dbStations.Where(s => !riot3ByVendorRef.ContainsKey(s.VendorRef!)).ToList();
+            var claimed = new HashSet<Guid>();
+            var codesInUse = new HashSet<string>(
+                allStations.Where(s => s.Code != null).Select(s => s.Code!), StringComparer.Ordinal);
+            var touched = new List<Station>();
+
+            int added = 0, updated = 0, deactivated = 0, reactivated = 0, rebound = 0, codeConflicts = 0;
 
             foreach (var (vendorRef, riot3Station) in riot3ByVendorRef)
             {
+                var yaw = riot3Station.PosYaw / 1000.0;
+
                 if (dbByVendorRef.TryGetValue(vendorRef, out var existing))
                 {
                     // Raw signed coords — RIOT3's origin can put points in any
                     // quadrant. Mirroring with Math.Abs (older behaviour) broke
                     // station ↔ robot spatial alignment whenever either crossed
                     // the origin.
-                    existing.UpdateFromVendor(
-                        riot3Station.Name,
-                        riot3Station.PosX,
-                        riot3Station.PosY,
-                        riot3Station.PosYaw / 1000.0);
+                    var wasActive = existing.IsActive;
+                    if (!existing.UpdateFromVendor(riot3Station.Name, riot3Station.PosX, riot3Station.PosY, yaw))
+                        continue;
 
-                    if (!existing.IsActive) reactivated++;
+                    if (!wasActive && existing.IsActive)
+                    {
+                        reactivated++;
+                        touched.Add(existing);
+                    }
                     else updated++;
+                    continue;
+                }
+
+                var takeover = FindTakeover(removed, claimed, riot3Station.Name);
+                if (takeover is not null)
+                {
+                    claimed.Add(takeover.Id);
+                    var oldRef = takeover.VendorRef;
+                    takeover.SetVendorRef(vendorRef);
+                    takeover.UpdateFromVendor(riot3Station.Name, riot3Station.PosX, riot3Station.PosY, yaw);
+                    touched.Add(takeover);
+                    rebound++;
+                    _logger.LogInformation(
+                        "SyncMapStations: map {Name} — station {Code} re-created in RIOT3 (id {OldRef} → {NewRef}); kept existing row {StationId}",
+                        map.Name, takeover.Code, oldRef, vendorRef, takeover.Id);
+                    continue;
+                }
+
+                var station = new Station(
+                    Guid.NewGuid(), map.Id, riot3Station.Name,
+                    new Coordinate(riot3Station.PosX, riot3Station.PosY, yaw), StationType.Normal);
+                station.SetVendorRef(vendorRef);
+
+                var code = StationCodeSearch.NormalizeExact(riot3Station.Name);
+                if (code.Length > 0 && codesInUse.Add(code))
+                {
+                    station.SetCode(code);
                 }
                 else
                 {
-                    var coord = new Coordinate(
-                        riot3Station.PosX,
-                        riot3Station.PosY,
-                        riot3Station.PosYaw / 1000.0);
-
-                    var station = new Station(Guid.NewGuid(), map.Id, riot3Station.Name, coord, StationType.Normal);
-                    station.SetVendorRef(riot3Station.Id.ToString());
-                    station.SetCode(riot3Station.Name);
-                    await _stationRepo.AddAsync(station, ct);
-                    added++;
+                    // Added without a Code rather than failing the whole sync on the
+                    // unique index; orders can't target it until someone sets one.
+                    codeConflicts++;
+                    _logger.LogWarning(
+                        "SyncMapStations: map {Name} — new RIOT3 station {VendorRef} '{StationName}' added without a Code: '{Code}' is already used on this map",
+                        map.Name, vendorRef, riot3Station.Name, code);
                 }
+
+                await _stationRepo.AddAsync(station, ct);
+                added++;
             }
 
-            foreach (var dbStation in dbStations.Where(s => !riot3ByVendorRef.ContainsKey(s.VendorRef!)))
+            foreach (var dbStation in removed)
             {
-                if (dbStation.IsActive)
+                if (dbStation.IsActive && !claimed.Contains(dbStation.Id))
                 {
                     dbStation.Deactivate();
+                    touched.Add(dbStation);
                     deactivated++;
                 }
             }
 
             await _stationRepo.SaveChangesAsync(ct);
+            await InvalidateLookupCacheAsync(touched, ct);
 
             _logger.LogInformation(
-                "SyncMapStations: map {MapId} ({Name}) — added={Added} updated={Updated} reactivated={Reactivated} deactivated={Deactivated}",
-                map.Id, map.Name, added, updated, reactivated, deactivated);
+                "SyncMapStations: map {MapId} ({Name}) — added={Added} updated={Updated} reactivated={Reactivated} deactivated={Deactivated} rebound={Rebound} codeConflicts={CodeConflicts}",
+                map.Id, map.Name, added, updated, reactivated, deactivated, rebound, codeConflicts);
 
             return Result<SyncMapStationsResult>.Success(new SyncMapStationsResult(
-                map.Id, map.Name, added, updated, reactivated, deactivated));
+                map.Id, map.Name, added, updated, reactivated, deactivated, rebound, codeConflicts));
         }
         finally
         {
             semaphore.Release();
+        }
+    }
+
+    // Exact RIOT3 name first (survives an operator-edited Code such as
+    // PREFORM → PREFORM01), then the Code the new station would have taken.
+    private static Station? FindTakeover(List<Station> removed, HashSet<Guid> claimed, string riot3Name)
+    {
+        var code = StationCodeSearch.NormalizeExact(riot3Name);
+        return removed.FirstOrDefault(s => !claimed.Contains(s.Id) && s.Name == riot3Name)
+            ?? (code.Length == 0
+                ? null
+                : removed.FirstOrDefault(s => !claimed.Contains(s.Id) && s.Code == code));
+    }
+
+    /// <summary>
+    /// Drops the submit-time lookup cache for stations whose availability changed,
+    /// so order validation sees it now instead of after the TTL. Key format mirrors
+    /// CachedStationLookup in the DeliveryOrder module — keep these in sync.
+    /// </summary>
+    private async Task InvalidateLookupCacheAsync(List<Station> stations, CancellationToken ct)
+    {
+        foreach (var station in stations)
+        {
+            try
+            {
+                await _cache.RemoveAsync($"station:lookup:{station.Id}", ct);
+                if (!string.IsNullOrWhiteSpace(station.Code))
+                    await _cache.RemoveAsync($"station:lookup:{station.Code}", ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "SyncMapStations: cache invalidation failed for {StationId}; falling back to TTL expiry.", station.Id);
+                return;
+            }
         }
     }
 }

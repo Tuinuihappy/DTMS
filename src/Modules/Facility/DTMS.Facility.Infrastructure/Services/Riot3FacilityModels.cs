@@ -7,6 +7,9 @@ public sealed class Riot3MapListResponse
     [JsonPropertyName("code")]
     public string Code { get; set; } = string.Empty;
 
+    [JsonPropertyName("message")]
+    public string? Message { get; set; }
+
     [JsonPropertyName("data")]
     public Riot3MapPageData? Data { get; set; }
 }
@@ -40,8 +43,13 @@ public sealed class Riot3StationListResponse
     [JsonPropertyName("code")]
     public string Code { get; set; } = string.Empty;
 
+    [JsonPropertyName("message")]
+    public string? Message { get; set; }
+
+    // Null (not empty) when RIOT3 answers with an error envelope — keeps
+    // "no data" distinguishable from "map has zero stations".
     [JsonPropertyName("data")]
-    public List<Riot3StationRecord> Data { get; set; } = new();
+    public List<Riot3StationRecord>? Data { get; set; }
 }
 
 public sealed class Riot3StationRecord

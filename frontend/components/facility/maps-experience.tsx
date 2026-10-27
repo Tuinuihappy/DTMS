@@ -408,14 +408,22 @@ export function MapsExperience() {
     try {
       const result = await syncMapStations(selectedMapId);
       setLastSync(new Date());
-      const delta = result.added + result.updated + result.reactivated + result.deactivated;
-      setToast({
-        kind: "ok",
-        msg:
-          delta === 0
-            ? `${result.mapName} is already up to date`
-            : `Synced ${delta} station${delta === 1 ? "" : "s"} on ${result.mapName}`,
-      });
+      const delta =
+        result.added + result.updated + result.reactivated + result.deactivated + result.rebound;
+      setToast(
+        result.codeConflicts > 0
+          ? {
+              kind: "err",
+              msg: `${result.codeConflicts} new station${result.codeConflicts === 1 ? "" : "s"} on ${result.mapName} need a code — the RIOT name is already used`,
+            }
+          : {
+              kind: "ok",
+              msg:
+                delta === 0
+                  ? `${result.mapName} is already up to date`
+                  : `Synced ${delta} station${delta === 1 ? "" : "s"} on ${result.mapName}`,
+            },
+      );
       await refreshStations(selectedMapId);
     } catch (err) {
       setToast({
@@ -2229,23 +2237,31 @@ function StationDirectory({
 }) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeKey | "ALL">("ALL");
-  const [activeOnly, setActiveOnly] = useState(false);
+  // On by default: inactive rows are stations RIOT3 has removed — kept for
+  // trip history, but noise for day-to-day editing.
+  const [activeOnly, setActiveOnly] = useState(true);
+
+  const visible = useMemo(
+    () => (activeOnly ? stations.filter((s) => s.isActive) : stations),
+    [stations, activeOnly],
+  );
+  const hiddenCount = stations.length - visible.length;
 
   // Per-type counts feed the filter chips so the operator sees the
   // distribution at a glance — replaces the standalone Taxonomy card.
+  // Counted over `visible` so a chip never promises rows the list hides.
   const counts = useMemo(() => {
     const m: Partial<Record<TypeKey, number>> = {};
-    for (const s of stations) {
+    for (const s of visible) {
       const k = typeKey(s.type);
       m[k] = (m[k] ?? 0) + 1;
     }
     return m;
-  }, [stations]);
+  }, [visible]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return stations.filter((s) => {
-      if (activeOnly && !s.isActive) return false;
+    return visible.filter((s) => {
       if (typeFilter !== "ALL" && typeKey(s.type) !== typeFilter) return false;
       if (!term) return true;
       return (
@@ -2254,7 +2270,7 @@ function StationDirectory({
         (s.vendorRef?.toLowerCase().includes(term) ?? false)
       );
     });
-  }, [stations, search, typeFilter, activeOnly]);
+  }, [visible, search, typeFilter]);
 
   return (
     <motion.div
@@ -2284,6 +2300,7 @@ function StationDirectory({
 
             <button
               type="button"
+              aria-pressed={activeOnly}
               onClick={() => setActiveOnly((v) => !v)}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full px-3 h-9 text-[11.5px] font-medium tracking-tight transition-colors cursor-pointer",
@@ -2294,6 +2311,9 @@ function StationDirectory({
             >
               <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2.2} />
               Active only
+              {activeOnly && hiddenCount > 0 && (
+                <span className="opacity-70 tabular-nums">· {hiddenCount} hidden</span>
+              )}
             </button>
           </div>
         </div>
@@ -2303,7 +2323,7 @@ function StationDirectory({
             active={typeFilter === "ALL"}
             onClick={() => setTypeFilter("ALL")}
             color="var(--color-ink-700)"
-            count={stations.length}
+            count={visible.length}
           >
             All
           </TypeChip>
