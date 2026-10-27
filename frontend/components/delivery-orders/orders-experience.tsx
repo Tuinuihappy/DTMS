@@ -38,6 +38,7 @@ import {
   type StateActionVariant,
 } from "./state-action-dialog";
 import { useToast } from "@/components/primitives/toast";
+import { NumberTicker } from "@/components/primitives/number-ticker";
 import { T } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/datetime";
@@ -866,7 +867,14 @@ function ExperienceInner() {
               ? `Couldn't load orders · ${error}`
               : loading
                 ? "Loading active and historical orders…"
-                : `${totalCount.toLocaleString("en-US")} orders · live · refreshes every 15s`
+                : (
+                    <>
+                      {/* Rolls only when the total changes (new / cancelled
+                          orders arriving live); first paint shows the real
+                          number, not a count-up from 0. */}
+                      <NumberTicker value={totalCount} from="value" /> orders · live · refreshes every 15s
+                    </>
+                  )
           }
         />
       </motion.div>

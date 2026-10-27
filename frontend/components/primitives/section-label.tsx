@@ -10,7 +10,7 @@ export function SectionLabel({
 }: {
   icon?: ReactNode;
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   action?: ReactNode;
   className?: string;
 }) {

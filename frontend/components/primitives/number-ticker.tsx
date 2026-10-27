@@ -16,6 +16,10 @@ type Props = {
   prefix?: string;
   suffix?: string;
   className?: string;
+  /** "zero" (default): count up from 0 on first view — showcase tiles.
+   *  "value": render the real number at once and only roll on later
+   *  changes — live counts an operator reads (orders total). */
+  from?: "zero" | "value";
 };
 
 // Counts up to `value` once scrolled into view, then glides between later
@@ -27,11 +31,12 @@ type Props = {
 // not once per spring frame. tabular-nums keeps the width steady while the
 // digits roll. useSpring isn't covered by <MotionConfig reducedMotion>, so
 // reduced motion is handled here: jump straight to the value.
-export function NumberTicker({ value, decimals = 0, prefix = "", suffix = "", className }: Props) {
+export function NumberTicker({ value, decimals = 0, prefix = "", suffix = "", className, from = "zero" }: Props) {
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true, margin: "-20%" });
   const reduced = useReducedMotion();
-  const target = useMotionValue(0);
+  // Initial value only — later changes go through the effect below.
+  const target = useMotionValue(from === "value" ? value : 0);
   const spring = useSpring(target, { stiffness: 150, damping: 25 });
   const text = useTransform(
     spring,
