@@ -4,8 +4,8 @@ namespace DTMS.Facility.Domain.ValueObjects;
 
 // One executable action a robot performs at a station — keyed in
 // Station.Actions by an "intent" string (e.g. "lift", "drop", "charge",
-// "scan"). The Dispatch module reads the intent from the trip's task
-// type and looks it up here to compose the matching RIOT3 ACT mission.
+// "scan"). Dispatch does not read it: ACT missions come from the
+// OrderTemplate (see Station.Actions).
 //
 // Vendor-agnostic on purpose: ActionType / Category / Parameters are
 // strings the vendor adapter knows how to interpret. For RIOT3 today

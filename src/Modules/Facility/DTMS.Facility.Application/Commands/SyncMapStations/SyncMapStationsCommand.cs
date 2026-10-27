@@ -6,7 +6,7 @@ public record SyncMapStationsCommand(Guid MapId) : ICommand<SyncMapStationsResul
 
 // Updated counts only stations whose name/coords actually changed.
 // Rebound = a RIOT3 station re-created under a new id that took over the
-// removed row with the same name/code (keeps Type/Actions/Code).
+// removed row with the same name/code (keeps its Id, Type and Code).
 // CodeConflicts = new stations added WITHOUT a Code because it was already
 // taken on this map — they need an operator to assign one in the editor.
 public record SyncMapStationsResult(

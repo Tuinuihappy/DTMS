@@ -28,11 +28,11 @@ public class Station : Entity<Guid>
     public DateTime? ManualOverrideExpiresAt { get; private set; }
 
     // Vendor action map keyed by "intent" (e.g. "lift", "drop", "charge",
-    // "scan"). The Dispatch module reads the intent from the trip's task
-    // type (TaskType.Lift → key "lift", etc.) and appends the matching
-    // RIOT3 ACT mission after the MOVE. A station can carry several intents
-    // — e.g. a DOCK that serves as both pickup and dropoff would have
-    // both "lift" and "drop" entries. Null/empty = pure MOVE waypoint.
+    // "scan"). NOT USED BY DISPATCH: the original design had Dispatch append
+    // the matching ACT mission after each MOVE, but dispatch now sends the
+    // OrderTemplate's own MOVE/ACT missions and nothing reads this map
+    // (last reader removed 2026-10-27). Settable only through the station
+    // API — no UI — and no station sets it. Kept until it is removed.
     public IReadOnlyDictionary<string, StationAction>? Actions { get; private set; }
 
     private Station() { }
