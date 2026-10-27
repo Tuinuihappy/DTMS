@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AlertTriangle,
   Check,
   ChevronRight,
   Copy,
@@ -141,6 +142,7 @@ export function OrderTemplatesTable({
                           <Highlight text={t.description} query={search} />
                         </div>
                       )}
+                      <RemovedStationsChip stations={t.removedStations} />
                     </div>
                   </div>
                 </TableTd>
@@ -256,6 +258,7 @@ export function OrderTemplatesTable({
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <BindingChip template={t} search={search} compact />
                   </div>
+                  <RemovedStationsChip stations={t.removedStations} />
                 </div>
                 <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[var(--color-ink-400)]" />
               </div>
@@ -393,6 +396,21 @@ function GroupCell({
           @{wait}
         </span>
       )}
+    </div>
+  );
+}
+
+// Stations this template uses that RIOT3 removed — dispatch refuses the
+// template until they're replaced in the editor.
+function RemovedStationsChip({ stations }: { stations?: string[] | null }) {
+  if (!stations || stations.length === 0) return null;
+  return (
+    <div
+      className="mt-1 inline-flex max-w-[280px] items-center gap-1 rounded-full bg-[var(--color-coral-soft)] px-2 py-0.5 text-[10.5px] font-semibold text-[var(--color-coral)]"
+      title={`RIOT3 removed: ${stations.join(", ")} — edit the template and pick current stations`}
+    >
+      <AlertTriangle className="h-3 w-3 shrink-0" strokeWidth={2.4} />
+      <span className="truncate">Station removed: {stations.join(", ")}</span>
     </div>
   );
 }

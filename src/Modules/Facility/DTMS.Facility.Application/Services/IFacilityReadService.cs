@@ -19,8 +19,18 @@ public sealed record VendorStationRef(string MapVendorRef, string StationVendorR
 /// </summary>
 public sealed record UnavailableVendorStation(string MapVendorRef, string StationVendorRef, string? Name);
 
+/// <summary>A station on a live map with both of its keys; MapVendorRef is null for a map not linked to RIOT3.</summary>
+public sealed record StationRef(Guid Id, string? MapVendorRef, string? StationVendorRef, string Label, bool IsActive);
+
 public interface IFacilityReadService
 {
+    /// <summary>
+    /// Every station on a live map (one row each, ~hundreds) — what OrderTemplates
+    /// are checked against: a template referring to a station that isn't active
+    /// here, or no longer here at all (purged), needs fixing.
+    /// </summary>
+    Task<IReadOnlyList<StationRef>> GetStationRefsAsync(CancellationToken cancellationToken = default);
+
     /// <summary>
     /// The subset of <paramref name="refs"/> that RIOT3 no longer has, judged by
     /// the station sync. Refs on a map DTMS doesn't sync are never reported —

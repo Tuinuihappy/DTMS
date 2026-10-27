@@ -83,6 +83,10 @@ export function OrderTemplatesExperience() {
   const [error, setError] = useState<string | null>(null);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
+  // Only templates using a station RIOT3 removed. The toggle shows while
+  // there are any (needsFixCount) or while it's on.
+  const [needsFixOnly, setNeedsFixOnly] = useState(false);
+  const [needsFixCount, setNeedsFixCount] = useState(0);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 250);
   const [sortBy, setSortBy] = useState<SortColumn>("modifiedAt");
@@ -110,7 +114,7 @@ export function OrderTemplatesExperience() {
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, debouncedSearch, pageSize, sortBy, sortDir]);
+  }, [statusFilter, needsFixOnly, debouncedSearch, pageSize, sortBy, sortDir]);
 
   const fetchList = useCallback(
     async (signal?: AbortSignal) => {
@@ -126,12 +130,15 @@ export function OrderTemplatesExperience() {
         };
         if (statusFilter === "All") params.includeInactive = true;
         else params.isActive = statusFilter === "Active";
+        if (needsFixOnly) params.needsFix = true;
         const result = await listOrderTemplates(params, signal);
         setRecords(result.records ?? []);
         setTotal(result.total ?? 0);
         // Recorded with the rows so the table fades on a query change,
         // not on a refresh after an edit.
-        setDataSig([page, pageSize, debouncedSearch, sortBy, sortDir, statusFilter].join("|"));
+        setDataSig(
+          [page, pageSize, debouncedSearch, sortBy, sortDir, statusFilter, needsFixOnly].join("|"),
+        );
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
         setError((e as Error).message || "Failed to load templates.");
@@ -141,7 +148,7 @@ export function OrderTemplatesExperience() {
         setLoading(false);
       }
     },
-    [page, pageSize, debouncedSearch, sortBy, sortDir, statusFilter],
+    [page, pageSize, debouncedSearch, sortBy, sortDir, statusFilter, needsFixOnly],
   );
 
   useEffect(() => {
@@ -159,6 +166,17 @@ export function OrderTemplatesExperience() {
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
       setStats((cur) => cur ?? EMPTY_STATS);
+    }
+    // How many templates use a removed station (all states) — drives the
+    // Needs-fix toggle. A one-row page is enough to read the total.
+    try {
+      const fix = await listOrderTemplates(
+        { page: 1, size: 1, includeInactive: true, needsFix: true },
+        signal,
+      );
+      setNeedsFixCount(fix.total ?? 0);
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
     }
   }, []);
 
@@ -183,9 +201,11 @@ export function OrderTemplatesExperience() {
   }, [totalCount, page, pageSize]);
 
   const kpi = stats ?? EMPTY_STATS;
-  const hasFilters = statusFilter !== "All" || debouncedSearch.trim().length > 0;
+  const hasFilters =
+    statusFilter !== "All" || needsFixOnly || debouncedSearch.trim().length > 0;
   const clearFilters = () => {
     setStatusFilter("All");
+    setNeedsFixOnly(false);
     setSearch("");
   };
 
@@ -333,6 +353,25 @@ export function OrderTemplatesExperience() {
             );
           })}
         </div>
+
+        {(needsFixCount > 0 || needsFixOnly) && (
+          <button
+            type="button"
+            aria-pressed={needsFixOnly}
+            onClick={() => setNeedsFixOnly((v) => !v)}
+            title="Templates that use a station RIOT3 has removed — dispatch refuses them until it's replaced"
+            className={cn(
+              "inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition-colors",
+              needsFixOnly
+                ? "bg-[var(--color-coral)] text-white"
+                : "bg-[var(--color-coral-soft)] text-[var(--color-coral)] hover:brightness-95",
+            )}
+          >
+            <AlertTriangle className="h-3.5 w-3.5" strokeWidth={2.3} />
+            Needs fix
+            <span className="tabular-nums opacity-80">({needsFixCount})</span>
+          </button>
+        )}
 
         <button
           type="button"

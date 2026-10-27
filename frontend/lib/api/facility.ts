@@ -104,6 +104,9 @@ export type UseStationOptionsResult = {
   // template that references a now-deactivated station still resolves
   // back to the saved code when the editor opens.
   byId: Map<string, string>;
+  // Codes of active stations, including ones force-offline for now — a
+  // code outside this set is a station RIOT3 removed.
+  liveCodes: Set<string>;
   loading: boolean;
   error: string | null;
 };
@@ -111,6 +114,7 @@ export type UseStationOptionsResult = {
 export function useStationOptions(): UseStationOptionsResult {
   const [stations, setStations] = useState<StationOption[]>([]);
   const [byId, setById] = useState<Map<string, string>>(new Map());
+  const [liveCodes, setLiveCodes] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -133,6 +137,7 @@ export function useStationOptions(): UseStationOptionsResult {
         for (const s of all) if (s.code) map.set(s.id, s.code);
         setStations(active);
         setById(map);
+        setLiveCodes(new Set(all.filter((s) => s.isActive && s.code).map((s) => s.code as string)));
       })
       .catch((e: Error) => {
         if (!cancelled) setError(e.message || "Failed to load stations");
@@ -145,7 +150,7 @@ export function useStationOptions(): UseStationOptionsResult {
     };
   }, []);
 
-  return { stations, byId, loading, error };
+  return { stations, byId, liveCodes, loading, error };
 }
 
 // Stations exposed by their RIOT3 numeric vendor id — the int the MOVE
@@ -159,27 +164,48 @@ export type StationVendorOption = {
   code: string | null;
 };
 
-export async function getStationVendorOptions(): Promise<StationVendorOption[]> {
-  const stations = await getStations();
-  const out: StationVendorOption[] = [];
+type StationVendorCatalog = {
+  options: StationVendorOption[];
+  // RIOT3 ids of active stations, including ones force-offline for now —
+  // a MOVE target outside this set (on a synced map) was removed by RIOT3.
+  liveIds: Set<number>;
+  // RIOT3 id → code/name for every known station, so a removed one can
+  // still be named while it has a row.
+  labels: Map<number, string>;
+};
+
+async function getStationVendorCatalog(): Promise<StationVendorCatalog> {
+  const stations = await getStations({ includeInactive: true });
+  const options: StationVendorOption[] = [];
+  const liveIds = new Set<number>();
+  const labels = new Map<number, string>();
   for (const s of stations) {
-    if (!s.isActive || s.isManualOverrideActive) continue;
     if (!s.vendorRef) continue;
     const n = Number(s.vendorRef);
     if (!Number.isInteger(n)) continue;
-    out.push({ vendorId: n, name: s.name, type: s.type, code: s.code });
+    if (!labels.has(n) || s.isActive) labels.set(n, s.code ?? s.name);
+    if (!s.isActive) continue;
+    liveIds.add(n);
+    if (s.isManualOverrideActive) continue;
+    options.push({ vendorId: n, name: s.name, type: s.type, code: s.code });
   }
-  return out.sort((a, b) => a.vendorId - b.vendorId);
+  return { options: options.sort((a, b) => a.vendorId - b.vendorId), liveIds, labels };
 }
 
 export type UseStationVendorOptionsResult = {
   stations: StationVendorOption[];
+  liveIds: Set<number>;
+  labels: Map<number, string>;
   loading: boolean;
   error: string | null;
 };
 
 export function useStationVendorOptions(): UseStationVendorOptionsResult {
-  const [stations, setStations] = useState<StationVendorOption[]>([]);
+  const [catalog, setCatalog] = useState<StationVendorCatalog>({
+    options: [],
+    liveIds: new Set(),
+    labels: new Map(),
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -187,9 +213,9 @@ export function useStationVendorOptions(): UseStationVendorOptionsResult {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    getStationVendorOptions()
-      .then((opts) => {
-        if (!cancelled) setStations(opts);
+    getStationVendorCatalog()
+      .then((c) => {
+        if (!cancelled) setCatalog(c);
       })
       .catch((e: Error) => {
         if (!cancelled) setError(e.message || "Failed to load stations");
@@ -202,7 +228,13 @@ export function useStationVendorOptions(): UseStationVendorOptionsResult {
     };
   }, []);
 
-  return { stations, loading, error };
+  return {
+    stations: catalog.options,
+    liveIds: catalog.liveIds,
+    labels: catalog.labels,
+    loading,
+    error,
+  };
 }
 
 export type RobotPositionDto = {

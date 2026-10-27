@@ -47,6 +47,9 @@ export type OrderTemplateDto = {
   modifiedBy: string | null;
   pickupStationId: string | null;
   dropStationId: string | null;
+  /** Stations this template routes through / MOVEs to that RIOT3 removed —
+   *  dispatch refuses it until they're replaced. Null when none. */
+  removedStations?: string[] | null;
 };
 
 export type PagedOrderTemplates = {
@@ -119,6 +122,8 @@ export type ListOrderTemplatesParams = {
   search?: string;
   sortBy?: OrderTemplateSortKey;
   sortDir?: "asc" | "desc";
+  // Only templates that use a station RIOT3 removed (removedStations set).
+  needsFix?: boolean;
 };
 
 export async function listOrderTemplates(
@@ -133,6 +138,7 @@ export async function listOrderTemplates(
   if (params.search?.trim()) qs.set("search", params.search.trim());
   if (params.sortBy) qs.set("sortBy", params.sortBy);
   if (params.sortDir) qs.set("sortDir", params.sortDir);
+  if (params.needsFix) qs.set("needsFix", "true");
   const res = await fetch(`/api/order-templates?${qs}`, { cache: "no-store", signal });
   return unwrap<PagedOrderTemplates>(res);
 }

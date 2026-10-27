@@ -17,6 +17,7 @@ using DTMS.Planning.Application.Queries.GetJobStatusHistory;
 using DTMS.Planning.Application.Queries.GetLastDispatch;
 using DTMS.Planning.Application.Queries.GetOrderTemplateById;
 using DTMS.Planning.Application.Queries.GetOrderTemplates;
+using DTMS.Planning.Application.Services;
 using DTMS.Iam.Application.Authorization;
 using DTMS.Planning.Domain.Entities;
 using DTMS.Planning.Domain.Enums;
@@ -302,6 +303,9 @@ public static class PlanningEndpoints
             if (pickupResolve.IsError) return RiotEnvelope.BadRequest(pickupResolve.Error!);
             var dropResolve = await StationCodeHelpers.ResolveStationCodeAsync(req.DropStationCode, "dropStationCode", facilityReadService);
             if (dropResolve.IsError) return RiotEnvelope.BadRequest(dropResolve.Error!);
+            var removedError = await StationCodeHelpers.RejectRemovedStationsAsync(
+                pickupResolve.Value, dropResolve.Value, missions, facilityReadService);
+            if (removedError is not null) return RiotEnvelope.BadRequest(removedError);
 
             var transport = req.TransportOrder!;
             var result = await sender.Send(new CreateOrderTemplateCommand(
@@ -340,7 +344,9 @@ public static class PlanningEndpoints
             string? search,
             string? sortBy,
             string? sortDir,
-            ISender sender) =>
+            bool? needsFix,
+            ISender sender,
+            DTMS.Facility.Application.Services.IFacilityReadService facilityReadService) =>
         {
             var descending = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase);
             var result = await sender.Send(new GetOrderTemplatesQuery(
@@ -350,7 +356,9 @@ public static class PlanningEndpoints
                 Search: search,
                 IsActive: isActive,
                 SortBy: sortBy,
-                SortDescending: descending));
+                SortDescending: descending,
+                Removed: await StationCodeHelpers.LoadRemovedStationsAsync(facilityReadService),
+                NeedsFix: needsFix ?? false));
             return result.IsSuccess
                 ? RiotEnvelope.Ok(result.Value)
                 : RiotEnvelope.BadRequest(result.Error);
@@ -368,9 +376,13 @@ public static class PlanningEndpoints
         }).RequirePermission(Permissions.Planning.OrderTemplateRead);
 
         // GET /{id}
-        orderTemplates.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
+        orderTemplates.MapGet("/{id:guid}", async (
+            Guid id,
+            ISender sender,
+            DTMS.Facility.Application.Services.IFacilityReadService facilityReadService) =>
         {
-            var result = await sender.Send(new GetOrderTemplateByIdQuery(id));
+            var result = await sender.Send(new GetOrderTemplateByIdQuery(
+                id, await StationCodeHelpers.LoadRemovedStationsAsync(facilityReadService)));
             return result.IsSuccess
                 ? RiotEnvelope.Ok(result.Value)
                 : RiotEnvelope.NotFound(result.Error);
@@ -400,6 +412,9 @@ public static class PlanningEndpoints
                 if (pickupResolve.IsError) return RiotEnvelope.BadRequest(pickupResolve.Error!);
                 var dropResolve = await StationCodeHelpers.ResolveStationCodeAsync(req.DropStationCode, "dropStationCode", facilityReadService);
                 if (dropResolve.IsError) return RiotEnvelope.BadRequest(dropResolve.Error!);
+                var removedError = await StationCodeHelpers.RejectRemovedStationsAsync(
+                    pickupResolve.Value, dropResolve.Value, missions, facilityReadService);
+                if (removedError is not null) return RiotEnvelope.BadRequest(removedError);
 
                 var transport = req.TransportOrder!;
                 var result = await sender.Send(new UpdateOrderTemplateCommand(
@@ -549,6 +564,39 @@ internal static partial class StationCodeHelpers
         return guid is null
             ? StationCodeResolution.Fail($"'{code}' is not a valid station code for {fieldName}.")
             : StationCodeResolution.Ok(guid);
+    }
+
+    /// <summary>Facility's stations as a RemovedStationSet — what template references are judged against.</summary>
+    public static async Task<RemovedStationSet> LoadRemovedStationsAsync(
+        DTMS.Facility.Application.Services.IFacilityReadService facilityReadService,
+        CancellationToken ct = default)
+    {
+        var stations = await facilityReadService.GetStationRefsAsync(ct);
+        return new RemovedStationSet(stations.Select(s => (
+            s.Id,
+            int.TryParse(s.MapVendorRef, out var m) ? m : (int?)null,
+            int.TryParse(s.StationVendorRef, out var v) ? v : (int?)null,
+            s.Label,
+            s.IsActive)));
+    }
+
+    /// <summary>
+    /// Null when the template being saved uses no RIOT3-removed station;
+    /// otherwise the 400 message naming them. Saving one would store a
+    /// template dispatch refuses, so the editor has to replace them first.
+    /// </summary>
+    public static async Task<string?> RejectRemovedStationsAsync(
+        Guid? pickupStationId,
+        Guid? dropStationId,
+        IReadOnlyList<OrderTemplateMission> missions,
+        DTMS.Facility.Application.Services.IFacilityReadService facilityReadService)
+    {
+        var removed = await LoadRemovedStationsAsync(facilityReadService);
+        var found = removed.Find(pickupStationId, dropStationId,
+            missions.Where(m => m.Type == MissionType.Move).Select(m => (m.MapId, m.StationId)));
+        return found.Count == 0
+            ? null
+            : $"RIOT3 has removed {string.Join(", ", found)} from its map — pick a current station instead before saving.";
     }
 }
 

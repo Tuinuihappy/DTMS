@@ -1,3 +1,4 @@
+using DTMS.Planning.Application.Services;
 using DTMS.Planning.Domain.Entities;
 using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
@@ -44,7 +45,11 @@ public sealed record OrderTemplateDto(
     string? CreatedBy,
     string? ModifiedBy,
     Guid? PickupStationId,
-    Guid? DropStationId);
+    Guid? DropStationId,
+    // Codes of stations this template uses (route or MOVE) that RIOT3 has
+    // removed — dispatch refuses it until they're replaced. Null when none
+    // (or when the caller didn't check).
+    IReadOnlyList<string>? RemovedStations = null);
 
 // RIOT3-style envelope for the paged list. Field names match the vendor
 // (`current`, `pages`, `size`, `total`, `records`) so a client that knows
@@ -63,7 +68,11 @@ public record GetOrderTemplatesQuery(
     string? Search = null,
     bool? IsActive = null,
     string? SortBy = null,
-    bool SortDescending = false) : IQuery<PagedOrderTemplates>;
+    bool SortDescending = false,
+    // Templates are annotated against this set; NeedsFix keeps only those
+    // that use a removed station.
+    RemovedStationSet? Removed = null,
+    bool NeedsFix = false) : IQuery<PagedOrderTemplates>;
 
 public class GetOrderTemplatesQueryHandler : IQueryHandler<GetOrderTemplatesQuery, PagedOrderTemplates>
 {
@@ -82,17 +91,32 @@ public class GetOrderTemplatesQueryHandler : IQueryHandler<GetOrderTemplatesQuer
         var page = request.Page < 1 ? 1 : request.Page;
         var size = request.Size < 1 ? 20 : Math.Min(request.Size, MaxPageSize);
 
-        var (templates, total) = await _repo.ListPagedAsync(
-            page,
-            size,
-            request.IncludeInactive,
-            string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim(),
-            request.IsActive,
-            string.IsNullOrWhiteSpace(request.SortBy) ? null : request.SortBy.Trim(),
-            request.SortDescending,
-            cancellationToken);
+        var removed = request.Removed ?? RemovedStationSet.Unknown;
+        var search = string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim();
+        var sortBy = string.IsNullOrWhiteSpace(request.SortBy) ? null : request.SortBy.Trim();
 
-        var records = templates.Select(OrderTemplateDtoFactory.From).ToList();
+        IReadOnlyList<OrderTemplate> templates;
+        long total;
+        if (request.NeedsFix)
+        {
+            // Removed stations live in Facility and MOVE targets inside the
+            // Missions jsonb, so this filter can't be SQL — it runs in memory
+            // over the filtered catalog (hundreds of rows) and pages after.
+            var (all, _) = await _repo.ListPagedAsync(
+                1, int.MaxValue, request.IncludeInactive, search, request.IsActive, sortBy,
+                request.SortDescending, cancellationToken);
+            var broken = all.Where(t => OrderTemplateDtoFactory.RemovedIn(t, removed).Count > 0).ToList();
+            total = broken.Count;
+            templates = broken.Skip((page - 1) * size).Take(size).ToList();
+        }
+        else
+        {
+            (templates, total) = await _repo.ListPagedAsync(
+                page, size, request.IncludeInactive, search, request.IsActive, sortBy,
+                request.SortDescending, cancellationToken);
+        }
+
+        var records = templates.Select(t => OrderTemplateDtoFactory.From(t, removed)).ToList();
         // Mybatis-Plus convention: ceil(total/size), minimum 1 even when empty.
         var pages = total == 0 ? 1 : (total + size - 1) / size;
         return Result<PagedOrderTemplates>.Success(
@@ -137,6 +161,17 @@ public class GetOrderTemplateStatsQueryHandler
 
 public static class OrderTemplateDtoFactory
 {
+    /// <summary>Labels of removed stations the template routes through or MOVEs to.</summary>
+    public static IReadOnlyList<string> RemovedIn(OrderTemplate t, RemovedStationSet removed)
+        => removed.Find(t.PickupStationId, t.DropStationId,
+            t.Missions.Where(m => m.Type == MissionType.Move).Select(m => (m.MapId, m.StationId)));
+
+    public static OrderTemplateDto From(OrderTemplate t, RemovedStationSet removed)
+    {
+        var found = RemovedIn(t, removed);
+        return From(t) with { RemovedStations = found.Count > 0 ? found : null };
+    }
+
     public static OrderTemplateDto From(OrderTemplate t)
     {
         var missions = t.Missions

@@ -320,6 +320,47 @@ export function TemplateEditor({
     sourceDto != null &&
     (sourceDto.pickupStationId != null || sourceDto.dropStationId != null) &&
     stationCodesFilledFor !== sourceDto.id;
+  // Stations in the form RIOT3 has removed: a route code that's a known
+  // station but not an active one, or a MOVE target on a synced map that
+  // isn't live. Save is refused while any remain (the API refuses too).
+  const knownCodes = useMemo(() => new Set(stations.byId.values()), [stations.byId]);
+  const removedRouteCode = (code: string) =>
+    !!code && knownCodes.has(code) && !stations.liveCodes.has(code);
+  const removedInForm = useMemo(() => {
+    // Without the catalogs nothing can be judged — leave it to the API.
+    if (stations.loading || stationVendors.loading || mapVendors.loading) return [];
+    if (stations.error || stationVendors.error || mapVendors.error) return [];
+    const out: string[] = [];
+    for (const code of [form.pickupStationCode.trim(), form.dropStationCode.trim()])
+      if (code && knownCodes.has(code) && !stations.liveCodes.has(code) && !out.includes(code))
+        out.push(code);
+    for (const m of form.missions) {
+      if (m.type !== "MOVE") continue;
+      const sid = Number(m.stationId);
+      const synced = mapVendors.maps.some((mp) => String(mp.vendorId) === m.mapId.trim());
+      if (!synced || m.stationId.trim() === "" || !Number.isInteger(sid)) continue;
+      if (stationVendors.liveIds.has(sid)) continue;
+      const label = stationVendors.labels.get(sid) ?? `RIOT3 station ${sid}`;
+      if (!out.includes(label)) out.push(label);
+    }
+    return out;
+  }, [
+    form.pickupStationCode,
+    form.dropStationCode,
+    form.missions,
+    knownCodes,
+    stations.loading,
+    stations.error,
+    stations.liveCodes,
+    stationVendors.loading,
+    stationVendors.error,
+    stationVendors.liveIds,
+    stationVendors.labels,
+    mapVendors.loading,
+    mapVendors.error,
+    mapVendors.maps,
+  ]);
+
   const moveMissionCount = form.missions.filter((m) => m.type === "MOVE").length;
   const actMissionCount = form.missions.length - moveMissionCount;
 
@@ -355,6 +396,12 @@ export function TemplateEditor({
     const v = validate(form);
     if (v) {
       setValidationError(v);
+      return;
+    }
+    if (removedInForm.length > 0) {
+      setValidationError(
+        `RIOT3 has removed ${removedInForm.join(", ")} — pick current stations before saving.`,
+      );
       return;
     }
     setBusy(true);
@@ -554,6 +601,7 @@ export function TemplateEditor({
                 loading={stations.loading}
                 error={stations.error}
                 missingStationId={form.pickupStationCode ? null : missingStationIds.pickup}
+                removed={removedRouteCode(form.pickupStationCode.trim())}
               />
               <FieldStation
                 label="Drop station code"
@@ -564,6 +612,7 @@ export function TemplateEditor({
                 loading={stations.loading}
                 error={stations.error}
                 missingStationId={form.dropStationCode ? null : missingStationIds.drop}
+                removed={removedRouteCode(form.dropStationCode.trim())}
               />
             </div>
           </EditorCard>
@@ -713,6 +762,8 @@ function MissionRow({
   mapVendors: { maps: MapVendorOption[]; loading: boolean; error: string | null };
   stationVendors: {
     stations: StationVendorOption[];
+    liveIds: Set<number>;
+    labels: Map<number, string>;
     loading: boolean;
     error: string | null;
   };
@@ -723,6 +774,15 @@ function MissionRow({
   };
 }) {
   const isMove = mission.type === "MOVE";
+  // A target outside the live set on a map DTMS syncs is a station RIOT3
+  // removed; anything else off-list is just unknown to the picker.
+  const stationNotInListLabel = (v: string) => {
+    const n = Number(v);
+    const synced = mapVendors.maps.some((m) => String(m.vendorId) === mission.mapId.trim());
+    return synced && Number.isInteger(n) && !stationVendors.liveIds.has(n)
+      ? `${stationVendors.labels.get(n) ?? `Station id ${v}`} was removed by RIOT3 — pick another station`
+      : `Station id ${v} isn't in the list`;
+  };
   const dragControls = useDragControls();
   return (
     <Reorder.Item
@@ -847,7 +907,7 @@ function MissionRow({
                 placeholder="Select station…"
                 loadingPlaceholder="Loading stations…"
                 emptyLabel="No station matches"
-                notInListLabel={(v) => `Station id ${v} isn't in the list`}
+                notInListLabel={stationNotInListLabel}
                 icon={<Tag className="h-3 w-3" />}
               />
             </div>
@@ -1172,6 +1232,7 @@ function FieldStation({
   loading,
   error,
   missingStationId,
+  removed,
 }: {
   label: string;
   value: string;
@@ -1182,6 +1243,8 @@ function FieldStation({
   error: string | null;
   // Saved station the catalog no longer has; shown while the field is empty.
   missingStationId?: string | null;
+  // The chosen code is a station RIOT3 removed.
+  removed?: boolean;
 }) {
   return (
     <label className="block">
@@ -1202,6 +1265,11 @@ function FieldStation({
         <span className="mt-1 block text-[11px] font-medium text-[var(--color-amber-600)]">
           The saved station ({missingStationId}) is no longer in the station list — saving
           will clear it.
+        </span>
+      )}
+      {removed && (
+        <span className="mt-1 block text-[11px] font-semibold text-[var(--color-coral)]">
+          {value} was removed by RIOT3 — pick another station.
         </span>
       )}
     </label>

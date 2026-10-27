@@ -1,10 +1,11 @@
 using DTMS.Planning.Application.Queries.GetOrderTemplates;
+using DTMS.Planning.Application.Services;
 using DTMS.Planning.Domain.Repositories;
 using DTMS.SharedKernel.Messaging;
 
 namespace DTMS.Planning.Application.Queries.GetOrderTemplateById;
 
-public record GetOrderTemplateByIdQuery(Guid Id) : IQuery<OrderTemplateDto>;
+public record GetOrderTemplateByIdQuery(Guid Id, RemovedStationSet? Removed = null) : IQuery<OrderTemplateDto>;
 
 public class GetOrderTemplateByIdQueryHandler : IQueryHandler<GetOrderTemplateByIdQuery, OrderTemplateDto>
 {
@@ -19,6 +20,7 @@ public class GetOrderTemplateByIdQueryHandler : IQueryHandler<GetOrderTemplateBy
         var t = await _repo.GetByIdAsync(request.Id, cancellationToken);
         if (t is null) return Result<OrderTemplateDto>.Failure($"OrderTemplate {request.Id} not found.");
 
-        return Result<OrderTemplateDto>.Success(OrderTemplateDtoFactory.From(t));
+        return Result<OrderTemplateDto>.Success(
+            OrderTemplateDtoFactory.From(t, request.Removed ?? RemovedStationSet.Unknown));
     }
 }

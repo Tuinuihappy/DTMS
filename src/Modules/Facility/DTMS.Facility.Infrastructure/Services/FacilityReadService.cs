@@ -14,6 +14,13 @@ public sealed class FacilityReadService : IFacilityReadService
         _db = db;
     }
 
+    public async Task<IReadOnlyList<StationRef>> GetStationRefsAsync(CancellationToken cancellationToken = default)
+        => await (
+            from s in _db.Stations.AsNoTracking()
+            join m in _db.Maps.AsNoTracking() on s.MapId equals m.Id
+            select new StationRef(s.Id, m.VendorRef, s.VendorRef, s.Code ?? s.Name, s.IsActive))
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<UnavailableVendorStation>> FindUnavailableVendorStationsAsync(
         IReadOnlyCollection<VendorStationRef> refs,
         CancellationToken cancellationToken = default)
