@@ -3,6 +3,7 @@ using DTMS.Facility.Application.Commands.ClearStationOverride;
 using DTMS.Facility.Application.Commands.CreateMap;
 using DTMS.Facility.Application.Commands.ForceStationOffline;
 using DTMS.Facility.Application.Commands.ImportMapFromRiot3;
+using DTMS.Facility.Application.Commands.PurgeStations;
 using DTMS.Facility.Application.Commands.UpdateStation;
 using DTMS.Facility.Application.Commands.SyncMapStations;
 using DTMS.Facility.Application.Queries.GetMapById;
@@ -54,12 +55,22 @@ public static class MapEndpoints
 
         // Manual on-demand sync — same code path as the background poller, so the user
         // can refresh a map immediately after editing it in RIOT3 instead of waiting
-        // for the next poll interval (default 30 min).
-        group.MapPost("/maps/{id:guid}/sync-stations", async (Guid id, ISender sender) =>
+        // for the next poll interval (default 30 min). confirmMassDeactivation=true
+        // deactivates a held batch (result.heldStations) the operator has confirmed.
+        group.MapPost("/maps/{id:guid}/sync-stations", async (Guid id, bool? confirmMassDeactivation, ISender sender) =>
         {
-            var result = await sender.Send(new SyncMapStationsCommand(id));
+            var result = await sender.Send(new SyncMapStationsCommand(id, confirmMassDeactivation ?? false));
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         }).RequirePermission(Permissions.Facility.MapSync);
+
+        // POST /api/v1/facility/maps/{id}/stations/purge  { stationIds?: [...] }
+        // Hard-deletes stations RIOT3 has removed; omit stationIds for all of
+        // them. Skips (with a reason) any RIOT3 still lists or anything still uses.
+        group.MapPost("/maps/{id:guid}/stations/purge", async (Guid id, PurgeStationsRequest? req, ISender sender) =>
+        {
+            var result = await sender.Send(new PurgeStationsCommand(id, req?.StationIds));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        }).RequirePermission(Permissions.Facility.StationWrite);
 
         // ── Stations ───────────────────────────────────────────────────────
         // POST /api/v1/facility/maps/{mapId}/stations
@@ -113,6 +124,8 @@ public static class MapEndpoints
 }
 
 public record ImportMapFromRiot3Request(int Riot3MapId);
+
+public record PurgeStationsRequest(IReadOnlyList<Guid>? StationIds);
 // UpdateActions=false (default) leaves the existing action map untouched;
 // set UpdateActions=true and pass null/empty Actions to explicitly clear it,
 // or a non-empty map to replace it wholesale.

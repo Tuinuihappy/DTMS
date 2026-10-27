@@ -180,6 +180,11 @@ public static class ModuleServiceRegistration
         var riot3ApiKey = configuration.GetValue<string>("VendorAdapter:Riot3:ApiKey");
 
         var syncIntervalMinutes = configuration.GetValue<int>("VendorAdapter:Riot3:MapStationSync:IntervalMinutes", 30);
+        services.AddSingleton(new DTMS.Facility.Application.Services.StationSyncOptions
+        {
+            MaxDeactivateFraction = configuration.GetValue("VendorAdapter:Riot3:MapStationSync:MaxDeactivateFraction", 0.2),
+        });
+        services.AddScoped<DTMS.Facility.Application.Services.IStationUsageReader, DTMS.Api.Adapters.StationUsageReader>();
         services.AddHttpClient<DTMS.Facility.Application.Services.IRiot3FacilityClient, Riot3FacilityClient>(client =>
         {
             client.BaseAddress = new Uri(riot3BaseUrl);

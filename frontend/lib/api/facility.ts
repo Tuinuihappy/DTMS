@@ -50,6 +50,8 @@ export type SyncMapStationsResultDto = {
   rebound: number;
   /** New stations added without a Code because it was already taken. */
   codeConflicts: number;
+  /** Removals held for confirmation (too many at once); null when none. */
+  heldStations: string[] | null;
 };
 
 export async function getStations(opts?: {
@@ -379,20 +381,40 @@ export async function clearStationOverride(stationId: string): Promise<void> {
   }
 }
 
-export async function syncMapStations(mapId: string): Promise<SyncMapStationsResultDto> {
-  const res = await fetch(`/api/facility/maps/${mapId}/sync-stations`, {
+export async function syncMapStations(
+  mapId: string,
+  opts?: { confirmMassDeactivation?: boolean },
+): Promise<SyncMapStationsResultDto> {
+  const qs = opts?.confirmMassDeactivation ? "?confirmMassDeactivation=true" : "";
+  const res = await fetch(`/api/facility/maps/${mapId}/sync-stations${qs}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
   });
   if (!res.ok) {
-    let message = `Sync failed (${res.status})`;
-    try {
-      const body = (await res.json()) as { message?: string };
-      if (body?.message) message = body.message;
-    } catch {
-      // body wasn't JSON — fall through to default message
-    }
-    throw new Error(message);
+    await throwIfRateLimited(res);
+    throw new Error(await errorMessageFrom(res, `Sync failed (${res.status})`));
+  }
+  return res.json();
+}
+
+export type PurgeStationsResultDto = {
+  purged: { id: string; label: string }[];
+  skipped: { id: string; label: string; reason: string }[];
+};
+
+/** Hard-deletes stations RIOT3 removed. Omit stationIds for all of them on the map. */
+export async function purgeStations(
+  mapId: string,
+  stationIds?: string[],
+): Promise<PurgeStationsResultDto> {
+  const res = await fetch(`/api/facility/maps/${mapId}/stations/purge`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(stationIds ? { stationIds } : {}),
+  });
+  if (!res.ok) {
+    await throwIfRateLimited(res);
+    throw new Error(await errorMessageFrom(res, `Purge failed (${res.status})`));
   }
   return res.json();
 }

@@ -68,7 +68,9 @@ export async function errorMessageFrom(res: Response, fallback: string): Promise
   const text = await res.text().catch(() => "");
   if (!text) return fallback;
   try {
-    const body = JSON.parse(text) as { message?: unknown; detail?: unknown; error?: unknown };
+    const body = JSON.parse(text) as { message?: unknown; detail?: unknown; error?: unknown } | string;
+    // Results.BadRequest("reason") serializes a bare JSON string.
+    if (typeof body === "string") return body.trim() !== "" && body.length <= 300 ? body : fallback;
     const msg = [body?.message, body?.detail, body?.error].find(
       (v): v is string => typeof v === "string" && v.trim() !== "",
     );

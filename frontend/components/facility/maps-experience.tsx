@@ -42,6 +42,7 @@ import {
   Search,
   Signal,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 
@@ -58,6 +59,7 @@ import {
   forceStationOffline,
   getStations,
   listMaps,
+  purgeStations,
   syncMapStations,
   updateStation,
   type MapSummaryDto,
@@ -67,6 +69,7 @@ import {
   StationEditDrawer,
   type StationOp,
 } from "@/components/facility/station-edit-drawer";
+import { StationConfirmDialog } from "@/components/facility/station-confirm-dialog";
 import {
   RobotLayer,
   RobotTooltip,
@@ -402,12 +405,73 @@ export function MapsExperience() {
     [stations, editingStationId],
   );
 
+  // Irreversible station actions waiting on the operator: a removal batch
+  // the sync held back (too many at once), or a purge (one row / all).
+  const [confirmAction, setConfirmAction] = useState<
+    | { kind: "held"; mapId: string; mapName: string; codes: string[] }
+    | { kind: "purge"; mapId: string; ids: string[] | null; codes: string[] }
+    | null
+  >(null);
+
+  const onPurge = useCallback(
+    (targets: StationDto[], all: boolean) => {
+      if (!selectedMapId || targets.length === 0) return;
+      setConfirmAction({
+        kind: "purge",
+        mapId: selectedMapId,
+        ids: all ? null : targets.map((s) => s.id),
+        codes: targets.map((s) => s.code ?? s.name),
+      });
+    },
+    [selectedMapId],
+  );
+
+  const runConfirmAction = useCallback(async () => {
+    if (!confirmAction) return;
+    if (confirmAction.kind === "held") {
+      const result = await syncMapStations(confirmAction.mapId, { confirmMassDeactivation: true });
+      await refreshStations(confirmAction.mapId);
+      setToast({
+        kind: "ok",
+        msg: `Deactivated ${result.deactivated} station${result.deactivated === 1 ? "" : "s"} on ${result.mapName}`,
+      });
+      return;
+    }
+    const result = await purgeStations(confirmAction.mapId, confirmAction.ids ?? undefined);
+    await refreshStations(confirmAction.mapId);
+    return (
+      <>
+        <p className="font-semibold text-[var(--color-ink-900)]">
+          Deleted {result.purged.length} station{result.purged.length === 1 ? "" : "s"}
+          {result.skipped.length > 0 && `, kept ${result.skipped.length}`}
+        </p>
+        {result.skipped.length > 0 && (
+          <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+            {result.skipped.map((s) => (
+              <li key={s.id}>
+                <span className="font-mono font-semibold">{s.label}</span>{" "}
+                <span className="text-[var(--color-ink-500)]">— {s.reason}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </>
+    );
+  }, [confirmAction, refreshStations]);
+
   const onSync = useCallback(async () => {
     if (!selectedMapId || syncing || cooldownRemaining > 0) return;
     setSyncing(true);
     try {
       const result = await syncMapStations(selectedMapId);
       setLastSync(new Date());
+      if (result.heldStations && result.heldStations.length > 0)
+        setConfirmAction({
+          kind: "held",
+          mapId: selectedMapId,
+          mapName: result.mapName,
+          codes: result.heldStations,
+        });
       const delta =
         result.added + result.updated + result.reactivated + result.deactivated + result.rebound;
       setToast(
@@ -464,6 +528,38 @@ export function MapsExperience() {
         loading={loading}
         error={error}
         onEditStation={setEditingStationId}
+        onPurge={selectedMap?.vendorRef ? onPurge : undefined}
+      />
+
+      <StationConfirmDialog
+        open={confirmAction !== null}
+        tone={confirmAction?.kind === "purge" ? "danger" : "warn"}
+        eyebrow={confirmAction?.kind === "purge" ? "Purge stations" : "Sync held back"}
+        title={
+          confirmAction?.kind === "purge"
+            ? `Delete ${confirmAction.ids === null ? "all removed stations" : confirmAction.codes.length === 1 ? confirmAction.codes[0] : `${confirmAction.codes.length} stations`}?`
+            : `Deactivate ${confirmAction?.codes.length ?? 0} stations?`
+        }
+        description={
+          confirmAction?.kind === "purge" ? (
+            <>
+              ลบ station ที่ RIOT3 ลบไปแล้วออกจาก DTMS ถาวร — ระบบจะเช็คกับ RIOT3 อีกครั้งก่อนลบ
+              และจะ<span className="font-semibold">ข้าม</span>ตัวที่ RIOT3 ยังมีอยู่ หรือยังมี
+              template / trip / order ที่ยังไม่จบใช้อยู่
+            </>
+          ) : (
+            <>
+              RIOT3 ไม่มี station เหล่านี้แล้ว — เยอะเกินเกณฑ์ในรอบเดียว (ค่าเริ่มต้น 20% ของที่ใช้งานอยู่) ระบบเลย
+              <span className="font-semibold">ยังไม่ deactivate</span> ให้ ถ้า RIOT3 กำลังแก้ map อยู่
+              ให้กด Not now แล้ว sync ใหม่ทีหลัง
+            </>
+          )
+        }
+        items={confirmAction?.codes ?? []}
+        confirmLabel={confirmAction?.kind === "purge" ? "Delete" : "Deactivate"}
+        busyLabel={confirmAction?.kind === "purge" ? "Deleting…" : "Deactivating…"}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={runConfirmAction}
       />
 
       <StationEditDrawer
@@ -2229,12 +2325,18 @@ function StationDirectory({
   loading,
   error,
   onEditStation,
+  onPurge,
 }: {
   stations: StationDto[];
   loading: boolean;
   error: string | null;
   onEditStation: (id: string) => void;
+  /** Absent when the map isn't linked to RIOT3. `all` = purge every removed station. */
+  onPurge?: (targets: StationDto[], all: boolean) => void;
 }) {
+  // Inactive RIOT3 stations = the ones RIOT3 removed; only these can be purged.
+  const removed = useMemo(() => stations.filter((s) => !s.isActive && s.vendorRef), [stations]);
+
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeKey | "ALL">("ALL");
   // On by default: inactive rows are stations RIOT3 has removed — kept for
@@ -2315,6 +2417,18 @@ function StationDirectory({
                 <span className="opacity-70 tabular-nums">· {hiddenCount} hidden</span>
               )}
             </button>
+
+            {onPurge && removed.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onPurge(removed, true)}
+                className="inline-flex items-center gap-1.5 rounded-full px-3 h-9 text-[11.5px] font-medium tracking-tight transition-colors cursor-pointer bg-white/65 dark:bg-white/[0.05] text-[var(--color-coral)] hover:bg-[var(--color-coral-soft)]"
+              >
+                <Trash2 className="h-3.5 w-3.5" strokeWidth={2.2} />
+                Purge removed
+                <span className="opacity-70 tabular-nums">({removed.length})</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -2422,7 +2536,18 @@ function StationDirectory({
                           )}
                         </span>
                       </td>
-                      <td className="py-3 pr-5 text-right">
+                      <td className="py-3 pr-5 text-right whitespace-nowrap">
+                        {onPurge && !s.isActive && s.vendorRef && (
+                          <button
+                            type="button"
+                            onClick={() => onPurge([s], false)}
+                            className="mr-1.5 inline-flex items-center gap-1 rounded-full bg-white/65 dark:bg-white/[0.05] px-2.5 h-7 text-[10.5px] font-semibold tracking-tight text-[var(--color-coral)] hover:bg-[var(--color-coral-soft)] hover:-translate-y-px transition-all cursor-pointer"
+                            aria-label={`Purge ${s.name}`}
+                          >
+                            <Trash2 className="h-3 w-3" strokeWidth={2.4} />
+                            Purge
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => onEditStation(s.id)}

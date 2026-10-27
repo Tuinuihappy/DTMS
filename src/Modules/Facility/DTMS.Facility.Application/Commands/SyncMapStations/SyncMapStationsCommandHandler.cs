@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DTMS.Facility.Application.Services;
 using DTMS.Facility.Domain.Entities;
 using DTMS.Facility.Domain.Repositories;
@@ -13,15 +12,11 @@ namespace DTMS.Facility.Application.Commands.SyncMapStations;
 internal sealed class SyncMapStationsCommandHandler
     : ICommandHandler<SyncMapStationsCommand, SyncMapStationsResult>
 {
-    // Per-map lock — shared between the background poller and any manual trigger so two
-    // concurrent syncs on the same map can't race on the Stations table (unique-index
-    // violation, double-add, etc.). Different maps still run in parallel.
-    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> _locks = new();
-
     private readonly IMapRepository _mapRepo;
     private readonly IStationRepository _stationRepo;
     private readonly IRiot3FacilityClient _riot3;
     private readonly IDistributedCache _cache;
+    private readonly StationSyncOptions _options;
     private readonly ILogger<SyncMapStationsCommandHandler> _logger;
 
     public SyncMapStationsCommandHandler(
@@ -29,12 +24,14 @@ internal sealed class SyncMapStationsCommandHandler
         IStationRepository stationRepo,
         IRiot3FacilityClient riot3,
         IDistributedCache cache,
+        StationSyncOptions options,
         ILogger<SyncMapStationsCommandHandler> logger)
     {
         _mapRepo = mapRepo;
         _stationRepo = stationRepo;
         _riot3 = riot3;
         _cache = cache;
+        _options = options;
         _logger = logger;
     }
 
@@ -53,10 +50,11 @@ internal sealed class SyncMapStationsCommandHandler
             return Result<SyncMapStationsResult>.Failure(
                 $"Map {map.Name} has non-integer VendorRef '{map.VendorRef}'.");
 
-        var semaphore = _locks.GetOrAdd(map.Id, _ => new SemaphoreSlim(1, 1));
+        // Shared with the purge — see MapStationLocks. Different maps still run in parallel.
+        var semaphore = MapStationLocks.For(map.Id);
         if (!await semaphore.WaitAsync(TimeSpan.Zero, ct))
             return Result<SyncMapStationsResult>.Failure(
-                $"Sync for map {map.Name} is already in progress.");
+                $"Another sync or purge for map {map.Name} is in progress.");
 
         try
         {
@@ -171,9 +169,22 @@ internal sealed class SyncMapStationsCommandHandler
                 added++;
             }
 
-            foreach (var dbStation in removed)
+            var toDeactivate = removed.Where(s => s.IsActive && !claimed.Contains(s.Id)).ToList();
+            var activeBefore = dbStations.Count(s => s.IsActive);
+            // Max(1, …) so a small map can still lose a single station unattended.
+            var allowed = Math.Max(1, activeBefore * _options.MaxDeactivateFraction);
+            List<string>? held = null;
+
+            if (toDeactivate.Count > allowed && !request.ConfirmMassDeactivation)
             {
-                if (dbStation.IsActive && !claimed.Contains(dbStation.Id))
+                held = toDeactivate.Select(s => s.Code ?? s.Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
+                _logger.LogWarning(
+                    "SyncMapStations: map {Name} — RIOT3 no longer lists {Count} of {Active} active stations (limit {Limit:P0}); holding the deactivation until confirmed: {Stations}",
+                    map.Name, toDeactivate.Count, activeBefore, _options.MaxDeactivateFraction, string.Join(", ", held));
+            }
+            else
+            {
+                foreach (var dbStation in toDeactivate)
                 {
                     dbStation.Deactivate();
                     touched.Add(dbStation);
@@ -185,11 +196,11 @@ internal sealed class SyncMapStationsCommandHandler
             await InvalidateLookupCacheAsync(touched, ct);
 
             _logger.LogInformation(
-                "SyncMapStations: map {MapId} ({Name}) — added={Added} updated={Updated} reactivated={Reactivated} deactivated={Deactivated} rebound={Rebound} codeConflicts={CodeConflicts}",
-                map.Id, map.Name, added, updated, reactivated, deactivated, rebound, codeConflicts);
+                "SyncMapStations: map {MapId} ({Name}) — added={Added} updated={Updated} reactivated={Reactivated} deactivated={Deactivated} rebound={Rebound} codeConflicts={CodeConflicts} held={Held}",
+                map.Id, map.Name, added, updated, reactivated, deactivated, rebound, codeConflicts, held?.Count ?? 0);
 
             return Result<SyncMapStationsResult>.Success(new SyncMapStationsResult(
-                map.Id, map.Name, added, updated, reactivated, deactivated, rebound, codeConflicts));
+                map.Id, map.Name, added, updated, reactivated, deactivated, rebound, codeConflicts, held));
         }
         finally
         {

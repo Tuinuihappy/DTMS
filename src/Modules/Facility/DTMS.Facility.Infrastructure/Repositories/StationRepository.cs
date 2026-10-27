@@ -49,5 +49,7 @@ public class StationRepository : IStationRepository
     public async Task AddAsync(Station station, CancellationToken ct = default)
         => await _db.Stations.AddAsync(station, ct);
 
+    public void Remove(Station station) => _db.Stations.Remove(station);
+
     public Task SaveChangesAsync(CancellationToken ct = default) => _db.SaveChangesAsync(ct);
 }
