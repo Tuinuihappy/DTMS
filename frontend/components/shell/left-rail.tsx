@@ -438,8 +438,9 @@ export function LeftRail({ initialExpanded = false }: { initialExpanded?: boolea
 }
 
 /* -------------------------------------------------------------------------- */
-/* RailNav — sections of rows. Expanded: small caps label over each section.  */
-/* Collapsed: no separator — one continuous column of pills.                  */
+/* RailNav — one continuous column of pills in both states. Section labels  */
+/* are not rendered (user preference 2026-10-27); `label` only names the    */
+/* group in code.                                                             */
 /* -------------------------------------------------------------------------- */
 function RailNav({
   sections,
@@ -458,19 +459,6 @@ function RailNav({
     <div className="flex flex-col gap-2">
       {sections.map((s, si) => (
         <div key={s.label ?? `s${si}`}>
-          {s.label && (
-            <motion.div
-              initial={false}
-              animate={{ height: expanded ? "auto" : 0, opacity: expanded ? 1 : 0 }}
-              transition={{ height: spring.gentle, opacity: expanded ? T.base : T.exit }}
-              aria-hidden={!expanded}
-              className="overflow-hidden"
-            >
-              <div className="px-2.5 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-ink-400)] whitespace-nowrap">
-                {s.label}
-              </div>
-            </motion.div>
-          )}
           <ul className="flex flex-col gap-2">
             {s.items.map((a) => (
               <li key={a.label}>

@@ -1,6 +1,6 @@
 # แผน: Frontend review — animation ที่ทำให้ UI เร็ว ชัด และมีชีวิต
 
-> **สถานะ**: ✅ โค้ดเสร็จ P0–P4 (ยังไม่ commit / ยังไม่ deploy) — typecheck ✓ · `next build` ✓ · overlay/route guard ✓ · **ยังไม่ได้ทดสอบบน browser/tablet** — ดู checklist ท้ายไฟล์ — 2026-10-23
+> **สถานะ**: ✅ DEPLOYED 2026-10-23 (`d6c7d610`, frontend only) — typecheck ✓ · `next build` ✓ · overlay/route guard ✓ · **ยังไม่ได้ทดสอบบน browser/tablet** — ดู checklist ท้ายไฟล์ — 2026-10-23
 > **สิ่งที่ขอ**: review frontend และเพิ่ม animation ให้ UI มีประสิทธิภาพขึ้น ทั้งด้าน feedback ที่ชัด ความเร็ว/ลื่น และความสวย
 > **ขอบเขต**: Ops (`/delivery-orders`, `/dispatch`), Admin/Facility/Fleet/Templates/Reports, Dashboard/Home/Landing/Login/Profile — **ไม่รวม `/m` (tablet PWA)**
 > **ประเภท / ขนาด**: refactor + bug fix + feature · L · frontend อย่างเดียว · 5 phase (P0–P4)
@@ -90,9 +90,22 @@
 - `lib/motion.ts`, `components/primitives/{toast,confirm-dialog,button}.tsx`, `data-table/row-group.tsx`, `lib/hooks/{use-flash-on-change,use-media-query}.ts`
 - `components/delivery-orders/toast.tsx` ถูกลบ → ใช้ `@/components/primitives/toast` (mount ใน providers)
 
+## Sidebar (ปรับตามผู้ใช้ 2026-10-23 → 2026-10-27)
+
+- ปุ่มขาวทรงแคปซูลแยกทีละอัน ไม่มีแผงพื้นหลัง ไม่มีเส้นคั่น ไม่มีชื่อหมวด — เรียงต่อกันแถวเดียวทั้งตอนกางและหด
+- ทั้งแถบ scroll เป็นรายการเดียว ไม่มีส่วนที่ปักไว้ (Admin อยู่ท้ายสุด)
+- หด/ขยายใช้รูปทรงปุ่มเดียวกัน — spring ของความกว้างทำหน้าที่ morph ทั้งสองทาง
+- โลโก้ TopNav กึ่งกลางตรงคอลัมน์ไอคอน (x = 44px); TopNav เต็มความกว้างบน lg+
+
+**ตัดสินใจกับผู้ใช้ 2026-10-27**
+- ชื่อหมวดตอนกาง sidebar → เอาออก
+- Login บนมือถือ autofocus ช่อง username (คีย์บอร์ดเด้งทันที) → ยอมรับได้
+- จอ > 1472px ปุ่มฝั่งขวาของ TopNav ชิดขอบจอ → โอเค
+
 ## Checklist ทดสอบ (desktop + tablet — ยังไม่ได้ทำ)
 
 **Shell / ทั่วไป**
+- [ ] Sidebar: หด/ขยายลื่นทั้งสองทาง, โลโก้ตรงแนวปุ่ม, scroll ได้ทั้งแถบ, ตอนหดชี้ไอคอนมี tooltip และกลุ่มมีเมนูเด้งข้าง
 - [ ] กดเปลี่ยนหน้าไปมา: top bar + rail ไม่ fade/เลื่อนใหม่; rail ที่ขยายไว้ reload แล้วไม่ "เด้ง" จากแคบ
 - [ ] toggle rail: เนื้อหาขยับทันที ไม่กระตุก; ตั้งค่าเดิมจาก localStorage ยังอยู่หลัง deploy ครั้งแรก
 - [ ] เปิด OS "Reduce motion": ไม่มีอะไรเด้ง/ลอย/pulse
@@ -121,7 +134,7 @@
 - [ ] Carrier types: reload ล้ม → banner (ไม่ทับทั้งหน้า)
 
 **Login / Landing / Dashboard**
-- [ ] /login: ฟอร์มขึ้นทันที, focus ที่ username (มือถือคีย์บอร์ดเด้ง — ยอมรับได้ไหม?), Chrome autofill แล้ว label ไม่ทับ
+- [ ] /login: ฟอร์มขึ้นทันที, focus ที่ username, Chrome autofill แล้ว label ไม่ทับ
 - [ ] รหัสผิด: สั่นครั้งเดียว ข้อความที่พิมพ์ไม่หาย; พิมพ์ใหม่ error หาย; login สำเร็จไปหน้าถัดไปทันที
 - [ ] /: intro เล่นครั้งเดียวต่อ session, กด/คีย์ข้ามได้, reload ไม่กระพริบ
 - [ ] /dashboard: เข้าครั้งที่สองไม่เล่น entrance; ticker format ถูก (`+18%`); Profile route สีถูกใน dark
