@@ -82,7 +82,9 @@
 - B3 (Retry reason) **ไม่ใช่ bug** — dialog Retry ไม่มีช่องเหตุผล; ถ้าส่ง `reason` จะได้ข้อความ default ของ Cancel ไปแทน → คงเดิม
 - Login ไม่ใส่ `router.prefetch` ก่อน login — `proxy.ts` จะตอบ redirect ไป `/login` แล้ว router อาจ replay redirect นั้นหลัง login
 - Reports ไม่ dim ข้อมูลเก่าตอนเปลี่ยน window — `useProjectionPoll` ล้างข้อมูลโดยตั้งใจ (ห้ามโชว์ตัวเลขของ window เก่า)
-- P4 ข้าม: trip status step track (สถานะไม่เป็นเส้นตรง), ticker บน total count (SectionLabel รับแค่ string), check-morph ใน order cancel dialog (เป็น delayed write + Undo), feed insert บน dashboard (mock ไม่เปลี่ยน)
+- P4 ข้ามรอบแรก: check-morph ใน order cancel dialog (เป็น delayed write + Undo), feed insert บน dashboard (mock ไม่เปลี่ยน)
+- P4 ทำเพิ่ม 2026-10-27: ticker บน total count หน้า Orders (`6df2e238`, `from="value"` — วิ่งเฉพาะตอนยอดเปลี่ยน); mission step track ใต้หัว trip drawer (`a17e4355`, **เฉพาะ mission ที่รายงานมาแล้ว** — ไม่มีแผน mission ใน trip API; ถ้าจะโชว์ขั้นที่เหลือต้องให้ backend แกะจาก VendorRequestSnapshot); Reports คงเดิม (ล้างเป็น skeleton ตอนเปลี่ยนช่วง — ตามที่ผู้ใช้เลือก)
+- TopNav: เอาช่องค้นหา + ปุ่มเข็มทิศ (ไม่ได้ต่อกับอะไร) ออก (`02ed60ac`)
 
 **ของใหม่ที่ควรรู้**
 - `app/(app)/` route group + `layout.tsx` (shell ถาวร), `loading.tsx`, `error.tsx` — URL เดิมทุกหน้า; `check-route-protection.mjs` สแกนเข้า route group แล้ว
@@ -106,6 +108,8 @@
 
 **Shell / ทั่วไป**
 - [ ] Sidebar: หด/ขยายลื่นทั้งสองทาง, โลโก้ตรงแนวปุ่ม, scroll ได้ทั้งแถบ, ตอนหดชี้ไอคอนมี tooltip และกลุ่มมีเมนูเด้งข้าง
+- [ ] Orders: ยอดรวมใต้หัวข้อโชว์เลขจริงทันที, เลขวิ่งเมื่อมี order ใหม่/ยกเลิก/เปลี่ยน filter
+- [ ] Trip drawer (หุ่นกำลังวิ่ง): track ใต้ badge — วงแหวนอยู่ที่ mission ปัจจุบันและเลื่อนตาม, ชี้จุดเห็นรายละเอียด, trip ยาวเลื่อนให้เห็นขั้นปัจจุบัน
 - [ ] กดเปลี่ยนหน้าไปมา: top bar + rail ไม่ fade/เลื่อนใหม่; rail ที่ขยายไว้ reload แล้วไม่ "เด้ง" จากแคบ
 - [ ] toggle rail: เนื้อหาขยับทันที ไม่กระตุก; ตั้งค่าเดิมจาก localStorage ยังอยู่หลัง deploy ครั้งแรก
 - [ ] เปิด OS "Reduce motion": ไม่มีอะไรเด้ง/ลอย/pulse
