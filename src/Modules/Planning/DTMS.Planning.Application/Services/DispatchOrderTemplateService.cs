@@ -11,6 +11,7 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
     private readonly IOrderTemplateRepository _templateRepository;
     private readonly IOrderTemplateResolver _resolver;
     private readonly IRobotOrderDispatcher _dispatcher;
+    private readonly IVendorStationAvailability _stations;
     private readonly ISender _sender;
     private readonly ILogger<DispatchOrderTemplateService> _logger;
 
@@ -18,12 +19,14 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
         IOrderTemplateRepository templateRepository,
         IOrderTemplateResolver resolver,
         IRobotOrderDispatcher dispatcher,
+        IVendorStationAvailability stations,
         ISender sender,
         ILogger<DispatchOrderTemplateService> logger)
     {
         _templateRepository = templateRepository;
         _resolver = resolver;
         _dispatcher = dispatcher;
+        _stations = stations;
         _sender = sender;
         _logger = logger;
     }
@@ -31,21 +34,48 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
     public async Task<Result> CheckRouteAsync(
         Guid pickupStationId, Guid dropStationId, CancellationToken cancellationToken = default)
     {
-        // Same two steps, same order, as DispatchByRouteAsync below — kept
+        // Same steps, same order, as DispatchByRouteAsync below — kept
         // separate so the live dispatch path is untouched.
         var template = await _templateRepository.FindByRouteAsync(pickupStationId, dropStationId, cancellationToken);
         if (template is null)
             return Result.Failure("no active OrderTemplate is registered for this route");
 
+        ResolvedOrder resolved;
         try
         {
-            await _resolver.ResolveAsync(template, cancellationToken);
-            return Result.Success();
+            resolved = await _resolver.ResolveAsync(template, cancellationToken);
         }
         catch (InvalidOperationException ex)
         {
             return Result.Failure($"OrderTemplate '{template.Name}' does not resolve: {ex.Message}");
         }
+
+        var removed = await FindRemovedMoveTargetsAsync(template.Name, resolved, cancellationToken);
+        return removed is null ? Result.Success() : Result.Failure(removed);
+    }
+
+    // RIOT3 deletes stations from the map; a template still MOVEing to one is
+    // POSTed and refused vendor-side (2026-10-27: 52 active templates pointed
+    // at removed stations such as ATH_01). Intake only checks the order's own
+    // pickup/drop codes — retries, RetryJob and waypoints inside the template
+    // bypassed that — so every dispatch checks the template's MOVE targets here.
+    private async Task<string?> FindRemovedMoveTargetsAsync(
+        string templateName, ResolvedOrder resolved, CancellationToken cancellationToken)
+    {
+        var targets = resolved.Missions
+            .Where(m => m.MapId.HasValue && m.StationId.HasValue)
+            .Select(m => new VendorStation(m.MapId!.Value, m.StationId!.Value))
+            .Distinct()
+            .ToList();
+        if (targets.Count == 0) return null;
+
+        var removed = await _stations.FindRemovedAsync(targets, cancellationToken);
+        if (removed.Count == 0) return null;
+
+        var names = string.Join(", ", removed.Select(r =>
+            r.Name is null ? $"RIOT3 station {r.StationId}" : $"{r.Name} (RIOT3 id {r.StationId})"));
+        return $"OrderTemplate '{templateName}' moves to {names}, which RIOT3 no longer has on its map — " +
+               "update the template's missions";
     }
 
     public async Task<Result<DispatchTemplateResult>> DispatchByRouteAsync(
@@ -87,6 +117,14 @@ public sealed class DispatchOrderTemplateService : IDispatchOrderTemplateService
             _logger.LogWarning("[EnvelopeDispatch] Template {TemplateId} ({TemplateName}) resolution failed: {Error}",
                 template.Id, template.Name, ex.Message);
             return Result<DispatchTemplateResult>.Failure(ex.Message);
+        }
+
+        var removedTargets = await FindRemovedMoveTargetsAsync(template.Name, resolved, cancellationToken);
+        if (removedTargets is not null)
+        {
+            _logger.LogWarning("[EnvelopeDispatch] Template {TemplateId} not sent (upperKey {UpperKey}): {Error}",
+                template.Id, upperKey, removedTargets);
+            return Result<DispatchTemplateResult>.Failure(removedTargets);
         }
 
         // Apply per-dispatch overrides on top of the resolved template.

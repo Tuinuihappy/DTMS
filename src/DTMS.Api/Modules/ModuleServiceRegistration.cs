@@ -486,6 +486,7 @@ public static class ModuleServiceRegistration
         services.AddScoped<IOrderTemplateRepository, OrderTemplateRepository>();
         services.AddScoped<IDispatchClaimRepository, DispatchClaimRepository>();
         services.AddScoped<IOrderTemplateResolver, OrderTemplateResolver>();
+        services.AddScoped<IVendorStationAvailability, DTMS.Api.Adapters.FacilityVendorStationAvailability>();
         // Vendor seam: swap to a no-op adapter when VendorAdapter:Riot3:Enabled=false
         // so load tests / dev scenarios can drive orders through the full DTMS
         // pipeline to "Dispatched" without contacting the real RIOT3 cluster.

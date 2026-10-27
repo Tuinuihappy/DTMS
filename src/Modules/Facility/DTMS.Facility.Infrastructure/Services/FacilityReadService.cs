@@ -14,6 +14,41 @@ public sealed class FacilityReadService : IFacilityReadService
         _db = db;
     }
 
+    public async Task<IReadOnlyList<UnavailableVendorStation>> FindUnavailableVendorStationsAsync(
+        IReadOnlyCollection<VendorStationRef> refs,
+        CancellationToken cancellationToken = default)
+    {
+        if (refs.Count == 0) return [];
+
+        var mapRefs = refs.Select(r => r.MapVendorRef).Distinct().ToList();
+        var maps = await _db.Maps.AsNoTracking()
+            .Where(m => m.VendorRef != null && mapRefs.Contains(m.VendorRef))
+            .Select(m => new { m.Id, m.VendorRef })
+            .ToListAsync(cancellationToken);
+        if (maps.Count == 0) return [];
+
+        var mapIds = maps.Select(m => m.Id).ToList();
+        var stationRefs = refs.Select(r => r.StationVendorRef).Distinct().ToList();
+        var stations = await _db.Stations.AsNoTracking()
+            .Where(s => mapIds.Contains(s.MapId) && s.VendorRef != null && stationRefs.Contains(s.VendorRef))
+            .Select(s => new { s.MapId, s.VendorRef, s.Name, s.IsActive })
+            .ToListAsync(cancellationToken);
+
+        var mapIdByRef = maps.ToDictionary(m => m.VendorRef!, m => m.Id);
+        var unavailable = new List<UnavailableVendorStation>();
+        foreach (var r in refs.Distinct())
+        {
+            if (!mapIdByRef.TryGetValue(r.MapVendorRef, out var mapId)) continue;
+
+            var station = stations.FirstOrDefault(s => s.MapId == mapId && s.VendorRef == r.StationVendorRef);
+            if (station is null)
+                unavailable.Add(new UnavailableVendorStation(r.MapVendorRef, r.StationVendorRef, null));
+            else if (!station.IsActive)
+                unavailable.Add(new UnavailableVendorStation(r.MapVendorRef, r.StationVendorRef, station.Name));
+        }
+        return unavailable;
+    }
+
     public Task<bool> StationExistsAsync(Guid stationId, CancellationToken cancellationToken = default)
         => _db.Stations.AnyAsync(s => s.Id == stationId, cancellationToken);
 

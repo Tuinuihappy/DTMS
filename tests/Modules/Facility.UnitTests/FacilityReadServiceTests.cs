@@ -1,3 +1,4 @@
+using DTMS.Facility.Application.Services;
 using DTMS.Facility.Domain.Entities;
 using DTMS.Facility.Domain.ValueObjects;
 using DTMS.Facility.Infrastructure.Data;
@@ -72,5 +73,36 @@ public class FacilityReadServiceTests
             .ResolveStationByVendorRefAsync("999");
 
         resolved.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task FindUnavailableVendorStations_ReportsRemovedAndMissing_IgnoresUnsyncedMaps()
+    {
+        await using var db = NewDb();
+        var map = new Map(Guid.NewGuid(), "FAN1_MAP", "v2", 100, 100, "{}");
+        map.SetVendorRef("2");
+        db.Maps.Add(map);
+        var removed = NewStation(map.Id, "ATH_01", vendorRef: "119");
+        removed.Deactivate();
+        db.Stations.AddRange(
+            NewStation(map.Id, "SHELF1", vendorRef: "5"),
+            removed,
+            // Same ref on an orphaned row must not make 777 look known.
+            NewStation(mapId: Guid.NewGuid(), "ORPHAN", vendorRef: "777"));
+        await db.SaveChangesAsync();
+
+        var result = await new FacilityReadService(db).FindUnavailableVendorStationsAsync(
+        [
+            new VendorStationRef("2", "5"),     // live
+            new VendorStationRef("2", "119"),   // removed by RIOT3
+            new VendorStationRef("2", "777"),   // synced map, no such station
+            new VendorStationRef("9", "1"),     // map DTMS doesn't sync
+        ]);
+
+        result.Should().BeEquivalentTo(new[]
+        {
+            new UnavailableVendorStation("2", "119", "ATH_01"),
+            new UnavailableVendorStation("2", "777", null),
+        });
     }
 }

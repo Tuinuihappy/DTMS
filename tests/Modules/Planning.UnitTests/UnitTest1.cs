@@ -1198,7 +1198,7 @@ public class DispatchOrderTemplateServiceTests
         var dispatcher = new StubDispatcher();
 
         var svc = new DTMS.Planning.Application.Services.DispatchOrderTemplateService(
-            repo, resolver, dispatcher, new StubSender(), Microsoft.Extensions.Logging.Abstractions.NullLogger<DTMS.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
+            repo, resolver, dispatcher, new StubStations(), new StubSender(), Microsoft.Extensions.Logging.Abstractions.NullLogger<DTMS.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
 
         var result = await svc.DispatchByRouteAsync(Guid.NewGuid(), pickup, drop, upperKey: "trip-1");
 
@@ -1214,7 +1214,7 @@ public class DispatchOrderTemplateServiceTests
             new StubTemplateRepo(matching: null),
             new StubResolver(),
             new StubDispatcher(),
-            new StubSender(),
+            new StubStations(), new StubSender(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DTMS.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
 
         var result = await svc.DispatchByRouteAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), upperKey: "  ");
@@ -1235,7 +1235,7 @@ public class DispatchOrderTemplateServiceTests
             new StubTemplateRepo(matching: template),
             new StubResolver(),
             dispatcher,
-            new StubSender(),
+            new StubStations(), new StubSender(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DTMS.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
 
         var result = await svc.DispatchByRouteAsync(Guid.NewGuid(), pickup, drop, upperKey: "trip-abc");
@@ -1258,7 +1258,7 @@ public class DispatchOrderTemplateServiceTests
             new StubTemplateRepo(matching: template),
             new StubResolver(),
             dispatcher,
-            new StubSender(),
+            new StubStations(), new StubSender(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DTMS.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
 
         await svc.DispatchByRouteAsync(Guid.NewGuid(), template.PickupStationId!.Value, template.DropStationId!.Value,
@@ -1278,7 +1278,7 @@ public class DispatchOrderTemplateServiceTests
             new StubTemplateRepo(matching: template),
             resolver,
             dispatcher,
-            new StubSender(),
+            new StubStations(), new StubSender(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DTMS.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
 
         await svc.DispatchByRouteAsync(Guid.NewGuid(), template.PickupStationId!.Value, template.DropStationId!.Value,
@@ -1297,7 +1297,7 @@ public class DispatchOrderTemplateServiceTests
             new StubTemplateRepo(matching: template),
             new StubResolver(),
             dispatcher,
-            new StubSender(),
+            new StubStations(), new StubSender(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DTMS.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
 
         var result = await svc.DispatchByRouteAsync(Guid.NewGuid(), template.PickupStationId!.Value, template.DropStationId!.Value, upperKey: "trip");
@@ -1307,9 +1307,10 @@ public class DispatchOrderTemplateServiceTests
     }
 
     private static DTMS.Planning.Application.Services.DispatchOrderTemplateService CheckSvc(
-        OrderTemplate? matching, StubResolver? resolver = null, StubDispatcher? dispatcher = null)
+        OrderTemplate? matching, StubResolver? resolver = null, StubDispatcher? dispatcher = null,
+        StubStations? stations = null)
         => new(new StubTemplateRepo(matching), resolver ?? new StubResolver(), dispatcher ?? new StubDispatcher(),
-            new StubSender(),
+            stations ?? new StubStations(), new StubSender(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DTMS.Planning.Application.Services.DispatchOrderTemplateService>.Instance);
 
     [Fact]
@@ -1350,6 +1351,74 @@ public class DispatchOrderTemplateServiceTests
         dispatcher.Called.Should().BeFalse();
     }
 
+    // 2026-10-27: 52 active templates MOVEd to stations RIOT3 had removed
+    // (e.g. ATH_01 = 119) — intake passed them when only a waypoint was gone,
+    // and retries skipped intake altogether.
+    private static StubResolver ResolverMovingTo(params int[] stationIds)
+        => new() { Missions = stationIds.Select((id, i) => new DTMS.Planning.Application.Services.ResolvedMission(
+            i + 1, "MOVE", "agv", 2, id, null, null, null)).ToArray() };
+
+    [Fact]
+    public async Task CheckRoute_TemplateMovesToRemovedStation_FailsNamingTemplateAndStation()
+    {
+        var template = TemplateFor(Guid.NewGuid(), Guid.NewGuid(), "SHELF1 TO ATH01");
+        var stations = new StubStations(new DTMS.Planning.Application.Services.RemovedVendorStation(2, 119, "ATH_01"));
+
+        var result = await CheckSvc(template, ResolverMovingTo(5, 10, 119), stations: stations)
+            .CheckRouteAsync(template.PickupStationId!.Value, template.DropStationId!.Value);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("SHELF1 TO ATH01").And.Contain("ATH_01 (RIOT3 id 119)");
+        stations.Asked.Should().BeEquivalentTo(new[]
+        {
+            new DTMS.Planning.Application.Services.VendorStation(2, 5),
+            new DTMS.Planning.Application.Services.VendorStation(2, 10),
+            new DTMS.Planning.Application.Services.VendorStation(2, 119),
+        });
+    }
+
+    [Fact]
+    public async Task DispatchByRoute_TemplateMovesToRemovedStation_IsNotSentToRiot()
+    {
+        var template = TemplateFor(Guid.NewGuid(), Guid.NewGuid());
+        var dispatcher = new StubDispatcher { ReturnVendorKey = "K" };
+        var stations = new StubStations(new DTMS.Planning.Application.Services.RemovedVendorStation(2, 10, null));
+
+        var result = await CheckSvc(template, ResolverMovingTo(5, 10), dispatcher, stations)
+            .DispatchByRouteAsync(Guid.NewGuid(), template.PickupStationId!.Value, template.DropStationId!.Value, upperKey: "trip");
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("RIOT3 station 10");
+        dispatcher.Called.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DispatchByRoute_AllMoveTargetsLive_IsSent()
+    {
+        var template = TemplateFor(Guid.NewGuid(), Guid.NewGuid());
+        var dispatcher = new StubDispatcher { ReturnVendorKey = "K" };
+
+        var result = await CheckSvc(template, ResolverMovingTo(5, 10), dispatcher)
+            .DispatchByRouteAsync(Guid.NewGuid(), template.PickupStationId!.Value, template.DropStationId!.Value, upperKey: "trip");
+
+        result.IsSuccess.Should().BeTrue();
+        dispatcher.Called.Should().BeTrue();
+    }
+
+    private sealed class StubStations(params DTMS.Planning.Application.Services.RemovedVendorStation[] removed)
+        : DTMS.Planning.Application.Services.IVendorStationAvailability
+    {
+        public IReadOnlyCollection<DTMS.Planning.Application.Services.VendorStation> Asked { get; private set; } = [];
+
+        public Task<IReadOnlyList<DTMS.Planning.Application.Services.RemovedVendorStation>> FindRemovedAsync(
+            IReadOnlyCollection<DTMS.Planning.Application.Services.VendorStation> stations, CancellationToken c = default)
+        {
+            Asked = stations;
+            return Task.FromResult<IReadOnlyList<DTMS.Planning.Application.Services.RemovedVendorStation>>(
+                removed.Where(r => stations.Contains(new DTMS.Planning.Application.Services.VendorStation(r.MapId, r.StationId))).ToList());
+        }
+    }
+
     private sealed class StubTemplateRepo : DTMS.Planning.Domain.Repositories.IOrderTemplateRepository
     {
         private readonly OrderTemplate? _matching;
@@ -1373,6 +1442,7 @@ public class DispatchOrderTemplateServiceTests
     {
         public string? AppointVehicleKey { get; set; }
         public string? FailWith { get; set; }
+        public DTMS.Planning.Application.Services.ResolvedMission[] Missions { get; set; } = [];
         public Task<DTMS.Planning.Application.Services.ResolvedOrder> ResolveAsync(
             OrderTemplate template, CancellationToken c = default)
         {
@@ -1382,7 +1452,7 @@ public class DispatchOrderTemplateServiceTests
                 Priority: template.Priority,
                 StructureType: template.StructureType,
                 TransportOrderPriority: template.TransportOrderPriority,
-                Missions: Array.Empty<DTMS.Planning.Application.Services.ResolvedMission>(),
+                Missions: Missions,
                 AppointVehicleKey: AppointVehicleKey ?? template.AppointVehicleKey,
                 AppointVehicleName: template.AppointVehicleName,
                 AppointVehicleGroupKey: template.AppointVehicleGroupKey,
