@@ -51,11 +51,48 @@ function Write-Log([string]$msg) {
     Add-Content -Path $Log -Value $line -Encoding utf8
 }
 
-# Runs a native command and logs its output. `*>> $Log` would append UTF-16
-# (PowerShell 5.1's redirection default) into a UTF-8 file.
-function Invoke-Logged([scriptblock]$cmd) {
-    $out = & $cmd 2>&1 | ForEach-Object { "$_" } | Out-String
-    if ($out.Trim()) { Write-Log $out.TrimEnd() }
+# Every podman / compose call goes through here, bounded by a timeout.
+# Seen 2026-10-07: one `podman machine inspect` never returned; a plain
+# `& $Podman ...` waits forever, so this single instance sat on the mutex
+# for three weeks doing nothing, and on 2026-10-27 the stack died and nobody
+# brought it back. On timeout the whole process tree is killed (podman.exe
+# spawns wsl.exe) and the call reports TimedOut; the next round tries again.
+function Invoke-Bounded([string]$File, [string[]]$Arguments, [int]$TimeoutSec = 60, [string]$WorkDir = $Repo) {
+    $quoted = $Arguments | ForEach-Object {
+        if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ }
+    }
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $File
+    $psi.Arguments = $quoted -join ' '
+    $psi.WorkingDirectory = $WorkDir
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    # Async reads: a full pipe buffer would otherwise block the child forever.
+    $stdout = $proc.StandardOutput.ReadToEndAsync()
+    $stderr = $proc.StandardError.ReadToEndAsync()
+    $timedOut = -not $proc.WaitForExit($TimeoutSec * 1000)
+    if ($timedOut) {
+        & taskkill.exe /T /F /PID $proc.Id *> $null
+        $proc.WaitForExit(5000) | Out-Null
+        Write-Log ("TIMEOUT after {0}s, killed: {1} {2}" -f $TimeoutSec, (Split-Path -Leaf $File), $psi.Arguments)
+    }
+    $text = ''
+    if ($stdout.Wait(5000)) { $text += $stdout.Result }
+    if ($stderr.Wait(5000)) { $text += $stderr.Result }
+    [pscustomobject]@{
+        ExitCode = if ($timedOut) { -1 } else { $proc.ExitCode }
+        Output   = $text
+        TimedOut = $timedOut
+    }
+}
+
+# Logs a call's output. `*>> $Log` would append UTF-16 (PowerShell 5.1's
+# redirection default) into a UTF-8 file.
+function Write-Output-Log([string]$text) {
+    if ($text -and $text.Trim()) { Write-Log $text.TrimEnd() }
 }
 
 function Limit-Log {
@@ -66,21 +103,22 @@ function Limit-Log {
 }
 
 function Test-Engine {
-    & $Podman version --format '{{.Server.Version}}' *> $null
-    return $LASTEXITCODE -eq 0
+    $r = Invoke-Bounded $Podman @('version', '--format', '{{.Server.Version}}') 30
+    return $r.ExitCode -eq 0
 }
 
 function Ensure-Machine {
-    $state = (& $Podman machine inspect --format '{{.State}}' 2>$null) -join ''
+    $r = Invoke-Bounded $Podman @('machine', 'inspect', '--format', '{{.State}}') 30
+    $state = $r.Output.Trim()
     if ($state -ne 'running') {
         Write-Log "machine is '$state' - starting"
-        Invoke-Logged { & $Podman machine start }
+        Write-Output-Log (Invoke-Bounded $Podman @('machine', 'start') 300).Output
     }
     if (-not (Test-Engine)) {
         # Seen 2026-09-24: the rootful API socket dies while the VM stays up,
         # and every podman/compose call then fails to connect.
         Write-Log 'engine not answering - restarting the rootful podman.socket'
-        Invoke-Logged { & $Podman machine ssh 'sudo systemctl start podman.socket' }
+        Write-Output-Log (Invoke-Bounded $Podman @('machine', 'ssh', 'sudo systemctl start podman.socket') 60).Output
     }
     return Test-Engine
 }
@@ -98,21 +136,20 @@ function Test-Paused {
 
 function Ensure-Containers {
     if (Test-Paused) { return }
-    $running = & $Podman ps --format '{{.Names}}' 2>$null
+    $ps = Invoke-Bounded $Podman @('ps', '--format', '{{.Names}}') 30
+    if ($ps.ExitCode -ne 0) { Write-Log 'podman ps failed - retrying next round'; return }
+    $running = $ps.Output -split "`r?`n" | Where-Object { $_ }
     $missing = $LongRunning | Where-Object { $running -notcontains $_ }
     if (-not $missing) { return }
 
     Write-Log ("not running: {0} - compose up" -f ($missing -join ', '))
     $env:DOCKER_HOST = 'npipe:////./pipe/docker_engine'   # compose otherwise targets the removed Docker Desktop pipe
-    Push-Location $Repo
-    try {
-        # Only the summary lines: compose's full output is a pull/wait log per service.
-        $out = & $Compose -f docker-compose.yml -f docker-compose.podman.yml --profile prod `
-            up -d --no-build @Services 2>&1 | ForEach-Object { "$_" }
-        $code = $LASTEXITCODE
-        $out | Where-Object { $_ -match 'Started|Error|error|unhealthy' } | ForEach-Object { Write-Log "  $_" }
-        Write-Log "compose up exited $code"
-    } finally { Pop-Location }
+    # Only the summary lines: compose's full output is a pull/wait log per service.
+    $r = Invoke-Bounded $Compose (@('-f', 'docker-compose.yml', '-f', 'docker-compose.podman.yml',
+        '--profile', 'prod', 'up', '-d', '--no-build') + $Services) 600
+    $r.Output -split "`r?`n" | Where-Object { $_ -match 'Started|Error|error|unhealthy' } |
+        ForEach-Object { Write-Log "  $_" }
+    Write-Log "compose up exited $($r.ExitCode)"
 }
 
 # Started hidden from here instead of through its own task: that task opened a

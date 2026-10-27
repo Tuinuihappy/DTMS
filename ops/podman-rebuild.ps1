@@ -25,7 +25,10 @@
 param(
     [ValidateSet('all', 'api', 'frontend')]
     [string]$Only = 'all',
-    [int]$Retries = 3
+    [int]$Retries = 3,
+    # Free commit (GB) required before a build starts. See Assert-Headroom.
+    [double]$MinFreeCommitGB = 6,
+    [switch]$IgnoreMemory
 )
 
 $ErrorActionPreference = 'Stop'
@@ -50,8 +53,29 @@ function Invoke-Compose([string[]]$composeArgs) {
     Invoke-Native { & $Compose -f docker-compose.yml -f docker-compose.podman.yml --profile prod @composeArgs }
 }
 
+# A build runs inside the podman WSL VM, which grows (npm ci, dotnet
+# publish) and does not hand memory back to Windows. 2026-10-27: with the
+# host at ~42/45.5 GB commit, a frontend build tipped it over, Windows
+# stopped the VM, and postgres/api/frontend all went down for ~15 min -
+# not just the image being built. So refuse to start (or retry) a build
+# without headroom; -IgnoreMemory overrides. ASCII only in strings: this
+# BOM-less file is read as ANSI by PowerShell 5.1.
+function Assert-Headroom {
+    if ($IgnoreMemory) { return }
+    $os = Get-CimInstance Win32_OperatingSystem
+    $freeGB = [math]::Round($os.FreeVirtualMemory / 1MB, 1)
+    $limitGB = [math]::Round($os.TotalVirtualMemorySize / 1MB, 1)
+    if ($freeGB -lt $MinFreeCommitGB) {
+        throw ("only $freeGB GB of $limitGB GB commit free (need $MinFreeCommitGB). " +
+            'A build now can crash the podman VM and stop the WHOLE stack. ' +
+            'Free memory or reboot the PC off-hours, or rerun with -IgnoreMemory.')
+    }
+    Write-Host "memory: $freeGB GB commit free of $limitGB GB"
+}
+
 function Build-Image([string]$tag, [string]$dockerfile, [string]$context, [string[]]$extra = @()) {
     for ($i = 1; $i -le $Retries; $i++) {
+        Assert-Headroom
         Step "podman build $tag (attempt $i/$Retries)"
         $code = Invoke-Native { & $Podman build --network=host -t $tag -f $dockerfile @extra $context }
         if ($code -eq 0) { return }
