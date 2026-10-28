@@ -245,7 +245,7 @@ public class PurgeStationsHandlerTests
         _map.SetVendorRef("2");
         _db.Maps.Add(_map);
         _db.SaveChanges();
-        _usage.FindInUseAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+        _usage.FindInUseAsync(Arg.Any<IReadOnlyCollection<StationUsageCandidate>>(), Arg.Any<CancellationToken>())
             .Returns(new Dictionary<Guid, string>());
         RiotReturns(new Riot3StationInfo(1, "LIVE", 0, 0, 0));
     }
@@ -279,7 +279,7 @@ public class PurgeStationsHandlerTests
         var gone = Seed("ATH_01", "119", active: false);
         var used = Seed("F_21", "189", active: false);
         var manual = Seed("HAND", null, active: true);
-        _usage.FindInUseAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+        _usage.FindInUseAsync(Arg.Any<IReadOnlyCollection<StationUsageCandidate>>(), Arg.Any<CancellationToken>())
             .Returns(new Dictionary<Guid, string> { [used.Id] = "active order template 'X' routes through it" });
 
         var result = await Purge();
@@ -289,6 +289,22 @@ public class PurgeStationsHandlerTests
         result.Value.Skipped.Should().ContainSingle(s => s.Id == used.Id && s.Reason.Contains("template"));
         Rows().Select(s => s.Id).Should().BeEquivalentTo(new[] { live.Id, used.Id, manual.Id });
         await _cache.Received().RemoveAsync("station:lookup:ATH_01", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UsageCheck_GetsRiotMapAndStationIds_ForTemplateMoveMissions()
+    {
+        var gone = Seed("ATH_01", "119", active: false);
+        IReadOnlyCollection<StationUsageCandidate>? asked = null;
+        _usage.FindInUseAsync(Arg.Do<IReadOnlyCollection<StationUsageCandidate>>(c => asked = c), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, string> { [gone.Id] = "active order template 'X' MOVEs to it" });
+
+        var result = await Purge();
+
+        asked.Should().BeEquivalentTo(new[] { new StationUsageCandidate(gone.Id, 2, 119) });
+        result.Value.Purged.Should().BeEmpty();
+        result.Value.Skipped.Should().ContainSingle(s => s.Id == gone.Id && s.Reason.Contains("MOVEs"));
+        Rows().Should().Contain(s => s.Id == gone.Id);
     }
 
     [Fact]

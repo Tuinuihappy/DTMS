@@ -3,14 +3,15 @@ using DTMS.DeliveryOrder.Infrastructure.Data;
 using DTMS.Dispatch.Domain.Enums;
 using DTMS.Dispatch.Infrastructure.Data;
 using DTMS.Facility.Application.Services;
+using DTMS.Planning.Domain.Entities;
 using DTMS.Planning.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace DTMS.Api.Adapters;
 
 // Composition-root bridge: Facility's purge asks whether Planning, Dispatch
-// or DeliveryOrder still point at a station by its Guid. Read-only, three
-// small indexed queries over the candidate ids.
+// or DeliveryOrder still point at a station — by its Guid, or (template MOVE
+// missions) by its RIOT3 map + station id. Read-only, three small queries.
 internal sealed class StationUsageReader : IStationUsageReader
 {
     // Trips/orders in these states never dispatch again, so a station they
@@ -33,27 +34,40 @@ internal sealed class StationUsageReader : IStationUsageReader
     }
 
     public async Task<IReadOnlyDictionary<Guid, string>> FindInUseAsync(
-        IReadOnlyCollection<Guid> stationIds, CancellationToken cancellationToken = default)
+        IReadOnlyCollection<StationUsageCandidate> stations, CancellationToken cancellationToken = default)
     {
-        var ids = stationIds.Distinct().ToList();
+        var candidates = stations.DistinctBy(s => s.Id).ToList();
+        var ids = candidates.Select(s => s.Id).ToList();
         var inUse = new Dictionary<Guid, string>();
         if (ids.Count == 0) return inUse;
 
+        // Missions is value-converted jsonb that LINQ can't filter on, so every
+        // active template is read and matched here — a few hundred small rows.
         var templates = await _planning.OrderTemplates.AsNoTracking()
-            .Where(t => t.IsActive
-                && ((t.PickupStationId != null && ids.Contains(t.PickupStationId.Value))
-                    || (t.DropStationId != null && ids.Contains(t.DropStationId.Value))))
-            .Select(t => new { t.Name, t.PickupStationId, t.DropStationId })
+            .Where(t => t.IsActive)
+            .Select(t => new { t.Name, t.PickupStationId, t.DropStationId, t.Missions })
             .ToListAsync(cancellationToken);
-        foreach (var id in ids)
+        foreach (var c in candidates)
         {
-            var names = templates
-                .Where(t => t.PickupStationId == id || t.DropStationId == id)
+            var routes = templates
+                .Where(t => t.PickupStationId == c.Id || t.DropStationId == c.Id)
                 .Select(t => t.Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
-            if (names.Count > 0)
-                inUse[id] = names.Count == 1
-                    ? $"active order template '{names[0]}' routes through it"
-                    : $"{names.Count} active order templates route through it (e.g. '{names[0]}')";
+            if (routes.Count > 0)
+            {
+                inUse[c.Id] = routes.Count == 1
+                    ? $"active order template '{routes[0]}' routes through it"
+                    : $"{routes.Count} active order templates route through it (e.g. '{routes[0]}')";
+                continue;
+            }
+            if (c.Riot3StationId is not { } stationId) continue;
+            var moves = templates
+                .Where(t => t.Missions.Any(m => m.Type == MissionType.Move
+                    && m.MapId == c.Riot3MapId && m.StationId == stationId))
+                .Select(t => t.Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
+            if (moves.Count > 0)
+                inUse[c.Id] = moves.Count == 1
+                    ? $"active order template '{moves[0]}' MOVEs to it"
+                    : $"{moves.Count} active order templates MOVE to it (e.g. '{moves[0]}')";
         }
 
         var trips = await _dispatch.Trips.AsNoTracking()

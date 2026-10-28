@@ -109,7 +109,8 @@ internal sealed class PurgeStationsCommandHandler
 
             var inUse = candidates.Count == 0
                 ? new Dictionary<Guid, string>()
-                : await _usage.FindInUseAsync(candidates.Select(s => s.Id).ToList(), ct);
+                : await _usage.FindInUseAsync(candidates.Select(s => new StationUsageCandidate(
+                    s.Id, riot3MapId, int.TryParse(s.VendorRef, out var v) ? v : null)).ToList(), ct);
 
             var purged = new List<PurgedStation>();
             var removed = new List<Station>();
